@@ -115,20 +115,30 @@ final class ReleaseStoreContractTests: XCTestCase {
 
     // MARK: - The store's own invariants, asserted against the script text
 
-    /// The activation must replace `releases/active` ATOMICALLY, via a temp
-    /// name and `mv -f`.
+    /// The activation must replace `releases/active` atomically AND without
+    /// following it: `ln -sfn` to build the temp link, `mv -fh` to install it.
     ///
-    /// This is not a style point. `ln -sf target existing_symlink_to_a_dir` does
-    /// NOT replace the link — it creates a new link INSIDE the directory the
-    /// existing link points at, leaving `active` untouched and burying a stray
-    /// symlink in a version directory. It is one of the great unforced errors in
-    /// shell installers and it fails silently, so the shape is pinned here.
-    func testActivationReplacesTheActiveLinkAtomically() throws {
+    /// THIS TEST EXISTS BECAUSE THE BUG SHIPPED. `active` is a symlink to a
+    /// DIRECTORY, and both obvious spellings silently do something else:
+    /// `ln -sf new active` creates `active/new`, and `mv -f tmp active` moves
+    /// `tmp` INTO the directory. The first version of `gm_activate` used
+    /// `mv -f`, promoted a release, wrote the new version into `.gm_version` —
+    /// and left `active` pointing at the old directory with a stray
+    /// `.active.tmp.<pid>` buried inside it. The store claimed one version and
+    /// executed another, with no error anywhere.
+    ///
+    /// `-n` (ln) and `-h` (mv) both mean "operate on the link, don't follow it".
+    /// A regression here is invisible in normal use, so it is pinned in text.
+    func testActivationReplacesTheActiveLinkWithoutFollowingIt() throws {
         let text = try String(
             contentsOf: gmkScripts.appendingPathComponent("gm_releases.sh"), encoding: .utf8)
-        XCTAssertTrue(text.contains("mv -f"), """
-            gm_activate no longer replaces the active symlink with `mv -f`. A bare \
-            `ln -sf` onto an existing symlink-to-a-directory does not replace it.
+        XCTAssertTrue(text.contains("mv -fh"), """
+            gm_activate does not use `mv -fh`. Without -h, mv FOLLOWS the `active` \
+            symlink and moves the temp link INTO the directory it points at, \
+            leaving the old version active while .gm_version records the new one.
+            """)
+        XCTAssertFalse(text.contains("mv -f \""), """
+            gm_activate still has a bare `mv -f` on a symlink target. Use `mv -fh`.
             """)
         XCTAssertTrue(text.contains("ln -sfn"), """
             gm_activate must use `ln -sfn`; without -n the link is followed into \

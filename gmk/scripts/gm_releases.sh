@@ -142,11 +142,24 @@ gm_verify_staged() {
 
 # gm_activate <channel> <version> — point bin/ at a staged version.
 #
-# ORDER MATTERS. The `active` symlink is replaced via a temp name and `mv -f`,
-# which is atomic on the same filesystem, so there is no instant where `active`
-# does not exist. A plain `ln -sf` onto an existing symlink-to-a-directory does
-# not replace it — it creates the link INSIDE the target directory, which is one
-# of the great unforced errors in shell installers.
+# ── THE SYMLINK-TO-A-DIRECTORY TRAP, WHICH BIT THIS FUNCTION ONCE ────────────
+#
+# `active` is a symlink TO A DIRECTORY, and both of the obvious ways to replace
+# it silently do something else instead:
+#
+#   ln -sf  new active   → creates `active/new`, INSIDE the old target
+#   mv -f   tmp  active  → moves tmp INTO the old target directory
+#
+# Both "succeed", both leave `active` pointing exactly where it did, and the
+# stray link they deposit in a version directory is the only evidence. That is
+# not hypothetical: the first version of this function used `mv -f` and promoted
+# a release by writing `.active.tmp.67631 -> downloads/50.0.1` into the BETA
+# directory while `.gm_version` cheerfully recorded the new version. The store
+# claimed one version and executed another.
+#
+# `-n` on ln and `-h` on mv are the flags that mean "operate on the LINK, do not
+# follow it". `mv -fh` keeps the atomic rename — there is no instant where
+# `active` is missing — and actually replaces the link.
 gm_activate() {
     _channel="$1"; _version="$2"
     case "$_channel" in
@@ -160,14 +173,22 @@ gm_activate() {
 
     mkdir -p "$GM_BIN"
     ln -sfn "$_rel" "$GM_RELEASES/.active.tmp.$$"
-    mv -f "$GM_RELEASES/.active.tmp.$$" "$GM_ACTIVE"
+    mv -fh "$GM_RELEASES/.active.tmp.$$" "$GM_ACTIVE"
 
     # The per-binary links are relative to $GM_BIN so the whole tree can be
     # copied to a sandbox path and still resolve within itself.
+    #
+    # -h here too. These point at FILES, so today `mv -f` would replace them
+    # correctly — but the flag costs nothing and stops the pair from diverging
+    # the moment someone points one of them at a directory.
     for b in $GM_BINARIES; do
         ln -sfn "releases/active/$b" "$GM_BIN/.$b.tmp.$$"
-        mv -f "$GM_BIN/.$b.tmp.$$" "$GM_BIN/$b"
+        mv -fh "$GM_BIN/.$b.tmp.$$" "$GM_BIN/$b"
     done
+
+    # A failed or interrupted activation can leave a temp link behind inside a
+    # version directory. Swept here rather than left to accumulate.
+    rm -f "$GM_RELEASES"/*/*/.active.tmp.* "$GM_RELEASES"/.active.tmp.* 2>/dev/null || true
 
     printf '%s\n' "$_version" > "$GM_VERSION_STAMP"
 
