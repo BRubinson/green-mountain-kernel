@@ -1,7 +1,8 @@
-# gmcc-marketplace
+# green-mountain-kernel
 
 Monorepo for the GM-CDE (Green Mountain Contextual Development
-Environment). GMB identity and behavioral rules are NOT here — they live
+Environment), where the GMCC toolchain is being rebuilt on native
+framework/model work. GMB identity and behavioral rules are NOT here — they live
 plugin-globally in `plugins/gmcc/skills/gmcc/SKILL.md` so every
 gmcc-booted repo gets them, not just this one.
 

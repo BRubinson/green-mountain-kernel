@@ -157,7 +157,7 @@ source "${CLAUDE_PLUGIN_ROOT}/scripts/gmcc_session_startup.sh"
 
 1. **Check if in git repo**: Run `git status` - if it fails, you're not in a git repository
 2. **Restart Claude Code**: The SessionStart hook only runs on session start
-3. **Verify plugin installed**: Check `~/.claude/settings.json` includes `gmcc@gmcc-marketplace`
+3. **Verify plugin installed**: Check `~/.claude/settings.json` includes `gmcc@green-mountain-kernel`
 
 ### Environment variables partially set
 

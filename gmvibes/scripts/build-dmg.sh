@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# build-dmg.sh — Build GMVibes (gmvibes/ in the gmcc-marketplace monorepo) into a distributable .dmg.
+# build-dmg.sh — Build GMVibes (gmvibes/ in the green-mountain-kernel monorepo) into a distributable .dmg.
 #
 # Auto-detects signing capability:
 #   • If a "Developer ID Application" cert is installed, the app is signed with

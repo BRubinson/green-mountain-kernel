@@ -3,7 +3,7 @@
 # release.sh — Build the GMVibes DMG and publish it as a GitHub release asset.
 #
 # Builds via scripts/build-dmg.sh (which auto-detects signing) and uploads the
-# resulting DMG to a GitHub release on the `origin` repo (the gmcc-marketplace
+# resulting DMG to a GitHub release on the `origin` repo (the green-mountain-kernel
 # monorepo) using `gh`. Tags are namespaced `gmvibes-v<version>` so app releases
 # never collide with marketplace/plugin tags.
 #
@@ -45,12 +45,12 @@ TAG="gmvibes-v$VERSION"
 # --- Preflight --------------------------------------------------------------
 command -v gh >/dev/null || { echo "error: gh not installed" >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo "error: gh not authenticated — run: gh auth login" >&2; exit 1; }
-# Releases ship to the gmcc-marketplace monorepo — refuse any other origin so
-# a stray checkout can never publish somewhere surprising.
+# Releases ship to the green-mountain-kernel monorepo — refuse any other origin
+# so a stray checkout can never publish somewhere surprising.
 ORIGIN="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
 case "$ORIGIN" in
-  *gmcc-marketplace*) ;;
-  *) echo "error: origin is '$ORIGIN' — releases must publish to gmcc-marketplace" >&2; exit 1 ;;
+  *green-mountain-kernel*) ;;
+  *) echo "error: origin is '$ORIGIN' — releases must publish to green-mountain-kernel" >&2; exit 1 ;;
 esac
 
 # --- Decide notarization ----------------------------------------------------

@@ -1,7 +1,7 @@
-# GMCC Marketplace
+# Green Mountain Kernel
 
 Green Mountain Compiler Collection — a Claude Code plugin marketplace for **contextual
-development**. The `gmcc` plugin turns Claude Code into the GM-CDE (Green
+development**, rebuilt on native framework/model work. The `gmcc` plugin turns Claude Code into the GM-CDE (Green
 Mountain Contextual Development Environment): a workflow system that authors, clarifies,
 and implements prompts against a persistent per-repo/per-branch knowledge store (the
 **ckfs**), backed by reusable knowledge bites (**kbites**).
@@ -18,7 +18,7 @@ and implements prompts against a persistent per-repo/per-branch knowledge store 
 1. Open Claude Code
 2. Run `/plugins`
 3. Select **Add Marketplace**
-4. Enter: `brubinson/gmcc-marketplace`
+4. Enter: `brubinson/green-mountain-kernel`
 5. Confirm
 
 ### Install the plugin
@@ -29,7 +29,7 @@ and implements prompts against a persistent per-repo/per-branch knowledge store 
 
 | Plugin | Version | Description |
 |--------|---------|-------------|
-| gmcc | 14.0.0 | GM-CDE plugin for contextual development |
+| gmcc | 43.0.0 | GM-CDE plugin for contextual development |
 
 ## Setup (Quickstart)
 
@@ -184,7 +184,7 @@ To remove the marketplace:
 
 1. Run `/plugins`
 2. Select **Manage Marketplaces**
-3. Remove `gmcc-marketplace`
+3. Remove `green-mountain-kernel`
 
 Your ckfs data under `~/gmcc_ckfs/` is left untouched; delete it manually if you want a
 clean slate.

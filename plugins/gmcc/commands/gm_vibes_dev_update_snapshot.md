@@ -1,6 +1,6 @@
 ---
 name: gm_vibes_dev_update_snapshot
-description: Create or refresh the local-dev sandbox at gmcc_ckfs/development/local_sandbox — a snapshot of the gmcc-marketplace repo, the gmcc sqlite (via a BACKUP read), and a sub-ckfs, fully isolated behind GMCC_ROOT so a dev daemon + GMVibes stack runs without touching prod.
+description: Create or refresh the local-dev sandbox at gmcc_ckfs/development/local_sandbox — a snapshot of the green-mountain-kernel repo, the gmcc sqlite (via a BACKUP read), and a sub-ckfs, fully isolated behind GMCC_ROOT so a dev daemon + GMVibes stack runs without touching prod.
 argument-hint: [status]
 disable-model-invocation: true
 allowed-tools: Bash, Read, AskUserQuestion
@@ -15,7 +15,7 @@ sandboxed client never touch the prod db.
 
 ## The invariants (check them, do not work around them)
 
-- Run from the **gmcc-marketplace repo root**, in a **prod** session
+- Run from the **green-mountain-kernel repo root**, in a **prod** session
   (`GMCC_ROOT` unset).
 - The prod db is touched ONLY by a BACKUP read — never copy
   `~/gmcc/gmcc.db` in place, and never write the live ckfs.

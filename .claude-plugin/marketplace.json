@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "gmcc-marketplace",
+  "name": "green-mountain-kernel",
   "version": "1.0.0",
   "description": "Green Mountain Compiler Collection - GM-CDE plugin for contextual development",
   "owner": {

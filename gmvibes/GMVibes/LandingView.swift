@@ -360,7 +360,7 @@ private struct DaemonGateState: View {
 
             switch daemon.health {
             case .notInstalled:
-                CommandCopyRow(command: "cd ~/Dev/gmcc-marketplace && bash plugins/gmcc/scripts/build_daemon.sh")
+                CommandCopyRow(command: "cd ~/Dev/green-mountain-kernel && bash plugins/gmcc/scripts/build_daemon.sh")
                     .frame(maxWidth: 480)
             case .down:
                 Button {
@@ -406,7 +406,7 @@ private struct DaemonGateState: View {
         case .incompatible(let version):
             return "The running daemon speaks protocol v\(version.map(String.init) ?? "?"), newer than this build of GMVibes. Rebuild the app against the updated daemon package."
         case .notInstalled:
-            return "No daemon binary at \(Paths.binDaemon.path). Build and install it from the gmcc marketplace repo:"
+            return "No daemon binary at \(Paths.binDaemon.path). Build and install it from the green-mountain-kernel repo:"
         case .down(let reason, let intentional):
             return intentional ? "The daemon was stopped." : reason
         default:

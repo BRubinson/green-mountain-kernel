@@ -1,12 +1,12 @@
 ---
 name: release-dmg
-description: Build the GMVibes macOS app (gmvibes/ in this monorepo) into a DMG — notarized if a Developer ID cert exists, otherwise ad-hoc — and publish it as a GitHub release asset on the gmcc-marketplace repo. Use when the user wants to cut a GMVibes release, ship a new DMG, upload a build to GitHub, or distribute the app.
+description: Build the GMVibes macOS app (gmvibes/ in this monorepo) into a DMG — notarized if a Developer ID cert exists, otherwise ad-hoc — and publish it as a GitHub release asset on the green-mountain-kernel repo. Use when the user wants to cut a GMVibes release, ship a new DMG, upload a build to GitHub, or distribute the app.
 ---
 
 # release-dmg
 
 Builds the app into a distributable `.dmg` and uploads it to a GitHub release on
-the `origin` repo (the **gmcc-marketplace** monorepo). Release tags are
+the `origin` repo (the **green-mountain-kernel** monorepo). Release tags are
 namespaced `gmvibes-v<version>` so app releases never collide with
 marketplace/plugin tags. Signing is automatic: **notarized** when a *Developer ID
 Application* certificate is installed, otherwise **ad-hoc**.
@@ -21,7 +21,7 @@ The heavy lifting lives in two scripts — prefer running them over reimplementi
 1. **Preflight.** Confirm prerequisites and report any gaps before building:
    ```sh
    gh auth status                                  # must be logged in
-   git remote get-url origin                       # must point at gmcc-marketplace on GitHub
+   git remote get-url origin                       # must point at green-mountain-kernel on GitHub
    security find-identity -v -p codesigning | grep "Developer ID Application" || true
    ```
    - If `gh` is not authenticated, stop and tell the user to run
@@ -61,9 +61,9 @@ Program. Without it, builds are ad-hoc and recipients clear quarantine once:
 
 ## Notes
 
-- Historical releases `v1.0`–`v3.2` live on the archived `BRubinson/gmcc-ui`
-  repo; everything from the monorepo transition onward ships here as
-  `gmvibes-v*`.
+- `gmvibes-v*` releases from before the kernel split live on `BRubinson/gmcc-marketplace`,
+  and `v1.0`–`v3.2` on the archived `BRubinson/gmcc-ui`; everything cut from this
+  repo ships here under the same `gmvibes-v*` tag namespace.
 - Build artifacts (`gmvibes/build/`, `*.dmg`) are gitignored — only the release
   asset is published, nothing is committed.
 - This is distribution-only; it does not bump `MARKETING_VERSION`. Bump that in

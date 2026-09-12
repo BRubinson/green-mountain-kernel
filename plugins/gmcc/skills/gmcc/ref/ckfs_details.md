@@ -76,8 +76,8 @@ Identity is derived daemon-side by `gmcc_hook context ensure`
 
 | Concept | Source | Derived value |
 |---------|--------|---------------|
-| `project_name` | `basename $(git rev-parse --show-toplevel)` | e.g. `gmcc-marketplace` |
-| `instance_code` | `{project_name}_{4-char hash of abs path}` | e.g. `gmcc-marketplace_a3f2` |
+| `project_name` | `basename $(git rev-parse --show-toplevel)` | e.g. `green-mountain-kernel` |
+| `instance_code` | `{project_name}_{4-char hash of abs path}` | e.g. `green-mountain-kernel_a3f2` |
 | `session_code` | Sanitized current git branch | e.g. `v4_2`, `feature__login` |
 
 ### Instance Code Algorithm

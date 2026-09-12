@@ -11,8 +11,8 @@ you see in the app is the live state of your GMCC workspace.
 ## Companion plugin
 
 This app is the UI half of the GMCC toolchain and lives in the same
-**gmcc-marketplace** monorepo as the plugin (slash commands, GM-CDE protocols,
-the ckfs schema): https://github.com/BRubinson/gmcc-marketplace
+**green-mountain-kernel** monorepo as the plugin (slash commands, GM-CDE protocols,
+the ckfs schema): https://github.com/BRubinson/green-mountain-kernel
 
 Install the plugin first so the `GMCC_*` environment is set up; GM Vibes then
 surfaces that workspace visually. Without the plugin, the app launches but has
@@ -22,13 +22,13 @@ no ckfs to read.
 
 - macOS 26.1 (Tahoe) or later
 - Xcode 26.x (to build from source)
-- The [gmcc-marketplace](https://github.com/BRubinson/gmcc-marketplace) plugin,
+- The [green-mountain-kernel](https://github.com/BRubinson/green-mountain-kernel) plugin,
   for a populated workspace
 
 ## Install (DMG)
 
 1. Download the latest `GMVibes.dmg` from the
-   [Releases](https://github.com/BRubinson/gmcc-marketplace/releases (tags `gmvibes-v*`)) page.
+   [Releases](https://github.com/BRubinson/green-mountain-kernel/releases (tags `gmvibes-v*`)) page.
 2. Open the DMG and drag **GM Vibes** to **Applications**.
 
 If the build is **ad-hoc / unsigned** (no Apple notarization), macOS Gatekeeper
@@ -43,13 +43,13 @@ install with no extra steps.
 
 ## Build from source
 
-GM Vibes lives in the gmcc-marketplace monorepo under `gmvibes/`, building
+GM Vibes lives in the green-mountain-kernel monorepo under `gmvibes/`, building
 directly against the daemon package at `plugins/gmcc/daemon` (no vendored
 copy):
 
 ```sh
-git clone https://github.com/BRubinson/gmcc-marketplace.git
-cd gmcc-marketplace/gmvibes
+git clone https://github.com/BRubinson/green-mountain-kernel.git
+cd green-mountain-kernel/gmvibes
 open GMVibes.xcodeproj          # build & run in Xcode (scheme: GMVibes)
 ```
 

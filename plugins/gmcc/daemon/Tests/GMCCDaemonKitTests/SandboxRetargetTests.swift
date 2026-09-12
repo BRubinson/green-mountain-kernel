@@ -7,14 +7,14 @@ import XCTest
 final class SandboxRetargetTests: XCTestCase {
 
     private var dbPath: String!
-    private let oldRepo = "/Users/dev/gmcc-marketplace"
-    private let newRepo = "/Users/dev/gmcc_ckfs/development/local_sandbox/repo/gmcc-marketplace"
+    private let oldRepo = "/Users/dev/green-mountain-kernel"
+    private let newRepo = "/Users/dev/gmcc_ckfs/development/local_sandbox/repo/green-mountain-kernel"
 
     private var oldCode: String {
-        InstanceIdentity.code(repoName: "gmcc-marketplace", absolutePath: oldRepo)
+        InstanceIdentity.code(repoName: "green-mountain-kernel", absolutePath: oldRepo)
     }
     private var newCode: String {
-        InstanceIdentity.code(repoName: "gmcc-marketplace", absolutePath: newRepo)
+        InstanceIdentity.code(repoName: "green-mountain-kernel", absolutePath: newRepo)
     }
 
     override func setUpWithError() throws {
@@ -30,22 +30,22 @@ final class SandboxRetargetTests: XCTestCase {
             try db.execute(sql: """
                 INSERT INTO project (id, uuid, version, created_at, updated_at,
                     git_repo_name, code, name, ckfs_relative_storage_path)
-                VALUES (\(base("proj-1")), 'gmcc-marketplace', 'gmcc-marketplace',
-                        'gmcc-marketplace', 'projects/gmcc-marketplace');
+                VALUES (\(base("proj-1")), 'green-mountain-kernel', 'green-mountain-kernel',
+                        'green-mountain-kernel', 'projects/green-mountain-kernel');
                 INSERT INTO instance (id, uuid, version, created_at, updated_at,
                     project_uuid, code, name, absolute_file_system_path, ckfs_relative_storage_path)
                 VALUES (\(base("inst-1")), 'proj-1', '\(oldCode)', '\(oldCode)', '\(oldRepo)',
-                        'projects/gmcc-marketplace/instances/\(oldCode)');
+                        'projects/green-mountain-kernel/instances/\(oldCode)');
                 INSERT INTO session (id, uuid, version, created_at, updated_at,
                     instance_uuid, code, name, backstory, goal, status, ckfs_relative_storage_path)
                 VALUES (\(base("sess-1")), 'inst-1', 'main', 'main', '', '', 'active',
-                        'projects/gmcc-marketplace/instances/\(oldCode)/sessions/main');
+                        'projects/green-mountain-kernel/instances/\(oldCode)/sessions/main');
                 INSERT INTO prompt (id, uuid, version, created_at, updated_at,
                     session_uuid, seq, code, name, backstory, goal, detail, command,
                     status, ckfs_relative_storage_path)
                 VALUES (\(base("prompt-1")), 'sess-1', 1, 'p1', 'p1', '', '', '', '',
                         'draft',
-                        'projects/gmcc-marketplace/instances/\(oldCode)/sessions/main/prompts/1_p1');
+                        'projects/green-mountain-kernel/instances/\(oldCode)/sessions/main/prompts/1_p1');
                 """)
         }
         try? store.closeDatabase()
@@ -101,14 +101,14 @@ final class SandboxRetargetTests: XCTestCase {
             XCTAssertEqual(inst["absolute_file_system_path"] as String, self.newRepo)
             XCTAssertEqual(
                 inst["ckfs_relative_storage_path"] as String,
-                "projects/gmcc-marketplace/instances/\(self.newCode)")
+                "projects/green-mountain-kernel/instances/\(self.newCode)")
 
             // Mid-path rewrites across dependent tables.
             let session = try String.fetchOne(
                 db, sql: "SELECT ckfs_relative_storage_path FROM session WHERE uuid = 'sess-1'")
             XCTAssertEqual(
                 session,
-                "projects/gmcc-marketplace/instances/\(self.newCode)/sessions/main")
+                "projects/green-mountain-kernel/instances/\(self.newCode)/sessions/main")
             let stale = try Int.fetchOne(db, sql: """
                 SELECT count(*) FROM prompt
                 WHERE ckfs_relative_storage_path LIKE '%instances/\(self.oldCode)%'
