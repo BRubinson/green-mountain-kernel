@@ -1,6 +1,6 @@
 // swift-tools-version:6.0
 
-// gmToolchainTests — the SEVENTH package, and the only one that ships nothing.
+// gmToolchain — the SEVENTH package, and the only one that ships nothing.
 //
 // THE TESTS THAT READ FILES RATHER THAN CALL SYMBOLS. That is the whole
 // membership rule, and it is what makes this a coherent package instead of a
@@ -35,11 +35,18 @@
 //
 // NOT a shipped module. Nothing in gmk/'s runtime graph depends on it, and
 // nothing should.
+//
+// NAMED `gmToolchain`, NOT `gmToolchainTests`, even though it currently holds
+// only test targets. A directory whose name ends in "Tests" reads as a mistake
+// the moment any manifest names it in a `.package(path:)` line, and the next
+// person to notice will "fix" it in the wrong direction. The name describes
+// what it is FOR — the repository's own toolchain contracts — rather than what
+// kind of target happens to live in it today.
 
 import PackageDescription
 
 let package = Package(
-    name: "gmToolchainTests",
+    name: "gmToolchain",
     // The lowest floor in the graph. These tests parse files and run `bash -n`;
     // this package must never be the reason a CI job needs a newer SDK.
     platforms: [.macOS(.v14)],

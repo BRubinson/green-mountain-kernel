@@ -2,7 +2,7 @@
 #
 # release.sh — Build the GMVibes DMG and publish it as a GitHub release asset.
 #
-# Builds via scripts/build-dmg.sh (which auto-detects signing) and uploads the
+# Builds via gmk/scripts/build-dmg.sh (which auto-detects signing) and uploads the
 # resulting DMG to a GitHub release on the `origin` repo (the green-mountain-kernel
 # monorepo) using `gh`. Tags are namespaced `gmvibes-v<version>` so app releases
 # never collide with marketplace/plugin tags.
@@ -26,8 +26,9 @@
 set -euo pipefail
 
 APP_NAME="GMVibes"
-# gmk/, TWO levels up — see build-dmg.sh for why.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# gmk/ — one level up from gmk/scripts/. See build-dmg.sh for why these live
+# here and not under gmk/gmVibes/.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DMG_PATH="$ROOT/build/$APP_NAME.dmg"
@@ -66,7 +67,7 @@ else
 fi
 
 # --- Build ------------------------------------------------------------------
-"$ROOT/gmVibes/scripts/build-dmg.sh"
+"$ROOT/scripts/build-dmg.sh"
 [ -f "$DMG_PATH" ] || { echo "error: DMG not produced at $DMG_PATH" >&2; exit 1; }
 
 # --- Publish ----------------------------------------------------------------

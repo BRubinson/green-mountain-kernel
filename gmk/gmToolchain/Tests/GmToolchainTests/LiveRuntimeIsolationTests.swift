@@ -24,7 +24,7 @@ final class LiveRuntimeIsolationTests: XCTestCase {
     private func testSources() throws -> [URL] {
         let fm = FileManager.default
         var out: [URL] = []
-        for name in RepoRoot.sourcePackages + ["gmToolchainTests"] {
+        for name in RepoRoot.sourcePackages + ["gmToolchain"] {
             let root = RepoRoot.package(name)
                 .appendingPathComponent("Tests", isDirectory: true)
             guard let walker = fm.enumerator(at: root, includingPropertiesForKeys: nil)

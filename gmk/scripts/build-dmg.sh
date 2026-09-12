@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
 # build-dmg.sh — Build GMVibes (gmk/gmVibes/ in the green-mountain-kernel monorepo) into a distributable .dmg.
+# Run from anywhere; it resolves gmk/ from its own location.
 #
 # Auto-detects signing capability:
 #   • If a "Developer ID Application" cert is installed, the app is signed with
@@ -25,10 +26,11 @@ PROJECT="gmk.xcodeproj"
 CONFIG="Release"
 NOTARY_PROFILE="${NOTARY_PROFILE:-gmcc-ui}"
 
-# gmk/, TWO levels up: this script lives at gmk/gmVibes/scripts/ and the one
-# Xcode project is gmk/gmk.xcodeproj. It used to be one level, when the app and
-# its project sat together under gmvibes/.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# gmk/ — the directory holding the one Xcode project, one level up from
+# gmk/scripts/. This script sits beside build_gm.sh rather than under
+# gmk/gmVibes/ because everything in the app's source directory is inside its
+# filesystem-synchronized Xcode group, and a shell script is not app sources.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 BUILD_DIR="$ROOT/build"

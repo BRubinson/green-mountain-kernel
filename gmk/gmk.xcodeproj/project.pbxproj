@@ -35,17 +35,17 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		1B4010752FDCA09200DAF751 /* GMVibes */ = {
+		1B4010752FDCA09200DAF751 /* gmVibes */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = gmVibes;
 			sourceTree = "<group>";
 		};
-		1B4010852FDCA09300DAF751 /* GMVibesTests */ = {
+		1B4010852FDCA09300DAF751 /* gmVibesTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = gmVibesTests;
 			sourceTree = "<group>";
 		};
-		1B40108F2FDCA09300DAF751 /* GMVibesUITests */ = {
+		1B40108F2FDCA09300DAF751 /* gmVibesUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = gmVibesUITests;
 			sourceTree = "<group>";
@@ -82,9 +82,9 @@
 		1B40106A2FDCA09200DAF751 = {
 			isa = PBXGroup;
 			children = (
-				1B4010752FDCA09200DAF751 /* GMVibes */,
-				1B4010852FDCA09300DAF751 /* GMVibesTests */,
-				1B40108F2FDCA09300DAF751 /* GMVibesUITests */,
+				1B4010752FDCA09200DAF751 /* gmVibes */,
+				1B4010852FDCA09300DAF751 /* gmVibesTests */,
+				1B40108F2FDCA09300DAF751 /* gmVibesUITests */,
 				1B4010742FDCA09200DAF751 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -115,7 +115,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				1B4010752FDCA09200DAF751 /* GMVibes */,
+				1B4010752FDCA09200DAF751 /* gmVibes */,
 			);
 			name = GMVibes;
 			packageProductDependencies = (
@@ -140,7 +140,7 @@
 				1B4010842FDCA09300DAF751 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				1B4010852FDCA09300DAF751 /* GMVibesTests */,
+				1B4010852FDCA09300DAF751 /* gmVibesTests */,
 			);
 			name = GMVibesTests;
 			packageProductDependencies = (
@@ -163,7 +163,7 @@
 				1B40108E2FDCA09300DAF751 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				1B40108F2FDCA09300DAF751 /* GMVibesUITests */,
+				1B40108F2FDCA09300DAF751 /* gmVibesUITests */,
 			);
 			name = GMVibesUITests;
 			packageProductDependencies = (
@@ -195,7 +195,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 1B40106E2FDCA09200DAF751 /* Build configuration list for PBXProject "GMVibes" */;
+			buildConfigurationList = 1B40106E2FDCA09200DAF751 /* Build configuration list for PBXProject "gmk" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -560,7 +560,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		1B40106E2FDCA09200DAF751 /* Build configuration list for PBXProject "GMVibes" */ = {
+		1B40106E2FDCA09200DAF751 /* Build configuration list for PBXProject "gmk" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1B4010942FDCA09300DAF751 /* Debug */,

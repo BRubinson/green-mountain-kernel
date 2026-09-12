@@ -123,8 +123,8 @@ final class RetiredNameContractTests: XCTestCase {
     /// and checks that it resolves `$HOME/gmcc/bin/gmcc_hook`. A contract that
     /// flagged them would be flagging the frozen plugin at one remove.
     private let frozenPluginTests: Set<String> = [
-        "gmk/gmToolchainTests/Tests/GmToolchainTests/HookScriptTests.swift",
-        "gmk/gmToolchainTests/Tests/GmToolchainTests/DocsContractTests.swift",
+        "gmk/gmToolchain/Tests/GmToolchainTests/HookScriptTests.swift",
+        "gmk/gmToolchain/Tests/GmToolchainTests/DocsContractTests.swift",
     ]
 
     /// The HISTORICAL RECORD. These name the old spelling because the old
@@ -167,10 +167,10 @@ final class RetiredNameContractTests: XCTestCase {
     /// This file, and the RepoRoot helper: both NAME the retired spellings in
     /// prose in order to explain the retirement.
     private let selfReferential: Set<String> = [
-        "gmk/gmToolchainTests/Tests/GmToolchainTests/RetiredNameContractTests.swift",
-        "gmk/gmToolchainTests/Tests/GmToolchainTests/RepoRoot.swift",
+        "gmk/gmToolchain/Tests/GmToolchainTests/RetiredNameContractTests.swift",
+        "gmk/gmToolchain/Tests/GmToolchainTests/RepoRoot.swift",
         // Its banned-token LIST necessarily spells the tokens it bans.
-        "gmk/gmToolchainTests/Tests/GmToolchainTests/LiveRuntimeIsolationTests.swift",
+        "gmk/gmToolchain/Tests/GmToolchainTests/LiveRuntimeIsolationTests.swift",
     ]
 
     private var allExempt: Set<String> {

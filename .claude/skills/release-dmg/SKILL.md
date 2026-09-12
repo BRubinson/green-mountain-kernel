@@ -13,8 +13,8 @@ Application* certificate is installed, otherwise **ad-hoc**.
 
 The heavy lifting lives in two scripts — prefer running them over reimplementing:
 
-- `gmk/gmVibes/scripts/build-dmg.sh` — archives the `GMVibes` scheme, signs, packages the DMG.
-- `gmk/gmVibes/scripts/release.sh` — calls `build-dmg.sh`, then creates/updates the GitHub release.
+- `gmk/scripts/build-dmg.sh` — archives the `GMVibes` scheme, signs, packages the DMG.
+- `gmk/scripts/release.sh` — calls `build-dmg.sh`, then creates/updates the GitHub release.
 
 ## Steps
 
@@ -38,9 +38,9 @@ The heavy lifting lives in two scripts — prefer running them over reimplementi
 3. **Build + publish.** Run the release script (this archives, signs/notarizes,
    builds the DMG, and uploads it):
    ```sh
-   gmk/gmVibes/scripts/release.sh                 # auto: gmvibes-v<MARKETING_VERSION>
-   gmk/gmVibes/scripts/release.sh 1.2.0           # explicit version
-   NOTARIZE=0 gmk/gmVibes/scripts/release.sh      # skip notarization even with a Dev ID
+   gmk/scripts/release.sh                 # auto: gmvibes-v<MARKETING_VERSION>
+   gmk/scripts/release.sh 1.2.0           # explicit version
+   NOTARIZE=0 gmk/scripts/release.sh      # skip notarization even with a Dev ID
    ```
    The build takes a minute or two — allow a generous timeout.
 
