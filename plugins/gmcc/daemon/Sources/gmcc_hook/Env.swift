@@ -1,7 +1,7 @@
 import Foundation
 import GMCCDaemonKit
 
-/// `gmcc_hook context env` — the SessionStart env block on stdout, consistency
+/// `gm_hook context env` — the SessionStart env block on stdout, consistency
 /// warnings on stderr, ALWAYS exit 0.
 ///
 /// EXIT 0 IS THE CONTRACT, not politeness. SessionStart sources this output; a
@@ -21,19 +21,19 @@ func emitSessionEnv(pluginRoot: String?) -> Int32 {
     defer { client.close() }
     let paths = try? client.pathsGet()
 
-    let lines = GmccEnvironment.emit(
+    let lines = GmEnvironment.emit(
         pluginRoot: pluginRoot,
         inheritedPath: inheritedPath,
-        dbCkfsRoot: paths?.ckfsRoot)
+        dbFsRoot: paths?.gmFsRoot)
     for line in lines { print(line) }
 
     var warnings: [String] = []
     if let paths {
-        warnings = GmccEnvironment.check(paths).map(\.message)
+        warnings = GmEnvironment.check(paths).map(\.message)
     } else {
         warnings.append(
             "[GMB] daemon unavailable — env derived from defaults; run "
-            + "'bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh' then restart the session")
+            + "'bash $GM_PLUGIN_ROOT/scripts/install_daemon.sh' then restart the session")
     }
     for warning in warnings {
         FileHandle.standardError.write(Data((warning + "\n").utf8))

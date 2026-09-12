@@ -43,19 +43,19 @@ enum JSONValue: Codable, Sendable {
     }
 }
 
-/// `gmcc_hook call <MESSAGE_TYPE> [--json '<payload>' | --json-file <path>]`
+/// `gm_hook call <MESSAGE_TYPE> [--json '<payload>' | --json-file <path>]`
 ///
 /// KEYS ARE SENT VERBATIM. The wire is snake_case, and this does not translate
 /// — a caller reaching for the raw passthrough is working at wire level and a
 /// silent key rewrite here would be a second dialect to learn.
 func runCall(_ argv: [String]) -> Int32 {
     guard let typeName = argv.first, !typeName.hasPrefix("-") else {
-        FileHandle.standardError.write(Data("[GMB] usage: gmcc_hook call <MESSAGE_TYPE> [--json '<payload>'] [--json-file <path>]\n".utf8))
+        FileHandle.standardError.write(Data("[GMB] usage: gm_hook call <MESSAGE_TYPE> [--json '<payload>'] [--json-file <path>]\n".utf8))
         return 2
     }
     guard let type = MessageType(rawValue: typeName.uppercased()) else {
         FileHandle.standardError.write(Data("""
-            [GMB] unknown message type '\(typeName)'. `gmcc_hook verbs --json` lists every type the daemon serves.
+            [GMB] unknown message type '\(typeName)'. `gm_hook verbs --json` lists every type the daemon serves.
 
             """.utf8))
         return 2

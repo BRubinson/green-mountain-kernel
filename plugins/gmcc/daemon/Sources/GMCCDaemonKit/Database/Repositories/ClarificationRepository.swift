@@ -261,7 +261,7 @@ struct ClarificationRepository: RepositoryContext {
                 throw StoreError.invalidEntityTransition(
                     entity: "clarification", from: summary.status,
                     to: ClarificationStatus.complete.rawValue,
-                    reason: "the \(variantRaw) variant requires a READY care package before finalize — gmcc_hook call CARE_PACKAGE_OPEN, then care_ref_add, then care_package_complete first")
+                    reason: "the \(variantRaw) variant requires a READY care package before finalize — gm_hook call CARE_PACKAGE_OPEN, then care_ref_add, then care_package_complete first")
             }
         } else if let package {
             guard package.status == "ready" else {

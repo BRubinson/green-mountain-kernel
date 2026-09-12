@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 // Polled directory snapshots backing the Memories file explorer — the one
-// surviving slice of the old ckfs filesystem facade. memory/*.md content stays
+// surviving slice of the old gmfs filesystem facade. memory/*.md content stays
 // on the filesystem by design (the db stores artifact pointers only), and the
 // filesystem emits no daemon events, so this store keeps its page-driven 1s
 // refresh honestly.

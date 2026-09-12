@@ -14,10 +14,10 @@ public enum InstanceIdentity {
     }
 }
 
-/// Offline retarget of a *sandbox copy* of gmcc.db, run BEFORE any sandbox
+/// Offline retarget of a *sandbox copy* of gm.db, run BEFORE any sandbox
 /// daemon ever boots. This closes the first-boot window where a freshly
 /// spawned sandbox daemon would read copied `daemon_config` rows that still
-/// point at the LIVE ckfs, and rehomes the instance identity (the code hashes
+/// point at the LIVE gmfs, and rehomes the instance identity (the code hashes
 /// the absolute repo path, so an untouched copy would resolve to a fresh
 /// empty instance).
 ///
@@ -45,15 +45,15 @@ public struct SandboxRetarget {
         }
     }
 
-    /// The default production db location, computed WITHOUT the GMCC_ROOT
+    /// The default production db location, computed WITHOUT the GM_FS_ROOT
     /// override so a sandboxed process still knows where prod lives.
     static var prodDbPath: String {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("gmcc", isDirectory: true)
-            .appendingPathComponent("gmcc.db", isDirectory: false).path
+            .appendingPathComponent("gm.db", isDirectory: false).path
     }
 
-    /// Every base table carrying a `ckfs_relative_storage_path` column,
+    /// Every base table carrying a `gmfs_relative_storage_path` column,
     /// discovered from the live schema (never a hardcoded list, so a future
     /// path-bearing migration is covered automatically). FTS shadow tables
     /// are excluded — external-content mirrors sync via triggers.
@@ -69,7 +69,7 @@ public struct SandboxRetarget {
         var hits: [String] = []
         for table in names {
             let cols = try Row.fetchAll(db, sql: "PRAGMA table_info(\(table))")
-            if cols.contains(where: { ($0["name"] as String?) == "ckfs_relative_storage_path" }) {
+            if cols.contains(where: { ($0["name"] as String?) == "gmfs_relative_storage_path" }) {
                 hits.append(table)
             }
         }
@@ -77,16 +77,16 @@ public struct SandboxRetarget {
     }
 
     /// Rewrite `dbPath` (a staged sandbox copy) in one transaction:
-    /// - daemon_config ckfs/kbite roots -> the sandbox paths
+    /// - daemon_config gmfs/kbite roots -> the sandbox paths
     /// - the instance row whose absolute_file_system_path == `oldRepoPath`
     ///   -> identity derived from `newRepoPath`
-    /// - every ckfs_relative_storage_path: `instances/<old>` -> `instances/<new>`
+    /// - every gmfs_relative_storage_path: `instances/<old>` -> `instances/<new>`
     @discardableResult
     public static func run(
         dbPath: String,
         oldRepoPath: String,
         newRepoPath: String,
-        ckfsRoot: String,
+        gmFsRoot: String,
         kbiteRoot: String,
         kbiteOpenRoot: String,
         kbiteDigestedRoot: String
@@ -110,7 +110,7 @@ public struct SandboxRetarget {
         return try queue.write { db in
             // 1. Config roots — the copied rows still point at the live tree.
             let configPairs: [(ConfigKey, String)] = [
-                (.ckfsRoot, ckfsRoot),
+                (.gmFsRoot, gmFsRoot),
                 (.kbiteRoot, kbiteRoot),
                 (.kbiteOpenRoot, kbiteOpenRoot),
                 (.kbiteDigestedRoot, kbiteDigestedRoot),
@@ -159,18 +159,18 @@ public struct SandboxRetarget {
                 try db.execute(
                     sql: """
                         UPDATE \(table)
-                        SET ckfs_relative_storage_path =
-                            replace(ckfs_relative_storage_path, ?, ?)
-                        WHERE instr(ckfs_relative_storage_path, ?) > 0
+                        SET gmfs_relative_storage_path =
+                            replace(gmfs_relative_storage_path, ?, ?)
+                        WHERE instr(gmfs_relative_storage_path, ?) > 0
                         """,
                     arguments: [midOld, midNew, midOld])
                 try db.execute(
                     sql: """
                         UPDATE \(table)
-                        SET ckfs_relative_storage_path =
-                            substr(ckfs_relative_storage_path, 1,
-                                   length(ckfs_relative_storage_path) - ?) || ?
-                        WHERE substr(ckfs_relative_storage_path, -?) = ?
+                        SET gmfs_relative_storage_path =
+                            substr(gmfs_relative_storage_path, 1,
+                                   length(gmfs_relative_storage_path) - ?) || ?
+                        WHERE substr(gmfs_relative_storage_path, -?) = ?
                         """,
                     arguments: [sufOld.count, sufNew, sufOld.count, sufOld])
             }

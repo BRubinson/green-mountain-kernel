@@ -4,7 +4,7 @@ import Foundation
 
 // Client-side identity derivation, shared by every DAEMON CLIENT that needs
 // the project → instance → session triple or the calling Claude instance's
-// key — gmcc_hook and the gmcc_mcp server alike (m0025 moved this here from the
+// key — gm_hook and the gm_mcp server alike (m0025 moved this here from the
 // client's
 // Support/ so the MCP server never grows a parallel implementation).
 
@@ -18,7 +18,7 @@ public struct ClientContextError: Error, LocalizedError {
 /// The CLI gathers the git context (repo root, basename, branch) from the
 /// working directory and mirrors gmcc_session_startup.sh's identity
 /// conventions (instance code = {repo}_{4-char md5 of abs path}, branch
-/// slugified / → __) so db rows line up with the ckfs tree.
+/// slugified / → __) so db rows line up with the gmfs tree.
 public struct GitContext {
     public let repoRoot: String
     public let repoName: String
@@ -96,26 +96,26 @@ public struct GitContext {
     }
 }
 
-public enum CkfsYaml {
-    /// `~/gmcc_ckfs/`, or `$GMCC_CKFS_ROOT` when set — same env name the
+public enum GmFsYaml {
+    /// `~/gmfs/`, or `$GM_FS_ROOT` when set — same env name the
     /// SessionStart hook already exports, so sandbox sessions redirect the
     /// CLI's yaml reads without a second variable.
     public static let root: URL = {
-        if let override = ProcessInfo.processInfo.environment["GMCC_CKFS_ROOT"],
+        if let override = ProcessInfo.processInfo.environment["GM_FS_ROOT"],
            !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
         return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("gmcc_ckfs", isDirectory: true)
+            .appendingPathComponent("gmfs", isDirectory: true)
     }()
 
-    /// Extract the first top-level `uuid:` from a ckfs data yaml, if present.
+    /// Extract the first top-level `uuid:` from a gmfs data yaml, if present.
     public static func uuid(_ relativePath: String) -> String? {
         scalar("uuid", relativePath)
     }
 
     /// Extract the first top-level single-line scalar value for `key:` from a
-    /// ckfs data yaml, if present. Block scalars (|, >) are not resolved.
+    /// gmfs data yaml, if present. Block scalars (|, >) are not resolved.
     public static func scalar(_ key: String, _ relativePath: String) -> String? {
         guard let text = try? String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8) else {
             return nil
@@ -144,7 +144,7 @@ public enum CkfsYaml {
 
 public enum ContextBuilder {
     /// Build the full CONTEXT_ENSURE payload from the working directory's git
-    /// identity plus whatever the ckfs tree already knows (uuids). Kbite
+    /// identity plus whatever the gmfs tree already knows (uuids). Kbite
     /// registries are db-native — no yaml kbite reads on this path.
     ///
     /// `claudeSessionId` is the SessionStart payload's conversation uuid. It
@@ -169,21 +169,21 @@ public enum ContextBuilder {
                 gitRepoName: git.repoName,
                 code: git.repoName,
                 name: git.repoName,
-                ckfsRelativeStoragePath: projectRel,
-                uuid: CkfsYaml.uuid("\(projectRel)/project_data.gmcc.yaml")
+                gmfsRelativeStoragePath: projectRel,
+                uuid: GmFsYaml.uuid("\(projectRel)/project_data.gmcc.yaml")
             ),
             instance: InstanceContext(
                 code: git.instanceCode,
                 name: git.instanceCode,
                 absoluteFileSystemPath: git.repoRoot,
-                ckfsRelativeStoragePath: instanceRel,
-                uuid: CkfsYaml.uuid("\(instanceRel)/instance_data.gmcc.yaml")
+                gmfsRelativeStoragePath: instanceRel,
+                uuid: GmFsYaml.uuid("\(instanceRel)/instance_data.gmcc.yaml")
             ),
             session: SessionContext(
                 code: git.sessionCode,
                 name: git.sessionCode,
-                ckfsRelativeStoragePath: sessionRel,
-                uuid: CkfsYaml.uuid("\(sessionRel)/session_data.gmcc.yaml")
+                gmfsRelativeStoragePath: sessionRel,
+                uuid: GmFsYaml.uuid("\(sessionRel)/session_data.gmcc.yaml")
             ),
             claudeSessionId: claudeSessionId
         )
@@ -207,7 +207,7 @@ public enum ContextBuilder {
 /// clobbering, and what makes a spawned agent's briefing lookup
 /// deterministic (no uuid has to survive a spawn prompt).
 ///
-/// nil when no claude ancestor exists (a bare terminal running gmcc_hook by hand):
+/// nil when no claude ancestor exists (a bare terminal running gm_hook by hand):
 /// callers omit the key and the daemon falls back to the session's single
 /// activation when unambiguous.
 public enum ClientKey {

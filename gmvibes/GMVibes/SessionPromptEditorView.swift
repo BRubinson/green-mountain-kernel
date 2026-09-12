@@ -114,7 +114,7 @@ struct SessionPromptScreen: View {
                     .popover(isPresented: $showSessionDope, arrowEdge: .trailing) {
                         // DopePane frames to .infinity; a bare popover proposes
                         // nothing, so the explicit frame is load-bearing. The
-                        // environment is re-injected per the GmccDaemonStatus
+                        // environment is re-injected per the GmDaemonStatus
                         // precedent.
                         DopePane(scope: scope, promptUuid: nil)
                             .environment(daemon)
@@ -252,7 +252,7 @@ struct SessionPromptScreen: View {
 // MARK: - Editor pane
 
 private struct PromptEditorPane: View {
-    @Environment(GMCCEnvironment.self) private var gmcc
+    @Environment(GMVibesEnvironment.self) private var gmcc
     @Environment(DaemonConnectionModel.self) private var daemon
     @Environment(CatalogStore.self) private var catalog
     let stub: PromptStub
@@ -282,7 +282,7 @@ private struct PromptEditorPane: View {
         var promptFolder: URL?
         var memoryRoot: URL?
         /// True when memoryRoot is the exact directory PROMPT_MEMORY_CHANGED
-        /// describes (see CkfsPathResolver.ResolvedMemory).
+        /// describes (see GmFsPathResolver.ResolvedMemory).
         var memoryIsDaemonWatched = false
     }
 
@@ -978,37 +978,37 @@ private struct PromptEditorPane: View {
     /// Resolve filesystem locations off-main (the resolver does FileManager
     /// probes; body must never trigger them).
     private func resolvePaths() async {
-        let root = gmcc[.ckfsRoot]
+        let root = gmcc[.gmFsRoot]
         let sessionStub = catalog.sessionsByUuid[store.sessionUuid]
         let instance = catalog.instance(uuid: windowID.instanceUUID.wireString)
         let project = instance.flatMap { inst in catalog.projects.first { $0.uuid == inst.projectUuid } }
         let artifacts = store.promptDetails[stub.uuid]?.artifacts ?? []
-        let storagePath = stub.ckfsRelativeStoragePath
+        let storagePath = stub.gmfsRelativeStoragePath
         let resolved: ResolvedPaths = await Task.detached(priority: .userInitiated) {
             var p = ResolvedPaths()
             if let path = instance?.absoluteFileSystemPath, !path.isEmpty {
                 p.repoFolder = URL(fileURLWithPath: path, isDirectory: true)
             }
-            // No $GMCC_CKFS_ROOT → every ckfs-derived location is nil (buttons
+            // No $GM_FS_ROOT → every gmfs-derived location is nil (buttons
             // disable; Memories explains) instead of resolving against cwd.
             guard let root, !root.isEmpty else { return p }
             if let sessionStub {
-                p.sessionFolder = CkfsPathResolver.resolve(
-                    relative: sessionStub.ckfsRelativeStoragePath, ckfsRoot: root)
+                p.sessionFolder = GmFsPathResolver.resolve(
+                    relative: sessionStub.gmfsRelativeStoragePath, gmFsRoot: root)
             }
-            p.promptFolder = CkfsPathResolver.promptFolder(
-                ckfsRoot: root, storagePath: storagePath)
-            let memory = CkfsPathResolver.memoryRoot(
-                ckfsRoot: root, storagePath: storagePath, artifacts: artifacts)
+            p.promptFolder = GmFsPathResolver.promptFolder(
+                gmFsRoot: root, storagePath: storagePath)
+            let memory = GmFsPathResolver.memoryRoot(
+                gmFsRoot: root, storagePath: storagePath, artifacts: artifacts)
             p.memoryRoot = memory.root
             p.memoryIsDaemonWatched = memory.isDaemonWatched
             if let instance {
-                p.instanceFolder = CkfsPathResolver.resolve(
-                    relative: instance.ckfsRelativeStoragePath, ckfsRoot: root)
+                p.instanceFolder = GmFsPathResolver.resolve(
+                    relative: instance.gmfsRelativeStoragePath, gmFsRoot: root)
             }
             if let project {
-                p.projectFolder = CkfsPathResolver.resolve(
-                    relative: project.ckfsRelativeStoragePath, ckfsRoot: root)
+                p.projectFolder = GmFsPathResolver.resolve(
+                    relative: project.gmfsRelativeStoragePath, gmFsRoot: root)
             }
             return p
         }.value

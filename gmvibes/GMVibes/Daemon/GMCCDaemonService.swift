@@ -169,7 +169,7 @@ actor GMCCDaemonService {
             goal: request.goal,
             detail: request.detail,
             command: request.command,
-            ckfsRelativeStoragePath: request.ckfsRelativeStoragePath
+            gmfsRelativeStoragePath: request.gmfsRelativeStoragePath
         )
         return try await perform { try $0.createPrompt(req) }
     }

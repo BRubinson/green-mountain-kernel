@@ -2,7 +2,7 @@ import Foundation
 
 /// What a verb is: a write, or a read. A CLASSIFICATION, not a permission —
 /// nothing in this file refuses anybody. It exists so the pen sheet can put
-/// reads before writes, and so `gmcc_hook verbs` can say which side of the
+/// reads before writes, and so `gm_hook verbs` can say which side of the
 /// line a MessageType falls on.
 public enum VerbRole: Hashable, Sendable {
     /// A write. `agentPhases` is DECLARATIVE metadata: the workflow phases in
@@ -62,9 +62,9 @@ public struct VerbSpec: Hashable, Sendable {
 /// everything that needs to know what verbs exist, instead of several drifting
 /// copies:
 ///
-///   1. the `gmcc_mcp` pen roster (checked against this at startup),
+///   1. the `gm_mcp` pen roster (checked against this at startup),
 ///   2. `PenSheet`, the generated agent-facing sheet,
-///   3. `gmcc_hook verbs`, the machine-readable catalogue,
+///   3. `gm_hook verbs`, the machine-readable catalogue,
 ///   4. the tests (`VerbRegistryTests`, `WorkflowSpecTests`).
 ///
 /// `VerbRegistryTests` asserts every `MessageType` is either here or in an

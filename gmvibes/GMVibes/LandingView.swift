@@ -8,7 +8,7 @@ import GMCCDaemonKit
 /// The gate is daemon reachability: down/not-installed states replace the
 /// launcher, and a healthy daemon with an empty db shows the migration state.
 struct LandingView: View {
-    @Environment(GMCCEnvironment.self) private var gmcc
+    @Environment(GMVibesEnvironment.self) private var gmcc
     @Environment(DaemonConnectionModel.self) private var daemon
     @Environment(CatalogStore.self) private var catalog
     @Environment(CheckoutWatcher.self) private var checkout
@@ -430,7 +430,7 @@ private struct EmptyDatabaseState: View {
                 .frame(maxWidth: 480)
 
             VStack(spacing: 10) {
-                CommandCopyRow(command: "gmcc_hook context ensure")
+                CommandCopyRow(command: "gm_hook context ensure")
             }
             .frame(maxWidth: 480)
         }
@@ -456,7 +456,7 @@ private struct CatalogErrorState: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 520)
-            Text("If this appeared after a daemon rebuild (\"no such column\"), restart the daemon (gmcc_hook call SHUTDOWN --json '{}', then gmcc_hook ping to autostart) so migrations run. The database is append-only history — never delete it; take a snapshot first with gmcc_hook call BACKUP --json '{}' if you need to investigate.")
+            Text("If this appeared after a daemon rebuild (\"no such column\"), restart the daemon (gm_hook call SHUTDOWN --json '{}', then gm_hook ping to autostart) so migrations run. The database is append-only history — never delete it; take a snapshot first with gm_hook call BACKUP --json '{}' if you need to investigate.")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
@@ -470,13 +470,13 @@ private struct CatalogErrorState: View {
 // Thin warning when browsing works (daemon up) but the shell env is unset —
 // Memories and folder-open actions degrade without it.
 private struct EnvWarningStrip: View {
-    @Environment(GMCCEnvironment.self) private var gmcc
+    @Environment(GMVibesEnvironment.self) private var gmcc
 
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
-            Text("The ckfs root couldn't be resolved from the daemon or a conventional location — memory files and folder-open actions are unavailable.")
+            Text("The gmfs root couldn't be resolved from the daemon or a conventional location — memory files and folder-open actions are unavailable.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()

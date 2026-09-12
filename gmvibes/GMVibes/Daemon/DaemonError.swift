@@ -70,7 +70,7 @@ nonisolated enum DaemonError: Error, Equatable {
                 self = .notInstalled
             }
         case .protocolMismatch(let message, let daemonVersion):
-            if let daemonVersion, daemonVersion >= GMCCWireProtocol.version {
+            if let daemonVersion, daemonVersion >= GmWireProtocol.version {
                 self = .clientTooOld(daemonVersion: daemonVersion)
             } else {
                 self = .daemonTooOld(daemonVersion: daemonVersion, message: message)
@@ -91,7 +91,7 @@ nonisolated enum DaemonError: Error, Equatable {
 }
 
 nonisolated extension UUID {
-    /// The db and the ckfs yamls store lowercase v4 uuids and SQLite TEXT
+    /// The db and the gmfs yamls store lowercase v4 uuids and SQLite TEXT
     /// comparison is case-sensitive; Swift's `uuidString` emits uppercase.
     /// Every uuid crossing the wire goes through this.
     var wireString: String { uuidString.lowercased() }

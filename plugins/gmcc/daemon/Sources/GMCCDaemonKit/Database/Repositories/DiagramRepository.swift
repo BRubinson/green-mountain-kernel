@@ -25,7 +25,7 @@ struct DiagramOwner {
     /// DERIVED, never an ownership tier since m0021: a session's
     /// instance, resolved through the join. The diagram row no longer
     /// stores it; callers that genuinely need a checkout (nothing does,
-    /// after rendering moved to CKFS storage) still get it here.
+    /// after rendering moved to GMFS storage) still get it here.
     let instanceUuid: String?
     let sessionUuid: String?
     let promptUuid: String?
@@ -337,10 +337,10 @@ struct DiagramRepository: RepositoryContext {
             ownerStoragePath: try diagramOwnerStoragePath(diagram: diagram))
     }
 
-    /// The CKFS storage directory of whichever tier owns this diagram.
+    /// The GMFS storage directory of whichever tier owns this diagram.
     ///
     /// This is the root rendered output is written under. Every tier carries the
-    /// column, which is precisely why CKFS storage works at project tier
+    /// column, which is precisely why GMFS storage works at project tier
     /// where an instance checkout did not.
     func diagramOwnerStoragePath(diagram: DiagramRow) throws -> String? {
         guard let tier = DiagramTier(rawValue: diagram.tier) else { return nil }
@@ -352,10 +352,10 @@ struct DiagramRepository: RepositoryContext {
         }
         guard let uuid else { return nil }
         let path = try String.fetchOne(db, sql: """
-            SELECT ckfs_relative_storage_path FROM \(table) WHERE uuid = ?
+            SELECT gmfs_relative_storage_path FROM \(table) WHERE uuid = ?
             """, arguments: [uuid])
         // Empty is as good as absent: a caller must not build a path that
-        // silently resolves to the CKFS root itself.
+        // silently resolves to the GMFS root itself.
         return (path?.isEmpty ?? true) ? nil : path
     }
 
@@ -1106,7 +1106,7 @@ struct DiagramRepository: RepositoryContext {
 
         // gmcc_diagram_path is legal at EVERY tier since m0021. It used to
         // be refused at PROJECT because only an instance carried a checkout
-        // to anchor against; screenshots now materialize under CKFS storage,
+        // to anchor against; screenshots now materialize under GMFS storage,
         // which a project has as much as a session does.
         if let patch = update.gmccDiagramPath {
             switch patch {

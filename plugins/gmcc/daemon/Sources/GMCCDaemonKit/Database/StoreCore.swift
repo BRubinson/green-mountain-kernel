@@ -93,7 +93,7 @@ final class StoreCore: @unchecked Sendable {
     }
 
     /// The storage-path analogue of GitHead.sessionCode: forward-only, lossy,
-    /// NEVER un-slugged. Applied when deriving a prompt's ckfs folder segment
+    /// NEVER un-slugged. Applied when deriving a prompt's gmfs folder segment
     /// so names with spaces/slashes can't produce paths the MemoryWatcher's
     /// exact-match resolution would miss. Case is preserved (lowercasing
     /// would change more than needed). Existing rows are never rewritten.
@@ -107,7 +107,7 @@ final class StoreCore: @unchecked Sendable {
             }
         }
         while slug.contains("__") { slug = slug.replacingOccurrences(of: "__", with: "_") }
-        // ASCII-only by construction, so 80 characters == 80 bytes (the ckfs
+        // ASCII-only by construction, so 80 characters == 80 bytes (the gmfs
         // folder-name budget). Cap BEFORE trimming so truncation can't leave
         // a trailing separator.
         if slug.count > 80 { slug = String(slug.prefix(80)) }
@@ -151,7 +151,7 @@ final class StoreCore: @unchecked Sendable {
 
     /// Insert a row with the five BaseEntity columns plus `extra` columns.
     /// Returns the row's uuid (freshly generated unless `uuid` is supplied —
-    /// callers pass a ckfs uuid to keep db ↔ ckfs joins trivial).
+    /// callers pass a gmfs uuid to keep db ↔ gmfs joins trivial).
     @discardableResult
     func insertBase(
         _ db: Database,

@@ -85,7 +85,7 @@ public enum StoreError: Error, Sendable {
             // The open hint is entity-derived, and names the pen tool wherever
             // one covers the open; the rest go through the raw verb.
             func rawOpen(_ type: String) -> String {
-                "gmcc_hook call \(type) --json '{\"prompt_uuid\":\"\(uuid)\"}'"
+                "gm_hook call \(type) --json '{\"prompt_uuid\":\"\(uuid)\"}'"
             }
             let hint: String
             switch entity {
@@ -126,7 +126,7 @@ public enum StoreError: Error, Sendable {
             var target = "session \(sessionUuid)"
             if let promptUuid { target += " / prompt \(promptUuid)" }
             if let code { target += " code '\(code)'" }
-            let initHint = "gmcc_hook call DOPE_INIT --json '{\"session_uuid\":\"\(sessionUuid)\""
+            let initHint = "gm_hook call DOPE_INIT --json '{\"session_uuid\":\"\(sessionUuid)\""
                 + (promptUuid.map { ",\"prompt_uuid\":\"\($0)\"" } ?? "")
                 + ",\"code\":\"\(code ?? "<code>")\",\"name\":\"<name>\"}'"
             return ErrorPayload(
@@ -139,12 +139,12 @@ public enum StoreError: Error, Sendable {
                 code: .summaryAbsent,
                 message: "\(target) has no project-tier dope scope yet — a project scope "
                        + "arrives by promotion from a primary-branch session "
-                       + "(gmcc_hook call DOPE_PROMOTE --json '{\"session_uuid\":\"<U>\"}'), "
+                       + "(gm_hook call DOPE_PROMOTE --json '{\"session_uuid\":\"<U>\"}'), "
                        + "not by DOPE_INIT")
         case .diagramAbsent(let ownerKind, let ownerUuid, let code):
             var target = "\(ownerKind) \(ownerUuid)"
             if let code { target += " code '\(code)'" }
-            let initHint = "gmcc_hook call DIAGRAM_INIT --json "
+            let initHint = "gm_hook call DIAGRAM_INIT --json "
                 + "'{\"\(ownerKind)_uuid\":\"\(ownerUuid)\",\"code\":\"\(code ?? "<code>")\","
                 + "\"name\":\"<name>\"}'"
             return ErrorPayload(

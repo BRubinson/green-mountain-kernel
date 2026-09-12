@@ -102,8 +102,8 @@ struct ProjectSettingsSheet: View {
             LabeledContent("Git repo") {
                 Text(project.gitRepoName).font(.caption.monospaced())
             }
-            LabeledContent("CKFS path") {
-                Text(project.ckfsRelativeStoragePath)
+            LabeledContent("GMFS path") {
+                Text(project.gmfsRelativeStoragePath)
                     .font(.caption.monospaced())
                     .lineLimit(1)
                     .truncationMode(.head)

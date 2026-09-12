@@ -154,14 +154,16 @@ final class MigrationTests: XCTestCase {
 
     /// Runs whatever migrations the copy still owes, against real accumulated
     /// data. Assertions are phrased so they hold whether the copy is pre-m0002
-    /// or (as any copy of ~/gmcc/gmcc.db now is) already several migrations in:
-    /// `clarified` maps INTO `done` rather than replacing it, so the expected
-    /// count is the sum of both before-counts.
+    /// or (as any copy of a long-lived database is) already several migrations
+    /// in: `clarified` maps INTO `done` rather than replacing it, so the
+    /// expected count is the sum of both before-counts.
     func testAgainstLiveDbCopy() throws {
-        // Point GMCC_TEST_LIVE_DB_COPY at a COPY of ~/gmcc/gmcc.db (never the
-        // live file) to prove the migrations against real accumulated data.
-        guard let path = ProcessInfo.processInfo.environment["GMCC_TEST_LIVE_DB_COPY"] else {
-            throw XCTSkip("GMCC_TEST_LIVE_DB_COPY not set")
+        // Point GM_TEST_DB_COPY at a COPY the caller made — never at a live
+        // database file. This test MIGRATES what it is handed, so the
+        // skip-by-default shape is what keeps a live file from being the
+        // accidental target.
+        guard let path = ProcessInfo.processInfo.environment["GM_TEST_DB_COPY"] else {
+            throw XCTSkip("GM_TEST_DB_COPY not set")
         }
         let store = try Store(path: path)
         let before: (prompts: Int, artifacts: Int, done: Int, clarified: Int,
@@ -304,17 +306,17 @@ final class MigrationTests: XCTestCase {
             let now = Store.isoNow()
             try db.execute(sql: """
                 INSERT INTO project (uuid, version, created_at, updated_at,
-                    git_repo_name, code, name, ckfs_relative_storage_path)
+                    git_repo_name, code, name, gmfs_relative_storage_path)
                 VALUES ('proj-1', 0, '\(now)', '\(now)', 'r', 'r', 'r', 'p/r');
                 INSERT INTO instance (uuid, version, created_at, updated_at,
-                    project_uuid, code, name, absolute_file_system_path, ckfs_relative_storage_path)
+                    project_uuid, code, name, absolute_file_system_path, gmfs_relative_storage_path)
                 VALUES ('inst-1', 0, '\(now)', '\(now)', 'proj-1', 'r_1', 'r_1', '/tmp/r', 'p/r/i');
                 INSERT INTO session (uuid, version, created_at, updated_at,
-                    instance_uuid, code, name, backstory, goal, status, ckfs_relative_storage_path)
+                    instance_uuid, code, name, backstory, goal, status, gmfs_relative_storage_path)
                 VALUES ('sess-1', 0, '\(now)', '\(now)', 'inst-1', 'main', 'main', '', '', 'active', 'p/r/i/s');
                 INSERT INTO prompt (uuid, version, created_at, updated_at,
                     session_uuid, seq, code, name, backstory, goal, detail, command, status,
-                    ckfs_relative_storage_path)
+                    gmfs_relative_storage_path)
                 VALUES ('prompt-x', 0, '\(now)', '\(now)', 'sess-1', 1, 'p1', 'one', '', '', '', '', 'draft', '');
                 INSERT INTO exploration_summary (uuid, version, created_at, updated_at,
                     prompt_uuid, status, overview)
@@ -569,18 +571,18 @@ final class MigrationTests: XCTestCase {
         try store.dbQueue.write { db in
             try db.execute(sql: """
                 INSERT INTO project (uuid, version, created_at, updated_at,
-                    git_repo_name, code, name, ckfs_relative_storage_path)
+                    git_repo_name, code, name, gmfs_relative_storage_path)
                 VALUES ('proj-1', 0, '\(now)', '\(now)', 'r', 'r', 'r', 'p/r');
                 INSERT INTO instance (uuid, version, created_at, updated_at,
-                    project_uuid, code, name, absolute_file_system_path, ckfs_relative_storage_path)
+                    project_uuid, code, name, absolute_file_system_path, gmfs_relative_storage_path)
                 VALUES ('inst-1', 0, '\(now)', '\(now)', 'proj-1', 'r_1', 'r_1', '/tmp/r', 'p/r/i');
                 INSERT INTO session (uuid, version, created_at, updated_at,
-                    instance_uuid, code, name, backstory, goal, status, ckfs_relative_storage_path)
+                    instance_uuid, code, name, backstory, goal, status, gmfs_relative_storage_path)
                 VALUES ('sess-main', 0, '\(now)', '\(now)', 'inst-1', 'main', 'main', '', '', 'active', 'p/r/i/s'),
                        ('sess-other', 0, '\(now)', '\(now)', 'inst-1', 'other', 'other', '', '', 'active', 'p/r/i/s2');
                 INSERT INTO prompt (uuid, version, created_at, updated_at,
                     session_uuid, seq, code, name, backstory, goal, detail, command, status,
-                    ckfs_relative_storage_path)
+                    gmfs_relative_storage_path)
                 VALUES ('prompt-x', 0, '\(now)', '\(now)', 'sess-main', 1, 'p1', 'one', '', '', '', '', 'draft', '');
                 INSERT INTO session_file (uuid, version, created_at, updated_at,
                     session_uuid, relative_path, active)
@@ -704,6 +706,111 @@ final class MigrationTests: XCTestCase {
             let fileChangeSql = try String.fetchOne(
                 db, sql: "SELECT sql FROM sqlite_master WHERE name = 'file_change'") ?? ""
             XCTAssertTrue(fileChangeSql.contains("CHECK (change_kind IN"), fileChangeSql)
+        }
+    }
+
+    /// m0027 renames a column on four tables that already hold data, so the
+    /// thing worth asserting is not "did the column appear" but "did the VALUES
+    /// come with it". A rename that silently produced an empty new column would
+    /// pass a schema-shape check and lose every storage path.
+    ///
+    /// The fixture is built at m0026 — the last schema that still carries the
+    /// old name — seeded, then migrated the rest of the way.
+    func testM0027RenamesTheStoragePathColumnWithoutLosingValues() throws {
+        let dbPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("m0027-\(UUID().uuidString).db").path
+        defer { try? FileManager.default.removeItem(atPath: dbPath) }
+        let queue = try DatabaseQueue(path: dbPath)
+        try Migrations.migrator.migrate(queue, upTo: "m0026_claudeSessionAttribution")
+
+        let now = "2026-08-01T00:00:00Z"
+        try queue.write { db in
+            // The pre-rename vocabulary, which is the whole point of stopping
+            // at m0026 to write this fixture.
+            try db.execute(sql: """
+                INSERT INTO project (uuid, version, created_at, updated_at,
+                    git_repo_name, code, name, ckfs_relative_storage_path)
+                VALUES ('proj-1', 0, '\(now)', '\(now)', 'r', 'r', 'r', 'projects/r');
+
+                INSERT INTO instance (uuid, version, created_at, updated_at,
+                    project_uuid, code, name, absolute_file_system_path,
+                    ckfs_relative_storage_path)
+                VALUES ('inst-1', 0, '\(now)', '\(now)', 'proj-1', 'r_1', 'r_1', '/tmp/r',
+                        'projects/r/instances/r_1');
+
+                INSERT INTO session (uuid, version, created_at, updated_at,
+                    instance_uuid, code, name, backstory, goal, status,
+                    ckfs_relative_storage_path)
+                VALUES ('sess-1', 0, '\(now)', '\(now)', 'inst-1', 'main', 'main', '', '',
+                        'active', 'projects/r/instances/r_1/sessions/main');
+
+                INSERT INTO prompt (uuid, version, created_at, updated_at,
+                    session_uuid, seq, code, name, backstory, goal, detail, command, status,
+                    ckfs_relative_storage_path)
+                VALUES ('prompt-1', 0, '\(now)', '\(now)', 'sess-1', 1, 'p1', 'one',
+                        '', '', '', '', 'draft',
+                        'projects/r/instances/r_1/sessions/main/prompts/1_p1');
+                """)
+            // The config key m0027 renames, and its value, which it must not.
+            try db.execute(sql: """
+                UPDATE daemon_config SET config_value = '/somewhere/specific'
+                 WHERE config_key = 'ckfs_root'
+                """)
+        }
+
+        try Migrations.migrator.migrate(queue)
+
+        try queue.read { db in
+            // The VALUES survived, per table, under the new name.
+            for (table, uuid, expected) in [
+                ("project", "proj-1", "projects/r"),
+                ("instance", "inst-1", "projects/r/instances/r_1"),
+                ("session", "sess-1", "projects/r/instances/r_1/sessions/main"),
+                ("prompt", "prompt-1",
+                 "projects/r/instances/r_1/sessions/main/prompts/1_p1"),
+            ] {
+                XCTAssertEqual(
+                    try String.fetchOne(
+                        db,
+                        sql: "SELECT gmfs_relative_storage_path FROM \(table) WHERE uuid = ?",
+                        arguments: [uuid]),
+                    expected,
+                    "\(table) lost its storage path across the rename")
+            }
+
+            // The old name is GONE, not aliased. A lingering duplicate column
+            // is how a half-finished rename hides.
+            for table in ["project", "instance", "session", "prompt"] {
+                let sql = try String.fetchOne(
+                    db, sql: "SELECT sql FROM sqlite_master WHERE name = ?",
+                    arguments: [table]) ?? ""
+                XCTAssertFalse(sql.contains("ckfs_relative_storage_path"),
+                               "\(table) still carries the retired column: \(sql)")
+                XCTAssertTrue(sql.contains("gmfs_relative_storage_path"), sql)
+            }
+
+            // The config KEY renamed; the VALUE is untouched. Rewriting values
+            // here would mean the migration guessed at a filesystem layout it
+            // cannot see.
+            XCTAssertEqual(
+                try String.fetchOne(
+                    db,
+                    sql: "SELECT config_value FROM daemon_config WHERE config_key = 'gmfs_root'"),
+                "/somewhere/specific")
+            XCTAssertEqual(
+                try Int.fetchOne(
+                    db,
+                    sql: "SELECT COUNT(*) FROM daemon_config WHERE config_key = 'ckfs_root'"),
+                0, "the retired config key survived the rename")
+
+            // Indexes and UNIQUEs are untouched by RENAME COLUMN — which is
+            // exactly why this migration is four ALTERs and not four rebuilds.
+            let indexes = try Set(String.fetchAll(
+                db, sql: "SELECT name FROM sqlite_master WHERE type = 'index'"))
+            XCTAssertTrue(indexes.contains("idx_prompt_session_uuid"))
+
+            XCTAssertEqual(
+                try Int.fetchOne(db, sql: "SELECT MAX(version) FROM schema_migrations"), 27)
         }
     }
 }

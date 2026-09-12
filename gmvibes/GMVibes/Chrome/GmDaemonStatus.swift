@@ -3,7 +3,7 @@ import SwiftUI
 /// The top-bar daemon status pill: "gmcc" in a capsule whose BORDER color
 /// tracks daemon health. Clicking opens the same diagnostic popover as the old
 /// dot indicator (`DaemonStatusPopover` reused verbatim).
-struct GmccDaemonStatus: View {
+struct GmDaemonStatus: View {
     @Environment(DaemonConnectionModel.self) private var daemon
     @State private var showPopover = false
 

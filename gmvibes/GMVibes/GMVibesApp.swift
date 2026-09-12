@@ -13,7 +13,7 @@ struct GMVibesApp: App {
         // its decoder always yields landing so restoration lands there too.
         WindowGroup("GM Vibes", for: WindowSeed.self) { $seed in
             GMVibesWindow(seed: seed ?? WindowSeed())
-                .gmccEnv(services)
+                .gmEnv(services)
         } defaultValue: {
             WindowSeed()
         }

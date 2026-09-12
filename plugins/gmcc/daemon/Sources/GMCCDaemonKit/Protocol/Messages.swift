@@ -15,7 +15,7 @@ import Foundation
 public struct BaseEntity: Codable, Hashable, Sendable {
     /// Serial rowid — internal to the db, nil before insert.
     public let id: Int64?
-    /// v4 lowercase — the external join key shared with ckfs yamls and the wire.
+    /// v4 lowercase — the external join key shared with gmfs yamls and the wire.
     public let uuid: String
     /// Incremented by the daemon on every write (optimistic concurrency —
     /// guarded updates require the caller's expected_version to match).
@@ -217,7 +217,7 @@ public enum ChangeDepth: String, Codable, Hashable, CaseIterable, Sendable {
 /// The daemon_config key space is enum-bound — an unknown key is BAD_REQUEST,
 /// keeping config a typed subsystem rather than a free-form bag.
 public enum ConfigKey: String, Codable, Hashable, CaseIterable, Sendable {
-    case ckfsRoot = "ckfs_root"
+    case gmFsRoot = "gmfs_root"
     case kbiteRoot = "kbite_root"
     case kbiteOpenRoot = "kbite_open_root"
     case kbiteDigestedRoot = "kbite_digested_root"
@@ -527,8 +527,8 @@ public struct BackupResponse: Codable, Hashable, Sendable {
 // MARK: - Context blocks
 
 /// Context blocks let the daemon lazily ensure the project → instance →
-/// session chain exists. Where the ckfs already carries a uuid, the caller
-/// passes it so the db row reuses it (trivial db ↔ ckfs joins). Optional
+/// session chain exists. Where the gmfs already carries a uuid, the caller
+/// passes it so the db row reuses it (trivial db ↔ gmfs joins). Optional
 /// kbite_codes seed that level's active-kbite registry at CREATE time only —
 /// mirroring gmcc_session_startup.sh's inherit_kbite (existing rows are never
 /// re-seeded; a child created without codes copies its parent's junctions).
@@ -537,7 +537,7 @@ public struct ProjectContext: Codable, Hashable, Sendable {
     public let gitRepoName: String
     public let code: String
     public let name: String
-    public let ckfsRelativeStoragePath: String
+    public let gmfsRelativeStoragePath: String
     public let uuid: String?
     public let kbiteCodes: [String]?
 
@@ -545,14 +545,14 @@ public struct ProjectContext: Codable, Hashable, Sendable {
         gitRepoName: String,
         code: String,
         name: String,
-        ckfsRelativeStoragePath: String,
+        gmfsRelativeStoragePath: String,
         uuid: String? = nil,
         kbiteCodes: [String]? = nil
     ) {
         self.gitRepoName = gitRepoName
         self.code = code
         self.name = name
-        self.ckfsRelativeStoragePath = ckfsRelativeStoragePath
+        self.gmfsRelativeStoragePath = gmfsRelativeStoragePath
         self.uuid = uuid
         self.kbiteCodes = kbiteCodes
     }
@@ -562,7 +562,7 @@ public struct InstanceContext: Codable, Hashable, Sendable {
     public let code: String
     public let name: String
     public let absoluteFileSystemPath: String
-    public let ckfsRelativeStoragePath: String
+    public let gmfsRelativeStoragePath: String
     public let uuid: String?
     public let kbiteCodes: [String]?
 
@@ -570,14 +570,14 @@ public struct InstanceContext: Codable, Hashable, Sendable {
         code: String,
         name: String,
         absoluteFileSystemPath: String,
-        ckfsRelativeStoragePath: String,
+        gmfsRelativeStoragePath: String,
         uuid: String? = nil,
         kbiteCodes: [String]? = nil
     ) {
         self.code = code
         self.name = name
         self.absoluteFileSystemPath = absoluteFileSystemPath
-        self.ckfsRelativeStoragePath = ckfsRelativeStoragePath
+        self.gmfsRelativeStoragePath = gmfsRelativeStoragePath
         self.uuid = uuid
         self.kbiteCodes = kbiteCodes
     }
@@ -588,7 +588,7 @@ public struct SessionContext: Codable, Hashable, Sendable {
     public let name: String
     public let backstory: String
     public let goal: String
-    public let ckfsRelativeStoragePath: String
+    public let gmfsRelativeStoragePath: String
     public let uuid: String?
     public let kbiteCodes: [String]?
 
@@ -597,7 +597,7 @@ public struct SessionContext: Codable, Hashable, Sendable {
         name: String,
         backstory: String = "",
         goal: String = "",
-        ckfsRelativeStoragePath: String,
+        gmfsRelativeStoragePath: String,
         uuid: String? = nil,
         kbiteCodes: [String]? = nil
     ) {
@@ -605,7 +605,7 @@ public struct SessionContext: Codable, Hashable, Sendable {
         self.name = name
         self.backstory = backstory
         self.goal = goal
-        self.ckfsRelativeStoragePath = ckfsRelativeStoragePath
+        self.gmfsRelativeStoragePath = gmfsRelativeStoragePath
         self.uuid = uuid
         self.kbiteCodes = kbiteCodes
     }
@@ -661,7 +661,7 @@ public struct ContextEnsureResponse: Codable, Hashable, Sendable {
     /// the way it did before.
     ///
     /// OPTIONAL BY CONSTRUCTION: an additive optional field on an existing
-    /// message does not bump `GMCCWireProtocol.version`, so an older client
+    /// message does not bump `GmWireProtocol.version`, so an older client
     /// decodes this response unchanged and GMVibes' pinned kit keeps working.
     public let claudeSessionBindingCount: Int?
 
@@ -866,7 +866,7 @@ public struct SessionUpdateRequest: Codable, Hashable, Sendable {
 
 public struct PromptCreateRequest: Codable, Hashable, Sendable {
     public let sessionUuid: String
-    /// Optional ckfs uuid pass-through (db ↔ ckfs join bridge).
+    /// Optional gmfs uuid pass-through (db ↔ gmfs join bridge).
     public let uuid: String?
     /// Defaults to "p{seq}" when nil.
     public let code: String?
@@ -875,7 +875,7 @@ public struct PromptCreateRequest: Codable, Hashable, Sendable {
     public let goal: String
     public let detail: String
     public let command: String?
-    public let ckfsRelativeStoragePath: String?
+    public let gmfsRelativeStoragePath: String?
 
     public init(
         sessionUuid: String,
@@ -886,7 +886,7 @@ public struct PromptCreateRequest: Codable, Hashable, Sendable {
         goal: String = "",
         detail: String = "",
         command: String? = nil,
-        ckfsRelativeStoragePath: String? = nil
+        gmfsRelativeStoragePath: String? = nil
     ) {
         self.sessionUuid = sessionUuid
         self.uuid = uuid
@@ -896,7 +896,7 @@ public struct PromptCreateRequest: Codable, Hashable, Sendable {
         self.goal = goal
         self.detail = detail
         self.command = command
-        self.ckfsRelativeStoragePath = ckfsRelativeStoragePath
+        self.gmfsRelativeStoragePath = gmfsRelativeStoragePath
     }
 }
 
@@ -1386,7 +1386,7 @@ public struct KbiteRemoveResponse: Codable, Hashable, Sendable {
 
 /// Filesystem skeleton only — no db rows (maws are not tracked in the db).
 /// The client resolves $GMCC_KBITE_OPEN and passes the absolute maw path; the
-/// daemon never reads ckfs environment variables.
+/// daemon never reads gmfs environment variables.
 public struct KbiteMawOpenRequest: Codable, Hashable, Sendable {
     public let kbiteName: String
     public let mawPath: String
@@ -2506,9 +2506,9 @@ public struct ArchReviseRequest: Codable, Hashable, Sendable {
 /// full option bodies, verbatim change_code, every row, and none of the new
 /// response keys emitted at all. A caller that ships no new field — GMVibes'
 /// local package build, any older peer — gets a byte-identical response,
-/// which is exactly why this does NOT bump GMCCWireProtocol.version.
+/// which is exactly why this does NOT bump GmWireProtocol.version.
 ///
-/// THE NARROWING IS APPLIED BY THE PEN, NOT THE DAEMON. gmcc_mcp's `arch_get`
+/// THE NARROWING IS APPLIED BY THE PEN, NOT THE DAEMON. gm_mcp's `arch_get`
 /// passes includeOptions=false / full=false / limit by DEFAULT and exposes
 /// include_options / option_uuid / full / change_uuid / limit / cursor in its
 /// tool schema so an agent can widen. The agent harness — not the daemon — is
@@ -3425,34 +3425,41 @@ public struct PathsGetRequest: Codable, Hashable, Sendable {
 }
 
 /// Typed roots (never a map — dictionary keys and coder key strategies don't
-/// mix). gmcc/db/socket/backups come from Paths; the ckfs and kbite roots
-/// from daemon_config (seeded defaults, settable via CONFIG_SET). Retires
+/// mix). The fs root plus db/socket/backups come from Paths; the kbite roots
+/// from daemon_config (fallback defaults, settable via CONFIG_SET). Retires
 /// client-side ~/.zshrc scraping.
+///
+/// The retired second root is GONE rather than renamed. It used to name a
+/// separate content tree, and with one top-level filesystem there is nothing
+/// left for it to name — two fields that always held the same value would be an
+/// invitation to let them drift. `projectsRoot` takes its place in the response
+/// because it is what clients actually wanted from it: the absolute half of
+/// every `gmfs_relative_storage_path`.
 public struct PathsGetResponse: Codable, Hashable, Sendable {
-    public let gmccRoot: String
+    public let gmFsRoot: String
     public let dbPath: String
     public let socketPath: String
     public let backupsRoot: String
-    public let ckfsRoot: String
+    public let projectsRoot: String
     public let kbiteRoot: String
     public let kbiteOpenRoot: String
     public let kbiteDigestedRoot: String
 
     public init(
-        gmccRoot: String,
+        gmFsRoot: String,
         dbPath: String,
         socketPath: String,
         backupsRoot: String,
-        ckfsRoot: String,
+        projectsRoot: String,
         kbiteRoot: String,
         kbiteOpenRoot: String,
         kbiteDigestedRoot: String
     ) {
-        self.gmccRoot = gmccRoot
+        self.gmFsRoot = gmFsRoot
         self.dbPath = dbPath
         self.socketPath = socketPath
         self.backupsRoot = backupsRoot
-        self.ckfsRoot = ckfsRoot
+        self.projectsRoot = projectsRoot
         self.kbiteRoot = kbiteRoot
         self.kbiteOpenRoot = kbiteOpenRoot
         self.kbiteDigestedRoot = kbiteDigestedRoot
@@ -4526,7 +4533,7 @@ public struct DiagramGetResponse: Codable, Hashable, Sendable {
     public let tree: DiagramTree
     /// One row per dope_scope binding element (resolvedVia nil = ghost).
     public let bindings: [DiagramBindingResolution]
-    /// The OWNER's `ckfs_relative_storage_path` — the root a rendered
+    /// The OWNER's `gmfs_relative_storage_path` — the root a rendered
     /// screenshot lands under, whichever tier owns the diagram.
     ///
     /// ADDITIVE OPTIONAL on an existing message, so it does not bump the
@@ -4693,7 +4700,7 @@ public struct DiagramSearchResponse: Codable, Hashable, Sendable {
 /// delete trigger, and prompt-qualified readings via m0022's CASCADE. A
 /// durable DIAGRAM_CHANGE (action "deleted") is recorded BEFORE the row
 /// drops so live galleries/editors close cleanly. Screenshot cleanup is
-/// the CLIENT's (ckfs is gm territory, exactly like rendering).
+/// the CLIENT's (gmfs is gm territory, exactly like rendering).
 public struct DiagramDeleteRequest: Codable, Hashable, Sendable {
     public let diagramUuid: String
     public let expectedRevision: Int64?

@@ -18,7 +18,7 @@ struct ProjectRecord: BaseRecordFields {
     var gitRepoName: String
     var code: String
     var name: String
-    var ckfsRelativeStoragePath: String
+    var gmfsRelativeStoragePath: String
     var primaryProjectBranch: String
 }
 
@@ -31,7 +31,7 @@ extension ProjectRecord {
             gitRepoName: gitRepoName,
             code: code,
             name: name,
-            ckfsRelativeStoragePath: ckfsRelativeStoragePath,
+            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
             primaryProjectBranch: primaryProjectBranch,
             createdAt: createdAt,
             updatedAt: updatedAt

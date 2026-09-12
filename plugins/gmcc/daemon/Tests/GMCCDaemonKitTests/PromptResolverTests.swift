@@ -17,7 +17,7 @@ final class PromptResolverTests: XCTestCase {
             name: name,
             status: "draft",
             version: 0,
-            ckfsRelativeStoragePath: "path/\(seq)",
+            gmfsRelativeStoragePath: "path/\(seq)",
             reports: nil,
             createdAt: "2026-09-12T00:00:00Z",
             updatedAt: "2026-09-12T00:00:00Z")

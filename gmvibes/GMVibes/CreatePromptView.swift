@@ -8,7 +8,7 @@ import GMCCDaemonKit
 // all:true); selected kbites are registered at prompt scope after creation.
 struct CreatePromptView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(GMCCEnvironment.self) private var gmcc
+    @Environment(GMVibesEnvironment.self) private var gmcc
 
     let store: SessionStore
     // Parent session's backstory, inherited into the new prompt at sheet-open
@@ -27,7 +27,7 @@ struct CreatePromptView: View {
 
     // Code derives from the TRIMMED name so code and stored name agree.
     private var segment: String {
-        CkfsPathResolver.slug(name.trimmingCharacters(in: .whitespaces))
+        GmFsPathResolver.slug(name.trimmingCharacters(in: .whitespaces))
     }
     private var canSave: Bool { !segment.isEmpty && !isSaving }
 
@@ -113,7 +113,7 @@ struct CreatePromptView: View {
         let kbites = availableKbites.filter { selectedKbites.contains($0) }   // stable order
         do {
             // Code passed EXPLICITLY — a nil code defaults to "p{seq}".
-            // ckfsRelativeStoragePath stays nil: the daemon allocates seq
+            // gmfsRelativeStoragePath stays nil: the daemon allocates seq
             // atomically and derives the slugged path itself (v8); the
             // returned row's path is the only folder the resolver (and the
             // daemon's MemoryWatcher) will ever look at.
@@ -137,10 +137,10 @@ struct CreatePromptView: View {
             // empty storage path creates NOTHING: the resolver has no
             // guessing legs, so a conventionally-named folder could never be
             // found again.
-            if let root = gmcc[.ckfsRoot], !root.isEmpty,
-               !row.ckfsRelativeStoragePath.isEmpty {
+            if let root = gmcc[.gmFsRoot], !root.isEmpty,
+               !row.gmfsRelativeStoragePath.isEmpty {
                 let memory = URL(fileURLWithPath: root, isDirectory: true)
-                    .appendingPathComponent(row.ckfsRelativeStoragePath, isDirectory: true)
+                    .appendingPathComponent(row.gmfsRelativeStoragePath, isDirectory: true)
                     .appendingPathComponent("memory", isDirectory: true)
                 try? FileManager.default.createDirectory(
                     at: memory, withIntermediateDirectories: true)

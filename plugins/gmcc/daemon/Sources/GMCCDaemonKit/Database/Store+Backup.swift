@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-// BACKUP — SQLite Online Backup API via GRDB, into ~/gmcc/backups/.
+// BACKUP — SQLite Online Backup API via GRDB, into ~/gmfs/backups/.
 // Required before real prompt content trusts the db.
 
 extension Store {

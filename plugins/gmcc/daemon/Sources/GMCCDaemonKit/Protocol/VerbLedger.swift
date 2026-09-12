@@ -4,7 +4,7 @@ import Foundation
 /// serves, which pen tool covers it, and whether it is a read or a write.
 ///
 /// HOISTED TO THE KIT so any front-end can print it without a Store and
-/// without a socket — `gmcc_hook verbs` is the reader, and it answers even
+/// without a socket — `gm_hook verbs` is the reader, and it answers even
 /// when the daemon is down.
 ///
 /// It classifies; it does not authorize. Nothing consults this to refuse a

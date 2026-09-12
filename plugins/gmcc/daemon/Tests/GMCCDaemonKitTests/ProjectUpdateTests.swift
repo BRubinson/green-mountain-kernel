@@ -17,7 +17,7 @@ final class ProjectUpdateTests: XCTestCase {
             let now = Store.isoNow()
             try db.execute(sql: """
                 INSERT INTO project (id, uuid, version, created_at, updated_at,
-                    git_repo_name, code, name, ckfs_relative_storage_path)
+                    git_repo_name, code, name, gmfs_relative_storage_path)
                 VALUES (NULL, 'proj-1', 0, '\(now)', '\(now)',
                         'repo', 'repo', 'repo', 'projects/repo');
                 """)
@@ -83,7 +83,7 @@ final class ProjectUpdateTests: XCTestCase {
     func testProjectRowDecodesWithoutTheNewKey() throws {
         let legacy = """
             {"uuid":"p","version":0,"git_repo_name":"r","code":"r","name":"r",
-             "ckfs_relative_storage_path":"projects/r",
+             "gmfs_relative_storage_path":"projects/r",
              "created_at":"t","updated_at":"t"}
             """.data(using: .utf8)!
         let row = try WireCodec.decoder.decode(ProjectRow.self, from: legacy)

@@ -4,10 +4,10 @@ import Observation
 /// The app's shared service singletons in one container, injected by a single
 /// modifier at every scene root — adding a service later is zero call-site
 /// churn. Views keep their existing granular @Environment bindings
-/// (GMCCEnvironment / FileTreeStore / DaemonConnectionModel / CatalogStore).
+/// (GMVibesEnvironment / FileTreeStore / DaemonConnectionModel / CatalogStore).
 @Observable @MainActor
 final class GMVibesServices {
-    let env: GMCCEnvironment
+    let env: GMVibesEnvironment
     let fileTrees: FileTreeStore
     let daemon: DaemonConnectionModel
     let catalog: CatalogStore
@@ -20,7 +20,7 @@ final class GMVibesServices {
     let diagramCatalog: DiagramCatalogStore
 
     init() {
-        env = GMCCEnvironment()
+        env = GMVibesEnvironment()
         fileTrees = FileTreeStore.shared
         daemon = DaemonConnectionModel()
         catalog = CatalogStore()
@@ -34,7 +34,7 @@ final class GMVibesServices {
 
 extension View {
     /// Inject the shared GMCC services into a scene's root view in one call.
-    func gmccEnv(_ services: GMVibesServices) -> some View {
+    func gmEnv(_ services: GMVibesServices) -> some View {
         self
             .environment(services.env)
             .environment(services.fileTrees)

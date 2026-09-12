@@ -64,9 +64,9 @@ public enum PenSheet {
           - Seal only your own summary. That seal is yours; another agent's is not.
 
         A VERB WITH NO PEN TOOL is reached the same way every daemon verb is: \
-        gmcc_hook call <MESSAGE_TYPE> --json '{...}' (--json-file for a body \
+        gm_hook call <MESSAGE_TYPE> --json '{...}' (--json-file for a body \
         bigger than an argv). Wire keys are snake_case and are sent verbatim; \
-        `gmcc_hook verbs --json` lists every type. If a pen tool you DO have \
+        `gm_hook verbs --json` lists every type. If a pen tool you DO have \
         covers the write, use the pen tool — it is typed and it threads the \
         version for you.
         """

@@ -23,12 +23,12 @@ final class AttributionTests: XCTestCase {
 
     private let project = ProjectContext(
         gitRepoName: "repo", code: "repo", name: "repo",
-        ckfsRelativeStoragePath: "projects/repo")
+        gmfsRelativeStoragePath: "projects/repo")
     private let instance = InstanceContext(
         code: "repo_1", name: "repo_1", absoluteFileSystemPath: "/tmp/attr-repo",
-        ckfsRelativeStoragePath: "projects/repo/instances/repo_1")
+        gmfsRelativeStoragePath: "projects/repo/instances/repo_1")
     private let session = SessionContext(
-        code: "main", name: "main", ckfsRelativeStoragePath: "x")
+        code: "main", name: "main", gmfsRelativeStoragePath: "x")
 
     override func setUpWithError() throws {
         dbPath = FileManager.default.temporaryDirectory
@@ -126,7 +126,7 @@ final class AttributionTests: XCTestCase {
     /// silently re-point it.
     func testTheBindingPinsOnceAndSurvivesASecondEnsure() throws {
         let otherBranch = SessionContext(
-            code: "feature", name: "feature", ckfsRelativeStoragePath: "y")
+            code: "feature", name: "feature", gmfsRelativeStoragePath: "y")
         let second = try store.ensureContext(ContextEnsureRequest(
             project: project, instance: instance, session: otherBranch,
             claudeSessionId: conversation))
@@ -225,10 +225,10 @@ final class AttributionTests: XCTestCase {
     func testUnboundWriteInAnUnknownRepoIsRefusedSilently() throws {
         let stranger = ProjectContext(
             gitRepoName: "elsewhere", code: "elsewhere", name: "elsewhere",
-            ckfsRelativeStoragePath: "projects/elsewhere")
+            gmfsRelativeStoragePath: "projects/elsewhere")
         let strangerInstance = InstanceContext(
             code: "elsewhere_1", name: "elsewhere_1", absoluteFileSystemPath: "/tmp/elsewhere",
-            ckfsRelativeStoragePath: "projects/elsewhere/instances/elsewhere_1")
+            gmfsRelativeStoragePath: "projects/elsewhere/instances/elsewhere_1")
         XCTAssertThrowsError(
             try hookWrite(
                 claudeSessionId: "conv-somewhere-else",

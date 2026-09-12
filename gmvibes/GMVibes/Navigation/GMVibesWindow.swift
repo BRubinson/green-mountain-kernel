@@ -7,7 +7,7 @@ import SwiftUI
 struct GMVibesWindow: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(DaemonConnectionModel.self) private var daemon
-    @Environment(GMCCEnvironment.self) private var gmcc
+    @Environment(GMVibesEnvironment.self) private var gmcc
     @State private var nav: WindowNav
     // Above the `.id(nav.route)` boundary so the non-persisted diagram
     // workspaces survive in-window navigation (including the session
@@ -22,7 +22,7 @@ struct GMVibesWindow: View {
     var body: some View {
         VStack(spacing: 0) {
             // Sandbox stacks are visually indistinguishable from prod except
-            // for this strip: GMCC_ROOT is set only by the sandbox launcher
+            // for this strip: GM_FS_ROOT is set only by the sandbox launcher
             // (gm sandbox refresh), never in a normal launch.
             if let sandboxRoot = Self.sandboxRoot {
                 SandboxBanner(root: sandboxRoot)
@@ -59,7 +59,7 @@ struct GMVibesWindow: View {
         }
         .focusedSceneValue(\.commandPalette) { nav.paletteOpen = true }
         // PATHS_GET loader at the window root (not Landing — instance-only
-        // windows need it too). GMCCEnvironment's env fetch can't live in its
+        // windows need it too). GMVibesEnvironment's env fetch can't live in its
         // synchronous init; the probe seeds values there and the daemon's
         // typed roots overlay them here on every generation bump and on
         // CONFIG_SET (.paths). Coalescing is the env's own change-gate.
@@ -90,10 +90,10 @@ struct GMVibesWindow: View {
         .environment(diagrams)
     }
 
-    /// Non-empty GMCC_ROOT == sandboxed. Read once: the env of a process
+    /// Non-empty GM_FS_ROOT == sandboxed. Read once: the env of a process
     /// never changes after launch.
     private static let sandboxRoot: String? = {
-        guard let root = ProcessInfo.processInfo.environment["GMCC_ROOT"],
+        guard let root = ProcessInfo.processInfo.environment["GM_FS_ROOT"],
               !root.isEmpty else { return nil }
         return root
     }()
@@ -179,7 +179,7 @@ struct GlobalToolbarGroup: ToolbarContent {
                 }
                 .help("Go back")
             }
-            GmccDaemonStatus()
+            GmDaemonStatus()
             Button {
                 nav.railOpen.toggle()
             } label: {

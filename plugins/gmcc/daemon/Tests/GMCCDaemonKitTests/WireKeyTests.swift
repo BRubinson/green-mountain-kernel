@@ -63,7 +63,7 @@ final class WireKeyTests: XCTestCase {
     /// key is unknown data now, and unknown keys have always been ignored.
     func testStaleCallerRoleKeyIsIgnoredNotRejected() throws {
         let line = Data(
-            #"{"protocol_version":\#(GMCCWireProtocol.version),"type":"PING","request_id":"r-4","caller_role":"agent"}"#
+            #"{"protocol_version":\#(GmWireProtocol.version),"type":"PING","request_id":"r-4","caller_role":"agent"}"#
                 .utf8)
         let head = try NDJSON.decode(RawEnvelopeHead.self, from: line)
         XCTAssertEqual(head.type, .ping, "the head must still decode")
@@ -74,7 +74,7 @@ final class WireKeyTests: XCTestCase {
         let stub = PromptStub(
             uuid: "u-1", sessionUuid: "s-1", seq: 3, code: "p3",
             name: "demo", status: "draft", version: 2,
-            ckfsRelativeStoragePath: "projects/r/prompts/3_demo",
+            gmfsRelativeStoragePath: "projects/r/prompts/3_demo",
             createdAt: "2026-08-22T00:00:00Z", updatedAt: "2026-08-22T00:00:00Z")
         let data = try NDJSON.encodeLine(stub)
         let json = try XCTUnwrap(

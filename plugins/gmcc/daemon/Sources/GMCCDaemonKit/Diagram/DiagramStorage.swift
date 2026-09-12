@@ -2,10 +2,10 @@ import Foundation
 
 /// Where a diagram's materialized files live.
 ///
-/// CKFS-rooted at EVERY tier. The predecessor anchored screenshots to the
+/// GMFS-rooted at EVERY tier. The predecessor anchored screenshots to the
 /// diagram's instance checkout, which is why a PROJECT-tier diagram could
 /// not have one at all: a project spans zero-to-many checkouts and none of
-/// them is "the" one. Every tier carries a `ckfs_relative_storage_path`, so
+/// them is "the" one. Every tier carries a `gmfs_relative_storage_path`, so
 /// rooting there removes the special case instead of working around it —
 /// and, incidentally, means the files are outside the repo, so there is no
 /// .gitignore to manage.
@@ -16,7 +16,7 @@ import Foundation
 public enum DiagramStorage {
 
     /// The path segment a diagram's own files live under, relative to its
-    /// owner's CKFS storage directory. `gmcc_diagram_path` was inert
+    /// owner's GMFS storage directory. `gmcc_diagram_path` was inert
     /// free-text with zero consumers before this; it is the override.
     public static let defaultDirectory = "diagrams"
     public static let screenshotsDirectory = "screenshots"
@@ -50,7 +50,7 @@ public enum DiagramStorage {
 
     // MARK: - Path hygiene
 
-    /// Split and validate, so a stored path can never climb out of the CKFS
+    /// Split and validate, so a stored path can never climb out of the GMFS
     /// root. This runs BEFORE any sandbox check — defence in depth, and it
     /// gives a comprehensible error instead of a containment refusal.
     public static func sanitizedSegments(_ raw: String, label: String) throws -> [String] {
@@ -60,7 +60,7 @@ public enum DiagramStorage {
         }
         guard !trimmed.hasPrefix("/") else {
             throw StoreError.badRequest(
-                detail: "\(label) must be CKFS-relative, not absolute: \(trimmed)")
+                detail: "\(label) must be GMFS-relative, not absolute: \(trimmed)")
         }
         let segments = trimmed.split(separator: "/").map(String.init)
         guard !segments.isEmpty else {

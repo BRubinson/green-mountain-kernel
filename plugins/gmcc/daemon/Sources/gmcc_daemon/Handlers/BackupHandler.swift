@@ -1,7 +1,7 @@
 import Foundation
 import GMCCDaemonKit
 
-/// BACKUP — SQLite Online Backup into ~/gmcc/backups/ (timestamped,
+/// BACKUP — SQLite Online Backup into ~/gmfs/backups/ (timestamped,
 /// collision-guarded). Emits a BACKUP event.
 enum BackupHandler {
     static func handle(line: Data, head: EnvelopeHead, store: Store) throws -> HandlerResult {

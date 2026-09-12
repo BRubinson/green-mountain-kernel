@@ -1,7 +1,7 @@
 import Foundation
 import GMCCDaemonKit
 
-// gmcc_hook — the shell-callable client.
+// gm_hook — the shell-callable client.
 //
 // WHY THIS BINARY EXISTS AT ALL, given the pen is Claude's only door: a Claude
 // Code hook is a SHELL process. It cannot open an MCP session, and the hook
@@ -15,7 +15,7 @@ import GMCCDaemonKit
 // CLI pulled, and it dies with it — 123 verbs' worth of declarative parsing was
 // its justification, and roughly a dozen ops verbs plus a passthrough is not.
 //
-// THE PASSTHROUGH IS THE POINT. `gmcc_hook call <MESSAGE_TYPE> --json '{...}'`
+// THE PASSTHROUGH IS THE POINT. `gm_hook call <MESSAGE_TYPE> --json '{...}'`
 // reaches every verb the daemon serves in ~80 lines, so deleting the typed CLI
 // costs a person at a terminal no capability whatsoever. What it costs is
 // discoverability, which is exactly the pressure that should exist: Claude uses

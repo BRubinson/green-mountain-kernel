@@ -14,14 +14,14 @@ public enum DaemonClientError: Error, Sendable {
     case wire(String)
 }
 
-/// NDJSON unix-socket REQUEST/RESPONSE client used by gmcc_hook, gmcc_mcp AND
+/// NDJSON unix-socket REQUEST/RESPONSE client used by gm_hook, gm_mcp AND
 /// GMVibes.
 ///
 /// Blocking POSIX socket I/O — connections are short-lived request/response
 /// exchanges; GMVibes wraps calls in a Task off the main actor, and an
 /// internal lock serializes concurrent request() callers so the shared fd
 /// and read buffer can never interleave frames. Connect-or-autostart: when
-/// the socket is dead the client spawns ~/gmcc/bin/gmcc_daemon (idempotent —
+/// the socket is dead the client spawns ~/gmfs/bin/gm_daemon (idempotent —
 /// the daemon's pidfile flock makes a duplicate spawn exit 0) and retries
 /// with capped backoff.
 ///
@@ -90,7 +90,7 @@ public final class DaemonClient: @unchecked Sendable {
             return try connectOnce()
         } catch DaemonClientError.protocolMismatch(let message, let daemonVersion) {
             closeLocked()
-            if let daemonVersion, daemonVersion >= GMCCWireProtocol.version {
+            if let daemonVersion, daemonVersion >= GmWireProtocol.version {
                 throw DaemonClientError.protocolMismatch(message: message, daemonVersion: daemonVersion)
             }
             try autostart()
@@ -115,7 +115,7 @@ public final class DaemonClient: @unchecked Sendable {
         } catch let error as DaemonClientError {
             // A wire failure usually means the daemon restarted under us
             // (EPIPE/EOF on a stale fd). A one-shot invocation never noticed;
-            // long-lived clients (gmcc_mcp, GMVibes) were permanently
+            // long-lived clients (gm_mcp, GMVibes) were permanently
             // bricked. Reset the socket and retry ONCE — the hello
             // handshake re-runs and the directional version logic still
             // applies; a second failure propagates.

@@ -9,7 +9,7 @@ import Foundation
 /// diagram.tier values — the chain-non-null ownership ladder.
 ///
 /// INSTANCE was removed by m0021. It existed to give a diagram a repo
-/// checkout to anchor a path against; screenshots now materialize under CKFS
+/// checkout to anchor a path against; screenshots now materialize under GMFS
 /// storage, which every remaining tier carries, so the rung had nothing left
 /// to do. A session or prompt diagram still reaches an instance transitively
 /// via session -> instance wherever one is genuinely needed.

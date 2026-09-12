@@ -24,7 +24,7 @@ struct PromptRecord: BaseRecordFields {
     var detail: String
     var command: String
     var status: String
-    var ckfsRelativeStoragePath: String
+    var gmfsRelativeStoragePath: String
 }
 
 /// Read-side mirror of the `prompt_activation` table. Columns map via convertFromSnakeCase.
@@ -99,7 +99,7 @@ extension PromptRecord {
             detail: detail,
             command: command,
             status: status,
-            ckfsRelativeStoragePath: ckfsRelativeStoragePath,
+            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
             createdAt: createdAt,
             updatedAt: updatedAt)
     }

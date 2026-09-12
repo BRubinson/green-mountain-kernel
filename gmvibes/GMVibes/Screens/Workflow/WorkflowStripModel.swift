@@ -11,7 +11,7 @@ import GMCCDaemonKit
 ///
 /// Every rule `make` encodes is a version-skew state this monorepo actually
 /// produces: the app is built against one compiled-in `WorkflowSpec` and
-/// talks to whatever daemon binary is installed in `~/gmcc/bin`, which may
+/// talks to whatever daemon binary is installed in `~/gmfs/bin`, which may
 /// be serving another. A variant this build has never heard of, or a phase
 /// code that is not in this build's graph, is a routine Tuesday — never a
 /// crash, never an empty strip, never a dropped highlight.

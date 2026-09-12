@@ -74,7 +74,7 @@ final class VerbRegistryTests: XCTestCase {
         let data = try WireCodec.prettyEncoder.encode(VerbLedger.build())
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         let verbs = try XCTUnwrap(json["verbs"] as? [[String: Any]])
-        XCTAssertFalse(verbs.isEmpty, "gmcc_hook verbs must list the MessageTypes it serves")
+        XCTAssertFalse(verbs.isEmpty, "gm_hook verbs must list the MessageTypes it serves")
         XCTAssertTrue(
             verbs.allSatisfy { ($0["message_type"] as? String)?.isEmpty == false },
             "every catalogue row must name its MessageType — that is what the reader is for")

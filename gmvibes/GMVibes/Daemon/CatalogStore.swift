@@ -3,7 +3,7 @@ import Observation
 import GMCCDaemonKit
 
 /// The whole project → instance → session tree, fetched in three unfiltered
-/// Listing calls and grouped in memory. At ckfs scale this is cheaper than the
+/// Listing calls and grouped in memory. At gmfs scale this is cheaper than the
 /// old per-level tree walk, deletes all browse polling, and pre-plumbs
 /// cross-instance search. Refreshes are driven by .topology invalidations
 /// from the event hub — the store owns no timer. Groups are sorted once at

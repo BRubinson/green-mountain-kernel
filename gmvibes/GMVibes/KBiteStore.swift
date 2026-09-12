@@ -14,7 +14,7 @@ enum KBiteRoot: String, CaseIterable, Hashable, Identifiable {
         }
     }
 
-    var envKey: GMCCEnvKey {
+    var envKey: GMVibesEnvKey {
         switch self {
         case .open: .kbiteOpen
         case .digested: .kbiteDigested
@@ -37,12 +37,12 @@ final class KBiteStore {
         rescanToken &+= 1
     }
 
-    func rootURL(for root: KBiteRoot, gmcc: GMCCEnvironment) -> URL? {
+    func rootURL(for root: KBiteRoot, gmcc: GMVibesEnvironment) -> URL? {
         guard let path = gmcc[root.envKey], !path.isEmpty else { return nil }
         return URL(fileURLWithPath: path, isDirectory: true)
     }
 
-    func kbites(in root: KBiteRoot, gmcc: GMCCEnvironment) -> [KBiteEntry] {
+    func kbites(in root: KBiteRoot, gmcc: GMVibesEnvironment) -> [KBiteEntry] {
         _ = rescanToken
         guard let dir = rootURL(for: root, gmcc: gmcc) else { return [] }
         let fm = FileManager.default

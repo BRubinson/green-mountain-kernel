@@ -2,7 +2,7 @@ import Foundation
 import GMCCDaemonKit
 
 let usage = """
-gmcc_hook — the shell-callable GMCC client.
+gm_hook — the shell-callable GMCC client.
 
 Claude records through the pen (the MCP server). This binary exists for the two
 callers that cannot: a shell hook, and a person at a terminal.

@@ -21,7 +21,7 @@ struct SessionRecord: BaseRecordFields {
     var backstory: String
     var goal: String
     var status: String
-    var ckfsRelativeStoragePath: String
+    var gmfsRelativeStoragePath: String
 }
 
 /// Read-side mirror of the `session_file` table. Columns map via convertFromSnakeCase.
@@ -72,7 +72,7 @@ struct SessionStubRecord: SnakeCaseDecoded {
     var instanceUuid: String
     var code: String
     var name: String
-    var ckfsRelativeStoragePath: String
+    var gmfsRelativeStoragePath: String
     var createdAt: String
     var updatedAt: String
     var lastActivityAt: String
@@ -87,7 +87,7 @@ extension SessionStubRecord {
             instanceUuid: instanceUuid,
             code: code,
             name: name,
-            ckfsRelativeStoragePath: ckfsRelativeStoragePath,
+            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
             createdAt: createdAt,
             updatedAt: updatedAt,
             lastActivityAt: lastActivityAt)

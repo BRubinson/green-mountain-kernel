@@ -80,7 +80,7 @@ final class Server: @unchecked Sendable {
         }
         listener.stateUpdateHandler = { state in
             if case .failed(let error) = state {
-                FileHandle.standardError.write(Data("[gmcc_daemon] listener failed: \(error)\n".utf8))
+                FileHandle.standardError.write(Data("[gm_daemon] listener failed: \(error)\n".utf8))
                 exit(1)
             }
         }
@@ -163,7 +163,7 @@ final class Server: @unchecked Sendable {
                 id: 0,
                 kind: DaemonEventKind.promptMemoryChange.rawValue,
                 subjectUuid: promptUuid,
-                payload: "{\"ckfs_relative_storage_path\":\(Self.jsonString(storagePath))}",
+                payload: "{\"gmfs_relative_storage_path\":\(Self.jsonString(storagePath))}",
                 createdAt: Store.isoNow()))
         }
     }
@@ -241,16 +241,16 @@ final class Server: @unchecked Sendable {
                 payload: ErrorPayload(code: .badRequest, message: "undecodable envelope: \(error)"))
         }
 
-        guard rawHead.protocolVersion == GMCCWireProtocol.version else {
-            let clientNewer = rawHead.protocolVersion > GMCCWireProtocol.version
+        guard rawHead.protocolVersion == GmWireProtocol.version else {
+            let clientNewer = rawHead.protocolVersion > GmWireProtocol.version
             let message = clientNewer
-                ? "daemon speaks v\(GMCCWireProtocol.version), client spoke newer v\(rawHead.protocolVersion) — daemon exiting for restart"
-                : "daemon speaks v\(GMCCWireProtocol.version), client spoke older v\(rawHead.protocolVersion) — rejected, daemon stays up"
+                ? "daemon speaks v\(GmWireProtocol.version), client spoke newer v\(rawHead.protocolVersion) — daemon exiting for restart"
+                : "daemon speaks v\(GmWireProtocol.version), client spoke older v\(rawHead.protocolVersion) — rejected, daemon stays up"
             let result = errorResult(
                 type: rawHead.type ?? .error, requestId: rawHead.requestId ?? "",
                 payload: ErrorPayload(
                     code: .protocolMismatch, message: message,
-                    daemonProtocolVersion: GMCCWireProtocol.version))
+                    daemonProtocolVersion: GmWireProtocol.version))
             return HandlerResult(line: result.line, postAction: clientNewer ? .shutdown : .none)
         }
 
@@ -259,7 +259,7 @@ final class Server: @unchecked Sendable {
                 type: .error, requestId: rawHead.requestId ?? "",
                 payload: ErrorPayload(
                     code: .unknownType,
-                    message: "unknown message type \(rawHead.typeRaw) at matching protocol v\(GMCCWireProtocol.version)"))
+                    message: "unknown message type \(rawHead.typeRaw) at matching protocol v\(GmWireProtocol.version)"))
         }
         let head = EnvelopeHead(
             protocolVersion: rawHead.protocolVersion,
@@ -273,7 +273,7 @@ final class Server: @unchecked Sendable {
                     print("[\(Store.isoNow())] client connected: \(hello.payload.clientName) pid \(hello.payload.pid)")
                     fflush(stdout)
                 }
-                let ack = HelloAck(daemonPid: getpid(), protocolVersion: GMCCWireProtocol.version)
+                let ack = HelloAck(daemonPid: getpid(), protocolVersion: GmWireProtocol.version)
                 let envelope = ResponseEnvelope<HelloAck>(
                     type: .hello, requestId: head.requestId, ok: true, payload: ack)
                 return HandlerResult(line: try NDJSON.encodeLine(envelope))
@@ -610,7 +610,7 @@ final class Server: @unchecked Sendable {
         // fail; the fallback is still a decodable error line rather than a
         // bare newline the client would report as a contextless wire error.
         let fallback = Data(
-            #"{"protocol_version":\#(GMCCWireProtocol.version),"type":"ERROR","request_id":"","ok":false,"error":{"code":"INTERNAL_ERROR","message":"error-envelope encoding failed"}}"#
+            #"{"protocol_version":\#(GmWireProtocol.version),"type":"ERROR","request_id":"","ok":false,"error":{"code":"INTERNAL_ERROR","message":"error-envelope encoding failed"}}"#
                 .utf8) + Data([0x0A])
         let line = (try? NDJSON.encodeLine(envelope)) ?? fallback
         return HandlerResult(line: line)

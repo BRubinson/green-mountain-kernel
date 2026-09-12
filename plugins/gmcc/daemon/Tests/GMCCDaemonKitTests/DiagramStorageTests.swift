@@ -1,7 +1,7 @@
 import XCTest
 @testable import GMCCDaemonKit
 
-/// CKFS-rooted render paths and the staleness key.
+/// GMFS-rooted render paths and the staleness key.
 ///
 /// The path arithmetic is pure, so it is tested without a filesystem. The
 /// fingerprint is tested for the property that actually matters: that it
@@ -10,7 +10,7 @@ final class DiagramStorageTests: XCTestCase {
 
     // MARK: - Path derivation, all three tiers
 
-    /// The whole point of moving to CKFS: every tier has a storage root, so
+    /// The whole point of moving to GMFS: every tier has a storage root, so
     /// PROJECT stops being the special case that could not render at all.
     func testEveryTierDerivesAScreenshotPath() throws {
         let project = try DiagramStorage.screenshotRelativePath(
@@ -52,13 +52,13 @@ final class DiagramStorageTests: XCTestCase {
     // MARK: - Containment (defence in depth, before the sandbox even runs)
 
     func testTraversalAndAbsolutePathsAreRefused() {
-        // A stored path climbing out of the CKFS root.
+        // A stored path climbing out of the GMFS root.
         XCTAssertThrowsError(try DiagramStorage.screenshotRelativePath(
             ownerStoragePath: "projects/../../etc", gmccDiagramPath: nil, diagramCode: "d"))
         XCTAssertThrowsError(try DiagramStorage.screenshotRelativePath(
             ownerStoragePath: "projects/repo", gmccDiagramPath: "../../etc",
             diagramCode: "d"))
-        // Absolute owner paths are a category error: these are CKFS-relative.
+        // Absolute owner paths are a category error: these are GMFS-relative.
         XCTAssertThrowsError(try DiagramStorage.screenshotRelativePath(
             ownerStoragePath: "/etc", gmccDiagramPath: nil, diagramCode: "d"))
         // A code carrying a separator would smuggle a directory.

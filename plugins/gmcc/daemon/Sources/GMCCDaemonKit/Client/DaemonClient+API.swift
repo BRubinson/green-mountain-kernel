@@ -1,7 +1,7 @@
 import Foundation
 
 // Typed one-method-per-message facade — the entire integration surface for
-// gmcc_hook, gmcc_mcp and GMVibes. Wraps the generic request plumbing; callers never touch
+// gm_hook, gm_mcp and GMVibes. Wraps the generic request plumbing; callers never touch
 // MessageType or responseType.
 
 extension DaemonClient {

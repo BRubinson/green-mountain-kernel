@@ -24,22 +24,22 @@ final class BriefingTests: XCTestCase {
             }
             try db.execute(sql: """
                 INSERT INTO project (id, uuid, version, created_at, updated_at,
-                    git_repo_name, code, name, ckfs_relative_storage_path)
+                    git_repo_name, code, name, gmfs_relative_storage_path)
                 VALUES (\(base("proj-1")), 'repo', 'repo', 'repo', 'projects/repo');
                 INSERT INTO instance (id, uuid, version, created_at, updated_at,
-                    project_uuid, code, name, absolute_file_system_path, ckfs_relative_storage_path)
+                    project_uuid, code, name, absolute_file_system_path, gmfs_relative_storage_path)
                 VALUES (\(base("inst-1")), 'proj-1', 'repo_1', 'repo_1', '/tmp/repo',
                         'projects/repo/instances/repo_1');
                 INSERT INTO session (id, uuid, version, created_at, updated_at,
-                    instance_uuid, code, name, backstory, goal, status, ckfs_relative_storage_path)
+                    instance_uuid, code, name, backstory, goal, status, gmfs_relative_storage_path)
                 VALUES (\(base("sess-1")), 'inst-1', 'main', 'main', '', '', 'active', 'x');
                 INSERT INTO prompt (id, uuid, version, created_at, updated_at,
                     session_uuid, seq, code, name, backstory, goal, detail, command, status,
-                    ckfs_relative_storage_path)
+                    gmfs_relative_storage_path)
                 VALUES (\(base("prompt-a")), 'sess-1', 1, 'p1', 'one', '', '', '', '', 'draft', '');
                 INSERT INTO prompt (id, uuid, version, created_at, updated_at,
                     session_uuid, seq, code, name, backstory, goal, detail, command, status,
-                    ckfs_relative_storage_path)
+                    gmfs_relative_storage_path)
                 VALUES (\(base("prompt-b")), 'sess-1', 2, 'p2', 'two', '', '', '', '', 'draft', '');
                 """)
         }
@@ -360,9 +360,9 @@ final class BriefingTests: XCTestCase {
     }
 
     /// Opportunity O2 — the JSON-args layer the repository tests never touch.
-    /// The pen (gmcc_mcp) builds this request from `Args.optStrings`, which
+    /// The pen (gm_mcp) builds this request from `Args.optStrings`, which
     /// maps a MISSING key to nil and `[]` to `[]`; the whole nil-vs-empty
-    /// design leans on that distinction surviving the decode. gmcc_mcp is an
+    /// design leans on that distinction surviving the decode. gm_mcp is an
     /// executable target and cannot be imported here, so the contract is
     /// asserted where it actually lives: the Codable layer both sides share.
     func testBriefingCompleteRequestDecodePreservesEmptyVersusAbsent() throws {
@@ -569,12 +569,12 @@ final class BriefingTests: XCTestCase {
     func testFileChangeAttributionIgnoresTheActivationClaim() throws {
         let project = ProjectContext(
             gitRepoName: "repo", code: "repo", name: "repo",
-            ckfsRelativeStoragePath: "projects/repo")
+            gmfsRelativeStoragePath: "projects/repo")
         let instance = InstanceContext(
             code: "repo_1", name: "repo_1", absoluteFileSystemPath: "/tmp/repo",
-            ckfsRelativeStoragePath: "projects/repo/instances/repo_1")
+            gmfsRelativeStoragePath: "projects/repo/instances/repo_1")
         let session = SessionContext(
-            code: "main", name: "main", ckfsRelativeStoragePath: "x")
+            code: "main", name: "main", gmfsRelativeStoragePath: "x")
 
         func add(auto: Bool) throws -> String? {
             let response = try store.addFileChange(FileChangeAdd(

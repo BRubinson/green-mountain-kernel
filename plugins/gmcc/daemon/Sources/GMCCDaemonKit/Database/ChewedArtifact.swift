@@ -2,7 +2,7 @@ import Foundation
 
 // Lenient section-scanner for {name}_chewed.md artifacts (the
 // gmcc_agent_kbite_crunch_chew output contract). Deliberately dependency-free
-// and tolerant, in the same spirit as CkfsYaml's yaml scanning: a malformed
+// and tolerant, in the same spirit as GmFsYaml's yaml scanning: a malformed
 // chewed file yields a thin ChewedArtifact (body always survives verbatim),
 // never a parse error — digest must not lose a resource to format drift.
 

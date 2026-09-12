@@ -26,14 +26,14 @@ final class PenResultNarrowingTests: XCTestCase {
             let now = Store.isoNow()
             try db.execute(sql: """
                 INSERT INTO project (uuid, version, created_at, updated_at,
-                    git_repo_name, code, name, ckfs_relative_storage_path)
+                    git_repo_name, code, name, gmfs_relative_storage_path)
                 VALUES ('proj-1', 0, '\(now)', '\(now)', 'repo', 'repo', 'repo', 'projects/repo');
                 INSERT INTO instance (uuid, version, created_at, updated_at,
-                    project_uuid, code, name, absolute_file_system_path, ckfs_relative_storage_path)
+                    project_uuid, code, name, absolute_file_system_path, gmfs_relative_storage_path)
                 VALUES ('inst-1', 0, '\(now)', '\(now)', 'proj-1', 'repo_1', 'repo_1', '/tmp/pen-narrow-repo',
                         'projects/repo/instances/repo_1');
                 INSERT INTO session (uuid, version, created_at, updated_at,
-                    instance_uuid, code, name, backstory, goal, status, ckfs_relative_storage_path)
+                    instance_uuid, code, name, backstory, goal, status, gmfs_relative_storage_path)
                 VALUES ('sess-1', 0, '\(now)', '\(now)', 'inst-1', 'main', 'main', '', '', 'active',
                         'projects/repo/instances/repo_1/sessions/main');
                 """)

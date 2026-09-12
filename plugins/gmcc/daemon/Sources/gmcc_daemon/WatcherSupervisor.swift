@@ -1,7 +1,7 @@
 import Foundation
 import GMCCDaemonKit
 
-/// Owns both watchers and the ONE recompute path serving A3 (ckfs re-rooting)
+/// Owns both watchers and the ONE recompute path serving A3 (gmfs re-rooting)
 /// and A8 (instance-set churn). It recomputes both watched sets from
 /// committed db state and pushes them down; both pushes are idempotent, so a
 /// rebuild triggered by an irrelevant change costs two comparisons.
@@ -23,11 +23,11 @@ final class WatcherSupervisor: @unchecked Sendable {
 
     /// Recompute both watched sets from committed db state.
     func rebuild() {
-        let ckfs = (try? store.configValue(.ckfsRoot)).flatMap { $0 }
-        let watchableCkfs = ckfs.flatMap {
+        let gmfs = (try? store.configValue(.gmFsRoot)).flatMap { $0 }
+        let watchableGmfs = gmfs.flatMap {
             FileManager.default.fileExists(atPath: $0) ? $0 : nil
         }
-        memory.setRoot(watchableCkfs)
+        memory.setRoot(watchableGmfs)
 
         let instances = (try? store.listInstances(
             InstanceListRequest(projectUuid: nil)).instances) ?? []
@@ -45,7 +45,7 @@ final class WatcherSupervisor: @unchecked Sendable {
         if !bootLogged {
             bootLogged = true
             print("[\(Store.isoNow())] watchers: memory "
-                + (watchableCkfs.map { "on \($0)" } ?? "disabled (no ckfs_root configured or path missing)")
+                + (watchableGmfs.map { "on \($0)" } ?? "disabled (no gmfs_root configured or path missing)")
                 + ", checkout on \(roots.count) instance repo(s)")
             fflush(stdout)
         }

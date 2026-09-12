@@ -2,14 +2,18 @@ import GRDB
 import XCTest
 @testable import GMCCDaemonKit
 
-/// Runs the real migrator against a COPY of the production database when one
-/// is present. Guards the migrations that move data (m0012's five-table
-/// rebuild) against the only dataset that actually matters. Silently skips
-/// when the copy is absent, so CI on a clean machine stays green.
+/// Runs the real migrator against a COPY of a real database when one is
+/// present. Guards the migrations that move data (m0012's five-table rebuild)
+/// against the only dataset that actually matters. Silently skips when the copy
+/// is absent, so CI on a clean machine stays green.
+///
+/// `GM_TEST_DB_COPY` must point at a COPY the caller made. This test MIGRATES
+/// what it is given, so pointing it at a live database would mutate it — the
+/// skip-by-default shape is what keeps that from being the accidental case.
 final class LiveMigrationSmokeTests: XCTestCase {
     func testMigratesACopyOfTheLiveDatabaseWithoutLosingRows() throws {
-        let copy = ProcessInfo.processInfo.environment["GMCC_LIVE_DB_COPY"]
-        try XCTSkipIf(copy == nil, "set GMCC_LIVE_DB_COPY to exercise this")
+        let copy = ProcessInfo.processInfo.environment["GM_TEST_DB_COPY"]
+        try XCTSkipIf(copy == nil, "set GM_TEST_DB_COPY to a COPY to exercise this")
         let path = copy!
         try XCTSkipUnless(FileManager.default.fileExists(atPath: path))
 

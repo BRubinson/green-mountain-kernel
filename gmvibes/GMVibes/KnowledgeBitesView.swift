@@ -17,7 +17,7 @@ struct KBitesScene: View {
 }
 
 struct KnowledgeBitesView: View {
-    @Environment(GMCCEnvironment.self) private var gmcc
+    @Environment(GMVibesEnvironment.self) private var gmcc
     @Environment(KBiteStore.self) private var store
 
     private enum KBiteTab: Hashable { case open, digested, search }
@@ -50,7 +50,7 @@ struct KnowledgeBitesView: View {
                     Label("Open in VS Code", systemImage: "chevron.left.forwardslash.chevron.right")
                 }
                 .disabled(rootFolderURL == nil)
-                .help("Open this kbites folder (in the ckfs) in VS Code")
+                .help("Open this kbites folder (in the gmfs) in VS Code")
             }
             ToolbarItem {
                 Button {
@@ -62,9 +62,9 @@ struct KnowledgeBitesView: View {
         }
     }
 
-    // The ckfs folder backing the current tab (open / digested kbites root).
+    // The gmfs folder backing the current tab (open / digested kbites root).
     private var rootFolderURL: URL? {
-        let key: GMCCEnvKey
+        let key: GMVibesEnvKey
         switch selectedTab {
         case .open: key = KBiteRoot.open.envKey
         case .digested, .search: key = KBiteRoot.digested.envKey
@@ -231,7 +231,7 @@ private struct KBiteSearchPane: View {
 private struct KBitesPaneView: View {
     let root: KBiteRoot
 
-    @Environment(GMCCEnvironment.self) private var gmcc
+    @Environment(GMVibesEnvironment.self) private var gmcc
     @Environment(KBiteStore.self) private var store
 
     @State private var selectedFile: URL?

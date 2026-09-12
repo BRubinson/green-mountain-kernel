@@ -1,6 +1,6 @@
 import Foundation
 
-// Typed read-side DTOs — the row shapes GMVibes and gmcc_hook render from.
+// Typed read-side DTOs — the row shapes GMVibes and gm_hook render from.
 // Same lowering conventions as Messages.swift.
 
 // MARK: - Project
@@ -11,7 +11,7 @@ public struct ProjectRow: Codable, Hashable, Sendable {
     public let gitRepoName: String
     public let code: String
     public let name: String
-    public let ckfsRelativeStoragePath: String
+    public let gmfsRelativeStoragePath: String
     /// BASE_DOPED_BRANCH — the branch whose SESSION_INSTANCE dope scope may
     /// promote into this project's BASE_PROJECT scope. Defaults to "main"
     /// (m0011 backfills every existing row); user-configured through
@@ -29,7 +29,7 @@ public struct ProjectRow: Codable, Hashable, Sendable {
         gitRepoName: String,
         code: String,
         name: String,
-        ckfsRelativeStoragePath: String,
+        gmfsRelativeStoragePath: String,
         primaryProjectBranch: String = "main",
         createdAt: String,
         updatedAt: String
@@ -39,7 +39,7 @@ public struct ProjectRow: Codable, Hashable, Sendable {
         self.gitRepoName = gitRepoName
         self.code = code
         self.name = name
-        self.ckfsRelativeStoragePath = ckfsRelativeStoragePath
+        self.gmfsRelativeStoragePath = gmfsRelativeStoragePath
         self.primaryProjectBranch = primaryProjectBranch
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -55,8 +55,8 @@ public struct ProjectRow: Codable, Hashable, Sendable {
         self.gitRepoName = try c.decode(String.self, forKey: .gitRepoName)
         self.code = try c.decode(String.self, forKey: .code)
         self.name = try c.decode(String.self, forKey: .name)
-        self.ckfsRelativeStoragePath =
-            try c.decode(String.self, forKey: .ckfsRelativeStoragePath)
+        self.gmfsRelativeStoragePath =
+            try c.decode(String.self, forKey: .gmfsRelativeStoragePath)
         self.primaryProjectBranch =
             try c.decodeIfPresent(String.self, forKey: .primaryProjectBranch) ?? "main"
         self.createdAt = try c.decode(String.self, forKey: .createdAt)
@@ -73,7 +73,7 @@ public struct InstanceRow: Codable, Hashable, Sendable {
     public let code: String
     public let name: String
     public let absoluteFileSystemPath: String
-    public let ckfsRelativeStoragePath: String
+    public let gmfsRelativeStoragePath: String
     public let createdAt: String
     public let updatedAt: String
 
@@ -84,7 +84,7 @@ public struct InstanceRow: Codable, Hashable, Sendable {
         code: String,
         name: String,
         absoluteFileSystemPath: String,
-        ckfsRelativeStoragePath: String,
+        gmfsRelativeStoragePath: String,
         createdAt: String,
         updatedAt: String
     ) {
@@ -94,7 +94,7 @@ public struct InstanceRow: Codable, Hashable, Sendable {
         self.code = code
         self.name = name
         self.absoluteFileSystemPath = absoluteFileSystemPath
-        self.ckfsRelativeStoragePath = ckfsRelativeStoragePath
+        self.gmfsRelativeStoragePath = gmfsRelativeStoragePath
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -114,7 +114,7 @@ public struct SessionStub: Codable, Hashable, Sendable {
     public let instanceUuid: String
     public let code: String
     public let name: String
-    public let ckfsRelativeStoragePath: String
+    public let gmfsRelativeStoragePath: String
     public let createdAt: String
     public let updatedAt: String
     public let lastActivityAt: String
@@ -125,7 +125,7 @@ public struct SessionStub: Codable, Hashable, Sendable {
         instanceUuid: String,
         code: String,
         name: String,
-        ckfsRelativeStoragePath: String,
+        gmfsRelativeStoragePath: String,
         createdAt: String,
         updatedAt: String,
         lastActivityAt: String
@@ -135,7 +135,7 @@ public struct SessionStub: Codable, Hashable, Sendable {
         self.instanceUuid = instanceUuid
         self.code = code
         self.name = name
-        self.ckfsRelativeStoragePath = ckfsRelativeStoragePath
+        self.gmfsRelativeStoragePath = gmfsRelativeStoragePath
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.lastActivityAt = lastActivityAt
@@ -219,7 +219,7 @@ public struct PromptRow: Codable, Hashable, Sendable {
     public let detail: String
     public let command: String
     public let status: String
-    public let ckfsRelativeStoragePath: String
+    public let gmfsRelativeStoragePath: String
     public let createdAt: String
     public let updatedAt: String
 
@@ -237,7 +237,7 @@ public struct PromptRow: Codable, Hashable, Sendable {
         detail: String,
         command: String,
         status: String,
-        ckfsRelativeStoragePath: String,
+        gmfsRelativeStoragePath: String,
         createdAt: String,
         updatedAt: String
     ) {
@@ -252,7 +252,7 @@ public struct PromptRow: Codable, Hashable, Sendable {
         self.detail = detail
         self.command = command
         self.status = status
-        self.ckfsRelativeStoragePath = ckfsRelativeStoragePath
+        self.gmfsRelativeStoragePath = gmfsRelativeStoragePath
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -270,7 +270,7 @@ public struct PromptStub: Codable, Hashable, Sendable {
     public let name: String
     public let status: String
     public let version: Int64
-    public let ckfsRelativeStoragePath: String
+    public let gmfsRelativeStoragePath: String
     /// Present only when PROMPT_LIST was called with `with_reports` — nested
     /// so "not requested" (nil) and "requested, none exists" (present with
     /// nil members) stay distinguishable.
@@ -286,7 +286,7 @@ public struct PromptStub: Codable, Hashable, Sendable {
         name: String,
         status: String,
         version: Int64,
-        ckfsRelativeStoragePath: String,
+        gmfsRelativeStoragePath: String,
         reports: PromptReportsStub? = nil,
         createdAt: String,
         updatedAt: String
@@ -298,7 +298,7 @@ public struct PromptStub: Codable, Hashable, Sendable {
         self.name = name
         self.status = status
         self.version = version
-        self.ckfsRelativeStoragePath = ckfsRelativeStoragePath
+        self.gmfsRelativeStoragePath = gmfsRelativeStoragePath
         self.reports = reports
         self.createdAt = createdAt
         self.updatedAt = updatedAt

@@ -12,7 +12,7 @@ enum StatusHandler {
     ) throws -> HandlerResult {
         let response = StatusResponse(
             daemonPid: getpid(),
-            protocolVersion: GMCCWireProtocol.version,
+            protocolVersion: GmWireProtocol.version,
             socketPath: Paths.socket.path,
             dbPath: store.dbPath,
             schemaVersion: try store.schemaVersion(),

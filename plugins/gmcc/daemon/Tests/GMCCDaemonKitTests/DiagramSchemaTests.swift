@@ -25,21 +25,21 @@ final class DiagramSchemaTests: XCTestCase {
             }
             try db.execute(sql: """
                 INSERT INTO project (id, uuid, version, created_at, updated_at,
-                    git_repo_name, code, name, ckfs_relative_storage_path)
+                    git_repo_name, code, name, gmfs_relative_storage_path)
                 VALUES (\(base("proj-1")), 'repo', 'repo', 'repo', 'projects/repo');
 
                 INSERT INTO instance (id, uuid, version, created_at, updated_at,
-                    project_uuid, code, name, absolute_file_system_path, ckfs_relative_storage_path)
+                    project_uuid, code, name, absolute_file_system_path, gmfs_relative_storage_path)
                 VALUES (\(base("inst-1")), 'proj-1', 'repo_1', 'repo_1', '/tmp/repo',
                         'projects/repo/instances/repo_1');
 
                 INSERT INTO session (id, uuid, version, created_at, updated_at,
-                    instance_uuid, code, name, backstory, goal, status, ckfs_relative_storage_path)
+                    instance_uuid, code, name, backstory, goal, status, gmfs_relative_storage_path)
                 VALUES (\(base("sess-1")), 'inst-1', 'main', 'main', '', '', 'active', 'x');
 
                 INSERT INTO prompt (id, uuid, version, created_at, updated_at,
                     session_uuid, seq, code, name, backstory, goal, detail, command, status,
-                    ckfs_relative_storage_path)
+                    gmfs_relative_storage_path)
                 VALUES (\(base("prompt-a")), 'sess-1', 1, 'p1', 'one', '', '', '', '', 'draft', '');
                 """)
         }
@@ -103,7 +103,7 @@ final class DiagramSchemaTests: XCTestCase {
     }
 
     /// m0021 removed the INSTANCE tier outright — it existed only to give a
-    /// diagram a repo checkout to anchor a path against, and CKFS storage
+    /// diagram a repo checkout to anchor a path against, and GMFS storage
     /// gives every remaining tier a root.
     func testInstanceTierIsNoLongerAcceptedBySchema() throws {
         try store.dbQueue.write { db in
@@ -116,7 +116,7 @@ final class DiagramSchemaTests: XCTestCase {
     /// INVERTED BY m0021, deliberately. This test previously asserted the
     /// opposite — that a path at PROJECT tier was refused — because only an
     /// instance carried a filesystem checkout. Screenshots now materialize
-    /// under CKFS storage, which a project has as much as a session does, so
+    /// under GMFS storage, which a project has as much as a session does, so
     /// the CHECK was dropped and a path is legal at every tier.
     func testGmccDiagramPathIsLegalAtEveryTier() throws {
         try store.dbQueue.write { db in
@@ -300,6 +300,6 @@ final class DiagramSchemaTests: XCTestCase {
     /// pins the current value so a migration can never land silently.
     func testSchemaVersionMatchesCompiledConstant() throws {
         XCTAssertEqual(try store.schemaVersion(), Migrations.currentSchemaVersion)
-        XCTAssertEqual(Migrations.currentSchemaVersion, 26)
+        XCTAssertEqual(Migrations.currentSchemaVersion, 27)
     }
 }

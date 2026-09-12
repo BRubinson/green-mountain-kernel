@@ -16,9 +16,9 @@ import Foundation
 /// wrong write path is the wrong write path, everywhere, at once.
 ///
 /// Verbs with no pen tool are written the way every other daemon verb is
-/// reachable: `gmcc_hook call <MESSAGE_TYPE> --json '{...}'` (or `--json-file`
+/// reachable: `gm_hook call <MESSAGE_TYPE> --json '{...}'` (or `--json-file`
 /// when the body is larger than an argv can carry). Keys are the wire's
-/// snake_case, sent verbatim. `gmcc_hook verbs --json` lists every type the
+/// snake_case, sent verbatim. `gm_hook verbs --json` lists every type the
 /// daemon serves.
 public enum WorkflowSpec {
 
@@ -128,13 +128,13 @@ public enum WorkflowSpec {
             mcp__plugin_gmcc_pen__clarify_note_add (weight 0-999, 0 = critical), written \
             from the ranked record rather than from a re-read of the repo.
             When the pass returns, the primary seals the suite: \
-            gmcc_hook call CLARIFY_SEAL --json \
+            gm_hook call CLARIFY_SEAL --json \
             '{"summary_uuid":"<clarification>","expected_version":V}'.
             """
         case .clarifyUser:
             var text = """
             Ask the user each open question (AskUserQuestion; options mirror the option \
-            rows), record each answer with gmcc_hook call CLARIFY_ANSWER --json \
+            rows), record each answer with gm_hook call CLARIFY_ANSWER --json \
             '{"question_uuid":"Q","expected_version":V,"answer_text":"...", \
             "selected_option_uuids":["<option>"],"skip":false}'. At most 2 generative \
             follow-up passes: question-add stays legal while the summary is answering, so \
@@ -142,7 +142,7 @@ public enum WorkflowSpec {
             """
             if variant == .bot {
                 text += """
-                 When every question is answered or skipped: gmcc_hook call \
+                 When every question is answered or skipped: gm_hook call \
                 CLARIFY_FINALIZE --json \
                 '{"summary_uuid":"<clarification>","expected_version":V}' (pure gate), \
                 then mcp__plugin_gmcc_pen__prompt_set_status status: architecting.
@@ -151,14 +151,14 @@ public enum WorkflowSpec {
             return text
         case .carePackage:
             return """
-            Open the package: gmcc_hook call CARE_PACKAGE_OPEN --json \
+            Open the package: gm_hook call CARE_PACKAGE_OPEN --json \
             '{"summary_uuid":"<clarification summary>"}'. Then curate through the pen: \
             mcp__plugin_gmcc_pen__care_ref_add with kind dope|kbite|exploration \
             (exploration entries are COPIES of ranked findings written with more intent — \
             never re-explore). Finish with mcp__plugin_gmcc_pen__care_package_complete, \
             clarified_intent being backstory+goal+detail as clarified. The intent \
             lives ONLY here — it is never written back to the prompt row. Then \
-            gmcc_hook call CLARIFY_FINALIZE --json \
+            gm_hook call CLARIFY_FINALIZE --json \
             '{"summary_uuid":"<clarification>","expected_version":V}' (pure gate) and \
             mcp__plugin_gmcc_pen__prompt_set_status status: architecting.
             """
@@ -176,7 +176,7 @@ public enum WorkflowSpec {
                 mcp__plugin_gmcc_pen__arch_decide (option_uuid, expected_version, \
                 rationale — it stamps selected, rejects siblings, records why; offer \
                 unused-option features to the user later). Then expand ONLY the selected \
-                option into rows, persistence FIRST: gmcc_hook call ARCH_PERSIST_ADD \
+                option into rows, persistence FIRST: gm_hook call ARCH_PERSIST_ADD \
                 --json '{"summary_uuid":"S","class_name":"...","file_path":"...", \
                 "reason_brief":"...","change_kind":"add|modify|rename|delete", \
                 "dope_ref":"<entity code>"}', then ARCH_FIELD_ADD (change_kind, \
@@ -189,7 +189,7 @@ public enum WorkflowSpec {
             Design in context (bot) or via your single subagent (rpi) from the clarified \
             record — in rpi the subagent PROPOSES and returns its proposal in its final \
             message; the primary is what persists it. Every row is written db-natively, \
-            persistence FIRST: gmcc_hook call ARCH_PERSIST_ADD --json \
+            persistence FIRST: gm_hook call ARCH_PERSIST_ADD --json \
             '{"summary_uuid":"S","class_name":"...","file_path":"...", \
             "reason_brief":"...","change_kind":"add|modify|rename|delete", \
             "dope_ref":"<entity code>"}', then ARCH_FIELD_ADD (dope_property_ref for \
@@ -200,12 +200,12 @@ public enum WorkflowSpec {
             """
         case .planGate:
             return """
-            gmcc_hook call ARCH_PROPOSE --json '{"summary_uuid":"S","expected_version":V}', \
+            gm_hook call ARCH_PROPOSE --json '{"summary_uuid":"S","expected_version":V}', \
             then present the plan for user sign-off — ALWAYS include the full persistence \
             delta table (positive AND negative changes, dope refs shown). Approve → \
-            gmcc_hook call ARCH_APPROVE --json '{"summary_uuid":"S","expected_version":V}' \
+            gm_hook call ARCH_APPROVE --json '{"summary_uuid":"S","expected_version":V}' \
             + mcp__plugin_gmcc_pen__prompt_set_status status: implementing (it claims the \
-            activation). Modify → gmcc_hook call ARCH_REVISE --json \
+            activation). Modify → gm_hook call ARCH_REVISE --json \
             '{"summary_uuid":"S","expected_version":V}' and return to architecture.
             """
         case .implement:
@@ -251,13 +251,13 @@ public enum WorkflowSpec {
             }
             return """
             mcp__plugin_gmcc_pen__prompt_set_status status: reviewing, then open the \
-            summary: gmcc_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'. \
+            summary: gm_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'. \
             \(spawn) Reviewers scope themselves with mcp__plugin_gmcc_pen__arch_get and \
             mcp__plugin_gmcc_pen__file_change_list, read the record so far with \
             mcp__plugin_gmcc_pen__review_get, and write their findings with \
             mcp__plugin_gmcc_pen__review_finding_add, each rating its own. The primary \
             then runs the one cross-agent calibration pass \
-            (mcp__plugin_gmcc_pen__review_rank) and seals with gmcc_hook call \
+            (mcp__plugin_gmcc_pen__review_rank) and seals with gm_hook call \
             REVIEW_COMPLETE, whose payload is summary_uuid, expected_version, overview and \
             verdict (approved|approved_with_nits|changes_requested). It refuses unranked \
             findings. Write the payload to a file and pass --json-file: an overview is \
@@ -266,7 +266,7 @@ public enum WorkflowSpec {
         case .reviewFix:
             return """
             Clarify fix intent with the user (fix all / fix critical / proceed), then run \
-            the fix loop: every finding under rating 100 gets gmcc_hook call \
+            the fix loop: every finding under rating 100 gets gm_hook call \
             REVIEW_RESOLVE --json '{"finding_uuid":"F","expected_version":V, \
             "status":"fixed|accepted|wont_fix"}' (legal after complete by design — the fix \
             loop runs post-seal). The fixes are implementation and carry implementation's \

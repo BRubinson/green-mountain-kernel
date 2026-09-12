@@ -19,7 +19,7 @@ struct InstanceRecord: BaseRecordFields {
     var code: String
     var name: String
     var absoluteFileSystemPath: String
-    var ckfsRelativeStoragePath: String
+    var gmfsRelativeStoragePath: String
 }
 
 extension InstanceRecord {
@@ -32,7 +32,7 @@ extension InstanceRecord {
             code: code,
             name: name,
             absoluteFileSystemPath: absoluteFileSystemPath,
-            ckfsRelativeStoragePath: ckfsRelativeStoragePath,
+            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
             createdAt: createdAt,
             updatedAt: updatedAt
         )

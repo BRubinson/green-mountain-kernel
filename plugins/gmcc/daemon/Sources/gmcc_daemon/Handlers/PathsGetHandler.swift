@@ -1,7 +1,7 @@
 import Foundation
 import GMCCDaemonKit
 
-/// PATHS_GET — typed runtime/ckfs/kbite roots from Paths + daemon_config.
+/// PATHS_GET — typed runtime/gmfs/kbite roots from Paths + daemon_config.
 enum PathsGetHandler {
     static func handle(line: Data, head: EnvelopeHead, store: Store) throws -> HandlerResult {
         _ = try decodePayload(PathsGetRequest.self, from: line)

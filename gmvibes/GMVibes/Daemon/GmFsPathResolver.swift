@@ -2,15 +2,15 @@ import Foundation
 import GMCCDaemonKit
 
 /// Filesystem derivations off daemon rows, isolated in one place. Rows carry
-/// ckfs-RELATIVE storage paths; everything here resolves against
-/// $GMCC_CKFS_ROOT. Historical archiving moved PROMPT folders (not session
+/// gmfs-RELATIVE storage paths; everything here resolves against
+/// $GM_FS_ROOT. Historical archiving moved PROMPT folders (not session
 /// dirs) into _archive/cold_storage/<same relative path>, so the archive
 /// mirror is probed at the prompt-folder level, where archiving actually
 /// happened.
 ///
 /// All functions perform synchronous FileManager probes — callers resolve
 /// off the main actor and cache the results (never call from a View body).
-nonisolated enum CkfsPathResolver {
+nonisolated enum GmFsPathResolver {
     /// Slug rule shared with prompt codes (mirrors the historical folder
     /// segment rule; also used by CreatePromptView's code preview).
     ///
@@ -34,42 +34,42 @@ nonisolated enum CkfsPathResolver {
         return out
     }
 
-    private static func archiveMirror(relative: String, ckfsRoot: String) -> URL {
-        URL(fileURLWithPath: ckfsRoot, isDirectory: true)
+    private static func archiveMirror(relative: String, gmFsRoot: String) -> URL {
+        URL(fileURLWithPath: gmFsRoot, isDirectory: true)
             .appendingPathComponent("_archive/cold_storage", isDirectory: true)
             .appendingPathComponent(relative, isDirectory: true)
     }
 
-    /// Resolve a ckfs-relative path, falling back to the archive mirror when
+    /// Resolve a gmfs-relative path, falling back to the archive mirror when
     /// the live location is gone. Returns the live URL when neither exists
     /// (callers render empty states off a missing directory).
-    static func resolve(relative: String, ckfsRoot: String) -> URL {
-        let live = URL(fileURLWithPath: ckfsRoot, isDirectory: true)
+    static func resolve(relative: String, gmFsRoot: String) -> URL {
+        let live = URL(fileURLWithPath: gmFsRoot, isDirectory: true)
             .appendingPathComponent(relative, isDirectory: true)
         if FileManager.default.fileExists(atPath: live.path) { return live }
-        let archived = archiveMirror(relative: relative, ckfsRoot: ckfsRoot)
+        let archived = archiveMirror(relative: relative, gmFsRoot: gmFsRoot)
         if FileManager.default.fileExists(atPath: archived.path) { return archived }
         return live
     }
 
-    static func sessionDir(ckfsRoot: String, session: SessionStub) -> URL {
-        URL(fileURLWithPath: ckfsRoot, isDirectory: true)
-            .appendingPathComponent(session.ckfsRelativeStoragePath, isDirectory: true)
+    static func sessionDir(gmFsRoot: String, session: SessionStub) -> URL {
+        URL(fileURLWithPath: gmFsRoot, isDirectory: true)
+            .appendingPathComponent(session.gmfsRelativeStoragePath, isDirectory: true)
     }
 
     /// A prompt's folder, or nil when it has no filesystem presence. The
-    /// row's `ckfs_relative_storage_path` is the ONLY source (probed live,
+    /// row's `gmfs_relative_storage_path` is the ONLY source (probed live,
     /// then in the archive mirror — archiving moves prompt folders, leaving
     /// the session dir live with an emptied prompts/). There is NO folder
     /// guessing: a guessed `<seq>_*` folder can collide with a stranger's
     /// files, so an empty path renders a non-blocking unavailable state
     /// instead.
-    static func promptFolder(ckfsRoot: String, storagePath: String) -> URL? {
+    static func promptFolder(gmFsRoot: String, storagePath: String) -> URL? {
         guard !storagePath.isEmpty else { return nil }
-        let live = URL(fileURLWithPath: ckfsRoot, isDirectory: true)
+        let live = URL(fileURLWithPath: gmFsRoot, isDirectory: true)
             .appendingPathComponent(storagePath, isDirectory: true)
         if FileManager.default.fileExists(atPath: live.path) { return live }
-        let archived = archiveMirror(relative: storagePath, ckfsRoot: ckfsRoot)
+        let archived = archiveMirror(relative: storagePath, gmFsRoot: gmFsRoot)
         if FileManager.default.fileExists(atPath: archived.path) { return archived }
         return nil
     }
@@ -78,7 +78,7 @@ nonisolated enum CkfsPathResolver {
     /// daemon's MemoryWatcher resolves against.
     struct ResolvedMemory: Equatable, Sendable {
         let root: URL?
-        /// True only when `root` IS `<ckfsRoot>/<storagePath>/memory` — the
+        /// True only when `root` IS `<gmFsRoot>/<storagePath>/memory` — the
         /// directory PROMPT_MEMORY_CHANGED describes. The artifact-common-
         /// ancestor rule can legitimately land elsewhere, and the event would
         /// never describe that directory: only this flag may switch the
@@ -92,12 +92,12 @@ nonisolated enum CkfsPathResolver {
     /// 2. The storage-path folder's memory/ subdirectory.
     /// Root is nil when neither resolves.
     static func memoryRoot(
-        ckfsRoot: String,
+        gmFsRoot: String,
         storagePath: String = "",
         artifacts: [ArtifactRow]
     ) -> ResolvedMemory {
         let watched: URL? = storagePath.isEmpty ? nil :
-            URL(fileURLWithPath: ckfsRoot, isDirectory: true)
+            URL(fileURLWithPath: gmFsRoot, isDirectory: true)
                 .appendingPathComponent(storagePath, isDirectory: true)
                 .appendingPathComponent("memory", isDirectory: true)
         func wrap(_ root: URL?) -> ResolvedMemory {
@@ -110,7 +110,7 @@ nonisolated enum CkfsPathResolver {
             let path = artifact.filePath
             let fileURL: URL = path.hasPrefix("/")
                 ? URL(fileURLWithPath: path)
-                : URL(fileURLWithPath: ckfsRoot, isDirectory: true).appendingPathComponent(path)
+                : URL(fileURLWithPath: gmFsRoot, isDirectory: true).appendingPathComponent(path)
             let parent = fileURL.deletingLastPathComponent()
             return FileManager.default.fileExists(atPath: parent.path) ? parent : nil
         }
@@ -123,7 +123,7 @@ nonisolated enum CkfsPathResolver {
             }
             if common.path != "/" { return wrap(common) }
         }
-        let folder = promptFolder(ckfsRoot: ckfsRoot, storagePath: storagePath)
+        let folder = promptFolder(gmFsRoot: gmFsRoot, storagePath: storagePath)
         return wrap(folder.map { $0.appendingPathComponent("memory", isDirectory: true) })
     }
 }

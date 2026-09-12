@@ -28,14 +28,14 @@ final class DopeRepoVerbTests: XCTestCase {
             }
             try db.execute(sql: """
                 INSERT INTO project (id, uuid, version, created_at, updated_at,
-                    git_repo_name, code, name, ckfs_relative_storage_path)
+                    git_repo_name, code, name, gmfs_relative_storage_path)
                 VALUES (\(base("proj-1")), 'repo', 'repo', 'repo', 'projects/repo');
                 INSERT INTO instance (id, uuid, version, created_at, updated_at,
-                    project_uuid, code, name, absolute_file_system_path, ckfs_relative_storage_path)
+                    project_uuid, code, name, absolute_file_system_path, gmfs_relative_storage_path)
                 VALUES (\(base("inst-1")), 'proj-1', 'repo_1', 'repo_1',
                         '\(repoRoot.path)', 'projects/repo/instances/repo_1');
                 INSERT INTO session (id, uuid, version, created_at, updated_at,
-                    instance_uuid, code, name, backstory, goal, status, ckfs_relative_storage_path)
+                    instance_uuid, code, name, backstory, goal, status, gmfs_relative_storage_path)
                 VALUES (\(base("sess-1")), 'inst-1', 'main', 'main', '', '', 'active', 'x');
                 """)
         }
@@ -326,7 +326,7 @@ final class DopeRepoVerbTests: XCTestCase {
             try db.execute(sql: """
                 INSERT INTO prompt (id, uuid, version, created_at, updated_at,
                     session_uuid, seq, code, name, backstory, goal, detail, command,
-                    status, ckfs_relative_storage_path)
+                    status, gmfs_relative_storage_path)
                 VALUES (NULL, 'prompt-1', 0, '\(now)', '\(now)',
                         'sess-1', 1, 'p1', 'P1', '', '', '', '', 'draft', 'x');
                 """)

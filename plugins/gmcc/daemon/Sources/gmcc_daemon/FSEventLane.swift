@@ -49,7 +49,7 @@ final class FSEventLane: @unchecked Sendable {
             var next = Array(Set(paths)).sorted()
             if next.count > Self.maxPaths {
                 FileHandle.standardError.write(Data(
-                    "[gmcc_daemon] FSEventLane: \(next.count) paths exceeds cap \(Self.maxPaths) — truncating\n".utf8))
+                    "[gm_daemon] FSEventLane: \(next.count) paths exceeds cap \(Self.maxPaths) — truncating\n".utf8))
                 next = Array(next.prefix(Self.maxPaths))
             }
             guard next != self.current else { return }
@@ -81,7 +81,7 @@ final class FSEventLane: @unchecked Sendable {
                     kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes)
             ) else {
                 FileHandle.standardError.write(Data(
-                    "[gmcc_daemon] FSEventLane: FSEventStreamCreate failed for \(next)\n".utf8))
+                    "[gm_daemon] FSEventLane: FSEventStreamCreate failed for \(next)\n".utf8))
                 self.current = []
                 return
             }

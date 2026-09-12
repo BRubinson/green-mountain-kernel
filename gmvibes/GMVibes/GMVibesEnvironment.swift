@@ -2,12 +2,18 @@ import Foundation
 import Observation
 import GMCCDaemonKit
 
-enum GMCCEnvKey: String, CaseIterable, Hashable {
-    case ckfsRoot       = "GMCC_CKFS_ROOT"
+enum GMVibesEnvKey: String, CaseIterable, Hashable {
+    case gmFsRoot       = "GM_FS_ROOT"
     // The kbite roots survive only for the KBites browser's filesystem tabs;
     // they die when the daemon serves kbite tree listings (written goal).
-    case kbiteDigested  = "GMCC_KBITE_DIGESTED"
-    case kbiteOpen      = "GMCC_KBITE_OPEN"
+    //
+    // Carried onto the GM_ prefix for consistency, not because anything sets
+    // them: the session env provisions exactly three vars, and the docs
+    // contract has listed this pair as retired for a while. They are a
+    // best-effort probe over names nothing writes, which is why the rename is
+    // free — but leaving them on the retired prefix would read as an oversight.
+    case kbiteDigested  = "GM_KBITE_DIGESTED"
+    case kbiteOpen      = "GM_KBITE_OPEN"
 }
 
 /// Locator for the filesystem roots (memory files, folder-open actions, KBites
@@ -18,21 +24,21 @@ enum GMCCEnvKey: String, CaseIterable, Hashable {
 ///   survive with the daemon down.
 /// - `fromDaemon` — PATHS_GET, adopted asynchronously by the window root's
 ///   loader task (on `daemon.generation` and `.paths` invalidations). WINS on
-///   merge: the daemon's MemoryWatcher is rooted at ITS ckfs root, so a
+///   merge: the daemon's MemoryWatcher is rooted at ITS gmfs root, so a
 ///   divergent client root would silently mis-resolve memories, and a
 ///   Finder-launched app's stale exported var is the likelier wrong answer.
 @Observable
 @MainActor
-final class GMCCEnvironment {
-    private(set) var values: [GMCCEnvKey: String] = [:]
+final class GMVibesEnvironment {
+    private(set) var values: [GMVibesEnvKey: String] = [:]
 
-    private var probed: [GMCCEnvKey: String] = [:]
-    private var fromDaemon: [GMCCEnvKey: String] = [:]
+    private var probed: [GMVibesEnvKey: String] = [:]
+    private var fromDaemon: [GMVibesEnvKey: String] = [:]
     private var loadInFlight: Task<Void, Never>?
 
-    subscript(key: GMCCEnvKey) -> String? { values[key] }
+    subscript(key: GMVibesEnvKey) -> String? { values[key] }
 
-    var isLoaded: Bool { values[.ckfsRoot] != nil }
+    var isLoaded: Bool { values[.gmFsRoot] != nil }
 
     init() {
         refresh()
@@ -44,21 +50,21 @@ final class GMCCEnvironment {
         let home = FileManager.default.homeDirectoryForCurrentUser
         let env = ProcessInfo.processInfo.environment
 
-        var out: [GMCCEnvKey: String] = [:]
-        for key in GMCCEnvKey.allCases {
+        var out: [GMVibesEnvKey: String] = [:]
+        for key in GMVibesEnvKey.allCases {
             if let value = env[key.rawValue], !value.isEmpty {
                 out[key] = value
             }
         }
-        // Conventional-location probe: the standard install puts the ckfs at
-        // ~/gmcc_ckfs (and kbites under it).
-        if out[.ckfsRoot] == nil {
-            let conventional = home.appendingPathComponent("gmcc_ckfs")
+        // Conventional-location probe: the standard install puts the gmfs at
+        // ~/gmfs (and kbites under it).
+        if out[.gmFsRoot] == nil {
+            let conventional = home.appendingPathComponent("gmfs")
             if FileManager.default.fileExists(atPath: conventional.path) {
-                out[.ckfsRoot] = conventional.path
+                out[.gmFsRoot] = conventional.path
             }
         }
-        if let root = out[.ckfsRoot] {
+        if let root = out[.gmFsRoot] {
             let kbites = URL(fileURLWithPath: root).appendingPathComponent("kbites")
             if out[.kbiteDigested] == nil {
                 let digested = kbites.appendingPathComponent("digested")
@@ -105,16 +111,16 @@ final class GMCCEnvironment {
 
     /// Adopt the daemon's typed roots (PATHS_GET). Strictly an overlay — the
     /// probe stays underneath so a daemon restart never blanks the env.
-    /// Roots move as a SET: when the daemon answers with a ckfs root but the
+    /// Roots move as a SET: when the daemon answers with a gmfs root but the
     /// kbite roots are unset daemon-side, they are derived from the daemon's
     /// root rather than left pointing at probe-derived paths under a
     /// possibly-different root.
     func adopt(_ paths: PathsGetResponse) {
-        var out: [GMCCEnvKey: String] = [:]
-        if !paths.ckfsRoot.isEmpty { out[.ckfsRoot] = paths.ckfsRoot }
+        var out: [GMVibesEnvKey: String] = [:]
+        if !paths.gmFsRoot.isEmpty { out[.gmFsRoot] = paths.gmFsRoot }
         if !paths.kbiteDigestedRoot.isEmpty { out[.kbiteDigested] = paths.kbiteDigestedRoot }
         if !paths.kbiteOpenRoot.isEmpty { out[.kbiteOpen] = paths.kbiteOpenRoot }
-        if let root = out[.ckfsRoot] {
+        if let root = out[.gmFsRoot] {
             let kbites = URL(fileURLWithPath: root, isDirectory: true)
                 .appendingPathComponent("kbites", isDirectory: true)
             if out[.kbiteDigested] == nil {

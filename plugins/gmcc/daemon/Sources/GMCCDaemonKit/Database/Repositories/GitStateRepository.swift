@@ -42,7 +42,7 @@ struct GitStateRepository: RepositoryContext {
             // Same column list + last_activity_at shape as SESSION_LIST.
             if let row = try SessionStubRecord.fetchOne(db, sql: """
                 SELECT s.uuid, s.version, s.instance_uuid, s.code, s.name,
-                       s.ckfs_relative_storage_path, s.created_at, s.updated_at,
+                       s.gmfs_relative_storage_path, s.created_at, s.updated_at,
                        MAX(
                            s.updated_at,
                            COALESCE((SELECT MAX(p.updated_at) FROM prompt p

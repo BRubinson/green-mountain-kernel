@@ -25,22 +25,22 @@ final class PromptQualifiedDiagramTests: XCTestCase {
             }
             try db.execute(sql: """
                 INSERT INTO project (id, uuid, version, created_at, updated_at,
-                    git_repo_name, code, name, ckfs_relative_storage_path)
+                    git_repo_name, code, name, gmfs_relative_storage_path)
                 VALUES (\(base("proj-1")), 'repo', 'repo', 'repo', 'projects/repo');
                 INSERT INTO instance (id, uuid, version, created_at, updated_at,
-                    project_uuid, code, name, absolute_file_system_path, ckfs_relative_storage_path)
+                    project_uuid, code, name, absolute_file_system_path, gmfs_relative_storage_path)
                 VALUES (\(base("inst-1")), 'proj-1', 'repo_1', 'repo_1', '/tmp/repo',
                         'projects/repo/instances/repo_1');
                 INSERT INTO session (id, uuid, version, created_at, updated_at,
-                    instance_uuid, code, name, backstory, goal, status, ckfs_relative_storage_path)
+                    instance_uuid, code, name, backstory, goal, status, gmfs_relative_storage_path)
                 VALUES (\(base("sess-1")), 'inst-1', 'main', 'main', '', '', 'active', 'x');
                 INSERT INTO prompt (id, uuid, version, created_at, updated_at,
                     session_uuid, seq, code, name, backstory, goal, detail, command, status,
-                    ckfs_relative_storage_path)
+                    gmfs_relative_storage_path)
                 VALUES (\(base("prompt-a")), 'sess-1', 1, 'p1', 'one', '', '', '', '', 'draft', '');
                 INSERT INTO prompt (id, uuid, version, created_at, updated_at,
                     session_uuid, seq, code, name, backstory, goal, detail, command, status,
-                    ckfs_relative_storage_path)
+                    gmfs_relative_storage_path)
                 VALUES (\(base("prompt-b")), 'sess-1', 2, 'p2', 'two', '', '', '', '', 'draft', '');
                 """)
         }
@@ -266,13 +266,13 @@ final class PromptQualifiedDiagramTests: XCTestCase {
     /// the value is pinned so a migration cannot land silently.
     func testSchemaVersionMatchesCompiledConstant() throws {
         XCTAssertEqual(try store.schemaVersion(), Migrations.currentSchemaVersion)
-        XCTAssertEqual(Migrations.currentSchemaVersion, 26)
+        XCTAssertEqual(Migrations.currentSchemaVersion, 27)
         try store.dbQueue.read { db in
             XCTAssertEqual(
-                try Int.fetchOne(db, sql: "SELECT MAX(version) FROM schema_migrations"), 26)
+                try Int.fetchOne(db, sql: "SELECT MAX(version) FROM schema_migrations"), 27)
             XCTAssertEqual(
                 try Int.fetchOne(
-                    db, sql: "SELECT COUNT(*) FROM schema_migrations WHERE version = 25"), 1)
+                    db, sql: "SELECT COUNT(*) FROM schema_migrations WHERE version = 26"), 1)
             // Both FK indexes, named for the family.
             for index in ["idx_prompt_qualified_diagram_prompt_fk",
                           "idx_prompt_qualified_diagram_diagram_fk"] {

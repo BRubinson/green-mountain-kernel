@@ -20,16 +20,16 @@ struct PromptRepository: RepositoryContext {
             sql: "SELECT COALESCE(MAX(seq), 0) FROM prompt WHERE session_uuid = ?",
             arguments: [req.sessionUuid]) ?? 0) + 1
         let code = req.code ?? "p\(seq)"
-        // Item 7: derive the ckfs folder daemon-side when the caller
+        // Item 7: derive the gmfs folder daemon-side when the caller
         // doesn't supply one — the session row (same transaction) already
         // carries its own path, and the folder convention is
         // {seq}_{name}. Legacy rows stay empty (no backfill: a wrong path
         // is worse than an absent one).
-        var ckfsPath = req.ckfsRelativeStoragePath ?? ""
-        if ckfsPath.isEmpty {
+        var gmfsPath = req.gmfsRelativeStoragePath ?? ""
+        if gmfsPath.isEmpty {
             let sessionPath = try String.fetchOne(
                 db,
-                sql: "SELECT ckfs_relative_storage_path FROM session WHERE uuid = ?",
+                sql: "SELECT gmfs_relative_storage_path FROM session WHERE uuid = ?",
                 arguments: [req.sessionUuid]) ?? ""
             if !sessionPath.isEmpty {
                 // A4: the name is slugged (forward-only, lossy) so the
@@ -37,7 +37,7 @@ struct PromptRepository: RepositoryContext {
                 // case-sensitive equality — never contains spaces/slashes.
                 // Clients MUST use this returned path verbatim, never
                 // re-derive {seq}_{name} themselves.
-                ckfsPath = "\(sessionPath)/prompts/\(seq)_\(Store.slugStorageSegment(req.name))"
+                gmfsPath = "\(sessionPath)/prompts/\(seq)_\(Store.slugStorageSegment(req.name))"
             }
         }
         let uuid = try core.insertBase(db, table: "prompt", uuid: req.uuid, extra: [
@@ -50,7 +50,7 @@ struct PromptRepository: RepositoryContext {
             "detail": req.detail,
             "command": req.command ?? "",
             "status": PromptStatus.draft.rawValue,
-            "ckfs_relative_storage_path": ckfsPath,
+            "gmfs_relative_storage_path": gmfsPath,
         ])
         // Seed prompt kbites from the session registry (create-time-only
         // inheritance, same rule as the context chain).
@@ -160,7 +160,7 @@ struct PromptRepository: RepositoryContext {
     ///   architecting → implementing: requires the architecture approved
     /// Legacy (pre-m0002) prompts bypass absent-backing-row gates AND skip
     /// create-on-enter — creating a summary for one would wedge it a state
-    /// later. They walk all six states on their ckfs artifacts; CLARIFY_OPEN
+    /// later. They walk all six states on their gmfs artifacts; CLARIFY_OPEN
     /// is the explicit adoption path.
     func setStatus(_ req: PromptSetStatusRequest) throws -> PromptRow {
         guard let head = try Row.fetchOne(

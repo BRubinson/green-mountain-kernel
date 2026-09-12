@@ -67,12 +67,12 @@ final class WorkflowSpecTests: XCTestCase {
     //   2. A hardcoded 19-name expected roster, which had to be hand-edited
     //      every time the pen grew a tool.
     //   3. mcpToolNames(), which scraped `name: "` line prefixes out of
-    //      gmcc_mcp/main.swift's SOURCE TEXT — brittle in both directions
+    //      gm_mcp/main.swift's SOURCE TEXT — brittle in both directions
     //      (any params literal formatted that way would have been counted as
     //      a tool).
     //
     // The registry is the roster now. VerbRegistry.penToolNames is what
-    // gmcc_mcp serves, what `gm verbs --json` prints, and what agent defs may
+    // gm_mcp serves, what `gm verbs --json` prints, and what agent defs may
     // name — and the parity below is BIDIRECTIONAL, so neither side can grow
     // a tool the other has not heard of.
 
@@ -96,7 +96,7 @@ final class WorkflowSpecTests: XCTestCase {
         }
     }
 
-    /// The tools gmcc_mcp actually serves, read off the `Tool(` literals. The
+    /// The tools gm_mcp actually serves, read off the `Tool(` literals. The
     /// read is anchored on `Tool(` rather than on a bare `name: "` line prefix,
     /// so a params tuple can never be mistaken for a tool.
     private func servedPenTools() throws -> [String] {
@@ -108,7 +108,7 @@ final class WorkflowSpecTests: XCTestCase {
         let dir = pluginRoot.appendingPathComponent("daemon/Sources/gmcc_mcp")
         let files = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "swift" }
-        XCTAssertFalse(files.isEmpty, "no gmcc_mcp sources found — the roster read is broken")
+        XCTAssertFalse(files.isEmpty, "no gm_mcp sources found — the roster read is broken")
         let pattern = try NSRegularExpression(pattern: #"\bTool\(\s*\n\s*name:\s*"([a-z0-9_]+)""#)
         var found: [String] = []
         for file in files {
@@ -136,7 +136,7 @@ final class WorkflowSpecTests: XCTestCase {
             XCTAssertTrue(
                 registry.contains(tool),
                 """
-                gmcc_mcp serves '\(tool)' but VerbRegistry has no row for it. \
+                gm_mcp serves '\(tool)' but VerbRegistry has no row for it. \
                 Add a VerbSpec (pen: "\(tool)") — or, if it composes several \
                 verbs, a VerbRegistry.compositePenTools entry.
                 """)
@@ -145,7 +145,7 @@ final class WorkflowSpecTests: XCTestCase {
             XCTAssertTrue(
                 served.contains(tool),
                 """
-                VerbRegistry declares pen tool '\(tool)' but gmcc_mcp does not \
+                VerbRegistry declares pen tool '\(tool)' but gm_mcp does not \
                 serve it. Add the Tool literal, or drop the `pen:` from its \
                 VerbSpec — a promised-but-absent tool is what a deny reason \
                 would name.

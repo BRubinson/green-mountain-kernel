@@ -39,7 +39,7 @@ struct ListingRepository: RepositoryContext {
         // fold over an unfiltered FILE_CHANGE_LIST.
         var sql = """
             SELECT s.uuid, s.version, s.instance_uuid, s.code, s.name,
-                   s.ckfs_relative_storage_path, s.created_at, s.updated_at,
+                   s.gmfs_relative_storage_path, s.created_at, s.updated_at,
                    MAX(
                        s.updated_at,
                        COALESCE((SELECT MAX(p.updated_at) FROM prompt p

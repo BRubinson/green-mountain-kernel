@@ -6,7 +6,7 @@ import Foundation
 /// freshly built binary can take over, while an older client is merely
 /// rejected — the daemon stays up (an old pinned-Kit GMVibes must never be
 /// able to kill-loop a fresh daemon).
-public enum GMCCWireProtocol {
+public enum GmWireProtocol {
     /// v18 — m0017 RENAMED a wire field on an existing message rather than
     /// adding one: DopePropertyBody.related_property_ref became
     /// relationship_target_ref, and DopeNodeFields.related_property_uuid
@@ -95,11 +95,30 @@ public enum GMCCWireProtocol {
     /// vendored kit compatible. FileChangeAdd.client_key going away is
     /// likewise decode-safe (an unknown key is ignored) — it needs no bump of
     /// its own and simply travels with this one.
-    public static let version = 25
+    ///
+    /// v25 → v26: CKFS retired for GMFS. TWO reasons, and the second is the
+    /// one worth reading.
+    ///
+    /// (a) `ckfs_relative_storage_path` → `gmfs_relative_storage_path` is a
+    /// RENAME on an existing message, not an additive OPTIONAL field. It does
+    /// NOT decode safely in both directions: a stale client sending the old key
+    /// to a new daemon, or reading the new key it does not know, lands on `nil`
+    /// for a TEXT NOT NULL column. The same goes for `PathsGetResponse`, where
+    /// `ckfs_root` is dropped outright rather than renamed. Per CLAUDE.md, a
+    /// rename on an existing message is exactly when this number moves.
+    ///
+    /// (b) It is also a SAFETY FEATURE for the parallel-stack period. Two
+    /// daemons now coexist on separate sockets (the retired runtime's socket
+    /// and `~/gmfs/daemon.sock`). If a stale client reaches the wrong one, the
+    /// version check fails LOUDLY on the HELLO rather than mis-decoding a
+    /// renamed field to nil and writing a plausible-looking wrong row — which
+    /// is precisely the silent failure the m0017 model warns about. Not bumping
+    /// would have made the two stacks *look* interoperable.
+    public static let version = 26
 }
 
 /// Discriminator for every NDJSON message on the socket. One case per spec
-/// message; each request type has its own handler in gmcc_daemon.
+/// message; each request type has its own handler in gm_daemon.
 public enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     // Infra
     case hello = "HELLO"
@@ -337,7 +356,7 @@ public struct RequestEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
         requestId: String = UUID().uuidString.lowercased(),
         payload: Payload
     ) {
-        self.protocolVersion = GMCCWireProtocol.version
+        self.protocolVersion = GmWireProtocol.version
         self.type = type
         self.requestId = requestId
         self.payload = payload
@@ -361,7 +380,7 @@ public struct ResponseEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
         payload: Payload? = nil,
         error: ErrorPayload? = nil
     ) {
-        self.protocolVersion = GMCCWireProtocol.version
+        self.protocolVersion = GmWireProtocol.version
         self.type = type
         self.requestId = requestId
         self.ok = ok

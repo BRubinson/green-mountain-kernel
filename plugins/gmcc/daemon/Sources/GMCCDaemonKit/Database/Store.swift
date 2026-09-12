@@ -4,7 +4,7 @@ import GRDB
 // StoreError lives in StoreError.swift; PersistedEvent in PersistedEvent.swift.
 
 /// SQLite access layer. The daemon is the ONLY caller — every other client
-/// (gmcc_hook, gmcc_mcp, GMVibes) reaches the db through the socket. DatabaseQueue serializes all access,
+/// (gm_hook, gm_mcp, GMVibes) reaches the db through the socket. DatabaseQueue serializes all access,
 /// making the single-writer invariant structural rather than conventional.
 ///
 /// Domain methods live in per-family extensions (Store+Context, Store+Session,

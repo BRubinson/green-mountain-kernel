@@ -2,7 +2,7 @@ import SwiftUI
 import GMCCDaemonKit
 
 // The old dot-style DaemonStatusIndicator is gone — the top bar's
-// GmccDaemonStatus pill (Chrome/GmccDaemonStatus.swift) is the single status
+// GmDaemonStatus pill (Chrome/GmDaemonStatus.swift) is the single status
 // control, and it reuses this popover verbatim.
 struct DaemonStatusPopover: View {
     @Environment(DaemonConnectionModel.self) private var daemon
@@ -25,7 +25,7 @@ struct DaemonStatusPopover: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .incompatible(let daemonVersion):
-                Text("The running daemon speaks protocol v\(daemonVersion.map(String.init) ?? "?"), newer than this build of GMVibes (v\(GMCCWireProtocol.version)). Rebuild GMVibes against the updated daemon package.")
+                Text("The running daemon speaks protocol v\(daemonVersion.map(String.init) ?? "?"), newer than this build of GMVibes (v\(GmWireProtocol.version)). Rebuild GMVibes against the updated daemon package.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .starting:

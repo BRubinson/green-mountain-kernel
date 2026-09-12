@@ -90,7 +90,7 @@ struct ContextRepository: RepositoryContext {
             "git_repo_name": ctx.gitRepoName,
             "code": ctx.code,
             "name": ctx.name,
-            "ckfs_relative_storage_path": ctx.ckfsRelativeStoragePath,
+            "gmfs_relative_storage_path": ctx.gmfsRelativeStoragePath,
         ])
         try seedKbites(level: "project", ownerUuid: uuid, codes: ctx.kbiteCodes, parent: nil)
         try core.appendEvent(db, kind: .createProject, subjectUuid: uuid)
@@ -112,7 +112,7 @@ struct ContextRepository: RepositoryContext {
             "code": ctx.code,
             "name": ctx.name,
             "absolute_file_system_path": ctx.absoluteFileSystemPath,
-            "ckfs_relative_storage_path": ctx.ckfsRelativeStoragePath,
+            "gmfs_relative_storage_path": ctx.gmfsRelativeStoragePath,
         ])
         try seedKbites(
             level: "instance", ownerUuid: uuid, codes: ctx.kbiteCodes,
@@ -138,7 +138,7 @@ struct ContextRepository: RepositoryContext {
             "backstory": ctx.backstory,
             "goal": ctx.goal,
             "status": SessionStatus.active.rawValue,
-            "ckfs_relative_storage_path": ctx.ckfsRelativeStoragePath,
+            "gmfs_relative_storage_path": ctx.gmfsRelativeStoragePath,
         ])
         try seedKbites(
             level: "session", ownerUuid: uuid, codes: ctx.kbiteCodes,

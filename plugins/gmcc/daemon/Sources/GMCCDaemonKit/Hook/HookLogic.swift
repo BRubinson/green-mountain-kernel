@@ -21,13 +21,13 @@ struct HookDryRun: Encodable {
     /// The runtime this write would land in. A sandbox session whose marker
     /// was missed prints the prod root here, which is the single most
     /// valuable thing this flag can tell its reader.
-    let gmccRoot: String
+    let gmFsRoot: String
     let changes: [FileChangeAdd]
 }
 
 struct SubagentStartDryRun: Encodable {
     let event: String
-    let gmccRoot: String
+    let gmFsRoot: String
     let registration: AgentRegisterRequest?
 }
 
@@ -126,7 +126,7 @@ public struct HookPayload: Equatable {
 /// Adopt a snapshot's runtime when the hook fires inside one.
 ///
 /// WITHOUT THIS A SANDBOX SESSION'S HOOKS WRITE THE PROD DB. Sandbox sessions
-/// used to be told which runtime they were in by an inherited GMCC_ROOT; a
+/// used to be told which runtime they were in by an inherited GM_FS_ROOT; a
 /// hook that reads no inherited env has to find that out for itself, and the
 /// marker on disk is the thing that knows. This is the hazard that removing
 /// env inheritance creates, closed at the same time.
@@ -138,19 +138,30 @@ public struct HookPayload: Equatable {
 enum SandboxMarker {
     static let fileName = ".gmcc_sandbox"
 
-    /// No-op when GMCC_ROOT is already set: an explicit runtime always wins,
+    /// No-op when GM_FS_ROOT is already set: an explicit runtime always wins,
     /// and a sandbox launcher sets it before any client ever runs.
     static func adopt(startingAt directory: String) {
         let env = ProcessInfo.processInfo.environment
-        guard env["GMCC_ROOT"].map({ $0.isEmpty }) ?? true else { return }
-        guard let roots = find(startingAt: directory) else { return }
-        if let root = roots.gmccRoot { setenv("GMCC_ROOT", root, 1) }
-        if let ckfs = roots.ckfsRoot { setenv("GMCC_CKFS_ROOT", ckfs, 1) }
+        guard env["GM_FS_ROOT"].map({ $0.isEmpty }) ?? true else { return }
+        guard let roots = find(startingAt: directory),
+              let root = roots.gmFsRoot else { return }
+        setenv("GM_FS_ROOT", root, 1)
     }
 
+    /// ONE root, where this used to carry two (a runtime root and a separate
+    /// content root, which a marker had to keep in agreement by hand).
+    ///
+    /// This is the clearest place the one-root collapse pays off: a sandbox is
+    /// no longer a special env SHAPE — a snapshot whose marker had to name two
+    /// vars, either of which could be missing or could disagree with the other
+    /// — but simply a different VALUE of a single var. There is no longer a
+    /// combination of marker contents that describes a half-sandboxed session.
+    ///
+    /// Kept as a struct rather than flattened to a `String?` so that a future
+    /// marker field is an additive change here rather than a signature change
+    /// at every call site.
     struct Roots: Equatable {
-        let gmccRoot: String?
-        let ckfsRoot: String?
+        let gmFsRoot: String?
     }
 
     /// The nearest marker at or above `directory`, parsed. nil when there is
@@ -168,7 +179,7 @@ enum SandboxMarker {
     }
 
     /// `export NAME="value"` lines, first wins — the same shape the sandbox
-    /// snapshot writes and the same two names it writes.
+    /// snapshot writes, and now the ONE name it writes.
     static func parse(_ text: String) -> Roots {
         func value(_ name: String) -> String? {
             let prefix = "export \(name)=\""
@@ -180,7 +191,7 @@ enum SandboxMarker {
             }
             return nil
         }
-        return Roots(gmccRoot: value("GMCC_ROOT"), ckfsRoot: value("GMCC_CKFS_ROOT"))
+        return Roots(gmFsRoot: value("GM_FS_ROOT"))
     }
 }
 
@@ -766,7 +777,7 @@ enum GitPathClassifier {
     /// Repo-relative, or nil when the path is not inside this repo at all.
     ///
     /// Containment is checked against the BOOTED repo root rather than "some
-    /// git repo": $HOME can itself be a git toplevel, and the ckfs and kbite
+    /// git repo": $HOME can itself be a git toplevel, and the gmfs and kbite
     /// trees are repos too — foreign paths would land as junk rows in an
     /// append-only db.
     static func repoRelative(_ absolute: String, repoRoot: String) -> String? {

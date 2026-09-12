@@ -252,18 +252,19 @@ final class HookPayloadTests: XCTestCase {
         let repo = fixtureRoot.appendingPathComponent("snapshot", isDirectory: true)
         let deep = repo.appendingPathComponent("Sources/Deep", isDirectory: true)
         try fm.createDirectory(at: deep, withIntermediateDirectories: true)
+        // ONE root in the marker, where this used to carry two. A snapshot
+        // whose marker named a runtime root and a separate content root could
+        // describe a half-sandboxed session; one var cannot.
         try """
         # Written by gm sandbox refresh — sourced by gmcc_session_startup.sh so any
         # Claude session inside this snapshot auto-sandboxes.
-        export GMCC_ROOT="/tmp/sandbox/runtime"
-        export GMCC_CKFS_ROOT="/tmp/sandbox/ckfs"
+        export GM_FS_ROOT="/tmp/sandbox/gmfs"
         """.write(
             to: repo.appendingPathComponent(".gmcc_sandbox"),
             atomically: true, encoding: .utf8)
 
         let roots = try XCTUnwrap(SandboxMarker.find(startingAt: deep.path))
-        XCTAssertEqual(roots.gmccRoot, "/tmp/sandbox/runtime")
-        XCTAssertEqual(roots.ckfsRoot, "/tmp/sandbox/ckfs")
+        XCTAssertEqual(roots.gmFsRoot, "/tmp/sandbox/gmfs")
     }
 
     func testNoMarkerMeansNoRetarget() throws {
@@ -476,7 +477,7 @@ final class HookPayloadTests: XCTestCase {
         XCTAssertEqual(
             GitPathClassifier.repoRelative("/repo/Sources/A.swift", repoRoot: "/repo"),
             "Sources/A.swift")
-        // $HOME is itself a git toplevel on plenty of machines, and the ckfs
+        // $HOME is itself a git toplevel on plenty of machines, and the gmfs
         // and kbite trees are repos too. Foreign paths would land as junk
         // rows in an append-only db.
         XCTAssertNil(GitPathClassifier.repoRelative("/elsewhere/A.swift", repoRoot: "/repo"))

@@ -1,18 +1,18 @@
 import Foundation
 import GMCCDaemonKit
 
-// gmcc_daemon — the single writer. Boot order:
-//   1. ensure ~/gmcc/ exists
+// gm_daemon — the single writer. Boot order:
+//   1. ensure ~/gmfs/ exists
 //   2. pidfile flock — a second instance exits 0 immediately (makes client
 //      autostart races harmless)
-//   3. redirect stdout/stderr → ~/gmcc/daemon.log
+//   3. redirect stdout/stderr → ~/gmfs/daemon.log
 //   4. open + migrate the db, record DAEMON_START
 //   5. bind the unix socket, serve, dispatchMain()
 
 do {
     try Paths.ensureRuntimeDirs()
 } catch {
-    FileHandle.standardError.write(Data("[gmcc_daemon] cannot create ~/gmcc: \(error)\n".utf8))
+    FileHandle.standardError.write(Data("[gm_daemon] cannot create ~/gmfs: \(error)\n".utf8))
     exit(1)
 }
 
@@ -20,7 +20,7 @@ do {
 // auto-releases on exit, so a crashed daemon never wedges the pidfile) -------
 let pidFd = open(Paths.pidfile.path, O_CREAT | O_RDWR, 0o644)
 guard pidFd >= 0 else {
-    FileHandle.standardError.write(Data("[gmcc_daemon] cannot open pidfile\n".utf8))
+    FileHandle.standardError.write(Data("[gm_daemon] cannot open pidfile\n".utf8))
     exit(1)
 }
 guard flock(pidFd, LOCK_EX | LOCK_NB) == 0 else {
@@ -63,7 +63,7 @@ do {
     exit(1)
 }
 server.start()
-log("daemon pid \(getpid()) protocol v\(GMCCWireProtocol.version) listening at \(Paths.socket.path)")
+log("daemon pid \(getpid()) protocol v\(GmWireProtocol.version) listening at \(Paths.socket.path)")
 // Watchers (memory + checkout) are owned by the Server's WatcherSupervisor,
 // built inside server.start() and rebuilt on CONFIG_SET / CREATE_INSTANCE via
 // the post-commit event sink — no ad-hoc boot-time watcher block anymore.

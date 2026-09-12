@@ -31,7 +31,7 @@ extension Store {
         try dbQueue.read { db in try ConfigRepository(db: db, core: core).configValue(key) }
     }
 
-    /// MemoryWatcher's reverse lookup: prompt by its ckfs folder path.
+    /// MemoryWatcher's reverse lookup: prompt by its gmfs folder path.
     public func promptUuid(byStoragePath path: String) throws -> String? {
         try dbQueue.read { db in try ConfigRepository(db: db, core: core).promptUuid(byStoragePath: path) }
     }

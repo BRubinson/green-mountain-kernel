@@ -1,7 +1,7 @@
 import Foundation
 import GMCCDaemonKit
 
-// gmcc_mcp — the GMCC MCP stdio server: the agent PEN surface as typed MCP
+// gm_mcp — the GMCC MCP stdio server: the agent PEN surface as typed MCP
 // tools. A thin client of the daemon socket beside gm and GMVibes — reuses
 // DaemonClient/WireCodec verbatim and NEVER touches the db (single-writer
 // invariant).
@@ -887,14 +887,14 @@ let tools: [Tool] = [
     let declared = VerbRegistry.penToolNames
     var lines: [String] = []
     for orphan in served.subtracting(declared).sorted() {
-        lines.append("[gmcc_mcp] serves '\(orphan)' with no VerbSpec — the door has made no role decision about it")
+        lines.append("[gm_mcp] serves '\(orphan)' with no VerbSpec — the door has made no role decision about it")
     }
     for missing in declared.subtracting(served).sorted() {
-        lines.append("[gmcc_mcp] VerbRegistry declares pen tool '\(missing)' but this binary does not serve it")
+        lines.append("[gm_mcp] VerbRegistry declares pen tool '\(missing)' but this binary does not serve it")
     }
     let instructionBytes = PenSheet.instructions.utf8.count
     if instructionBytes > 2_048 {
-        lines.append("[gmcc_mcp] initialize instructions are \(instructionBytes) bytes (budget 2048)")
+        lines.append("[gm_mcp] initialize instructions are \(instructionBytes) bytes (budget 2048)")
     }
     guard !lines.isEmpty else { return }
     FileHandle.standardError.write(Data((lines.joined(separator: "\n") + "\n").utf8))
@@ -975,7 +975,7 @@ while let line = readLine(strippingNewline: true) {
             "capabilities": ["tools": [String: Any]()],
             "serverInfo": [
                 "name": "gmcc-pen",
-                "version": "\(GMCCWireProtocol.version)",
+                "version": "\(GmWireProtocol.version)",
             ],
             // Loaded at session start, ahead of any tool schema — the only
             // place the pen gets to state its own contract.

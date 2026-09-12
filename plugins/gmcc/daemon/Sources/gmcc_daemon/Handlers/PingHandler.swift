@@ -8,7 +8,7 @@ enum PingHandler {
     static func handle(head: EnvelopeHead, startedAt: String, startedDate: Date) throws -> HandlerResult {
         let response = PingResponse(
             daemonPid: getpid(),
-            protocolVersion: GMCCWireProtocol.version,
+            protocolVersion: GmWireProtocol.version,
             buildSha: BuildInfo.sha,
             buildDate: BuildInfo.date,
             startedAt: startedAt,

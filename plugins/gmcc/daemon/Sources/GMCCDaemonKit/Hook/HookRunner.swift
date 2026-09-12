@@ -25,7 +25,7 @@ public enum HookRunner {
         guard let payload = HookPayload.decode(stdin), let cwd = payload.cwd else {
             return nil
         }
-        // BEFORE ANY OTHER WORK: Paths.root resolves GMCC_ROOT once per process,
+        // BEFORE ANY OTHER WORK: Paths.root resolves GM_FS_ROOT once per process,
         // and DaemonClient resolves the socket through it.
         SandboxMarker.adopt(startingAt: cwd)
 
@@ -72,7 +72,7 @@ public enum HookRunner {
             return encodeJSON(HookDryRun(
                 event: payload.hookEventName ?? "PostToolUse",
                 repoRoot: git.repoRoot,
-                gmccRoot: Paths.root.path,
+                gmFsRoot: Paths.root.path,
                 changes: changes))
         }
         // Per-change `try?`: one refused path must not cost the others their
@@ -116,7 +116,7 @@ public enum HookRunner {
         if dryRun {
             return encodeJSON(SubagentStartDryRun(
                 event: payload.hookEventName ?? "SubagentStart",
-                gmccRoot: Paths.root.path,
+                gmFsRoot: Paths.root.path,
                 registration: registration))
         }
 

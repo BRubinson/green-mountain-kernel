@@ -29,7 +29,7 @@ public enum KbiteArchive {
     // DocsContractTests bans that spelling everywhere in docs.
     public static let treePlaceholder = "{{KBITE_TREE}}"
     public static let identityPlaceholder = "{{KBITE_IDENTITY}}"
-    public static let ckfsPlaceholder = "{{GMCC_CKFS}}"
+    public static let gmfsPlaceholder = "{{GM_FS}}"
     public static let homePlaceholder = "{{GMCC_HOME}}"
 
     /// Archive codes come from UNTRUSTED zips and become filesystem path

@@ -45,7 +45,7 @@ public enum DopePromotion {
             return "[GMB] dope: promoted to BASE_PROJECT: " + parts.joined(separator: ", ")
         case let .unreachable(reason):
             return "[GMB] dope: WARN — promotion skipped: \(reason) "
-                + "(inspect with: gmcc_hook call DOPE_PROMOTE --json "
+                + "(inspect with: gm_hook call DOPE_PROMOTE --json "
                 + "'{\"session_uuid\":\"<uuid>\",\"dry_run\":true}')"
         }
     }

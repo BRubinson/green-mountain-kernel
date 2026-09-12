@@ -62,7 +62,7 @@ struct PromptInitResult: Encodable {
     let code: String?
     let name: String?
     let status: String?
-    let ckfsRelativeStoragePath: String?
+    let gmfsRelativeStoragePath: String?
     let phase: String?
     let instructions: String?
     let gateBlockers: [String]
@@ -142,7 +142,7 @@ func makeFastPathTools() -> [Tool] { [
                                 .init(seq: $0.seq, code: $0.code, name: $0.name, status: $0.status, uuid: $0.uuid)
                             }),
                         promptUuid: nil, sessionUuid: sessionUuid, seq: nil, code: nil, name: nil,
-                        status: nil, ckfsRelativeStoragePath: nil, phase: nil, instructions: nil,
+                        status: nil, gmfsRelativeStoragePath: nil, phase: nil, instructions: nil,
                         gateBlockers: [], nextPhase: nil, briefing: nil,
                         warnings: ["selector '\(selector)' matched \(candidates.count) prompts — pass a seq or an exact name"])
                 case .notFound:
@@ -161,7 +161,7 @@ func makeFastPathTools() -> [Tool] { [
                     return PromptInitResult(
                         resolution: .init(matchedBy: nil, created: false, candidates: nil),
                         promptUuid: nil, sessionUuid: sessionUuid, seq: nil, code: nil, name: nil,
-                        status: nil, ckfsRelativeStoragePath: nil, phase: nil, instructions: nil,
+                        status: nil, gmfsRelativeStoragePath: nil, phase: nil, instructions: nil,
                         gateBlockers: [], nextPhase: nil, briefing: nil,
                         warnings: ["no prompt matched. Pass create:true with name and detail to create one."])
                 }
@@ -176,7 +176,7 @@ func makeFastPathTools() -> [Tool] { [
                 stub = PromptStub(
                     uuid: row.uuid, sessionUuid: row.sessionUuid, seq: row.seq, code: row.code,
                     name: row.name, status: row.status, version: row.version,
-                    ckfsRelativeStoragePath: row.ckfsRelativeStoragePath, reports: nil,
+                    gmfsRelativeStoragePath: row.gmfsRelativeStoragePath, reports: nil,
                     createdAt: row.createdAt, updatedAt: row.updatedAt)
             }
 
@@ -236,7 +236,7 @@ func makeFastPathTools() -> [Tool] { [
                 code: prompt.code,
                 name: prompt.name,
                 status: prompt.status,
-                ckfsRelativeStoragePath: prompt.ckfsRelativeStoragePath,
+                gmfsRelativeStoragePath: prompt.gmfsRelativeStoragePath,
                 phase: next.phase,
                 instructions: next.instructions,
                 gateBlockers: next.gateBlockers,

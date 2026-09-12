@@ -168,14 +168,14 @@ struct SessionRepository: RepositoryContext {
         if let sessionUuid {
             sql = """
                 SELECT uuid, session_uuid, seq, code, name, status, version,
-                       ckfs_relative_storage_path, created_at, updated_at
+                       gmfs_relative_storage_path, created_at, updated_at
                 FROM prompt WHERE session_uuid = ? ORDER BY seq
                 """
             arguments = [sessionUuid]
         } else {
             sql = """
                 SELECT uuid, session_uuid, seq, code, name, status, version,
-                       ckfs_relative_storage_path, created_at, updated_at
+                       gmfs_relative_storage_path, created_at, updated_at
                 FROM prompt ORDER BY session_uuid, seq
                 """
             arguments = []
@@ -312,7 +312,7 @@ struct SessionRepository: RepositoryContext {
                 name: row["name"],
                 status: row["status"],
                 version: row["version"],
-                ckfsRelativeStoragePath: row["ckfs_relative_storage_path"],
+                gmfsRelativeStoragePath: row["gmfs_relative_storage_path"],
                 reports: withReports
                     ? PromptReportsStub(
                         clarification: clar[uuid], architecture: arch[uuid],
