@@ -42,97 +42,29 @@ import GmDaemonSdk
 // can see the size before paying for it, and the eventual fix is composition
 // (see the dynamic-profile note below) rather than silent truncation here.
 //
-// THE DYNAMIC-PROFILE SEAM IS DELIBERATELY NOT TAKEN YET. `DynamicInstructions`,
+// THE DYNAMIC-PROFILE SEAM IS STILL NOT TAKEN, BUT IT IS NO LONGER BLOCKED —
+// and the distinction matters, because the reason recorded here was a hard
+// constraint and is now merely a scheduling choice. `DynamicInstructions`,
 // `LanguageModelSession.Profile` and `LanguageModelSession.DynamicProfile` are
 // the natural home for "load only the persona and toolset the current phase
 // needs", and they would cut the cost above directly. All three are macOS 27
-// ONLY. `Instructions`, `Prompt` and `LanguageModelSession` are macOS 26. CI
-// pins macos-26, and an availability annotation does not save a file that names
-// a symbol the SDK does not contain — it fails to compile. So this file uses
-// only the macOS 26 surface, and the composition layer waits for the floor to
-// move. That is a scheduling decision, not an oversight.
+// only, and this file was written when the package floor was 26 and CI pinned
+// macos-26 — a case where no availability annotation helps, since a file naming
+// a symbol the SDK does not contain fails to compile outright.
+//
+// THAT FLOOR HAS SINCE MOVED TO 27 (the vendored gmClaudeForFoundationModels
+// forced it; see Package.swift). So the three types are now reachable, and what
+// remains is ordinary unwritten work rather than a wall: composing these blocks
+// into per-phase profiles is a design pass on its own, and staging the verbatim
+// baseline first was the point of this file. `approximateTokenCost` is what
+// makes the case for doing it measurable when someone picks it up.
 
-/// The personas GMCC runs, each backed by one standing instruction block.
-///
-/// A role is not a tool family (`GmAgentToolFamily`) and does not map onto one:
-/// families partition the tool SURFACE, roles partition the AGENTS that call
-/// into it. The clarifier and the reviewer both reach the `cde` family and are
-/// nothing alike.
-public enum GmAgentRole: String, Sendable, Hashable, Codable, CaseIterable {
-
-    /// The GMB itself — the primary, in-session contract every other role
-    /// assumes is already loaded.
-    case primary
-
-    /// Context acquisition. Opinion-free ref pre-selection into a briefing row.
-    case doper
-
-    /// Exploration. Writes its own per-agent summary and finding rows.
-    case explorer
-
-    /// The single reader between exploration and the user conversation.
-    case clarifier
-
-    /// Architecture. Holds the option pen in team flows.
-    case architect
-
-    /// Review. Writes finding rows; never ranks them.
-    case reviewer
-
-    /// KBite crunch: raw sources in, structured chewed analysis out.
-    case kbiteChewer = "kbite_chewer"
-
-    /// Maw web fetch: the Playwright download runner.
-    case mawFetcher = "maw_fetcher"
-
-    /// Where this role's text was copied FROM, relative to `plugins/gmcc/`.
-    ///
-    /// Provenance rather than decoration: it is what makes a re-sync a
-    /// mechanical copy instead of an archaeology exercise.
-    public var sourcePath: String {
-        switch self {
-        case .primary: return "skills/gmcc/SKILL.md"
-        case .doper: return "agents/doper.md"
-        case .explorer: return "agents/code-explorer.md"
-        case .clarifier: return "agents/clarifier.md"
-        case .architect: return "agents/code-architect.md"
-        case .reviewer: return "agents/code-quality-reviewer.md"
-        case .kbiteChewer: return "prompts/gmcc_agent_kbite_crunch_chew.prompt.md"
-        case .mawFetcher: return "prompts/gmcc_agent_maw_web_fetch.prompt.md"
-        }
-    }
-
-    /// Whether this role is spawned WITH a methodology
-    /// (`ExplorationAgentType`) and commits fully to it.
-    ///
-    /// Exactly the three fan-out roles. The doper and the clarifier are
-    /// deliberately single-instance — one calibrates, one pre-selects — and
-    /// giving either a methodology would defeat the point of having one reader.
-    public var takesMethodology: Bool {
-        switch self {
-        case .explorer, .architect, .reviewer: return true
-        case .primary, .doper, .clarifier, .kbiteChewer, .mawFetcher: return false
-        }
-    }
-
-    /// The `subagent_type` the plugin spawns this role by, when it has one.
-    ///
-    /// `primary` has none — it is not spawned; it is the session. The two
-    /// `prompts/*.prompt.md` roles are declared as prompt files rather than
-    /// `agents/*.md` definitions and are spawned by their own names.
-    public var subagentType: String? {
-        switch self {
-        case .primary: return nil
-        case .doper: return "gmcc:doper"
-        case .explorer: return "gmcc:code-explorer"
-        case .clarifier: return "gmcc:clarifier"
-        case .architect: return "gmcc:code-architect"
-        case .reviewer: return "gmcc:code-quality-reviewer"
-        case .kbiteChewer: return "gmcc:gmcc_agent_kbite_crunch_chew"
-        case .mawFetcher: return "gmcc:gmcc_agent_maw_web_fetch"
-        }
-    }
-}
+// `GmAgentRole` — the roster of personas these blocks belong to — LIVES NEXT
+// DOOR in `GmAgentRole.swift`, at the top level of the module rather than in
+// this directory. It started here, because instructions were the first thing
+// that needed it; it moved because "which agents exist" is package-level
+// vocabulary, not a fact about templates, and the next thing to spawn or route
+// an agent should not have to import a templates file to name one.
 
 /// The standing instruction block for each `GmAgentRole`.
 public enum GmAgentInstructions {
