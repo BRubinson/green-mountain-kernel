@@ -1,0 +1,42 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "kbite_keyword_junction",
+  "description" : "Kbite-level keyword tags; UNIQUE(kbite, keyword)",
+  "entity_type" : "MODEL",
+  "name" : "KBite Keyword Junction",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "kbite_uuid",
+      "data_type" : "relationship",
+      "description" : "Tagged kbite; cascade",
+      "is_unique" : false,
+      "name" : "KBite",
+      "nullable" : false,
+      "relationship_target_ref" : "kbites.kbite.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "keyword_uuid",
+      "data_type" : "relationship",
+      "description" : "The keyword; cascade",
+      "is_unique" : false,
+      "name" : "Keyword",
+      "nullable" : false,
+      "relationship_target_ref" : "kbites.keyword.uuid",
+      "sort_order" : 7
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 5,
+  "version" : 764
+}

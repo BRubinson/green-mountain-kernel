@@ -1,0 +1,59 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "kbite_resource_file",
+  "description" : "One digested file within a resource. resource_file_content may be NULL — the raw source then lives on the filesystem under the kbite's digested tree, located by resource/file name (no path column exists). This is the uuid target of briefing and care-package kbite refs, and the bm25 search surface (FTS mirror)",
+  "entity_type" : "MODEL",
+  "name" : "KBite Resource File",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "kbite_resource_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning resource; cascade",
+      "is_unique" : false,
+      "name" : "Resource",
+      "nullable" : false,
+      "relationship_target_ref" : "kbites.kbite_resource.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "resource_file_name",
+      "data_type" : "text",
+      "description" : "File name within the resource",
+      "is_unique" : false,
+      "name" : "File Name",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "resource_file_summary",
+      "data_type" : "text",
+      "description" : "The brief served by kbite search and denormalized into briefing/care-package refs",
+      "is_unique" : false,
+      "name" : "File Summary",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "resource_file_content",
+      "data_type" : "text",
+      "description" : "Digested content; NULL = filesystem-resident raw source",
+      "is_unique" : false,
+      "name" : "File Content",
+      "nullable" : true,
+      "sort_order" : 9
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 3,
+  "version" : 764
+}

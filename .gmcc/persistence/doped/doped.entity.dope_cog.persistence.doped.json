@@ -1,0 +1,87 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "dope_cog",
+  "description" : "COGS grouping inside a dope scope; shares the scope's revision, tombstone and tier rules",
+  "entity_type" : "MODEL",
+  "name" : "Dope Cog",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "dope_scope_uuid",
+      "data_type" : "relationship",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Scope UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "doped.dope_scope.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 3
+    },
+    {
+      "code" : "name",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Name",
+      "nullable" : false,
+      "sort_order" : 4
+    },
+    {
+      "code" : "description",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Description",
+      "nullable" : false,
+      "sort_order" : 5,
+      "text_char_limit" : 512
+    },
+    {
+      "code" : "sort_order",
+      "data_type" : "int",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Sort Order",
+      "nullable" : false,
+      "sort_order" : 6
+    },
+    {
+      "code" : "content_revision",
+      "data_type" : "int",
+      "description" : "The cogs area counter",
+      "is_unique" : false,
+      "name" : "Content Revision",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "deleted_on",
+      "data_type" : "datetime",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Deleted On",
+      "nullable" : true,
+      "sort_order" : 30
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 7,
+  "version" : 764
+}

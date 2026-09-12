@@ -1,0 +1,105 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "agent_registration",
+  "description" : "Answers 'who is agent X' for an opaque agent_id. UNIQUE(agent_id) ALONE, so the spawner can register with the one identifier it holds. Two writers merge into one row: the SubagentStart hook writes IDENTITY, gm agent register writes AUTHORITY (role, methodology, phase). The join is at READ time, so ordering is not a constraint — a late registration still explains rows already written. Distinct from agent_briefing, whose per-phase key cannot hold four same-typed explorers.",
+  "entity_type" : "MODEL",
+  "name" : "Agent Registration",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "agent_id",
+      "data_type" : "text",
+      "description" : "The opaque agent identifier from the payload — NEVER parsed; its shape varies by spawn kind",
+      "is_unique" : true,
+      "name" : "Agent Id",
+      "nullable" : false,
+      "sort_order" : 6
+    },
+    {
+      "code" : "claude_session_id",
+      "data_type" : "text",
+      "description" : "The conversation the agent was spawned in — data, not a key: every spawn shape shares the primary's conversation",
+      "is_unique" : false,
+      "name" : "Claude Session Id",
+      "nullable" : true,
+      "sort_order" : 7
+    },
+    {
+      "code" : "claude_turn_id",
+      "data_type" : "text",
+      "description" : "The spawning TURN (payload field: prompt_id) — Claude Code's turn id, never a gmcc prompt uuid",
+      "is_unique" : false,
+      "name" : "Claude Turn Id",
+      "nullable" : true,
+      "sort_order" : 8
+    },
+    {
+      "code" : "session_uuid",
+      "data_type" : "relationship",
+      "description" : "The gmcc session resolved at registration; written by the identity half",
+      "is_unique" : false,
+      "name" : "Session",
+      "nullable" : true,
+      "relationship_target_ref" : "project.session.uuid",
+      "sort_order" : 9
+    },
+    {
+      "code" : "prompt_uuid",
+      "data_type" : "relationship",
+      "description" : "The prompt the agent was spawned into; spawn-time truth, since an agent belongs to one phase of one prompt",
+      "is_unique" : false,
+      "name" : "Prompt",
+      "nullable" : true,
+      "relationship_target_ref" : "project.prompt.uuid",
+      "sort_order" : 10
+    },
+    {
+      "code" : "agent_type",
+      "data_type" : "text",
+      "description" : "Payload LABEL only, never authoritative: overloaded by spawn shape (subagent_type / workflow-subagent / teammate NAME)",
+      "is_unique" : false,
+      "name" : "Agent Type",
+      "nullable" : true,
+      "sort_order" : 11
+    },
+    {
+      "code" : "role",
+      "data_type" : "text",
+      "description" : "The authoritative role — SPAWNER-registered; for a bare workflow agent it exists nowhere else",
+      "is_unique" : false,
+      "name" : "Role",
+      "nullable" : true,
+      "sort_order" : 12
+    },
+    {
+      "code" : "methodology",
+      "data_type" : "text",
+      "description" : "The authoritative methodology — SPAWNER-registered; same-typed personas differ by agent_id alone",
+      "is_unique" : false,
+      "name" : "Methodology",
+      "nullable" : true,
+      "sort_order" : 13
+    },
+    {
+      "code" : "workflow_phase",
+      "data_type" : "text",
+      "description" : "The phase the agent was spawned into — SPAWNER-registered; completes the authority triple",
+      "is_unique" : false,
+      "name" : "Workflow Phase",
+      "nullable" : true,
+      "sort_order" : 14
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 44,
+  "version" : 764
+}

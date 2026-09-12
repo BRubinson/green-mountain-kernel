@@ -1,0 +1,42 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "instance_active_kbite",
+  "description" : "The instance-tier kbite activation registry: kbites are INHERITED via these registries, never trigger-matched; rows are added only on explicit gm kbite add. UNIQUE(instance, kbite)",
+  "entity_type" : "MODEL",
+  "name" : "Instance Active KBite",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "instance_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning instance; cascade",
+      "is_unique" : false,
+      "name" : "Instance",
+      "nullable" : false,
+      "relationship_target_ref" : "project.instance.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "kbite_uuid",
+      "data_type" : "relationship",
+      "description" : "The activated kbite; cascade",
+      "is_unique" : false,
+      "name" : "KBite",
+      "nullable" : false,
+      "relationship_target_ref" : "kbites.kbite.uuid",
+      "sort_order" : 7
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 8,
+  "version" : 764
+}

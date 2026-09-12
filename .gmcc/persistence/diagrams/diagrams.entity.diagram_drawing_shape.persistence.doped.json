@@ -1,0 +1,78 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "diagram_drawing_shape",
+  "description" : "Subtype: a geometric shape",
+  "entity_type" : "MODEL",
+  "name" : "Diagram Drawing Shape",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "element_uuid",
+      "data_type" : "relationship",
+      "description" : "UNIQUE: one subtype row per element",
+      "is_unique" : true,
+      "name" : "Element UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "diagrams.diagram_element.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "shape_kind",
+      "data_type" : "enum",
+      "description" : "",
+      "enum_ref" : "diagrams.enums.diagram_shape_kind",
+      "is_unique" : false,
+      "name" : "Shape Kind",
+      "nullable" : false,
+      "sort_order" : 3
+    },
+    {
+      "code" : "stroke_color",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Stroke Color",
+      "nullable" : false,
+      "sort_order" : 4
+    },
+    {
+      "code" : "stroke_width",
+      "data_type" : "decimal",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Stroke Width",
+      "nullable" : false,
+      "sort_order" : 5
+    },
+    {
+      "code" : "fill_color",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Fill Color",
+      "nullable" : true,
+      "sort_order" : 6
+    },
+    {
+      "code" : "corner_radius",
+      "data_type" : "decimal",
+      "description" : "Rectangles only",
+      "is_unique" : false,
+      "name" : "Corner Radius",
+      "nullable" : true,
+      "sort_order" : 7
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 5,
+  "version" : 764
+}

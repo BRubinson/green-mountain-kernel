@@ -1,0 +1,114 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "prompt",
+  "description" : "A single unit of work moving through the lifecycle within a session",
+  "entity_type" : "MODEL",
+  "name" : "Prompt",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "session_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning session",
+      "is_unique" : false,
+      "name" : "Session",
+      "nullable" : false,
+      "relationship_target_ref" : "project.session.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "seq",
+      "data_type" : "int",
+      "description" : "1-based order within the session; unique per session",
+      "is_unique" : false,
+      "name" : "Sequence",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "Canonical snake_case code; unique per session",
+      "is_unique" : false,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "name",
+      "data_type" : "text",
+      "description" : "Display name",
+      "is_unique" : false,
+      "name" : "Name",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "backstory",
+      "data_type" : "text",
+      "description" : "Human-authored context; human-input only",
+      "is_unique" : false,
+      "name" : "Backstory",
+      "nullable" : false,
+      "sort_order" : 10
+    },
+    {
+      "code" : "goal",
+      "data_type" : "text",
+      "description" : "What the prompt aims to achieve",
+      "is_unique" : false,
+      "name" : "Goal",
+      "nullable" : false,
+      "sort_order" : 11
+    },
+    {
+      "code" : "detail",
+      "data_type" : "text",
+      "description" : "The passed prompt text, verbatim",
+      "is_unique" : false,
+      "name" : "Detail",
+      "nullable" : false,
+      "sort_order" : 12
+    },
+    {
+      "code" : "command",
+      "data_type" : "text",
+      "description" : "Slash command that authored the prompt; empty default",
+      "is_unique" : false,
+      "name" : "Command",
+      "nullable" : false,
+      "sort_order" : 13
+    },
+    {
+      "code" : "status",
+      "data_type" : "enum",
+      "description" : "Moved only via gm prompt set-status",
+      "enum_ref" : "project.enums.prompt_status",
+      "is_unique" : false,
+      "name" : "Status",
+      "nullable" : false,
+      "sort_order" : 14
+    },
+    {
+      "code" : "ckfs_relative_storage_path",
+      "data_type" : "text",
+      "description" : "Storage path relative to the CKFS root",
+      "is_unique" : false,
+      "name" : "CKFS Storage Path",
+      "nullable" : false,
+      "sort_order" : 15
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 4,
+  "version" : 764
+}

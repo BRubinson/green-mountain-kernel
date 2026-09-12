@@ -1,0 +1,28 @@
+{
+  "code" : "review_verdict",
+  "description" : "Outcome of a completed review",
+  "name" : "Review Verdict",
+  "options" : [
+    {
+      "code" : "approved",
+      "description" : "Clean approval",
+      "name" : "Approved",
+      "sort_order" : 1
+    },
+    {
+      "code" : "approved_with_nits",
+      "description" : "Approved; minor issues noted",
+      "name" : "Approved With Nits",
+      "sort_order" : 2
+    },
+    {
+      "code" : "changes_requested",
+      "description" : "Must be fixed",
+      "name" : "Changes Requested",
+      "sort_order" : 3
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 10,
+  "version" : 764
+}

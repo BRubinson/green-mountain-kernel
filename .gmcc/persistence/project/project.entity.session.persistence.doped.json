@@ -1,0 +1,87 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "session",
+  "description" : "A branch-scoped body of work within an instance",
+  "entity_type" : "MODEL",
+  "name" : "Session",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "instance_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning instance",
+      "is_unique" : false,
+      "name" : "Instance",
+      "nullable" : false,
+      "relationship_target_ref" : "project.instance.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "Canonical snake_case code; unique per instance",
+      "is_unique" : false,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "name",
+      "data_type" : "text",
+      "description" : "Display name",
+      "is_unique" : false,
+      "name" : "Name",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "backstory",
+      "data_type" : "text",
+      "description" : "Human-authored context behind the session",
+      "is_unique" : false,
+      "name" : "Backstory",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "goal",
+      "data_type" : "text",
+      "description" : "What the session aims to achieve",
+      "is_unique" : false,
+      "name" : "Goal",
+      "nullable" : false,
+      "sort_order" : 10
+    },
+    {
+      "code" : "status",
+      "data_type" : "enum",
+      "description" : "active until resolved",
+      "enum_ref" : "project.enums.session_status",
+      "is_unique" : false,
+      "name" : "Status",
+      "nullable" : false,
+      "sort_order" : 11
+    },
+    {
+      "code" : "ckfs_relative_storage_path",
+      "data_type" : "text",
+      "description" : "Storage path relative to the CKFS root",
+      "is_unique" : false,
+      "name" : "CKFS Storage Path",
+      "nullable" : false,
+      "sort_order" : 12
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 3,
+  "version" : 764
+}

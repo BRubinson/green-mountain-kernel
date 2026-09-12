@@ -1,0 +1,39 @@
+{
+  "code" : "kbite_resource_type",
+  "description" : "What kind of source a kbite resource was crunched from (pre-m0021 hard db CHECK)",
+  "name" : "KBite Resource Type",
+  "options" : [
+    {
+      "code" : "documentation",
+      "description" : "Official docs",
+      "name" : "Documentation",
+      "sort_order" : 1
+    },
+    {
+      "code" : "example_project",
+      "description" : "A working example codebase",
+      "name" : "Example Project",
+      "sort_order" : 2
+    },
+    {
+      "code" : "api_reference",
+      "description" : "Generated/reference API surface",
+      "name" : "API Reference",
+      "sort_order" : 3
+    },
+    {
+      "code" : "blogs",
+      "description" : "Blog posts and articles",
+      "name" : "Blogs",
+      "sort_order" : 4
+    },
+    {
+      "code" : "all_others",
+      "description" : "Anything else",
+      "name" : "All Others",
+      "sort_order" : 5
+    }
+  ],
+  "sort_order" : 11,
+  "version" : 764
+}

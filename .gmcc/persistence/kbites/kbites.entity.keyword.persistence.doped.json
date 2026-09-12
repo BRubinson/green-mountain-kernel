@@ -1,0 +1,31 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "keyword",
+  "description" : "Shared keyword vocabulary tagged onto kbites and resource files; orphans are garbage-collected on kbite delete",
+  "entity_type" : "MODEL",
+  "name" : "Keyword",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "keyword",
+      "data_type" : "text",
+      "description" : "The keyword text; unique db-wide",
+      "is_unique" : true,
+      "name" : "Keyword",
+      "nullable" : false,
+      "sort_order" : 6
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 4,
+  "version" : 764
+}

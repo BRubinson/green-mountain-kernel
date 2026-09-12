@@ -1,0 +1,141 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "architecture_persistence_field_change",
+  "description" : "One planned field within a persistence change",
+  "entity_type" : "MODEL",
+  "name" : "Architecture Persistence Field Change",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "persistence_change_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning persistence change; cascade on delete",
+      "is_unique" : false,
+      "name" : "Persistence Change",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.architecture_persistence_change.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "seq",
+      "data_type" : "int",
+      "description" : "Order within the change; unique per change",
+      "is_unique" : false,
+      "name" : "Sequence",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "field_name",
+      "data_type" : "text",
+      "description" : "Field/column being added or changed",
+      "is_unique" : false,
+      "name" : "Field Name",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "change_reason",
+      "data_type" : "text",
+      "description" : "Why the field changes",
+      "is_unique" : false,
+      "name" : "Change Reason",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "change_purpose",
+      "data_type" : "text",
+      "description" : "What the field is for",
+      "is_unique" : false,
+      "name" : "Change Purpose",
+      "nullable" : false,
+      "sort_order" : 10
+    },
+    {
+      "code" : "data_type",
+      "data_type" : "text",
+      "description" : "Free-text declared type of the field",
+      "is_unique" : false,
+      "name" : "Data Type",
+      "nullable" : false,
+      "sort_order" : 11
+    },
+    {
+      "code" : "nullable",
+      "data_type" : "boolean",
+      "description" : "Whether the field allows NULL",
+      "is_unique" : false,
+      "name" : "Nullable",
+      "nullable" : false,
+      "sort_order" : 12
+    },
+    {
+      "code" : "is_foreign_key",
+      "data_type" : "boolean",
+      "description" : "Whether the field is an FK; requires fk_target when true",
+      "is_unique" : false,
+      "name" : "Is Foreign Key",
+      "nullable" : false,
+      "sort_order" : 13
+    },
+    {
+      "code" : "fk_target",
+      "data_type" : "text",
+      "description" : "table.column the FK points at",
+      "is_unique" : false,
+      "name" : "FK Target",
+      "nullable" : true,
+      "sort_order" : 14
+    },
+    {
+      "code" : "is_indexed",
+      "data_type" : "boolean",
+      "description" : "Whether the field gets an index",
+      "is_unique" : false,
+      "name" : "Is Indexed",
+      "nullable" : false,
+      "sort_order" : 15
+    },
+    {
+      "code" : "change_kind",
+      "data_type" : "enum",
+      "description" : "add|modify|rename|delete (default add)",
+      "enum_ref" : "agentics.enums.arch_change_kind",
+      "is_unique" : false,
+      "name" : "Change Kind",
+      "nullable" : false,
+      "sort_order" : 16
+    },
+    {
+      "code" : "renamed_from",
+      "data_type" : "text",
+      "description" : "Old field name when change_kind = rename",
+      "is_unique" : false,
+      "name" : "Renamed From",
+      "nullable" : true,
+      "sort_order" : 17
+    },
+    {
+      "code" : "dope_property_ref",
+      "data_type" : "text",
+      "description" : "domain.entity.property dope dot-path CODE, ghost-legal",
+      "is_unique" : false,
+      "name" : "Dope Property Ref",
+      "nullable" : true,
+      "sort_order" : 18
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 5,
+  "version" : 764
+}

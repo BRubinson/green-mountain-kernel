@@ -1,0 +1,59 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "file_change_range",
+  "description" : "A line range within a file change, optionally with the changed content. Populated on both write paths: the hook expands tool_response.structuredPatch into real hunks (body capped at 4000 chars, 100 hunks per change, so a generated-file rewrite cannot land a megabyte per row), and the manual path takes them from gm file-change add --ranges, which is where the live population comes from",
+  "entity_type" : "MODEL",
+  "name" : "File Change Range",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "file_change_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning change; cascade on delete",
+      "is_unique" : false,
+      "name" : "File Change",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.file_change.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "line_start",
+      "data_type" : "int",
+      "description" : "Range start line — a real line number from a structuredPatch hunk or a --ranges argument",
+      "is_unique" : false,
+      "name" : "Line Start",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "line_end",
+      "data_type" : "int",
+      "description" : "Range end line",
+      "is_unique" : false,
+      "name" : "Line End",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "changed_content",
+      "data_type" : "text",
+      "description" : "The hunk body or an authored note for the range",
+      "is_unique" : false,
+      "name" : "Changed Content",
+      "nullable" : true,
+      "sort_order" : 9
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 14,
+  "version" : 764
+}

@@ -1,0 +1,41 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "dope_cog_persistence_owner",
+  "description" : "Subtype: names a persistence domain a Hull owns, by CODE. Shipped by m0019 and never doped until prompt 9.",
+  "entity_type" : "MODEL",
+  "name" : "Dope Cog Persistence Owner",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : true,
+      "sort_order" : 1
+    },
+    {
+      "code" : "element_uuid",
+      "data_type" : "relationship",
+      "description" : "The cog element this subtype row completes",
+      "is_unique" : true,
+      "name" : "Element UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "doped.dope_cog_element.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "dope_persistence_code",
+      "data_type" : "text",
+      "description" : "The owned persistence domain's CODE, never a uuid: ingest re-mints child uuids. Ghost-tolerant, resolved at read time.",
+      "is_unique" : false,
+      "name" : "Dope Persistence Code",
+      "nullable" : true,
+      "sort_order" : 3
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 12,
+  "version" : 764
+}

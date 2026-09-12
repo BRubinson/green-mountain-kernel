@@ -1,0 +1,34 @@
+{
+  "code" : "scope_type",
+  "description" : "Whether a scope is the session's base model or a prompt-local one",
+  "name" : "Scope Type",
+  "options" : [
+    {
+      "code" : "base_project",
+      "description" : "Project-wide shared truth, promoted from the primary branch; always fully hydrated",
+      "name" : "Base Project",
+      "sort_order" : 1
+    },
+    {
+      "code" : "session_instance",
+      "description" : "One session+instance's tree; what .gmcc/dope carries and boot sync reconciles",
+      "name" : "Session Instance",
+      "sort_order" : 1
+    },
+    {
+      "code" : "project_item",
+      "description" : "Personal db-only overlay masking BASE_PROJECT by dot-path position",
+      "name" : "Project Item",
+      "sort_order" : 2
+    },
+    {
+      "code" : "session_instance_item",
+      "description" : "Personal db-only overlay masking SESSION_INSTANCE",
+      "name" : "Session Instance Item",
+      "sort_order" : 2
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 1,
+  "version" : 764
+}

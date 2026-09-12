@@ -1,0 +1,21 @@
+{
+  "code" : "workflow_status",
+  "description" : "bot_workflow lifecycle (m0025); partial-unique predicates key on active. done is written by set-status done (closeForPrompt); there is no abandon verb — resume steals instead",
+  "name" : "Workflow Status",
+  "options" : [
+    {
+      "code" : "active",
+      "description" : "The prompt's one live workflow",
+      "name" : "Active",
+      "sort_order" : 1
+    },
+    {
+      "code" : "done",
+      "description" : "Closed by set-status done",
+      "name" : "Done",
+      "sort_order" : 2
+    }
+  ],
+  "sort_order" : 22,
+  "version" : 764
+}

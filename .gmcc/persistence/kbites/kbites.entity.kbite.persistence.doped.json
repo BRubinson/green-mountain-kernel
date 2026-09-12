@@ -1,0 +1,31 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "kbite",
+  "description" : "A digested knowledge bite: the db registry row for one crunched knowledge source. The digested tree (indexes + raw sources) lives on the filesystem under the kbite roots; the db owns identity, resources, files, keywords and per-tier activation registries",
+  "entity_type" : "MODEL",
+  "name" : "KBite",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "Unique kbite code (the {name} used across gm kbite verbs and directory layout)",
+      "is_unique" : true,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 6
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Repositories/KbiteRepository.swift",
+  "sort_order" : 1,
+  "version" : 764
+}

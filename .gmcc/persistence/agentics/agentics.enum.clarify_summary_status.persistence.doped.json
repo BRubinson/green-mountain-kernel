@@ -1,0 +1,28 @@
+{
+  "code" : "clarify_summary_status",
+  "description" : "Clarification summary lifecycle; reopen returns complete to answering",
+  "name" : "Clarify Summary Status",
+  "options" : [
+    {
+      "code" : "building",
+      "description" : "Questions being asked",
+      "name" : "Building",
+      "sort_order" : 1
+    },
+    {
+      "code" : "answering",
+      "description" : "Sealed; answers being collected",
+      "name" : "Answering",
+      "sort_order" : 2
+    },
+    {
+      "code" : "complete",
+      "description" : "Finalized with refined goal/detail",
+      "name" : "Complete",
+      "sort_order" : 3
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 1,
+  "version" : 764
+}

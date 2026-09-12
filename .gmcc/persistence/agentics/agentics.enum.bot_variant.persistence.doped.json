@@ -1,0 +1,27 @@
+{
+  "code" : "bot_variant",
+  "description" : "Workflow machine variants (m0025). task deliberately absent — its write-nothing contract means no workflow row",
+  "name" : "Bot Variant",
+  "options" : [
+    {
+      "code" : "bot",
+      "description" : "Single-context: every phase in the primary",
+      "name" : "Bot",
+      "sort_order" : 1
+    },
+    {
+      "code" : "rpi",
+      "description" : "One general-persona subagent per phase + up to 2 implementation subagents",
+      "name" : "RPI",
+      "sort_order" : 2
+    },
+    {
+      "code" : "team",
+      "description" : "Methodology fan-outs via teammates/dynamic workflows",
+      "name" : "Team",
+      "sort_order" : 3
+    }
+  ],
+  "sort_order" : 21,
+  "version" : 764
+}

@@ -1,0 +1,68 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "dope_element_provenance",
+  "description" : "The merge base for per-element three-way reconciliation. Keyed by DOT-PATH, never uuid, because ingest re-mints every child uuid. Shipped by m0020 and never doped until prompt 9.",
+  "entity_type" : "MODEL",
+  "name" : "Dope Element Provenance",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : true,
+      "sort_order" : 1
+    },
+    {
+      "code" : "dope_scope_uuid",
+      "data_type" : "relationship",
+      "description" : "The scope this provenance row belongs to",
+      "is_unique" : false,
+      "name" : "Dope Scope UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "doped.dope_scope.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "dot_path",
+      "data_type" : "text",
+      "description" : "The element's dot-path address. THE key: uuid-keyed provenance would be destroyed by the very re-ingest it informs.",
+      "is_unique" : false,
+      "name" : "Dot Path",
+      "nullable" : true,
+      "sort_order" : 3
+    },
+    {
+      "code" : "element_kind",
+      "data_type" : "text",
+      "description" : "Which dope level the dot-path addresses",
+      "is_unique" : false,
+      "name" : "Element Kind",
+      "nullable" : true,
+      "sort_order" : 4
+    },
+    {
+      "code" : "synced_content_hash",
+      "data_type" : "text",
+      "description" : "Content hash at the last files -> db sync. NULL means never synced from a file, which differs from synced-and-unchanged.",
+      "is_unique" : false,
+      "name" : "Synced Content Hash",
+      "nullable" : true,
+      "sort_order" : 5
+    },
+    {
+      "code" : "locally_modified",
+      "data_type" : "boolean",
+      "description" : "Set by every granular dope mutation, cleared on sync. Drives the three-way merge's conflict decision.",
+      "is_unique" : false,
+      "name" : "Locally Modified",
+      "nullable" : true,
+      "sort_order" : 6
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 13,
+  "version" : 764
+}

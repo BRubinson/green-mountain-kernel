@@ -1,0 +1,41 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "prompt_activation",
+  "description" : "One activation claim per running Claude Code instance: client_key is working prompt X. Claimed by set-status implementing, released at done. SCOPE: non-hook CLI claiming ONLY — it takes no part in file-change attribution, which resolves from claude_session_binding, and FileChangeAdd carries no client_key field at all, so the two ladders have no row to disagree about. A registry, never a single session pointer — several prompts are routinely active on one session concurrently.",
+  "entity_type" : "MODEL",
+  "name" : "Prompt Activation",
+  "properties" : [
+    {
+      "code" : "session_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning session",
+      "is_unique" : false,
+      "name" : "Session",
+      "nullable" : false,
+      "relationship_target_ref" : "project.session.uuid",
+      "sort_order" : 1
+    },
+    {
+      "code" : "prompt_uuid",
+      "data_type" : "relationship",
+      "description" : "The claimed prompt; one claim per prompt",
+      "is_unique" : true,
+      "name" : "Prompt",
+      "nullable" : false,
+      "relationship_target_ref" : "project.prompt.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "client_key",
+      "data_type" : "text",
+      "description" : "Claude instance identity: nearest claude-ancestor pid + start time, gm-resolved",
+      "is_unique" : true,
+      "name" : "Client Key",
+      "nullable" : false,
+      "sort_order" : 3
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Store+Session.swift",
+  "sort_order" : 22,
+  "version" : 764
+}

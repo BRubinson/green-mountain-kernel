@@ -1,0 +1,87 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "user_clarification_question",
+  "description" : "A user-facing clarification question (m0025 split). Adopts the seq space; options are ordered child rows; the selected answer(s) live in the user_clarification_answer junction (multi-select ready, GMVibes-answerable later); answer_text carries a typed answer — either or both satisfy answered",
+  "entity_type" : "MODEL",
+  "name" : "User Clarification Question",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "clarification_summary_uuid",
+      "data_type" : "relationship",
+      "description" : "Parent summary; cascade",
+      "is_unique" : false,
+      "name" : "Summary",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.clarification_summary.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "seq",
+      "data_type" : "int",
+      "description" : "UNIQUE(summary, seq) — the adopted question ordering",
+      "is_unique" : false,
+      "name" : "Seq",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "question",
+      "data_type" : "text",
+      "description" : "The question text",
+      "is_unique" : false,
+      "name" : "Question",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "status",
+      "data_type" : "enum",
+      "description" : "open|answered|skipped (Swift guard: answered requires text or a selection)",
+      "enum_ref" : "agentics.enums.clarify_status",
+      "is_unique" : false,
+      "name" : "Status",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "answer_text",
+      "data_type" : "text",
+      "description" : "Typed free answer (may coexist with selections)",
+      "is_unique" : false,
+      "name" : "Answer Text",
+      "nullable" : true,
+      "sort_order" : 10
+    },
+    {
+      "code" : "agent_id",
+      "data_type" : "text",
+      "description" : "Authoring agent id",
+      "is_unique" : false,
+      "name" : "Agent Id",
+      "nullable" : true,
+      "sort_order" : 11
+    },
+    {
+      "code" : "agent_name",
+      "data_type" : "text",
+      "description" : "Authoring persona (e.g. the-ques)",
+      "is_unique" : false,
+      "name" : "Agent Name",
+      "nullable" : true,
+      "sort_order" : 12
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 34,
+  "version" : 764
+}

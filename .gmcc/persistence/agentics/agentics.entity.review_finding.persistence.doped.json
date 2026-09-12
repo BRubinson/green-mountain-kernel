@@ -1,0 +1,124 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "review_finding",
+  "description" : "One review finding; resolved post-complete via the fix loop",
+  "entity_type" : "MODEL",
+  "name" : "Review Finding",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "review_summary_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning summary; cascade on delete",
+      "is_unique" : false,
+      "name" : "Summary",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.review_summary.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "kind",
+      "data_type" : "enum",
+      "description" : "Finding classification",
+      "enum_ref" : "agentics.enums.review_finding_kind",
+      "is_unique" : false,
+      "name" : "Kind",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "title",
+      "data_type" : "text",
+      "description" : "Short finding title",
+      "is_unique" : false,
+      "name" : "Title",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "body",
+      "data_type" : "text",
+      "description" : "Full finding body",
+      "is_unique" : false,
+      "name" : "Body",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "file_path",
+      "data_type" : "text",
+      "description" : "File the finding is anchored to",
+      "is_unique" : false,
+      "name" : "File Path",
+      "nullable" : true,
+      "sort_order" : 10
+    },
+    {
+      "code" : "line_start",
+      "data_type" : "int",
+      "description" : "Anchor start line; required if line_end set",
+      "is_unique" : false,
+      "name" : "Line Start",
+      "nullable" : true,
+      "sort_order" : 11
+    },
+    {
+      "code" : "line_end",
+      "data_type" : "int",
+      "description" : "Anchor end line",
+      "is_unique" : false,
+      "name" : "Line End",
+      "nullable" : true,
+      "sort_order" : 12
+    },
+    {
+      "code" : "agent_name",
+      "data_type" : "text",
+      "description" : "Agent that produced the finding",
+      "is_unique" : false,
+      "name" : "Agent Name",
+      "nullable" : false,
+      "sort_order" : 13
+    },
+    {
+      "code" : "finding_rating",
+      "data_type" : "int",
+      "description" : "0-999; 0=critical, 999=tombstone; null until ranked",
+      "is_unique" : false,
+      "name" : "Finding Rating",
+      "nullable" : true,
+      "sort_order" : 14
+    },
+    {
+      "code" : "status",
+      "data_type" : "enum",
+      "description" : "Resolution set post-complete",
+      "enum_ref" : "agentics.enums.review_finding_status",
+      "is_unique" : false,
+      "name" : "Status",
+      "nullable" : false,
+      "sort_order" : 15
+    },
+    {
+      "code" : "agent_id",
+      "data_type" : "text",
+      "description" : "Self-reported agent id for dedup/tracking (m0025 sweep)",
+      "is_unique" : false,
+      "name" : "Agent Id",
+      "nullable" : true,
+      "sort_order" : 16
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 11,
+  "version" : 764
+}

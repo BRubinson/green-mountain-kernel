@@ -1,0 +1,28 @@
+{
+  "code" : "clarify_status",
+  "description" : "Per-question state",
+  "name" : "Clarification Status",
+  "options" : [
+    {
+      "code" : "open",
+      "description" : "Awaiting an answer",
+      "name" : "Open",
+      "sort_order" : 1
+    },
+    {
+      "code" : "answered",
+      "description" : "Answer recorded",
+      "name" : "Answered",
+      "sort_order" : 2
+    },
+    {
+      "code" : "skipped",
+      "description" : "Explicitly skipped",
+      "name" : "Skipped",
+      "sort_order" : 3
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 4,
+  "version" : 764
+}

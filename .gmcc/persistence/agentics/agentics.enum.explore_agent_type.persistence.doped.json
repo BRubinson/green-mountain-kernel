@@ -1,0 +1,45 @@
+{
+  "code" : "explore_agent_type",
+  "description" : "Per-agent exploration summary vocabulary (m0025). Registry-governed in Swift (ExplorationAgentType), no db CHECK",
+  "name" : "Exploration Agent Type",
+  "options" : [
+    {
+      "code" : "aggressive",
+      "description" : "Progress-first methodology persona",
+      "name" : "Aggressive",
+      "sort_order" : 1
+    },
+    {
+      "code" : "conservative",
+      "description" : "Stability-first methodology persona",
+      "name" : "Conservative",
+      "sort_order" : 2
+    },
+    {
+      "code" : "pragmatic",
+      "description" : "Value-per-effort methodology persona",
+      "name" : "Pragmatic",
+      "sort_order" : 3
+    },
+    {
+      "code" : "alternative",
+      "description" : "Assumption-challenging methodology persona",
+      "name" : "Alternative",
+      "sort_order" : 4
+    },
+    {
+      "code" : "general",
+      "description" : "All four lenses at once (solo bot/rpi runs)",
+      "name" : "General",
+      "sort_order" : 5
+    },
+    {
+      "code" : "synthesis",
+      "description" : "The prompt-level seal row the primary completes last",
+      "name" : "Synthesis",
+      "sort_order" : 6
+    }
+  ],
+  "sort_order" : 20,
+  "version" : 764
+}

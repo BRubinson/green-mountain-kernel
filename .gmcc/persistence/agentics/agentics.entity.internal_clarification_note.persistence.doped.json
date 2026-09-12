@@ -1,0 +1,96 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "internal_clarification_note",
+  "description" : "An agent-authored internal note (m0025): what confused exploration or the clarifier, resolved without the user. weight uses the finding_rating polarity (0=critical … 999). The confused-entity ref is a SOFT uuid+type pair (ghost semantics — may point at any entity kind); notes may attach to an answered question after the fact",
+  "entity_type" : "MODEL",
+  "name" : "Internal Clarification Note",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "clarification_summary_uuid",
+      "data_type" : "relationship",
+      "description" : "Parent summary; cascade",
+      "is_unique" : false,
+      "name" : "Summary",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.clarification_summary.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "body",
+      "data_type" : "text",
+      "description" : "The note text",
+      "is_unique" : false,
+      "name" : "Body",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "confused_entity_uuid",
+      "data_type" : "text",
+      "description" : "Soft ref — no FK, ghost-legal",
+      "is_unique" : false,
+      "name" : "Confused Entity",
+      "nullable" : true,
+      "sort_order" : 8
+    },
+    {
+      "code" : "confused_entity_type",
+      "data_type" : "text",
+      "description" : "exploration_finding|briefing|question|other (Swift vocabulary)",
+      "is_unique" : false,
+      "name" : "Confused Entity Type",
+      "nullable" : true,
+      "sort_order" : 9
+    },
+    {
+      "code" : "weight",
+      "data_type" : "int",
+      "description" : "0-999 importance, finding_rating polarity (0 = critical)",
+      "is_unique" : false,
+      "name" : "Weight",
+      "nullable" : true,
+      "sort_order" : 10
+    },
+    {
+      "code" : "question_uuid",
+      "data_type" : "relationship",
+      "description" : "Post-answer attachment; SET NULL on question delete",
+      "is_unique" : false,
+      "name" : "Question",
+      "nullable" : true,
+      "relationship_target_ref" : "agentics.user_clarification_question.uuid",
+      "sort_order" : 11
+    },
+    {
+      "code" : "agent_id",
+      "data_type" : "text",
+      "description" : "Authoring agent id",
+      "is_unique" : false,
+      "name" : "Agent Id",
+      "nullable" : true,
+      "sort_order" : 12
+    },
+    {
+      "code" : "agent_name",
+      "data_type" : "text",
+      "description" : "Authoring persona",
+      "is_unique" : false,
+      "name" : "Agent Name",
+      "nullable" : true,
+      "sort_order" : 13
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 37,
+  "version" : 764
+}

@@ -1,0 +1,39 @@
+{
+  "code" : "diagram_shape_kind",
+  "description" : "Shape geometry",
+  "name" : "Diagram Shape Kind",
+  "options" : [
+    {
+      "code" : "rectangle",
+      "description" : "",
+      "name" : "rectangle",
+      "sort_order" : 1
+    },
+    {
+      "code" : "ellipse",
+      "description" : "",
+      "name" : "ellipse",
+      "sort_order" : 2
+    },
+    {
+      "code" : "line",
+      "description" : "",
+      "name" : "line",
+      "sort_order" : 3
+    },
+    {
+      "code" : "arrow",
+      "description" : "",
+      "name" : "arrow",
+      "sort_order" : 4
+    },
+    {
+      "code" : "polygon",
+      "description" : "",
+      "name" : "polygon",
+      "sort_order" : 5
+    }
+  ],
+  "sort_order" : 3,
+  "version" : 764
+}

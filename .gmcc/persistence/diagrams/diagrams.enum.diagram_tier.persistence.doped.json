@@ -1,0 +1,27 @@
+{
+  "code" : "diagram_tier",
+  "description" : "Which level owns the canvas",
+  "name" : "Diagram Tier",
+  "options" : [
+    {
+      "code" : "project",
+      "description" : "",
+      "name" : "project",
+      "sort_order" : 1
+    },
+    {
+      "code" : "session",
+      "description" : "",
+      "name" : "session",
+      "sort_order" : 3
+    },
+    {
+      "code" : "prompt",
+      "description" : "",
+      "name" : "prompt",
+      "sort_order" : 4
+    }
+  ],
+  "sort_order" : 1,
+  "version" : 764
+}

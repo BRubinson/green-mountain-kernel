@@ -1,0 +1,50 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "session_file",
+  "description" : "A repo file touched during a session; anchor for its changes",
+  "entity_type" : "MODEL",
+  "name" : "Session File",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "session_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning session",
+      "is_unique" : false,
+      "name" : "Session",
+      "nullable" : false,
+      "relationship_target_ref" : "project.session.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "relative_path",
+      "data_type" : "text",
+      "description" : "Repo-relative path; unique per session",
+      "is_unique" : false,
+      "name" : "Relative Path",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "active",
+      "data_type" : "boolean",
+      "description" : "Whether the file is still tracked; default true",
+      "is_unique" : false,
+      "name" : "Active",
+      "nullable" : false,
+      "sort_order" : 8
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 12,
+  "version" : 764
+}

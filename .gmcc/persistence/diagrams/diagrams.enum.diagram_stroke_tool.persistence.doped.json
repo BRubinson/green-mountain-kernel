@@ -1,0 +1,27 @@
+{
+  "code" : "diagram_stroke_tool",
+  "description" : "Pen tool",
+  "name" : "Diagram Stroke Tool",
+  "options" : [
+    {
+      "code" : "pencil",
+      "description" : "",
+      "name" : "pencil",
+      "sort_order" : 1
+    },
+    {
+      "code" : "marker",
+      "description" : "",
+      "name" : "marker",
+      "sort_order" : 2
+    },
+    {
+      "code" : "highlighter",
+      "description" : "",
+      "name" : "highlighter",
+      "sort_order" : 3
+    }
+  ],
+  "sort_order" : 4,
+  "version" : 764
+}

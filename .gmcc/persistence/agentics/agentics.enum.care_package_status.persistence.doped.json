@@ -1,0 +1,21 @@
+{
+  "code" : "care_package_status",
+  "description" : "building until package-complete; ready when consumable (the bot-next gate for the architecture phases)",
+  "name" : "Care Package Status",
+  "options" : [
+    {
+      "code" : "building",
+      "description" : "Refs and intent still being curated",
+      "name" : "Building",
+      "sort_order" : 1
+    },
+    {
+      "code" : "ready",
+      "description" : "Sealed with the clarified intent; consumable",
+      "name" : "Ready",
+      "sort_order" : 2
+    }
+  ],
+  "sort_order" : 26,
+  "version" : 764
+}

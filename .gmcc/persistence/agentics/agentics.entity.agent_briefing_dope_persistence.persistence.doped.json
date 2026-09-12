@@ -1,0 +1,59 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "agent_briefing_dope_persistence",
+  "description" : "Briefing dope ref child (m0025): a dot-path CODE, never a uuid FK — ghost-legal at read (the diagram binding precedent); dope deletes never block or cascade briefing history. CASCADE on briefing delete; truncated on briefing reset",
+  "entity_type" : "MODEL",
+  "name" : "Agent Briefing Dope Persistence",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "agent_briefing_uuid",
+      "data_type" : "relationship",
+      "description" : "Parent briefing; cascade",
+      "is_unique" : false,
+      "name" : "Briefing",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.agent_briefing.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "dope_code",
+      "data_type" : "text",
+      "description" : "domain.entity[.property] dot-path CODE",
+      "is_unique" : false,
+      "name" : "Dope Code",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "brief",
+      "data_type" : "text",
+      "description" : "Optional denormalized brief",
+      "is_unique" : false,
+      "name" : "Brief",
+      "nullable" : true,
+      "sort_order" : 8
+    },
+    {
+      "code" : "seq",
+      "data_type" : "int",
+      "description" : "Order within the briefing",
+      "is_unique" : false,
+      "name" : "Seq",
+      "nullable" : false,
+      "sort_order" : 9
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 31,
+  "version" : 764
+}

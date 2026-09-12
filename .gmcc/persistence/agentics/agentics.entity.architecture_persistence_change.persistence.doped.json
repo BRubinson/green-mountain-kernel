@@ -1,0 +1,87 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "architecture_persistence_change",
+  "description" : "One planned persistence-layer change (a table/class) in an architecture",
+  "entity_type" : "MODEL",
+  "name" : "Architecture Persistence Change",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "architecture_summary_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning summary; cascade on delete",
+      "is_unique" : false,
+      "name" : "Summary",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.architecture_summary.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "seq",
+      "data_type" : "int",
+      "description" : "Order within the summary; unique per summary",
+      "is_unique" : false,
+      "name" : "Sequence",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "class_name",
+      "data_type" : "text",
+      "description" : "Persistence class/table being changed",
+      "is_unique" : false,
+      "name" : "Class Name",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "file_path",
+      "data_type" : "text",
+      "description" : "File holding the persistence definition",
+      "is_unique" : false,
+      "name" : "File Path",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "reason_brief",
+      "data_type" : "text",
+      "description" : "Why this change is needed",
+      "is_unique" : false,
+      "name" : "Reason Brief",
+      "nullable" : false,
+      "sort_order" : 10
+    },
+    {
+      "code" : "change_kind",
+      "data_type" : "enum",
+      "description" : "add|modify|rename|delete — negative changes are first-class (default modify)",
+      "enum_ref" : "agentics.enums.arch_change_kind",
+      "is_unique" : false,
+      "name" : "Change Kind",
+      "nullable" : false,
+      "sort_order" : 11
+    },
+    {
+      "code" : "dope_ref",
+      "data_type" : "text",
+      "description" : "domain.entity dope dot-path CODE, ghost-legal — never a uuid",
+      "is_unique" : false,
+      "name" : "Dope Ref",
+      "nullable" : true,
+      "sort_order" : 12
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 4,
+  "version" : 764
+}

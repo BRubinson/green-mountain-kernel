@@ -1,0 +1,15 @@
+{
+  "code" : "briefing_step",
+  "description" : "Which phase consumes a briefing. Registry-governed in Swift (BriefingStepSpec); no db CHECK. m0025 retired the second step — the care package replaced it (historical rows were retagged to initial by the migration)",
+  "name" : "Briefing Step",
+  "options" : [
+    {
+      "code" : "initial",
+      "description" : "Pre-exploration briefing assembled at prompt open",
+      "name" : "Initial",
+      "sort_order" : 1
+    }
+  ],
+  "sort_order" : 14,
+  "version" : 764
+}

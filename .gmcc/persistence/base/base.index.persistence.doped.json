@@ -1,0 +1,13 @@
+{
+  "code" : "base",
+  "description" : "Shared composable blocks every model entity carries; a plain domain — the daemon never creates or special-cases it.",
+  "entities" : {
+    "base_entity" : "base.entity.base_entity.persistence.doped.json"
+  },
+  "enums" : {
+
+  },
+  "name" : "Base",
+  "sort_order" : 0,
+  "version" : 764
+}

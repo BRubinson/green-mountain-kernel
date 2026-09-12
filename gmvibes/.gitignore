@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# Xcode — build artifacts
+build/
+DerivedData/
+*.xcarchive
+*.app
+*.dmg
+
+# Xcode — user-specific
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.moved-aside
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Distribution / signing secrets
+ExportOptions.plist
+*.p12
+*.cer
+*.provisionprofile
+notarytool-*.json

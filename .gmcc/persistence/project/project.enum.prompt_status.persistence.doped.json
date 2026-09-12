@@ -1,0 +1,46 @@
+{
+  "code" : "prompt_status",
+  "description" : "Prompt lifecycle; reviewing is skippable",
+  "name" : "Prompt Status",
+  "options" : [
+    {
+      "code" : "draft",
+      "description" : "Created, content still editable",
+      "name" : "Draft",
+      "sort_order" : 1
+    },
+    {
+      "code" : "clarifying",
+      "description" : "Clarification pipeline running",
+      "name" : "Clarifying",
+      "sort_order" : 2
+    },
+    {
+      "code" : "architecting",
+      "description" : "Architecture being drafted",
+      "name" : "Architecting",
+      "sort_order" : 3
+    },
+    {
+      "code" : "implementing",
+      "description" : "Changes being written",
+      "name" : "Implementing",
+      "sort_order" : 4
+    },
+    {
+      "code" : "reviewing",
+      "description" : "Review pipeline running",
+      "name" : "Reviewing",
+      "sort_order" : 5
+    },
+    {
+      "code" : "done",
+      "description" : "Prompt complete",
+      "name" : "Done",
+      "sort_order" : 6
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 2,
+  "version" : 764
+}

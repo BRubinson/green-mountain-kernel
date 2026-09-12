@@ -1,0 +1,69 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "kbite_resource",
+  "description" : "One consumed source within a kbite (a chewed crunchable). resource_summary is the full chewed analysis body — the per-resource synthesis",
+  "entity_type" : "MODEL",
+  "name" : "KBite Resource",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "kbite_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning kbite; cascade",
+      "is_unique" : false,
+      "name" : "KBite",
+      "nullable" : false,
+      "relationship_target_ref" : "kbites.kbite.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "resource_name",
+      "data_type" : "text",
+      "description" : "The source's name within the kbite",
+      "is_unique" : false,
+      "name" : "Resource Name",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "resource_summary",
+      "data_type" : "text",
+      "description" : "The chewed per-resource synthesis",
+      "is_unique" : false,
+      "name" : "Resource Summary",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "resource_type",
+      "data_type" : "enum",
+      "description" : "documentation|example_project|api_reference|blogs|all_others (pre-m0021 hard CHECK)",
+      "enum_ref" : "kbites.enums.kbite_resource_type",
+      "is_unique" : false,
+      "name" : "Resource Type",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "resource_trust",
+      "data_type" : "int",
+      "description" : "0-100 trust score (CHECKed range)",
+      "is_unique" : false,
+      "name" : "Resource Trust",
+      "nullable" : false,
+      "sort_order" : 10
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 2,
+  "version" : 764
+}

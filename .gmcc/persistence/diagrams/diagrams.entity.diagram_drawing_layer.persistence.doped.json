@@ -1,0 +1,59 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "diagram_drawing_layer",
+  "description" : "Subtype: a free-drawing layer",
+  "entity_type" : "MODEL",
+  "name" : "Diagram Drawing Layer",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "element_uuid",
+      "data_type" : "relationship",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "Element UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "diagrams.diagram_element.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "opacity",
+      "data_type" : "decimal",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Opacity",
+      "nullable" : false,
+      "sort_order" : 3
+    },
+    {
+      "code" : "visible",
+      "data_type" : "boolean",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Visible",
+      "nullable" : false,
+      "sort_order" : 4
+    },
+    {
+      "code" : "locked",
+      "data_type" : "boolean",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Locked",
+      "nullable" : false,
+      "sort_order" : 5
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 3,
+  "version" : 764
+}

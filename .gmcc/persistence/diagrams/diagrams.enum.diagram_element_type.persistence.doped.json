@@ -1,0 +1,51 @@
+{
+  "code" : "diagram_element_type",
+  "description" : "Subtype discriminator. Unlike the cog registry this one DOES carry a db CHECK, which is why adding a type here is a table rebuild",
+  "name" : "Diagram Element Type",
+  "options" : [
+    {
+      "code" : "drawing_layer",
+      "description" : "",
+      "name" : "drawing_layer",
+      "sort_order" : 1
+    },
+    {
+      "code" : "drawing_stroke",
+      "description" : "",
+      "name" : "drawing_stroke",
+      "sort_order" : 2
+    },
+    {
+      "code" : "drawing_shape",
+      "description" : "",
+      "name" : "drawing_shape",
+      "sort_order" : 3
+    },
+    {
+      "code" : "dope_scope_persistence_layer",
+      "description" : "Per-element binding to a dope scope (m0018 rename)",
+      "name" : "Dope Scope Persistence Layer",
+      "sort_order" : 4
+    },
+    {
+      "code" : "dope_entity",
+      "description" : "",
+      "name" : "dope_entity",
+      "sort_order" : 5
+    },
+    {
+      "code" : "drawing_text",
+      "description" : "Resizable markdown text box; explicit width/height, no vertex table",
+      "name" : "Drawing Text",
+      "sort_order" : 6
+    },
+    {
+      "code" : "connector",
+      "description" : "Deferred-resolution element joining its parent to a peer of its parent",
+      "name" : "Connector",
+      "sort_order" : 7
+    }
+  ],
+  "sort_order" : 2,
+  "version" : 764
+}

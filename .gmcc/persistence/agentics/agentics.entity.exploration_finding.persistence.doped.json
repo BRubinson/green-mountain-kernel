@@ -1,0 +1,96 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "exploration_finding",
+  "description" : "One rated exploration finding — since m0025 also the merged key-file shape: a kind=key_file row is a path-anchored finding with empty body (the exploration_key_file table is retired)",
+  "entity_type" : "MODEL",
+  "name" : "Exploration Finding",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "exploration_summary_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning summary; cascade on delete",
+      "is_unique" : false,
+      "name" : "Summary",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.exploration_summary.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "kind",
+      "data_type" : "enum",
+      "description" : "Finding classification",
+      "enum_ref" : "agentics.enums.explore_finding_kind",
+      "is_unique" : false,
+      "name" : "Kind",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "title",
+      "data_type" : "text",
+      "description" : "Short finding title",
+      "is_unique" : false,
+      "name" : "Title",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "body",
+      "data_type" : "text",
+      "description" : "Full finding body",
+      "is_unique" : false,
+      "name" : "Body",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "agent_name",
+      "data_type" : "text",
+      "description" : "Agent that produced the finding",
+      "is_unique" : false,
+      "name" : "Agent Name",
+      "nullable" : false,
+      "sort_order" : 10
+    },
+    {
+      "code" : "finding_rating",
+      "data_type" : "int",
+      "description" : "0-999; 0=critical, 999=tombstone; null until ranked",
+      "is_unique" : false,
+      "name" : "Finding Rating",
+      "nullable" : true,
+      "sort_order" : 11
+    },
+    {
+      "code" : "file_path",
+      "data_type" : "text",
+      "description" : "Repo-relative anchor when the finding is file-anchored (the merged key-file half)",
+      "is_unique" : false,
+      "name" : "File Path",
+      "nullable" : true,
+      "sort_order" : 12
+    },
+    {
+      "code" : "agent_id",
+      "data_type" : "text",
+      "description" : "Self-reported agent id for dedup/tracking",
+      "is_unique" : false,
+      "name" : "Agent Id",
+      "nullable" : true,
+      "sort_order" : 13
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 9,
+  "version" : 764
+}

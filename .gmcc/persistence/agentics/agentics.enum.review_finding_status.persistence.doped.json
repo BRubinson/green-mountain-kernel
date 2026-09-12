@@ -1,0 +1,34 @@
+{
+  "code" : "review_finding_status",
+  "description" : "Resolution state; never returns to open",
+  "name" : "Review Finding Status",
+  "options" : [
+    {
+      "code" : "open",
+      "description" : "Unresolved",
+      "name" : "Open",
+      "sort_order" : 1
+    },
+    {
+      "code" : "fixed",
+      "description" : "Addressed with a change",
+      "name" : "Fixed",
+      "sort_order" : 2
+    },
+    {
+      "code" : "accepted",
+      "description" : "Accepted as-is",
+      "name" : "Accepted",
+      "sort_order" : 3
+    },
+    {
+      "code" : "wont_fix",
+      "description" : "Deliberately not fixing",
+      "name" : "Won't Fix",
+      "sort_order" : 4
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 12,
+  "version" : 764
+}

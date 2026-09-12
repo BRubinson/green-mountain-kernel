@@ -1,0 +1,16 @@
+{
+  "code" : "gm_bot",
+  "description" : "The GMB skills, commands and prompts that drive the bot workflow tiers; a persistence consumer via the gm CLI",
+  "elements" : [
+    {
+      "code" : "gm_bot",
+      "description" : "",
+      "element_type" : "Hull",
+      "name" : "GM Bot",
+      "primary_path" : "plugins/gmcc/skills",
+      "sort_order" : 0
+    }
+  ],
+  "name" : "GM Bot",
+  "sort_order" : 0
+}

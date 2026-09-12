@@ -1,0 +1,22 @@
+{
+  "code" : "explore_status",
+  "description" : "Exploration summary lifecycle; reopen returns complete to exploring",
+  "name" : "Exploration Status",
+  "options" : [
+    {
+      "code" : "exploring",
+      "description" : "Findings being collected",
+      "name" : "Exploring",
+      "sort_order" : 1
+    },
+    {
+      "code" : "complete",
+      "description" : "Ranked and overviewed",
+      "name" : "Complete",
+      "sort_order" : 2
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 7,
+  "version" : 764
+}

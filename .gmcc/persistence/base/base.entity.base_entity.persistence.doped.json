@@ -1,0 +1,57 @@
+{
+  "code" : "base_entity",
+  "description" : "The universal BaseEntity wrap: serial PK, uuid join key, optimistic-lock version, timestamps.",
+  "entity_type" : "BASE_COMPOSABLE",
+  "name" : "Base Entity",
+  "properties" : [
+    {
+      "auto_increment" : true,
+      "code" : "id",
+      "data_type" : "long",
+      "description" : "Auto-increment primary key (base entity)",
+      "is_unique" : true,
+      "name" : "ID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "version",
+      "data_type" : "int",
+      "description" : "Optimistic-lock counter, default 0 (base entity)",
+      "is_unique" : false,
+      "name" : "Version",
+      "nullable" : false,
+      "sort_order" : 3
+    },
+    {
+      "code" : "created_at",
+      "data_type" : "datetime",
+      "description" : "Row creation time, ISO-8601 (base entity)",
+      "is_unique" : false,
+      "name" : "Created At",
+      "nullable" : false,
+      "sort_order" : 4
+    },
+    {
+      "code" : "updated_at",
+      "data_type" : "datetime",
+      "description" : "Last update time, ISO-8601 (base entity)",
+      "is_unique" : false,
+      "name" : "Updated At",
+      "nullable" : false,
+      "sort_order" : 5
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 0,
+  "version" : 764
+}

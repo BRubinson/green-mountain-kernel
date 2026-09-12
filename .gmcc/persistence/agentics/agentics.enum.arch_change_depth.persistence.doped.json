@@ -1,0 +1,28 @@
+{
+  "code" : "arch_change_depth",
+  "description" : "Fidelity of change_code in a general change",
+  "name" : "Architecture Change Depth",
+  "options" : [
+    {
+      "code" : "pseudo",
+      "description" : "Pseudocode sketch",
+      "name" : "Pseudo",
+      "sort_order" : 1
+    },
+    {
+      "code" : "draft",
+      "description" : "Draft-quality code",
+      "name" : "Draft",
+      "sort_order" : 2
+    },
+    {
+      "code" : "actual",
+      "description" : "Final intended code",
+      "name" : "Actual",
+      "sort_order" : 3
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 6,
+  "version" : 764
+}

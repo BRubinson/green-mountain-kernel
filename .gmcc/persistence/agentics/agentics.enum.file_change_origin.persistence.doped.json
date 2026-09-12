@@ -1,0 +1,27 @@
+{
+  "code" : "file_change_origin",
+  "description" : "Provenance of a file_change row. The column has no CHECK, so rows written under an older vocabulary keep their values; this enum governs what may be written now",
+  "name" : "File Change Origin",
+  "options" : [
+    {
+      "code" : "hook",
+      "description" : "The PostToolUse hook, from an Edit/Write/NotebookEdit payload — exact paths, exact structuredPatch ranges",
+      "name" : "Hook",
+      "sort_order" : 1
+    },
+    {
+      "code" : "manual",
+      "description" : "An explicit gm file-change add / MCP tool call",
+      "name" : "Manual",
+      "sort_order" : 2
+    },
+    {
+      "code" : "command",
+      "description" : "Inferred from the paths a Bash command NAMED (the write allowlist) — marked as inference, never mistakable for exact",
+      "name" : "Command",
+      "sort_order" : 3
+    }
+  ],
+  "sort_order" : 23,
+  "version" : 764
+}

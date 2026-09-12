@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E7EEF6"/>
+    </linearGradient>
+    <clipPath id="squircle">
+      <rect x="100" y="90" width="824" height="824" rx="180" ry="180"/>
+    </clipPath>
+  </defs>
+  <g clip-path="url(#squircle)">
+    <rect x="100" y="90" width="824" height="824" fill="url(#sky)"/>
+
+    <circle cx="512" cy="412" r="150" fill="#7191BD"/>
+
+    <g fill="#FFFFFF">
+      <rect x="300" y="352" width="424" height="24" rx="12"/>
+      <rect x="290" y="400" width="444" height="22" rx="11"/>
+      <rect x="300" y="444" width="424" height="24" rx="12"/>
+      <rect x="320" y="492" width="384" height="22" rx="11"/>
+    </g>
+
+    <g fill="#7191BD">
+      <rect x="360" y="330" width="300" height="22" rx="11"/>
+      <rect x="690" y="330" width="130" height="22" rx="11"/>
+      <rect x="176" y="376" width="300" height="24" rx="12"/>
+      <rect x="508" y="376" width="330" height="24" rx="12"/>
+      <rect x="232" y="422" width="210" height="22" rx="11"/>
+      <rect x="470" y="422" width="380" height="22" rx="11"/>
+      <rect x="300" y="468" width="330" height="24" rx="12"/>
+      <rect x="660" y="468" width="160" height="24" rx="12"/>
+      <rect x="356" y="514" width="290" height="20" rx="10"/>
+    </g>
+
+    <path fill="#1B1B1E" d="M 138 716 L 186 660 L 204 686 L 244 562 L 260 588 L 274 444 L 294 542 L 312 516 L 354 638 L 372 612 L 410 760 Z"/>
+    <path fill="#1B1B1E" d="M 890 716 L 846 662 L 828 688 L 790 570 L 774 596 L 746 470 L 724 560 L 706 534 L 670 646 L 652 622 L 618 760 Z"/>
+    <path fill="#1B1B1E" d="M 300 760 L 336 672 L 382 508 L 398 490 L 416 518 L 460 378 L 476 404 L 511 270 L 554 414 L 572 386 L 614 524 L 634 498 L 694 664 L 736 760 Z"/>
+
+    <g fill="#FFFFFF">
+      <path d="M 478 760 L 511 482 L 536 760 Z"/>
+      <path d="M 424 760 L 478 582 L 460 760 Z"/>
+      <path d="M 562 760 L 568 592 L 606 760 Z"/>
+      <path d="M 318 760 L 358 632 L 350 760 Z"/>
+      <path d="M 690 760 L 716 642 L 738 760 Z"/>
+      <path d="M 246 760 L 274 668 L 268 760 Z"/>
+      <path d="M 770 760 L 780 676 L 800 760 Z"/>
+    </g>
+
+    <rect x="100" y="760" width="824" height="170" fill="url(#sky)"/>
+  </g>
+</svg>

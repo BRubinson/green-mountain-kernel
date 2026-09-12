@@ -1,0 +1,181 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "file_change",
+  "description" : "One recorded modification of a session file, attributed to a prompt through the pinned Claude session (m0026). The payload capture set is one typed column per field, never a blob, so every axis is queryable; (tool_use_id, session_file_uuid) is partial-UNIQUE so a replayed payload produces one row",
+  "entity_type" : "MODEL",
+  "name" : "File Change",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "session_file_uuid",
+      "data_type" : "relationship",
+      "description" : "The file this change belongs to",
+      "is_unique" : false,
+      "name" : "Session File",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.session_file.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "session_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning session, denormalized",
+      "is_unique" : false,
+      "name" : "Session",
+      "nullable" : false,
+      "relationship_target_ref" : "project.session.uuid",
+      "sort_order" : 7
+    },
+    {
+      "code" : "prompt_uuid",
+      "data_type" : "relationship",
+      "description" : "Prompt attribution, resolved from the claude_session_binding for a hook write; drives implementation-state comparison",
+      "is_unique" : false,
+      "name" : "Prompt",
+      "nullable" : true,
+      "relationship_target_ref" : "project.prompt.uuid",
+      "sort_order" : 8
+    },
+    {
+      "code" : "change_kind",
+      "data_type" : "enum",
+      "description" : "edit, create, delete, rename",
+      "enum_ref" : "agentics.enums.file_change_kind",
+      "is_unique" : false,
+      "name" : "Change Kind",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "agent_id",
+      "data_type" : "text",
+      "description" : "Writing agent's opaque id, stamped from the payload; its ABSENCE is the primary/subagent discriminator",
+      "is_unique" : false,
+      "name" : "Agent Id",
+      "nullable" : true,
+      "sort_order" : 10
+    },
+    {
+      "code" : "agent_name",
+      "data_type" : "text",
+      "description" : "Self-reported agent/persona name",
+      "is_unique" : false,
+      "name" : "Agent Name",
+      "nullable" : true,
+      "sort_order" : 11
+    },
+    {
+      "code" : "workflow_phase",
+      "data_type" : "text",
+      "description" : "Stamped SERVER-SIDE from the attributed prompt's active bot_workflow — the writer cannot mis-stamp",
+      "is_unique" : false,
+      "name" : "Workflow Phase",
+      "nullable" : true,
+      "sort_order" : 12
+    },
+    {
+      "code" : "origin",
+      "data_type" : "enum",
+      "description" : "hook|manual|command (default hook): a command-derived inference never passes for an exact structuredPatch row",
+      "enum_ref" : "agentics.enums.file_change_origin",
+      "is_unique" : false,
+      "name" : "Origin",
+      "nullable" : false,
+      "sort_order" : 13
+    },
+    {
+      "code" : "claude_session_id",
+      "data_type" : "text",
+      "description" : "The conversation that produced this change; denormalized so attribution is queryable without the binding join",
+      "is_unique" : false,
+      "name" : "Claude Session Id",
+      "nullable" : true,
+      "sort_order" : 20
+    },
+    {
+      "code" : "claude_turn_id",
+      "data_type" : "text",
+      "description" : "Claude Code's TURN id (payload field: prompt_id). NEVER a gmcc prompt uuid — named for what it holds",
+      "is_unique" : false,
+      "name" : "Claude Turn Id",
+      "nullable" : true,
+      "sort_order" : 21
+    },
+    {
+      "code" : "tool_use_id",
+      "data_type" : "text",
+      "description" : "The tool call — idempotency key, partial-UNIQUE with session_file_uuid because one Bash call writes N files",
+      "is_unique" : false,
+      "name" : "Tool Use Id",
+      "nullable" : true,
+      "sort_order" : 22
+    },
+    {
+      "code" : "tool_name",
+      "data_type" : "text",
+      "description" : "Which tool wrote it (Edit, Write, NotebookEdit, Bash)",
+      "is_unique" : false,
+      "name" : "Tool Name",
+      "nullable" : true,
+      "sort_order" : 23
+    },
+    {
+      "code" : "agent_type",
+      "data_type" : "text",
+      "description" : "The payload's agent_type label for the writer; overloaded by spawn shape, so authority lives on agent_registration",
+      "is_unique" : false,
+      "name" : "Agent Type",
+      "nullable" : true,
+      "sort_order" : 24
+    },
+    {
+      "code" : "permission_mode",
+      "data_type" : "text",
+      "description" : "The permission mode in force for the tool call",
+      "is_unique" : false,
+      "name" : "Permission Mode",
+      "nullable" : true,
+      "sort_order" : 25
+    },
+    {
+      "code" : "duration_ms",
+      "data_type" : "int",
+      "description" : "How long the tool call took. Data only — never an mtime window, which misattributes under parallel fan-out",
+      "is_unique" : false,
+      "name" : "Duration Ms",
+      "nullable" : true,
+      "sort_order" : 26
+    },
+    {
+      "code" : "transcript_path",
+      "data_type" : "text",
+      "description" : "The transcript the tool call belongs to; the row is self-describing without the harness",
+      "is_unique" : false,
+      "name" : "Transcript Path",
+      "nullable" : true,
+      "sort_order" : 27
+    },
+    {
+      "code" : "agent_registration_uuid",
+      "data_type" : "relationship",
+      "description" : "The identity that made this change. NULL IS FORCED for a primary write: the primary carries no agent_id to point at",
+      "is_unique" : false,
+      "name" : "Agent Registration",
+      "nullable" : true,
+      "relationship_target_ref" : "agentics.agent_registration.uuid",
+      "sort_order" : 28
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 13,
+  "version" : 764
+}

@@ -1,0 +1,42 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "resource_file_keyword_junction",
+  "description" : "File-level keyword tags; UNIQUE(file, keyword)",
+  "entity_type" : "MODEL",
+  "name" : "Resource File Keyword Junction",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "file_uuid",
+      "data_type" : "relationship",
+      "description" : "Tagged resource file; cascade",
+      "is_unique" : false,
+      "name" : "File",
+      "nullable" : false,
+      "relationship_target_ref" : "kbites.kbite_resource_file.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "keyword_uuid",
+      "data_type" : "relationship",
+      "description" : "The keyword; cascade",
+      "is_unique" : false,
+      "name" : "Keyword",
+      "nullable" : false,
+      "relationship_target_ref" : "kbites.keyword.uuid",
+      "sort_order" : 7
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 6,
+  "version" : 764
+}

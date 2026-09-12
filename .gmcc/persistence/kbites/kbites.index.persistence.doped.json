@@ -1,0 +1,22 @@
+{
+  "code" : "kbites",
+  "description" : "The kbite knowledge system: digested knowledge bites, their resources and files (the uuid target of briefing/care-package kbite refs and the bm25 search surface), the shared keyword vocabulary, and the four per-tier activation registries (inheritance, never trigger-matching)",
+  "entities" : {
+    "instance_active_kbite" : "kbites.entity.instance_active_kbite.persistence.doped.json",
+    "kbite" : "kbites.entity.kbite.persistence.doped.json",
+    "kbite_keyword_junction" : "kbites.entity.kbite_keyword_junction.persistence.doped.json",
+    "kbite_resource" : "kbites.entity.kbite_resource.persistence.doped.json",
+    "kbite_resource_file" : "kbites.entity.kbite_resource_file.persistence.doped.json",
+    "keyword" : "kbites.entity.keyword.persistence.doped.json",
+    "project_active_kbite" : "kbites.entity.project_active_kbite.persistence.doped.json",
+    "prompt_active_kbite" : "kbites.entity.prompt_active_kbite.persistence.doped.json",
+    "resource_file_keyword_junction" : "kbites.entity.resource_file_keyword_junction.persistence.doped.json",
+    "session_active_kbite" : "kbites.entity.session_active_kbite.persistence.doped.json"
+  },
+  "enums" : {
+    "kbite_resource_type" : "kbites.enum.kbite_resource_type.persistence.doped.json"
+  },
+  "name" : "KBites",
+  "sort_order" : 6,
+  "version" : 764
+}

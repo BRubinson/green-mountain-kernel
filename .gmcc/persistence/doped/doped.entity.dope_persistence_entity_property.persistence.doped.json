@@ -1,0 +1,154 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "dope_persistence_entity_property",
+  "description" : "A modeled column/property of an entity",
+  "entity_type" : "MODEL",
+  "name" : "Dope Persistence Entity Property",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "dope_persistence_entity_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning entity; cascade on delete",
+      "is_unique" : false,
+      "name" : "Persistence Entity UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "doped.dope_persistence_entity.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "snake_case reference code; unique per entity",
+      "is_unique" : false,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "name",
+      "data_type" : "text",
+      "description" : "Display name",
+      "is_unique" : false,
+      "name" : "Name",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "description",
+      "data_type" : "text",
+      "description" : "What the property holds",
+      "is_unique" : false,
+      "name" : "Description",
+      "nullable" : false,
+      "sort_order" : 9,
+      "text_char_limit" : 128
+    },
+    {
+      "code" : "sort_order",
+      "data_type" : "int",
+      "description" : "Stable diagram ordering",
+      "is_unique" : false,
+      "name" : "Sort Order",
+      "nullable" : false,
+      "sort_order" : 10
+    },
+    {
+      "code" : "data_type",
+      "data_type" : "enum",
+      "description" : "Value type of the property",
+      "enum_ref" : "doped.enums.property_data_type",
+      "is_unique" : false,
+      "name" : "Data Type",
+      "nullable" : false,
+      "sort_order" : 11
+    },
+    {
+      "code" : "nullable",
+      "data_type" : "boolean",
+      "description" : "Whether NULL is allowed in the table",
+      "is_unique" : false,
+      "name" : "Nullable",
+      "nullable" : false,
+      "sort_order" : 12
+    },
+    {
+      "code" : "is_unique",
+      "data_type" : "boolean",
+      "description" : "Simple single-column unique constraint",
+      "is_unique" : false,
+      "name" : "Is Unique",
+      "nullable" : false,
+      "sort_order" : 13
+    },
+    {
+      "code" : "auto_increment",
+      "data_type" : "boolean",
+      "description" : "Only for long properties",
+      "is_unique" : false,
+      "name" : "Auto Increment",
+      "nullable" : true,
+      "sort_order" : 14
+    },
+    {
+      "code" : "text_char_limit",
+      "data_type" : "int",
+      "description" : "Only for text properties",
+      "is_unique" : false,
+      "name" : "Text Char Limit",
+      "nullable" : true,
+      "sort_order" : 15
+    },
+    {
+      "code" : "dope_persistence_enum_uuid",
+      "data_type" : "relationship",
+      "description" : "Set iff data_type is enum",
+      "is_unique" : false,
+      "name" : "Persistence Enum UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "doped.dope_persistence_enum.uuid",
+      "sort_order" : 16
+    },
+    {
+      "code" : "relationship_target_uuid",
+      "data_type" : "relationship",
+      "description" : "The property this relationship points at; set iff data_type is relationship",
+      "is_unique" : false,
+      "name" : "Relationship Target UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "doped.dope_persistence_entity_property.uuid",
+      "sort_order" : 17
+    },
+    {
+      "code" : "base_origin_property_uuid",
+      "data_type" : "relationship",
+      "description" : "The BASE_COMPOSABLE property this one materializes; provenance only (m0009)",
+      "is_unique" : false,
+      "name" : "Base Origin Property UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "doped.dope_persistence_entity_property.uuid",
+      "sort_order" : 25
+    },
+    {
+      "code" : "deleted_on",
+      "data_type" : "datetime",
+      "description" : "Tombstone / whiteout. Reads never filter it; it rides only on the overlay tiers and never reaches the saved .doped.json",
+      "is_unique" : false,
+      "name" : "Deleted On",
+      "nullable" : true,
+      "sort_order" : 30
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 4,
+  "version" : 764
+}

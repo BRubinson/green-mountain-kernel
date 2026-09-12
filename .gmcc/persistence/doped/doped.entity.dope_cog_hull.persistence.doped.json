@@ -1,0 +1,41 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "dope_cog_hull",
+  "description" : "Subtype: a Hull's typed metadata. Table renamed from dope_cog_primary_system by m0019.",
+  "entity_type" : "MODEL",
+  "name" : "Dope Cog Hull",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "element_uuid",
+      "data_type" : "relationship",
+      "description" : "UNIQUE: the schema itself proves one subtype row per element",
+      "is_unique" : true,
+      "name" : "Element UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "doped.dope_cog_element.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "primary_path",
+      "data_type" : "text",
+      "description" : "Root path of the primary system",
+      "is_unique" : false,
+      "name" : "Primary Path",
+      "nullable" : false,
+      "sort_order" : 3
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 9,
+  "version" : 764
+}

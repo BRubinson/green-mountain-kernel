@@ -1,0 +1,28 @@
+{
+  "code" : "arch_status",
+  "description" : "Architecture summary lifecycle; revise returns proposed to drafting",
+  "name" : "Architecture Status",
+  "options" : [
+    {
+      "code" : "drafting",
+      "description" : "Being drafted",
+      "name" : "Drafting",
+      "sort_order" : 1
+    },
+    {
+      "code" : "proposed",
+      "description" : "Proposed for approval",
+      "name" : "Proposed",
+      "sort_order" : 2
+    },
+    {
+      "code" : "approved",
+      "description" : "Approved for implementation",
+      "name" : "Approved",
+      "sort_order" : 3
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 5,
+  "version" : 764
+}

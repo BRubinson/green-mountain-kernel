@@ -1,0 +1,78 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "care_package_exploration_ref",
+  "description" : "A curated COPY of exploration output (m0025) — more intentional text than the exploration blob, never re-explored; the soft provenance ref survives source pruning via SET NULL",
+  "entity_type" : "MODEL",
+  "name" : "Care Package Exploration Ref",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "care_package_uuid",
+      "data_type" : "relationship",
+      "description" : "Parent package; cascade",
+      "is_unique" : false,
+      "name" : "Care Package",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.care_package.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "curated_title",
+      "data_type" : "text",
+      "description" : "The intentional title",
+      "is_unique" : false,
+      "name" : "Curated Title",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "curated_body",
+      "data_type" : "text",
+      "description" : "The intentional body",
+      "is_unique" : false,
+      "name" : "Curated Body",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "file_path",
+      "data_type" : "text",
+      "description" : "Repo-relative anchor",
+      "is_unique" : false,
+      "name" : "File Path",
+      "nullable" : true,
+      "sort_order" : 9
+    },
+    {
+      "code" : "source_finding_uuid",
+      "data_type" : "relationship",
+      "description" : "Provenance; SET NULL on finding delete",
+      "is_unique" : false,
+      "name" : "Source Finding",
+      "nullable" : true,
+      "relationship_target_ref" : "agentics.exploration_finding.uuid",
+      "sort_order" : 10
+    },
+    {
+      "code" : "seq",
+      "data_type" : "int",
+      "description" : "Render order",
+      "is_unique" : false,
+      "name" : "Seq",
+      "nullable" : false,
+      "sort_order" : 11
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 41,
+  "version" : 764
+}

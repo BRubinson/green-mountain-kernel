@@ -1,0 +1,370 @@
+{
+  "code" : "studio_pilot",
+  "description" : "Phase E pilot: UML request flow",
+  "elements" : [
+    {
+      "center_x" : 0,
+      "center_y" : 0,
+      "children" : [
+        {
+          "center_x" : 0,
+          "center_y" : 0,
+          "children" : [
+            {
+              "center_x" : 0,
+              "center_y" : 0,
+              "children" : [
+
+              ],
+              "code" : "c_start",
+              "description" : "",
+              "element_z" : 0,
+              "name" : "Connector",
+              "payload" : {
+                "fields" : {
+                  "head_kind" : "open_arrow",
+                  "label" : "",
+                  "line_style" : "solid",
+                  "routing_kind" : "straight",
+                  "stroke_color" : "#2e7d4f",
+                  "stroke_width" : 2,
+                  "tail_kind" : "none"
+                },
+                "kind" : "connector"
+              },
+              "scale" : 1,
+              "sort_order" : 0,
+              "target_code_path" : "flow\/client"
+            }
+          ],
+          "code" : "start",
+          "description" : "",
+          "element_z" : 0,
+          "name" : "Node",
+          "payload" : {
+            "fields" : {
+              "fill_color" : "#dcefe2",
+              "height" : 90,
+              "markdown" : "**Start**",
+              "node_kind" : "circle",
+              "stroke_color" : "#2e7d4f",
+              "width" : 90
+            },
+            "kind" : "uml_node"
+          },
+          "scale" : 1,
+          "sort_order" : 0
+        },
+        {
+          "center_x" : 260,
+          "center_y" : 0,
+          "children" : [
+            {
+              "center_x" : 0,
+              "center_y" : 0,
+              "children" : [
+
+              ],
+              "code" : "c_req",
+              "description" : "",
+              "element_z" : 0,
+              "name" : "Connector",
+              "payload" : {
+                "fields" : {
+                  "head_kind" : "arrow",
+                  "label" : "request",
+                  "line_style" : "solid",
+                  "routing_kind" : "orthogonal_step",
+                  "stroke_color" : "#33437a",
+                  "stroke_width" : 2,
+                  "tail_kind" : "none"
+                },
+                "kind" : "connector"
+              },
+              "scale" : 1,
+              "sort_order" : 0,
+              "target_code_path" : "flow\/gate"
+            }
+          ],
+          "code" : "client",
+          "description" : "",
+          "element_z" : 0,
+          "name" : "Node",
+          "payload" : {
+            "fields" : {
+              "fill_color" : "#e8eefc",
+              "height" : 110,
+              "markdown" : "## Client\n- session token\n- retries: 3",
+              "node_kind" : "rounded_rect",
+              "stroke_color" : "#33437a",
+              "width" : 190
+            },
+            "kind" : "uml_node"
+          },
+          "scale" : 1,
+          "sort_order" : 1
+        },
+        {
+          "center_x" : 560,
+          "center_y" : 0,
+          "children" : [
+            {
+              "center_x" : 0,
+              "center_y" : 0,
+              "children" : [
+
+              ],
+              "code" : "c_yes",
+              "description" : "",
+              "element_z" : 0,
+              "name" : "Connector",
+              "payload" : {
+                "fields" : {
+                  "head_kind" : "arrow",
+                  "label" : "yes",
+                  "line_style" : "solid",
+                  "routing_kind" : "orthogonal_step",
+                  "stroke_color" : "#1f6f60",
+                  "stroke_width" : 2,
+                  "tail_kind" : "none"
+                },
+                "kind" : "connector"
+              },
+              "scale" : 1,
+              "sort_order" : 0,
+              "target_code_path" : "flow\/service"
+            },
+            {
+              "center_x" : 0,
+              "center_y" : 0,
+              "children" : [
+
+              ],
+              "code" : "c_no",
+              "description" : "",
+              "element_z" : 0,
+              "name" : "Connector",
+              "payload" : {
+                "fields" : {
+                  "head_kind" : "cross",
+                  "label" : "no",
+                  "line_style" : "dashed",
+                  "routing_kind" : "straight",
+                  "stroke_color" : "#a33327",
+                  "stroke_width" : 2,
+                  "tail_kind" : "none"
+                },
+                "kind" : "connector"
+              },
+              "scale" : 1,
+              "sort_order" : 1,
+              "target_code_path" : "flow\/denied"
+            }
+          ],
+          "code" : "gate",
+          "description" : "",
+          "element_z" : 0,
+          "name" : "Node",
+          "payload" : {
+            "fields" : {
+              "fill_color" : "#fdf3d8",
+              "height" : 130,
+              "markdown" : "**authorized?**",
+              "node_kind" : "diamond",
+              "stroke_color" : "#8a6d1a",
+              "width" : 170
+            },
+            "kind" : "uml_node"
+          },
+          "scale" : 1,
+          "sort_order" : 2
+        },
+        {
+          "center_x" : 860,
+          "center_y" : 0,
+          "children" : [
+            {
+              "center_x" : 0,
+              "center_y" : 0,
+              "children" : [
+
+              ],
+              "code" : "c_write",
+              "description" : "",
+              "element_z" : 0,
+              "name" : "Connector",
+              "payload" : {
+                "fields" : {
+                  "head_kind" : "diamond",
+                  "label" : "writes",
+                  "line_style" : "solid",
+                  "routing_kind" : "curved",
+                  "stroke_color" : "#5a3d8a",
+                  "stroke_width" : 2,
+                  "tail_kind" : "circle"
+                },
+                "kind" : "connector"
+              },
+              "scale" : 1,
+              "sort_order" : 0,
+              "target_code_path" : "flow\/store"
+            }
+          ],
+          "code" : "service",
+          "description" : "",
+          "element_z" : 0,
+          "name" : "Node",
+          "payload" : {
+            "fields" : {
+              "fill_color" : "#e9f6f3",
+              "height" : 110,
+              "markdown" : "## Service\n`handle(req)`",
+              "node_kind" : "rhombus",
+              "stroke_color" : "#1f6f60",
+              "width" : 200
+            },
+            "kind" : "uml_node"
+          },
+          "scale" : 1,
+          "sort_order" : 3
+        },
+        {
+          "center_x" : 860,
+          "center_y" : 300,
+          "children" : [
+
+          ],
+          "code" : "store",
+          "description" : "",
+          "element_z" : 0,
+          "name" : "Node",
+          "payload" : {
+            "fields" : {
+              "fill_color" : "#f0e9fb",
+              "height" : 150,
+              "markdown" : "**gmcc.db**\n- append-only",
+              "node_kind" : "db_cylinder",
+              "stroke_color" : "#5a3d8a",
+              "width" : 180
+            },
+            "kind" : "uml_node"
+          },
+          "scale" : 1,
+          "sort_order" : 4
+        },
+        {
+          "center_x" : 560,
+          "center_y" : 300,
+          "children" : [
+
+          ],
+          "code" : "denied",
+          "description" : "",
+          "element_z" : 0,
+          "name" : "Node",
+          "payload" : {
+            "fields" : {
+              "fill_color" : "#fbe9e7",
+              "height" : 120,
+              "markdown" : "`401`",
+              "node_kind" : "triangle",
+              "stroke_color" : "#a33327",
+              "width" : 150
+            },
+            "kind" : "uml_node"
+          },
+          "scale" : 1,
+          "sort_order" : 5
+        },
+        {
+          "center_x" : 260,
+          "center_y" : 260,
+          "children" : [
+
+          ],
+          "code" : "note",
+          "description" : "",
+          "element_z" : 0,
+          "name" : "Text",
+          "payload" : {
+            "fields" : {
+              "background_color" : "#f5f2ea",
+              "font_size" : 12,
+              "height" : 110,
+              "markdown" : "### Notes\n- one revision per batch\n- `DIAGRAM_CHANGE` is durable",
+              "text_color" : "#333333",
+              "width" : 240
+            },
+            "kind" : "drawing_text"
+          },
+          "scale" : 1,
+          "sort_order" : 6
+        },
+        {
+          "center_x" : 30,
+          "center_y" : 150,
+          "children" : [
+
+          ],
+          "code" : "ink",
+          "description" : "",
+          "element_z" : 0,
+          "name" : "Stroke",
+          "payload" : {
+            "fields" : {
+              "stroke_color" : "#b04a2f",
+              "stroke_width" : 3,
+              "tool" : "pencil",
+              "vertices" : [
+                {
+                  "pressure" : 0.20078740157480315,
+                  "x" : -60,
+                  "y" : 30
+                },
+                {
+                  "pressure" : 0.5984251968503937,
+                  "x" : -20,
+                  "y" : -10
+                },
+                {
+                  "pressure" : 0.9015748031496063,
+                  "x" : 30,
+                  "y" : 20
+                },
+                {
+                  "pressure" : 0.5,
+                  "x" : 80,
+                  "y" : -15
+                },
+                {
+                  "pressure" : 0.2992125984251969,
+                  "x" : 120,
+                  "y" : 10
+                }
+              ]
+            },
+            "kind" : "drawing_stroke"
+          },
+          "scale" : 1,
+          "sort_order" : 7
+        }
+      ],
+      "code" : "flow",
+      "description" : "",
+      "element_z" : 0,
+      "name" : "Layer 1",
+      "payload" : {
+        "fields" : {
+          "locked" : false,
+          "opacity" : 1,
+          "visible" : true
+        },
+        "kind" : "drawing_layer"
+      },
+      "scale" : 1,
+      "sort_order" : 0
+    }
+  ],
+  "name" : "Diagram Studio Pilot",
+  "version" : 2
+}

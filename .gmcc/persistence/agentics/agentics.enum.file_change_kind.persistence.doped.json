@@ -1,0 +1,34 @@
+{
+  "code" : "file_change_kind",
+  "description" : "Kind of file modification",
+  "name" : "File Change Kind",
+  "options" : [
+    {
+      "code" : "edit",
+      "description" : "In-place edit",
+      "name" : "Edit",
+      "sort_order" : 1
+    },
+    {
+      "code" : "create",
+      "description" : "New file",
+      "name" : "Create",
+      "sort_order" : 2
+    },
+    {
+      "code" : "delete",
+      "description" : "File removed",
+      "name" : "Delete",
+      "sort_order" : 3
+    },
+    {
+      "code" : "rename",
+      "description" : "File moved/renamed",
+      "name" : "Rename",
+      "sort_order" : 4
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 13,
+  "version" : 764
+}

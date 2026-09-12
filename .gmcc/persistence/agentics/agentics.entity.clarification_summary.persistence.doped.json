@@ -1,0 +1,42 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "clarification_summary",
+  "description" : "The per-prompt clarification status machine (building → answering → complete; reopen: complete → answering). m0025: backstory_note/refined_goal/refined_detail are retired — questions and notes are child entities, the clarified intent lives on the care package, and finalize is a PURE GATE that never writes prompt content",
+  "entity_type" : "MODEL",
+  "name" : "Clarification Summary",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "prompt_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning prompt; one summary per prompt",
+      "is_unique" : true,
+      "name" : "Prompt",
+      "nullable" : false,
+      "relationship_target_ref" : "project.prompt.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "status",
+      "data_type" : "enum",
+      "description" : "building, answering, complete",
+      "enum_ref" : "agentics.enums.clarify_summary_status",
+      "is_unique" : false,
+      "name" : "Status",
+      "nullable" : false,
+      "sort_order" : 7
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 1,
+  "version" : 764
+}

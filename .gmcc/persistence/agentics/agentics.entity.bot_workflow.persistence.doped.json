@@ -1,0 +1,89 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "bot_workflow",
+  "description" : "The daemon-held workflow state machine row (m0025). Deliberately THIN: variant + status + claim + observability — the current phase is DERIVED from db evidence at every BOT_NEXT (resume IS the first-run code path). Partial UNIQUE(prompt_uuid) WHERE active and UNIQUE(client_key) WHERE active (the m0023 ownership pattern). task variant gets NO row",
+  "entity_type" : "MODEL",
+  "name" : "Bot Workflow",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "session_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning session",
+      "is_unique" : false,
+      "name" : "Session",
+      "nullable" : false,
+      "relationship_target_ref" : "project.session.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "prompt_uuid",
+      "data_type" : "relationship",
+      "description" : "The prompt this workflow drives; partial-unique while active",
+      "is_unique" : false,
+      "name" : "Prompt",
+      "nullable" : false,
+      "relationship_target_ref" : "project.prompt.uuid",
+      "sort_order" : 7
+    },
+    {
+      "code" : "variant",
+      "data_type" : "enum",
+      "description" : "bot|rpi|team — selects the phase graph (WorkflowSpec registry)",
+      "enum_ref" : "agentics.enums.bot_variant",
+      "is_unique" : false,
+      "name" : "Variant",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "status",
+      "data_type" : "enum",
+      "description" : "active|done|abandoned",
+      "enum_ref" : "agentics.enums.workflow_status",
+      "is_unique" : false,
+      "name" : "Status",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "client_key",
+      "data_type" : "text",
+      "description" : "The claiming Claude instance (ClientKey ancestry); zero-uuid resolution anchor",
+      "is_unique" : false,
+      "name" : "Client Key",
+      "nullable" : true,
+      "sort_order" : 10
+    },
+    {
+      "code" : "last_served_phase",
+      "data_type" : "text",
+      "description" : "Observability ONLY — never an input; phase is always recomputed",
+      "is_unique" : false,
+      "name" : "Last Served Phase",
+      "nullable" : true,
+      "sort_order" : 11
+    },
+    {
+      "code" : "reconcile_git_head",
+      "data_type" : "text",
+      "description" : "DEAD COLUMN — no reader, no writer, no record property; kept because dropping it is a full rebuild for no gain",
+      "is_unique" : false,
+      "name" : "Reconcile Git Head",
+      "nullable" : true,
+      "sort_order" : 12
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Repositories/BotWorkflowRepository.swift",
+  "sort_order" : 30,
+  "version" : 764
+}

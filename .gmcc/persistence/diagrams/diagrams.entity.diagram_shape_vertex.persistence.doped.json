@@ -1,0 +1,59 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "diagram_shape_vertex",
+  "description" : "A point on a polygon shape, same subtype-FK proof",
+  "entity_type" : "MODEL",
+  "name" : "Diagram Shape Vertex",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "shape_element_uuid",
+      "data_type" : "relationship",
+      "description" : "SQL targets the shape subtype's UNIQUE element_uuid; dope forbids chain refs so this points at the subtype row",
+      "is_unique" : false,
+      "name" : "Shape Element UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "diagrams.diagram_drawing_shape.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "seq",
+      "data_type" : "int",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Seq",
+      "nullable" : false,
+      "sort_order" : 3
+    },
+    {
+      "code" : "x",
+      "data_type" : "decimal",
+      "description" : "Element-local coordinate",
+      "is_unique" : false,
+      "name" : "X",
+      "nullable" : false,
+      "sort_order" : 4
+    },
+    {
+      "code" : "y",
+      "data_type" : "decimal",
+      "description" : "Element-local coordinate",
+      "is_unique" : false,
+      "name" : "Y",
+      "nullable" : false,
+      "sort_order" : 5
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 9,
+  "version" : 764
+}

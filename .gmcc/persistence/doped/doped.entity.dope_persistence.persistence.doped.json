@@ -1,0 +1,87 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "dope_persistence",
+  "description" : "Named grouping of entities and enums within a scope, like a db schema",
+  "entity_type" : "MODEL",
+  "name" : "Dope Persistence",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "dope_scope_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning scope; cascade on delete",
+      "is_unique" : false,
+      "name" : "Scope",
+      "nullable" : false,
+      "relationship_target_ref" : "doped.dope_scope.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "snake_case schema prefix; unique per scope",
+      "is_unique" : false,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "name",
+      "data_type" : "text",
+      "description" : "Display name",
+      "is_unique" : false,
+      "name" : "Name",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "description",
+      "data_type" : "text",
+      "description" : "What the domain covers",
+      "is_unique" : false,
+      "name" : "Description",
+      "nullable" : false,
+      "sort_order" : 9,
+      "text_char_limit" : 512
+    },
+    {
+      "code" : "sort_order",
+      "data_type" : "int",
+      "description" : "Stable diagram ordering",
+      "is_unique" : false,
+      "name" : "Sort Order",
+      "nullable" : false,
+      "sort_order" : 10
+    },
+    {
+      "code" : "content_revision",
+      "data_type" : "int",
+      "description" : "Per-area counter BESIDE dope_scope.revision, which stays the whole-tree counter and the sole CAS gate",
+      "is_unique" : false,
+      "name" : "Content Revision",
+      "nullable" : false,
+      "sort_order" : 29
+    },
+    {
+      "code" : "deleted_on",
+      "data_type" : "datetime",
+      "description" : "Tombstone / whiteout. Reads never filter it; it rides only on the overlay tiers and never reaches the saved .doped.json",
+      "is_unique" : false,
+      "name" : "Deleted On",
+      "nullable" : true,
+      "sort_order" : 30
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 2,
+  "version" : 764
+}

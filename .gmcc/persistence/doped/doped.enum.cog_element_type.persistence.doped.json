@@ -1,0 +1,21 @@
+{
+  "code" : "cog_element_type",
+  "description" : "Registry-governed in Swift (DopeCogElementSpec); deliberately carries NO db CHECK so a new type is one registry entry, never a migration",
+  "name" : "Cog Element Type",
+  "options" : [
+    {
+      "code" : "hull",
+      "description" : "A top-level organizational boundary a repo splits along; cannot nest (m0019 rename)",
+      "name" : "Hull",
+      "sort_order" : 1
+    },
+    {
+      "code" : "persistence_owner",
+      "description" : "Names a persistence domain a Hull owns; siblings express multiplicity (m0019)",
+      "name" : "Persistence Owner",
+      "sort_order" : 2
+    }
+  ],
+  "sort_order" : 4,
+  "version" : 764
+}

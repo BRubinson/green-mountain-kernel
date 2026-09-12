@@ -1,0 +1,27 @@
+{
+  "code" : "arch_option_status",
+  "description" : "The m0025 option decision machine: gm arch decide stamps one selected and rejects the siblings atomically",
+  "name" : "Architecture Option Status",
+  "options" : [
+    {
+      "code" : "proposed",
+      "description" : "Written by its architect, undecided",
+      "name" : "Proposed",
+      "sort_order" : 1
+    },
+    {
+      "code" : "selected",
+      "description" : "The winner — the only option that expands into change rows",
+      "name" : "Selected",
+      "sort_order" : 2
+    },
+    {
+      "code" : "rejected",
+      "description" : "A losing option, kept as a feature-graft offer",
+      "name" : "Rejected",
+      "sort_order" : 3
+    }
+  ],
+  "sort_order" : 25,
+  "version" : 764
+}

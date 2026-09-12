@@ -1,0 +1,67 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "project",
+  "description" : "A git repository known to gmcc; root of the hierarchy",
+  "entity_type" : "MODEL",
+  "name" : "Project",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "git_repo_name",
+      "data_type" : "text",
+      "description" : "Git repository name the project tracks",
+      "is_unique" : false,
+      "name" : "Git Repo Name",
+      "nullable" : false,
+      "sort_order" : 6
+    },
+    {
+      "code" : "primary_project_branch",
+      "data_type" : "text",
+      "description" : "BASE_DOPED_BRANCH: the branch whose SESSION_INSTANCE scope may promote into BASE_PROJECT",
+      "is_unique" : false,
+      "name" : "Primary Project Branch",
+      "nullable" : false,
+      "sort_order" : 6
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "Canonical snake_case code, globally unique",
+      "is_unique" : true,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "name",
+      "data_type" : "text",
+      "description" : "Display name",
+      "is_unique" : false,
+      "name" : "Name",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "ckfs_relative_storage_path",
+      "data_type" : "text",
+      "description" : "Storage path relative to the CKFS root",
+      "is_unique" : false,
+      "name" : "CKFS Storage Path",
+      "nullable" : false,
+      "sort_order" : 9
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 1,
+  "version" : 764
+}

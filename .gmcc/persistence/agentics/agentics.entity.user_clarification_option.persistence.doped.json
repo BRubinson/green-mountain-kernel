@@ -1,0 +1,50 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "user_clarification_option",
+  "description" : "A pre-authored option on a user question (m0025): seq + text, mirrored by AskUserQuestion and any future GMVibes answering surface",
+  "entity_type" : "MODEL",
+  "name" : "User Clarification Option",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "question_uuid",
+      "data_type" : "relationship",
+      "description" : "Parent question; cascade",
+      "is_unique" : false,
+      "name" : "Question",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.user_clarification_question.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "seq",
+      "data_type" : "int",
+      "description" : "UNIQUE(question, seq)",
+      "is_unique" : false,
+      "name" : "Seq",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "body",
+      "data_type" : "text",
+      "description" : "The option text",
+      "is_unique" : false,
+      "name" : "Body",
+      "nullable" : false,
+      "sort_order" : 8
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 35,
+  "version" : 764
+}

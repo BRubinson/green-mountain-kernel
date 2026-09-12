@@ -1,0 +1,52 @@
+{
+  "code" : "explore_finding_kind",
+  "description" : "Classification of an exploration finding",
+  "name" : "Exploration Finding Kind",
+  "options" : [
+    {
+      "code" : "persistence_model",
+      "description" : "Existing persistence structure",
+      "name" : "Persistence Model",
+      "sort_order" : 1
+    },
+    {
+      "code" : "implementation_pattern",
+      "description" : "Pattern to follow",
+      "name" : "Implementation Pattern",
+      "sort_order" : 2
+    },
+    {
+      "code" : "existing_functionality",
+      "description" : "Behavior already present",
+      "name" : "Existing Functionality",
+      "sort_order" : 3
+    },
+    {
+      "code" : "scope_creep_risk",
+      "description" : "Risk of expanding scope",
+      "name" : "Scope Creep Risk",
+      "sort_order" : 4
+    },
+    {
+      "code" : "general_relevant_change",
+      "description" : "Other relevant change",
+      "name" : "General Relevant Change",
+      "sort_order" : 5
+    },
+    {
+      "code" : "other",
+      "description" : "Anything else",
+      "name" : "Other",
+      "sort_order" : 6
+    },
+    {
+      "code" : "key_file",
+      "description" : "The merged key-file shape (m0025): a path-anchored finding with empty body — never ranked",
+      "name" : "Key File",
+      "sort_order" : 7
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 8,
+  "version" : 764
+}

@@ -1,0 +1,70 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "review_summary",
+  "description" : "Per-prompt review report with overview and verdict",
+  "entity_type" : "MODEL",
+  "name" : "Review Summary",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "prompt_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning prompt; one summary per prompt",
+      "is_unique" : true,
+      "name" : "Prompt",
+      "nullable" : false,
+      "relationship_target_ref" : "project.prompt.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "status",
+      "data_type" : "enum",
+      "description" : "reviewing or complete",
+      "enum_ref" : "agentics.enums.review_status",
+      "is_unique" : false,
+      "name" : "Status",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "verdict",
+      "data_type" : "enum",
+      "description" : "Required once complete",
+      "enum_ref" : "agentics.enums.review_verdict",
+      "is_unique" : false,
+      "name" : "Verdict",
+      "nullable" : true,
+      "sort_order" : 8
+    },
+    {
+      "code" : "overview",
+      "data_type" : "text",
+      "description" : "Overview text; writable only via complete",
+      "is_unique" : false,
+      "name" : "Overview",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "agent_id",
+      "data_type" : "text",
+      "description" : "Self-reported agent id for dedup/tracking (m0025 sweep)",
+      "is_unique" : false,
+      "name" : "Agent Id",
+      "nullable" : true,
+      "sort_order" : 10
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 10,
+  "version" : 764
+}

@@ -1,0 +1,21 @@
+{
+  "cogs" : {
+    "gm_bot" : "cogs/gm_bot/gm_bot.index.cog.doped.json",
+    "gm_daemon" : "cogs/gm_daemon/gm_daemon.index.cog.doped.json",
+    "gm_vibes" : "cogs/gm_vibes/gm_vibes.index.cog.doped.json"
+  },
+  "persistence" : {
+    "agentics" : "persistence/agentics/agentics.index.persistence.doped.json",
+    "base" : "persistence/base/base.index.persistence.doped.json",
+    "diagrams" : "persistence/diagrams/diagrams.index.persistence.doped.json",
+    "doped" : "persistence/doped/doped.index.persistence.doped.json",
+    "kbites" : "persistence/kbites/kbites.index.persistence.doped.json",
+    "project" : "persistence/project/project.index.persistence.doped.json"
+  },
+  "scope" : {
+    "code" : "gmcc",
+    "description" : "The internal data model driving gmcc",
+    "name" : "Green Mountain Compiler Collection (GMCC)"
+  },
+  "version" : 764
+}

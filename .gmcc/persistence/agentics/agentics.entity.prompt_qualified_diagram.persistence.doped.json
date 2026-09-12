@@ -1,0 +1,78 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "prompt_qualified_diagram",
+  "description" : "What a prompt UNDERSTOOD when it read a rendered diagram. One row per (prompt, diagram); re-qualifying upserts.",
+  "entity_type" : "MODEL",
+  "name" : "Prompt Qualified Diagram",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : true,
+      "sort_order" : 1
+    },
+    {
+      "code" : "prompt_uuid",
+      "data_type" : "relationship",
+      "description" : "The prompt whose context did the qualifying",
+      "is_unique" : false,
+      "name" : "Prompt UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "project.prompt.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "diagram_uuid",
+      "data_type" : "relationship",
+      "description" : "Which canvas was read; UNIQUE with prompt_uuid",
+      "is_unique" : false,
+      "name" : "Diagram UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "diagrams.diagram.uuid",
+      "sort_order" : 3
+    },
+    {
+      "code" : "rendered_path",
+      "data_type" : "text",
+      "description" : "The CKFS image path the agent actually read",
+      "is_unique" : false,
+      "name" : "Rendered Path",
+      "nullable" : true,
+      "sort_order" : 4
+    },
+    {
+      "code" : "rendered_revision",
+      "data_type" : "int",
+      "description" : "diagram.revision at qualification time",
+      "is_unique" : false,
+      "name" : "Rendered Revision",
+      "nullable" : true,
+      "sort_order" : 5
+    },
+    {
+      "code" : "render_fingerprint",
+      "data_type" : "text",
+      "description" : "Serialized DiagramRenderFingerprint: revision alone cannot see a bound dope tree move",
+      "is_unique" : false,
+      "name" : "Render Fingerprint",
+      "nullable" : true,
+      "sort_order" : 6
+    },
+    {
+      "code" : "qualification",
+      "data_type" : "text",
+      "description" : "What the bot concluded the diagram means, in the prompt's context",
+      "is_unique" : false,
+      "name" : "Qualification",
+      "nullable" : true,
+      "sort_order" : 7
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 20,
+  "version" : 764
+}

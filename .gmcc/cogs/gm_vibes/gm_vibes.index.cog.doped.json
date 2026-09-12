@@ -1,0 +1,16 @@
+{
+  "code" : "gm_vibes",
+  "description" : "The macOS SwiftUI app; a persistence consumer that reads and mutates through the daemon wire protocol",
+  "elements" : [
+    {
+      "code" : "gm_vibes",
+      "description" : "",
+      "element_type" : "Hull",
+      "name" : "GM Vibes",
+      "primary_path" : "gmvibes",
+      "sort_order" : 0
+    }
+  ],
+  "name" : "GM Vibes",
+  "sort_order" : 2
+}

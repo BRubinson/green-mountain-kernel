@@ -1,0 +1,107 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "dope_cog_element",
+  "description" : "A typed node in a cog. element_type carries NO db CHECK on purpose: validity is the Swift registry, so a new type is one entry plus one subtype table, never a migration",
+  "entity_type" : "MODEL",
+  "name" : "Dope Cog Element",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "dope_cog_uuid",
+      "data_type" : "relationship",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Cog UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "doped.dope_cog.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "parent_element_uuid",
+      "data_type" : "relationship",
+      "description" : "Self-parent for nested elements",
+      "is_unique" : false,
+      "name" : "Parent Element UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "doped.dope_cog_element.uuid",
+      "sort_order" : 3
+    },
+    {
+      "code" : "element_type",
+      "data_type" : "enum",
+      "description" : "Registry-governed in Swift; NO db CHECK, which is what keeps a new type off the migration path",
+      "enum_ref" : "doped.enums.cog_element_type",
+      "is_unique" : false,
+      "name" : "Element Type",
+      "nullable" : false,
+      "sort_order" : 4
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 5
+    },
+    {
+      "code" : "name",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Name",
+      "nullable" : false,
+      "sort_order" : 6
+    },
+    {
+      "code" : "description",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Description",
+      "nullable" : false,
+      "sort_order" : 7,
+      "text_char_limit" : 512
+    },
+    {
+      "code" : "sort_order",
+      "data_type" : "int",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Sort Order",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "dope_scope_code",
+      "data_type" : "text",
+      "description" : "Ghost-tolerant CODE resolved at read time, never a uuid FK: ingest re-mints uuids and scope delete is not offered",
+      "is_unique" : false,
+      "name" : "Dope Scope Code",
+      "nullable" : true,
+      "sort_order" : 9
+    },
+    {
+      "code" : "deleted_on",
+      "data_type" : "datetime",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Deleted On",
+      "nullable" : true,
+      "sort_order" : 30
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 8,
+  "version" : 764
+}

@@ -1,0 +1,21 @@
+{
+  "code" : "briefing_status",
+  "description" : "Consumption gate, not a build machine: only ready briefings are served to stubs. Registry-governed, NO db CHECK",
+  "name" : "Briefing Status",
+  "options" : [
+    {
+      "code" : "building",
+      "description" : "Row reserved (open); doper composing. Open on existing (owner, step) resets here",
+      "name" : "Building",
+      "sort_order" : 1
+    },
+    {
+      "code" : "ready",
+      "description" : "Completed; body non-empty; staleness recomputed at every read",
+      "name" : "Ready",
+      "sort_order" : 2
+    }
+  ],
+  "sort_order" : 15,
+  "version" : 764
+}

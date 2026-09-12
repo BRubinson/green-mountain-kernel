@@ -1,0 +1,22 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "gmcc-marketplace",
+  "version": "1.0.0",
+  "description": "Green Mountain Compiler Collection - GM-CDE plugin for contextual development",
+  "owner": {
+    "name": "brycerubinson",
+    "email": "bryce@example.com"
+  },
+  "plugins": [
+    {
+      "name": "gmcc",
+      "description": "Green Mountain Compiler Collection - GM-CDE plugin for contextual development",
+      "version": "43.0.0",
+      "author": {
+        "name": "brycerubinson"
+      },
+      "source": "./plugins/gmcc",
+      "category": "development"
+    }
+  ]
+}

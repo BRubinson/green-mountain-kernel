@@ -1,0 +1,126 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "diagram",
+  "description" : "A db-persisted canvas over dope. Owner is a chain-non-null tier ladder: each tier fills its own FK and every ancestor's",
+  "entity_type" : "MODEL",
+  "name" : "Diagram",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "project_uuid",
+      "data_type" : "relationship",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Project UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "project.project.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "session_uuid",
+      "data_type" : "relationship",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Session UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "project.session.uuid",
+      "sort_order" : 4
+    },
+    {
+      "code" : "prompt_uuid",
+      "data_type" : "relationship",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Prompt UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "project.prompt.uuid",
+      "sort_order" : 5
+    },
+    {
+      "code" : "tier",
+      "data_type" : "enum",
+      "description" : "",
+      "enum_ref" : "diagrams.enums.diagram_tier",
+      "is_unique" : false,
+      "name" : "Tier",
+      "nullable" : false,
+      "sort_order" : 6
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "name",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Name",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "description",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Description",
+      "nullable" : false,
+      "sort_order" : 9,
+      "text_char_limit" : 512
+    },
+    {
+      "code" : "gmcc_diagram_path",
+      "data_type" : "text",
+      "description" : "Refused at PROJECT tier",
+      "is_unique" : false,
+      "name" : "GMCC Diagram Path",
+      "nullable" : true,
+      "sort_order" : 10
+    },
+    {
+      "code" : "dope_scope_code",
+      "data_type" : "text",
+      "description" : "Which scope this WHOLE canvas reads through; masking tiers only on write, ghost-tolerant on read",
+      "is_unique" : false,
+      "name" : "Dope Scope Code",
+      "nullable" : true,
+      "sort_order" : 11
+    },
+    {
+      "code" : "revision",
+      "data_type" : "int",
+      "description" : "Whole-tree content counter; never the row's optimistic-lock version",
+      "is_unique" : false,
+      "name" : "Revision",
+      "nullable" : false,
+      "sort_order" : 12
+    },
+    {
+      "code" : "kbite_code",
+      "data_type" : "text",
+      "description" : "Ghost-tolerant kbite binding, resolved at read time; dope_scope_code precedent",
+      "is_unique" : false,
+      "name" : "Kbite Code",
+      "nullable" : true,
+      "sort_order" : 13
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 1,
+  "version" : 764
+}

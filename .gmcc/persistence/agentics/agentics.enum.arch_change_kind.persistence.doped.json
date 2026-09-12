@@ -1,0 +1,33 @@
+{
+  "code" : "arch_change_kind",
+  "description" : "Entity/field-level delta kind (m0025) — negative changes (rename/delete) are first-class and dope-linkable",
+  "name" : "Architecture Change Kind",
+  "options" : [
+    {
+      "code" : "add",
+      "description" : "New entity or field",
+      "name" : "Add",
+      "sort_order" : 1
+    },
+    {
+      "code" : "modify",
+      "description" : "Changed in place",
+      "name" : "Modify",
+      "sort_order" : 2
+    },
+    {
+      "code" : "rename",
+      "description" : "Renamed (field rows carry renamed_from)",
+      "name" : "Rename",
+      "sort_order" : 3
+    },
+    {
+      "code" : "delete",
+      "description" : "Removed",
+      "name" : "Delete",
+      "sort_order" : 4
+    }
+  ],
+  "sort_order" : 24,
+  "version" : 764
+}

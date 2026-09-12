@@ -1,0 +1,28 @@
+{
+  "code" : "entity_type",
+  "description" : "How central an entity is to the model",
+  "name" : "Entity Type",
+  "options" : [
+    {
+      "code" : "model",
+      "description" : "Key entity that must be understood",
+      "name" : "MODEL",
+      "sort_order" : 1
+    },
+    {
+      "code" : "junction",
+      "description" : "Join table for complex relations",
+      "name" : "JUNCTION",
+      "sort_order" : 2
+    },
+    {
+      "code" : "base_composable",
+      "description" : "Not persisted alone; a shared column block other entities compose in",
+      "name" : "Base Composable",
+      "sort_order" : 3
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 2,
+  "version" : 764
+}

@@ -1,0 +1,22 @@
+{
+  "code" : "session_status",
+  "description" : "Lifecycle of a session",
+  "name" : "Session Status",
+  "options" : [
+    {
+      "code" : "active",
+      "description" : "Session is open for work",
+      "name" : "Active",
+      "sort_order" : 1
+    },
+    {
+      "code" : "closed",
+      "description" : "Session has been resolved",
+      "name" : "Closed",
+      "sort_order" : 2
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 1,
+  "version" : 764
+}

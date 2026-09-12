@@ -1,0 +1,26 @@
+{
+  "code" : "diagrams",
+  "description" : "Db-persisted canvases over dope (m0010): a tier-owned diagram, its element tree, five element subtypes and two vertex tables",
+  "entities" : {
+    "diagram" : "diagrams.entity.diagram.persistence.doped.json",
+    "diagram_connector" : "diagrams.entity.diagram_connector.persistence.doped.json",
+    "diagram_dope_entity" : "diagrams.entity.diagram_dope_entity.persistence.doped.json",
+    "diagram_dope_scope_persistence_layer" : "diagrams.entity.diagram_dope_scope_persistence_layer.persistence.doped.json",
+    "diagram_drawing_layer" : "diagrams.entity.diagram_drawing_layer.persistence.doped.json",
+    "diagram_drawing_shape" : "diagrams.entity.diagram_drawing_shape.persistence.doped.json",
+    "diagram_drawing_stroke" : "diagrams.entity.diagram_drawing_stroke.persistence.doped.json",
+    "diagram_drawing_text" : "diagrams.entity.diagram_drawing_text.persistence.doped.json",
+    "diagram_element" : "diagrams.entity.diagram_element.persistence.doped.json",
+    "diagram_shape_vertex" : "diagrams.entity.diagram_shape_vertex.persistence.doped.json",
+    "diagram_stroke_vertex" : "diagrams.entity.diagram_stroke_vertex.persistence.doped.json"
+  },
+  "enums" : {
+    "diagram_element_type" : "diagrams.enum.diagram_element_type.persistence.doped.json",
+    "diagram_shape_kind" : "diagrams.enum.diagram_shape_kind.persistence.doped.json",
+    "diagram_stroke_tool" : "diagrams.enum.diagram_stroke_tool.persistence.doped.json",
+    "diagram_tier" : "diagrams.enum.diagram_tier.persistence.doped.json"
+  },
+  "name" : "Diagrams",
+  "sort_order" : 1,
+  "version" : 764
+}

@@ -1,0 +1,41 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "claude_session_binding",
+  "description" : "The payload-side attribution key: Claude Code's conversation uuid pinned to one gmcc session at SessionStart and never re-derived. The UNIQUE index on claude_session_id IS the pin-once rule. Two columns and nothing else — no branch column, no invalidation, no drift detection, because a column nobody reads is the first step back toward them. It pins the SESSION, not a prompt: one conversation walks several prompts. ACCEPTED: after a mid-session checkout it still points at the old branch's session.",
+  "entity_type" : "MODEL",
+  "name" : "Claude Session Binding",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "claude_session_id",
+      "data_type" : "text",
+      "description" : "Claude Code's conversation uuid from the hook payload — the resolution key, and the only field the hook has to key on",
+      "is_unique" : true,
+      "name" : "Claude Session Id",
+      "nullable" : false,
+      "sort_order" : 6
+    },
+    {
+      "code" : "session_uuid",
+      "data_type" : "relationship",
+      "description" : "The gmcc session (instance+branch) this conversation is pinned to; cascade",
+      "is_unique" : false,
+      "name" : "Session",
+      "nullable" : false,
+      "relationship_target_ref" : "project.session.uuid",
+      "sort_order" : 7
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 43,
+  "version" : 764
+}

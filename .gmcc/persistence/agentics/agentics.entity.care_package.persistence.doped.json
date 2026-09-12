@@ -1,0 +1,70 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "care_package",
+  "description" : "The standalone clarified-intent bundle on a clarification summary (m0025) — REPLACES the retired second briefing step for multi-agent flows (bot skips it). Carries the clarified-intent blob (backstory+goal+detail, clarified) that downstream agents load; it NEVER writes back to the prompt row — the prompt triple is human input only. Staleness stamped server-side like agent_briefing",
+  "entity_type" : "MODEL",
+  "name" : "Care Package",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "clarification_summary_uuid",
+      "data_type" : "relationship",
+      "description" : "UNIQUE parent summary; cascade",
+      "is_unique" : true,
+      "name" : "Summary",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.clarification_summary.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "clarified_intent",
+      "data_type" : "text",
+      "description" : "The single clarified-intent blob — carried ONLY by package-complete",
+      "is_unique" : false,
+      "name" : "Clarified Intent",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "status",
+      "data_type" : "enum",
+      "description" : "building|ready — the bot-next gate for the architecture phases",
+      "enum_ref" : "agentics.enums.care_package_status",
+      "is_unique" : false,
+      "name" : "Status",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "dope_scope_uuid",
+      "data_type" : "relationship",
+      "description" : "Staleness anchor; SET NULL on scope delete",
+      "is_unique" : false,
+      "name" : "Dope Scope",
+      "nullable" : true,
+      "relationship_target_ref" : "doped.dope_scope.uuid",
+      "sort_order" : 9
+    },
+    {
+      "code" : "dope_scope_revision",
+      "data_type" : "long",
+      "description" : "Server-stamped at complete; compared live at read",
+      "is_unique" : false,
+      "name" : "Dope Scope Revision",
+      "nullable" : true,
+      "sort_order" : 10
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Repositories/ClarificationRepository.swift",
+  "sort_order" : 38,
+  "version" : 764
+}

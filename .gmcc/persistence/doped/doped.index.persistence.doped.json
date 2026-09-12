@@ -1,0 +1,26 @@
+{
+  "code" : "doped",
+  "description" : "Domain Optimized Project Essence modeling tables: scope, persistence, entity, property, enum, option, cog",
+  "entities" : {
+    "dope_cog" : "doped.entity.dope_cog.persistence.doped.json",
+    "dope_cog_element" : "doped.entity.dope_cog_element.persistence.doped.json",
+    "dope_cog_hull" : "doped.entity.dope_cog_hull.persistence.doped.json",
+    "dope_cog_persistence_owner" : "doped.entity.dope_cog_persistence_owner.persistence.doped.json",
+    "dope_element_provenance" : "doped.entity.dope_element_provenance.persistence.doped.json",
+    "dope_persistence" : "doped.entity.dope_persistence.persistence.doped.json",
+    "dope_persistence_entity" : "doped.entity.dope_persistence_entity.persistence.doped.json",
+    "dope_persistence_entity_property" : "doped.entity.dope_persistence_entity_property.persistence.doped.json",
+    "dope_persistence_enum" : "doped.entity.dope_persistence_enum.persistence.doped.json",
+    "dope_persistence_enum_option" : "doped.entity.dope_persistence_enum_option.persistence.doped.json",
+    "dope_scope" : "doped.entity.dope_scope.persistence.doped.json"
+  },
+  "enums" : {
+    "cog_element_type" : "doped.enum.cog_element_type.persistence.doped.json",
+    "entity_type" : "doped.enum.entity_type.persistence.doped.json",
+    "property_data_type" : "doped.enum.property_data_type.persistence.doped.json",
+    "scope_type" : "doped.enum.scope_type.persistence.doped.json"
+  },
+  "name" : "DOPED",
+  "sort_order" : 2,
+  "version" : 764
+}

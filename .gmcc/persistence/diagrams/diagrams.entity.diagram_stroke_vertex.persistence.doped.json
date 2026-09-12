@@ -1,0 +1,68 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "diagram_stroke_vertex",
+  "description" : "A point on a stroke. FKs target the SUBTYPE table's unique element_uuid, so the schema proves a vertex can only hang off a stroke",
+  "entity_type" : "MODEL",
+  "name" : "Diagram Stroke Vertex",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "stroke_element_uuid",
+      "data_type" : "relationship",
+      "description" : "SQL targets the stroke subtype's UNIQUE element_uuid; dope forbids chain refs so this points at the subtype row",
+      "is_unique" : false,
+      "name" : "Stroke Element UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "diagrams.diagram_drawing_stroke.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "seq",
+      "data_type" : "int",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Seq",
+      "nullable" : false,
+      "sort_order" : 3
+    },
+    {
+      "code" : "x",
+      "data_type" : "decimal",
+      "description" : "Element-local coordinate",
+      "is_unique" : false,
+      "name" : "X",
+      "nullable" : false,
+      "sort_order" : 4
+    },
+    {
+      "code" : "y",
+      "data_type" : "decimal",
+      "description" : "Element-local coordinate",
+      "is_unique" : false,
+      "name" : "Y",
+      "nullable" : false,
+      "sort_order" : 5
+    },
+    {
+      "code" : "pressure",
+      "data_type" : "decimal",
+      "description" : "Stylus pressure 0..1; NULL when the device reports none (trackpad). Present since m0010",
+      "is_unique" : false,
+      "name" : "Pressure",
+      "nullable" : true,
+      "sort_order" : 6
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 8,
+  "version" : 764
+}

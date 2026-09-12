@@ -1,0 +1,78 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "diagram_drawing_stroke",
+  "description" : "Subtype: a pen stroke; its vertices are element-local",
+  "entity_type" : "MODEL",
+  "name" : "Diagram Drawing Stroke",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "element_uuid",
+      "data_type" : "relationship",
+      "description" : "UNIQUE: one subtype row per element",
+      "is_unique" : true,
+      "name" : "Element UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "diagrams.diagram_element.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "tool",
+      "data_type" : "enum",
+      "description" : "",
+      "enum_ref" : "diagrams.enums.diagram_stroke_tool",
+      "is_unique" : false,
+      "name" : "Tool",
+      "nullable" : false,
+      "sort_order" : 3
+    },
+    {
+      "code" : "stroke_color",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Stroke Color",
+      "nullable" : false,
+      "sort_order" : 4
+    },
+    {
+      "code" : "stroke_width",
+      "data_type" : "decimal",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Stroke Width",
+      "nullable" : false,
+      "sort_order" : 5
+    },
+    {
+      "code" : "packed_vertices",
+      "data_type" : "text",
+      "description" : "BLOB: packed little-endian f32 x, f32 y, u8 pressure per vertex",
+      "is_unique" : false,
+      "name" : "Packed Vertices",
+      "nullable" : true,
+      "sort_order" : 6
+    },
+    {
+      "code" : "vertex_count",
+      "data_type" : "int",
+      "description" : "Vertex count for the packed blob; NULL means read the vertex rows",
+      "is_unique" : false,
+      "name" : "Vertex Count",
+      "nullable" : true,
+      "sort_order" : 7
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 4,
+  "version" : 764
+}

@@ -1,0 +1,86 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "diagram_drawing_text",
+  "description" : "Subtype: a resizable markdown text box. The only bounded element that is NOT vertex-derived — markdown wrapping needs a known layout width.",
+  "entity_type" : "MODEL",
+  "name" : "Diagram Drawing Text",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : true,
+      "sort_order" : 1
+    },
+    {
+      "code" : "element_uuid",
+      "data_type" : "relationship",
+      "description" : "The element this subtype row completes",
+      "is_unique" : true,
+      "name" : "Element UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "diagrams.diagram_element.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "markdown",
+      "data_type" : "text",
+      "description" : "Box content; inline markdown at render time",
+      "is_unique" : false,
+      "name" : "Markdown",
+      "nullable" : true,
+      "sort_order" : 3
+    },
+    {
+      "code" : "width",
+      "data_type" : "decimal",
+      "description" : "Explicit layout width — wrapping needs it up front, CHECK > 0",
+      "is_unique" : false,
+      "name" : "Width",
+      "nullable" : true,
+      "sort_order" : 4
+    },
+    {
+      "code" : "height",
+      "data_type" : "decimal",
+      "description" : "Explicit box height, CHECK > 0",
+      "is_unique" : false,
+      "name" : "Height",
+      "nullable" : true,
+      "sort_order" : 5
+    },
+    {
+      "code" : "font_size",
+      "data_type" : "decimal",
+      "description" : "Base font size, CHECK > 0",
+      "is_unique" : false,
+      "name" : "Font Size",
+      "nullable" : true,
+      "sort_order" : 6
+    },
+    {
+      "code" : "text_color",
+      "data_type" : "text",
+      "description" : "Foreground colour",
+      "is_unique" : false,
+      "name" : "Text Color",
+      "nullable" : true,
+      "sort_order" : 7
+    },
+    {
+      "code" : "background_color",
+      "data_type" : "text",
+      "description" : "Optional fill; NULL is transparent over ink",
+      "is_unique" : false,
+      "name" : "Background Color",
+      "nullable" : true,
+      "sort_order" : 8
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 10,
+  "version" : 764
+}

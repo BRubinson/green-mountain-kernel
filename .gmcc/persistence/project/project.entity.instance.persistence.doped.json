@@ -1,0 +1,68 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "instance",
+  "description" : "A working checkout of a project on disk",
+  "entity_type" : "MODEL",
+  "name" : "Instance",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "project_uuid",
+      "data_type" : "relationship",
+      "description" : "Owning project",
+      "is_unique" : false,
+      "name" : "Project",
+      "nullable" : false,
+      "relationship_target_ref" : "project.project.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "Canonical snake_case code",
+      "is_unique" : false,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "name",
+      "data_type" : "text",
+      "description" : "Display name; unique per project",
+      "is_unique" : false,
+      "name" : "Name",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "absolute_file_system_path",
+      "data_type" : "text",
+      "description" : "Absolute path of the working checkout",
+      "is_unique" : false,
+      "name" : "Filesystem Path",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "ckfs_relative_storage_path",
+      "data_type" : "text",
+      "description" : "Storage path relative to the CKFS root",
+      "is_unique" : false,
+      "name" : "CKFS Storage Path",
+      "nullable" : false,
+      "sort_order" : 10
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 2,
+  "version" : 764
+}

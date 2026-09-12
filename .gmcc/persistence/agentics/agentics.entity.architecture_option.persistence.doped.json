@@ -1,0 +1,69 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "architecture_option",
+  "description" : "One methodology's persisted architecture proposal (m0025 pen inversion — the first architect pen). UNIQUE(summary, agent_name); gm arch decide stamps one selected and rejects siblings atomically, and ONLY the selected option expands into change rows; losers persist as feature-graft offers",
+  "entity_type" : "MODEL",
+  "name" : "Architecture Option",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "Stable external identifier (base entity)",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 2
+    },
+    {
+      "code" : "architecture_summary_uuid",
+      "data_type" : "relationship",
+      "description" : "Parent summary; cascade",
+      "is_unique" : false,
+      "name" : "Summary",
+      "nullable" : false,
+      "relationship_target_ref" : "agentics.architecture_summary.uuid",
+      "sort_order" : 6
+    },
+    {
+      "code" : "agent_name",
+      "data_type" : "text",
+      "description" : "The methodology persona; unique per summary",
+      "is_unique" : false,
+      "name" : "Agent Name",
+      "nullable" : false,
+      "sort_order" : 7
+    },
+    {
+      "code" : "agent_id",
+      "data_type" : "text",
+      "description" : "Self-reported agent id",
+      "is_unique" : false,
+      "name" : "Agent Id",
+      "nullable" : true,
+      "sort_order" : 8
+    },
+    {
+      "code" : "body",
+      "data_type" : "text",
+      "description" : "The full proposal (markdown)",
+      "is_unique" : false,
+      "name" : "Body",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "status",
+      "data_type" : "enum",
+      "description" : "proposed|selected|rejected",
+      "enum_ref" : "agentics.enums.arch_option_status",
+      "is_unique" : false,
+      "name" : "Status",
+      "nullable" : false,
+      "sort_order" : 10
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 42,
+  "version" : 764
+}

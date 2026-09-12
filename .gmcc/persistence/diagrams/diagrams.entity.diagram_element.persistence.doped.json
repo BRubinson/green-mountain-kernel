@@ -1,0 +1,125 @@
+{
+  "base_composable_ref" : "base.base_entity",
+  "code" : "diagram_element",
+  "description" : "One node on a canvas. center_x/y are parent-space, scale composes down the tree, element_z orders siblings only",
+  "entity_type" : "MODEL",
+  "name" : "Diagram Element",
+  "properties" : [
+    {
+      "base_origin_ref" : "base.base_entity.uuid",
+      "code" : "uuid",
+      "data_type" : "uuid",
+      "description" : "",
+      "is_unique" : true,
+      "name" : "UUID",
+      "nullable" : false,
+      "sort_order" : 1
+    },
+    {
+      "code" : "diagram_uuid",
+      "data_type" : "relationship",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Diagram UUID",
+      "nullable" : false,
+      "relationship_target_ref" : "diagrams.diagram.uuid",
+      "sort_order" : 2
+    },
+    {
+      "code" : "parent_element_uuid",
+      "data_type" : "relationship",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Parent Element UUID",
+      "nullable" : true,
+      "relationship_target_ref" : "diagrams.diagram_element.uuid",
+      "sort_order" : 3
+    },
+    {
+      "code" : "element_type",
+      "data_type" : "enum",
+      "description" : "",
+      "enum_ref" : "diagrams.enums.diagram_element_type",
+      "is_unique" : false,
+      "name" : "Element Type",
+      "nullable" : false,
+      "sort_order" : 4
+    },
+    {
+      "code" : "code",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Code",
+      "nullable" : false,
+      "sort_order" : 5
+    },
+    {
+      "code" : "name",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Name",
+      "nullable" : false,
+      "sort_order" : 6
+    },
+    {
+      "code" : "description",
+      "data_type" : "text",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Description",
+      "nullable" : false,
+      "sort_order" : 7,
+      "text_char_limit" : 512
+    },
+    {
+      "code" : "sort_order",
+      "data_type" : "int",
+      "description" : "",
+      "is_unique" : false,
+      "name" : "Sort Order",
+      "nullable" : false,
+      "sort_order" : 8
+    },
+    {
+      "code" : "center_x",
+      "data_type" : "decimal",
+      "description" : "Parent-space",
+      "is_unique" : false,
+      "name" : "Center X",
+      "nullable" : false,
+      "sort_order" : 9
+    },
+    {
+      "code" : "center_y",
+      "data_type" : "decimal",
+      "description" : "Parent-space",
+      "is_unique" : false,
+      "name" : "Center Y",
+      "nullable" : false,
+      "sort_order" : 10
+    },
+    {
+      "code" : "element_z",
+      "data_type" : "decimal",
+      "description" : "Orders siblings only",
+      "is_unique" : false,
+      "name" : "Element Z",
+      "nullable" : false,
+      "sort_order" : 11
+    },
+    {
+      "code" : "scale",
+      "data_type" : "decimal",
+      "description" : "Composes down the tree",
+      "is_unique" : false,
+      "name" : "Scale",
+      "nullable" : false,
+      "sort_order" : 12
+    }
+  ],
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "sort_order" : 2,
+  "version" : 764
+}
