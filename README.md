@@ -1,10 +1,30 @@
 # Green Mountain Kernel
 
 Green Mountain Coding Collection — a Claude Code plugin marketplace for **contextual
-development**, rebuilt on native framework/model work. The `gmcc` plugin turns Claude Code into the GM-CDE (Green
-Mountain Contextual Development Environment): a workflow system that authors, clarifies,
-and implements prompts against a persistent per-repo/per-branch knowledge store (the
-**ckfs**), backed by reusable knowledge bites (**kbites**).
+development**, rebuilt on native framework/model work. The `gmcc` plugin turns Claude Code
+into the GM-CDE (Green Mountain Contextual Development Environment): a workflow system that
+authors, clarifies, and implements prompts against a persistent per-repo/per-branch
+knowledge store on the **GMFS** (the Green Mountain filesystem), backed by reusable
+knowledge bites (**kbites**).
+
+## Status — what is live and what is not
+
+This repository currently holds **two stacks side by side, deliberately**:
+
+| | where | state |
+|---|---|---|
+| the stack that runs today | published from the `gmcc-marketplace` repo | live, untouched, keeps working |
+| the new stack | `gmk/` in this repo (six Swift packages + the GMVibes app) | built and tested in parallel, **not installed** |
+
+Everything under `plugins/gmcc/` is **frozen on purpose** while the new stack is brought
+up: those files still carry the previously shipped binary names, environment variables and
+filesystem layout, and they must, because that is what the running install expects. The
+legacy literals are documented by the stack that ships them, not repeated here.
+
+**This README documents the new names** — `gm_daemon` / `gm_mcp` / `gm_hook`, the single
+`~/gmfs` root, the `GM_*` environment variables. They become the installed reality at
+**cutover**, a separate later event. If you install the published plugin today, expect its
+own legacy paths rather than the ones below, and do not treat the difference as a bug.
 
 ## Installation
 
@@ -13,9 +33,9 @@ and implements prompts against a persistent per-repo/per-branch knowledge store 
 - macOS (Apple Silicon or Intel) and [Claude Code](https://claude.ai/code) CLI installed
 - `jq` (for the `/gm_init` permission grant) and `uuidgen` — both standard on macOS
 
-No Swift toolchain is required. The daemon binaries are downloaded prebuilt
-(universal, SHA-256 verified) by `scripts/install_daemon.sh`. Xcode is only
-needed if you intend to work on the daemon's sources.
+No Swift toolchain is required. The binaries are downloaded prebuilt (universal, SHA-256
+verified) by the installer script. Xcode is only needed if you intend to work on the
+sources.
 
 ### Add the marketplace
 
@@ -46,27 +66,25 @@ provisioned automatically.
 /gm_init
 ```
 
-This creates `~/gmcc_ckfs/` (the Context Knowledge File System) with the `projects/`
-root and an empty registry. It also:
+This creates the GMFS root at `~/gmfs/` with its `projects/` tree and an empty registry. It
+also adds a permission grant to `~/.claude/settings.json` so the plugin can read and write
+under `~/gmfs/` without per-file prompts.
 
-- writes a `# >>> gmcc env >>>` block to `~/.zshrc` exporting the stable `GMCC_*` paths, and
-- adds a CKFS permission grant to `~/.claude/settings.json` so the plugin can read/write
-  under `~/gmcc_ckfs/` without per-file prompts.
-
-Run `source ~/.zshrc` (or open a new terminal) afterward. The permission grant takes
-effect on the next Claude Code restart.
+**No shell profile is written.** GMCC never edits `~/.zshrc`; the environment reaches a
+session through the `SessionStart` env block, and any remediation is printed for you to run,
+never applied behind your back. The permission grant takes effect on the next Claude Code
+restart.
 
 ### 2. Open Claude Code inside a git repository
 
-The `SessionStart` hook (`scripts/gmcc_session_startup.sh`) detects the repo and branch and
-**auto-provisions** the project / instance / session directories for you — no manual
-per-repo or per-branch command is needed:
+The `SessionStart` hook detects the repo and branch and **auto-provisions** the project /
+instance / session directories for you — no manual per-repo or per-branch command is needed:
 
 ```
-~/gmcc_ckfs/projects/{project}/instances/{checkout}/sessions/{branch}/
+~/gmfs/projects/{project}/instances/{checkout}/sessions/{branch}/
 ```
 
-If `$GMCC_BOOTED` ever looks wrong, run `/gmcc_boot` for diagnostics.
+If `$GM_BOOTED` ever looks wrong, run the `gmcc:gmcc_boot` skill for diagnostics.
 
 ### 3. Run a workflow
 
@@ -81,8 +99,6 @@ numeric id with no description: `/gm_bot {id}` (or `/gm_bot_rpi {id}` / `/gm_bot
 The bot picks up the draft and runs it from its current status. Passing a *name* instead
 always starts a brand-new draft.
 
-> Migrating from an older layout? Run `/gm_cleanup` to audit and repair your ckfs.
-
 ## Workflows
 
 GMCC offers four entry points. All but `/gm_task` author a prompt into the current
@@ -95,8 +111,8 @@ session (a draft → clarifying → architecting → implementing → reviewing 
 | `/gm_bot_team` | Agent teams — 4 teammates per phase, each on a different methodology | Large or high-stakes tasks | `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` |
 | `/gm_task` | Context-loaded but **read-only** — no prompt rows or clarifications | Applying GMCC context to a one-off without the prompt pipeline | — |
 
-`/gm_task` is "read-only" with respect to the ckfs only — it still edits your repository
-files. It writes nothing under `~/gmcc_ckfs/` unless you explicitly ask for a retroactive
+`/gm_task` is "read-only" with respect to the GMFS only — it still edits your repository
+files. It writes nothing under `~/gmfs/` unless you explicitly ask for a retroactive
 write-back later in the conversation.
 
 ## Capabilities
@@ -111,15 +127,20 @@ write-back later in the conversation.
 | `/gm_crunch_digest <name>` | Move chewed resources into the persistent kbite |
 | `/gm_kbite_relate <a> <b> "<reason>"` | Cross-reference two kbites |
 | `/gm_kbite_export [name…]` | Zip selected kbites (root + digested) to a portable archive on the Desktop |
-| `/gm_kbite_import <zip>` | Import a kbite archive into the current ckfs (asks per name-collision) |
+| `/gm_kbite_import <zip>` | Import a kbite archive into this machine's store (asks per name-collision) |
 
 ### Maintenance & system
 
 | Command | Purpose |
 |---------|---------|
 | `/gm_init` | One-time machine-level system init (see Setup) |
-| `/gm_cleanup` | Audit the ckfs for non-compliant structure and interactively repair each finding |
-| `/gm_bot_v4_migrate_kbite` | One-shot migration of legacy v4 kbites to the current layout |
+| `/gmcc_session_cleanup` | Audit and repair the current session's stored structure |
+| `/gmcc_cleanup_system` | Machine-level audit and repair across the whole store |
+| `/gmcc_environment_cleanup` | Remove retired environment leftovers (including any legacy shell-profile block) |
+
+Daemon status, build/self-heal and health diagnostics have their own command and skill in
+the plugin's `gmcc:` namespace; run `/plugins` to list them. They are named for the stack
+they drive, which is why this file points at the namespace instead of spelling the name.
 
 ## KBite system
 
@@ -153,14 +174,14 @@ Relate knowledge domains to each other:
 
 ### How kbites are loaded (v11+)
 
-KBites are **inherited, not trigger-matched.** Each level of the ckfs
+KBites are **inherited, not trigger-matched.** Each level of the store
 (project → instance → session → prompt) carries a `kbite:` registry, and a prompt
 inherits the kbites declared up its chain. A kbite is added to a context only on
 **explicit request** (e.g. "add the `swift_ui` kbite") — there is no trigger-word
 auto-activation (that paradigm was retired in v11; the old `KBITE_TRIGGERS.md` /
 `KBITE_TRIGGER_MAP.md` files no longer exist).
 
-KBites are stored under `~/gmcc_ckfs/kbites/`:
+KBites are stored under `~/gmfs/kbites/`:
 
 ```
 kbites/
@@ -171,16 +192,21 @@ kbites/
 
 ## Architecture (at a glance)
 
+- **Swift packages** — `gmk/` holds six: `gmDaemonSdk` (wire protocol, client and the
+  shared domain layer, plus the `gm_hook` client binary), `gmDaemon` (persistence and the
+  `gm_daemon` server), `gmUxComponentLibrary` (shared SwiftUI components),
+  `gmAgententicsSdk` (agent-tool protocols), `gmMcp` (the `gm_mcp` pen server) and
+  `gmVibes` (the macOS app). One Xcode project, `gmk/gmk.xcodeproj`, spans them.
 - **Skills** — the core `gmcc` skill defines GM-CDE behavior; supporting skills
-  (`gmcc_agent`, `gmcc_kbite`, `gmcc_maw`, `gmcc_cleanup`) carry
+  (`gmcc_kbite`, `gmcc_maw`, `gmcc_cleanup`, …) carry
   `disable-model-invocation` so they load only during the relevant workflow, keeping
   per-message context lean. `gmcc_boot` runs on `SessionStart`.
-- **Hook** — `SessionStart` → `scripts/gmcc_session_startup.sh` provisions the ckfs and exports
-  the `GMCC_*` environment variables.
-- **Output styles** — four GMCC personas (aggressive / alternative / conservative /
-  pragmatic) you can switch between.
-
-See `plugins/gmcc/MIGRATION.md` for version-to-version migration notes.
+- **Hook** — `SessionStart` runs the plugin's startup script, which provisions the store and
+  exports the session environment (`GM_BOOTED`, `GM_PLUGIN_ROOT`, `GM_FS_ROOT`, `PATH`).
+- **Write containment** — nothing is written outside `$GM_FS_ROOT` or the working repo
+  unless you ask. That is enforced by a path check in the SDK, not just documented.
+- **Contributor docs** — see `CLAUDE.md` for the build/test loop, the release procedure, and
+  the two-stack rules above in full.
 
 ## Uninstalling
 
@@ -190,8 +216,7 @@ To remove the marketplace:
 2. Select **Manage Marketplaces**
 3. Remove `green-mountain-kernel`
 
-Your ckfs data under `~/gmcc_ckfs/` is left untouched; delete it manually if you want a
-clean slate.
+Your data under `~/gmfs/` is left untouched; delete it manually if you want a clean slate.
 
 ## License
 

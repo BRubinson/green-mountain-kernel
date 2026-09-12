@@ -17,9 +17,24 @@ xcuserdata/
 *.xcscmblueprint
 *.moved-aside
 
+# Xcode — SHARED schemes are TRACKED, deliberately.
+# Every scheme used to live in the gitignored xcuserdata/ above, autocreated by
+# whoever happened to open the project. A clean clone therefore had nothing to
+# build BY NAME, which is why gmVibes could never be built in CI and why
+# build-dmg.sh's `-scheme GMVibes` only worked on a machine that had already
+# opened Xcode. The negation is explicit so a future tidy-up of the
+# user-specific block above cannot take the shared schemes with it.
+!**/xcshareddata/
+!**/xcshareddata/**
+
 # Swift Package Manager
+# `.build/` and `.swiftpm/` are unanchored, so they already cover every
+# gmk/<package>/ build directory; the explicit entries exist so the five
+# package build dirs are visible to a reader of this file rather than implied.
 .build/
 .swiftpm/
+gmk/*/.build/
+gmk/*/.swiftpm/
 
 # Distribution / signing secrets
 ExportOptions.plist
@@ -28,5 +43,11 @@ ExportOptions.plist
 *.provisionprofile
 notarytool-*.json
 
-# gm CLI build product (built by build_daemon.sh, installed to ~/gmcc/bin)
+# Build product of the FROZEN live plugin's own build script, which still
+# installs into the previously shipped runtime root. Kept because that stack is
+# what runs this machine until cutover.
 plugins/gmcc/bin/
+
+# The plugin DIRECTORY is not ignored and did not move: .claude-plugin/
+# marketplace.json still registers `./plugins/gmcc`, and its commands/, skills/,
+# hooks/ and .mcp.json are all still there. Only the Swift package left it.

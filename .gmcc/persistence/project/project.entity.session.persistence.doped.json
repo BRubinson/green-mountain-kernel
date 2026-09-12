@@ -72,16 +72,16 @@
       "sort_order" : 11
     },
     {
-      "code" : "ckfs_relative_storage_path",
+      "code" : "gmfs_relative_storage_path",
       "data_type" : "text",
-      "description" : "Storage path relative to the CKFS root",
+      "description" : "Storage path relative to the GMFS root",
       "is_unique" : false,
-      "name" : "CKFS Storage Path",
+      "name" : "GMFS Storage Path",
       "nullable" : false,
       "sort_order" : 12
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Migrations.swift",
   "sort_order" : 3,
-  "version" : 764
+  "version" : 765
 }

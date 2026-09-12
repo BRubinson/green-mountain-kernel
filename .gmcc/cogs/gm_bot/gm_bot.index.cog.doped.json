@@ -1,6 +1,6 @@
 {
   "code" : "gm_bot",
-  "description" : "The GMB skills, commands and prompts that drive the bot workflow tiers; a persistence consumer via the gm CLI",
+  "description" : "The GMB skills, commands and prompts that drive the bot workflow tiers; a persistence consumer through the hook client. The plugin markdown surface did NOT move in the six-module reorg, which is why this hull still points inside plugins/gmcc",
   "elements" : [
     {
       "code" : "gm_bot",

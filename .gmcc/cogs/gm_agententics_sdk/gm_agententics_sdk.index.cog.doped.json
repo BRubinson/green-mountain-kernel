@@ -1,0 +1,16 @@
+{
+  "code" : "gm_agententics_sdk",
+  "description" : "Agent-tool protocol declarations against the on-device model framework. Intentionally minimal — its emptiness is a decision, not a gap — and the only module carrying an availability-macro unsafe flag, which is what makes every other module flag-free",
+  "elements" : [
+    {
+      "code" : "gm_agententics_sdk",
+      "description" : "",
+      "element_type" : "Hull",
+      "name" : "GM Agententics SDK",
+      "primary_path" : "gmk/gmAgententicsSdk",
+      "sort_order" : 0
+    }
+  ],
+  "name" : "GM Agententics SDK",
+  "sort_order" : 4
+}

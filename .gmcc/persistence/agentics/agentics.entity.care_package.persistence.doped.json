@@ -64,7 +64,7 @@
       "sort_order" : 10
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Repositories/ClarificationRepository.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Repositories/ClarificationRepository.swift",
   "sort_order" : 38,
-  "version" : 764
+  "version" : 765
 }

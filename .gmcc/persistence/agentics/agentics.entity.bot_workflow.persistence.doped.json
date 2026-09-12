@@ -32,7 +32,7 @@
       "is_unique" : false,
       "name" : "Prompt",
       "nullable" : false,
-      "relationship_target_ref" : "project.prompt.uuid",
+      "relationship_target_ref" : "agentics.prompt.uuid",
       "sort_order" : 7
     },
     {
@@ -83,7 +83,7 @@
       "sort_order" : 12
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Repositories/BotWorkflowRepository.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Repositories/BotWorkflowRepository.swift",
   "sort_order" : 30,
-  "version" : 764
+  "version" : 765
 }

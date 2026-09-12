@@ -1,0 +1,16 @@
+{
+  "code" : "gm_mcp",
+  "description" : "The MCP pen server Claude records through: the narrow door onto the daemon's verbs. Depends on the SDK alone and never reaches the persistence layer",
+  "elements" : [
+    {
+      "code" : "gm_mcp",
+      "description" : "",
+      "element_type" : "Hull",
+      "name" : "GM MCP",
+      "primary_path" : "gmk/gmMcp",
+      "sort_order" : 0
+    }
+  ],
+  "name" : "GM MCP",
+  "sort_order" : 5
+}

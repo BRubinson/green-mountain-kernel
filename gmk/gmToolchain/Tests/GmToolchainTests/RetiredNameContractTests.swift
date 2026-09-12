@@ -173,12 +173,45 @@ final class RetiredNameContractTests: XCTestCase {
         "gmk/gmToolchain/Tests/GmToolchainTests/LiveRuntimeIsolationTests.swift",
     ]
 
+    /// The one-shot migration OFF the retired stack. It is the mirror image of
+    /// `historicalRecord`: that set names the old spelling to RECORD a
+    /// retirement, this one names it to PERFORM one. A script that copies
+    /// `~/gmcc/gmcc.db` to `~/gmfs/gm.db` cannot be written without naming both
+    /// roots, and every literal in it is load-bearing:
+    ///
+    /// - `$HOME/gmcc` and `$HOME/gmcc_ckfs` are the SOURCE of the copy.
+    /// - `gmcc.db` is the file being copied FROM, in the same line that
+    ///   promises it is never written to.
+    /// - `gmcc_hook call SHUTDOWN` quiesces the LIVE daemon, which is the whole
+    ///   point of taking the snapshot rather than `cp`-ing a WAL-mode database
+    ///   out from under a running writer. `gm_hook` cannot do it: it is not
+    ///   installed until the user installs the new plugin.
+    /// - `SELECT ckfs_relative_storage_path ... LIMIT 0` is the assertion that
+    ///   the column is GONE rather than ALIASED. That probe exists because
+    ///   m0027 was briefly a rename-to-itself, which SQLite accepts in silence
+    ///   and a green suite did not catch. It cannot be written without the old
+    ///   column name.
+    ///
+    /// Two alternatives were considered and rejected: moving the script outside
+    /// `gmk/**` would hide the riskiest script in the repo from the only walk
+    /// that covers scripts, and parameterising the old names into variables
+    /// would make a one-shot, irreversible-if-wrong 596MB database copy harder
+    /// to read in exchange for contract purity.
+    ///
+    /// A FOURTH path-keyed exemption category would be evidence that the SCOPE
+    /// RULE is wrong, not that another file is special. Argue with this sentence
+    /// before adding one.
+    private let migrationOffRetiredStack: Set<String> = [
+        "gmk/scripts/migrate_to_gmfs.sh",
+    ]
+
     private var allExempt: Set<String> {
         frozenPluginTests
             .union(historicalRecord)
             .union(frozenRemediation)
             .union(fixtureStrings)
             .union(selfReferential)
+            .union(migrationOffRetiredStack)
     }
 
     // MARK: - Retired binaries

@@ -1,0 +1,16 @@
+{
+  "code" : "gm_daemon_sdk",
+  "description" : "The base layer every other module sits on: the wire protocol, the client, and the shared domain layer (dope, diagram models, hook logic, kbite archive, environment, paths). Zero external dependencies, which is the property that keeps GRDB out of the app's link closure. Ships the hook client binary, which links this module alone",
+  "elements" : [
+    {
+      "code" : "gm_daemon_sdk",
+      "description" : "",
+      "element_type" : "Hull",
+      "name" : "GM Daemon SDK",
+      "primary_path" : "gmk/gmDaemonSdk",
+      "sort_order" : 0
+    }
+  ],
+  "name" : "GM Daemon SDK",
+  "sort_order" : 1
+}

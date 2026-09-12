@@ -16,7 +16,7 @@
       "sort_order" : 2
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Migrations.swift",
   "sort_order" : 1,
-  "version" : 764
+  "version" : 765
 }

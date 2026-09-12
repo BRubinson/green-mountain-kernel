@@ -1,0 +1,176 @@
+name: gmk-ci
+
+# The green-suite rule, enforced per MODULE. This replaces daemon-ci.yml, whose
+# single job tested one monolithic package; gmk/ is six packages plus an app, and
+# a matrix gives each one its own visible green/red check in the PR UI. A break
+# now names the module that broke instead of "the suite".
+#
+# RUNNER FLOOR IS NOT A PREFERENCE: gmAgententicsSdk's GmAgentTool.swift carries
+# an unconditional `import FoundationModels`, which exists only in the macOS 26
+# SDK. An older image does not fail slowly or partially — the package does not
+# compile at all. Every job whose graph transitively includes that package
+# inherits the floor, so all of them run on macos-26 rather than reasoning about
+# which ones strictly need it. If that import ever becomes conditional, this can
+# drop back down; until then the floor moves with the SDK.
+#
+# OVER-TRIGGERING IS DELIBERATE. A gmVibes-only change also rebuilds gmDaemon.
+# The alternative — a hand-maintained path filter per package — is a second copy
+# of the dependency graph, and the copy rots silently. Over-triggering wastes
+# runner minutes; under-triggering ships a downstream break. Only one of those is
+# recoverable by looking at the PR.
+#
+# THE SCRIPTS ARE NEVER RUN HERE, ONLY SYNTAX-CHECKED. That is a PRESERVED
+# invariant, not a new rule: daemon-ci.yml never invoked the installers either.
+# build_gm.sh and install_gm.sh write to ~/gmfs and download release assets;
+# neither belongs in a per-PR job, and the packages are built directly below,
+# which is the part worth gating. Do not "fix" this by adding a real build.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'gmk/**'
+      - 'plugins/gmcc/**'
+      - '.github/workflows/gmk-ci.yml'
+  pull_request:
+    paths:
+      - 'gmk/**'
+      - 'plugins/gmcc/**'
+      - '.github/workflows/gmk-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: gmk-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # One job per package. `mode` is test everywhere except gmAgententicsSdk,
+  # which is COMPILE-ONLY BY DESIGN: it is 60 lines of protocol declarations,
+  # zero tests exist, and the prompt that created it explicitly forbids
+  # fleshing it out. `swift test` on a package with an empty test target is a
+  # failure, not a pass, so the mode is part of the matrix rather than a
+  # conditional inside one step.
+  packages:
+    name: ${{ matrix.package }}
+    runs-on: macos-26
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: gmDaemonSdk
+            mode: test
+          - package: gmDaemon
+            mode: test
+          - package: gmUxComponentLibrary
+            mode: test
+          - package: gmMcp
+            mode: test
+          - package: gmAgententicsSdk
+            mode: build
+          - package: gmToolchain
+            mode: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Report toolchain
+        run: swift --version
+
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: gmk/${{ matrix.package }}/.build
+          # Package.swift is in the key alongside Package.resolved because
+          # three of these packages have NO external dependencies and so no
+          # resolved file at all — hashing only the resolved file would give
+          # them an empty, shared key.
+          key: spm-${{ matrix.package }}-${{ runner.os }}-${{ hashFiles(format('gmk/{0}/Package.resolved', matrix.package), format('gmk/{0}/Package.swift', matrix.package)) }}
+          restore-keys: spm-${{ matrix.package }}-${{ runner.os }}-
+
+      # No BuildInfo stamp step: the SwiftPM PREBUILD PLUGIN in gmDaemon does
+      # the stamping inside the build graph, so every job here and every Xcode
+      # build get it for free. A clean clone now compiles with no prior shell
+      # step, which was not true before.
+      - name: swift ${{ matrix.mode }}
+        run: swift ${{ matrix.mode }} --package-path gmk/${{ matrix.package }}
+
+  # gmVibes has NEVER been built in CI. It is built here for the first time.
+  #
+  # CODE_SIGNING_ALLOWED=NO is load-bearing: signing is split on purpose — the
+  # app target is CODE_SIGN_STYLE = Manual with DEVELOPMENT_TEAM = 4VL4UGNPQQ,
+  # the test targets are Automatic — and a build-only job must not require the
+  # Developer ID cert to be present on the runner. Release signing stays on the
+  # existing release-dmg path, which is where a real identity belongs.
+  gmvibes:
+    name: gmVibes (xcodebuild)
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      # The schemes are SHARED and committed under
+      # gmk/gmk.xcodeproj/xcshareddata/xcschemes/. Before that they lived in
+      # gitignored xcuserdata/, so a clean runner had nothing to build by name
+      # and this job could not exist. Listing first makes a missing scheme a
+      # legible failure instead of an obscure xcodebuild error.
+      - name: xcodebuild -list
+        run: xcodebuild -list -project gmk/gmk.xcodeproj
+
+      # No log prettifier in the pipeline: a pipe would hand the job the
+      # formatter's exit status instead of xcodebuild's, and a build that failed
+      # while the job passed is the one outcome a first-time CI job must not
+      # produce. `-quiet` gets the noise down without changing who reports.
+      - name: Build gmVibes
+        run: |
+          xcodebuild build -quiet \
+            -project gmk/gmk.xcodeproj \
+            -scheme GMVibes \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS=""
+
+  # Everything that is not a Swift package: the shipped shell scripts, the
+  # plugin manifests, and the version pin. Cheap, and it catches the class of
+  # break that reaches every session in every booted repo.
+  contracts:
+    name: scripts + manifests
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The shipped scripts are never compiled, so the only thing standing
+      # between a typo and every session in every booted repo is a syntax check.
+      # Both trees are checked: the FROZEN live plugin scripts, which still run
+      # this machine, and the new gmk/ scripts, which are written but not yet
+      # exercised anywhere.
+      - name: bash -n over shipped scripts
+        run: |
+          for s in plugins/gmcc/scripts/*.sh gmk/scripts/*.sh; do
+            [ -e "$s" ] || continue
+            bash -n "$s" || { echo "::error file=$s::bash -n failed"; exit 1; }
+          done
+
+      - name: Plugin manifests parse
+        run: |
+          for f in .claude-plugin/marketplace.json \
+                   plugins/gmcc/.claude-plugin/plugin.json \
+                   plugins/gmcc/.mcp.json \
+                   plugins/gmcc/hooks/hooks.json; do
+            python3 -m json.tool "$f" > /dev/null || { echo "::error file=$f::invalid JSON"; exit 1; }
+          done
+
+      # gmk/VERSION is what install_gm.sh fetches. A malformed one is not a
+      # cosmetic problem: it becomes a release tag and a download URL.
+      - name: gmk/VERSION is semver
+        run: |
+          v="$(cat gmk/VERSION)"
+          echo "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
+            || { echo "::error::gmk/VERSION is '$v', expected MAJOR.MINOR.PATCH"; exit 1; }

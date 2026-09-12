@@ -22,7 +22,7 @@
       "is_unique" : false,
       "name" : "Prompt UUID",
       "nullable" : true,
-      "relationship_target_ref" : "project.prompt.uuid",
+      "relationship_target_ref" : "agentics.prompt.uuid",
       "sort_order" : 2
     },
     {
@@ -38,7 +38,7 @@
     {
       "code" : "rendered_path",
       "data_type" : "text",
-      "description" : "The CKFS image path the agent actually read",
+      "description" : "The GMFS image path the agent actually read",
       "is_unique" : false,
       "name" : "Rendered Path",
       "nullable" : true,
@@ -72,7 +72,7 @@
       "sort_order" : 7
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Migrations.swift",
   "sort_order" : 20,
-  "version" : 764
+  "version" : 765
 }

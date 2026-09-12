@@ -22,7 +22,7 @@
       "is_unique" : true,
       "name" : "Prompt",
       "nullable" : false,
-      "relationship_target_ref" : "project.prompt.uuid",
+      "relationship_target_ref" : "agentics.prompt.uuid",
       "sort_order" : 6
     },
     {
@@ -54,7 +54,7 @@
       "sort_order" : 9
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Migrations.swift",
   "sort_order" : 3,
-  "version" : 764
+  "version" : 765
 }

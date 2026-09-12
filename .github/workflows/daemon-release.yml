@@ -1,16 +1,28 @@
 name: daemon-release
 
-# Builds the universal daemon binaries once and attaches them to a
-# `daemon-v<version>` release. install_daemon.sh fetches exactly this asset.
+# Builds the universal `gm_daemon` / `gm_mcp` / `gm_hook` binaries once and
+# attaches them to a `daemon-v<version>` release. install_gm.sh fetches exactly
+# this asset.
+#
+# *** MADE CORRECT, NOT EXERCISED. *** Publishing a release is not a gate on the
+# reorg that rewrote this file. It is safe to change precisely because the live
+# machine installs from the gmcc-marketplace repo, not from this one — so this
+# workflow currently feeds nothing that is running.
+#
+# THE BINARIES NOW COME FROM THREE PACKAGES, not one:
+#   gm_daemon <- gmk/gmDaemon        gm_mcp <- gmk/gmMcp        gm_hook <- gmk/gmDaemonSdk
+# gm_hook ships from the base SDK deliberately: it links the SDK alone, so
+# bundling it with the persistence layer would drag GRDB into a client that
+# never opens the database.
 #
 # TAG NAMESPACE: `daemon-v*`, beside the app's `gmvibes-v*`. One monorepo ships
 # two independently versioned artifacts and their tags must not collide.
 #
-# DAEMON VERSION IS DECOUPLED FROM PLUGIN VERSION ON PURPOSE. The plugin is ~300KB
-# of markdown that changes constantly; the daemon is 44k lines of Swift that does
+# THE BINARY VERSION IS DECOUPLED FROM THE PLUGIN VERSION ON PURPOSE. The plugin
+# is ~300KB of markdown that changes constantly; the Swift is 44k lines that does
 # not. Coupling them would make every prompt-wording tweak force every install to
-# re-download ~15MB of unchanged binaries. daemon/VERSION moves only when the
-# daemon does.
+# re-download ~15MB of unchanged binaries. gmk/VERSION moves only when the code
+# behind it does.
 #
 # Trigger: push a tag, or dispatch manually (which tags for you).
 #   git tag daemon-v50.0.1 && git push origin daemon-v50.0.1
@@ -21,7 +33,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Daemon version to release (must equal daemon/VERSION)'
+        description: 'Version to release (must equal gmk/VERSION)'
         required: true
 
 permissions:
@@ -45,46 +57,72 @@ jobs:
       - name: Resolve and verify version
         id: v
         run: |
-          pinned="$(cat plugins/gmcc/daemon/VERSION)"
+          pinned="$(cat gmk/VERSION)"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             asked="${{ inputs.version }}"
           else
             asked="${GITHUB_REF_NAME#daemon-v}"
           fi
           if [ "$pinned" != "$asked" ]; then
-            echo "::error::daemon/VERSION is '$pinned' but the release asks for '$asked' — bump the file and the tag together"
+            echo "::error::gmk/VERSION is '$pinned' but the release asks for '$asked' — bump the file and the tag together"
             exit 1
           fi
           echo "version=$pinned" >> "$GITHUB_OUTPUT"
           echo "tag=daemon-v$pinned" >> "$GITHUB_OUTPUT"
-          echo "asset=gmcc-daemon-$pinned-macos-universal.tar.gz" >> "$GITHUB_OUTPUT"
+          echo "asset=gm-daemon-$pinned-macos-universal.tar.gz" >> "$GITHUB_OUTPUT"
 
-      - name: Stamp BuildInfo
-        run: bash plugins/gmcc/scripts/stamp_build_info.sh plugins/gmcc/daemon "${{ steps.v.outputs.version }}"
+      # NO BuildInfo stamp step. The SwiftPM prebuild plugin in gmDaemon stamps
+      # the build identity inside the build graph, so CI and a developer's Xcode
+      # produce the same shape with nothing to keep in sync — which is exactly
+      # why the shell step could be deleted rather than ported.
 
-      # Never ship what was not tested. The suite is the same one daemon-ci runs;
-      # running it again here means a release can be cut from a tag without
-      # trusting that CI happened to pass on that commit.
+      # Never ship what was not tested. Same suites gmk-ci runs; running them
+      # again here means a release can be cut from a tag without trusting that
+      # CI happened to pass on that commit.
       - name: swift test
-        run: swift test --package-path plugins/gmcc/daemon
+        run: |
+          set -euo pipefail
+          for p in gmDaemonSdk gmDaemon gmUxComponentLibrary gmMcp gmToolchain; do
+            echo "--- swift test $p"
+            swift test --package-path "gmk/$p"
+          done
+
+      # gmAgententicsSdk has no tests by design and ships no binary, so nothing
+      # else in this workflow would touch it. Compiled explicitly rather than
+      # left uncovered on a release commit.
+      - name: swift build (gmAgententicsSdk, compile-only by design)
+        run: swift build --package-path gmk/gmAgententicsSdk
 
       # SwiftPM emits a genuinely universal Mach-O when handed both --arch flags
       # (no lipo step); the verification below is what makes that a fact rather
       # than an assumption.
+      #
+      # THREE PACKAGES, THREE BINARIES. Each is built and then staged from its
+      # OWN bin path — the three no longer share one. Staging from a single
+      # directory would silently ship whatever stale copy happened to be there.
       - name: Build universal (arm64 + x86_64)
         run: |
-          swift build -c release --package-path plugins/gmcc/daemon \
-            --arch arm64 --arch x86_64
+          set -euo pipefail
+          for p in gmDaemonSdk gmDaemon gmMcp; do
+            swift build -c release --package-path "gmk/$p" --arch arm64 --arch x86_64
+          done
 
       - name: Stage, strip, sign
         id: stage
         run: |
           set -euo pipefail
-          BIN_DIR="$(swift build -c release --package-path plugins/gmcc/daemon \
-                       --arch arm64 --arch x86_64 --show-bin-path)"
+          bin_path() {
+            swift build -c release --package-path "gmk/$1" \
+              --arch arm64 --arch x86_64 --show-bin-path
+          }
+          SDK_BIN="$(bin_path gmDaemonSdk)"
+          DAEMON_BIN="$(bin_path gmDaemon)"
+          MCP_BIN="$(bin_path gmMcp)"
           mkdir -p dist
-          for b in gmcc_daemon gmcc_mcp gmcc_hook; do
-            cp "$BIN_DIR/$b" "dist/$b"
+          cp "$DAEMON_BIN/gm_daemon" dist/gm_daemon
+          cp "$MCP_BIN/gm_mcp"       dist/gm_mcp
+          cp "$SDK_BIN/gm_hook"      dist/gm_hook
+          for b in gm_daemon gm_mcp gm_hook; do
             # -S drops debug symbols only; the binaries keep their exported
             # symbols and stay fully functional. Measured on this package:
             # 55MB -> 45MB raw, 15MB -> 12MB compressed, per architecture.
@@ -111,9 +149,9 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          # Flat archive: install_daemon.sh extracts into a temp dir and expects
-          # the three binaries at the root, with no version directory to guess.
-          tar -czf "../${{ steps.v.outputs.asset }}" gmcc_daemon gmcc_mcp gmcc_hook
+          # Flat archive: install_gm.sh extracts into a temp dir and expects the
+          # three binaries at the root, with no version directory to guess.
+          tar -czf "../${{ steps.v.outputs.asset }}" gm_daemon gm_mcp gm_hook
           cd ..
           shasum -a 256 "${{ steps.v.outputs.asset }}" > "${{ steps.v.outputs.asset }}.sha256"
           cat "${{ steps.v.outputs.asset }}.sha256"
@@ -129,20 +167,20 @@ jobs:
           # fenced code blocks has to start lines at column 0, and a column-0
           # line inside a YAML block scalar ends the scalar.
           cat > release-notes.md <<'NOTES'
-          Universal (arm64 + x86_64) macOS binaries for `gmcc_daemon`, `gmcc_mcp`, `gmcc_hook`.
+          Universal (arm64 + x86_64) macOS binaries for `gm_daemon`, `gm_mcp`, `gm_hook`.
 
-          Installed by `plugins/gmcc/scripts/install_daemon.sh`, which pins this version
-          via `plugins/gmcc/daemon/VERSION` and verifies the SHA-256 sidecar before unpacking.
+          Installed by `gmk/scripts/install_gm.sh`, which pins this version via
+          `gmk/VERSION` and verifies the SHA-256 sidecar before unpacking.
 
           Manual install:
 
-              bash plugins/gmcc/scripts/install_daemon.sh
+              bash gmk/scripts/install_gm.sh
           NOTES
           # The heredoc body carries this file's YAML indentation; strip it back off.
           sed -i '' 's/^          //' release-notes.md
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" \
-              --title "GMCC daemon v${{ steps.v.outputs.version }}" \
+              --title "GM daemon v${{ steps.v.outputs.version }}" \
               --notes-file release-notes.md
           fi
           gh release upload "$TAG" \

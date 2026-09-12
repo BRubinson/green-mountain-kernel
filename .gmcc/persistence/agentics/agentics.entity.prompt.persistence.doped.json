@@ -92,23 +92,23 @@
       "code" : "status",
       "data_type" : "enum",
       "description" : "Moved only via gm prompt set-status",
-      "enum_ref" : "project.enums.prompt_status",
+      "enum_ref" : "agentics.enums.prompt_status",
       "is_unique" : false,
       "name" : "Status",
       "nullable" : false,
       "sort_order" : 14
     },
     {
-      "code" : "ckfs_relative_storage_path",
+      "code" : "gmfs_relative_storage_path",
       "data_type" : "text",
-      "description" : "Storage path relative to the CKFS root",
+      "description" : "Storage path relative to the GMFS root",
       "is_unique" : false,
-      "name" : "CKFS Storage Path",
+      "name" : "GMFS Storage Path",
       "nullable" : false,
       "sort_order" : 15
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Migrations.swift",
   "sort_order" : 4,
-  "version" : 764
+  "version" : 765
 }
