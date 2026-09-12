@@ -45,7 +45,7 @@ fi
 # --- 3. Locate gmcc_hook ----------------------------------------------------
 HOOK_BIN="${GMCC_ROOT:-$HOME/gmcc}/bin/gmcc_hook"
 if [ ! -x "$HOOK_BIN" ]; then
-    echo "[GMB] gmcc_hook binary missing at $HOOK_BIN — run 'bash $GMCC_PLUGIN_DIR/scripts/build_daemon.sh' to build, then restart the session"
+    echo "[GMB] gmcc_hook binary missing at $HOOK_BIN — run 'bash $GMCC_PLUGIN_DIR/scripts/install_daemon.sh', then restart the session"
     exit 0
 fi
 
@@ -54,7 +54,7 @@ warnings=$( (cd "$REPO_ROOT" && printf '%s' "$payload" \
     | "$HOOK_BIN" context ensure --hook-payload >/dev/null) 2>&1 )
 if [ $? -ne 0 ]; then
     warnings="$warnings
-[GMB] daemon unavailable — context not ensured (run 'bash $GMCC_PLUGIN_DIR/scripts/build_daemon.sh' or /gmcc_daemon, then 'gmcc_hook context ensure')"
+[GMB] daemon unavailable — context not ensured (run 'bash $GMCC_PLUGIN_DIR/scripts/install_daemon.sh' or /gmcc_daemon, then 'gmcc_hook context ensure')"
 fi
 
 # --- 5. Cheatsheet into hook stdout (automatic; the agent never runs it) ----

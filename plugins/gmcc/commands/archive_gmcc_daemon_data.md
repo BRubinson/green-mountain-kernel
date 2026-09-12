@@ -66,7 +66,7 @@ If `~/gmcc/gmcc.db` does not exist, report "nothing to archive" and stop.
    row counts (just the ensured context chain).
 
 **Self-heal**: if `gmcc_hook` is missing at any step, run
-`bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh` and retry once.
+`bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh` and retry once.
 
 ---
 

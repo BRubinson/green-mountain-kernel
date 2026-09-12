@@ -233,7 +233,7 @@ polarity as `weight`.
 
 ## Error recovery
 
-Daemon unreachable: `bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh`, then
+Daemon unreachable: `bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`, then
 `gmcc_hook context ensure`, then retry. `$GMCC_BOOTED` unset: restart
 Claude Code. Anything stranded mid-phase: `prompt_init` with the prompt's
 selector, then `bot_next` — resume is the first-run code path by

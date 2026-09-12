@@ -47,7 +47,7 @@ list calls need the session uuid the first call returns):
 !`U=$(gmcc_hook context ensure | sed -n 's/.*"session_uuid" : "\(.*\)".*/\1/p'); echo "session_uuid=$U"; gmcc_hook call PROMPT_LIST --json "{\"session_uuid\":\"$U\",\"with_reports\":true}"; gmcc_hook call DOPE_LIST --json "{\"session_uuid\":\"$U\"}"`
 
 If that errored with "daemon unreachable", self-heal:
-`bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh`, then re-run it (the next
+`bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`, then re-run it (the next
 client call brings the daemon back up).
 
 ---

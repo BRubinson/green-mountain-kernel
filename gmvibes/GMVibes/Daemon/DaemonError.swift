@@ -36,7 +36,7 @@ nonisolated enum DaemonError: Error, Equatable {
     /// wording (e.g. search) may special-case a few cases and fall back here.
     var userMessage: String {
         switch self {
-        case .notInstalled: return "Daemon not installed (run build_daemon.sh)."
+        case .notInstalled: return "Daemon not installed (run install_daemon.sh)."
         case .unreachable(let m): return m
         case .clientTooOld(let v): return "Daemon (wire v\(v)) is newer than this app — rebuild GMVibes."
         case .daemonTooOld(_, let m): return m

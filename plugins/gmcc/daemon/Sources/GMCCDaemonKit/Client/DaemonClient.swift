@@ -177,7 +177,7 @@ public final class DaemonClient: @unchecked Sendable {
     private func autostart() throws {
         guard FileManager.default.isExecutableFile(atPath: daemonBinaryPath) else {
             throw DaemonClientError.unreachable(
-                "daemon binary missing at \(daemonBinaryPath) — run build_daemon.sh")
+                "daemon binary missing at \(daemonBinaryPath) — run install_daemon.sh")
         }
         var delay: UInt32 = 100_000 // µs
         for _ in 0..<10 {

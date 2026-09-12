@@ -28,17 +28,25 @@ Exit without proceeding.
 
 ## Execution
 
-1. **Build/install** — run:
+1. **Install** — run:
+   ```bash
+   bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh
+   ```
+   This fetches the pinned release and no-ops when `.gmcc_version` already
+   matches. Note whether it printed `installed` (binaries replaced) or
+   `already installed` / `leaving it alone` (no-op).
+
+   If `.gmcc_version` carries a `+src.<sha>` suffix the user is developing the
+   daemon, and the installer says so and stops. Use the source path instead:
    ```bash
    bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh
    ```
-   Append `--force` if the user passed it (clean rebuild). The script is
-   staleness-checked: note whether it printed `installed:` (rebuilt) or
-   `up to date` (no-op). It is the ONLY thing that builds — no client path
-   ever compiles anything.
+   Append `--force` to either if the user asked for a clean reinstall/rebuild.
+   These two are the ONLY things that put binaries on disk — no client path
+   ever compiles or downloads anything.
 
 2. **Ensure the RUNNING daemon is the installed build**:
-   - If step 1 rebuilt, the running daemon (if any) is definitionally
+   - If step 1 replaced binaries, the running daemon (if any) is definitionally
      stale — retire it (step 2a).
    - If step 1 no-oped, check what's serving the socket:
      `gmcc_hook daemon status` (never autostarts). If nothing is running,

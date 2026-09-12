@@ -1,6 +1,6 @@
 # Green Mountain Kernel
 
-Green Mountain Compiler Collection — a Claude Code plugin marketplace for **contextual
+Green Mountain Coding Collection — a Claude Code plugin marketplace for **contextual
 development**, rebuilt on native framework/model work. The `gmcc` plugin turns Claude Code into the GM-CDE (Green
 Mountain Contextual Development Environment): a workflow system that authors, clarifies,
 and implements prompts against a persistent per-repo/per-branch knowledge store (the
@@ -10,8 +10,12 @@ and implements prompts against a persistent per-repo/per-branch knowledge store 
 
 ### Prerequisites
 
-- [Claude Code](https://claude.ai/code) CLI installed
+- macOS (Apple Silicon or Intel) and [Claude Code](https://claude.ai/code) CLI installed
 - `jq` (for the `/gm_init` permission grant) and `uuidgen` — both standard on macOS
+
+No Swift toolchain is required. The daemon binaries are downloaded prebuilt
+(universal, SHA-256 verified) by `scripts/install_daemon.sh`. Xcode is only
+needed if you intend to work on the daemon's sources.
 
 ### Add the marketplace
 
@@ -29,7 +33,7 @@ and implements prompts against a persistent per-repo/per-branch knowledge store 
 
 | Plugin | Version | Description |
 |--------|---------|-------------|
-| gmcc | 43.0.0 | GM-CDE plugin for contextual development |
+| gmcc | 50.0.1 | GM-CDE plugin for contextual development |
 
 ## Setup (Quickstart)
 

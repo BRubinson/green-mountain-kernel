@@ -105,21 +105,26 @@ sandboxed); all other paths come from `gmcc_hook paths --json`.
 
 ---
 
-## Build the binaries and bring the daemon up
+## Install the binaries and bring the daemon up
 
 ```bash
-bash "${CLAUDE_PLUGIN_ROOT}/scripts/build_daemon.sh"
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/install_daemon.sh"
 "$HOME/gmcc/bin/gmcc_hook" ping
 "$HOME/gmcc/bin/gmcc_hook" status
 ```
 
-`build_daemon.sh` release-builds and installs `gmcc_daemon`, `gmcc_mcp` and
-`gmcc_hook` into `~/gmcc/bin/` (staleness-checked; `--force` to override).
+`install_daemon.sh` fetches the prebuilt universal binaries for the version
+pinned in `daemon/VERSION`, verifies their SHA-256, and installs `gmcc_daemon`,
+`gmcc_mcp` and `gmcc_hook` into `~/gmcc/bin/`. It no-ops when the installed
+version already matches. With no release to download it falls back to a source
+build, which needs a Swift toolchain — so a failure here is normally a network
+problem, not a missing Xcode.
+
 The first client call autostarts the daemon, which creates the `~/gmcc/`
 runtime dirs, the log, and the db at the current schema. Surface the
-`status` output so the user sees daemon pid + schema version. If the build
-fails (e.g. no Swift toolchain), warn and continue — the rest of init still
-completes; the SessionStart staleness hook will keep reminding.
+`status` output so the user sees daemon pid + schema version. If the install
+fails, warn and continue — the rest of init still completes; the SessionStart
+staleness hook will keep reminding.
 
 ---
 

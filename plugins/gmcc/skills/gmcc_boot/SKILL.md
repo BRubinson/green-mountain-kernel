@@ -86,7 +86,7 @@ echo "Prerequisites:"
 echo "  Git repository: $(git rev-parse --git-dir > /dev/null 2>&1 && echo 'YES' || echo 'NO')"
 echo "  Ckfs root: $([ -d "${GMCC_CKFS_ROOT:-$HOME/gmcc_ckfs}" ] && echo 'YES' || echo 'NO — run /gm_init')"
 for b in gmcc_daemon gmcc_mcp gmcc_hook; do
-  echo "  $b: $([ -x "${GMCC_ROOT:-$HOME/gmcc}/bin/$b" ] && echo 'installed' || echo 'MISSING — run build_daemon.sh')"
+  echo "  $b: $([ -x "${GMCC_ROOT:-$HOME/gmcc}/bin/$b" ] && echo 'installed' || echo 'MISSING — run install_daemon.sh')"
 done
 echo "  gmcc_hook on PATH: $(command -v gmcc_hook > /dev/null 2>&1 && echo "YES - $(command -v gmcc_hook)" || echo 'NO — session PATH not provisioned')"
 echo ""
@@ -118,7 +118,7 @@ To fix: Restart Claude Code from within a git repository.
 ```
 Issue: daemon system unavailable.
 
-Run: bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh
+Run: bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh
 Then: ~/gmcc/bin/gmcc_hook context ensure
 (See skills/gmcc_daemon/SKILL.md — self-heal rule.)
 ```
@@ -169,6 +169,6 @@ This usually means the SessionStart hook ran but there was a problem:
 ### Boot works but daemon calls fail
 
 The env can boot fine while the daemon system is missing or stale:
-1. Heed the `check_daemon_stale.sh` SessionStart warning — run `bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh`
+1. Heed the `check_daemon_stale.sh` SessionStart warning — run `bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`
 2. `gmcc_hook daemon status` reports without autostarting; `/refresh_daemon_state` and `/gmcc_daemon` cover build + restart
 3. `gmcc_hook context ensure` (idempotent) recreates missing db rows for the current repo/branch

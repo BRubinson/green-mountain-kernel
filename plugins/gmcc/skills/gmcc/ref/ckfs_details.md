@@ -30,7 +30,9 @@ Two channels reach the db: the **pen** (`mcp__plugin_gmcc_pen__*`, served by
 ├── prompts/gmcc_agent_*.md        # Crunch/maw agent prompts (the bot roles live in agents/)
 ├── scripts/gmcc_session_startup.sh         # SessionStart hook script
 ├── scripts/gmcc_hook.sh                    # Every non-SessionStart hook; event as argv, payload to `gmcc_hook hook`
-├── scripts/build_daemon.sh        # Builds + installs all three binaries
+├── scripts/install_daemon.sh      # Fetches + installs the pinned prebuilt binaries
+├── scripts/build_daemon.sh        # Dev path: compiles + installs all three binaries
+├── scripts/stamp_build_info.sh    # Writes the generated BuildInfo (shared by the build + CI)
 ├── scripts/check_daemon_stale.sh  # SessionStart staleness warning
 ├── scripts/run_mcp.sh             # Launches gmcc_mcp for the pen server
 ├── daemon/                        # Swift package: GMCCDaemonKit + gmcc_daemon + gmcc_mcp + gmcc_hook

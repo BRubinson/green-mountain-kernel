@@ -1,0 +1,151 @@
+name: daemon-release
+
+# Builds the universal daemon binaries once and attaches them to a
+# `daemon-v<version>` release. install_daemon.sh fetches exactly this asset.
+#
+# TAG NAMESPACE: `daemon-v*`, beside the app's `gmvibes-v*`. One monorepo ships
+# two independently versioned artifacts and their tags must not collide.
+#
+# DAEMON VERSION IS DECOUPLED FROM PLUGIN VERSION ON PURPOSE. The plugin is ~300KB
+# of markdown that changes constantly; the daemon is 44k lines of Swift that does
+# not. Coupling them would make every prompt-wording tweak force every install to
+# re-download ~15MB of unchanged binaries. daemon/VERSION moves only when the
+# daemon does.
+#
+# Trigger: push a tag, or dispatch manually (which tags for you).
+#   git tag daemon-v50.0.1 && git push origin daemon-v50.0.1
+
+on:
+  push:
+    tags: ['daemon-v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Daemon version to release (must equal daemon/VERSION)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      # The tag and the file must agree. They are two statements of the same
+      # fact, and if they disagree the asset name encodes one version while the
+      # installer asks for the other — a 404 that looks like a network problem.
+      - name: Resolve and verify version
+        id: v
+        run: |
+          pinned="$(cat plugins/gmcc/daemon/VERSION)"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            asked="${{ inputs.version }}"
+          else
+            asked="${GITHUB_REF_NAME#daemon-v}"
+          fi
+          if [ "$pinned" != "$asked" ]; then
+            echo "::error::daemon/VERSION is '$pinned' but the release asks for '$asked' — bump the file and the tag together"
+            exit 1
+          fi
+          echo "version=$pinned" >> "$GITHUB_OUTPUT"
+          echo "tag=daemon-v$pinned" >> "$GITHUB_OUTPUT"
+          echo "asset=gmcc-daemon-$pinned-macos-universal.tar.gz" >> "$GITHUB_OUTPUT"
+
+      - name: Stamp BuildInfo
+        run: bash plugins/gmcc/scripts/stamp_build_info.sh plugins/gmcc/daemon "${{ steps.v.outputs.version }}"
+
+      # Never ship what was not tested. The suite is the same one daemon-ci runs;
+      # running it again here means a release can be cut from a tag without
+      # trusting that CI happened to pass on that commit.
+      - name: swift test
+        run: swift test --package-path plugins/gmcc/daemon
+
+      # SwiftPM emits a genuinely universal Mach-O when handed both --arch flags
+      # (no lipo step); the verification below is what makes that a fact rather
+      # than an assumption.
+      - name: Build universal (arm64 + x86_64)
+        run: |
+          swift build -c release --package-path plugins/gmcc/daemon \
+            --arch arm64 --arch x86_64
+
+      - name: Stage, strip, sign
+        id: stage
+        run: |
+          set -euo pipefail
+          BIN_DIR="$(swift build -c release --package-path plugins/gmcc/daemon \
+                       --arch arm64 --arch x86_64 --show-bin-path)"
+          mkdir -p dist
+          for b in gmcc_daemon gmcc_mcp gmcc_hook; do
+            cp "$BIN_DIR/$b" "dist/$b"
+            # -S drops debug symbols only; the binaries keep their exported
+            # symbols and stay fully functional. Measured on this package:
+            # 55MB -> 45MB raw, 15MB -> 12MB compressed, per architecture.
+            strip -S "dist/$b"
+            # Ad-hoc signature. arm64 refuses to exec an unsigned Mach-O at all,
+            # and curl (unlike a browser) does not set com.apple.quarantine, so
+            # ad-hoc is sufficient for a CLI installed this way. Notarization
+            # would only matter if these were ever delivered through Gatekeeper's
+            # quarantine path, which they are not.
+            codesign --force --sign - --timestamp=none "dist/$b"
+            lipo -info "dist/$b"
+            # Fail loudly rather than shipping a single-arch asset named
+            # "universal" — an Intel user would download it and get "bad CPU
+            # type", which reads as a corrupt download, not a build mistake.
+            lipo -info "dist/$b" | grep -q 'arm64' \
+              || { echo "::error::$b is missing arm64"; exit 1; }
+            lipo -info "dist/$b" | grep -q 'x86_64' \
+              || { echo "::error::$b is missing x86_64"; exit 1; }
+            codesign --verify --strict "dist/$b" \
+              || { echo "::error::$b failed signature verification"; exit 1; }
+          done
+
+      - name: Package + checksum
+        run: |
+          set -euo pipefail
+          cd dist
+          # Flat archive: install_daemon.sh extracts into a temp dir and expects
+          # the three binaries at the root, with no version directory to guess.
+          tar -czf "../${{ steps.v.outputs.asset }}" gmcc_daemon gmcc_mcp gmcc_hook
+          cd ..
+          shasum -a 256 "${{ steps.v.outputs.asset }}" > "${{ steps.v.outputs.asset }}.sha256"
+          cat "${{ steps.v.outputs.asset }}.sha256"
+          ls -lh "${{ steps.v.outputs.asset }}"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.v.outputs.tag }}"
+          # Notes go through a file, not an inline --notes string: markdown with
+          # fenced code blocks has to start lines at column 0, and a column-0
+          # line inside a YAML block scalar ends the scalar.
+          cat > release-notes.md <<'NOTES'
+          Universal (arm64 + x86_64) macOS binaries for `gmcc_daemon`, `gmcc_mcp`, `gmcc_hook`.
+
+          Installed by `plugins/gmcc/scripts/install_daemon.sh`, which pins this version
+          via `plugins/gmcc/daemon/VERSION` and verifies the SHA-256 sidecar before unpacking.
+
+          Manual install:
+
+              bash plugins/gmcc/scripts/install_daemon.sh
+          NOTES
+          # The heredoc body carries this file's YAML indentation; strip it back off.
+          sed -i '' 's/^          //' release-notes.md
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" \
+              --title "GMCC daemon v${{ steps.v.outputs.version }}" \
+              --notes-file release-notes.md
+          fi
+          gh release upload "$TAG" \
+            "${{ steps.v.outputs.asset }}" \
+            "${{ steps.v.outputs.asset }}.sha256" \
+            --clobber

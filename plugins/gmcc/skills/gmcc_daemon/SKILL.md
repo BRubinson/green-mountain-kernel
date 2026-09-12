@@ -92,24 +92,26 @@ Workflow semantics (prompt lifecycle, briefings, ratings, who seals what) live
 in `skills/gmcc/ref/bot_workflows.md`, not here. For editing the repo's `.gmcc`
 dope files directly, load `skills/gmcc/ref/doped_files.md`.
 
-## Build / self-heal
+## Install / self-heal
 
-If `gmcc_hook` is not on the PATH, or a call reports the daemon binary missing,
-build first:
+If `gmcc_hook` is not on the PATH, or a call reports the daemon binary missing:
 
 ```bash
-bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh
+bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh
 ```
 
-The script is staleness-checked (no-ops when binaries are current; `--force` to
-override), stamps BuildInfo (git sha + date, returned by `gmcc_hook ping`), and
-installs all three binaries into `~/gmcc/bin/`. It never restarts anything: a
-rebuild leaves the running daemon stale, so stop it and let the next call
-autostart the new binary. The SessionStart hook
-`scripts/check_daemon_stale.sh` names any binary that is missing or older than
-the sources — treat it as a prompt to run the build.
+This fetches the prebuilt universal binaries for the version in `daemon/VERSION`,
+verifies their SHA-256, and installs all three into `~/gmcc/bin/`, recording the
+version in `~/gmcc/bin/.gmcc_version`. It no-ops when that stamp already matches,
+and falls back to a source build only when there is no release to download.
+It never restarts anything: new binaries leave the running daemon stale, so stop
+it and let the next call autostart. The SessionStart hook
+`scripts/check_daemon_stale.sh` names what is missing or drifted — treat it as a
+prompt to run the install.
 
-The full dev loop when changing daemon code:
+The dev loop when changing daemon code — `build_daemon.sh` compiles from source
+and stamps `<version>+src.<sha>`, which marks the bin directory developer-owned
+so no download replaces it:
 
 ```bash
 cd $GMCC_PLUGIN_ROOT/daemon && swift test         # full suite; must stay green

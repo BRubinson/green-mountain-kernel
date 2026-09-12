@@ -31,7 +31,7 @@ in sync and the host wiring healthy.
 
 | Category | Detection | Default suggestion |
 |----------|-----------|--------------------|
-| Daemon unhealthy | `gmcc_hook ping` / `gmcc_hook status` fails | Run `bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh`, then `gmcc_hook context ensure` |
+| Daemon unhealthy | `gmcc_hook ping` / `gmcc_hook status` fails | Run `bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`, then `gmcc_hook context ensure` |
 | Pre-daemon yaml runtime files | Any `session_data.gmcc.yaml`, `project_index.gmcc.yaml`, `project_data.gmcc.yaml`, `instance_data.gmcc.yaml`, `gmcc_session_file_index.yaml`, or prompt yaml triad (`*_data.gmcc.yaml` / `*_initial.yaml` / `*_clarified.yaml`) under `$GMCC_CKFS_ROOT/projects` (outside `_archive/`) | Archive to `_archive/cold_storage/` (default) — nothing reads these; the db is the runtime. Or skip |
 | Orphan memory artifact | `prompts/{seq}_{name}/memory/*.md` on disk with no matching `prompt_artifact` row (`ARTIFACT_LIST {"prompt_uuid":"U"}`) | Register via `ARTIFACT_ADD` with a caption `note` (default), or skip |
 | Dangling artifact pointer | `prompt_artifact` row whose `file_path` no longer exists on disk | Flag for user — restore the file from `_archive/` if it was moved, or accept the dangling pointer (rows are history; there is no delete verb for them) |

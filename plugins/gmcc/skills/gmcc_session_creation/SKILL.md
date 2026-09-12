@@ -68,7 +68,7 @@ db rows and creates the session's artifact home, and prints the resulting
 uuids as JSON. If it fails with the daemon unreachable, self-heal first:
 
 ```bash
-bash "$GMCC_PLUGIN_ROOT/scripts/build_daemon.sh"
+bash "$GMCC_PLUGIN_ROOT/scripts/install_daemon.sh"
 gmcc_hook context ensure
 ```
 

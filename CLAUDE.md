@@ -32,6 +32,13 @@ gmcc_hook call SHUTDOWN --json '{}'          # retire the running daemon
 gmcc_hook ping                               # the next client autostarts it
 ```
 
+`build_daemon.sh` is the DEVELOPER path and stamps `~/gmcc/bin/.gmcc_version`
+as `<version>+src.<sha>`, which marks that bin directory developer-owned so a
+download never replaces your build. Everyone else runs
+`plugins/gmcc/scripts/install_daemon.sh`, which fetches the prebuilt universal
+binaries for `plugins/gmcc/daemon/VERSION` from the matching `daemon-v*` release
+and verifies their SHA-256. Don't put compiling back on the install path.
+
 - `VerbRegistryTests` fails the build when a `MessageType` ships without
   a `VerbRegistry` row; `DocsContractTests` fails it when the plugin's
   docs regress (hardcoded binary paths, retired env names, retired DOPE
@@ -43,6 +50,28 @@ gmcc_hook ping                               # the next client autostarts it
 - Schema: migrations are append-only. The db at `~/gmcc/gmcc.db` is
   append-only history — NEVER wipe it. `gmcc_hook call BACKUP --json
   '{}'` takes the sanctioned online backup before risky work.
+
+## Releasing the daemon
+
+`plugins/gmcc/daemon/VERSION` is the pin. Bump it, commit, then tag:
+
+```bash
+git tag daemon-v$(cat plugins/gmcc/daemon/VERSION)
+git push origin daemon-v$(cat plugins/gmcc/daemon/VERSION)
+```
+
+`.github/workflows/daemon-release.yml` refuses to publish when the tag and the
+file disagree, runs the suite, builds universal (arm64 + x86_64), verifies both
+slices are present, and attaches the tarball plus its `.sha256`.
+
+- The daemon version is DECOUPLED from the plugin version on purpose. The plugin
+  is markdown that changes constantly; the daemon is 44k lines of Swift that does
+  not. Coupling them would make every prompt tweak force every install to
+  re-download ~15MB of unchanged binaries. Move `daemon/VERSION` only when the
+  daemon actually changed.
+- CI runs on `macos-26` because `GmAgentTool.swift` imports FoundationModels
+  unconditionally, and that framework only exists in the macOS 26 SDK. An older
+  runner does not degrade — the kit does not compile at all.
 
 ## Environment rules
 

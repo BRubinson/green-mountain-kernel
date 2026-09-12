@@ -11,10 +11,10 @@
 # An agent in that session reads a correct frontmatter tool list and finds every
 # pen call failing, which is indistinguishable from "the MCP is not registered".
 #
-# Building is now exclusively an explicit act: build_daemon.sh, or
-# `gmcc_daemon build` / a daemon restart. Staleness is reported by
-# check_daemon_stale.sh at SessionStart, which already runs on every session and
-# already stats all three binaries.
+# Getting binaries onto disk is now exclusively an explicit act:
+# install_daemon.sh (fetches the pinned release) or build_daemon.sh (builds from
+# source). Staleness is reported by check_daemon_stale.sh at SessionStart, which
+# already runs on every session and already stats all three binaries.
 #
 # A MISSING BINARY EXITS NON-ZERO, LOUDLY. That is the whole point of the exit
 # code: with tool search enabled Claude Code names the server that failed and
@@ -28,7 +28,7 @@
 GMCC_BIN="${GMCC_ROOT:-$HOME/gmcc}/bin"
 
 if [ ! -x "$GMCC_BIN/gmcc_mcp" ]; then
-    echo "[GMB] gmcc_mcp missing at $GMCC_BIN/gmcc_mcp — run: bash \"$(cd "$(dirname "$0")" && pwd)/build_daemon.sh\"" >&2
+    echo "[GMB] gmcc_mcp missing at $GMCC_BIN/gmcc_mcp — run: bash \"$(cd "$(dirname "$0")" && pwd)/install_daemon.sh\"" >&2
     exit 1
 fi
 

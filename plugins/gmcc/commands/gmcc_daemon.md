@@ -1,7 +1,7 @@
 ---
 name: gmcc_daemon
-description: Build, install, and control the GMCC daemon. Runs scripts/build_daemon.sh and drives gmcc_hook for status and lifecycle. The daemon owns the SQLite db at ~/gmcc/gmcc.db; everything else is a socket client.
-argument-hint: "[build | status | restart]"
+description: Install, build, and control the GMCC daemon. Runs scripts/install_daemon.sh (or scripts/build_daemon.sh for a source build) and drives gmcc_hook for status and lifecycle. The daemon owns the SQLite db at ~/gmcc/gmcc.db; everything else is a socket client.
+argument-hint: "[install | build | status | restart]"
 disable-model-invocation: true
 allowed-tools: Bash, Read, AskUserQuestion
 ---
@@ -31,10 +31,14 @@ Exit without proceeding.
 Read the `gmcc_daemon` skill (`$GMCC_PLUGIN_ROOT/skills/gmcc_daemon/SKILL.md`)
 for the complete protocol, then dispatch on the argument:
 
-- **`build`** (default when binaries are missing/stale): run
-  `bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh` and report the output. It
-  is the only thing that builds. Append `--force` if the user asked for a
-  clean rebuild.
+- **`install`** (default when binaries are missing or the version drifted): run
+  `bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh` and report the output. It
+  fetches the pinned release, and falls back to a source build only when there
+  is nothing to download. Append `--force` to reinstall over a matching version.
+- **`build`**: run `bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh` and report
+  the output. This is the developer path — it compiles the package. Append
+  `--force` if the user asked for a clean rebuild. Prefer `install` unless the
+  user is editing daemon sources.
 - **`status`**: run `gmcc_hook status` and report daemon pid, schema
   version, and table counts. (`gmcc_hook daemon status` is the narrower
   "is it up" check — it never autostarts.)

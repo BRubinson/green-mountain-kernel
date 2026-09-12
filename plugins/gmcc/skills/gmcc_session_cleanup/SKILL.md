@@ -71,7 +71,7 @@ repairs are the matching write verbs or filesystem moves within the session.
 | Finding | Example | Default suggestion |
 |---------|---------|--------------------|
 | No session row | no session row resolves for this repo/branch | `gmcc_hook context ensure` via the `gmcc_session_creation` skill (default) |
-| Daemon unreachable | `gmcc_hook ping` fails | Self-heal: `bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh`, retry |
+| Daemon unreachable | `gmcc_hook ping` fails | Self-heal: `bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`, retry |
 
 ---
 

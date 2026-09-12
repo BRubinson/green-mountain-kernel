@@ -12,8 +12,9 @@ callers that cannot: a shell hook, and a person at a terminal.
 
   context ensure [--hook-payload]    provision project/instance/session from $PWD + branch
   context env [--plugin-root P]      emit the session env block
-  daemon start|stop|restart|status   lifecycle. THE ONLY THING THAT BUILDS is
-                                     scripts/build_daemon.sh — never a connect path.
+  daemon start|stop|restart|status   lifecycle. THE ONLY THINGS THAT INSTALL are
+                                     scripts/install_daemon.sh (fetch) and
+                                     build_daemon.sh (compile) — never a connect path.
   paths [--json]                     resolved runtime roots
   status | ping | doctor | backup    health and safety
   verbs [--json] [--writes-only]     the verb catalogue: MessageType, pen tool, read/write
@@ -58,8 +59,9 @@ func runOps(_ argv: [String]) -> Int32 {
             do { emit(try client.ping()); return 0 } catch { return fail("daemon unreachable: \(error)") }
         default:
             return fail("""
-                daemon \(action) is not served here. Lifecycle is scripts/build_daemon.sh \
-                (build + install) and the launchd job; this binary never builds.
+                daemon \(action) is not served here. Lifecycle is scripts/install_daemon.sh \
+                (fetch + install), scripts/build_daemon.sh (compile from source) and the \
+                launchd job; this binary never installs or builds.
                 """)
         }
 

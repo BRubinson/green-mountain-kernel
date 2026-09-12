@@ -97,7 +97,7 @@ If `$GMCC_BOOTED` is unset:
 ```
 
 If the daemon is unreachable: `bash
-$GMCC_PLUGIN_ROOT/scripts/build_daemon.sh`, then `gmcc_hook context ensure`
+$GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`, then `gmcc_hook context ensure`
 (the next client call brings the daemon up), retry.
 
 ARGUMENTS: $ARGUMENTS

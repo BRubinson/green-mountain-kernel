@@ -32,7 +32,7 @@ that wiring healthy and clearing anything that competes with it.
 ## Step 1: Detect
 
 Run the checks below and collect findings before asking anything. If the
-daemon is unreachable, that is finding 1 — offer the build/restart remedy
+daemon is unreachable, that is finding 1 — offer the install/restart remedy
 first, then re-run the rest.
 
 ```bash
@@ -41,6 +41,10 @@ for b in gmcc_daemon gmcc_mcp gmcc_hook; do
   [ -x "${GMCC_ROOT:-$HOME/gmcc}/bin/$b" ] || echo "MISSING $b"
 done
 command -v gmcc_hook >/dev/null || echo "gmcc_hook not on the session PATH"
+
+# installed version vs what the plugin pins (a +src.<sha> stamp = dev build)
+cat "${GMCC_ROOT:-$HOME/gmcc}/bin/.gmcc_version" 2>/dev/null || echo "no version stamp"
+cat "$GMCC_PLUGIN_ROOT/daemon/VERSION"
 
 # daemon + the roots the db actually answers from
 gmcc_hook ping
@@ -58,12 +62,13 @@ grep -n '>>> gmcc env >>>' ~/.zshrc
 | Finding | Meaning | Default remedy |
 |---|---|---|
 | `zshrc_gmcc_block` | A `#### >>> gmcc env >>>` block exists in `~/.zshrc`. GMCC never writes shell profiles and nothing reads that block; its variables compete with the session env | **Delete the whole marker-bounded block.** This is the ONE rm-class action in the GMCC cleanup surface: print the exact lines to be removed first, require explicit confirmation, edit only between the markers |
-| `binary_missing` | One of the three binaries is absent from `${GMCC_ROOT:-$HOME/gmcc}/bin` | `bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh` |
+| `binary_missing` | One of the three binaries is absent from `${GMCC_ROOT:-$HOME/gmcc}/bin` | `bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh` |
+| `binary_version_drift` | `${GMCC_ROOT:-$HOME/gmcc}/bin/.gmcc_version` disagrees with the plugin's `daemon/VERSION` (a `+src.<sha>` stamp is a developer build, not drift — leave it) | `bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh` |
 | `hook_not_on_path` | Bare `gmcc_hook` does not resolve inside the session | The session env never provisioned — restart Claude Code from inside a git repo; meanwhile call `~/gmcc/bin/gmcc_hook` by path. Never write the user's shell profile |
 | `ckfs_root_mismatch` / `gmcc_root_mismatch` | The env's claim disagrees with the roots `gmcc_hook paths --json` reports from the db | Show both values and let the user pick which is right, then `gmcc_hook call CONFIG_SET --json '{"key":"ckfs_root","value":"<correct>"}'` (keys: `ckfs_root`, `kbite_root`, `kbite_open_root`, `kbite_digested_root`) |
 | `dope_files_ahead` | The repo `.gmcc` tree is newer than (or absent from) the session scope | `gmcc_hook call DOPE_INGEST --json '{"scope_uuid":"<U>"}'` |
 | `dope_db_ahead` | Session dope edits were never published to the repo files | `gmcc_hook call DOPE_WRITE_REPO --json '{"scope_uuid":"<U>"}'` (or accept — boot never overwrites db-ahead state) |
-| `daemon_unreachable` | Socket dead or binaries stale | `bash $GMCC_PLUGIN_ROOT/scripts/build_daemon.sh`, then `gmcc_hook ping` (the handshake retires the old daemon) |
+| `daemon_unreachable` | Socket dead or binaries stale | `bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`, then `gmcc_hook ping` (the handshake retires the old daemon) |
 
 Scope uuids for the dope remedies come from
 `gmcc_hook call DOPE_LIST --json '{"session_uuid":"<U>"}'`.
