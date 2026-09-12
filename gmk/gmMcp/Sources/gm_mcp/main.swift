@@ -872,7 +872,7 @@ let tools: [Tool] = [
 /// from VerbRegistry so it cannot drift from the roster, ordered critical
 /// first, and deliberately small (the budget below is ~2KB: this text is paid
 /// for by every session the pen is loaded into).
-// The pen sheet generator moved to GMCCDaemonKit as `PenSheet`. The
+// The pen sheet generator lives in GmDaemonSdk as `PenSheet`. The
 // SubagentStart hook hands spawned agents the same generated text, and two
 // generators over one registry drift apart — which is how the retired CLI
 // cheatsheet came to contradict the agent definitions it shipped beside.
@@ -914,7 +914,7 @@ let tools: [Tool] = [
 /// form (or to a note alone) and never emits invalid JSON.
 ///
 /// The threshold and the envelope shape live in `PenResultBudget` in
-/// GMCCDaemonKit — the pen binary cannot be linked into the test target, and
+/// GmDaemonSdk — the pen binary cannot be linked into the test target, and
 /// a size guard nothing can test is a size guard nobody trusts.
 func renderResult(
     tool: Tool, args: Args, client: DaemonClient, value: any Encodable

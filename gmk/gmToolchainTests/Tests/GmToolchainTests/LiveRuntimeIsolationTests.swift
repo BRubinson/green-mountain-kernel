@@ -42,6 +42,22 @@ final class LiveRuntimeIsolationTests: XCTestCase {
 
     private func name(_ url: URL) -> String { url.lastPathComponent }
 
+    /// Files whose TEXT necessarily spells the tokens these tests ban.
+    ///
+    /// This file's own banned-token list is the obvious case. The less obvious
+    /// one is `RetiredNameContractTests`: it is the sibling guard, and its
+    /// exemption tables have to NAME the symbols and paths they exempt. Two
+    /// source-scanning guards will always flag each other unless each is told
+    /// the other is prose, not code.
+    private let proseNotCode: Set<String> = [
+        "LiveRuntimeIsolationTests.swift",
+        "RetiredNameContractTests.swift",
+    ]
+
+    private func scannable() throws -> [URL] {
+        try testSources().filter { !proseNotCode.contains(name($0)) }
+    }
+
     /// `Paths.<member>` resolves against the real `$GM_FS_ROOT` / `$HOME`, so
     /// any test naming one is asserting about the machine it runs on.
     func testNoTestResolvesTheLiveRuntimeRoot() throws {
@@ -54,7 +70,7 @@ final class LiveRuntimeIsolationTests: XCTestCase {
             "Paths.ensureRuntimeDirs",
         ]
         var violations: [String] = []
-        for file in try testSources() where name(file) != name(URL(fileURLWithPath: #filePath)) {
+        for file in try scannable() {
             let body = try String(contentsOf: file, encoding: .utf8)
             for token in banned where body.contains(token) {
                 violations.append("\(name(file)): \(token)")
@@ -71,7 +87,7 @@ final class LiveRuntimeIsolationTests: XCTestCase {
     func testNoTestResolvesTheHomeDirectory() throws {
         let banned = ["homeDirectoryForCurrentUser", "NSHomeDirectory"]
         var violations: [String] = []
-        for file in try testSources() where name(file) != name(URL(fileURLWithPath: #filePath)) {
+        for file in try scannable() {
             let body = try String(contentsOf: file, encoding: .utf8)
             for token in banned where body.contains(token) {
                 violations.append("\(name(file)): \(token)")
@@ -93,9 +109,7 @@ final class LiveRuntimeIsolationTests: XCTestCase {
             "MigrationTests.swift",
         ]
         var violations: [String] = []
-        for file in try testSources()
-        where name(file) != name(URL(fileURLWithPath: #filePath))
-            && !allowed.contains(name(file)) {
+        for file in try scannable() where !allowed.contains(name(file)) {
             let body = try String(contentsOf: file, encoding: .utf8)
             if body.contains("ProcessInfo.processInfo.environment")
                 || body.contains("getenv(") {

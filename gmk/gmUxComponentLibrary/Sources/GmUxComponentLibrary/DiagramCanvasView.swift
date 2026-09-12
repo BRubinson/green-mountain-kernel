@@ -2,10 +2,14 @@
 import SwiftUI
 import GmDaemonSdk
 
-// The DIAGRAM component library. Lives INSIDE GMCCDaemonKit (not a sibling
-// target) because GMVibes' vendor-daemonkit.sh copies exactly this source
-// tree and generates a GRDB-only manifest — SwiftUI is an SDK framework, so
-// the manifest stays valid and vendoring needs zero extra plumbing.
+// The DIAGRAM component library, and now its own PACKAGE
+// (gmUxComponentLibrary) rather than a directory inside the daemon kit.
+//
+// It used to live inside that one target to keep a vendoring script's
+// generated manifest valid. That constraint is gone: the app takes these
+// components as a real local-path dependency, so the layering is expressed in
+// a manifest instead of in a copy step. The package is scoped to DiagramUI for
+// now and built to grow.
 //
 // Every view consumes ResolvedDiagram VALUES built by DiagramResolver — no
 // DaemonClient, no db, no daemon dependency at render time (the no-writes

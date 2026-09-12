@@ -10,7 +10,7 @@ import Foundation
 ///     { "code": "gm_daemon", "name": "GM Daemon",
 ///       "elements": [
 ///         { "code": "gm_daemon", "element_type": "Hull",
-///           "primary_path": "plugins/gmcc/daemon",
+///           "primary_path": "gmk/gmDaemon",
 ///           "links": { "persistence_owners": ["doped", "agentics"] } } ] }
 ///
 /// The collapse is deliberately lossy-but-canonical: a PersistenceOwner's

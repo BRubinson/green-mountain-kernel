@@ -47,6 +47,16 @@ final class DopeCogTests: XCTestCase {
             scopeUuid: scopeUuid, code: code, name: code.capitalized))
     }
 
+    /// THE PATH STRINGS BELOW ARE ARBITRARY FIXTURES, NOT REAL PATHS. They are
+    /// never resolved, statted or opened — `primaryPath` is an opaque TEXT
+    /// column here and these tests only check that what went in comes back out
+    /// ordered. They deliberately still read `gmvibes/` and
+    /// `plugins/gmcc/daemon/`, which no longer exist after the gmk reorg.
+    ///
+    /// Left alone ON PURPOSE, so a later `gmcc` -> `gm` sweep does not "fix"
+    /// them: rewriting a fixture to match a real layout makes the test look
+    /// like it depends on that layout, and the next person to move a directory
+    /// will come here expecting a breakage that cannot happen.
     func testAddCogAndSeedTheThreePrimarySystems() throws {
         let cog = try addCog()
         for (code, path) in [("gm_vibes", "gmvibes/"),

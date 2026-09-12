@@ -1,6 +1,6 @@
 ---
 name: release-dmg
-description: Build the GMVibes macOS app (gmvibes/ in this monorepo) into a DMG — notarized if a Developer ID cert exists, otherwise ad-hoc — and publish it as a GitHub release asset on the green-mountain-kernel repo. Use when the user wants to cut a GMVibes release, ship a new DMG, upload a build to GitHub, or distribute the app.
+description: Build the GMVibes macOS app (gmk/gmVibes/ in this monorepo) into a DMG — notarized if a Developer ID cert exists, otherwise ad-hoc — and publish it as a GitHub release asset on the green-mountain-kernel repo. Use when the user wants to cut a GMVibes release, ship a new DMG, upload a build to GitHub, or distribute the app.
 ---
 
 # release-dmg
@@ -13,8 +13,8 @@ Application* certificate is installed, otherwise **ad-hoc**.
 
 The heavy lifting lives in two scripts — prefer running them over reimplementing:
 
-- `gmvibes/scripts/build-dmg.sh` — archives the `GMVibes` scheme, signs, packages the DMG.
-- `gmvibes/scripts/release.sh` — calls `build-dmg.sh`, then creates/updates the GitHub release.
+- `gmk/gmVibes/scripts/build-dmg.sh` — archives the `GMVibes` scheme, signs, packages the DMG.
+- `gmk/gmVibes/scripts/release.sh` — calls `build-dmg.sh`, then creates/updates the GitHub release.
 
 ## Steps
 
@@ -31,16 +31,16 @@ The heavy lifting lives in two scripts — prefer running them over reimplementi
      notarized — surface it.
 
 2. **Pick the version/tag.** Default is `gmvibes-v<MARKETING_VERSION>` (read from
-   `gmvibes/GMVibes.xcodeproj/project.pbxproj`). If the user named a version, pass it.
+   `gmk/gmk.xcodeproj/project.pbxproj`). If the user named a version, pass it.
    If a release for that tag already exists, the asset is replaced (`--clobber`);
    warn the user rather than bumping silently.
 
 3. **Build + publish.** Run the release script (this archives, signs/notarizes,
    builds the DMG, and uploads it):
    ```sh
-   gmvibes/scripts/release.sh                 # auto: gmvibes-v<MARKETING_VERSION>
-   gmvibes/scripts/release.sh 1.2.0           # explicit version
-   NOTARIZE=0 gmvibes/scripts/release.sh      # skip notarization even with a Dev ID
+   gmk/gmVibes/scripts/release.sh                 # auto: gmvibes-v<MARKETING_VERSION>
+   gmk/gmVibes/scripts/release.sh 1.2.0           # explicit version
+   NOTARIZE=0 gmk/gmVibes/scripts/release.sh      # skip notarization even with a Dev ID
    ```
    The build takes a minute or two — allow a generous timeout.
 
@@ -64,7 +64,7 @@ Program. Without it, builds are ad-hoc and recipients clear quarantine once:
 - `gmvibes-v*` releases from before the kernel split live on `BRubinson/gmcc-marketplace`,
   and `v1.0`–`v3.2` on the archived `BRubinson/gmcc-ui`; everything cut from this
   repo ships here under the same `gmvibes-v*` tag namespace.
-- Build artifacts (`gmvibes/build/`, `*.dmg`) are gitignored — only the release
+- Build artifacts (`gmk/build/`, `*.dmg`) are gitignored — only the release
   asset is published, nothing is committed.
 - This is distribution-only; it does not bump `MARKETING_VERSION`. Bump that in
   Xcode (or the pbxproj) first if you want a new version number.

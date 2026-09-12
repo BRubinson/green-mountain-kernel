@@ -97,17 +97,16 @@ public struct GitContext {
 }
 
 public enum GmFsYaml {
-    /// `~/gmfs/`, or `$GM_FS_ROOT` when set — same env name the
-    /// SessionStart hook already exports, so sandbox sessions redirect the
-    /// CLI's yaml reads without a second variable.
-    public static let root: URL = {
-        if let override = ProcessInfo.processInfo.environment["GM_FS_ROOT"],
-           !override.isEmpty {
-            return URL(fileURLWithPath: override, isDirectory: true)
-        }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("gmfs", isDirectory: true)
-    }()
+    /// The content root — `Paths.contentRoot`, not a second resolution of it.
+    ///
+    /// This used to re-derive the root from the env itself, which was
+    /// defensible while there were TWO roots and this one wanted the content
+    /// one. With a single `GM_FS_ROOT` the two resolutions became the same
+    /// twelve lines twice, and a second source of truth for the root is
+    /// precisely what the write-containment rule cannot afford: a containment
+    /// check is a prefix test against ONE root, and two roots that are "always
+    /// equal" are two roots that can disagree.
+    public static var root: URL { Paths.contentRoot }
 
     /// Extract the first top-level `uuid:` from a gmfs data yaml, if present.
     public static func uuid(_ relativePath: String) -> String? {
