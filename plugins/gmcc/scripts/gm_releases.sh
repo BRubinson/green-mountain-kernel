@@ -50,11 +50,42 @@
 # A version directory name IS its version string, which is what lets the active
 # symlink's target name the running version without a lookup table.
 
+# ── THE APP RIDES ALONG ──────────────────────────────────────────────────────
+#
+#   $GM_FS_ROOT/apps/
+#   ├── .gmvibes_version                     what WE last installed
+#   └── downloads/50.0.2/GMVibes-50.0.2.dmg  checksum-verified before it was used
+#
+# The DMG is staged under the filesystem root exactly like the binaries, and for
+# the same reason: the bytes that were verified are the bytes that get installed,
+# and a re-install needs no second download. It is the ONE thing in this library
+# that then writes outside $GM_FS_ROOT — /Applications is where a macOS app has
+# to land to be launchable — and that step is a separate function so the write
+# is explicit at every call site rather than buried in a download path.
+#
+# ── ONE VERSION ACROSS THE WHOLE RELEASE ─────────────────────────────────────
+#
+# `gmk/VERSION` pins the binaries AND the app: build-dmg.sh stamps
+# MARKETING_VERSION from it, so the app's About box and `.gm_version` can never
+# disagree. Before this they were two independently tagged tracks
+# (`daemon-v*` and `gmvibes-v*`) and nothing made them meet.
+
 # Never sourced twice.
 [ -n "${GM_RELEASES_SH:-}" ] && return 0
 GM_RELEASES_SH=1
 
 GM_BINARIES="gm_daemon gm_mcp gm_hook"
+
+# The unified release tag namespace. GitHub's own "latest release" is the wrong
+# question for a monorepo that has shipped more than one kind of artifact, so
+# every lookup filters by this prefix.
+GM_TAG_PREFIX="gm_kernel-v"
+# The namespace this replaced. Releases published before the unification still
+# carry it and still contain a usable binary tarball, so the installer falls
+# back to it rather than telling a working machine that nothing is published.
+GM_LEGACY_TAG_PREFIX="daemon-v"
+
+GM_APP_NAME="GMVibes"
 
 # ── Roots ────────────────────────────────────────────────────────────────────
 #
@@ -82,6 +113,14 @@ gm_resolve_fs_root() {
     GM_LOCAL="$GM_RELEASES/local"
     GM_ACTIVE="$GM_RELEASES/active"
     GM_VERSION_STAMP="$GM_BIN/.gm_version"
+
+    # The app store, alongside the binary store and under the same one root.
+    GM_APPS="$GM_FS_ROOT/apps"
+    GM_APP_DOWNLOADS="$GM_APPS/downloads"
+    GM_APP_VERSION_STAMP="$GM_APPS/.gmvibes_version"
+    # Overridable so a sandbox — or a machine where /Applications is not
+    # writable — can install somewhere else without editing this library.
+    GM_APP_DEST="${GM_APP_DEST:-/Applications}"
 }
 
 # ── Staging ──────────────────────────────────────────────────────────────────
@@ -214,4 +253,120 @@ gm_retire_daemon() {
     [ -x "$GM_BIN/gm_hook" ] || return 0
     "$GM_BIN/gm_hook" call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
     echo "[GMB] retired the running daemon (if any) — the next client call autostarts the new build"
+}
+
+# ── The app ──────────────────────────────────────────────────────────────────
+
+# gm_app_dmg <version> — the staged path for a version's DMG. Printed, not
+# created; the caller makes the directory when it actually has bytes.
+gm_app_dmg() {
+    printf '%s\n' "$GM_APP_DOWNLOADS/$1/$GM_APP_NAME-$1.dmg"
+}
+
+# gm_installed_app_version — the version of the app ACTUALLY on disk, or `none`.
+#
+# Read from the installed bundle's Info.plist rather than from our own stamp
+# file. The stamp records what this library last installed; the bundle records
+# what is there now, and those differ the moment someone drags a build in by
+# hand. The question every caller is really asking is the second one.
+gm_installed_app_version() {
+    _plist="$GM_APP_DEST/$GM_APP_NAME.app/Contents/Info.plist"
+    if [ -f "$_plist" ]; then
+        defaults read "$_plist" CFBundleShortVersionString 2>/dev/null || echo unknown
+    else
+        echo none
+    fi
+}
+
+# gm_app_is_running — true if the app is up.
+#
+# Replacing a running bundle is the app-shaped version of the in-place-overwrite
+# trap documented at the top of this file: the running process keeps its open
+# inodes, the on-disk bundle becomes a mixture of two versions, and the symptom
+# is a crash on the next window it opens rather than an error here.
+gm_app_is_running() {
+    pgrep -x "$GM_APP_NAME" >/dev/null 2>&1
+}
+
+# gm_install_app <dmg> <version> — mount, copy out, swap into place.
+#
+# THE ONE WRITE OUTSIDE $GM_FS_ROOT in this library, and deliberately its own
+# function so that is visible at the call site.
+#
+# The swap is move-aside-then-move-in, never a copy over the top: see the
+# SIGKILL note at the top of this file, which applies to the app's Mach-O just
+# as it does to the daemon's. The staging copy is made INSIDE the destination
+# directory so the final rename is same-filesystem and effectively atomic — a
+# copy straight from the mounted image would cross devices and leave a
+# half-written bundle if it failed midway.
+gm_install_app() {
+    _dmg="$1"; _app_version="$2"
+    _app="$GM_APP_DEST/$GM_APP_NAME.app"
+
+    [ -f "$_dmg" ] || { echo "[GMB] ERROR: no DMG at $_dmg" >&2; return 1; }
+
+    if gm_app_is_running; then
+        echo "[GMB] ERROR: $GM_APP_NAME is running — quit it and re-run." >&2
+        echo "       Replacing a running app bundle corrupts it in ways that surface later." >&2
+        return 1
+    fi
+
+    if [ ! -d "$GM_APP_DEST" ] || [ ! -w "$GM_APP_DEST" ]; then
+        echo "[GMB] ERROR: $GM_APP_DEST is not writable." >&2
+        echo "       Install elsewhere with: GM_APP_DEST=\"\$HOME/Applications\"" >&2
+        return 1
+    fi
+
+    _mnt="$(mktemp -d "${TMPDIR:-/tmp}/gm-dmg.XXXXXX")"
+    if ! hdiutil attach "$_dmg" -nobrowse -readonly -quiet -mountpoint "$_mnt" >/dev/null 2>&1; then
+        rmdir "$_mnt" 2>/dev/null || true
+        echo "[GMB] ERROR: could not mount $_dmg" >&2
+        return 1
+    fi
+
+    _src="$_mnt/$GM_APP_NAME.app"
+    _new="$GM_APP_DEST/.$GM_APP_NAME.new.$$"
+    _old="$GM_APP_DEST/.$GM_APP_NAME.old.$$"
+    _rc=0
+
+    if [ ! -d "$_src" ]; then
+        echo "[GMB] ERROR: $_dmg does not contain $GM_APP_NAME.app" >&2
+        _rc=1
+    else
+        rm -rf "$_new"
+        # ditto, not cp -R: it preserves the bundle's extended attributes and
+        # resource forks, and a code signature does not survive without them.
+        ditto "$_src" "$_new" || _rc=1
+    fi
+
+    hdiutil detach "$_mnt" -quiet >/dev/null 2>&1 || hdiutil detach "$_mnt" -force -quiet >/dev/null 2>&1 || true
+    rmdir "$_mnt" 2>/dev/null || true
+
+    if [ "$_rc" -ne 0 ]; then
+        rm -rf "$_new"
+        return 1
+    fi
+
+    # A DMG fetched with curl can carry com.apple.quarantine, and a quarantined
+    # app opens a Gatekeeper dialog rather than launching. Cleared on the staged
+    # copy, before it becomes the live bundle.
+    xattr -dr com.apple.quarantine "$_new" 2>/dev/null || true
+
+    rm -rf "$_old"
+    if [ -d "$_app" ]; then
+        mv "$_app" "$_old" || { rm -rf "$_new"; echo "[GMB] ERROR: could not move the existing app aside" >&2; return 1; }
+    fi
+    if ! mv "$_new" "$_app"; then
+        # Put the old one back rather than leaving the machine with no app.
+        [ -d "$_old" ] && mv "$_old" "$_app"
+        rm -rf "$_new"
+        echo "[GMB] ERROR: could not move the new app into place" >&2
+        return 1
+    fi
+    rm -rf "$_old"
+
+    mkdir -p "$GM_APPS"
+    printf '%s\n' "$_app_version" > "$GM_APP_VERSION_STAMP"
+    echo "[GMB] $GM_APP_NAME $_app_version -> $_app"
+    return 0
 }

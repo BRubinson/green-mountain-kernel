@@ -86,9 +86,11 @@ CARE PACKAGE.
    writing it with `explore_key_file_add` / `explore_finding_add`, and
    sealing THAT row with `explore_complete`. Findings stay UNRANKED here —
    calibration is cross-agent and belongs to one reader. When every expected
-   row is complete: `prompt_set_status status: clarifying` (the primary's
-   call; it locks content and creates the clarification summary), then the
-   merged `gmcc:clarifier` pass.
+   row is complete, open the clarification summary yourself with
+   `gm_hook call CLARIFY_OPEN --json '{"prompt_uuid":"<prompt>"}'` — no status
+   move here; the prompt has been `initiated` since its briefing opened, and
+   the summary is no longer created as a side effect of a status change. Then
+   the merged `gmcc:clarifier` pass.
 3. **clarify_open** — the merged clarifier pass, one reader and one
    sequence, all pen: `explore_get` the whole record, ONE atomic prompt-wide
    `explore_rank`, then `bot_summary` with agent_type `synthesis` (the
@@ -124,7 +126,7 @@ CARE PACKAGE.
    then `care_package_complete` with `clarified_intent` = backstory + goal +
    detail, clarified. The intent lives ONLY here. Then
    `gm_hook call CLARIFY_FINALIZE --json '{"summary_uuid":"<clarification>","expected_version":V}'`
-   (a pure gate) and `prompt_set_status status: architecting`.
+   (a pure gate) and `gm_hook call ARCH_OPEN --json '{"prompt_uuid":"<prompt>"}'`.
 6. **arch_options** (team) — one architect per methodology. Each loads the
    clarified intent with `care_package_get` and writes its OWN proposal with
    `arch_option_add` (one row per `agent_name`). Once any option exists,
@@ -163,8 +165,7 @@ CARE PACKAGE.
    code is pure orchestration and never writes; the agents inside it hold
    the pen. `arch_get` audits progress (planned rows joined to what has
    actually been touched, plus the unplanned set).
-10. **review** — `prompt_set_status status: reviewing`, then
-    `gm_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'`.
+10. **review** — `gm_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'`.
     Reviewers scope themselves with `arch_get` and `file_change_list`, read
     the record with `review_get`, and write findings with
     `review_finding_add`, each rating its own. The primary then runs the one

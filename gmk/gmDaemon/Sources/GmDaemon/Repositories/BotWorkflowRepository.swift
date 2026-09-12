@@ -230,7 +230,10 @@ struct BotWorkflowRepository: RepositoryContext {
         let status = try promptStatus(promptUuid: promptUuid)
         let unmet: [String]
         switch current {
-        case .implement where status == "implementing":
+        // m0028: `implementing` is gone, so the scoping that suppressed this
+        // advisory on closed and historical prompts is now "started but not
+        // finished". Same intent, three-state vocabulary.
+        case .implement where status == "initiated":
             unmet = try WorkflowGates.implementExitUnmet(db, promptUuid: promptUuid)
         case .reviewFix where status != "done":
             unmet = try WorkflowGates.reviewFixExitUnmet(db, promptUuid: promptUuid)
@@ -320,17 +323,26 @@ struct BotWorkflowRepository: RepositoryContext {
                 """, arguments: [promptUuid]) ?? ""
             return body.isEmpty ? ["architecture summary body not written"] : []
         case .implement:
+            // ARCHITECTURE APPROVAL IS THE WHOLE GATE NOW.
+            //
+            // This used to ALSO require prompt.status to be implementing,
+            // reviewing or done — and it was the one place in the whole
+            // derivation that read prompt status at all. m0028 removed the
+            // states it named, and rather than rewriting the condition as
+            // `status == "initiated"` it is dropped: with three states,
+            // "initiated" means only that the prompt started, which every
+            // prompt that reached this phase necessarily did. The condition
+            // would be true whenever the phase could be reached, which is not a
+            // gate.
+            //
+            // What it was really enforcing — "a human approved the plan before
+            // anyone writes code" — is exactly what the approval check below
+            // says, and says without a second, weaker proxy for it.
             let approved = try Row.fetchOne(db, sql: """
                 SELECT 1 FROM architecture_summary
                 WHERE prompt_uuid = ? AND status = 'approved'
                 """, arguments: [promptUuid]) != nil
-            let status = try promptStatus(promptUuid: promptUuid)
-            var unmet: [String] = []
-            if !approved { unmet.append("architecture not approved") }
-            if status != "implementing" && status != "reviewing" && status != "done" {
-                unmet.append("prompt not implementing (mcp__plugin_gmcc_pen__prompt_set_status)")
-            }
-            return unmet
+            return approved ? [] : ["architecture not approved"]
         case .review:
             let opened = try Row.fetchOne(db, sql: """
                 SELECT 1 FROM review_summary WHERE prompt_uuid = ?

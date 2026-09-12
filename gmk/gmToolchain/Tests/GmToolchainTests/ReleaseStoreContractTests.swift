@@ -187,6 +187,131 @@ final class ReleaseStoreContractTests: XCTestCase {
             """)
     }
 
+    // MARK: - One release, one version
+
+    /// THE TAG NAMESPACE HAS EXACTLY ONE AUTHOR: `GM_TAG_PREFIX` in the shared
+    /// library. The publisher and the installer must not each carry their own
+    /// spelling of it.
+    ///
+    /// This is the failure the unified release was built to make impossible. The
+    /// two sides previously hardcoded `daemon-v` independently, so the publisher
+    /// and the installer agreed only by coincidence — and when the app was added
+    /// on its own `gmvibes-v*` tag, a third spelling appeared in a third script
+    /// that neither of the other two knew about. A literal tag prefix in either
+    /// script is that drift starting again.
+    func testTagPrefixIsDefinedOnceInTheSharedLibrary() throws {
+        let library = try String(
+            contentsOf: gmkScripts.appendingPathComponent("gm_releases.sh"), encoding: .utf8)
+        XCTAssertTrue(library.contains(#"GM_TAG_PREFIX="gm_kernel-v""#), """
+            gm_releases.sh no longer defines GM_TAG_PREFIX="gm_kernel-v". It is \
+            the single authority for the release namespace; both the publisher \
+            and the installer derive their tag from it.
+            """)
+
+        for script in [
+            gmkScripts.appendingPathComponent("publish_release.sh"),
+            pluginScripts.appendingPathComponent("install_gm.sh"),
+        ] {
+            let code = uncommented(try String(contentsOf: script, encoding: .utf8))
+            XCTAssertTrue(code.contains("GM_TAG_PREFIX"), """
+                \(script.lastPathComponent) does not use GM_TAG_PREFIX. The tag \
+                namespace must come from gm_releases.sh, not be spelled again here.
+                """)
+            XCTAssertFalse(code.contains(#"TAG="gm_kernel-v"#), """
+                \(script.lastPathComponent) hardcodes the tag prefix instead of \
+                using GM_TAG_PREFIX. Two spellings of one namespace is how the \
+                publisher and the installer drift apart; the symptom is a 404 \
+                that reads like a network problem.
+                """)
+        }
+    }
+
+    /// THE RELEASE CARRIES THE APP. A release with only binaries can upgrade
+    /// half a system: the user gets a new daemon and keeps whatever GMVibes they
+    /// had, with no record of which app went with which runtime.
+    func testPublishUploadsTheAppAlongsideTheBinaries() throws {
+        let code = uncommented(try String(
+            contentsOf: gmkScripts.appendingPathComponent("publish_release.sh"), encoding: .utf8))
+        XCTAssertTrue(code.contains("DMG_ASSET"), """
+            publish_release.sh no longer builds or uploads a DMG. The unified \
+            release exists so one tag carries the binaries AND the app at one \
+            version.
+            """)
+        XCTAssertTrue(code.contains("build-dmg.sh"), """
+            publish_release.sh no longer invokes build-dmg.sh. The app has no \
+            staging step of its own, so publish is where it gets built.
+            """)
+    }
+
+    /// NOTARIZATION IS A GATE, NOT A WARNING. An ad-hoc DMG runs only on the
+    /// machine that built it; Gatekeeper refuses it everywhere else with
+    /// "GMVibes is damaged", which is neither true nor actionable. The retired
+    /// `release.sh` would publish one with a note telling recipients to strip
+    /// quarantine by hand.
+    func testPublishRefusesAnUnsignedAppUnlessAsked() throws {
+        let code = uncommented(try String(
+            contentsOf: gmkScripts.appendingPathComponent("publish_release.sh"), encoding: .utf8))
+        XCTAssertTrue(code.contains("--allow-adhoc"), """
+            publish_release.sh no longer has an --allow-adhoc escape hatch, which \
+            means it either refuses always or refuses never. Both are wrong: a \
+            private test release is real, and it has to be asked for.
+            """)
+        XCTAssertTrue(code.contains("Developer ID Application"), """
+            publish_release.sh no longer checks for a Developer ID before \
+            building the DMG. Without that check an ad-hoc build ships silently \
+            and is Gatekeeper-blocked for every recipient.
+            """)
+    }
+
+    /// The app version is STAMPED from `gmk/VERSION`, never read out of the
+    /// project file. One release, one number — and a build that rewrote
+    /// project.pbxproj would dirty the tree publish requires to be clean.
+    func testTheAppVersionIsStampedFromTheVersionPin() throws {
+        let code = uncommented(try String(
+            contentsOf: gmkScripts.appendingPathComponent("build-dmg.sh"), encoding: .utf8))
+        XCTAssertTrue(code.contains(#"MARKETING_VERSION="$VERSION""#), """
+            build-dmg.sh no longer overrides MARKETING_VERSION from gmk/VERSION. \
+            Without the stamp the app carries a hand-edited version that can \
+            disagree with the tag it ships under.
+            """)
+        XCTAssertFalse(code.contains("project.pbxproj"), """
+            build-dmg.sh reads the version out of project.pbxproj again. \
+            gmk/VERSION is the pin for the binaries AND the app; reading the \
+            project file reintroduces the second number the unified release removed.
+            """)
+    }
+
+    /// `release.sh` is RETIRED and must stay that way. It published the app on
+    /// its own tag with its own version — the exact split the unified release
+    /// removed. It is kept as a signpost, so it has to keep refusing.
+    func testTheAppOnlyReleasePathStaysRetired() throws {
+        let path = gmkScripts.appendingPathComponent("release.sh")
+        let text = try String(contentsOf: path, encoding: .utf8)
+        let code = uncommented(text)
+        XCTAssertFalse(code.contains("gh release create"), """
+            gmk/scripts/release.sh creates a GitHub release again. The app is \
+            published by publish_release.sh inside the unified gm_kernel-v* \
+            release; a second publisher means two tags and two version numbers \
+            with no recorded relationship.
+            """)
+        XCTAssertTrue(code.contains("exit 2"), """
+            gmk/scripts/release.sh no longer refuses. It is a signpost kept so \
+            that calling it explains where the capability went rather than \
+            failing with "command not found".
+            """)
+    }
+
+    /// Strips comment lines so a substring search tests the CODE, not the
+    /// explanation above it. Several headers in these scripts necessarily name
+    /// the thing they forbid.
+    private func uncommented(_ text: String) -> String {
+        text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map(String.init)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("#") }
+            .joined(separator: "\n")
+    }
+
     /// The MCP launcher NEVER builds or installs. It used to build inline,
     /// which put a cold release build on the connect path: the session spent
     /// its handshake budget in bash and then ran with no pen, which is

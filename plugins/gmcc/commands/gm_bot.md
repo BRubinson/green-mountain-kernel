@@ -76,7 +76,8 @@ will look like it worked.
   care package — the clarified picture stays in your context.
 - Architecture: design in context; persistence rows first (change kinds +
   dope refs); propose → user sign-off with the full persistence delta
-  table → approve → set-status implementing.
+  table → approve. No status move: the prompt was stamped `initiated` when
+  its briefing opened and next moves to `done`.
 - Implement in context (persistence first; capture is the PostToolUse hook
   alone), review in context against your general review summary, complete
   with a verdict, run the fix loop, set-status done.

@@ -16,15 +16,17 @@ func makePrimaryDoorTools() -> [Tool] { [
     Tool(
         name: "prompt_set_status",
         description: """
-            THE ONLY DOOR THAT MOVES A PROMPT. draft → clarifying → architecting → \
-            implementing → reviewing → done. Creates the phase's backing summary as a side \
-            effect, and claims (or on `done`, releases) the prompt's activation for this \
-            instance. Primary only.
+            THE ONLY DOOR THAT MOVES A PROMPT. draft → initiated → done, plus done → \
+            draft to re-open a finished prompt for editing. Claims (or on `done`, releases) \
+            the prompt's activation for this instance. It does NOT create summaries — open \
+            each phase's own row with CLARIFY_OPEN / ARCH_OPEN / REVIEW_OPEN. In practice \
+            BRIEFING_OPEN already stamped draft → initiated for you, so the call you \
+            usually make here is `done`. Primary only.
             """,
         params: [
             ("prompt_uuid", "string", "The prompt to move", true),
             ("expected_version", "number", "The prompt version this write is based on", true),
-            ("status", "string", "clarifying | architecting | implementing | reviewing | done", true),
+            ("status", "string", "initiated | done | draft (draft re-opens a finished prompt)", true),
         ],
         run: { args, client in
             let raw = try args.string("status")

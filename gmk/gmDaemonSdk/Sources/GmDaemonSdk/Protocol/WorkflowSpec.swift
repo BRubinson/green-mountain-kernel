@@ -24,6 +24,25 @@ import Foundation
 /// BotWorkflowRepository against these codes, and a new phase or variant is an
 /// entry here rather than a schema change.
 ///
+/// PHASE IS NOT PROMPT STATUS, and m0028 made the distinction load-bearing
+/// rather than merely true. The prompt row now carries three states —
+/// draft / initiated / done — while this file still describes twelve phases.
+/// That is not a mismatch: the phases are derived from evidence rather than read
+/// off the prompt, which is what let the four middle states go without the
+/// machine losing its place.
+///
+/// ONE EXCEPTION EXISTED and is worth naming rather than rounding off, because
+/// "derivation never reads status" is the kind of claim that gets repeated until
+/// someone relies on it: the `implement` ENTRY GATE also required the prompt to
+/// be in `implementing`. m0028 dropped that condition rather than restating it
+/// as `initiated` — with three states it would have been true whenever the phase
+/// was reachable, which is not a gate. Architecture approval, which is what the
+/// condition was a proxy for, remains the real one. The practical consequence
+/// for the prose below is that the mid-workflow `set-status` calls are GONE:
+/// the prompt is stamped initiated when its briefing opens, and the next status
+/// move it makes is to done. Phase boundaries are crossed by opening and sealing
+/// the phase's own rows, which is what they always actually meant.
+///
 /// Instruction prose is compiled into the binary and drift-guarded by
 /// WorkflowSpecTests, which asserts more than presence: WHERE A PEN TOOL
 /// EXISTS, THE PROSE MUST NAME THE PEN TOOL. This text is served verbatim
@@ -120,11 +139,12 @@ public enum WorkflowSpec {
             mcp__plugin_gmcc_pen__explore_finding_add write it, and \
             mcp__plugin_gmcc_pen__explore_complete seals THAT row. Leave the findings \
             unranked here — calibration is cross-agent and belongs to one reader.
-            When every expected row is complete: mcp__plugin_gmcc_pen__prompt_set_status status: clarifying \
-            (the primary's call; it creates the clarification summary), then \
-            \(clarifierNote) for the merged pass — rank, seal the synthesis row, then \
-            author the question and note suite. Sealing synthesis is what moves the \
-            machine into clarify_open.
+            When every expected row is complete, \(clarifierNote) for the merged pass — \
+            rank, seal the synthesis row, then author the question and note suite. Sealing \
+            synthesis is what moves the machine into clarify_open. Open the clarification \
+            summary yourself with gm_hook call CLARIFY_OPEN --json \
+            '{"prompt_uuid":"<prompt>"}' — it is no longer created for you by a \
+            status move.
             """
         case .clarifyOpen:
             return """
@@ -160,7 +180,8 @@ public enum WorkflowSpec {
                  When every question is answered or skipped: gm_hook call \
                 CLARIFY_FINALIZE --json \
                 '{"summary_uuid":"<clarification>","expected_version":V}' (pure gate), \
-                then mcp__plugin_gmcc_pen__prompt_set_status status: architecting.
+                then open the architecture summary with gm_hook call ARCH_OPEN --json \
+                '{"prompt_uuid":"<prompt>"}'.
                 """
             }
             return text
@@ -175,7 +196,7 @@ public enum WorkflowSpec {
             lives ONLY here — it is never written back to the prompt row. Then \
             gm_hook call CLARIFY_FINALIZE --json \
             '{"summary_uuid":"<clarification>","expected_version":V}' (pure gate) and \
-            mcp__plugin_gmcc_pen__prompt_set_status status: architecting.
+            gm_hook call ARCH_OPEN --json '{"prompt_uuid":"<prompt>"}'.
             """
         case .archOptions:
             return """
@@ -218,9 +239,10 @@ public enum WorkflowSpec {
             gm_hook call ARCH_PROPOSE --json '{"summary_uuid":"S","expected_version":V}', \
             then present the plan for user sign-off — ALWAYS include the full persistence \
             delta table (positive AND negative changes, dope refs shown). Approve → \
-            gm_hook call ARCH_APPROVE --json '{"summary_uuid":"S","expected_version":V}' \
-            + mcp__plugin_gmcc_pen__prompt_set_status status: implementing (it claims the \
-            activation). Modify → gm_hook call ARCH_REVISE --json \
+            gm_hook call ARCH_APPROVE --json '{"summary_uuid":"S","expected_version":V}'. \
+            The prompt's status does not move here: it was claimed as initiated when its \
+            briefing opened, and the next move it makes is to done. Modify → gm_hook call \
+            ARCH_REVISE --json \
             '{"summary_uuid":"S","expected_version":V}' and return to architecture.
             """
         case .implement:
@@ -265,8 +287,7 @@ public enum WorkflowSpec {
             case .team: spawn = "Run the review workflow — one reviewer per methodology."
             }
             return """
-            mcp__plugin_gmcc_pen__prompt_set_status status: reviewing, then open the \
-            summary: gm_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'. \
+            Open the summary: gm_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'. \
             \(spawn) Reviewers scope themselves with mcp__plugin_gmcc_pen__arch_get and \
             mcp__plugin_gmcc_pen__file_change_list, read the record so far with \
             mcp__plugin_gmcc_pen__review_get, and write their findings with \

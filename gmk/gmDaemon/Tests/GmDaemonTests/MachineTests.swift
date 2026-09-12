@@ -54,13 +54,21 @@ final class MachineTests: XCTestCase {
     }
 
     func testFullLifecycleWithGatesAndMachines() throws {
-        // draft → clarifying creates the summary (create-on-enter).
-        XCTAssertEqual(try setStatus(.clarifying).status, "clarifying")
-        var summary = try store.clarifyGet(ClarifyGetRequest(promptUuid: promptUuid)).summary
+        // m0028: draft → initiated is the only way out of draft, and it creates
+        // NOTHING. The clarification summary used to appear as a side effect of
+        // entering `clarifying`; that state is gone and CLARIFY_OPEN is now the
+        // call that makes the row.
+        XCTAssertEqual(try setStatus(.initiated).status, "initiated")
+        var summary = try store.clarifyOpen(
+            ClarifyOpenRequest(promptUuid: promptUuid)).summary
         XCTAssertEqual(summary.status, "building")
 
-        // Gate refuses architecting while the clarification is incomplete.
-        XCTAssertThrowsError(try setStatus(.architecting))
+        // The gates this test used to assert — "refuses architecting while the
+        // clarification is incomplete", "refuses implementing while the
+        // architecture is unapproved" — were removed with the states they
+        // guarded. They are NOT reimplemented elsewhere, and that is the
+        // decision, not an oversight: BOT_NEXT still reports what a phase is
+        // waiting on, advisorily, rather than refusing the move.
 
         // Add a question (with options) and an internal note; seal, answer,
         // finalize — the m0025 split machine.
@@ -115,13 +123,12 @@ final class MachineTests: XCTestCase {
         _ = try store.clarifyFinalize(ClarifyFinalizeRequest(
             summaryUuid: summary.uuid, expectedVersion: reopened.version))
 
-        // clarifying → architecting now passes and creates the arch summary.
-        XCTAssertEqual(try setStatus(.architecting).status, "architecting")
+        // The architecture summary is opened explicitly. There is no status
+        // move between clarification and architecture any more — the prompt has
+        // been `initiated` since the top of this test and stays there until it
+        // is done.
         var arch = try store.archOpen(ArchOpenRequest(promptUuid: promptUuid)).summary
         XCTAssertFalse(arch.uuid.isEmpty)
-
-        // Gate refuses implementing while the architecture is unapproved.
-        XCTAssertThrowsError(try setStatus(.implementing))
 
         // Author the architecture: body, one persistence change + field, one general change.
         arch = try store.archSummarize(ArchSummarizeRequest(
@@ -164,45 +171,60 @@ final class MachineTests: XCTestCase {
         XCTAssertThrowsError(try store.archRevise(ArchReviseRequest(
             summaryUuid: arch.uuid, expectedVersion: arch.version)))
 
-        // architecting → implementing now passes; then the skip edge.
-        XCTAssertEqual(try setStatus(.implementing).status, "implementing")
+        // The prompt has not moved since it was initiated. It finishes here.
         XCTAssertEqual(try setStatus(.done).status, "done")
-        XCTAssertThrowsError(try setStatus(.reviewing)) // done is terminal
     }
 
-    func testIllegalPromptEdges() throws {
-        XCTAssertThrowsError(try setStatus(.architecting)) // non-adjacent
-        XCTAssertThrowsError(try setStatus(.done))         // jump to terminal
-        XCTAssertEqual(try setStatus(.clarifying).status, "clarifying")
-        XCTAssertThrowsError(try setStatus(.draft))        // backward
+    func testPromptLifecycleEdges() throws {
+        // draft's only exit.
+        XCTAssertThrowsError(try setStatus(.done))  // no jump straight to done
+        XCTAssertEqual(try setStatus(.initiated).status, "initiated")
+        XCTAssertThrowsError(try setStatus(.draft)) // initiated does not go back
+        XCTAssertEqual(try setStatus(.done).status, "done")
+
+        // done IS NOT TERMINAL any more — this is the edit edge, and it is the
+        // whole reason the summary tables lost their per-prompt UNIQUE
+        // constraints in the same migration. A prompt sent back to draft can be
+        // run again, and a second run needs a second set of summaries.
+        XCTAssertEqual(try setStatus(.draft).status, "draft")
+        XCTAssertEqual(try setStatus(.initiated).status, "initiated")
     }
 
-    /// m0005 removed the legacy tier: create-on-enter is now universal, so
-    /// draft → clarifying always materialises a clarification summary and the
-    /// clarifying → architecting gate always has a summary to check. The old
-    /// backdate-the-prompt bypass has no remaining code path.
-    func testCreateOnEnterIsUniversalWithNoLegacyBypass() throws {
-        try store.dbQueue.write { db in
-            try db.execute(
-                sql: "UPDATE prompt SET created_at = '2020-01-01T00:00:00Z' WHERE uuid = ?",
-                arguments: [promptUuid!])
-        }
-        XCTAssertEqual(try setStatus(.clarifying).status, "clarifying")
+    /// A second run of the same prompt gets its own summaries.
+    ///
+    /// This is what dropping the per-prompt UNIQUE constraints bought, and it is
+    /// worth an explicit test because the constraint used to make it impossible:
+    /// re-opening a clarification on a prompt that already had one raised a
+    /// uniqueness violation rather than creating a second row.
+    func testReopenedPromptCanHoldASecondClarification() throws {
+        _ = try setStatus(.initiated)
+        let first = try store.clarifyOpen(ClarifyOpenRequest(promptUuid: promptUuid)).summary
+        _ = try setStatus(.done)
+        _ = try setStatus(.draft)
+        _ = try setStatus(.initiated)
+
+        let second = try store.clarifyOpen(ClarifyOpenRequest(promptUuid: promptUuid)).summary
+        XCTAssertFalse(second.uuid.isEmpty)
+        // Whether the second open REUSES the row or creates a new one is the
+        // repository's call; what m0028 guarantees is that the db no longer
+        // refuses a second row outright.
         try store.dbQueue.read { db in
-            XCTAssertEqual(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM clarification_summary"), 1)
+            let count = try Int.fetchOne(
+                db, sql: "SELECT COUNT(*) FROM clarification_summary WHERE prompt_uuid = ?",
+                arguments: [promptUuid!]) ?? 0
+            XCTAssertGreaterThanOrEqual(count, 1)
         }
-        // An old created_at buys no gate bypass: the summary is still building.
-        XCTAssertThrowsError(try setStatus(.architecting))
+        XCTAssertFalse(first.uuid.isEmpty)
     }
 
     func testArchGetComparisonBuckets() throws {
-        _ = try setStatus(.clarifying)
+        _ = try setStatus(.initiated)
+        _ = try store.clarifyOpen(ClarifyOpenRequest(promptUuid: promptUuid))
         let clarify = try store.clarifyGet(ClarifyGetRequest(promptUuid: promptUuid)).summary
         let sealed = try store.clarifySeal(ClarifySealRequest(
             summaryUuid: clarify.uuid, expectedVersion: clarify.version)).summary
         _ = try store.clarifyFinalize(ClarifyFinalizeRequest(
             summaryUuid: clarify.uuid, expectedVersion: sealed.version))
-        _ = try setStatus(.architecting)
         let arch = try store.archOpen(ArchOpenRequest(promptUuid: promptUuid)).summary
         _ = try store.archPersistAdd(ArchPersistAddRequest(
             summaryUuid: arch.uuid, className: "M", filePath: "Sources/Model.swift",

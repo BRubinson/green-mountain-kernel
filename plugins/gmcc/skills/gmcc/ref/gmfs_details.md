@@ -196,10 +196,13 @@ file is fine; re-register to refresh the note.)
 
 ## Prompt Lifecycle
 
-Statuses are lowercase: `draft → clarifying → architecting → implementing
-→ reviewing → done`, forward-only + adjacent-only with one skip edge
-`implementing → done` (reviewing optional); `INVALID_TRANSITION`
-otherwise. Content edits are draft-only (`CONTENT_LOCKED` after).
+Statuses are lowercase and there are THREE: `draft → initiated → done`,
+plus `done → draft` to re-open a finished prompt for editing;
+`INVALID_TRANSITION` otherwise. Content edits are draft-only
+(`CONTENT_LOCKED` after) — which is also what makes the reverse edge useful.
+
+Status says only whether a prompt is unstarted, running, or finished. WHERE
+it is in the workflow is derived from db evidence at every `bot_next`.
 Gates: entering `clarifying` creates the clarification summary;
 `clarifying → architecting` requires it complete; `architecting →
 implementing` requires the architecture approved. There is no bypass — an
@@ -211,17 +214,26 @@ absent backing row fails the gate.
    from the session row. Never split, infer, or author these fields. Then
    `mkdir -p prompts/{seq}_{name}/memory/` from the returned
    `gmfs_relative_storage_path`.
-2. **clarifying** — enter with `prompt_set_status status: clarifying` (it
-   locks content and the daemon creates the summary). The clarifier then
-   writes `clarify_question_add` (+ option rows) and `clarify_note_add`;
-   the primary seals with `CLARIFY_SEAL`; the user answers via
-   `CLARIFY_ANSWER` (`selected_option_uuids` / `answer_text` / `skip`);
+2. **initiated** — the prompt leaves draft when its briefing opens
+   (`BRIEFING_OPEN` stamps it, daemon-side and idempotently); loading a prompt
+   never moves it. Everything from briefing through review happens in this one
+   state, and each phase opens its OWN summary rather than getting one as a side
+   effect of a status change: `CLARIFY_OPEN`, `ARCH_OPEN`, `REVIEW_OPEN`.
+   The clarifier writes `clarify_question_add` (+ option rows) and
+   `clarify_note_add`; the primary seals with `CLARIFY_SEAL`; the user answers
+   via `CLARIFY_ANSWER` (`selected_option_uuids` / `answer_text` / `skip`);
    optional care package; `CLARIFY_FINALIZE` is a PURE GATE — nothing ever
-   writes prompt content past draft (STAY TRUE).
-3. **architecting → implementing → reviewing → done** — architecture rows
+   writes prompt content past draft (STAY TRUE). Then architecture rows
    (persistence first) → `ARCH_PROPOSE`/`ARCH_APPROVE` → implement (the
-   PostToolUse hook captures every edit) → optional review → done,
-   threading `expected_version` through each step.
+   PostToolUse hook captures every edit) → optional review, threading
+   `expected_version` through each step.
+3. **done** — `prompt_set_status status: done` releases the activation claim and
+   closes the workflow row. `done → draft` is legal and is how a finished prompt
+   is re-opened for editing; a second run gets its own summaries.
+
+**Where a prompt is in its workflow is NOT its status.** Phase is derived from
+db evidence at every `bot_next` — twelve phases against three states — so ask
+the machine rather than reading `prompt.status`.
 
 Resume across sessions is `prompt_init` with the prompt's selector, then
 `bot_next`: status, content and artifact pointers all come back from the

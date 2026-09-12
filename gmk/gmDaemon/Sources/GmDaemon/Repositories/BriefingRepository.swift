@@ -81,14 +81,47 @@ struct BriefingRepository: RepositoryContext {
         }
 
         // A prompt-owned open also claims the activation for the calling
-        // instance (review finding 5f68f01d): briefings are consumed in
-        // the draft/architecting phases, long before set-status
-        // implementing would claim — and the claim is what makes every
-        // downstream agent's zero-uuid pull deterministic.
+        // instance (review finding 5f68f01d): briefings are consumed at the
+        // very start of a run, and the claim is what makes every downstream
+        // agent's zero-uuid pull deterministic.
         if let promptUuid, let clientKey = req.clientKey {
             try SessionRepository(db: db, core: core).claimActivation(
                 sessionUuid: sessionUuid,
                 promptUuid: promptUuid, clientKey: clientKey)
+        }
+
+        // m0028: opening a prompt's briefing is what STARTS it — draft →
+        // initiated, here, rather than through a set-status call an agent has
+        // to remember to make.
+        //
+        // THIS CALL, AND NOT LOADING THE PROMPT. Loading is a pure read and has
+        // to stay one; a read that advances the prompt means merely inspecting
+        // one moves it, and in an append-only db that mistake is not
+        // retractable. Opening a briefing is the first act of actual work, so
+        // it is the honest place for the transition.
+        //
+        // Written as a guarded UPDATE rather than a read-then-write: it is
+        // idempotent by construction (a prompt already initiated or done
+        // matches nothing), it cannot race, and it deliberately does NOT go
+        // through setStatus — that door checks an expected_version this caller
+        // has no business holding, and BRIEFING_OPEN is not a lifecycle verb.
+        if let promptUuid {
+            try db.execute(
+                sql: """
+                    UPDATE prompt
+                       SET status = 'initiated', updated_at = ?, version = version + 1
+                     WHERE uuid = ? AND status = 'draft';
+                    """,
+                arguments: [Store.isoNow(), promptUuid])
+            if db.changesCount > 0 {
+                try core.appendEvent(
+                    db, kind: .promptStatusChange, subjectUuid: promptUuid,
+                    payload: Store.jsonPayload([
+                        "from": PromptStatus.draft.rawValue,
+                        "to": PromptStatus.initiated.rawValue,
+                        "via": "briefing_open",
+                    ]))
+            }
         }
 
         if let existing = try fetchBriefingRow(

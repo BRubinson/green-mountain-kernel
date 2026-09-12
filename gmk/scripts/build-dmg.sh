@@ -9,10 +9,25 @@
 #   • Otherwise the app is ad-hoc signed and packaged into a DMG that works
 #     today — recipients clear Gatekeeper quarantine once (see README).
 #
+# ── THE VERSION COMES FROM gmk/VERSION, NOT FROM THE PROJECT FILE ────────────
+#
+# One release, one number. `gmk/VERSION` pins the three binaries and the app
+# together, and MARKETING_VERSION is STAMPED from it at archive time rather than
+# read out of project.pbxproj. Before this the app carried an independently
+# edited MARKETING_VERSION and shipped under its own `gmvibes-v*` tag, so the
+# app's About box and the installed runtime could disagree with nothing to
+# notice. The stamp is a build setting override, so project.pbxproj is never
+# rewritten and the working tree stays clean for publish_release.sh's check.
+#
 # Usage:
-#   scripts/build-dmg.sh                 # build (auto-detect signing)
+#   scripts/build-dmg.sh                 # build at gmk/VERSION (auto-detect signing)
+#   scripts/build-dmg.sh 50.0.2          # build at an explicit version
 #   NOTARIZE=1 scripts/build-dmg.sh      # also notarize + staple (needs Dev ID
 #                                        # + a `notarytool` keychain profile)
+#
+# Output: build/GMVibes-<version>.dmg — the name carries the version because it
+# becomes a release asset, and an asset named GMVibes.dmg forces every installer
+# to guess what is inside it.
 #
 # Notarization prerequisites (one-time):
 #   xcrun notarytool store-credentials gmcc-ui \
@@ -33,10 +48,14 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-gmcc-ui}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+VERSION="${1:-$(cat "$ROOT/VERSION")}"
+VERSION="${VERSION#v}"
+[ -n "$VERSION" ] || { echo "error: no version — gmk/VERSION is empty and none was passed" >&2; exit 1; }
+
 BUILD_DIR="$ROOT/build"
 ARCHIVE="$BUILD_DIR/$APP_NAME.xcarchive"
 STAGE="$BUILD_DIR/dmg"
-DMG_PATH="$BUILD_DIR/$APP_NAME.dmg"
+DMG_PATH="$BUILD_DIR/$APP_NAME-$VERSION.dmg"
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
@@ -46,12 +65,22 @@ DEV_ID="$(security find-identity -v -p codesigning 2>/dev/null \
   | grep "Developer ID Application" | head -1 \
   | sed -E 's/.*"(Developer ID Application: [^"]+)".*/\1/' || true)"
 
-echo "==> Archiving $SCHEME ($CONFIG)…"
+# BRACES ARE LOAD-BEARING HERE. The `…` that follows is multi-byte, and bash
+# absorbs its leading byte into an unbraced variable name — `$VERSION…` expands
+# a name that does not exist, which under `set -u` kills the script on a line
+# that is only printing a message.
+echo "==> Archiving $SCHEME ($CONFIG) at ${VERSION}…"
+# MARKETING_VERSION/CURRENT_PROJECT_VERSION are overridden on the command line
+# rather than written into project.pbxproj: the number lives in gmk/VERSION, and
+# a build that edits the project file would dirty the tree that
+# publish_release.sh requires to be clean.
 xcodebuild archive \
   -project "$PROJECT" \
   -scheme "$SCHEME" \
   -configuration "$CONFIG" \
   -archivePath "$ARCHIVE" \
+  MARKETING_VERSION="$VERSION" \
+  CURRENT_PROJECT_VERSION="$VERSION" \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGNING_ALLOWED=NO \
   | grep -E "^(===|\*\*|note:|error:|warning:)" || true

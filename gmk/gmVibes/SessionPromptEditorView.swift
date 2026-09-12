@@ -561,12 +561,18 @@ private struct PromptEditorPane: View {
                     reports: !isDraft || reportsEvidence(fresh))
             }
         }
-        // Status transitions (draft→clarifying→…→done) flip `editable` via
+        // Status transitions (draft → initiated → done) flip `editable` via
         // the stub. Store refresh + reconciliation ride the .prompt event arm
         // (PROMPT_STATUS_CHANGE routes there) — this handler only re-seeds
         // emphasis and fetches phases with a FRESH capture: the event loop's
         // captured self can hold a stale pre-transition status, so its
-        // `phasesApply` misses the draft → clarifying boundary.
+        // `phasesApply` misses the draft → initiated boundary.
+        //
+        // m0028 made that boundary FIRE MORE OFTEN THAN IT LOOKS. draft →
+        // initiated is now stamped daemon-side by BRIEFING_OPEN rather than by
+        // an explicit set-status, so this handler runs on a call that never
+        // mentions status at all. Re-seeding from a fresh capture is what keeps
+        // that correct.
         .onChange(of: stub.status) { _, _ in
             seedPhaseExpansion()
             Task { await phases.refresh(lifecyclePhases: phasesApply) }
@@ -800,31 +806,38 @@ private struct PromptEditorPane: View {
     /// never overridden except on a status change (which re-seeds
     /// deliberately — emphasis follows the phase, not accumulation).
     private func seedPhaseExpansion() {
-        switch PromptStatus(rawValue: stub.status) {
-        case .draft:
-            // Exploration is the one report that legally runs at draft
-            // (explicit-only open) — emphasize it, not clarify/arch.
-            exploreExpanded = true
-            clarifyExpanded = false
-            archExpanded = false
-            reviewExpanded = false
-        case .clarifying:
-            clarifyExpanded = true
-            archExpanded = false
-            exploreExpanded = false
-            reviewExpanded = false
-        case .architecting, .implementing:
-            archExpanded = true
-            clarifyExpanded = false
-            exploreExpanded = false
-            reviewExpanded = false
-        case .reviewing:
+        // FOLLOWS THE EVIDENCE, NOT THE STATUS. This used to switch over six
+        // lifecycle states, one section each. m0028 left three, and `initiated`
+        // covers everything between start and finish — so status can no longer
+        // say which section to emphasise.
+        //
+        // The reports stub already carries the answer and always did: the
+        // furthest-along report that EXISTS is the one the prompt is actually
+        // working on, which is the same thing the old status was a proxy for.
+        // Checked in reverse phase order so the latest wins.
+        exploreExpanded = false
+        clarifyExpanded = false
+        archExpanded = false
+        reviewExpanded = false
+
+        guard PromptStatus(rawValue: stub.status) != .done else {
+            // Finished: the review is the conclusion, and its absence means
+            // there is nothing more recent to show than the plan.
+            if stub.reports?.review != nil { reviewExpanded = true } else { archExpanded = true }
+            return
+        }
+
+        if stub.reports?.review != nil {
             reviewExpanded = true
-            clarifyExpanded = false
-            archExpanded = false
-            exploreExpanded = false
-        default:
-            break
+        } else if stub.reports?.architecture != nil {
+            archExpanded = true
+        } else if stub.reports?.clarification != nil {
+            clarifyExpanded = true
+        } else {
+            // Nothing yet, or exploration only. Exploration is the one report
+            // that legally runs at draft (explicit-only open), so it is the
+            // right thing to emphasise for an unstarted prompt too.
+            exploreExpanded = true
         }
     }
 

@@ -88,12 +88,18 @@ final class MigrationTests: XCTestCase {
             XCTAssertEqual(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM prompt_active_kbite"), 1)
             XCTAssertEqual(try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM file_change"), 1)
 
-            // Status mapping: clarified → done; draft/clarifying untouched.
+            // Status mapping, now the composition of TWO migrations — this runs
+            // the whole migrator, so what it observes is m0002's mapping with
+            // m0028's remap applied on top:
+            //   m0002: clarified → done, draft and clarifying untouched
+            //   m0028: clarifying → initiated
+            // prompt-c is the one that shows the second hop. prompt-a and
+            // prompt-b are unchanged by m0028 because done and draft survive it.
             let statuses = try Row.fetchAll(db, sql: "SELECT uuid, status, version FROM prompt ORDER BY uuid")
                 .map { ($0["uuid"] as String, $0["status"] as String, $0["version"] as Int64) }
             XCTAssertEqual(statuses[0].0, "prompt-a"); XCTAssertEqual(statuses[0].1, "done")
             XCTAssertEqual(statuses[1].0, "prompt-b"); XCTAssertEqual(statuses[1].1, "draft")
-            XCTAssertEqual(statuses[2].0, "prompt-c"); XCTAssertEqual(statuses[2].1, "clarifying")
+            XCTAssertEqual(statuses[2].0, "prompt-c"); XCTAssertEqual(statuses[2].1, "initiated")
             // Versions copied verbatim (rebuild is not a write).
             XCTAssertEqual(statuses[0].2, 3)
 
@@ -120,7 +126,11 @@ final class MigrationTests: XCTestCase {
                 db, sql: "SELECT sql FROM sqlite_master WHERE name = 'prompt'") ?? ""
             XCTAssertTrue(promptSql.contains("UNIQUE(session_uuid, code)"))
             XCTAssertTrue(promptSql.contains("UNIQUE(session_uuid, seq)"))
-            XCTAssertTrue(promptSql.contains("'architecting'"))
+            // The status CHECK survives m0028's rebuild too, carrying the NEW
+            // three-state vocabulary. Asserting the old spelling here would be
+            // asserting that m0028 did not run.
+            XCTAssertTrue(promptSql.contains("'initiated'"))
+            XCTAssertFalse(promptSql.contains("'architecting'"))
 
             // sqlite_sequence stays monotonic (max id was 3 before and after).
             let seqValue = try Int.fetchOne(
@@ -810,8 +820,11 @@ final class MigrationTests: XCTestCase {
                 db, sql: "SELECT name FROM sqlite_master WHERE type = 'index'"))
             XCTAssertTrue(indexes.contains("idx_prompt_session_uuid"))
 
+            // m0028 lands on top of m0027, so the ledger HEAD is 28 even in a
+            // test about m0027. What this test still owns is the assertion
+            // above: the rename preserved values and left the indexes alone.
             XCTAssertEqual(
-                try Int.fetchOne(db, sql: "SELECT MAX(version) FROM schema_migrations"), 27)
+                try Int.fetchOne(db, sql: "SELECT MAX(version) FROM schema_migrations"), 28)
         }
     }
 }

@@ -137,30 +137,56 @@ public enum ChangeKind: String, Codable, Hashable, CaseIterable, Sendable {
     case rename
 }
 
-/// Prompt lifecycle v2. Transitions are forward-only and adjacent-only, with
-/// exactly one skip edge (reviewing is optional):
-/// draft → clarifying → architecting → implementing → reviewing → done
-///                                          └───────── skip ───────↗
-/// Legacy note: the old terminal `clarified` was mapped to `done` by m0002.
+/// Prompt lifecycle v3 (m0028). THREE states, and a cycle rather than a ladder:
+///
+///     draft ⇄ initiated → done
+///       ↖──────────────────┘
+///
+/// WHY THE MIDDLE STATES WENT AWAY. The old ladder was
+/// draft → clarifying → architecting → implementing → reviewing → done, and it
+/// mostly duplicated information the machine derived anyway: phase comes from db
+/// evidence at every BOT_NEXT with no stored cursor, so `clarifying` was not
+/// what made the clarify phase current — the clarification summary's existence
+/// was. What the four middle arms actually did was gate: each transition
+/// demanded its predecessor's backing summary be complete. That is the part
+/// being retired, so the states that existed to carry it went with it.
+///
+/// It was not quite true that NOTHING read the status: the `implement` entry
+/// gate required `implementing` as a second, weaker proxy for "the plan was
+/// approved". m0028 dropped that condition rather than rewriting it, since with
+/// three states it would hold whenever the phase was reachable. Architecture
+/// approval is the gate that survived, and it is the one that was doing the
+/// work.
+///
+/// `done` IS NOT TERMINAL any more. done → draft is the edit edge: a finished
+/// prompt is re-opened by sending it back to draft, which is why the summary
+/// tables lost their per-prompt UNIQUE constraints in the same migration — a
+/// second run needs a second summary.
+///
+/// Legacy notes: the old terminal `clarified` was mapped to `done` by m0002;
+/// m0028 maps all four retired arms to `initiated`. Naming them here is legal
+/// under the retired-name contract for the same reason the wire-version note
+/// is — a record of a retirement has to be able to say what was retired.
 public enum PromptStatus: String, Codable, Hashable, CaseIterable, Sendable {
+    /// Not started, or sent back for editing.
     case draft
-    case clarifying
-    case architecting
-    case implementing
-    case reviewing
+    /// The single working state. Stamped by BRIEFING_OPEN, not by an agent —
+    /// whatever phase the prompt is in, the row says only that it is running.
+    case initiated
+    /// Finished. Releases the activation claim and closes the workflow row.
     case done
 
-    /// The legal next states as an explicit set, so the one skip edge is
-    /// stated rather than hidden in a permissive switch. Gate coupling
-    /// (backing summary requirements) lives in Store.setPromptStatus.
+    /// The legal next states as an explicit set. Unlike v2 this graph is NOT
+    /// forward-only: `done` returns to `draft`. Nothing else here gates —
+    /// backing-summary requirements were removed from PromptRepository.setStatus
+    /// with m0028, and summaries are now created by explicit opens
+    /// (CLARIFY_OPEN, ARCH_OPTION_ADD, REVIEW_OPEN) rather than as a side
+    /// effect of walking this enum.
     public var allowedNext: Set<PromptStatus> {
         switch self {
-        case .draft: return [.clarifying]
-        case .clarifying: return [.architecting]
-        case .architecting: return [.implementing]
-        case .implementing: return [.reviewing, .done]
-        case .reviewing: return [.done]
-        case .done: return []
+        case .draft: return [.initiated]
+        case .initiated: return [.done]
+        case .done: return [.draft]
         }
     }
 }
@@ -3865,14 +3891,24 @@ public struct DopeSearchRequest: Codable, Hashable, Sendable {
     /// base. A post-filter over resolver provenance, so the FTS query is the
     /// same shape with and without it.
     public let onlyMasks: Bool?
+    /// Restrict the UNION to these arms. m0028-era ADDITIVE OPTIONAL: nil or
+    /// empty means every arm, which is exactly what the absent field meant, so
+    /// it decodes safely in both directions and needed no wire bump of its own.
+    ///
+    /// The arms were always enumerable through `DopeSearchSource`; what was
+    /// missing was any way for a caller to SELECT among them, which is what the
+    /// agent tool surface needs when it asks for persistence rows or cogs
+    /// specifically rather than the whole tree.
+    public let sources: [DopeSearchSource]?
     public let limit: Int?
 
     public init(query: String, scope: DopeSearchScope, sessionUuid: String? = nil,
                 promptUuid: String? = nil, projectUuid: String? = nil,
-                onlyMasks: Bool? = nil, limit: Int? = nil) {
+                onlyMasks: Bool? = nil, sources: [DopeSearchSource]? = nil,
+                limit: Int? = nil) {
         self.query = query; self.scope = scope; self.sessionUuid = sessionUuid
         self.promptUuid = promptUuid; self.projectUuid = projectUuid
-        self.onlyMasks = onlyMasks; self.limit = limit
+        self.onlyMasks = onlyMasks; self.sources = sources; self.limit = limit
     }
 }
 

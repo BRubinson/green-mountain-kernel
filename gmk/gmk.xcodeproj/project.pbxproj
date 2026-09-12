@@ -210,6 +210,7 @@
 				1B4010A62FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmUxComponentLibrary" */,
 				1B4010A72FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmAgententicsSdk" */,
 				1B4010A82FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmMcp" */,
+				1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmToolchain" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1B4010742FDCA09200DAF751 /* Products */;
@@ -618,6 +619,10 @@
 		1B4010A82FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmMcp" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = gmMcp;
+		};
+		1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmToolchain" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = gmToolchain;
 		};
 /* End XCLocalSwiftPackageReference section */
 

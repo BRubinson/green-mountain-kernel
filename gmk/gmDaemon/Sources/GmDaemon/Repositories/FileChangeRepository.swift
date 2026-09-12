@@ -231,11 +231,25 @@ struct FileChangeRepository: RepositoryContext {
             sql: "SELECT prompt_uuid FROM bot_workflow WHERE session_uuid = ? AND status = 'active'",
             arguments: [sessionUuid])
         if workflowPrompts.count == 1 { return workflowPrompts[0] }
-        let implementing = try String.fetchAll(
+        // Fallback when no single active workflow answers: the session's one
+        // RUNNING prompt. m0028 widened what "running" means — this used to
+        // look for the single prompt in `implementing`, which was a narrow and
+        // therefore fairly selective probe. `initiated` covers everything
+        // between start and finish, so a session holding two started prompts
+        // now returns nil here where before one of them might have been in
+        // `implementing` alone and won.
+        //
+        // That is the right trade and not a regression: returning nil means
+        // "cannot attribute", which is already this function's honest answer
+        // for an ambiguous session. The alternative — guessing between two
+        // started prompts — would file changes against the wrong prompt in an
+        // append-only db. The active bot_workflow row above remains the
+        // precise path, and it is the one that normally answers.
+        let running = try String.fetchAll(
             db,
             sql: "SELECT uuid FROM prompt WHERE session_uuid = ? AND status = ?",
-            arguments: [sessionUuid, PromptStatus.implementing.rawValue])
-        if implementing.count == 1 { return implementing[0] }
+            arguments: [sessionUuid, PromptStatus.initiated.rawValue])
+        if running.count == 1 { return running[0] }
         return nil
     }
 

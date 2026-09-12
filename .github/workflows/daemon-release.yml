@@ -1,8 +1,8 @@
 name: daemon-release
 
 # Builds the universal `gm_daemon` / `gm_mcp` / `gm_hook` binaries once and
-# attaches them to a `daemon-v<version>` release. The plugin's install_gm.sh fetches
-# exactly this asset.
+# attaches them to a `gm_kernel-v<version>` release. The plugin's install_gm.sh
+# fetches exactly this asset.
 #
 #
 # THE BINARIES NOW COME FROM THREE PACKAGES, not one:
@@ -11,8 +11,23 @@ name: daemon-release
 # bundling it with the persistence layer would drag GRDB into a client that
 # never opens the database.
 #
-# TAG NAMESPACE: `daemon-v*`, beside the app's `gmvibes-v*`. One monorepo ships
-# two independently versioned artifacts and their tags must not collide.
+# TAG NAMESPACE: `gm_kernel-v*`, the ONE release namespace. It replaced a pair of
+# independently versioned tracks (`daemon-v*` here, `gmvibes-v*` for the app),
+# which had no recorded relationship to each other even though the app and the
+# daemon speak a versioned wire protocol.
+#
+# ── THIS FALLBACK PUBLISHES BINARIES ONLY ───────────────────────────────────
+#
+# A full release also carries `GMVibes-<version>.dmg`, and this workflow does not
+# build it. That is a deliberate limit, not a gap: a release DMG must be signed
+# with a Developer ID and notarized, which needs a certificate and an Apple ID in
+# the runner's keychain. An unsigned DMG attached here would be REFUSED by
+# Gatekeeper on every machine that downloaded it — the exact outcome
+# publish_release.sh now blocks by default.
+#
+# So a release cut here is missing its app, and install_gm.sh handles that the
+# same way it handles a legacy release: binaries install, the app step is
+# skipped. Cut the app from a Mac with the signing identity.
 #
 # THE BINARY VERSION IS DECOUPLED FROM THE PLUGIN VERSION ON PURPOSE. The plugin
 # is ~300KB of markdown that changes constantly; the Swift is 44k lines that does
@@ -53,7 +68,22 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-26
+    # `xcode-27`, NOT `macos-27` — GitHub publishes no such label; the macOS 27
+    # image ships under the Xcode-versioned name (arm64 only, GA 2026-09-10).
+    # See the runner note in gmk-ci.yml for the full reasoning.
+    #
+    # THIS JOB NEEDS THE 27 FLOOR FOR ITS TEST LOOP, NOT ITS BUILD. The universal
+    # build below covers gmDaemonSdk / gmDaemon / gmMcp, none of which reach
+    # gmAgententicsSdk — but the "never ship what was not tested" loop runs
+    # `swift test` against gmAgententicsSdk, and that package's graph now
+    # includes the vendored gmClaudeForFoundationModels at macOS 27. Dropping
+    # this back to macos-26 fails at graph resolution in the test step, long
+    # after the job has looked healthy.
+    #
+    # The arm64-only restriction costs nothing here: macos-26 was arm64 too, and
+    # the universal step cross-compiles x86_64 through SwiftPM's `--arch` flags
+    # rather than needing an Intel host.
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -78,7 +108,7 @@ jobs:
             exit 1
           fi
           echo "version=$pinned" >> "$GITHUB_OUTPUT"
-          echo "tag=daemon-v$pinned" >> "$GITHUB_OUTPUT"
+          echo "tag=gm_kernel-v$pinned" >> "$GITHUB_OUTPUT"
           echo "asset=gm-daemon-$pinned-macos-universal.tar.gz" >> "$GITHUB_OUTPUT"
 
       # NO BuildInfo stamp step. The SwiftPM prebuild plugin in gmDaemon stamps
@@ -92,16 +122,10 @@ jobs:
       - name: swift test
         run: |
           set -euo pipefail
-          for p in gmDaemonSdk gmDaemon gmUxComponentLibrary gmMcp gmToolchain; do
+          for p in gmDaemonSdk gmDaemon gmUxComponentLibrary gmMcp gmToolchain gmAgententicsSdk; do
             echo "--- swift test $p"
             swift test --package-path "gmk/$p"
           done
-
-      # gmAgententicsSdk has no tests by design and ships no binary, so nothing
-      # else in this workflow would touch it. Compiled explicitly rather than
-      # left uncovered on a release commit.
-      - name: swift build (gmAgententicsSdk, compile-only by design)
-        run: swift build --package-path gmk/gmAgententicsSdk
 
       # SwiftPM emits a genuinely universal Mach-O when handed both --arch flags
       # (no lipo step); the verification below is what makes that a fact rather
@@ -180,7 +204,7 @@ jobs:
           Universal (arm64 + x86_64) macOS binaries for `gm_daemon`, `gm_mcp`, `gm_hook`.
 
           Installed by the plugin's `install_gm.sh`, which fetches the newest
-          `daemon-v*` release and verifies the SHA-256 sidecar before unpacking.
+          `gm_kernel-v*` release and verifies the SHA-256 sidecar before unpacking.
 
           Manual install:
 
@@ -190,7 +214,7 @@ jobs:
           sed -i '' 's/^          //' release-notes.md
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" \
-              --title "GM daemon v${{ steps.v.outputs.version }}" \
+              --title "GM kernel v${{ steps.v.outputs.version }} (binaries only)" \
               --notes-file release-notes.md
           fi
           gh release upload "$TAG" \

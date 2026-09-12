@@ -181,8 +181,10 @@ public struct SessionRow: Codable, Hashable, Sendable {
 }
 
 /// One activation claim (v21): a running Claude Code instance (client_key,
-/// resolved from process ancestry by gm) is working prompt X. Claimed by
-/// set-status implementing, released at done.
+/// resolved from process ancestry by gm) is working prompt X. Claimed at
+/// `initiated` — which BRIEFING_OPEN stamps — and released at done. m0028 moved
+/// the claim earlier than it used to sit, so briefing, exploration and
+/// architecture now run under it too.
 public struct PromptActivationRow: Codable, Hashable, Sendable {
     public let uuid: String
     public let sessionUuid: String

@@ -19,9 +19,22 @@ struct DopeSearchRepository: RepositoryContext {
         let scopeUuids = scopes.map(\.uuid)
         let placeholders = scopeUuids.map { _ in "?" }.joined(separator: ", ")
 
+        // Which UNION arms to query. nil or empty means every arm, which is
+        // exactly what the absent field meant before m0028 added it — that
+        // equivalence is what makes `sources` an additive optional rather than
+        // a wire break, so do not "tidy" empty into "no results".
+        //
+        // Driven off allCases rather than a hand-written switch, so a future
+        // DopeSearchSource case is searchable the moment it exists instead of
+        // being silently unreachable.
+        let requested = req.sources.map(Set.init) ?? Set(DopeSearchSource.allCases)
+        let selected = DopeSearchSource.allCases.filter {
+            requested.isEmpty || requested.contains($0)
+        }
+
         var arms = [String]()
         var args: [any DatabaseValueConvertible] = []
-        for source in DopeSearchSource.allCases {
+        for source in selected {
             arms.append(Self.searchArm(source, scopePlaceholders: placeholders))
             args.append(pattern)
             args.append(contentsOf: scopeUuids)

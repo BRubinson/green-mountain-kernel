@@ -19,8 +19,12 @@ struct ClarificationRepository: RepositoryContext {
     // MARK: - Shared create-or-return
 
     /// Idempotent: returns the existing summary or creates one at `building`.
-    /// Called by CLARIFY_OPEN and by setPromptStatus's draft → clarifying
-    /// create-on-enter.
+    ///
+    /// CLARIFY_OPEN is now its ONLY caller. setPromptStatus used to call it too,
+    /// as the create-on-enter side effect of draft → clarifying; m0028 removed
+    /// that state and with it the side effect, so opening a clarification is
+    /// something an agent does deliberately rather than something that happens
+    /// to it while moving a status.
     @discardableResult
     func ensureSummary(promptUuid: String) throws -> (uuid: String, created: Bool) {
         guard try Row.fetchOne(

@@ -58,11 +58,55 @@ suffix is the only thing distinguishing bits that were merely built from bits
 that were published.
 
 Everyone who is not editing the sources runs the plugin's installer, which needs
-no checkout and asks GitHub for the newest `daemon-v*` release:
+no checkout and asks GitHub for the newest `gm_kernel-v*` release:
 
 ```bash
-bash plugins/gmcc/scripts/install_gm.sh
+bash plugins/gmcc/scripts/install_gm.sh          # binaries AND the app
+bash plugins/gmcc/scripts/install_gm.sh --check  # report only, change nothing
 ```
+
+### ONE RELEASE, ONE VERSION — the app ships with the binaries
+
+`gm_kernel-v<version>` carries four assets, all pinned by `gmk/VERSION`:
+
+```
+gm_kernel-v50.0.2
+├── gm-daemon-50.0.2-macos-universal.tar.gz   gm_daemon, gm_mcp, gm_hook
+├── gm-daemon-50.0.2-macos-universal.tar.gz.sha256
+├── GMVibes-50.0.2.dmg
+└── GMVibes-50.0.2.dmg.sha256
+```
+
+This replaced **two independent tracks** — `daemon-v*` from `gmk/VERSION` and
+`gmvibes-v*` from the app's hand-edited `MARKETING_VERSION` — published by two
+scripts that shared no code. Nothing recorded which app went with which daemon,
+even though they speak a versioned wire protocol, and `install_gm.sh` could only
+ever upgrade half a system. Consequences that follow, and must not be re-derived
+the other way:
+
+- **`build-dmg.sh` STAMPS `MARKETING_VERSION` from `gmk/VERSION`** as a build
+  setting override. Do not hand-edit the version in `project.pbxproj` and do not
+  make the script read it back out — `ReleaseStoreContractTests` fails on both.
+  The override is used rather than a file edit so a build never dirties the tree
+  that publish requires to be clean.
+- **`GM_TAG_PREFIX` in `gm_releases.sh` is the only spelling of the namespace.**
+  The publisher and the installer both derive from it. A literal `gm_kernel-v` in
+  either script is the drift that the old two-track layout institutionalised.
+- **`gmk/scripts/release.sh` is RETIRED** and exits 2 with a pointer. It is kept
+  as a signpost, not revived: a second publisher means two tags again.
+- **Publish refuses an un-notarized DMG** unless `--allow-adhoc` is passed. An
+  ad-hoc app is Gatekeeper-blocked on every machine except the one that built it,
+  and the retired script would happily ship one.
+- The installer still falls back to the retired `daemon-v*` namespace so an older
+  release installs rather than reporting that nothing is published. Those
+  releases have no DMG, and the app step is skipped with a line saying so.
+
+The DMG is staged under `$GM_FS_ROOT/apps/downloads/<version>/` and installed
+from there to `/Applications`. That install is the **one** write outside the
+filesystem root on this path: it is confined to `gm_install_app` in the shared
+library, `GM_APP_DEST` redirects it, and `--no-app` turns it off. It refuses
+while GMVibes is running, because replacing a live bundle corrupts it in ways
+that surface later as a crash rather than here as an error.
 
 ### The release store
 
@@ -106,7 +150,17 @@ nobody had run. Dispatch it manually when the local path is unavailable.
 
 - `gmk/` — the new home of every Swift deliverable: one Xcode project
   (`gmk/gmk.xcodeproj`) over six shipped packages, plus a seventh that ships
-  nothing and holds the repository's own contract tests.
+  nothing and holds the repository's own contract tests, plus an eighth that is
+  **vendored third-party source and authored nowhere in this repo**.
+  - **Open `gmk/gmk.xcworkspace`, not the project.** The workspace lists the
+    project alongside all seven packages as first-class members, which is the
+    only arrangement in which Xcode generates schemes for a package's TEST
+    targets — `GmToolchainTests` and `GmMcpTests` exist under the workspace and
+    do not exist under the project. The project is deliberately kept
+    SELF-SUFFICIENT anyway (it still carries its own local package references),
+    because `gmk-ci.yml` and `build-dmg.sh` both drive it with `-project`;
+    the workspace is an additional door, not a replacement, and neither file
+    needed to change.
   - `gmk/gmDaemonSdk/` — the base layer: the wire protocol (including the
     workflow spec the bot phases are driven by), the client, and the shared
     domain layer (`Dope/`, `Diagram/` models, `Hook/`, `Kbite/`, `Environment/`,
@@ -117,8 +171,38 @@ nobody had run. Dispatch it manually when the local path is unavailable.
   - `gmk/gmUxComponentLibrary/` — the shared component surface: the diagram UI
     views plus the geometry, routing, layout and organizer helpers they are built
     on. Diagrams only for now, built as a surface that expects to grow.
-  - `gmk/gmAgententicsSdk/` — the agent-tool protocol declarations. Intentionally
-    tiny; its emptiness is a decision, not a gap.
+  - `gmk/gmAgententicsSdk/` — the agent-tool surface: seven `GmAgentTool`
+    families declared against Apple's FoundationModels `Tool` protocol, with
+    `@Generable` argument/result schemas and `@Guide`-carried invariants.
+    **Declared, not wired** — every `call(arguments:)` throws and names the
+    daemon verb it will send. It **depends on `gmDaemonSdk`** so the tool
+    vocabulary IS the wire vocabulary and cannot drift from it; that edge was
+    added deliberately and it replaced an earlier decision that this package stay
+    empty. It is the only package carrying `unsafeFlags` (the `GmAgentOs 1.0`
+    availability define), which permanently bars it from being consumed as a
+    versioned remote dependency — free today, since every gmk package is a local
+    `path:` dependency, and the direct cause of the vendoring below.
+    It also owns `Templates/` — the GMCC personas and command contracts compiled
+    in as FoundationModels `Instructions` and `Prompt` values, copied VERBATIM
+    from `plugins/gmcc/` markdown. Personas are `Instructions`, invocations are
+    `Prompt`, and the split is load-bearing: a model obeys instructions over
+    prompts, so caller-supplied text must never reach the instruction half.
+    Phase text is NOT copied — it is read live from
+    `WorkflowSpec.instructions(variant:phase:)`.
+    **Its floor is macOS 27, not 26** — see the runner note below.
+  - `gmk/gmClaudeForFoundationModels/` — the eighth package: Anthropic's
+    **ClaudeForFoundationModels, vendored** (Apache-2.0). It conforms Claude to
+    Apple's `LanguageModel` protocol so a `LanguageModelSession` can be driven by
+    a server-side Claude model. **Do not edit it** — the only local modification
+    is a provenance header on its `Package.swift`; everything else is
+    byte-identical to the recorded upstream commit, and `VENDORED.md` carries the
+    commit, what was left behind, and the re-sync recipe. Fix a problem upstream
+    or in the re-sync, never in place.
+    **Vendored rather than pinned by URL, and that asymmetry with GRDB is the
+    point**: `unsafeFlags` bars `gmAgententicsSdk` from remote resolution, so every
+    `gmk/` package is consumed by local `path:`, and anything joining that graph
+    must be reachable the same way. Zero external dependencies of its own, which
+    is what keeps it a self-contained copy rather than the head of a tree.
   - `gmk/gmMcp/` — the `gm_mcp` MCP pen server.
   - `gmk/gmVibes/` — the GMVibes macOS app (Swift/SwiftUI). Release via the
     `release-dmg` skill.
@@ -159,13 +243,33 @@ Dependency graph, acyclic and 5 deep:
 gmDaemonSdk ──┬── gmDaemon
               ├── gmUxComponentLibrary ──┐
               ├── gmMcp                  ├── gmVibes
-              └──────────────────────────┘
-gmAgententicsSdk (independent)
+              ├──────────────────────────┘
+              └── gmAgententicsSdk ──┐
+                                     │  (vendored, zero deps of its own)
+       gmClaudeForFoundationModels ──┘
 ```
 
 The forcing constraint: the wire types already reference the dope and diagram
 document types, so those models cannot sit ABOVE the SDK. Any layering that
 tries becomes a dependency cycle.
+
+`gmAgententicsSdk` was drawn standing alone until its tool surface was filled
+in. It joined the graph because every tool schema speaks the daemon's vocabulary
+(`ExplorationFindingKind`, `SearchKind`, `ReviewVerdict`, `PromptStatus`…), and
+the alternative was a hand-maintained second copy of a dozen enums whose raw
+values are load-bearing on the wire AND in db CHECK constraints. The edge cannot
+cycle — nothing depends on that package — and `gmDaemonSdk` does not inherit its
+`unsafeFlags`, because SwiftPM target settings apply only to the declaring
+target.
+
+It has since taken a **second** edge, to the vendored
+`gmClaudeForFoundationModels`. That one also cannot cycle, for a stronger reason:
+the vendored package has zero dependencies of its own. Its cost is the platform
+floor — it requires macOS 27, a dependency may not have a floor above its
+consumer's, and **SwiftPM checks floors at GRAPH RESOLUTION, before any
+`@available` scope exists**. So `gmAgententicsSdk` had to move to 27 as well, and
+the CI runners with it. Reaching for `@available` to keep the floor at 26 is the
+plausible-looking move that cannot work.
 
 ## Build / test loop — the `gmk/` stack
 
@@ -177,7 +281,14 @@ swift test --package-path gmk/gmDaemon
 swift test --package-path gmk/gmUxComponentLibrary
 swift test --package-path gmk/gmMcp
 swift test --package-path gmk/gmToolchain
-swift build --package-path gmk/gmAgententicsSdk     # compile-only by design
+swift test --package-path gmk/gmAgententicsSdk      # roster + template contracts
+# gmk/gmClaudeForFoundationModels is VENDORED. It gets NO CI job of its own, and
+# that is a decision, not an oversight: it is already COMPILE-GATED in CI as a
+# dependency of gmAgententicsSdk, so a vendored break that can affect us fails
+# that job. What we deliberately do not run is UPSTREAM'S OWN SUITE — it can
+# only fail for reasons we did not cause and cannot fix in-tree (the fix is a
+# re-sync, never a patch), and gating our PRs on it would make someone else's
+# red build our red build. Run it by hand when re-syncing; see VENDORED.md.
 bash gmk/scripts/rebuild_local.sh                   # universal build → staged + activated
 ```
 
@@ -223,35 +334,99 @@ free and a clean clone compiles with no prior shell step.
 - Wire protocol: bump `GmWireProtocol.version` only for a new message type or an
   incompatible change. Additive OPTIONAL fields on existing messages do NOT bump
   — they decode safely in both directions. Renaming a field on an existing
-  message IS incompatible and DOES bump.
+  message IS incompatible and DOES bump. So is REMOVING AN ENUM CASE from a type
+  an existing message carries: m0028 collapsed `PromptStatus` from six arms to
+  three and bumped 26 → 27 for exactly that reason.
 - Schema: migrations are append-only. The db is append-only history — **NEVER
   wipe it**. `gm_hook call BACKUP --json '{}'` takes the sanctioned online backup
   before risky work.
+- **Dropping an inline `UNIQUE` or `CHECK` means rebuilding the table.** SQLite
+  backs an inline constraint with a `sqlite_autoindex_*` that `DROP INDEX`
+  refuses, so m0028 runs the documented 12-step rebuild over seven tables. Three
+  things it must get right, all of which fail SILENTLY: copy `id` explicitly
+  (the FTS5 indexes are EXTERNAL CONTENT keyed on `rowid`, so regenerated ids
+  leave search pointing at the wrong rows), recreate the AFTER
+  INSERT/UPDATE/DELETE triggers that die with the table, and keep
+  `legacy_alter_table = ON` across the renames so SQLite does not rewrite the
+  child FK clauses that already name the final table. `MigrationTests`'
+  m0002 case is the reference for what to assert afterwards: uuid→id PAIRS,
+  child FK clauses, indexes, UNIQUEs and `sqlite_sequence`.
 
-## Releasing the binaries
+### The prompt lifecycle is THREE states
 
-`gmk/VERSION` is the pin. Bump it, commit, then tag:
+`draft → initiated → done`, plus `done → draft` to re-open a finished prompt for
+editing. There are no states between start and finish, and no gates on the
+moves: **phase is derived from db evidence at every `BOT_NEXT`**, so where a
+prompt is in its workflow is a question for the machine, not for `prompt.status`.
+
+Consequences that are easy to re-derive wrongly:
+
+- **`BRIEFING_OPEN` performs `draft → initiated`**, daemon-side and idempotently.
+  Loading a prompt does NOT — a read that advances the prompt makes inspection
+  destructive, which an append-only db cannot take back.
+- **Summaries are opened explicitly** (`CLARIFY_OPEN`, `ARCH_OPEN`,
+  `REVIEW_OPEN`). They used to appear as a side effect of a status move; that
+  side effect went with the states.
+- **The activation claim moved earlier**, to `initiated`, so briefing and
+  exploration now run under it too.
+- The per-prompt `UNIQUE` constraints on the five summary tables and
+  `care_package` were dropped in the same migration — a re-opened prompt needs a
+  second set of summaries, and the constraints made that impossible.
+
+## Releasing
+
+`gmk/VERSION` is the pin for the three binaries **and** the app. Bump it, commit,
+then publish locally — that is the default path and it needs no tag command,
+because `publish_release.sh` creates and pushes the tag itself:
 
 ```bash
-git tag daemon-v$(cat gmk/VERSION)
-git push origin daemon-v$(cat gmk/VERSION)
+bash gmk/scripts/rebuild_local.sh
+bash gmk/scripts/publish_release.sh          # --dry-run to rehearse
 ```
 
-`.github/workflows/daemon-release.yml` refuses to publish when the tag and the
-file disagree, runs the suites, builds universal (arm64 + x86_64), verifies both
-slices are present, and attaches the tarball plus its `.sha256`. The three
-binaries are staged from THREE package bin paths — `gm_daemon` from `gmDaemon`,
-`gm_mcp` from `gmMcp`, `gm_hook` from `gmDaemonSdk` — because they no longer
-share one.
+`.github/workflows/daemon-release.yml` is the **fallback**, dispatched manually:
+
+```bash
+gh workflow run daemon-release.yml -f version=$(cat gmk/VERSION)
+```
+
+It refuses to publish when the tag and the file disagree, runs the suites, builds
+universal (arm64 + x86_64), verifies both slices are present, and attaches the
+tarball plus its `.sha256`. The three binaries are staged from THREE package bin
+paths — `gm_daemon` from `gmDaemon`, `gm_mcp` from `gmMcp`, `gm_hook` from
+`gmDaemonSdk` — because they no longer share one.
+
+**The fallback publishes BINARIES ONLY.** It cannot build the app, because a
+release DMG must be signed with a Developer ID and notarized and the runner has
+no certificate; an unsigned DMG attached there would be refused by Gatekeeper on
+every machine that downloaded it. A release cut in CI is therefore missing its
+app, and `install_gm.sh` skips the app step rather than 404-ing on it. Cut the
+app from a Mac that holds the identity.
 
 - The binary version is DECOUPLED from the plugin version on purpose. The plugin
   is markdown that changes constantly; the Swift is 44k lines that does not.
   Coupling them would make every prompt tweak force every install to re-download
   ~15MB of unchanged binaries. Move `gmk/VERSION` only when the code behind it
   actually changed.
-- CI runs on `macos-26` because `GmAgentTool.swift` imports FoundationModels
-  unconditionally, and that framework only exists in the macOS 26 SDK. An older
-  runner does not degrade — the package does not compile at all.
+- That decoupling is PLUGIN-vs-BINARIES and is unrelated to the app, which IS
+  coupled: `gmk/VERSION` now moves the DMG too, so an app-only change costs a
+  binary re-download. That was the accepted price of one release with one
+  version — the alternative was keeping two numbers whose relationship nothing
+  recorded.
+- **CI runs on `xcode-27`, and that is NOT a typo for `macos-27`.** GitHub
+  publishes no `macos-27` label at all — the macOS 27 image ships under the
+  Xcode-versioned name (`xcode-27` / `xcode-27-xlarge`), arm64 only, GA since
+  2026-09-10; `macos-latest` still resolves to macOS 26. "Correcting" it to
+  `macos-27` yields an unresolvable label and a job that never starts.
+  The floor is 27 rather than 26 because `gmAgententicsSdk` depends on the
+  vendored `gmClaudeForFoundationModels`, whose own floor is 27, and floors are
+  checked at graph resolution. An older runner does not degrade — the package
+  does not resolve at all. This moved with the SDK once already (26 → 27) and
+  will again.
+- All four jobs share the one label so the repo has ONE runner story. Only the
+  `packages` matrix and the `daemon-release` test loop strictly need 27; `gmvibes`
+  and `contracts` moved for consistency and can drop back safely if
+  `xcode-27` capacity ever makes them queue.
 - `.github/workflows/gmk-ci.yml` is one workflow with a matrix: one job per
   package plus an `xcodebuild` job for gmVibes, so every module gets its own
   visible check. It over-triggers by design (a gmVibes change also rebuilds

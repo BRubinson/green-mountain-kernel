@@ -2,8 +2,21 @@
 #
 # install_gm.sh — THE FRONT DOOR for everyone who is not editing the sources.
 #
-# Fetches the latest published `daemon-v*` release, verifies its checksum, stages
-# it under the release store and activates it.
+# Fetches the newest published `gm_kernel-v*` release, verifies every checksum,
+# stages it under the release store, activates the binaries and installs the app.
+#
+# ── IT UPGRADES THE WHOLE SYSTEM, NOT HALF OF IT ─────────────────────────────
+#
+# One release carries the three binaries AND the GMVibes DMG at one version, so
+# one command moves a machine forward. This used to be impossible: the app was
+# published on its own `gmvibes-v*` tag with its own version number by a script
+# that shared no code with the publisher, and nothing here fetched it — a user
+# who ran this got a new daemon and kept whatever app they had.
+#
+# The DMG is staged under $GM_FS_ROOT like everything else and installed from
+# there. /Applications is the one write outside the root; it is what makes a
+# macOS app launchable, it is confined to gm_install_app in the shared library,
+# and --no-app turns it off.
 #
 # ── WHY THIS LIVES IN THE PLUGIN AND NOT IN gmk/scripts ──────────────────────
 #
@@ -27,19 +40,24 @@
 # Asking for the newest `daemon-v*` release means the plugin cannot drift from
 # what was actually published.
 #
-# TAG NAMESPACE MATTERS HERE. The monorepo ships two independently versioned
-# artifacts, `daemon-v*` and `gmvibes-v*`, so GitHub's own "latest release" is
-# the wrong question — it would happily hand back an app release. This filters
-# by tag prefix.
+# TAG NAMESPACE MATTERS HERE. The repo's history contains more than one kind of
+# release tag, so GitHub's own "latest release" is the wrong question — it would
+# happily hand back an app-only release cut under the retired `gmvibes-v*`
+# namespace. This filters by prefix, newest `gm_kernel-v*` first, and falls back
+# to the retired `daemon-v*` namespace so a machine pointed at an older release
+# still installs rather than being told nothing is published.
 #
 # Usage:
-#   install_gm.sh                   # install/upgrade to the newest daemon release
+#   install_gm.sh                   # install/upgrade binaries + app
 #   install_gm.sh --check           # report only; exit 1 if an install is needed
 #   install_gm.sh --force           # reinstall even if that version is active
 #   install_gm.sh --version 50.0.1  # install one specific version
+#   install_gm.sh --no-app          # binaries only; never touch /Applications
+#   install_gm.sh --app             # the app only; leave the binaries alone
 #
 # Env:
 #   GM_FS_ROOT                      # the one filesystem root (default: $HOME/gmfs)
+#   GM_APP_DEST                     # where the app goes (default: /Applications)
 #   GM_DAEMON_RELEASE_REPO          # owner/name to fetch from
 
 set -e
@@ -53,11 +71,15 @@ API="https://api.github.com/repos/$RELEASE_REPO"
 
 MODE="install"
 WANT=""
+DO_BINARIES=1
+DO_APP=1
 while [ $# -gt 0 ]; do
     case "$1" in
         --check)   MODE="check" ;;
         --force)   MODE="force" ;;
         --version) shift; WANT="$1"; [ -n "$WANT" ] || { echo "[GMB] --version needs a value" >&2; exit 2; } ;;
+        --no-app)  DO_APP=0 ;;
+        --app)     DO_BINARIES=0 ;;
         "") ;;
         *) echo "[GMB] install_gm.sh: unknown flag $1" >&2; exit 2 ;;
     esac
@@ -73,21 +95,55 @@ INSTALLED="$(gm_installed_version)"
 # this path and an installer that fails on a missing JSON parser is an installer
 # that fails for the exact users it exists to serve. The releases list comes back
 # newest-first, so the first daemon-v tag in it is the newest daemon release.
-resolve_latest() {
-    curl -fsSL --retry 2 --connect-timeout 15 "$API/releases?per_page=100" 2>/dev/null \
-        | grep -o '"tag_name"[[:space:]]*:[[:space:]]*"daemon-v[^"]*"' \
-        | head -1 \
-        | sed -e 's/.*"\(daemon-v[^"]*\)"/\1/' -e 's/^daemon-v//'
+RELEASES_JSON=""
+fetch_releases() {
+    [ -n "$RELEASES_JSON" ] && return 0
+    RELEASES_JSON="$(curl -fsSL --retry 2 --connect-timeout 15 "$API/releases?per_page=100" 2>/dev/null || true)"
+    [ -n "$RELEASES_JSON" ]
 }
 
+# The tag prefix that actually produced the version being installed. It decides
+# whether a DMG can be expected in the release at all: the retired namespace
+# predates the unified release and carries binaries only.
+#
+# Printed as `<prefix> <version>` rather than assigned to a global, because
+# resolve_latest is called in a `$(...)` subshell and a variable it set there
+# would not survive the return. That is the kind of bug that shows up as an
+# installer confidently looking for a DMG in a release that has none.
+resolve_latest() {
+    fetch_releases || return 1
+    for _prefix in "$GM_TAG_PREFIX" "$GM_LEGACY_TAG_PREFIX"; do
+        _v="$(printf '%s' "$RELEASES_JSON" \
+            | grep -o "\"tag_name\"[[:space:]]*:[[:space:]]*\"$_prefix[^\"]*\"" \
+            | head -1 \
+            | sed -e "s/.*\"\($_prefix[^\"]*\)\"/\1/" -e "s/^$_prefix//")"
+        if [ -n "$_v" ]; then
+            printf '%s %s\n' "$_prefix" "$_v"
+            return 0
+        fi
+    done
+    return 1
+}
+
+FOUND_PREFIX="$GM_TAG_PREFIX"
 if [ -n "$WANT" ]; then
     VERSION="$WANT"
 else
-    echo "[GMB] asking $RELEASE_REPO for the newest daemon release..."
-    VERSION="$(resolve_latest || true)"
+    echo "[GMB] asking $RELEASE_REPO for the newest release..."
+    RESOLVED="$(resolve_latest || true)"
+    # Split with `case`, not `[ x ] && y` — under `set -e` a trailing test that
+    # evaluates false takes the whole script down, and here the false branch is
+    # the SUCCESS path.
+    VERSION=""
+    case "$RESOLVED" in
+        *" "*)
+            FOUND_PREFIX="${RESOLVED%% *}"
+            VERSION="${RESOLVED#* }"
+            ;;
+    esac
     if [ -z "$VERSION" ]; then
         cat >&2 <<EOF
-[GMB] ERROR: no published daemon-v* release found on $RELEASE_REPO.
+[GMB] ERROR: no published ${GM_TAG_PREFIX}* release found on $RELEASE_REPO.
 
       Nothing has been released yet, or the network is unreachable.
 
@@ -102,97 +158,169 @@ EOF
     fi
 fi
 
-TAG="daemon-v$VERSION"
+TAG="$FOUND_PREFIX$VERSION"
 ASSET="gm-daemon-$VERSION-macos-universal.tar.gz"
+DMG_ASSET="$GM_APP_NAME-$VERSION.dmg"
 BASE="https://github.com/$RELEASE_REPO/releases/download/$TAG"
 
+# A release under the retired namespace contains binaries only. Asking it for a
+# DMG would be a guaranteed 404 dressed up as a network problem.
+if [ "$FOUND_PREFIX" != "$GM_TAG_PREFIX" ] && [ "$DO_APP" -eq 1 ]; then
+    echo "[GMB] $TAG predates the unified release — it has no app. Binaries only."
+    DO_APP=0
+    DO_BINARIES=1
+fi
+
 # ── Up-to-date checks ────────────────────────────────────────────────────────
+#
+# The binaries and the app are checked SEPARATELY even though they share a
+# version. They can legitimately disagree — the app gets replaced by hand, an
+# earlier run used --no-app, /Applications was not writable that day — and a
+# single "is v$VERSION installed" question would answer yes while half the
+# system sat one release behind. Each side decides for itself whether it has
+# work to do, and the script exits early only when NEITHER does.
 have_all() { for b in $GM_BINARIES; do [ -x "$GM_BIN/$b" ] || return 1; done; return 0; }
 
+APP_INSTALLED="$(gm_installed_app_version)"
+BIN_WORK=1
+APP_WORK=1
+
+[ "$DO_BINARIES" -eq 1 ] || BIN_WORK=0
+[ "$DO_APP" -eq 1 ] || APP_WORK=0
+
 if [ "$MODE" != "force" ]; then
-    case "$INSTALLED" in
-        *-BETA)
-            # A locally built, locally staged binary. A download must never
-            # silently replace work someone is in the middle of testing.
-            if have_all; then
-                echo "[GMB] $INSTALLED is active (a local build) — leaving it alone"
-                echo "      rebuild:            bash gmk/scripts/rebuild_local.sh"
-                echo "      switch to v$VERSION: bash $SCRIPT_DIR/install_gm.sh --force"
-                exit 0
-            fi
-            ;;
-        "$VERSION")
-            if have_all; then
-                echo "[GMB] v$VERSION already active at $GM_BIN"
-                exit 0
-            fi
-            ;;
-    esac
+    if [ "$BIN_WORK" -eq 1 ]; then
+        case "$INSTALLED" in
+            *-BETA)
+                # A locally built, locally staged binary. A download must never
+                # silently replace work someone is in the middle of testing.
+                if have_all; then
+                    echo "[GMB] $INSTALLED is active (a local build) — leaving the binaries alone"
+                    echo "      rebuild:            bash gmk/scripts/rebuild_local.sh"
+                    echo "      switch to v$VERSION: bash $SCRIPT_DIR/install_gm.sh --force"
+                    BIN_WORK=0
+                fi
+                ;;
+            "$VERSION")
+                if have_all; then
+                    echo "[GMB] binaries v$VERSION already active at $GM_BIN"
+                    BIN_WORK=0
+                fi
+                ;;
+        esac
+    fi
+    if [ "$APP_WORK" -eq 1 ] && [ "$APP_INSTALLED" = "$VERSION" ]; then
+        echo "[GMB] $GM_APP_NAME $VERSION already installed at $GM_APP_DEST"
+        APP_WORK=0
+    fi
 fi
 
 if [ "$MODE" = "check" ]; then
     if [ "$INSTALLED" = "none" ]; then
-        echo "[GMB] not installed — newest published is v$VERSION"
+        echo "[GMB] binaries not installed — newest published is v$VERSION"
     else
-        echo "[GMB] $INSTALLED active, newest published is v$VERSION"
+        echo "[GMB] binaries $INSTALLED active, newest published is v$VERSION"
+    fi
+    echo "[GMB] $GM_APP_NAME $APP_INSTALLED installed, newest published is $VERSION"
+    if [ "$BIN_WORK" -eq 0 ] && [ "$APP_WORK" -eq 0 ]; then
+        echo "      everything is current"
+        exit 0
     fi
     echo "      run: bash $SCRIPT_DIR/install_gm.sh"
     exit 1
 fi
 
-# ── Already in the store? ────────────────────────────────────────────────────
-# A version that was downloaded before is re-activated rather than re-fetched.
-# This is what makes rolling between versions cheap and offline.
-if [ -d "$GM_DOWNLOADS/$VERSION" ] && [ "$MODE" != "force" ] \
-   && gm_verify_staged "$GM_DOWNLOADS/$VERSION" 2>/dev/null; then
-    echo "[GMB] v$VERSION is already in the store — activating without a download"
-    gm_activate downloads "$VERSION"
-    gm_retire_daemon
+if [ "$BIN_WORK" -eq 0 ] && [ "$APP_WORK" -eq 0 ]; then
     exit 0
 fi
 
-# ── Download ─────────────────────────────────────────────────────────────────
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/gm-install.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "[GMB] fetching $TAG from $RELEASE_REPO..."
-if ! curl -fsSL --retry 2 --connect-timeout 15 -o "$TMP/$ASSET" "$BASE/$ASSET" \
-   || ! curl -fsSL --retry 2 --connect-timeout 15 -o "$TMP/$ASSET.sha256" "$BASE/$ASSET.sha256"; then
-    cat >&2 <<EOF
-[GMB] ERROR: could not download $BASE/$ASSET
+# fetch_asset <name> — download an asset and its sidecar into $TMP, then verify.
+#
+# Checksum BEFORE anything is unpacked or mounted. The sidecar is written as
+# `<hash>  <filename>`, so it is verified from the directory where that filename
+# resolves. Mounting an unverified DMG is the same class of mistake as unpacking
+# an unverified tarball, and the app is the asset a user actually double-clicks.
+fetch_asset() {
+    _name="$1"
+    if ! curl -fsSL --retry 2 --connect-timeout 15 -o "$TMP/$_name" "$BASE/$_name" \
+       || ! curl -fsSL --retry 2 --connect-timeout 15 -o "$TMP/$_name.sha256" "$BASE/$_name.sha256"; then
+        cat >&2 <<EOF
+[GMB] ERROR: could not download $BASE/$_name
 
       The release exists but the asset does not, or the network is unreachable.
       With a checkout, build instead: bash gmk/scripts/rebuild_local.sh
 EOF
-    exit 1
+        return 1
+    fi
+    if ! ( cd "$TMP" && shasum -a 256 -c "$_name.sha256" >/dev/null 2>&1 ); then
+        echo "[GMB] ERROR: checksum mismatch on $_name — refusing to install" >&2
+        echo "       expected: $(cut -d' ' -f1 < "$TMP/$_name.sha256")" >&2
+        echo "       actual:   $(shasum -a 256 "$TMP/$_name" | cut -d' ' -f1)" >&2
+        return 1
+    fi
+    return 0
+}
+
+# ── Binaries ─────────────────────────────────────────────────────────────────
+if [ "$BIN_WORK" -eq 1 ]; then
+    # A version that was downloaded before is re-activated rather than
+    # re-fetched. This is what makes rolling between versions cheap and offline.
+    if [ -d "$GM_DOWNLOADS/$VERSION" ] && [ "$MODE" != "force" ] \
+       && gm_verify_staged "$GM_DOWNLOADS/$VERSION" 2>/dev/null; then
+        echo "[GMB] binaries v$VERSION are already in the store — activating without a download"
+        gm_activate downloads "$VERSION"
+        gm_retire_daemon
+    else
+        echo "[GMB] fetching $TAG binaries from $RELEASE_REPO..."
+        fetch_asset "$ASSET" || exit 1
+
+        tar -xzf "$TMP/$ASSET" -C "$TMP"
+        for b in $GM_BINARIES; do
+            [ -f "$TMP/$b" ] || {
+                echo "[GMB] ERROR: $ASSET does not contain $b — refusing a partial install" >&2
+                exit 1; }
+        done
+
+        DL="$(gm_stage_dir downloads "$VERSION")"
+        rm -rf "$DL"; DL="$(gm_stage_dir downloads "$VERSION")"
+        for b in $GM_BINARIES; do cp "$TMP/$b" "$DL/$b"; chmod +x "$DL/$b"; done
+        gm_write_manifest "$DL" "$VERSION" downloads "$TAG" "$(lipo -archs "$DL/gm_daemon" 2>/dev/null | tr ' ' ',')"
+
+        gm_activate downloads "$VERSION"
+        gm_retire_daemon
+    fi
+    echo "[GMB] installed binaries v$VERSION"
+    echo "      $GM_BIN/gm_daemon -> releases/downloads/$VERSION/gm_daemon"
 fi
 
-# Checksum BEFORE anything is unpacked. The sidecar is written as
-# `<hash>  <filename>`, so it is verified from the directory where that
-# filename resolves.
-if ! ( cd "$TMP" && shasum -a 256 -c "$ASSET.sha256" >/dev/null 2>&1 ); then
-    echo "[GMB] ERROR: checksum mismatch on $ASSET — refusing to install" >&2
-    echo "       expected: $(cut -d' ' -f1 < "$TMP/$ASSET.sha256")" >&2
-    echo "       actual:   $(shasum -a 256 "$TMP/$ASSET" | cut -d' ' -f1)" >&2
-    exit 1
+# ── The app ──────────────────────────────────────────────────────────────────
+#
+# Staged under $GM_FS_ROOT first and installed FROM the store, never straight
+# out of $TMP. A re-install or a roll back to this version then needs no network
+# at all, which is the same property the binary store has.
+if [ "$APP_WORK" -eq 1 ]; then
+    STAGED_DMG="$(gm_app_dmg "$VERSION")"
+    if [ ! -f "$STAGED_DMG" ] || [ "$MODE" = "force" ]; then
+        echo "[GMB] fetching $TAG $GM_APP_NAME from $RELEASE_REPO..."
+        fetch_asset "$DMG_ASSET" || exit 1
+        mkdir -p "$(dirname "$STAGED_DMG")"
+        cp "$TMP/$DMG_ASSET" "$STAGED_DMG"
+    else
+        echo "[GMB] $GM_APP_NAME $VERSION is already in the store — installing without a download"
+    fi
+
+    if gm_install_app "$STAGED_DMG" "$VERSION"; then
+        # `if`, not `[ ... ] && echo` — under `set -e` a trailing false test
+        # ends the script, and "the app was already installed" is the common case.
+        if [ "$APP_INSTALLED" = "none" ]; then
+            echo "      (first install — $GM_APP_NAME was not on this machine before)"
+        fi
+    else
+        echo "[GMB] the app was staged at $STAGED_DMG but not installed." >&2
+        echo "      Re-run when it can be replaced: bash $SCRIPT_DIR/install_gm.sh --app" >&2
+        exit 1
+    fi
 fi
-
-tar -xzf "$TMP/$ASSET" -C "$TMP"
-for b in $GM_BINARIES; do
-    [ -f "$TMP/$b" ] || {
-        echo "[GMB] ERROR: $ASSET does not contain $b — refusing a partial install" >&2
-        exit 1; }
-done
-
-# ── Stage + activate ─────────────────────────────────────────────────────────
-DL="$(gm_stage_dir downloads "$VERSION")"
-rm -rf "$DL"; DL="$(gm_stage_dir downloads "$VERSION")"
-for b in $GM_BINARIES; do cp "$TMP/$b" "$DL/$b"; chmod +x "$DL/$b"; done
-gm_write_manifest "$DL" "$VERSION" downloads "$TAG" "$(lipo -archs "$DL/gm_daemon" 2>/dev/null | tr ' ' ',')"
-
-gm_activate downloads "$VERSION"
-gm_retire_daemon
-
-echo ""
-echo "[GMB] installed v$VERSION"
-echo "      $GM_BIN/gm_daemon -> releases/downloads/$VERSION/gm_daemon"

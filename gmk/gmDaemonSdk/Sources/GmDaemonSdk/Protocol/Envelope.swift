@@ -114,7 +114,24 @@ public enum GmWireProtocol {
     /// renamed field to nil and writing a plausible-looking wrong row — which
     /// is precisely the silent failure the m0017 model warns about. Not bumping
     /// would have made the two stacks *look* interoperable.
-    public static let version = 26
+    /// v26 → v27: the prompt lifecycle collapse (m0028). PromptStatus loses
+    /// FOUR arms — the four middle states between draft and done — and gains
+    /// one. Removing a case from an enum on an existing message is the same
+    /// class of change as the v18/v19 renames and bumps for the same reason:
+    /// it does not decode safely in either direction. A stale client sending
+    /// the old middle state reaches a daemon with no such case, and a stale
+    /// client receiving the new one cannot map it — and because `status` is a
+    /// plain TEXT column with no CHECK, the failure would be a plausible-looking
+    /// wrong row rather than a loud rejection. That is precisely the silent
+    /// failure the m0017 note warns about, so the handshake has to catch the
+    /// peer first.
+    ///
+    /// What did NOT bump this and rides along: DopeSearchRequest.sources
+    /// ([DopeSearchSource]?). An additive OPTIONAL field that decodes safely in
+    /// both directions, and whose nil means exactly what the absent field meant
+    /// — every union arm. It needed no bump of its own and simply travels with
+    /// this one.
+    public static let version = 27
 }
 
 /// Discriminator for every NDJSON message on the socket. One case per spec

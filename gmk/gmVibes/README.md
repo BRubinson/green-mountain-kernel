@@ -25,10 +25,26 @@ no gmfs to read.
 - The [green-mountain-kernel](https://github.com/BRubinson/green-mountain-kernel) plugin,
   for a populated workspace
 
-## Install (DMG)
+## Install
 
-1. Download the latest `GMVibes.dmg` from the
-   [Releases](https://github.com/BRubinson/green-mountain-kernel/releases (tags `gmvibes-v*`)) page.
+The app ships **inside the unified release** alongside the daemon binaries, at
+one version pinned by `gmk/VERSION`. The plugin's installer fetches and installs
+both, and is the recommended path — it verifies the SHA-256 sidecar before
+mounting anything:
+
+```sh
+bash plugins/gmcc/scripts/install_gm.sh          # binaries + app
+bash plugins/gmcc/scripts/install_gm.sh --app    # just the app
+```
+
+Quit GM Vibes first if it is running: the installer refuses to replace a live
+app bundle.
+
+### By hand
+
+1. Download `GMVibes-<version>.dmg` from the
+   [Releases](https://github.com/BRubinson/green-mountain-kernel/releases) page
+   (tags `gm_kernel-v*`; the retired `gmvibes-v*` tags are app-only and frozen).
 2. Open the DMG and drag **GM Vibes** to **Applications**.
 
 If the build is **ad-hoc / unsigned** (no Apple notarization), macOS Gatekeeper
@@ -52,7 +68,7 @@ closure:
 ```sh
 git clone https://github.com/BRubinson/green-mountain-kernel.git
 cd green-mountain-kernel/gmk
-open gmk.xcodeproj              # build & run in Xcode (scheme: GMVibes)
+open gmk.xcworkspace            # build & run in Xcode (scheme: GMVibes)
 ```
 
 ## Build a DMG

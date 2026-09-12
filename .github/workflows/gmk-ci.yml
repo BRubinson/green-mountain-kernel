@@ -6,12 +6,22 @@ name: gmk-ci
 # now names the module that broke instead of "the suite".
 #
 # RUNNER FLOOR IS NOT A PREFERENCE: gmAgententicsSdk's GmAgentTool.swift carries
-# an unconditional `import FoundationModels`, which exists only in the macOS 26
-# SDK. An older image does not fail slowly or partially — the package does not
-# compile at all. Every job whose graph transitively includes that package
-# inherits the floor, so all of them run on macos-26 rather than reasoning about
-# which ones strictly need it. If that import ever becomes conditional, this can
-# drop back down; until then the floor moves with the SDK.
+# an unconditional `import FoundationModels`, and the package now also depends on
+# the vendored gmClaudeForFoundationModels, whose own floor is macOS 27 (the
+# server-side LanguageModel API it implements ships in the 27 SDK). An older
+# image does not fail slowly or partially — SwiftPM refuses at GRAPH RESOLUTION,
+# before a file is read, and no `@available` gate can reach that far. Every job
+# whose graph transitively includes that package inherits the floor, so all of
+# them run on one image rather than reasoning about which ones strictly need it.
+# The floor moves with the SDK; it was macos-26 until the vendored dependency
+# raised it.
+#
+# THE LABEL IS `xcode-27`, AND THAT IS NOT A TYPO FOR `macos-27`. GitHub ships no
+# `macos-27` label at all — the macOS 27 image is published under the Xcode-
+# versioned name (`xcode-27`, `xcode-27-xlarge`), arm64 only, GA since
+# 2026-09-10. `macos-latest` still resolves to macOS 26, so it is not a shortcut
+# here either. Anyone "correcting" this to macos-27 gets an unresolvable label
+# and a job that never starts.
 #
 # OVER-TRIGGERING IS DELIBERATE. A gmVibes-only change also rebuilds gmDaemon.
 # The alternative — a hand-maintained path filter per package — is a second copy
@@ -44,15 +54,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # One job per package. `mode` is test everywhere except gmAgententicsSdk,
-  # which is COMPILE-ONLY BY DESIGN: it is 60 lines of protocol declarations,
-  # zero tests exist, and the prompt that created it explicitly forbids
-  # fleshing it out. `swift test` on a package with an empty test target is a
-  # failure, not a pass, so the mode is part of the matrix rather than a
-  # conditional inside one step.
+  # One job per package, and `mode` is now test for ALL of them.
+  #
+  # THE COMPILE-ONLY EXCEPTION IS RETIRED. gmAgententicsSdk ran `mode: build`
+  # because it was 60 lines of protocol declarations with zero tests, and the
+  # prompt that created it forbade fleshing it out — `swift test` on a package
+  # whose test target has no tests is a failure, not a pass, which is why the
+  # mode lived in the matrix rather than in a conditional. All three of those
+  # facts have since changed: the package has a real test target, and
+  # daemon-release.yml has been running `swift test` against it in its own loop
+  # for a while. The matrix was simply the last place still saying otherwise.
+  # `mode` stays in the matrix because it costs nothing and the next package to
+  # arrive may genuinely be build-only.
   packages:
     name: ${{ matrix.package }}
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 45
     strategy:
       fail-fast: false
@@ -67,7 +83,7 @@ jobs:
           - package: gmMcp
             mode: test
           - package: gmAgententicsSdk
-            mode: build
+            mode: test
           - package: gmToolchain
             mode: test
     steps:
@@ -104,9 +120,14 @@ jobs:
   # the test targets are Automatic — and a build-only job must not require the
   # Developer ID cert to be present on the runner. Release signing stays on the
   # existing release-dmg path, which is where a real identity belongs.
+  # This job's graph does NOT include gmAgententicsSdk — gmVibes depends on
+  # gmUxComponentLibrary, gmMcp and gmDaemonSdk, and nothing in the repo depends
+  # on the agentics package. It is moved to the same image anyway, so the repo
+  # has ONE runner story rather than two that have to be kept straight; a lower
+  # floor builds fine on a higher SDK.
   gmvibes:
     name: gmVibes (xcodebuild)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -139,9 +160,13 @@ jobs:
   # Everything that is not a Swift package: the shipped shell scripts, the
   # plugin manifests, and the version pin. Cheap, and it catches the class of
   # break that reaches every session in every booted repo.
+  # This job touches no Swift at all — `bash -n` and JSON parsing — so it needs
+  # no platform floor whatsoever. It moves with the others only so the repo has
+  # ONE runner label to reason about; if xcode-27 capacity ever makes this job
+  # queue, dropping it back is safe and affects nothing else.
   contracts:
     name: scripts + manifests
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4

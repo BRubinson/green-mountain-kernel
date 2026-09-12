@@ -612,32 +612,15 @@ final class BriefingTests: XCTestCase {
     // MARK: - Set-status side effect
 
     func testSetStatusClaimsAndReleasesActivation() throws {
-        // Walk prompt-a to implementing with a client key.
-        var version: Int64 = 0
-        for status in [PromptStatus.clarifying, .architecting, .implementing] {
-            // clarifying → architecting is gated on a complete clarification;
-            // drive the summaries the minimal legal way.
-            if status == .architecting {
-                try store.dbQueue.write { db in
-                    try db.execute(sql: """
-                        UPDATE clarification_summary SET status = 'complete'
-                        WHERE prompt_uuid = 'prompt-a'
-                        """)
-                }
-            }
-            if status == .implementing {
-                try store.dbQueue.write { db in
-                    try db.execute(sql: """
-                        UPDATE architecture_summary SET status = 'approved'
-                        WHERE prompt_uuid = 'prompt-a'
-                        """)
-                }
-            }
-            let row = try store.setPromptStatus(PromptSetStatusRequest(
-                promptUuid: "prompt-a", expectedVersion: version, status: status,
-                clientKey: "test-instance-one"))
-            version = row.version
-        }
+        // m0028: ONE move claims the activation, where this used to walk three
+        // rungs and prop up two summary tables by hand to get past the gates.
+        // The gates are gone and the claim moved from `implementing` to
+        // `initiated`, so the whole setup collapses to a single call — which is
+        // most of the point of the collapse.
+        let row = try store.setPromptStatus(PromptSetStatusRequest(
+            promptUuid: "prompt-a", expectedVersion: 0, status: .initiated,
+            clientKey: "test-instance-one"))
+        let version = row.version
         try store.dbQueue.read { db in
             XCTAssertEqual(
                 try self.store.resolveActivePrompt(

@@ -225,7 +225,7 @@ final class CarePackageStalenessTests: XCTestCase {
     /// may move this number, and GMVibes' local package reference rides on
     /// that rule holding.
     func testWireProtocolVersionIsPinned() {
-        XCTAssertEqual(GmWireProtocol.version, 26)
+        XCTAssertEqual(GmWireProtocol.version, 27)
     }
 
     func testStalenessOmittedByAPeerDecodesToNil() throws {

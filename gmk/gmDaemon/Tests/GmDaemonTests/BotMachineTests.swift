@@ -78,7 +78,10 @@ final class BotMachineTests: XCTestCase {
 
     func testStartRefusesNonDraftAndResumeAdopts() throws {
         _ = try store.setPromptStatus(PromptSetStatusRequest(
-            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .clarifying))
+            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .initiated))
+        // m0028: the clarification summary was a side effect of entering
+        // `clarifying`. That state is gone, so it is opened explicitly.
+        _ = try store.clarifyOpen(ClarifyOpenRequest(promptUuid: promptUuid))
         XCTAssertThrowsError(try store.promptStart(PromptStartRequest(
             promptUuid: promptUuid, variant: .bot)))
         // Resume without a variant on a machine-less prompt asks for one.
@@ -132,8 +135,13 @@ final class BotMachineTests: XCTestCase {
         XCTAssertEqual(response.phase, "clarify_open")
 
         // Sealed clarification suite → clarify_user.
-        _ = try store.setPromptStatus(PromptSetStatusRequest(
-            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .clarifying))
+        //
+        // No status move: this walk opened a briefing above, and BRIEFING_OPEN
+        // is what stamps draft → initiated. A second `initiated` is refused —
+        // `initiated`'s only legal next is `done`.
+        // m0028: the clarification summary was a side effect of entering
+        // `clarifying`. That state is gone, so it is opened explicitly.
+        _ = try store.clarifyOpen(ClarifyOpenRequest(promptUuid: promptUuid))
         let clarify = try store.clarifyGet(ClarifyGetRequest(promptUuid: promptUuid)).summary
         let q = try store.clarifyQuestionAdd(ClarifyQuestionAddRequest(
             summaryUuid: clarify.uuid, question: "sure?", options: ["yes", "no"])).question
@@ -158,8 +166,8 @@ final class BotMachineTests: XCTestCase {
         let sealed = try store.clarifyGet(ClarifyGetRequest(promptUuid: promptUuid)).summary
         _ = try store.clarifyFinalize(ClarifyFinalizeRequest(
             summaryUuid: sealed.uuid, expectedVersion: sealed.version))
-        _ = try store.setPromptStatus(PromptSetStatusRequest(
-            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .architecting))
+        // m0028: no status move here — the prompt has been `initiated`
+        // since it started, and phase is derived from the rows below.
         response = try next()
         XCTAssertEqual(response.phase, "architecture")
 
@@ -173,8 +181,8 @@ final class BotMachineTests: XCTestCase {
             summaryUuid: arch.uuid, expectedVersion: arch.version)).summary
         arch = try store.archApprove(ArchApproveRequest(
             summaryUuid: arch.uuid, expectedVersion: arch.version)).summary
-        _ = try store.setPromptStatus(PromptSetStatusRequest(
-            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .implementing))
+        // m0028: no status move here — the prompt has been `initiated`
+        // since it started, and phase is derived from the rows below.
         response = try next()
         XCTAssertEqual(response.phase, "implement")
 
@@ -208,15 +216,18 @@ final class BotMachineTests: XCTestCase {
         // approved architecture, status implementing — the forward walk
         // stranded these at explore.
         _ = try store.setPromptStatus(PromptSetStatusRequest(
-            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .clarifying))
+            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .initiated))
+        // m0028: the clarification summary was a side effect of entering
+        // `clarifying`. That state is gone, so it is opened explicitly.
+        _ = try store.clarifyOpen(ClarifyOpenRequest(promptUuid: promptUuid))
         let clarify = try store.clarifyGet(ClarifyGetRequest(promptUuid: promptUuid)).summary
         _ = try store.clarifySeal(ClarifySealRequest(
             summaryUuid: clarify.uuid, expectedVersion: clarify.version))
         let sealed = try store.clarifyGet(ClarifyGetRequest(promptUuid: promptUuid)).summary
         _ = try store.clarifyFinalize(ClarifyFinalizeRequest(
             summaryUuid: sealed.uuid, expectedVersion: sealed.version))
-        _ = try store.setPromptStatus(PromptSetStatusRequest(
-            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .architecting))
+        // m0028: no status move here — the prompt has been `initiated`
+        // since it started, and phase is derived from the rows below.
         var arch = try store.archOpen(ArchOpenRequest(promptUuid: promptUuid)).summary
         arch = try store.archSummarize(ArchSummarizeRequest(
             summaryUuid: arch.uuid, expectedVersion: arch.version, body: "legacy plan")).summary
@@ -224,8 +235,8 @@ final class BotMachineTests: XCTestCase {
             summaryUuid: arch.uuid, expectedVersion: arch.version)).summary
         _ = try store.archApprove(ArchApproveRequest(
             summaryUuid: arch.uuid, expectedVersion: arch.version))
-        _ = try store.setPromptStatus(PromptSetStatusRequest(
-            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .implementing))
+        // m0028: no status move here — the prompt has been `initiated`
+        // since it started, and phase is derived from the rows below.
         // Only a synthesis summary exists (the migration's shape).
         let synthesis = try store.exploreOpen(ExploreOpenRequest(
             promptUuid: promptUuid, agentType: "synthesis")).summary
@@ -242,7 +253,10 @@ final class BotMachineTests: XCTestCase {
     func testRpiFinalizeRequiresReadyCarePackage() throws {
         _ = try store.promptStart(PromptStartRequest(promptUuid: promptUuid, variant: .rpi))
         _ = try store.setPromptStatus(PromptSetStatusRequest(
-            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .clarifying))
+            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .initiated))
+        // m0028: the clarification summary was a side effect of entering
+        // `clarifying`. That state is gone, so it is opened explicitly.
+        _ = try store.clarifyOpen(ClarifyOpenRequest(promptUuid: promptUuid))
         let clarify = try store.clarifyGet(ClarifyGetRequest(promptUuid: promptUuid)).summary
         _ = try store.clarifySeal(ClarifySealRequest(
             summaryUuid: clarify.uuid, expectedVersion: clarify.version))
@@ -277,15 +291,18 @@ final class BotMachineTests: XCTestCase {
 
     func testOptionDecideGuardsExpansionAndPropose() throws {
         _ = try store.setPromptStatus(PromptSetStatusRequest(
-            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .clarifying))
+            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .initiated))
+        // m0028: the clarification summary was a side effect of entering
+        // `clarifying`. That state is gone, so it is opened explicitly.
+        _ = try store.clarifyOpen(ClarifyOpenRequest(promptUuid: promptUuid))
         let clarify = try store.clarifyGet(ClarifyGetRequest(promptUuid: promptUuid)).summary
         _ = try store.clarifySeal(ClarifySealRequest(
             summaryUuid: clarify.uuid, expectedVersion: clarify.version))
         let sealed = try store.clarifyGet(ClarifyGetRequest(promptUuid: promptUuid)).summary
         _ = try store.clarifyFinalize(ClarifyFinalizeRequest(
             summaryUuid: sealed.uuid, expectedVersion: sealed.version))
-        _ = try store.setPromptStatus(PromptSetStatusRequest(
-            promptUuid: promptUuid, expectedVersion: try promptVersion(promptUuid), status: .architecting))
+        // m0028: no status move here — the prompt has been `initiated`
+        // since it started, and phase is derived from the rows below.
         var arch = try store.archOpen(ArchOpenRequest(promptUuid: promptUuid)).summary
 
         // Two options; a duplicate persona is refused.

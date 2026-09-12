@@ -161,9 +161,14 @@ final class AttributionTests: XCTestCase {
         XCTAssertNotNil(phase)
     }
 
-    /// Rung 2: no workflow at all, but exactly one prompt is implementing.
+    /// Rung 2: no workflow at all, but exactly one prompt is running.
+    ///
+    /// m0028 widened what "running" means — this rung used to look for the one
+    /// prompt in `implementing`, and now looks for the one in `initiated`. The
+    /// rung is strictly less selective as a result, which is why rung 3 below
+    /// (two running prompts → no attribution) matters more than it used to.
     func testLadderFallsBackToTheSingleImplementingPrompt() throws {
-        try setStatus(promptB, .implementing)
+        try setStatus(promptB, .initiated)
         let change = try hookWrite()
         XCTAssertEqual(try promptOf(change.fileChangeUuid), promptB)
     }
@@ -178,8 +183,8 @@ final class AttributionTests: XCTestCase {
         let ambiguousWorkflows = try hookWrite()
         XCTAssertNil(try promptOf(ambiguousWorkflows.fileChangeUuid))
 
-        try setStatus(promptA, .implementing)
-        try setStatus(promptB, .implementing)
+        try setStatus(promptA, .initiated)
+        try setStatus(promptB, .initiated)
         let ambiguousStatuses = try hookWrite(path: "Sources/Other.swift")
         XCTAssertNil(try promptOf(ambiguousStatuses.fileChangeUuid))
 
@@ -391,7 +396,7 @@ final class AttributionTests: XCTestCase {
     /// binding — the same single resolution path a file_change takes, so a
     /// registration cannot land in a session the binding disagrees with.
     func testIdentityRegistrationResolvesItsSessionThroughTheBinding() throws {
-        try setStatus(promptA, .implementing)
+        try setStatus(promptA, .initiated)
         let response = try store.agentRegister(AgentRegisterRequest(
             agentId: "a349d9808be1c1472",
             agentType: "workflow-subagent",

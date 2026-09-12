@@ -182,53 +182,48 @@ struct PromptRepository: RepositoryContext {
                     : "legal next from \(from.rawValue): "
                         + from.allowedNext.map(\.rawValue).sorted().joined(separator: ", "))
         }
-        switch (from, req.status) {
-        case (.draft, .clarifying):
-            _ = try ClarificationRepository(db: db, core: core)
-                .ensureSummary(promptUuid: req.promptUuid)
-        case (.clarifying, .architecting):
-            try requireSummaryStatus(
-                table: "clarification_summary", entity: "clarification",
-                promptUuid: req.promptUuid,
-                expected: ClarificationStatus.complete.rawValue)
-            _ = try ArchitectureRepository(db: db, core: core)
-                .ensureSummary(promptUuid: req.promptUuid)
-        case (.architecting, .implementing):
-            try requireSummaryStatus(
-                table: "architecture_summary", entity: "architecture",
-                promptUuid: req.promptUuid,
-                expected: ArchitectureStatus.approved.rawValue)
-        default:
-            // implementing → {reviewing, done} and reviewing → done stay
-            // UNGATED (decision 7, advisory for one release). Their exit
-            // contracts DO exist now — WorkflowGates.implementExitUnmet and
-            // WorkflowGates.reviewFixExitUnmet — but they are only REPORTED,
-            // through the blockers BOT_NEXT already prints, prefixed
-            // `advisory: `. Refusing here today would block prompts that are
-            // mid-flight against a capture path still being repaired.
-            //
-            // Promotion condition, both halves required: the advisories run
-            // clean on real prompts, AND per-agent file-change attribution
-            // has been watched across at least one parallel fan-out run
-            // (N agents race one baseline cursor; prompt-level attribution
-            // and change kinds are exact, agent_id is best-effort). Promote
-            // by calling the two predicates from cases added here — not by
-            // moving them into BotWorkflowRepository.entryBlockers, which
-            // would derive already-done prompts backwards.
-            break
-        }
+        // NO GATE SWITCH. m0028 removed it, and what it did is worth recording
+        // because its absence is the change rather than an omission.
+        //
+        // It used to do two jobs at once. It REFUSED a transition whose
+        // predecessor summary was not complete (clarification complete before
+        // architecting, architecture approved before implementing), and as a
+        // side effect it CREATED the next phase's backing summary via
+        // ensureSummary. With four of the six states gone there is nothing left
+        // to gate between: the only moves are draft → initiated → done and the
+        // done → draft edit edge.
+        //
+        // The creation half had to go somewhere, and it went where it always
+        // belonged — explicit opens. CLARIFY_OPEN, ARCH_OPTION_ADD and
+        // REVIEW_OPEN now create their own rows, so opening a summary is a
+        // call an agent makes rather than a thing that quietly happened to it
+        // while moving a status.
+        //
+        // The refusal half is not reimplemented elsewhere. BOT_NEXT's gate
+        // blockers still report what a phase is waiting on, which is the same
+        // information served advisorily instead of as a wall — matching the
+        // registry's stance that the machine classifies and guides but does not
+        // authorize.
         try core.updateBase(
             db, table: "prompt", uuid: req.promptUuid,
             expectedVersion: req.expectedVersion,
             set: ["status": req.status.rawValue])
         // Activation is a SIDE EFFECT of the lifecycle door, not a verb:
-        // declaring work active already WAS set-status implementing. One
-        // claim per running Claude instance (client_key), so concurrent
-        // prompts on one session each keep their own claim — never a
-        // last-writer-wins pointer. done releases the PROMPT's claim
-        // regardless of which instance calls it.
+        // declaring work active already WAS moving the status. One claim per
+        // running Claude instance (client_key), so concurrent prompts on one
+        // session each keep their own claim — never a last-writer-wins
+        // pointer. done releases the PROMPT's claim regardless of which
+        // instance calls it.
+        //
+        // m0028 moved the claim EARLIER, from the old implementing state to
+        // `initiated`. That is a behaviour change, not just a rename: work is
+        // now claimed when the prompt starts rather than when implementation
+        // starts, so briefing, exploration and architecture run under the claim
+        // too. That is the more honest reading of "this instance is working on
+        // this prompt", and it is the only reading available once the states
+        // between start and finish are gone.
         let sessionUuid: String = head["session_uuid"]
-        if req.status == .implementing, let clientKey = req.clientKey {
+        if req.status == .initiated, let clientKey = req.clientKey {
             try SessionRepository(db: db, core: core).claimActivation(
                 sessionUuid: sessionUuid,
                 promptUuid: req.promptUuid, clientKey: clientKey)
@@ -250,27 +245,12 @@ struct PromptRepository: RepositoryContext {
         return row
     }
 
-    /// Gate check shared by the lifecycle transitions: the backing summary
-    /// must exist at the expected status.
-    private func requireSummaryStatus(
-        table: String,
-        entity: String,
-        promptUuid: String,
-        expected: String
-    ) throws {
-        guard let actual = try String.fetchOne(
-            db, sql: "SELECT status FROM \(table) WHERE prompt_uuid = ?", arguments: [promptUuid]
-        ) else {
-            throw StoreError.invalidEntityTransition(
-                entity: "prompt", from: "gate", to: expected,
-                reason: "no \(entity) summary exists for prompt \(promptUuid)")
-        }
-        guard actual == expected else {
-            throw StoreError.invalidEntityTransition(
-                entity: "prompt", from: actual, to: expected,
-                reason: "\(entity) summary must be \(expected) first")
-        }
-    }
+    // `requireSummaryStatus` lived here until m0028 and is deliberately gone
+    // rather than left unused. It read one summary table's status and refused
+    // the transition unless it matched — the enforcement half of the gate
+    // switch above. With no transitions left to gate it had no caller, and a
+    // private helper kept "for later" is how a removed rule quietly comes back.
+    // The queries it ran are trivial to write again if a gate is ever wanted.
 
     // MARK: - Shared fetch helper
 

@@ -52,7 +52,8 @@ Same as /gm_bot (resume by seq / create by slug — STAY TRUE), with
   suite. YOU seal the suite, run the user conversation (AskUserQuestion
   mirroring the option rows) and the answers; then the care package
   (curated COPIES of ranked findings + dope/kbite refs + the
-  clarified-intent blob), finalize, set-status architecting.
+  clarified-intent blob), finalize, then open the architecture summary
+  (ARCH_OPEN). No status move — the prompt is already `initiated`.
 - **Architecture optioning** — four `gmcc:code-architect` personas each pen
   their OWN option row (`arch_option_add`). You pick the winner with
   `mcp__plugin_gmcc_pen__arch_decide` (rationale recorded; siblings rejected; offer the

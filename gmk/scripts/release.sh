@@ -1,94 +1,52 @@
 #!/usr/bin/env bash
 #
-# release.sh — Build the GMVibes DMG and publish it as a GitHub release asset.
+# release.sh — RETIRED. The app no longer has a release of its own.
 #
-# Builds via gmk/scripts/build-dmg.sh (which auto-detects signing) and uploads the
-# resulting DMG to a GitHub release on the `origin` repo (the green-mountain-kernel
-# monorepo) using `gh`. Tags are namespaced `gmvibes-v<version>` so app releases
-# never collide with marketplace/plugin tags.
+# This script used to build the GMVibes DMG and publish it under its own
+# `gmvibes-v<MARKETING_VERSION>` tag, independently of the binaries. That split
+# is what the unified release removed, and the reasons it had to go are worth
+# keeping written down:
 #
-# Signing / notarization is automatic:
-#   • Developer ID Application cert present → signs + notarizes + staples
-#     (set NOTARIZE=0 to skip notarization and ship a signed-but-not-notarized DMG).
-#   • No Developer ID → ad-hoc DMG (recipients clear quarantine; see README).
+#   - TWO VERSION NUMBERS, NO RELATIONSHIP. The app was tagged from
+#     MARKETING_VERSION (3.9) and the runtime from gmk/VERSION (50.0.1). Nothing
+#     recorded which app went with which daemon, and the wire protocol between
+#     them is not version-free.
+#   - THE INSTALLER COULD ONLY UPGRADE HALF THE SYSTEM. install_gm.sh fetched
+#     the binary release and had no idea an app release existed, so a user who
+#     upgraded got a new daemon talking to whatever app they happened to have.
+#   - IT WOULD PUBLISH AN AD-HOC DMG. With no Developer ID it built unsigned and
+#     shipped it with a note telling recipients to strip quarantine by hand.
+#     publish_release.sh now refuses that by default (--allow-adhoc to override).
 #
-# Usage:
-#   scripts/release.sh                 # tag from MARKETING_VERSION (e.g. gmvibes-v1.0)
-#   scripts/release.sh 1.2.0           # explicit version → tag gmvibes-v1.2.0
-#   scripts/release.sh v1.2.0          # explicit version → tag gmvibes-v1.2.0
-#   NOTARIZE=0 scripts/release.sh      # skip notarization even if Dev ID exists
+# This file is kept as a signpost rather than deleted: it was named by the
+# `release-dmg` skill and by anything a person's shell history remembers, and a
+# "command not found" says nothing about where the capability went.
 #
-# Prereqs: gh authenticated (`gh auth status`), an `origin` GitHub remote.
-# For notarization: a `notarytool` keychain profile (default name "gmcc-ui").
-#   xcrun notarytool store-credentials gmcc-ui \
-#       --apple-id "you@example.com" --team-id "TEAMID" --password "app-specific-pw"
+# TO CUT A RELEASE — one command publishes the binaries AND the app at one
+# version, under one `gm_kernel-v*` tag:
 #
-set -euo pipefail
+#     bash gmk/scripts/rebuild_local.sh      # build + stage <version>-BETA
+#     bash gmk/scripts/publish_release.sh    # verify, build the DMG, tag, upload
+#
+# TO BUILD A DMG WITHOUT PUBLISHING ANYTHING — unchanged, and still the right
+# tool for a one-off build you hand to someone:
+#
+#     bash gmk/scripts/build-dmg.sh          # build/GMVibes-<gmk/VERSION>.dmg
+#     bash gmk/scripts/build-dmg.sh 1.2.3    # ...at an explicit version
 
-APP_NAME="GMVibes"
-# gmk/ — one level up from gmk/scripts/. See build-dmg.sh for why these live
-# here and not under gmk/gmVibes/.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+cat >&2 <<'EOF'
+[GMB] gmk/scripts/release.sh is retired.
 
-DMG_PATH="$ROOT/build/$APP_NAME.dmg"
+      The app is no longer released on its own tag. One release now carries the
+      three binaries and the GMVibes DMG at one version from gmk/VERSION.
 
-# --- Resolve version / tag --------------------------------------------------
-ARG="${1:-}"
-if [ -n "$ARG" ]; then
-  VERSION="${ARG#v}"
-else
-  VERSION="$(grep -m1 'MARKETING_VERSION' "gmk.xcodeproj/project.pbxproj" \
-    | sed -E 's/.*= ([^;]+);.*/\1/' | tr -d ' ')"
-  [ -n "$VERSION" ] || { echo "error: could not read MARKETING_VERSION; pass a version arg" >&2; exit 1; }
-fi
-TAG="gmvibes-v$VERSION"
+      Publish everything:
+          bash gmk/scripts/rebuild_local.sh
+          bash gmk/scripts/publish_release.sh
 
-# --- Preflight --------------------------------------------------------------
-command -v gh >/dev/null || { echo "error: gh not installed" >&2; exit 1; }
-gh auth status >/dev/null 2>&1 || { echo "error: gh not authenticated — run: gh auth login" >&2; exit 1; }
-# Releases ship to the green-mountain-kernel monorepo — refuse any other origin
-# so a stray checkout can never publish somewhere surprising.
-ORIGIN="$(git -C "$ROOT" remote get-url origin 2>/dev/null || true)"
-case "$ORIGIN" in
-  *green-mountain-kernel*) ;;
-  *) echo "error: origin is '$ORIGIN' — releases must publish to green-mountain-kernel" >&2; exit 1 ;;
-esac
+      Just build a DMG, publishing nothing:
+          bash gmk/scripts/build-dmg.sh
 
-# --- Decide notarization ----------------------------------------------------
-DEV_ID="$(security find-identity -v -p codesigning 2>/dev/null \
-  | grep -c "Developer ID Application" || true)"
-if [ "${DEV_ID:-0}" -gt 0 ]; then
-  export NOTARIZE="${NOTARIZE:-1}"
-  echo "==> Developer ID found — NOTARIZE=$NOTARIZE"
-else
-  export NOTARIZE=0
-  echo "==> No Developer ID — building ad-hoc (unnotarized) DMG"
-fi
-
-# --- Build ------------------------------------------------------------------
-"$ROOT/scripts/build-dmg.sh"
-[ -f "$DMG_PATH" ] || { echo "error: DMG not produced at $DMG_PATH" >&2; exit 1; }
-
-# --- Publish ----------------------------------------------------------------
-if [ "$NOTARIZE" = "1" ]; then
-  NOTE="Notarized build."
-elif [ "${DEV_ID:-0}" -gt 0 ]; then
-  NOTE="Signed (Developer ID), not notarized."
-else
-  NOTE="Ad-hoc build (unsigned). Clear quarantine: \`xattr -dr com.apple.quarantine /Applications/$APP_NAME.app\`"
-fi
-
-if gh release view "$TAG" >/dev/null 2>&1; then
-  echo "==> Release $TAG exists — uploading asset (clobber)…"
-  gh release upload "$TAG" "$DMG_PATH" --clobber
-else
-  echo "==> Creating release ${TAG}…"
-  gh release create "$TAG" "$DMG_PATH" \
-    --title "$APP_NAME $TAG" \
-    --notes "$NOTE"
-fi
-
-echo ""
-echo "✅ Published $TAG"
-gh release view "$TAG" --json url -q .url
+      See the comments at the top of this file for why the split was removed.
+EOF
+exit 2

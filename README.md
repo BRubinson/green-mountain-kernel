@@ -196,7 +196,9 @@ kbites/
   shared domain layer, plus the `gm_hook` client binary), `gmDaemon` (persistence and the
   `gm_daemon` server), `gmUxComponentLibrary` (shared SwiftUI components),
   `gmAgententicsSdk` (agent-tool protocols), `gmMcp` (the `gm_mcp` pen server) and
-  `gmVibes` (the macOS app). One Xcode project, `gmk/gmk.xcodeproj`, spans them.
+  `gmVibes` (the macOS app). One Xcode project, `gmk/gmk.xcodeproj`, spans them, and
+  `gmk/gmk.xcworkspace` opens that project together with every package as an editable
+  workspace member.
 - **Skills** — the core `gmcc` skill defines GM-CDE behavior; supporting skills
   (`gmcc_kbite`, `gmcc_maw`, `gmcc_cleanup`, …) carry
   `disable-model-invocation` so they load only during the relevant workflow, keeping

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:gmk.xcodeproj">
+   </FileRef>
+   <Group
+      location = "container:"
+      name = "Packages">
+      <FileRef
+         location = "group:gmDaemonSdk">
+      </FileRef>
+      <FileRef
+         location = "group:gmDaemon">
+      </FileRef>
+      <FileRef
+         location = "group:gmUxComponentLibrary">
+      </FileRef>
+      <FileRef
+         location = "group:gmAgententicsSdk">
+      </FileRef>
+      <FileRef
+         location = "group:gmMcp">
+      </FileRef>
+      <FileRef
+         location = "group:gmToolchain">
+      </FileRef>
+   </Group>
+</Workspace>
