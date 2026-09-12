@@ -14,7 +14,7 @@ Processes all crunchable resources in the maw, generating analysis ("chewed") fi
 
 ## Pre-Flight Checks
 
-**Boot Validation**: If `$GMCC_BOOTED` is not set, output:
+**Boot Validation**: If `$GM_BOOTED` is not set, output:
 ```
 [GMB] ERROR: GMCC not booted
 
@@ -23,7 +23,7 @@ To fix: Restart Claude Code from within a git repository.
 ```
 Exit without proceeding.
 
-1. Resolve the kbite roots from `gmcc_hook paths --json` (kbite_root,
+1. Resolve the kbite roots from `gm_hook paths --json` (kbite_root,
    kbite_open_root)
 2. Verify maw exists at `{kbite_open_root}/{kbite_name}/`
 3. Read MAW_INDEX.md for current state

@@ -14,7 +14,7 @@ Opens a "maw" (processing directory) under the kbite for collecting crunchable r
 
 ## Pre-Flight Checks
 
-**Boot Validation**: If `$GMCC_BOOTED` is not set, output:
+**Boot Validation**: If `$GM_BOOTED` is not set, output:
 ```
 [GMB] ERROR: GMCC not booted
 
@@ -23,7 +23,7 @@ To fix: Restart Claude Code from within a git repository.
 ```
 Exit without proceeding.
 
-1. Resolve the kbite roots from `gmcc_hook paths --json` (kbite_root,
+1. Resolve the kbite roots from `gm_hook paths --json` (kbite_root,
    kbite_open_root, kbite_digested_root)
 2. Parse `{kbite_name}` argument
 
@@ -84,7 +84,7 @@ One call — the daemon creates the two-axis directory tree and `MAW_INDEX.md`
 No db rows are written; maws are filesystem-only until digest:
 
 ```bash
-gmcc_hook call KBITE_MAW_OPEN --json '{"kbite_name":"{kbite_name}","maw_path":"{kbite_open_root}/{kbite_name}"}'
+gm_hook call KBITE_MAW_OPEN --json '{"kbite_name":"{kbite_name}","maw_path":"{kbite_open_root}/{kbite_name}"}'
 ```
 
 The response reports `created_dirs` and `created_index` — both empty/false
@@ -127,7 +127,7 @@ Then create `{kbite_root}/{kbite_name}/KBITE_PURPOSE.md`:
 ## Success Criteria
 - [ ] Contains primary documentation sources
 - [ ] Chewed analysis covers all key concepts
-- [ ] `gmcc_hook call KBITE_GET --json '{"code":"{kbite_name}"}'` accurately reflects the digested resources
+- [ ] `gm_hook call KBITE_GET --json '{"code":"{kbite_name}"}'` accurately reflects the digested resources
 ```
 
 ---

@@ -3,7 +3,7 @@ name: gm_bot_team
 description: Agent-team GMCC workflow (variant team). Dynamic workflows drive briefing+explore+clarify-open, implementation, and review-fix; four methodology personas per fan-out phase; architecture optioning with one decide step.
 argument-hint: <prompt-name|seq> <task/prompt content>
 disable-model-invocation: true
-allowed-tools: Bash(gmcc_hook:*)
+allowed-tools: Bash(gm_hook:*)
 ---
 
 # GM-CDE Bot Team (variant: team)
@@ -16,7 +16,7 @@ gate blockers. Canonical reference: `skills/gmcc/ref/bot_workflows.md`.
 
 ## Pre-Flight
 
-If `$GMCC_BOOTED` is not set, or agent teams are unavailable
+If `$GM_BOOTED` is not set, or agent teams are unavailable
 (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`), report the error and exit
 (fallback: /gm_bot_rpi).
 

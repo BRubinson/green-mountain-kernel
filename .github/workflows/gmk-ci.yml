@@ -21,9 +21,9 @@ name: gmk-ci
 #
 # THE SCRIPTS ARE NEVER RUN HERE, ONLY SYNTAX-CHECKED. That is a PRESERVED
 # invariant, not a new rule: daemon-ci.yml never invoked the installers either.
-# build_gm.sh and install_gm.sh write to ~/gmfs and download release assets;
-# neither belongs in a per-PR job, and the packages are built directly below,
-# which is the part worth gating. Do not "fix" this by adding a real build.
+# rebuild_local.sh and publish_release.sh write to ~/gmfs, tag, and upload release
+# assets; neither belongs in a per-PR job, and the packages are built directly
+# below, which is the part worth gating. Do not "fix" this by adding a real build.
 
 on:
   push:

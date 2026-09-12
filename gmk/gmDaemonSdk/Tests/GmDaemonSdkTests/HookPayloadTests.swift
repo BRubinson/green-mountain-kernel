@@ -256,7 +256,7 @@ final class HookPayloadTests: XCTestCase {
         // whose marker named a runtime root and a separate content root could
         // describe a half-sandboxed session; one var cannot.
         try """
-        # Written by gm sandbox refresh — sourced by gmcc_session_startup.sh so any
+        # Written by gm sandbox refresh — sourced by gm_session_startup.sh so any
         # Claude session inside this snapshot auto-sandboxes.
         export GM_FS_ROOT="/tmp/sandbox/gmfs"
         """.write(
@@ -365,7 +365,7 @@ final class HookPayloadTests: XCTestCase {
         // A build system, a script and a patch tool all write files this
         // parser never sees named.
         XCTAssertEqual(extracted("make install"), [])
-        XCTAssertEqual(extracted("./scripts/build_daemon.sh"), [])
+        XCTAssertEqual(extracted("./scripts/rebuild_local.sh"), [])
         XCTAssertEqual(extracted("git apply fix.patch"), [])
         XCTAssertEqual(extracted("swift build"), [])
         // Unbalanced quotes: the scanner cannot know where the word

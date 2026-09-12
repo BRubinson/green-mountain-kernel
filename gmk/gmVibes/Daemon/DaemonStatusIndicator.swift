@@ -21,7 +21,7 @@ struct DaemonStatusPopover: View {
                     .lineLimit(4)
                 startButton
             case .notInstalled:
-                Text("Daemon binary missing at ~/gmcc/bin/gmcc_daemon.\nRun plugins/gmcc/scripts/install_daemon.sh in the green-mountain-kernel repo.")
+                Text("Daemon binary missing at ~/gmfs/bin/gm_daemon.\nRun plugins/gmcc/scripts/install_gm.sh, or bash gmk/scripts/rebuild_local.sh from a checkout.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .incompatible(let daemonVersion):

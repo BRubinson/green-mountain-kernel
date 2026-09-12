@@ -20,17 +20,17 @@ says, and let the human tell you how it reads.
 
 ## The substrate (nothing here is new machinery)
 
-- WRITE: `gmcc_hook call DIAGRAM_BATCH_APPLY --json-file P`, with the payload
+- WRITE: `gm_hook call DIAGRAM_BATCH_APPLY --json-file P`, with the payload
   `{"diagram_uuid":"U","expected_revision":N,"mutations":[...]}` — one
   transaction, one revision bump, one durable DIAGRAM_CHANGE event.
   `expected_revision` is the whole-diagram CAS: on VERSION_CONFLICT, re-get,
   rebase your mutations, retry ONCE. Use `--json-file` rather than `--json`
   for anything but a trivial batch; shell argument limits sit far below the
   daemon's content caps.
-- WATCH: `gmcc_hook call EVENT_LIST --json '{"kind":"DIAGRAM_CHANGE","subject_uuid":"U","since_id":N}'`.
+- WATCH: `gm_hook call EVENT_LIST --json '{"kind":"DIAGRAM_CHANGE","subject_uuid":"U","since_id":N}'`.
   Durable and replayable — no subscription needed; poll between your own
   turns.
-- READ BACK: `gmcc_hook call DIAGRAM_GET --json '{"diagram_uuid":"U"}'` for
+- READ BACK: `gm_hook call DIAGRAM_GET --json '{"diagram_uuid":"U"}'` for
   the tree, including read-time dope binding resolutions.
 
 ## Echo suppression (the one stated rule)
@@ -46,17 +46,17 @@ column, by design.
 ## Flow
 
 1. **Pick the canvas.** Resolve the current context first —
-   `gmcc_hook context ensure` returns project_uuid, instance_uuid and
+   `gm_hook context ensure` returns project_uuid, instance_uuid and
    session_uuid. No argument →
-   `gmcc_hook call DIAGRAM_SEARCH --json '{"project_uuid":"P","limit":20}'`
+   `gm_hook call DIAGRAM_SEARCH --json '{"project_uuid":"P","limit":20}'`
    (browse mode) and AskUserQuestion over the recent diagrams (+ "create
    new"). `new <code> <name>` →
-   `gmcc_hook call DIAGRAM_INIT --json '{"session_uuid":"U","code":"<code>","name":"<name>"}'`.
+   `gm_hook call DIAGRAM_INIT --json '{"session_uuid":"U","code":"<code>","name":"<name>"}'`.
    A bare code →
-   `gmcc_hook call DIAGRAM_GET --json '{"session_uuid":"U","code":"<code>"}'`;
+   `gm_hook call DIAGRAM_GET --json '{"session_uuid":"U","code":"<code>"}'`;
    on SUMMARY_ABSENT offer to init.
 2. **Baseline.** DIAGRAM_GET for the tree + revision; note the current event
-   cursor (`gmcc_hook status` → `last_event_id`). Set watermark = revision.
+   cursor (`gm_hook status` → `last_event_id`). Set watermark = revision.
    Ask the human what they see on the GMVibes canvas — that is your only
    check on how the tree actually reads.
 3. **Announce the loop** to the user: they draw in GMVibes (the canvas
@@ -90,14 +90,14 @@ use `parent_client_ref`/`target_client_ref`.
 
 ## Pre-flight
 
-If `$GMCC_BOOTED` is unset:
+If `$GM_BOOTED` is unset:
 
 ```
 [GMB] ERROR: GMCC not booted — run /gmcc_boot for diagnostics.
 ```
 
 If the daemon is unreachable: `bash
-$GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`, then `gmcc_hook context ensure`
+$GM_PLUGIN_ROOT/scripts/install_gm.sh`, then `gm_hook context ensure`
 (the next client call brings the daemon up), retry.
 
 ARGUMENTS: $ARGUMENTS

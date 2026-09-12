@@ -10,7 +10,7 @@ keywords, and search live in the daemon db (read with the `kbite_search` /
 `kbite_file_get` pen tools); the filesystem keeps each kbite's identity
 (`{kbite_root}/{name}/KBITE_PURPOSE.md`) and raw-source archive
 (`{kbite_digested_root}/{name}/`) — both roots from
-`gmcc_hook paths --json`.
+`gm_hook paths --json`.
 
 KBites are **inherited, not trigger-matched**. The kbites relevant to the
 current work are seeded down the hierarchy — project → instance → session →
@@ -24,7 +24,7 @@ To use kbite knowledge:
    scoped listing:
 
    ```bash
-   gmcc_hook call KBITE_LIST --json \
+   gm_hook call KBITE_LIST --json \
      '{"scope":"project|instance|session|prompt","owner_uuid":"U"}'
    # add "all": true for every kbite row in the db
    ```
@@ -34,12 +34,12 @@ To use kbite knowledge:
    — read the briefs, then pull the ones that matter with `kbite_file_get`
    (full file content — the targeted load). For a kbite's whole roster of
    resources, file stubs and keywords:
-   `gmcc_hook call KBITE_GET --json '{"code":"{name}"}'`.
+   `gm_hook call KBITE_GET --json '{"code":"{name}"}'`.
 3. **Explicit add only**: add a kbite to a registry only when the user
    explicitly asks for it:
 
    ```bash
-   gmcc_hook call KBITE_ADD --json '{"scope":"session","owner_uuid":"U","code":"C"}'
+   gm_hook call KBITE_ADD --json '{"scope":"session","owner_uuid":"U","code":"C"}'
    ```
 
    Never add one on your own initiative.
@@ -59,4 +59,4 @@ Suggest: "This looks like a good candidate for a kbite. Run `/gm_crunch_open_maw
 
 ## KBite System Reference
 
-Full kbite system documentation is in `$GMCC_PLUGIN_ROOT/skills/gmcc_kbite/SKILL.md`
+Full kbite system documentation is in `$GM_PLUGIN_ROOT/skills/gmcc_kbite/SKILL.md`

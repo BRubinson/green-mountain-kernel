@@ -9,7 +9,7 @@ allowed-tools: Read, Write, Bash, Glob, AskUserQuestion
 # GMCC Session Cleanup Skill
 
 Audits the **current session** — the artifact tree at the session's
-artifact home (`$GMCC_CKFS_ROOT/{ckfs_relative_storage_path}`, the relative
+artifact home (`$GM_FS_ROOT/{gmfs_relative_storage_path}`, the relative
 path on the session row) cross-checked against the daemon db rows
 (`SESSION_GET`, `PROMPT_LIST`, the pen's `prompt_get` and `file_change_list`,
 `ARTIFACT_LIST`) — and interactively resolves each finding.
@@ -19,7 +19,7 @@ This is the **session-scoped counterpart** to `gmcc_cleanup` (the
 **excludes** the running session's paths from its walk, so the inside of
 the active session is never inspected there. This skill fills that gap: it
 looks *only* at the current session and never walks siblings or the
-broader `$GMCC_CKFS_ROOT`.
+broader `$GM_FS_ROOT`.
 
 ---
 
@@ -34,8 +34,8 @@ broader `$GMCC_CKFS_ROOT`.
 ## Scope (hard boundary)
 
 **Walk ONLY the session's artifact home + this session's db rows.** Never recurse
-into `$GMCC_CKFS_ROOT` broadly, never inspect sibling sessions, never touch
-`_archive/`. Db reads go through the pen tools or `gmcc_hook call <TYPE>`;
+into `$GM_FS_ROOT` broadly, never inspect sibling sessions, never touch
+`_archive/`. Db reads go through the pen tools or `gm_hook call <TYPE>`;
 repairs are the matching write verbs or filesystem moves within the session.
 
 ---
@@ -57,7 +57,7 @@ repairs are the matching write verbs or filesystem moves within the session.
 | Finding | Example | Default suggestion |
 |---------|---------|--------------------|
 | Unregistered artifact | a file under `memory/` with no `prompt_artifact` row (`ARTIFACT_LIST {"prompt_uuid":"U"}`) | Register via `ARTIFACT_ADD {"prompt_uuid":"U","file_path":"…","note":"…"}` (default), or skip |
-| Report written as a file | any `memory/{qualified,architecture,explore,review}.md` | DRIFT: every report is db-native. If no rows exist yet, transfer the content through the normal verbs — exploration: `bot_summary` then `explore_complete`; review: `REVIEW_OPEN` then `REVIEW_COMPLETE` (use `gmcc_hook call ... --json-file` for an overview too large for a shell argument) — then archive the file to cold storage |
+| Report written as a file | any `memory/{qualified,architecture,explore,review}.md` | DRIFT: every report is db-native. If no rows exist yet, transfer the content through the normal verbs — exploration: `bot_summary` then `explore_complete`; review: `REVIEW_OPEN` then `REVIEW_COMPLETE` (use `gm_hook call ... --json-file` for an overview too large for a shell argument) — then archive the file to cold storage |
 | Dangling pointer | artifact row whose `file_path` doesn't exist on disk | Flag for user — restore the file if recoverable, or accept (pointers are history; there is no delete verb for them) |
 
 ### (c) File-change trail sanity
@@ -70,8 +70,8 @@ repairs are the matching write verbs or filesystem moves within the session.
 
 | Finding | Example | Default suggestion |
 |---------|---------|--------------------|
-| No session row | no session row resolves for this repo/branch | `gmcc_hook context ensure` via the `gmcc_session_creation` skill (default) |
-| Daemon unreachable | `gmcc_hook ping` fails | Self-heal: `bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`, retry |
+| No session row | no session row resolves for this repo/branch | `gm_hook context ensure` via the `gmcc_session_creation` skill (default) |
+| Daemon unreachable | `gm_hook ping` fails | Self-heal: `bash $GM_PLUGIN_ROOT/scripts/install_gm.sh`, retry |
 
 ---
 
@@ -79,7 +79,7 @@ repairs are the matching write verbs or filesystem moves within the session.
 
 Bounded to the session. Order:
 
-1. **Health first** — `gmcc_hook ping`, then `gmcc_hook context ensure` to
+1. **Health first** — `gm_hook ping`, then `gm_hook context ensure` to
    resolve this repo/branch to its uuids; without a reachable daemon +
    session row, only filesystem findings can be audited (offer to fix
    health first).
@@ -87,7 +87,7 @@ Bounded to the session. Order:
    `session_data.gmcc.yaml` / `gmcc_session_file_index.yaml`) is a
    finding.
 3. **Db → disk** — for each stub in
-   `gmcc_hook call PROMPT_LIST --json '{"session_uuid":"<U>"}'`: check the
+   `gm_hook call PROMPT_LIST --json '{"session_uuid":"<U>"}'`: check the
    `{seq}_{name}/memory/` dir, then `ARTIFACT_LIST` rows vs disk files.
 4. **Disk → db** — for each `prompts/{seq}_{name}/` folder: check a
    matching row exists; flag stray yamls and unknown files.
@@ -105,8 +105,8 @@ always the recommended, non-destructive default. Standard options:
 
 | Option | What it does |
 |--------|--------------|
-| **Register / repair** (default for db-vs-disk drift) | The matching write call (`ARTIFACT_ADD`, `gmcc_hook context ensure`) or `mkdir -p`/rename. |
-| **Archive** | `mv` into `$GMCC_CKFS_ROOT/_archive/cold_storage/{relative_path}` (structure-preserving, reversible). |
+| **Register / repair** (default for db-vs-disk drift) | The matching write call (`ARTIFACT_ADD`, `gm_hook context ensure`) or `mkdir -p`/rename. |
+| **Archive** | `mv` into `$GM_FS_ROOT/_archive/cold_storage/{relative_path}` (structure-preserving, reversible). |
 | **Skip** | Leave the finding in place. Always available. |
 
 ---
@@ -131,7 +131,7 @@ Beginning interactive resolution. You can abort at any time — completed action
 
 After resolution, print a resolved/skipped tally. Db repairs are audited
 automatically in the daemon event log
-(`gmcc_hook call EVENT_LIST --json '{"limit":50}'`); filesystem actions are
+(`gm_hook call EVENT_LIST --json '{"limit":50}'`); filesystem actions are
 reported in chat only.
 
 ---
@@ -140,6 +140,6 @@ reported in chat only.
 
 - **Never auto-fix** — every action requires user confirmation via AskUserQuestion.
 - **Never delete** — the destructive option is archive to cold storage (move, not delete).
-- **Never write the db directly** — every db repair goes over the socket, through a pen tool or `gmcc_hook call`.
+- **Never write the db directly** — every db repair goes over the socket, through a pen tool or `gm_hook call`.
 - **Stay in scope** — never act on anything outside the session's artifact home (plus this session's db rows).
 - **--dry-run** — when invoked with `--dry-run`, walk and report only; skip the resolution loop entirely.

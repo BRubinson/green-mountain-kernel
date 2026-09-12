@@ -84,7 +84,7 @@ For each downloaded URL, the script saves:
 | `{slug}.md` | Extracted text content as basic markdown |
 | `_manifest.json` | Metadata: URLs, timestamps, sizes, errors |
 
-Files are saved to: `{kbite_open_root}/{kbite}/{axis1}/{axis2}/{resource_name}/` (kbite_open_root from `gmcc_hook paths --json`)
+Files are saved to: `{kbite_open_root}/{kbite}/{axis1}/{axis2}/{resource_name}/` (kbite_open_root from `gm_hook paths --json`)
 
 ---
 

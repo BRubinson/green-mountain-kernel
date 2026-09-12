@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static wire-key contract extractor for GMCCDaemonKit/Protocol/*.swift.
+"""Static wire-key contract extractor for GmDaemonSdk/Protocol/*.swift.
 
 Emits one line per stored Codable property: `Type.property -> json_key`.
 The effective key is the explicit CodingKeys mapping when one exists, else

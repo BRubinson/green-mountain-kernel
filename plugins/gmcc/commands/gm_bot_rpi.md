@@ -3,7 +3,7 @@ name: gm_bot_rpi
 description: Subagent GMCC workflow (variant rpi). One general-persona subagent per phase adopts every methodology's goals at once; up to 2 implementation subagents; the care package carries clarified intent into architecture.
 argument-hint: <prompt-name|seq> <task/prompt content>
 disable-model-invocation: true
-allowed-tools: Bash(gmcc_hook:*)
+allowed-tools: Bash(gm_hook:*)
 ---
 
 # GM-CDE Bot RPI (variant: rpi)
@@ -17,7 +17,7 @@ Canonical reference: `skills/gmcc/ref/bot_workflows.md`.
 
 ## Pre-Flight
 
-If `$GMCC_BOOTED` is not set:
+If `$GM_BOOTED` is not set:
 
 ```
 [GMB] ERROR: GMCC not booted — run /gmcc_boot for diagnostics.

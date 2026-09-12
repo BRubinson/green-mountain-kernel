@@ -17,23 +17,23 @@ The db is the editing surface. The files are a **publication** of it.
 Granular edits are one verb per level, reached through the passthrough:
 
 ```bash
-gmcc_hook call DOPE_NODE_ADD --json \
+gm_hook call DOPE_NODE_ADD --json \
   '{"level":"persistence|entity|property|enum|option",
     "parent_uuid":"P","fields":{...}}'
 
-gmcc_hook call DOPE_NODE_UPDATE --json \
+gm_hook call DOPE_NODE_UPDATE --json \
   '{"level":"entity","node_uuid":"N","expected_version":V,"fields":{...}}'
 
-gmcc_hook call DOPE_WRITE_REPO --json '{"scope_uuid":"U"}'      # db -> files
+gm_hook call DOPE_WRITE_REPO --json '{"scope_uuid":"U"}'      # db -> files
 ```
 
 Hand-editing is the exception, not the workflow. When it happens:
 
 ```bash
 # parse + validate, never writes — one of scope_uuid or dir_path
-gmcc_hook call DOPE_READ_REPO  --json '{"scope_uuid":"U"}'
-gmcc_hook call DOPE_MERGE_PLAN --json '{"scope_uuid":"U"}'      # db vs files, read-only
-gmcc_hook call DOPE_RESOLVE    --json \
+gm_hook call DOPE_READ_REPO  --json '{"scope_uuid":"U"}'
+gm_hook call DOPE_MERGE_PLAN --json '{"scope_uuid":"U"}'      # db vs files, read-only
+gm_hook call DOPE_RESOLVE    --json \
   '{"scope_uuid":"U","take_ours":true,"dot_path":"<dot.path>"}'
 ```
 
@@ -175,7 +175,7 @@ Hulls ship flat; there is no nested cog directory level.
   "elements": [
     { "code": "gm_daemon", "name": "GM Daemon", "description": "",
       "sort_order": 0, "element_type": "Hull",
-      "primary_path": "plugins/gmcc/daemon",
+      "primary_path": "gmk/gmDaemon",
       "links": { "persistence_owners": ["agentics", "base", "doped"] } } ] }
 ```
 

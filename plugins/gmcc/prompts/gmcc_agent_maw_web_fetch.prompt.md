@@ -181,7 +181,7 @@ Task tool:
   prompt: |
     Download web pages for kbite "spatial".
 
-    **Script Path**: $GMCC_PLUGIN_ROOT/scripts/maw_web_fetch.mjs
+    **Script Path**: $GM_PLUGIN_ROOT/scripts/maw_web_fetch.mjs
     **Maw Root**: {kbite_open_root}/spatial/
     **MAW_INDEX**: {kbite_open_root}/spatial/MAW_INDEX.md
 
@@ -194,4 +194,4 @@ Task tool:
 ```
 
 (When composing the prompt, substitute `{kbite_open_root}` with the real
-absolute root — the `kbite_open_root` key of `gmcc_hook paths --json`.)
+absolute root — the `kbite_open_root` key of `gm_hook paths --json`.)

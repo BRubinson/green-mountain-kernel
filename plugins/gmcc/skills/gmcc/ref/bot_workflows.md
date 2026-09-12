@@ -14,11 +14,11 @@ Where a pen tool exists it is the write path — typed, threading
 daemon verb is reached:
 
 ```bash
-gmcc_hook call <MESSAGE_TYPE> --json '{...}'
-gmcc_hook call <MESSAGE_TYPE> --json-file <path>   # when the body outgrows an argv
+gm_hook call <MESSAGE_TYPE> --json '{...}'
+gm_hook call <MESSAGE_TYPE> --json-file <path>   # when the body outgrows an argv
 ```
 
-Keys are the wire's snake_case, sent verbatim. `gmcc_hook verbs --json`
+Keys are the wire's snake_case, sent verbatim. `gm_hook verbs --json`
 lists every MessageType the daemon serves and which of them carry a pen
 tool.
 
@@ -35,12 +35,12 @@ prompt_init  selector: "<seq | code | name | fragment>"
 ```
 
 It resolves or creates the prompt, reports NEW vs RESUMED, and returns the
-uuid bundle, `ckfs_relative_storage_path`, the derived phase with its
+uuid bundle, `gmfs_relative_storage_path`, the derived phase with its
 instruction text, the next phase's expected agents, the gate blockers, and
 whether a briefing exists. Then:
 
 ```bash
-mkdir -p $GMCC_CKFS_ROOT/<ckfs_relative_storage_path>/memory   # verbatim from the response
+mkdir -p $GM_FS_ROOT/<gmfs_relative_storage_path>/memory   # verbatim from the response
 ```
 
 Resume is the SAME call and the SAME code path — phase is derived, never
@@ -100,7 +100,7 @@ CARE PACKAGE.
    returns:
 
    ```bash
-   gmcc_hook call CLARIFY_SEAL --json \
+   gm_hook call CLARIFY_SEAL --json \
      '{"summary_uuid":"<clarification>","expected_version":V}'
    ```
 
@@ -109,7 +109,7 @@ CARE PACKAGE.
    rows) and records each answer:
 
    ```bash
-   gmcc_hook call CLARIFY_ANSWER --json \
+   gm_hook call CLARIFY_ANSWER --json \
      '{"question_uuid":"Q","expected_version":V,"answer_text":"...",
        "selected_option_uuids":["<option>"],"skip":false}'
    ```
@@ -118,12 +118,12 @@ CARE PACKAGE.
    legal while the summary is answering, so add the follow-ups and ask them
    in the same conversation.
 5. **care_package** (rpi/team) — open it with
-   `gmcc_hook call CARE_PACKAGE_OPEN --json '{"summary_uuid":"<clarification>"}'`,
+   `gm_hook call CARE_PACKAGE_OPEN --json '{"summary_uuid":"<clarification>"}'`,
    curate refs with `care_ref_add` (`kind` dope|kbite|exploration —
    exploration entries are COPIES of ranked findings, never re-explored),
    then `care_package_complete` with `clarified_intent` = backstory + goal +
    detail, clarified. The intent lives ONLY here. Then
-   `gmcc_hook call CLARIFY_FINALIZE --json '{"summary_uuid":"<clarification>","expected_version":V}'`
+   `gm_hook call CLARIFY_FINALIZE --json '{"summary_uuid":"<clarification>","expected_version":V}'`
    (a pure gate) and `prompt_set_status status: architecting`.
 6. **arch_options** (team) — one architect per methodology. Each loads the
    clarified intent with `care_package_get` and writes its OWN proposal with
@@ -135,7 +135,7 @@ CARE PACKAGE.
    into rows, persistence FIRST:
 
    ```bash
-   gmcc_hook call ARCH_PERSIST_ADD --json \
+   gm_hook call ARCH_PERSIST_ADD --json \
      '{"summary_uuid":"S","class_name":"...","file_path":"...",
        "reason_brief":"...","change_kind":"add|modify|rename|delete",
        "dope_ref":"<entity code>"}'
@@ -145,7 +145,7 @@ CARE PACKAGE.
    `dope_property_ref` for renames and deletes), then `ARCH_GENERAL_ADD`,
    then `ARCH_SUMMARIZE`. Write each general row as the instruction its
    implementer will execute, naming the `file_path` that implementer owns.
-8. **plan_gate** — `gmcc_hook call ARCH_PROPOSE --json
+8. **plan_gate** — `gm_hook call ARCH_PROPOSE --json
    '{"summary_uuid":"S","expected_version":V}'`, then user sign-off ALWAYS
    showing the full persistence delta table (positive AND negative changes,
    dope refs shown). Approve → `ARCH_APPROVE` + `prompt_set_status status:
@@ -164,19 +164,19 @@ CARE PACKAGE.
    the pen. `arch_get` audits progress (planned rows joined to what has
    actually been touched, plus the unplanned set).
 10. **review** — `prompt_set_status status: reviewing`, then
-    `gmcc_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'`.
+    `gm_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'`.
     Reviewers scope themselves with `arch_get` and `file_change_list`, read
     the record with `review_get`, and write findings with
     `review_finding_add`, each rating its own. The primary then runs the one
     cross-agent calibration pass (`review_rank`) and seals with
-    `gmcc_hook call REVIEW_COMPLETE --json-file <path>` — payload
+    `gm_hook call REVIEW_COMPLETE --json-file <path>` — payload
     `summary_uuid`, `expected_version`, `overview`, `verdict`
     (approved|approved_with_nits|changes_requested). It refuses unranked
     findings, and an overview is routinely larger than an argv can carry,
     which is why the payload goes through a file.
 11. **review_fix** — clarify fix intent with the user, then every finding
     under rating 100 gets
-    `gmcc_hook call REVIEW_RESOLVE --json '{"finding_uuid":"F","expected_version":V,"status":"fixed|accepted|wont_fix"}'`
+    `gm_hook call REVIEW_RESOLVE --json '{"finding_uuid":"F","expected_version":V,"status":"fixed|accepted|wont_fix"}'`
     (legal after complete by design — the fix loop runs post-seal).
 12. **done** — `prompt_set_status status: done` (releases the activation
     claim, closes the workflow row). Completion is db rows only — no
@@ -214,7 +214,7 @@ polarity as `weight`.
 
 - Thread `expected_version` on every mutation; on VERSION_CONFLICT re-get
   and retry. `SUMMARY_ABSENT` = open it; never a file fallback.
-- Everything is db rows — never read or write ckfs yamls; never mirror a
+- Everything is db rows — never read or write gmfs yamls; never mirror a
   report to a file.
 - Reads are windowed by default. `explore_get` / `review_get` return full
   rows for ratings under 100 and stubs beyond it (unranked findings are
@@ -233,8 +233,8 @@ polarity as `weight`.
 
 ## Error recovery
 
-Daemon unreachable: `bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`, then
-`gmcc_hook context ensure`, then retry. `$GMCC_BOOTED` unset: restart
+Daemon unreachable: `bash $GM_PLUGIN_ROOT/scripts/install_gm.sh`, then
+`gm_hook context ensure`, then retry. `$GM_BOOTED` unset: restart
 Claude Code. Anything stranded mid-phase: `prompt_init` with the prompt's
 selector, then `bot_next` — resume is the first-run code path by
 construction.

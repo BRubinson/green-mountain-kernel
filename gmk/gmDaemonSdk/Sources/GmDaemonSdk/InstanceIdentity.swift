@@ -8,7 +8,7 @@ import Foundation
 // SandboxRetarget, which does need GRDB. Six lines of CryptoKit, no database.
 
 /// Shared instance-identity derivation: `{repo}_{first 4 hex of md5(abs path)}`.
-/// The single Swift home of the convention gmcc_session_startup.sh mirrors in shell —
+/// The single Swift home of the convention gm_session_startup.sh mirrors in shell —
 /// GitContext (the client side) and SandboxRetarget both call this so the hash can
 /// never drift between the live and sandbox sides.
 public enum InstanceIdentity {

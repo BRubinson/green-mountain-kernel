@@ -25,27 +25,27 @@ Two things to know before using it:
 
 ## Steps
 
-1. **Boot check.** If `$GMCC_BOOTED` is not set, stop with
+1. **Boot check.** If `$GM_BOOTED` is not set, stop with
    `[GMB] ERROR: GMCC not booted` (run /gmcc_boot for diagnostics).
 
-2. **Resolve context.** `gmcc_hook context ensure` returns project_uuid,
+2. **Resolve context.** `gm_hook context ensure` returns project_uuid,
    instance_uuid and session_uuid. If the user passed `--prompt`, also
    resolve the active prompt uuid (or ask which prompt).
 
 3. **Pick the diagram.** With an argument, use it as the `code`. Otherwise
    enumerate:
    ```bash
-   gmcc_hook call DIAGRAM_LIST --json '{"session_uuid":"<U>"}'
+   gm_hook call DIAGRAM_LIST --json '{"session_uuid":"<U>"}'
    ```
    (`{"prompt_uuid":"<P>"}` in prompt mode.) Zero rows ⇒ report that no
    diagram exists yet and suggest `/gm_diagram_from_dope` to generate one, or
-   `gmcc_hook call DIAGRAM_INIT --json '{"session_uuid":"<U>","code":"<code>","name":"<name>"}'`
+   `gm_hook call DIAGRAM_INIT --json '{"session_uuid":"<U>","code":"<code>","name":"<name>"}'`
    for an empty canvas. Exactly one ⇒ use it. Several ⇒ take the first by
    code order and mention the others.
 
 4. **Read the tree.**
    ```bash
-   gmcc_hook call DIAGRAM_GET --json '{"diagram_uuid":"<D>"}'
+   gm_hook call DIAGRAM_GET --json '{"diagram_uuid":"<D>"}'
    ```
    (or `{"session_uuid":"<U>","code":"<C>"}` when you only hold the code).
 

@@ -152,7 +152,7 @@ final class SandboxRetargetTests: XCTestCase {
     }
 
     func testInstanceIdentityMatchesDetectRepoHash4() throws {
-        // gmcc_session_startup.sh: md5 -q -s "<abs path>" | cut -c1-4 appended to repo name.
+        // gm_session_startup.sh: md5 -q -s "<abs path>" | cut -c1-4 appended to repo name.
         let hex = Insecure.MD5.hash(data: Data("/tmp/repo".utf8))
             .map { String(format: "%02x", $0) }.joined()
         XCTAssertEqual(

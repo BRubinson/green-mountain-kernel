@@ -115,7 +115,7 @@ NEW_HOOK="$NEW_ROOT/bin/gm_hook"
 if [[ ! -x "$NEW_DAEMON" || ! -x "$NEW_HOOK" ]]; then
   step "NOTE: new binaries are not at $NEW_ROOT/bin yet."
   step "      Phase 4 needs them, because the REAL daemon must apply m0027."
-  step "      Run: bash gmk/scripts/build_gm.sh"
+  step "      Run: bash gmk/scripts/rebuild_local.sh"
 fi
 
 # ------------------------------------------------------------------ phase 1

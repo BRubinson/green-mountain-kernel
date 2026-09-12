@@ -14,7 +14,7 @@ Downloads web pages into a maw using headless Playwright for JS-rendered content
 
 ## Pre-Flight Checks
 
-**Boot Validation**: If `$GMCC_BOOTED` is not set, output:
+**Boot Validation**: If `$GM_BOOTED` is not set, output:
 ```
 [GMB] ERROR: GMCC not booted
 
@@ -23,7 +23,7 @@ To fix: Restart Claude Code from within a git repository.
 ```
 Exit without proceeding.
 
-1. Resolve the kbite roots from `gmcc_hook paths --json` (kbite_open_root)
+1. Resolve the kbite roots from `gm_hook paths --json` (kbite_open_root)
 2. Parse `{kbite_name}` from first token of `$ARGUMENTS`
 3. Verify maw exists at `{kbite_open_root}/{kbite_name}/`
 4. Read MAW_INDEX.md for current state
@@ -194,7 +194,7 @@ Task tool:
   prompt: |
     Download web pages for kbite "{kbite_name}".
 
-    **Script Path**: $GMCC_PLUGIN_ROOT/scripts/maw_web_fetch.mjs
+    **Script Path**: $GM_PLUGIN_ROOT/scripts/maw_web_fetch.mjs
     **Maw Root**: {kbite_open_root}/{kbite_name}/
     **MAW_INDEX**: {kbite_open_root}/{kbite_name}/MAW_INDEX.md
 
@@ -261,7 +261,7 @@ Falling back to direct script execution via Bash.
 On agent failure, attempt direct execution as fallback:
 ```bash
 # Write manifest to {kbite_open_root}/{kbite_name}/.maw_fetch_manifest.json
-# Execute: node $GMCC_PLUGIN_ROOT/scripts/maw_web_fetch.mjs /path/to/manifest.json
+# Execute: node $GM_PLUGIN_ROOT/scripts/maw_web_fetch.mjs /path/to/manifest.json
 # Verify results
 # Update MAW_INDEX manually
 # Cleanup: rm -f {kbite_open_root}/{kbite_name}/.maw_fetch_manifest.json

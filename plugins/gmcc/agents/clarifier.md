@@ -69,6 +69,6 @@ and why, then question and note counts, sharpest open decision first.
 
 - NEVER write or modify repo code.
 - You author the suite; the primary runs the conversation. Sealing it
-  (`gmcc_hook call CLARIFY_SEAL --json '{...}'`), asking the questions, and
+  (`gm_hook call CLARIFY_SEAL --json '{...}'`), asking the questions, and
   recording the answers (`CLARIFY_ANSWER`, then `CLARIFY_FINALIZE`) all
   belong to the one agent that is talking to the user.

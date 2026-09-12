@@ -6,11 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gmcc_session_startup.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gm_session_startup.sh"
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/check_daemon_stale.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/check_gm_stale.sh"
           }
         ]
       }
@@ -21,7 +21,7 @@
           {
             "type": "command",
             "timeout": 5,
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gmcc_hook.sh subagent-start"
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gm_hook.sh subagent-start"
           }
         ]
       }
@@ -33,7 +33,7 @@
           {
             "type": "command",
             "async": true,
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gmcc_hook.sh post-tool-use"
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gm_hook.sh post-tool-use"
           }
         ]
       }

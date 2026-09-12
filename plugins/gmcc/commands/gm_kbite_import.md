@@ -21,7 +21,7 @@ an explicit KBITE_ADD.
 
 ## Pre-Flight Checks
 
-**Boot Validation**: If `$GMCC_BOOTED` is not set, output:
+**Boot Validation**: If `$GM_BOOTED` is not set, output:
 ```
 [GMB] ERROR: GMCC not booted
 
@@ -31,9 +31,9 @@ To fix: Restart Claude Code from within a git repository.
 Exit without proceeding.
 
 1. Verify the zip exists at `{zip_path}`.
-2. Resolve the roots: `gmcc_hook paths --json` (ckfs_root, kbite_root,
+2. Resolve the roots: `gm_hook paths --json` (gmfs_root, kbite_root,
    kbite_digested_root).
-3. `gmcc_hook call BACKUP --json '{}'` — the documented pre-flight before any
+3. `gm_hook call BACKUP --json '{}'` — the documented pre-flight before any
    content-mutating import.
 
 ### If Zip Missing
@@ -63,13 +63,13 @@ version, not on any other version number.
 placeholders onto THIS machine's roots.
 
 ```bash
-gmcc_hook call KBITE_IMPORT --json '{
+gm_hook call KBITE_IMPORT --json '{
   "db_export_path": "'"$STAGE"'/gmcc_kbite_{code}/db_export.json",
   "on_collision": "skip",
   "rehydrate": [
     {"prefix": "{kbite_digested_root}", "placeholder": "{{KBITE_TREE}}"},
     {"prefix": "{kbite_root}",          "placeholder": "{{KBITE_IDENTITY}}"},
-    {"prefix": "{ckfs_root}",           "placeholder": "{{GMCC_CKFS}}"},
+    {"prefix": "{gmfs_root}",           "placeholder": "{{GMCC_GMFS}}"},
     {"prefix": "'"$HOME"'",             "placeholder": "{{GMCC_HOME}}"}
   ]
 }'
@@ -82,7 +82,7 @@ to overwrite (overwrite replaces the kbite's CONTENT under its existing uuid
 — scope registrations survive). On approval (or when the `overwrite`
 argument was passed up-front), re-run the same call with
 `"on_collision": "overwrite"`, and move the previous digested tree to
-`{ckfs_root}/_archive/cold_storage/` first — never delete it.
+`{gmfs_root}/_archive/cold_storage/` first — never delete it.
 
 ### Step 3: Restore the files
 
@@ -105,7 +105,7 @@ fi
 Digested sources: {restored path | archive carried none}
 
 The kbite is NOT registered anywhere yet. To activate it here:
-  gmcc_hook call KBITE_ADD --json '{"scope":"session","owner_uuid":"{U}","code":"{code}"}'
+  gm_hook call KBITE_ADD --json '{"scope":"session","owner_uuid":"{U}","code":"{code}"}'
   (scope may be session, instance, project or prompt — owner_uuid is that
   scope's row)
 ```

@@ -37,7 +37,7 @@ uuid S:
   means the same thing across every reviewer only when one reader who has
   read all of them runs `review_rank` in a single pass. Resolutions and the
   verdict are that same reader's, through
-  `gmcc_hook call REVIEW_RESOLVE --json '{...}'` and `REVIEW_COMPLETE`.
+  `gm_hook call REVIEW_RESOLVE --json '{...}'` and `REVIEW_COMPLETE`.
   Name in your receipt what you would rank highest and what you believe is
   already resolved.
 

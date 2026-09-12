@@ -13,22 +13,20 @@ import XCTest
 /// THE SCOPING RULE — READ THIS BEFORE ADDING A PATTERN
 /// ════════════════════════════════════════════════════════════════════════════
 ///
-/// The scan covers `gmk/**` and the ROOT DOCS (`CLAUDE.md`, `README.md`) ONLY.
-/// **`plugins/gmcc/**` IS EXEMPT.**
+/// The scan covers `gmk/**`, `plugins/gmcc/**`, and the ROOT DOCS (`CLAUDE.md`,
+/// `README.md`). That is the whole authored repository.
 ///
-/// That exemption is a decision, not an oversight. `plugins/gmcc/` is the LIVE
-/// plugin: its commands, skills, hooks and launchers drive the user's machine
-/// right now, through the currently-installed runtime. `gm_hook` does not exist
-/// on anyone's PATH until cutover, so sweeping those files would break every
-/// session the moment it landed. They still legitimately say `gmcc_hook` and
-/// `GMCC_CKFS_ROOT`, and they must keep saying it.
+/// **CUTOVER IS COMPLETE, AND THE DELETION OF THE PLUGIN EXEMPTION IS WHAT SAYS
+/// SO.** There used to be an `exemptPlugin` predicate here, because
+/// `plugins/gmcc/` drove the user's machine through a runtime installed under
+/// the old names: sweeping those files before the new binaries existed would
+/// have broken every session the moment it landed. That is no longer true. The
+/// plugin's launchers, hooks and docs now name `gm_hook`, `GM_FS_ROOT` and
+/// `~/gmfs`, the binaries they name are the ones on disk, and so the contract
+/// applies to them like everything else.
 ///
-/// Applying this contract to them would fail the build on files we DELIBERATELY
-/// did not change — which is how a guard rail gets deleted instead of fixed.
-///
-/// TODO(cutover): when the new stack is installed and `plugins/gmcc/` is swept,
-/// delete `exemptPlugin` below and let these patterns run over the whole repo.
-/// That deletion is the definition of the cutover being complete.
+/// Do not reintroduce a path-based exemption for the plugin. A file that needs
+/// one is a file that did not get swept.
 ///
 /// ════════════════════════════════════════════════════════════════════════════
 /// ALSO DELIBERATELY UNCHANGED — these are NOT retired and must never be flagged
@@ -54,25 +52,21 @@ final class RetiredNameContractTests: XCTestCase {
 
     // MARK: - Scope
 
-    /// `plugins/gmcc/` — exempt for this prompt. See the scoping rule above.
-    private func exemptPlugin(_ relativePath: String) -> Bool {
-        relativePath.hasPrefix("plugins/gmcc/")
-    }
-
-    /// Every file the contract applies to: all five packages' sources, the
-    /// test trees, the gmk-side docs and scripts, plus the two root docs.
+    /// Every file the contract applies to: all six packages' sources, the test
+    /// trees, the gmk-side scripts, THE WHOLE PLUGIN, plus the two root docs.
     private func scopedFiles() throws -> [URL] {
         let fm = FileManager.default
         var out: [URL] = []
 
-        let gmk = RepoRoot.gmkRoot()
-        if let walker = fm.enumerator(at: gmk, includingPropertiesForKeys: nil) {
+        for tree in [RepoRoot.gmkRoot(), RepoRoot.pluginRoot()] {
+            guard let walker = fm.enumerator(at: tree, includingPropertiesForKeys: nil)
+            else { continue }
             while let url = walker.nextObject() as? URL {
                 // Build products are generated, not authored.
                 if url.path.contains("/.build/") || url.path.contains("/.swiftpm/") {
                     continue
                 }
-                if ["swift", "md", "sh", "yml", "yaml"].contains(url.pathExtension) {
+                if ["swift", "md", "sh", "yml", "yaml", "json"].contains(url.pathExtension) {
                     out.append(url)
                 }
             }
@@ -102,7 +96,7 @@ final class RetiredNameContractTests: XCTestCase {
         var hits: [String] = []
         for file in try scopedFiles() {
             let rel = relative(file)
-            guard !exemptPlugin(rel), !allowFiles.contains(rel) else { continue }
+            guard !allowFiles.contains(rel) else { continue }
             guard let text = try? String(contentsOf: file, encoding: .utf8) else { continue }
             for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 let s = String(line)
@@ -116,16 +110,6 @@ final class RetiredNameContractTests: XCTestCase {
     }
 
     // MARK: - The exemptions, each naming why it is exempt
-
-    /// The two tests that assert on the FROZEN plugin. Their expectations have
-    /// to name the retired vocabulary, because the files they test still use
-    /// it — `HookScriptTests` literally runs `plugins/gmcc/scripts/gmcc_hook.sh`
-    /// and checks that it resolves `$HOME/gmcc/bin/gmcc_hook`. A contract that
-    /// flagged them would be flagging the frozen plugin at one remove.
-    private let frozenPluginTests: Set<String> = [
-        "gmk/gmToolchain/Tests/GmToolchainTests/HookScriptTests.swift",
-        "gmk/gmToolchain/Tests/GmToolchainTests/DocsContractTests.swift",
-    ]
 
     /// The HISTORICAL RECORD. These name the old spelling because the old
     /// spelling is the subject:
@@ -143,15 +127,6 @@ final class RetiredNameContractTests: XCTestCase {
         "gmk/gmDaemon/Sources/GmDaemon/Migrations.swift",
         "gmk/gmDaemonSdk/Sources/GmDaemonSdk/Protocol/Envelope.swift",
         "gmk/gmDaemon/Tests/GmDaemonTests/MigrationTests.swift",
-    ]
-
-    /// User-facing remediation strings that point at the FROZEN installer.
-    /// They name `~/gmcc/bin/gmcc_daemon` and `plugins/gmcc/scripts/` because
-    /// that is where the binary the user actually has installed lives. Telling
-    /// them about `~/gmfs` before cutover would send them somewhere empty.
-    private let frozenRemediation: Set<String> = [
-        "gmk/gmVibes/Daemon/DaemonStatusIndicator.swift",
-        "gmk/gmVibes/Daemon/DaemonError.swift",
     ]
 
     /// Arbitrary FIXTURE strings and doc-comment examples. `primary_path` is an
@@ -206,9 +181,7 @@ final class RetiredNameContractTests: XCTestCase {
     ]
 
     private var allExempt: Set<String> {
-        frozenPluginTests
-            .union(historicalRecord)
-            .union(frozenRemediation)
+        historicalRecord
             .union(fixtureStrings)
             .union(selfReferential)
             .union(migrationOffRetiredStack)

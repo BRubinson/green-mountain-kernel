@@ -13,13 +13,13 @@ into the daemon db (the canonical home for digested text, keywords, and
 search), then the raw source folders are archived under
 `{kbite_digested_root}/{kbite_name}/` and the open maw is deleted
 (kbite_root / kbite_open_root / kbite_digested_root come from
-`gmcc_hook paths --json`).
+`gm_hook paths --json`).
 
 ---
 
 ## Pre-Flight Checks
 
-**Boot Validation**: If `$GMCC_BOOTED` is not set, output:
+**Boot Validation**: If `$GM_BOOTED` is not set, output:
 ```
 [GMB] ERROR: GMCC not booted
 
@@ -28,7 +28,7 @@ To fix: Restart Claude Code from within a git repository.
 ```
 Exit without proceeding.
 
-1. Resolve the kbite roots from `gmcc_hook paths --json` (kbite_root,
+1. Resolve the kbite roots from `gm_hook paths --json` (kbite_root,
    kbite_open_root, kbite_digested_root)
 2. Verify maw exists at `{kbite_open_root}/{kbite_name}/`
 3. Read MAW_INDEX.md - verify status is "ready_to_digest" or has chewed resources
@@ -104,7 +104,7 @@ keyword rows (full text inlined for text-type files), then deletes the
 chewed `.md` files after the transaction commits:
 
 ```bash
-gmcc_hook call KBITE_DIGEST --json '{"code":"{kbite_name}","kbite_open_path":"{kbite_open_root}/{kbite_name}"}'
+gm_hook call KBITE_DIGEST --json '{"code":"{kbite_name}","kbite_open_path":"{kbite_open_root}/{kbite_name}"}'
 ```
 
 The response reports `resource_count`, `file_count`, `keyword_count`, and
@@ -114,7 +114,7 @@ The response reports `resource_count`, `file_count`, `keyword_count`, and
 
 Move the raw source folders from the maw into the digested archive
 (client-side — the daemon never moves raw sources; substitute the
-kbite_open_root / kbite_digested_root values from `gmcc_hook paths --json`):
+kbite_open_root / kbite_digested_root values from `gm_hook paths --json`):
 
 ```bash
 for axis1 in primary secondary; do
@@ -138,7 +138,7 @@ rm -rf "{kbite_open_root}/{kbite_name}"
 ### Step 5: Verify
 
 ```bash
-gmcc_hook call KBITE_GET --json '{"code":"{kbite_name}"}'
+gm_hook call KBITE_GET --json '{"code":"{kbite_name}"}'
 ```
 
 Confirm the resource/file/keyword counts match Step 2's response.
@@ -195,7 +195,7 @@ Run /gm_crunch_chew {kbite_name} to process crunchables.
 ```
 [GMB] Error: KBITE_DIGEST failed
 
-{gmcc_hook stderr}
+{gm_hook stderr}
 
 Nothing was deleted — the db transaction rolled back and chewed files are
 only removed after a successful commit. Fix the issue and re-run

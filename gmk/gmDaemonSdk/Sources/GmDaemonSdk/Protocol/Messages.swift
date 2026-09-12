@@ -530,7 +530,7 @@ public struct BackupResponse: Codable, Hashable, Sendable {
 /// session chain exists. Where the gmfs already carries a uuid, the caller
 /// passes it so the db row reuses it (trivial db ↔ gmfs joins). Optional
 /// kbite_codes seed that level's active-kbite registry at CREATE time only —
-/// mirroring gmcc_session_startup.sh's inherit_kbite (existing rows are never
+/// mirroring gm_session_startup.sh's inherit_kbite (existing rows are never
 /// re-seeded; a child created without codes copies its parent's junctions).
 
 public struct ProjectContext: Codable, Hashable, Sendable {

@@ -16,10 +16,10 @@ canvas updates live for anyone holding it open.
 
 ## Steps
 
-1. **Boot check.** If `$GMCC_BOOTED` is not set, stop with
+1. **Boot check.** If `$GM_BOOTED` is not set, stop with
    `[GMB] ERROR: GMCC not booted` (run /gmcc_boot for diagnostics).
 
-2. **Resolve context.** `gmcc_hook context ensure` returns project_uuid,
+2. **Resolve context.** `gm_hook context ensure` returns project_uuid,
    instance_uuid and session_uuid. If the user passed `--prompt`, also
    resolve the active prompt uuid (or ask which prompt) — prompt mode scopes
    BOTH the dope fetch and the diagram tier to that prompt.
@@ -27,13 +27,13 @@ canvas updates live for anyone holding it open.
 3. **Fetch the dope tree.** `mcp__plugin_gmcc_pen__dope_get` with the session
    (add `prompt_uuid` in prompt mode, and `code` to pick one scope). No scope
    ⇒ there is no dope model to draw: offer to seed one from the repo's
-   `.gmcc` tree (`gmcc_hook call DOPE_INGEST --json '{"scope_uuid":"S"}'`) or
+   `.gmcc` tree (`gm_hook call DOPE_INGEST --json '{"scope_uuid":"S"}'`) or
    to create one (`DOPE_INIT`). A tree whose domains are all entity-less ⇒
    there is nothing to draw; say so and stop.
 
 4. **Open the canvas (idempotent).**
    ```bash
-   gmcc_hook call DIAGRAM_INIT --json '{
+   gm_hook call DIAGRAM_INIT --json '{
      "session_uuid": "<U>", "code": "<C>", "name": "<name>",
      "dope_scope_code": "<scope code>"
    }'
@@ -43,7 +43,7 @@ canvas updates live for anyone holding it open.
    carries the diagram uuid and its current `revision`.
 
 5. **Regenerate in ONE batch.** Read the existing tree
-   (`gmcc_hook call DIAGRAM_GET --json '{"diagram_uuid":"<D>"}'`), then write
+   (`gm_hook call DIAGRAM_GET --json '{"diagram_uuid":"<D>"}'`), then write
    a single `DIAGRAM_BATCH_APPLY` payload to a scratchpad file and send it
    with `--json-file`:
    - one `element_delete` per existing TOP-LEVEL element (the delete cascades

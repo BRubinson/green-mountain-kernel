@@ -3,7 +3,7 @@ import GRDB
 import GmDaemonSdk
 
 // CONTEXT_ENSURE / CONTEXT_GET — the promoted ensure chain (mirrors
-// gmcc_session_startup.sh lazy creation) plus create-time-only kbite seeding
+// gm_session_startup.sh lazy creation) plus create-time-only kbite seeding
 // (mirrors inherit_kbite). Bodies live in ContextRepository; these wrappers
 // own the transaction.
 

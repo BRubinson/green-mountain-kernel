@@ -163,7 +163,7 @@ struct ContextRepository: RepositoryContext {
     /// Fill a newly created row's active-kbite junction: explicit codes from
     /// the context payload, plus a copy of the parent level's junction rows
     /// (create-time-only inheritance — existing rows are never re-seeded,
-    /// exactly like gmcc_session_startup.sh's inherit_kbite).
+    /// exactly like gm_session_startup.sh's inherit_kbite).
     private func seedKbites(
         level: String,
         ownerUuid: String,

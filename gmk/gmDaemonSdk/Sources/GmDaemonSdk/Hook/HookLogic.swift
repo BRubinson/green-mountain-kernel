@@ -131,7 +131,7 @@ public struct HookPayload: Equatable {
 /// marker on disk is the thing that knows. This is the hazard that removing
 /// env inheritance creates, closed at the same time.
 ///
-/// The parse matches gmcc_session_startup.sh's: the marker is read as DATA,
+/// The parse matches gm_session_startup.sh's: the marker is read as DATA,
 /// never sourced — a file that lives in a repo must not get shell execution
 /// out of a hook. The walk starts at the payload's cwd and climbs, so a tool
 /// call made in a subdirectory of the snapshot finds the marker at its root.

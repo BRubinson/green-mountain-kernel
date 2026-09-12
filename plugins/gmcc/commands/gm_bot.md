@@ -3,7 +3,7 @@ name: gm_bot
 description: Lightweight GMCC workflow (variant bot). Authors a prompt into the current session, enters the daemon's workflow machine, and runs every phase in primary context — the only spawn is the haiku doper briefing.
 argument-hint: <prompt-name|seq> <task/prompt content>
 disable-model-invocation: true
-allowed-tools: Bash(gmcc_hook:*)
+allowed-tools: Bash(gm_hook:*)
 ---
 
 # GM-CDE Bot (variant: bot)
@@ -16,7 +16,7 @@ contract. Canonical reference: `skills/gmcc/ref/bot_workflows.md`.
 
 ## Pre-Flight
 
-If `$GMCC_BOOTED` is not set:
+If `$GM_BOOTED` is not set:
 
 ```
 [GMB] ERROR: GMCC not booted — run /gmcc_boot for diagnostics.
@@ -52,7 +52,7 @@ source file.
   `prompt_init(selector: "{name}", variant: "bot", create: true, name: "{name}", detail: "<the user's prompt, verbatim>")`.
   Creation requires `create`, `name` AND `detail` together, so a mistyped
   selector can never silently become a new prompt. Then
-  `mkdir -p $GMCC_CKFS_ROOT/<ckfs_relative_storage_path>/memory`, taking the
+  `mkdir -p $GM_FS_ROOT/<gmfs_relative_storage_path>/memory`, taking the
   path verbatim from the response.
 - **No args** → AskUserQuestion for the prompt content.
 

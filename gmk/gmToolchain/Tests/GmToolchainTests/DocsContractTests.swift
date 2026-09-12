@@ -29,8 +29,9 @@ final class DocsContractTests: XCTestCase {
     ///
     /// This replaced a four-level `deletingLastPathComponent()` walk that
     /// encoded "this file is four levels below the plugin root" — true only
-    /// while the package lived at plugins/gmcc/daemon. After the move to gmk/
-    /// the same walk landed on a directory with no commands/, skills/,
+    /// while the package lived inside the plugin directory (`RepoRoot` spells
+    /// that old path, and is the one place licensed to). After the move to
+    /// `gmk/` the same walk landed on a directory with no commands/, skills/,
     /// hooks/hooks.json, .mcp.json or scripts/, and the 16 test functions below
     /// would each have examined nothing at all.
     private var pluginRoot: URL { RepoRoot.pluginRoot() }
@@ -122,10 +123,10 @@ final class DocsContractTests: XCTestCase {
     /// user-facing remediation messages that state where the binary lives.
     func testNoHardcodedGmBinaryPaths() throws {
         let hits = try violations(
-            pattern: #"gmcc/bin/gm"#,
+            pattern: #"gmfs/bin/gm_"#,
             allowFiles: [
                 "plugins/gmcc/commands/gm_init.md",              // bootstrap sequence + grant literals
-                "plugins/gmcc/commands/gmcc_daemon.md",          // remediation/success message text
+                "plugins/gmcc/commands/gm_daemon.md",          // remediation/success message text
                 "plugins/gmcc/commands/refresh_daemon_state.md", // staleness stat + message text
                 "plugins/gmcc/skills/gmcc_boot/SKILL.md",        // gm-missing remediation block
                 "plugins/gmcc/skills/gmcc_cleanup_system/SKILL.md", // grant literal it audits
@@ -271,26 +272,26 @@ final class DocsContractTests: XCTestCase {
         XCTAssertEqual(hits, [], "a cheatsheet paste mandate resurfaced:\n" + hits.joined(separator: "\n"))
     }
 
-    /// gmcc_daemon/SKILL.md is a ROUTING skill: it says which door to knock on,
+    /// gm_daemon/SKILL.md is a ROUTING skill: it says which door to knock on,
     /// never what the signatures behind that door are. Duplicated signatures
     /// and version literals are what let it drift; the pen tools' own schemas
-    /// and `gmcc_hook verbs --json` are the authority it must point at instead.
+    /// and `gm_hook verbs --json` are the authority it must point at instead.
     func testDaemonSkillCarriesNoVersionLiteralsOrSignatures() throws {
-        let skill = pluginRoot.appendingPathComponent("skills/gmcc_daemon/SKILL.md")
+        let skill = pluginRoot.appendingPathComponent("skills/gm_daemon/SKILL.md")
         let text = try String(contentsOf: skill, encoding: .utf8)
         XCTAssertLessThan(
             text.utf8.count, 8192,
-            "gmcc_daemon/SKILL.md outgrew its routing-skill diet")
+            "gm_daemon/SKILL.md outgrew its routing-skill diet")
         for pattern in [#"wire (protocol )?v\d"#, #"schema m\d{4}"#] {
             let regex = try NSRegularExpression(pattern: pattern)
             let range = NSRange(text.startIndex..., in: text)
             XCTAssertNil(
                 regex.firstMatch(in: text, range: range),
-                "gmcc_daemon/SKILL.md carries a version literal (pattern \(pattern)) — the live catalogue is the only authority")
+                "gm_daemon/SKILL.md carries a version literal (pattern \(pattern)) — the live catalogue is the only authority")
         }
         XCTAssertTrue(
-            text.contains("gmcc_hook verbs --json"),
-            "gmcc_daemon/SKILL.md must route MessageType questions to gmcc_hook verbs --json")
+            text.contains("gm_hook verbs --json"),
+            "gm_daemon/SKILL.md must route MessageType questions to gm_hook verbs --json")
     }
 
     /// The retired identity-file agent system: nothing may point agents at
@@ -514,10 +515,10 @@ final class DocsContractTests: XCTestCase {
     ///
     /// SessionStart is exempt by definition — it is the event that performs
     /// the boot, so it cannot require the boot to have happened, and it is the
-    /// one script that legitimately exports the GMCC_* names.
+    /// one script that legitimately exports the GM_* names.
     ///
     /// THE BANS ARE THE LOAD-BEARING HALF. The PRESENT assertions describe a
-    /// shape that would survive someone re-adding `[ -z "$GMCC_BOOTED" ] &&
+    /// shape that would survive someone re-adding `[ -z "$GM_BOOTED" ] &&
     /// exit 0` above it; the ABSENT list is what refuses the re-add. Each
     /// banned spelling failed for the SAME reason — it consults inherited
     /// state — and they were found one at a time, months apart, which is
@@ -531,11 +532,11 @@ final class DocsContractTests: XCTestCase {
         /// message names the reason so the next author reads an argument
         /// rather than a rule.
         let banned: [(needle: String, why: String)] = [
-            ("GMCC_BOOTED",
+            ("GM_BOOTED",
              "the session env does not survive into a hook process, so this gate silently disables the hook"),
             ("command -v gm",
              "the binary is on the session PATH, not the hook's — this resolves to nothing and exits 0 forever"),
-            ("command -v gmcc_hook",
+            ("command -v gm_hook",
              "the same inherited-PATH failure under the new name — resolve from the script's own location instead"),
             ("command -v jq",
              "the same inherited-PATH failure one dependency over; a tool a hook needs is found on disk or not needed at all"),
@@ -556,12 +557,12 @@ final class DocsContractTests: XCTestCase {
 
                         // PRESENT — the two halves of the resolution. The
                         // script's own location anchors it, the marker walk
-                        // retargets a sandbox snapshot, and `$HOME/gmcc` is
+                        // retargets a sandbox snapshot, and `$HOME/gmfs` is
                         // the default when there is no marker.
                         for (needle, what) in [
                             (#"dirname"#, "resolve its binary from its own script location"),
                             (#".gmcc_sandbox"#, "walk up for a sandbox marker, or a snapshot's hooks write the prod db"),
-                            (#"$HOME/gmcc"#, "fall back to the default runtime root"),
+                            (#"$HOME/gmfs"#, "fall back to the default runtime root"),
                         ] {
                             XCTAssertTrue(
                                 text.contains(needle),

@@ -6,33 +6,101 @@ framework/model work. GMB identity and behavioral rules are NOT here — they li
 plugin-globally in `plugins/gmcc/skills/gmcc/SKILL.md` so every
 gmcc-booted repo gets them, not just this one.
 
-## READ THIS FIRST — this repo currently holds TWO stacks, on purpose
+## READ THIS FIRST — cutover is DONE; there is ONE stack
 
-**The old stack, installed from the `gmcc-marketplace` repo, is what runs this
-machine.** It is untouched by the reorg and it keeps working.
-
-**The new stack lives in `gmk/` and is NOT live.** It is built and tested in
-parallel. Nothing in `gmk/` is installed or registered, no hook calls it, and no
-session boots from it.
+The runtime is `gmk/`, the binaries are `gm_daemon` / `gm_mcp` / `gm_hook`, the
+one filesystem root is `~/gmfs`, and `plugins/gmcc/` drives them. The previously
+shipped stack, under its own binary names and its own runtime root, is retired.
+Those literals are deliberately not repeated in this file — the retired-name
+contract forbids them here, and `gmk/scripts/migrate_to_gmfs.sh` is the one place
+that legitimately spells them, because performing a migration requires naming
+what it migrates from.
 
 Consequences a reader must not re-derive incorrectly:
 
-- Everything under `plugins/gmcc/` — `commands/`, `skills/`, `hooks/`,
-  `scripts/`, `.mcp.json` — is **FROZEN ON PURPOSE**. Those files still name the
-  previously shipped binaries, env vars and roots, and they must keep naming
-  them or the running machine breaks. That is **correct, not stale**. The
-  retired-name contract in `DocsContractTests` explicitly EXEMPTS
-  `plugins/gmcc/**`; the exemption carries a TODO naming cutover as the place it
-  is removed.
+- **`plugins/gmcc/` is no longer frozen.** It was, for the length of the reorg,
+  because it drove the machine through a runtime installed under the old names.
+  It has since been swept, and the retired-name contract now covers it like
+  everything else. `RetiredNameContractTests` has no path exemption for the
+  plugin, and **reintroducing one is not the fix for a file that trips it** —
+  sweeping that file is.
 - The plugin directory, the `gmcc:` command/skill namespace, the
-  `mcp__plugin_gmcc_pen__*` pen server name, and the in-repo `.gmcc/` dope
-  directory all **keep their names**. The repo deliberately holds both prefixes:
-  `gm`-prefixed on the runtime side, `gmcc` on the plugin side.
-- `~/gmfs` is **defined in code, not created by the build or by any test**. It is
-  populated exactly once, by the explicit migration step below, as the last
-  action before the reorg commit.
-- **CUTOVER is a separate, later event**, gated on the full migration plus the
-  initial MCP refactor. Until then: build and test outside the live ecosystem.
+  `mcp__plugin_gmcc_pen__*` pen server name, the `.gmcc_sandbox` marker filename
+  and the in-repo `.gmcc/` dope directory all **keep their names**. The repo
+  deliberately holds both prefixes: `gm`-prefixed on the runtime side, `gmcc` on
+  the plugin/namespace side. `testAllowedSpellingsAreNotFlagged` is what stops a
+  future sweep from "tidying" the second list into the first.
+- **The original database is still on disk and is the rollback anchor.** The
+  migration COPIED it and never wrote to it, which is what makes the whole step
+  reversible. `migrate_to_gmfs.sh` names its exact path. Do not delete it
+  casually.
+- The `unity` kbite payload was deliberately left at the old content root, so its
+  row in `gm.db` is a knowingly dangling reference. That is recorded, not
+  forgotten.
+
+## The release loop
+
+Binaries reach `~/gmfs/bin` two ways, and only two:
+
+```bash
+bash gmk/scripts/rebuild_local.sh     # build this working tree, stage <version>-BETA, activate
+bash gmk/scripts/publish_release.sh   # verify, run the suites, tag, upload, promote
+```
+
+`rebuild_local.sh` builds **universal** (arm64 + x86_64) so the artifact it
+stages is already releasable — `publish_release.sh` uploads exactly those bytes
+rather than rebuilding, so what you tested is what ships. `--fast` builds arm64
+only for the edit-compile loop and is refused by publish, which reads slices with
+`lipo` rather than trusting the manifest.
+
+A local build is **always** stamped `-BETA`. There is no flag to suppress it: the
+suffix is the only thing distinguishing bits that were merely built from bits
+that were published.
+
+Everyone who is not editing the sources runs the plugin's installer, which needs
+no checkout and asks GitHub for the newest `daemon-v*` release:
+
+```bash
+bash plugins/gmcc/scripts/install_gm.sh
+```
+
+### The release store
+
+Versions are staged immutably and selected by symlink, so rollback is a swap:
+
+```
+~/gmfs/bin/
+├── gm_daemon -> releases/active/gm_daemon      relative links
+├── .gm_version                                 "50.0.1" or "50.0.1-BETA"
+└── releases/
+    ├── active -> downloads/50.0.1
+    ├── downloads/<version>/                    fetched from a release
+    └── local/<version>-BETA/                   built from a working tree
+```
+
+Symlinks rather than copies because overwriting a signed Mach-O **in place**
+leaves the kernel's code-signature cache pointing at the old inode and the next
+exec dies with SIGKILL — exit 137, no output. Staged binaries are never
+rewritten, so there is no in-place overwrite to get wrong.
+
+`gm_releases.sh` is the store contract and **exists twice on purpose**: authored
+at `gmk/scripts/`, vendored byte-identical into `plugins/gmcc/scripts/`. A
+marketplace install materialises `plugins/gmcc/` alone, so the plugin's installer
+cannot source a library under `gmk/`, and it must not climb out of the cache to
+look for one — on a machine whose `$HOME` is a git repo, `git rev-parse
+--show-toplevel` from the plugin cache confidently returns the home directory.
+`ReleaseStoreContractTests` fails the build if the two copies drift; fix that by
+copying, never by editing both.
+
+**The publish path is repo-side only.** `gmk/scripts/` is not in the plugin
+payload (`source: ./plugins/gmcc`), so installing the plugin does not distribute
+`publish_release.sh`. On top of that it refuses unless the authenticated `gh`
+user holds push on the repo.
+
+`.github/workflows/daemon-release.yml` is the **fallback**, not the default. Its
+tag trigger was deliberately removed: it would have fired on the tag
+`publish_release.sh` pushes and clobbered the verified assets with a fresh build
+nobody had run. Dispatch it manually when the local path is unavailable.
 
 ## Layout
 
@@ -77,8 +145,9 @@ Consequences a reader must not re-derive incorrectly:
     of the app target's source directory.
   - `gmk/VERSION` — the version pin for the three shipped binaries.
 - `plugins/gmcc/` — the Claude Code plugin: skills, commands, prompts, hooks,
-  scripts and `.mcp.json`. **Frozen** (see above). The Swift package left this
-  directory; nothing else did.
+  scripts and `.mcp.json`, plus the installer and the vendored release-store
+  library. It ships **no Swift sources** — the package left this directory for
+  `gmk/` and did not come back.
 - `.gmcc/` — this repo's committed DOPE tree (Domain Optimized Project Essence);
   sessions boot-sync their dope scope from it. **The directory keeps this name.**
   Any rename pass must exclude the `.gmcc/` path segment — a blind sweep would
@@ -109,39 +178,27 @@ swift test --package-path gmk/gmUxComponentLibrary
 swift test --package-path gmk/gmMcp
 swift test --package-path gmk/gmToolchain
 swift build --package-path gmk/gmAgententicsSdk     # compile-only by design
-bash gmk/scripts/build_gm.sh                        # release build → ~/gmfs/bin/
+bash gmk/scripts/rebuild_local.sh                   # universal build → staged + activated
 ```
 
-`build_gm.sh` is the DEVELOPER path and stamps `~/gmfs/bin/.gm_version` as
-`<version>+src.<sha>`, which marks that bin directory developer-owned so a
-download never replaces your build. Everyone else runs
-`gmk/scripts/install_gm.sh`, which fetches the prebuilt universal binaries for
-`gmk/VERSION` from the matching `daemon-v*` release and verifies their SHA-256.
-Don't put compiling back on the install path.
+See **The release loop** above for how `rebuild_local.sh`, `publish_release.sh`
+and the plugin's `install_gm.sh` divide the work.
 
-**Neither script is exercised yet.** Running either one writes to `~/gmfs`, which
-is out of scope until cutover; CI only `bash -n` syntax-checks them, and that is
-a preserved invariant rather than an oversight.
+CI `bash -n` syntax-checks the scripts and never runs them — they write to
+`~/gmfs` and, in publish's case, tag and upload. That is a preserved invariant,
+not an oversight; the packages are built directly, which is the part worth
+gating. Do not "fix" it by adding a real build.
 
-Both scripts resolve the repo with `git rev-parse --show-toplevel` and a
-script-directory walk as fallback, because `${CLAUDE_PLUGIN_ROOT}` — the only
-anchor the plugin contract offers — now points BESIDE the package tree rather
-than above it. Proving that climb against a real marketplace install is a
-**cutover gate**; it cannot be exercised without installing.
+`rebuild_local.sh` and `publish_release.sh` resolve the repo with `git rev-parse
+--show-toplevel` plus a script-directory walk, and then **verify `gmk/` is
+actually there**. That check is not decoration: a bare `git rev-parse` can
+resolve to an unrelated enclosing repository, and a `$HOME` under version control
+is the case that actually bites. The plugin's installer sidesteps the problem
+entirely by needing no repo at all.
 
 There is no BuildInfo stamping step anywhere. A SwiftPM **prebuild plugin** in
 `gmk/gmDaemon` does it inside the build graph, so Xcode and every CI job get it
 free and a clean clone compiles with no prior shell step.
-
-### The frozen live loop, still valid today
-
-`plugins/gmcc/scripts/build_daemon.sh` and `plugins/gmcc/scripts/install_daemon.sh`
-still build and install the currently running stack, under its own binary names,
-its own runtime root and its own version stamp. Those literals are deliberately
-not repeated in this file — the retired-name contract forbids them here, and the
-frozen scripts themselves are the accurate source. Do not "modernize" them: the
-new names do not exist on `PATH` until cutover, so a sweep through those files
-breaks the machine the moment it lands.
 
 ### Guard rails
 
@@ -233,7 +290,7 @@ markdown erodes; this one fails a call.
 A sandbox is a full snapshot at `$GM_FS_ROOT/development/local_sandbox` — db
 (`gm_hook call BACKUP --json '{}'` takes the sanctioned online copy), repo clone,
 binaries, launchers. Sessions started inside the snapshot auto-sandbox via the
-`.gm_sandbox` marker, which sets `GM_FS_ROOT` to the snapshot; a sandboxed daemon
+`.gmcc_sandbox` marker, which sets `GM_FS_ROOT` to the snapshot; a sandboxed daemon
 opens only the staged db and never touches prod. Nothing in a sandbox should be
 pointed back at the prod runtime.
 
@@ -241,11 +298,11 @@ With one root variable, a sandbox is no longer a special SHAPE of the
 environment — it is a different VALUE of `GM_FS_ROOT`. That is the whole
 mechanism now.
 
-## The one-time migration into `~/gmfs`
+## The one-time migration into `~/gmfs` — ALREADY RUN
 
-Run by `gmk/scripts/migrate_to_gmfs.sh`, **once, as the final action of the reorg
-before commit** — not by the build, not by a test, not as a side effect of
-anything.
+`gmk/scripts/migrate_to_gmfs.sh` has been executed. It is kept as the record of
+what was done and as the only reversal reference; **do not run it again** — it
+refuses anyway, because `~/gmfs/gm.db` already exists.
 
 - `~/gmfs/gm.db` is created as a **quiesced copy** of the live db (shut down, then
   `sqlite3 .backup` — a raw `cp` of a ~600MB db with a live WAL can capture a
@@ -259,9 +316,13 @@ anything.
   prompt path in one statement.
 - Content comes across with it, because the relative paths resolve against it.
 
+**The sandbox marker filename is `.gmcc_sandbox` and is deliberately NOT
+renamed.** `HookLogic.SandboxMarker.fileName` in `gmDaemonSdk` is the authority,
+and the shell launchers must agree with it: a marker only one side recognises is
+a sandbox session writing the prod database. The variable INSIDE it is the single
+`GM_FS_ROOT`.
+
 ## Working-tree note
 
-Uncommitted reorg edits in the working tree are usually intentional — validate
-against the working tree, don't "fix" them back to HEAD without asking. In
-particular, a `plugins/gmcc/` file that still names the previously shipped
-binaries is frozen on purpose.
+Uncommitted edits in the working tree are usually intentional — validate against
+the working tree, don't "fix" them back to HEAD without asking.

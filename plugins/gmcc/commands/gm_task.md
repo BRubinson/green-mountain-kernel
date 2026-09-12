@@ -3,7 +3,7 @@ name: gm_task
 description: Load GMCC session context (via pen reads), then just do the task. Writes no prompt rows or report summaries — GMCC persistence happens only via the automatic file-change hook, an optional doper briefing for meaty tasks, or an explicitly requested retroactive write-back.
 argument-hint: <task / request>
 disable-model-invocation: true
-allowed-tools: Bash(gmcc_hook:*)
+allowed-tools: Bash(gm_hook:*)
 ---
 
 # GM-CDE Task (Context-loaded, no ceremony)
@@ -15,7 +15,7 @@ the user explicitly asks you to write something back.
 
 The contract that distinguishes this command from `/gm_bot`:
 
-> **Default behavior authors NOTHING in the daemon db or the ckfs.**
+> **Default behavior authors NOTHING in the daemon db or the gmfs.**
 > No prompt row, no clarify/arch/explore/review summaries, no artifact
 > registrations. Editing the user's *repository* files is the task and is
 > expected — and those Edit/Write changes are captured automatically by the
@@ -25,14 +25,14 @@ The contract that distinguishes this command from `/gm_bot`:
 > retroactive write-back (final section).
 
 SessionStart injects the pen sheet. The pen tools are typed, so there are no
-flags to guess; `gmcc_hook verbs --json` lists every MessageType the daemon
+flags to guess; `gm_hook verbs --json` lists every MessageType the daemon
 serves for the reads that have no pen tool.
 
 ---
 
 ## Pre-Flight
 
-**Boot Validation**: If `$GMCC_BOOTED` is not set, output:
+**Boot Validation**: If `$GM_BOOTED` is not set, output:
 ```
 [GMB] ERROR: GMCC not booted
 
@@ -44,10 +44,10 @@ Exit without proceeding.
 Current session state (inlined at invocation — one shell, because the two
 list calls need the session uuid the first call returns):
 
-!`U=$(gmcc_hook context ensure | sed -n 's/.*"session_uuid" : "\(.*\)".*/\1/p'); echo "session_uuid=$U"; gmcc_hook call PROMPT_LIST --json "{\"session_uuid\":\"$U\",\"with_reports\":true}"; gmcc_hook call DOPE_LIST --json "{\"session_uuid\":\"$U\"}"`
+!`U=$(gm_hook context ensure | sed -n 's/.*"session_uuid" : "\(.*\)".*/\1/p'); echo "session_uuid=$U"; gm_hook call PROMPT_LIST --json "{\"session_uuid\":\"$U\",\"with_reports\":true}"; gm_hook call DOPE_LIST --json "{\"session_uuid\":\"$U\"}"`
 
 If that errored with "daemon unreachable", self-heal:
-`bash $GMCC_PLUGIN_ROOT/scripts/install_daemon.sh`, then re-run it (the next
+`bash $GM_PLUGIN_ROOT/scripts/install_gm.sh`, then re-run it (the next
 client call brings the daemon back up).
 
 ---
@@ -61,9 +61,9 @@ scopes. Pull detail only where the task needs it:
 - `mcp__plugin_gmcc_pen__clarify_get` / `arch_get` / `explore_get` /
   `review_get` for full detail on the prompts that matter (each narrows —
   pass a rating window or an option/change uuid rather than pulling
-  everything). `gmcc_hook call SEARCH --json '{"query":"<topic>","session_uuid":"<U>","limit":20}'`
-  finds prior work across prompts — do not grep the ckfs for it.
-  `gmcc_hook call ARTIFACT_LIST --json '{"prompt_uuid":"<P>"}'` shows files
+  everything). `gm_hook call SEARCH --json '{"query":"<topic>","session_uuid":"<U>","limit":20}'`
+  finds prior work across prompts — do not grep the gmfs for it.
+  `gm_hook call ARTIFACT_LIST --json '{"prompt_uuid":"<P>"}'` shows files
   registered against a prompt.
 - **Dope on demand.** `mcp__plugin_gmcc_pen__dope_search` (FTS5, dot-path
   hits) then targeted `mcp__plugin_gmcc_pen__dope_get` with `code` — never
@@ -71,9 +71,9 @@ scopes. Pull detail only where the task needs it:
 - **KBites on demand.** If a task clearly benefits from a kbite:
   `mcp__plugin_gmcc_pen__kbite_search` for ranked stubs, read the briefs, then
   `mcp__plugin_gmcc_pen__kbite_file_get` for the content that matters
-  (`gmcc_hook call KBITE_GET --json '{"code":"{name}"}'` for the overview;
+  (`gm_hook call KBITE_GET --json '{"code":"{name}"}'` for the overview;
   purpose file at `{kbite_root}/{name}/KBITE_PURPOSE.md`, kbite_root from
-  `gmcc_hook paths --json`). Prefer kbites already active for the session. Do
+  `gm_hook paths --json`). Prefer kbites already active for the session. Do
   not block on an AskUserQuestion for kbite selection — only load what the
   task needs.
 
@@ -85,7 +85,7 @@ db write — `agent_briefing` rows are context plumbing, not work records).
 There is no prompt row, so the briefing is SESSION-owned:
 
 ```bash
-gmcc_hook call BRIEFING_OPEN --json '{"session_uuid":"{U}","briefing_for_step":"initial"}'
+gm_hook call BRIEFING_OPEN --json '{"session_uuid":"{U}","briefing_for_step":"initial"}'
 ```
 
 The response carries the briefing uuid.
@@ -119,7 +119,7 @@ genuinely warrants it).
   PostToolUse hook captures those changes automatically; do not add manual
   `file_change_add` bookkeeping on top of it.
 - **Do not** author GMCC record entities (no prompt rows, no report summaries, no
-  artifact registrations, nothing under `$GMCC_CKFS_ROOT`).
+  artifact registrations, nothing under `$GM_FS_ROOT`).
 - If the task balloons in scope and would benefit from the full clarify → plan →
   review pipeline, suggest the user re-run it under `/gm_bot` (or `/gm_bot_rpi`
   / `/gm_bot_team`) rather than reaching for GMCC bookkeeping here.
@@ -159,7 +159,7 @@ Capture the task after the fact as a prompt row (no clarify pipeline is run,
 so it lands as `draft`):
 
 ```bash
-gmcc_hook call PROMPT_CREATE --json '{
+gm_hook call PROMPT_CREATE --json '{
   "session_uuid": "{U}",
   "name": "{name}",
   "backstory": "",
@@ -174,12 +174,12 @@ it is recording work already done at the user's request, not splitting a
 human prompt. For a long write-up put the whole payload in a file and use
 `--json-file <path>`: shell argument limits are far below the daemon's
 content caps.) If you have artifacts to drop there, mkdir the memory dir at
-the RETURNED `ckfs_relative_storage_path` (relative to
-`gmcc_hook paths --json` → ckfs_root) — never re-derive `{seq}_{name}`
+the RETURNED `gmfs_relative_storage_path` (relative to
+`gm_hook paths --json` → gmfs_root) — never re-derive `{seq}_{name}`
 yourself; the daemon slugs the name — registering each with:
 
 ```bash
-gmcc_hook call ARTIFACT_ADD --json '{"prompt_uuid":"{P}","file_path":"{abs path}","note":"..."}'
+gm_hook call ARTIFACT_ADD --json '{"prompt_uuid":"{P}","file_path":"{abs path}","note":"..."}'
 ```
 
 After any write-back, state plainly what was persisted and where.

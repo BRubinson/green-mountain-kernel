@@ -8,14 +8,14 @@ import XCTest
 ///
 /// and the scrub is the entire point. The bug this family of scripts was
 /// rewritten to answer was a hook that resolved `gm` through PATH and gated on
-/// `GMCC_BOOTED` — both inherited from a session provisioning that a hook
+/// `GM_BOOTED` — both inherited from a session provisioning that a hook
 /// process never sees. In the developer's own shell those scripts pass every
 /// test that can be written for them, because the developer's shell has
-/// `~/gmcc/bin` on PATH and GMCC_BOOTED set. A test that inherits the
+/// `~/gmfs/bin` on PATH and GM_BOOTED set. A test that inherits the
 /// environment does not test this bug; it reproduces the conditions that hid
 /// it for weeks.
 ///
-/// So the environment carries exactly two names, neither of them GMCC's, and
+/// So the environment carries exactly two names, neither of them GM's, and
 /// `$HOME` points at a temp tree holding a fake `gm` that records the argv and
 /// the stdin it was handed. The script under test is COPIED into that tree:
 /// resolution climbs from the script's own directory looking for a sandbox
@@ -74,7 +74,7 @@ final class HookScriptTests: XCTestCase {
 
     /// Copy a shipped hook script into the temp tree at `<relativeDir>/<name>`.
     /// Nothing above a temp directory carries a `.gmcc_sandbox` marker, so a
-    /// copy placed here resolves to `$HOME/gmcc/bin/gmcc_hook` unless the test puts a
+    /// copy placed here resolves to `$HOME/gmfs/bin/gm_hook` unless the test puts a
     /// marker there on purpose.
     private func install(
         _ name: String, into sandbox: Sandbox, at relativeDir: String = "plugin/scripts"
@@ -114,7 +114,7 @@ final class HookScriptTests: XCTestCase {
 
     /// `env -i HOME=<sandbox> PATH=/usr/bin:/bin bash <script> <arguments>`.
     /// The environment dictionary IS the scrub — it replaces the parent's
-    /// rather than adding to it, so no GMCC_* and no `~/gmcc/bin` reaches the
+    /// rather than adding to it, so no GM_* and no `~/gmfs/bin` reaches the
     /// child by any route.
     private func run(
         _ script: URL, _ arguments: [String] = [], stdin: String = "", home: URL
@@ -146,15 +146,15 @@ final class HookScriptTests: XCTestCase {
     "tool_input":{"file_path":"/Users/nobody/repo/a.swift"},"duration_ms":12}
     """
 
-    // MARK: - gmcc_hook.sh
+    // MARK: - gm_hook.sh
 
     /// The payload reaches `gm hook post-tool-use` BYTE FOR BYTE. The shim
     /// parses nothing: if it ever starts to, the capture surface's fixtures
     /// stop describing what the daemon actually receives.
     func testPostToolUsePayloadReachesGmWithNoInheritedEnvironment() throws {
         let sandbox = try Sandbox()
-        let script = try install("gmcc_hook.sh", into: sandbox)
-        try installFakeGm(in: sandbox, at: "gmcc/bin/gmcc_hook", recordDir: "rec")
+        let script = try install("gm_hook.sh", into: sandbox)
+        try installFakeGm(in: sandbox, at: "gmfs/bin/gm_hook", recordDir: "rec")
 
         let result = try run(
             script, ["post-tool-use"], stdin: postToolUsePayload, home: sandbox.root)
@@ -168,8 +168,8 @@ final class HookScriptTests: XCTestCase {
     /// is the whole reason there is no second prelude to drift from this one.
     func testSubagentStartPayloadReachesGmWithNoInheritedEnvironment() throws {
         let sandbox = try Sandbox()
-        let script = try install("gmcc_hook.sh", into: sandbox)
-        try installFakeGm(in: sandbox, at: "gmcc/bin/gmcc_hook", recordDir: "rec")
+        let script = try install("gm_hook.sh", into: sandbox)
+        try installFakeGm(in: sandbox, at: "gmfs/bin/gm_hook", recordDir: "rec")
         let payload = """
         {"session_id":"6d3f1a90-hook-test","hook_event_name":"SubagentStart",\
         "cwd":"/Users/nobody/repo","agent_id":"agent-1","agent_type":"gmcc:code-explorer"}
@@ -188,7 +188,7 @@ final class HookScriptTests: XCTestCase {
     /// as a decision.
     func testMissingGmBinaryIsASilentExitZero() throws {
         let sandbox = try Sandbox()
-        let script = try install("gmcc_hook.sh", into: sandbox)
+        let script = try install("gm_hook.sh", into: sandbox)
 
         let result = try run(
             script, ["post-tool-use"], stdin: postToolUsePayload, home: sandbox.root)
@@ -203,8 +203,8 @@ final class HookScriptTests: XCTestCase {
     /// injected into the transcript.
     func testMissingEventArgumentRunsNothing() throws {
         let sandbox = try Sandbox()
-        let script = try install("gmcc_hook.sh", into: sandbox)
-        try installFakeGm(in: sandbox, at: "gmcc/bin/gmcc_hook", recordDir: "rec")
+        let script = try install("gm_hook.sh", into: sandbox)
+        try installFakeGm(in: sandbox, at: "gmfs/bin/gm_hook", recordDir: "rec")
 
         let result = try run(script, [], stdin: postToolUsePayload, home: sandbox.root)
 
@@ -218,23 +218,22 @@ final class HookScriptTests: XCTestCase {
     /// location finds the clone's `.gmcc_sandbox` and the binary named there.
     /// Without this a snapshot session's every edit lands in the PROD db —
     /// the hazard that removing the inherited env creates, since a sandbox
-    /// launcher's `GMCC_ROOT` is exactly the kind of variable a hook does not
+    /// launcher's `GM_FS_ROOT` is exactly the kind of variable a hook does not
     /// inherit.
     func testSandboxMarkerRetargetsTheBinary() throws {
         let sandbox = try Sandbox()
         let snapshotRoot = try sandbox.dir("snapshot/runtime")
         _ = try sandbox.write(
             """
-            export GMCC_ROOT="\(snapshotRoot.path)"
-            export GMCC_CKFS_ROOT="\(sandbox.root.path)/snapshot/ckfs"
+            export GM_FS_ROOT="\(snapshotRoot.path)"
             """,
             to: "snapshot/repo/.gmcc_sandbox")
         let script = try install(
-            "gmcc_hook.sh", into: sandbox, at: "snapshot/repo/plugins/gmcc/scripts")
+            "gm_hook.sh", into: sandbox, at: "snapshot/repo/plugins/gmcc/scripts")
         // The prod-shaped binary is present too: this test fails if the walk
         // is skipped, not merely if it finds nothing.
-        try installFakeGm(in: sandbox, at: "gmcc/bin/gmcc_hook", recordDir: "rec-prod")
-        try installFakeGm(in: sandbox, at: "snapshot/runtime/bin/gmcc_hook", recordDir: "rec-snapshot")
+        try installFakeGm(in: sandbox, at: "gmfs/bin/gm_hook", recordDir: "rec-prod")
+        try installFakeGm(in: sandbox, at: "snapshot/runtime/bin/gm_hook", recordDir: "rec-snapshot")
 
         let result = try run(
             script, ["post-tool-use"], stdin: postToolUsePayload, home: sandbox.root)

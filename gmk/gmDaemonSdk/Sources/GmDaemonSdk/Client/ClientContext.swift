@@ -16,7 +16,7 @@ public struct ClientContextError: Error, LocalizedError {
 }
 
 /// The CLI gathers the git context (repo root, basename, branch) from the
-/// working directory and mirrors gmcc_session_startup.sh's identity
+/// working directory and mirrors gm_session_startup.sh's identity
 /// conventions (instance code = {repo}_{4-char md5 of abs path}, branch
 /// slugified / → __) so db rows line up with the gmfs tree.
 public struct GitContext {
@@ -24,14 +24,14 @@ public struct GitContext {
     public let repoName: String
     public let branch: String
 
-    /// {repo}_{first 4 hex of md5(abs path)} — matches gmcc_session_startup.sh's hash4.
+    /// {repo}_{first 4 hex of md5(abs path)} — matches gm_session_startup.sh's hash4.
     /// Single Swift home of the convention: InstanceIdentity in the kit
     /// (shared with SandboxRetarget).
     public var instanceCode: String {
         InstanceIdentity.code(repoName: repoName, absolutePath: repoRoot)
     }
 
-    /// Branch with / slugified to __ — matches gmcc_session_startup.sh.
+    /// Branch with / slugified to __ — matches gm_session_startup.sh.
     public var sessionCode: String {
         branch.replacingOccurrences(of: "/", with: "__")
     }

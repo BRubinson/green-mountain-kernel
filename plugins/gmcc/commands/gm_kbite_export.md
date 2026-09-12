@@ -23,7 +23,7 @@ One kbite per zip. Kbite relationships are NOT resolved on the other side —
 
 ## Pre-Flight Checks
 
-**Boot Validation**: If `$GMCC_BOOTED` is not set, output:
+**Boot Validation**: If `$GM_BOOTED` is not set, output:
 ```
 [GMB] ERROR: GMCC not booted
 
@@ -32,17 +32,17 @@ To fix: Restart Claude Code from within a git repository.
 ```
 Exit without proceeding.
 
-1. Resolve the roots: `gmcc_hook paths --json` (ckfs_root, kbite_root,
+1. Resolve the roots: `gm_hook paths --json` (gmfs_root, kbite_root,
    kbite_digested_root).
 2. Verify the kbite exists in the db:
-   `gmcc_hook call KBITE_GET --json '{"code":"{kbite_code}"}'`
+   `gm_hook call KBITE_GET --json '{"code":"{kbite_code}"}'`
 
 ### If KBite Unknown
 ```
 [GMB] Error: kbite {kbite_code} not found in the db
 
 Every digested kbite on this machine:
-  gmcc_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"{U}","all":true}'
+  gm_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"{U}","all":true}'
 ```
 Exit without changes.
 
@@ -61,13 +61,13 @@ overlapping roots cannot half-replace each other):
 STAGE=$(mktemp -d)/gmcc_kbite_{kbite_code}
 mkdir -p "$STAGE"
 
-gmcc_hook call KBITE_EXPORT --json '{
+gm_hook call KBITE_EXPORT --json '{
   "code": "{kbite_code}",
   "db_export_path": "'"$STAGE"'/db_export.json",
   "anonymize": [
     {"prefix": "{kbite_digested_root}", "placeholder": "{{KBITE_TREE}}"},
     {"prefix": "{kbite_root}",          "placeholder": "{{KBITE_IDENTITY}}"},
-    {"prefix": "{ckfs_root}",           "placeholder": "{{GMCC_CKFS}}"},
+    {"prefix": "{gmfs_root}",           "placeholder": "{{GMCC_GMFS}}"},
     {"prefix": "'"$HOME"'",             "placeholder": "{{GMCC_HOME}}"}
   ]
 }'

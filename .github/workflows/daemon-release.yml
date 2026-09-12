@@ -1,13 +1,9 @@
 name: daemon-release
 
 # Builds the universal `gm_daemon` / `gm_mcp` / `gm_hook` binaries once and
-# attaches them to a `daemon-v<version>` release. install_gm.sh fetches exactly
-# this asset.
+# attaches them to a `daemon-v<version>` release. The plugin's install_gm.sh fetches
+# exactly this asset.
 #
-# *** MADE CORRECT, NOT EXERCISED. *** Publishing a release is not a gate on the
-# reorg that rewrote this file. It is safe to change precisely because the live
-# machine installs from the gmcc-marketplace repo, not from this one — so this
-# workflow currently feeds nothing that is running.
 #
 # THE BINARIES NOW COME FROM THREE PACKAGES, not one:
 #   gm_daemon <- gmk/gmDaemon        gm_mcp <- gmk/gmMcp        gm_hook <- gmk/gmDaemonSdk
@@ -24,12 +20,28 @@ name: daemon-release
 # re-download ~15MB of unchanged binaries. gmk/VERSION moves only when the code
 # behind it does.
 #
-# Trigger: push a tag, or dispatch manually (which tags for you).
-#   git tag daemon-v50.0.1 && git push origin daemon-v50.0.1
+# ── THIS IS THE FALLBACK PATH, NOT THE DEFAULT ONE ──────────────────────────
+#
+# The default way to cut a release is LOCAL:
+#
+#     bash gmk/scripts/rebuild_local.sh      # universal build, staged as -BETA
+#     bash gmk/scripts/publish_release.sh    # verify, tag, upload what you tested
+#
+# That exists so the published bytes are the bytes that were actually run on a
+# real machine, rather than a fresh build nobody has executed.
+#
+# THE TAG TRIGGER IS DELIBERATELY ABSENT. It used to be `on: push: tags`, and
+# leaving it that way would make this workflow fire on the tag publish_release.sh
+# pushes, rebuild from scratch, and `--clobber` the verified assets that were
+# just uploaded — silently replacing the tested artifact with an untested one.
+# The two publishers cannot both own the same tag, so this one is manual.
+#
+# Dispatch it when the local path is unavailable: no Mac at hand, a toolchain
+# that will not build, or to reproduce an existing release from a clean checkout.
+# It will clobber the assets on the tag it is given, which is the point when you
+# are reaching for it on purpose.
 
 on:
-  push:
-    tags: ['daemon-v*']
   workflow_dispatch:
     inputs:
       version:
@@ -58,11 +70,9 @@ jobs:
         id: v
         run: |
           pinned="$(cat gmk/VERSION)"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            asked="${{ inputs.version }}"
-          else
-            asked="${GITHUB_REF_NAME#daemon-v}"
-          fi
+          # workflow_dispatch is the only trigger now, so the version always
+          # arrives as an input; there is no tag ref to derive it from.
+          asked="${{ inputs.version }}"
           if [ "$pinned" != "$asked" ]; then
             echo "::error::gmk/VERSION is '$pinned' but the release asks for '$asked' — bump the file and the tag together"
             exit 1
@@ -169,12 +179,12 @@ jobs:
           cat > release-notes.md <<'NOTES'
           Universal (arm64 + x86_64) macOS binaries for `gm_daemon`, `gm_mcp`, `gm_hook`.
 
-          Installed by `gmk/scripts/install_gm.sh`, which pins this version via
-          `gmk/VERSION` and verifies the SHA-256 sidecar before unpacking.
+          Installed by the plugin's `install_gm.sh`, which fetches the newest
+          `daemon-v*` release and verifies the SHA-256 sidecar before unpacking.
 
           Manual install:
 
-              bash gmk/scripts/install_gm.sh
+              bash plugins/gmcc/scripts/install_gm.sh
           NOTES
           # The heredoc body carries this file's YAML indentation; strip it back off.
           sed -i '' 's/^          //' release-notes.md

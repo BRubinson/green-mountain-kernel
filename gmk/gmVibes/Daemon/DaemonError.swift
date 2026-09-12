@@ -4,7 +4,7 @@ import GmDaemonSdk
 /// App-facing typed error surface. Views and stores branch on these cases —
 /// never on message text — per the daemon's typed-code contract.
 nonisolated enum DaemonError: Error, Equatable {
-    /// Binary absent at ~/gmcc/bin/gmcc_daemon (distinct from a stopped daemon).
+    /// Binary absent at ~/gmfs/bin/gm_daemon (distinct from a stopped daemon).
     case notInstalled
     /// Socket dead and autostart disabled (or autostart exhausted its retries).
     case unreachable(String)
@@ -36,7 +36,7 @@ nonisolated enum DaemonError: Error, Equatable {
     /// wording (e.g. search) may special-case a few cases and fall back here.
     var userMessage: String {
         switch self {
-        case .notInstalled: return "Daemon not installed (run install_daemon.sh)."
+        case .notInstalled: return "Daemon not installed (run install_gm.sh)."
         case .unreachable(let m): return m
         case .clientTooOld(let v): return "Daemon (wire v\(v)) is newer than this app — rebuild GMVibes."
         case .daemonTooOld(_, let m): return m

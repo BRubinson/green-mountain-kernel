@@ -1,17 +1,17 @@
-# CKFS Detailed Structure Reference
+# GMFS Detailed Structure Reference
 
-Read this file on-demand when performing ckfs operations.
+Read this file on-demand when performing gmfs operations.
 
 Prompt/session/instance/project data AND all four bot reports live in the
-daemon's SQLite db at `~/gmcc/gmcc.db`. The ckfs on disk is a **file tree
+daemon's SQLite db at `~/gmfs/gm.db`. The gmfs on disk is a **file tree
 only** — prompt-scoped scratch files under `memory/`, plus the kbite
 content store.
 
 Two channels reach the db: the **pen** (`mcp__plugin_gmcc_pen__*`, served by
-`gmcc_mcp`) for everything that has a pen tool, and
-`gmcc_hook call <MESSAGE_TYPE> --json '{...}'` for everything else.
-`gmcc_hook verbs --json` is the catalogue. See
-`skills/gmcc_daemon/SKILL.md`.
+`gm_mcp`) for everything that has a pen tool, and
+`gm_hook call <MESSAGE_TYPE> --json '{...}'` for everything else.
+`gm_hook verbs --json` is the catalogue. See
+`skills/gm_daemon/SKILL.md`.
 
 ## Static Plugin Files (Installed to ~/.claude/plugins/gmcc/)
 ```
@@ -20,7 +20,7 @@ Two channels reach the db: the **pen** (`mcp__plugin_gmcc_pen__*`, served by
 ├── skills/
 │   ├── gmcc/SKILL.md              # Core rules (slim)
 │   ├── gmcc/ref/                  # Reference files (read on-demand)
-│   ├── gmcc_daemon/               # Daemon + pen invocation reference
+│   ├── gm_daemon/               # Daemon + pen invocation reference
 │   ├── gmcc_kbite/                # KBite knowledge system
 │   ├── gmcc_maw/                  # KBite web-fetch skill
 │   ├── gmcc_boot/                 # Boot validation
@@ -28,52 +28,59 @@ Two channels reach the db: the **pen** (`mcp__plugin_gmcc_pen__*`, served by
 ├── commands/gm_*.md               # All GM commands
 ├── agents/*.md                    # Native agent defs (gmcc:code-explorer, doper, …) — identity + pen contract
 ├── prompts/gmcc_agent_*.md        # Crunch/maw agent prompts (the bot roles live in agents/)
-├── scripts/gmcc_session_startup.sh         # SessionStart hook script
-├── scripts/gmcc_hook.sh                    # Every non-SessionStart hook; event as argv, payload to `gmcc_hook hook`
-├── scripts/install_daemon.sh      # Fetches + installs the pinned prebuilt binaries
-├── scripts/build_daemon.sh        # Dev path: compiles + installs all three binaries
-├── scripts/stamp_build_info.sh    # Writes the generated BuildInfo (shared by the build + CI)
-├── scripts/check_daemon_stale.sh  # SessionStart staleness warning
-├── scripts/run_mcp.sh             # Launches gmcc_mcp for the pen server
-├── daemon/                        # Swift package: GMCCDaemonKit + gmcc_daemon + gmcc_mcp + gmcc_hook
+├── scripts/gm_session_startup.sh         # SessionStart hook script
+├── scripts/gm_hook.sh                    # Every non-SessionStart hook; event as argv, payload to `gm_hook hook`
+├── scripts/install_gm.sh          # Fetches the newest daemon-v* release; stages + activates it
+├── scripts/gm_releases.sh         # The release-store contract (staging, activation, rollback)
+├── scripts/check_gm_stale.sh      # SessionStart health warning (local only — never hits the network)
+├── scripts/run_mcp.sh             # Launches gm_mcp for the pen server
 └── hooks/hooks.json               # Hook configuration (SessionStart, SubagentStart, PostToolUse)
 ```
 
+**The plugin ships no Swift sources.** The packages live in `gmk/` in the
+green-mountain-kernel repo and are built by `gmk/scripts/rebuild_local.sh`;
+`gmk/scripts/publish_release.sh` tags and uploads them. Neither script is part
+of the plugin payload, so installing the plugin does not distribute them.
+
 ## Runtime Layout (Per-User)
 ```
-~/gmcc/                                                       # daemon runtime (NOT in git)
-├── bin/{gmcc_daemon, gmcc_mcp, gmcc_hook}
-├── gmcc.db                                                   # SQLite — single source of truth for runtime data
+~/gmfs/                                                       # $GM_FS_ROOT — ONE root (NOT in git)
+├── bin/
+│   ├── {gm_daemon, gm_mcp, gm_hook}                          # symlinks -> releases/active/*
+│   ├── .gm_version                                           # active version ("50.0.1" or "50.0.1-BETA")
+│   └── releases/
+│       ├── active -> downloads/50.0.1
+│       ├── downloads/{version}/                              # fetched from a daemon-v* release
+│       └── local/{version}-BETA/                             # built by gmk/scripts/rebuild_local.sh
+├── gm.db                                                     # SQLite — single source of truth for runtime data
 ├── daemon.sock · daemon.log · daemon.pid · backups/
-
-~/gmcc_ckfs/                                                  # $GMCC_CKFS_ROOT — file artifacts only
 ├── README.md
 ├── _archive/cold_storage/                                    # universal archive bucket (structure-preserving)
 ├── projects/
-│   └── {project_name}/                                       # project ckfs_relative_storage_path
+│   └── {project_name}/                                       # project gmfs_relative_storage_path
 │       └── instances/
-│           └── {project_name}_{hash4}/                       # instance ckfs_relative_storage_path
+│           └── {project_name}_{hash4}/                       # instance gmfs_relative_storage_path
 │               └── sessions/
 │                   └── {sanitized_branch}/                   # session's artifact home
 │                       └── prompts/
 │                           └── {id}_{name}/                  # one folder per prompt
 │                               └── memory/                  # usually empty — every report
 │                                                             # is a db row
-└── kbites/                                                   # kbite_root (gmcc_hook paths --json)
+└── kbites/                                                   # kbite_root (gm_hook paths --json)
     ├── {kbite_name}/KBITE_PURPOSE.md                         # identity-level
     ├── digested/{kbite_name}/...                             # kbite_digested_root — raw-source archive (text is db-canonical)
     └── open/{kbite_name}/...                                 # kbite_open_root — in-progress maws
 ```
 
-Each row carries its own `ckfs_relative_storage_path`; the roots come from
-`gmcc_hook paths --json`. The db stores **pointers + captions** to the
+Each row carries its own `gmfs_relative_storage_path`; the roots come from
+`gm_hook paths --json`. The db stores **pointers + captions** to the
 `memory/*.md` files (`prompt_artifact` rows) — never their bodies. The
 daemon never writes files; bot workflows create the folders and write the
 markdown, then register each file with `ARTIFACT_ADD`.
 
 ## Identity Resolution (How a path becomes a session)
 
-Identity is derived daemon-side by `gmcc_hook context ensure`
+Identity is derived daemon-side by `gm_hook context ensure`
 (`GitContext`/`ContextBuilder` in Swift). Given a git repository:
 
 | Concept | Source | Derived value |
@@ -100,30 +107,30 @@ A project corresponds to exactly one git repo (by basename). An instance is a un
 
 ## Lazy Creation on SessionStart
 
-On every SessionStart, `gmcc_session_startup.sh`:
+On every SessionStart, `gm_session_startup.sh`:
 
 1. Confirms the git repo, locates the plugin root, and locates the right
-   `gmcc_hook` binary (prod runtime, or the sandbox runtime named by a
+   `gm_hook` binary (prod runtime, or the sandbox runtime named by a
    `.gmcc_sandbox` marker). It computes nothing the daemon computes.
-2. Calls `gmcc_hook context ensure --hook-payload` (best-effort):
+2. Calls `gm_hook context ensure --hook-payload` (best-effort):
    idempotently upserts the project → instance → session rows in the db
    (reusing existing uuids, seeding kbite inheritance at create time), pins
    the claude session binding every later hook write resolves through,
    creates the session's artifact home
-   (`{ckfs_relative_storage_path}/prompts/` under `$GMCC_CKFS_ROOT` — the
+   (`{gmfs_relative_storage_path}/prompts/` under `$GM_FS_ROOT` — the
    physical home for prompt `memory/` folders), and runs the dope boot
    sync. If the daemon/binary is unavailable it warns and continues.
-3. Prints the pen sheet (`gmcc_hook pen-sheet`) into the session's context.
-4. Emits the session env via `gmcc_hook context env` into
-   `$CLAUDE_ENV_FILE`: `GMCC_BOOTED`, `GMCC_PLUGIN_ROOT`, `GMCC_CKFS_ROOT`,
-   `PATH` (the active runtime's `bin/` first, so bare `gmcc_hook` resolves
-   to the correct prod/sandbox binary), plus `GMCC_ROOT` when sandboxed.
-   Per-level path vars do not exist — roots come from `gmcc_hook paths` and
-   per-row locations from `ckfs_relative_storage_path`.
+3. Prints the pen sheet (`gm_hook pen-sheet`) into the session's context.
+4. Emits the session env via `gm_hook context env` into
+   `$CLAUDE_ENV_FILE`: `GM_BOOTED`, `GM_PLUGIN_ROOT`, `GM_FS_ROOT`,
+   `PATH` (the active runtime's `bin/` first, so bare `gm_hook` resolves
+   to the correct prod/sandbox binary), plus `GM_FS_ROOT` when sandboxed.
+   Per-level path vars do not exist — roots come from `gm_hook paths` and
+   per-row locations from `gmfs_relative_storage_path`.
 
 This means **commands can always assume the env + session dir exist**;
 db rows exist whenever the daemon was reachable at SessionStart (and
-`gmcc_hook context ensure` may be re-run by any command at any time — it is
+`gm_hook context ensure` may be re-run by any command at any time — it is
 idempotent).
 
 ## Db-Backed Data Model
@@ -144,11 +151,11 @@ file_change_list   recorded edits for a prompt (or a session, or one path)
 ```
 
 ```bash
-gmcc_hook context ensure                                   # uuid triple for $PWD + branch
-gmcc_hook call SESSION_GET  --json '{"session_uuid":"U"}'  # session row + prompt stubs + change summaries
-gmcc_hook call PROMPT_LIST  --json '{"session_uuid":"U","with_reports":true}'
-gmcc_hook call ARTIFACT_LIST --json '{"prompt_uuid":"U"}'
-gmcc_hook call SEARCH       --json '{"query":"<topic>"}'   # across reports
+gm_hook context ensure                                   # uuid triple for $PWD + branch
+gm_hook call SESSION_GET  --json '{"session_uuid":"U"}'  # session row + prompt stubs + change summaries
+gm_hook call PROMPT_LIST  --json '{"session_uuid":"U","with_reports":true}'
+gm_hook call ARTIFACT_LIST --json '{"prompt_uuid":"U"}'
+gm_hook call SEARCH       --json '{"query":"<topic>"}'   # across reports
 ```
 
 ### Optimistic concurrency (`expected_version`)
@@ -180,7 +187,7 @@ content (`backstory`/`goal`/`detail`), status, and command live on the
 prompt row. Any file you write under `memory/` is registered with:
 
 ```bash
-gmcc_hook call ARTIFACT_ADD --json \
+gm_hook call ARTIFACT_ADD --json \
   '{"prompt_uuid":"U","file_path":"<abs path>","note":"<one-sentence caption>"}'
 ```
 
@@ -203,7 +210,7 @@ absent backing row fails the gate.
    verbatim; `goal` = "" (human/clarify input only); `backstory` inherited
    from the session row. Never split, infer, or author these fields. Then
    `mkdir -p prompts/{seq}_{name}/memory/` from the returned
-   `ckfs_relative_storage_path`.
+   `gmfs_relative_storage_path`.
 2. **clarifying** — enter with `prompt_set_status status: clarifying` (it
    locks content and the daemon creates the summary). The clarifier then
    writes `clarify_question_add` (+ option rows) and `clarify_note_add`;
@@ -249,8 +256,8 @@ sole registry. Read the active list as `kbite_codes` on `prompt_get` or
 `SESSION_GET`, or list a scope:
 
 ```bash
-gmcc_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"U"}'   # "all": true for every kbite row
-gmcc_hook call KBITE_ADD  --json '{"scope":"session","owner_uuid":"U","code":"C"}'
+gm_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"U"}'   # "all": true for every kbite row
+gm_hook call KBITE_ADD  --json '{"scope":"session","owner_uuid":"U","code":"C"}'
 ```
 
 Kbites are added only on explicit user request — see

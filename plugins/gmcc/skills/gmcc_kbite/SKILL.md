@@ -19,8 +19,8 @@ The KBite (Knowledge Bite) system provides persistent, indexed knowledge storage
 A **KBite** is a persisted body of analyzed knowledge that is:
 - **Pre-tokenized**: Content has been analyzed and summarized for efficient consumption
 - **Indexed**: Full-text searchable (FTS5, bm25-ranked) with snake_case keywords
-- **Persistent**: Digested text lives in the daemon db (`~/gmcc/gmcc.db`), shared across all repositories
-- **Referenced**: GMCC agents and contexts query it with the pen tools `kbite_search` and `kbite_file_get`, and with `gmcc_hook call KBITE_GET` for the per-kbite index
+- **Persistent**: Digested text lives in the daemon db (`~/gmfs/gm.db`), shared across all repositories
+- **Referenced**: GMCC agents and contexts query it with the pen tools `kbite_search` and `kbite_file_get`, and with `gm_hook call KBITE_GET` for the per-kbite index
 
 KBites transform raw reference materials (documentation, examples, APIs) into structured knowledge that GMB can leverage during development.
 
@@ -35,26 +35,26 @@ identity, raw sources, and in-progress maws:
 
 | Home | What lives there |
 |------|------------------|
-| Daemon db (`~/gmcc/gmcc.db`) | Resources, per-file summaries + full text, keywords, FTS5 search, kbite registries. Read with `kbite_search` / `kbite_file_get` / `KBITE_GET`. |
+| Daemon db (`~/gmfs/gm.db`) | Resources, per-file summaries + full text, keywords, FTS5 search, kbite registries. Read with `kbite_search` / `kbite_file_get` / `KBITE_GET`. |
 | `{kbite_root}/{name}/` (kbite root) | `KBITE_PURPOSE.md` (identity — defined once, above the lifecycle split) and `KBITE_RELATIONSHIPS.md` when relationships exist. |
 | `{kbite_digested_root}/{name}/` | **Raw-source archive**: the `{axis1}/{axis2}/{resource}/` folders moved out of the maw at digest time. No indexes — `KBITE_GET` is the index. |
 | `{kbite_open_root}/{name}/` | **In-progress maw**: raw sources being collected/chewed, plus `MAW_INDEX.md`. Deleted at digest time. |
 
 ### Path roots
 
-The kbite roots are daemon config, read from `gmcc_hook paths --json` (they are
+The kbite roots are daemon config, read from `gm_hook paths --json` (they are
 NOT env vars):
 
 | paths key | Default value | Per-kbite usage |
 |----------------|---------------|-----------------|
-| `kbite_root` | `$GMCC_CKFS_ROOT/kbites` | `{kbite_root}/{name}/KBITE_PURPOSE.md` |
-| `kbite_digested_root` | `$GMCC_CKFS_ROOT/kbites/digested` | `{kbite_digested_root}/{name}/...` (raw archive) |
-| `kbite_open_root` | `$GMCC_CKFS_ROOT/kbites/open` | `{kbite_open_root}/{name}/...` (open maw) |
+| `kbite_root` | `$GM_FS_ROOT/kbites` | `{kbite_root}/{name}/KBITE_PURPOSE.md` |
+| `kbite_digested_root` | `$GM_FS_ROOT/kbites/digested` | `{kbite_digested_root}/{name}/...` (raw archive) |
+| `kbite_open_root` | `$GM_FS_ROOT/kbites/open` | `{kbite_open_root}/{name}/...` (open maw) |
 
 Every kbite row in the db:
 
 ```bash
-gmcc_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"<SESSION_UUID>","all":true}'
+gm_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"<SESSION_UUID>","all":true}'
 ```
 
 > Some kbites on disk predate the db-canonical layout: they carry
@@ -99,7 +99,7 @@ Example: `primary/documentation/claude_code_hooks/`
 The **open maw** is a temporary holding area for resources being processed
 ("crunched") into the db. It lives under `{kbite_open_root}/{kbite_name}/` —
 there is at most one open maw per kbite, system-wide. The skeleton is created
-by `gmcc_hook call KBITE_MAW_OPEN --json '{"kbite_name":"{name}","maw_path":"{kbite_open_root}/{name}"}'`
+by `gm_hook call KBITE_MAW_OPEN --json '{"kbite_name":"{name}","maw_path":"{kbite_open_root}/{name}"}'`
 (idempotent, no db rows):
 
 ```
@@ -309,7 +309,7 @@ Processes each crunchable:
 
 Imports the maw's knowledge into the db and archives raw sources:
 1. ```bash
-   gmcc_hook call KBITE_DIGEST --json '{"code":"{name}","kbite_open_path":"{kbite_open_root}/{name}"}'
+   gm_hook call KBITE_DIGEST --json '{"code":"{name}","kbite_open_path":"{kbite_open_root}/{name}"}'
    ```
    The daemon parses every `*_chewed.md` under that path into resource / file /
    keyword rows (full text inlined), commits, then deletes the chewed files.
@@ -317,7 +317,7 @@ Imports the maw's knowledge into the db and archives raw sources:
 2. Client-side: raw source folders are moved from
    `{kbite_open_root}/{kbite_name}/` to `{kbite_digested_root}/{kbite_name}/`
    (same `{axis1}/{axis2}/` layout) and the open maw is deleted.
-3. Verify with `gmcc_hook call KBITE_GET --json '{"code":"{name}"}'`.
+3. Verify with `gm_hook call KBITE_GET --json '{"code":"{name}"}'`.
 
 ---
 
@@ -331,7 +331,7 @@ prompt — into the db's active-kbite registries at row-create time. When
 operating in GM-CDE mode, GMB MUST:
 
 1. **Read the Registry**: the active kbites are the `kbite_codes` on the
-   prompt (pen tool `prompt_get`) or on the session (`gmcc_hook call
+   prompt (pen tool `prompt_get`) or on the session (`gm_hook call
    SESSION_GET --json '{"session_uuid":"<U>"}'`). Registry listing is
    `KBITE_LIST` — scoped (`{"scope":"session","owner_uuid":"<U>"}`, resolved
    through the inheritance chain at read time) or whole-db (`"all":true`).
@@ -384,17 +384,17 @@ Direct queries — the pen tools `kbite_search` (query, optional limit) and
 `kbite_file_get` (file_uuid), plus the wire verbs:
 
 ```bash
-gmcc_hook call KBITE_GET  --json '{"code":"<CODE>"}'
-gmcc_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"<U>","all":true}'
-gmcc_hook call KBITE_ADD  --json '{"scope":"session","owner_uuid":"<U>","code":"<CODE>"}'
-gmcc_hook call KBITE_KEYWORD_TAG --json '{"level":"kbite","target_uuid":"<U>","keywords":["k1","k2"],"detach":false}'
+gm_hook call KBITE_GET  --json '{"code":"<CODE>"}'
+gm_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"<U>","all":true}'
+gm_hook call KBITE_ADD  --json '{"scope":"session","owner_uuid":"<U>","code":"<CODE>"}'
+gm_hook call KBITE_KEYWORD_TAG --json '{"level":"kbite","target_uuid":"<U>","keywords":["k1","k2"],"detach":false}'
 ```
 
 Scopes are `project | instance | session | prompt`; keyword-tag levels are
 `kbite | file`. Lifecycle (`KBITE_EXPORT` / `KBITE_IMPORT` / `KBITE_DELETE`) is
-below. `gmcc_hook verbs --json` lists every MessageType the daemon serves; the
+below. `gm_hook verbs --json` lists every MessageType the daemon serves; the
 doors themselves are described in
-`$GMCC_PLUGIN_ROOT/skills/gmcc_daemon/SKILL.md`.
+`$GM_PLUGIN_ROOT/skills/gm_daemon/SKILL.md`.
 
 ---
 
@@ -433,7 +433,7 @@ Rules the format guarantees:
 5. **Delete is db-first and content-destructive**: `KBITE_DELETE` cascades
    resources, files, junctions, and registrations in one statement (FTS stays
    consistent; orphaned keywords are garbage-collected; event history
-   survives). ALWAYS take a backup — `gmcc_hook call BACKUP --json '{}'`, or
+   survives). ALWAYS take a backup — `gm_hook call BACKUP --json '{}'`, or
    `KBITE_EXPORT`, which doubles as a restorable snapshot — before deleting:
    the digested knowledge is otherwise unrecoverable. The digested tree on
    disk is a separate, client-side step: MOVE it to `_archive/cold_storage/`
@@ -442,11 +442,11 @@ Rules the format guarantees:
 The three lifecycle calls:
 
 ```bash
-gmcc_hook call KBITE_EXPORT --json '{"code":"<CODE>","db_export_path":"<DIR>/db_export.json",
+gm_hook call KBITE_EXPORT --json '{"code":"<CODE>","db_export_path":"<DIR>/db_export.json",
   "anonymize":[{"prefix":"<ABS_PREFIX>","placeholder":"{{KBITE_TREE}}"}]}'
-gmcc_hook call KBITE_IMPORT --json '{"db_export_path":"<DIR>/db_export.json","on_collision":"skip",
+gm_hook call KBITE_IMPORT --json '{"db_export_path":"<DIR>/db_export.json","on_collision":"skip",
   "rehydrate":[{"prefix":"{{KBITE_TREE}}","placeholder":"<ABS_PREFIX>"}]}'
-gmcc_hook call KBITE_DELETE --json '{"code":"<CODE>"}'
+gm_hook call KBITE_DELETE --json '{"code":"<CODE>"}'
 ```
 
 ---
@@ -463,7 +463,7 @@ gmcc_hook call KBITE_DELETE --json '{"code":"<CODE>"}'
 
 The kbite system integrates with core GMCC:
 
-1. **Paths**: Uses the daemon's configured kbite roots — `kbite_root`, `kbite_digested_root`, `kbite_open_root` from `gmcc_hook paths --json` — for path resolution (resolved client-side; the daemon receives absolute paths)
+1. **Paths**: Uses the daemon's configured kbite roots — `kbite_root`, `kbite_digested_root`, `kbite_open_root` from `gm_hook paths --json` — for path resolution (resolved client-side; the daemon receives absolute paths)
 2. **System-Level Storage**: Kbites are independent of FAM/branch — one db + one kbites tree per machine
 3. **Agent System**: Uses GMCC agent framework for chewing
 4. **Registry System**: Active kbites live in the daemon db's `{project,instance,session,prompt}_active_kbite` registries (read with `KBITE_LIST`; explicit add via `KBITE_ADD`)

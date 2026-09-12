@@ -360,7 +360,7 @@ private struct DaemonGateState: View {
 
             switch daemon.health {
             case .notInstalled:
-                CommandCopyRow(command: "cd ~/Dev/green-mountain-kernel && bash plugins/gmcc/scripts/install_daemon.sh")
+                CommandCopyRow(command: "cd ~/Dev/green-mountain-kernel && bash plugins/gmcc/scripts/install_gm.sh")
                     .frame(maxWidth: 480)
             case .down:
                 Button {

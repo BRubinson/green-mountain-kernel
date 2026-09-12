@@ -427,7 +427,7 @@ public enum Migrations {
                 """)
 
             // Step 3 — seed daemon_config with the layout defaults ($HOME
-            // conventions, matching gmcc_session_startup.sh). CONFIG_SET is the write
+            // conventions, matching gm_session_startup.sh). CONFIG_SET is the write
             // door for a differing layout; the daemon never reads $GMCC_* env
             // vars (its environment is a posix_spawn snapshot of whichever
             // client invocation autostarted it).

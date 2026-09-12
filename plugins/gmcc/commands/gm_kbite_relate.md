@@ -24,7 +24,7 @@ Creates or updates a relationship between two kbites, enabling cross-referencing
 
 ## Pre-Flight Checks
 
-**Boot Validation**: If `$GMCC_BOOTED` is not set, output:
+**Boot Validation**: If `$GM_BOOTED` is not set, output:
 ```
 [GMB] ERROR: GMCC not booted
 
@@ -33,11 +33,11 @@ To fix: Restart Claude Code from within a git repository.
 ```
 Exit without proceeding.
 
-1. Resolve the kbite roots from `gmcc_hook paths --json` (kbite_root,
+1. Resolve the kbite roots from `gm_hook paths --json` (kbite_root,
    kbite_digested_root)
-2. Verify both kbites exist: known to the db (`gmcc_hook context ensure` for
+2. Verify both kbites exist: known to the db (`gm_hook context ensure` for
    the session uuid, then
-   `gmcc_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"{U}","all":true}'`)
+   `gm_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"{U}","all":true}'`)
    or present at `{kbite_root}/{name}/` (identity root)
 3. Parse relationship description to determine type
 
