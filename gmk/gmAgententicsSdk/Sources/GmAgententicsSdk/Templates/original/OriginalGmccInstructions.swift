@@ -1,5 +1,5 @@
 //
-//  Instructions.swift
+//  OriginalGmccInstructions.swift
 //  gmAgententicsSdk
 //
 //  Created by Bryce Rubinson on 9/12/26.
@@ -12,8 +12,8 @@ import GmDaemonSdk
 // The SYSTEM half of the template surface: every GMCC persona's standing
 // behavioral contract, compiled into the binary as FoundationModels
 // `Instructions`. The PROMPT half — the per-invocation turn text — is next door
-// in `Prompts.swift`, and the split is the framework's own: `Instructions` are
-// evaluated once when a `LanguageModelSession` is created and are trusted over
+// in `OriginalGmccPrompts.swift`, and the split is the framework's own:
+// `Instructions` are evaluated once when a session is created and are trusted over
 // anything a prompt later says, while a `Prompt` is a single request against an
 // already-configured session.
 //
@@ -59,14 +59,14 @@ import GmDaemonSdk
 // baseline first was the point of this file. `approximateTokenCost` is what
 // makes the case for doing it measurable when someone picks it up.
 
-// `GmAgentRole` — the roster of personas these blocks belong to — LIVES NEXT
-// DOOR in `GmAgentRole.swift`, at the top level of the module rather than in
-// this directory. It started here, because instructions were the first thing
-// that needed it; it moved because "which agents exist" is package-level
-// vocabulary, not a fact about templates, and the next thing to spawn or route
-// an agent should not have to import a templates file to name one.
+// `OriginalGmccRole` — the roster of personas these blocks belong to — LIVES NEXT
+// DOOR in `OriginalGmccEnums.swift`. It started inside this file, because
+// instructions were the first thing that needed it, and was split out so the
+// index is readable without scrolling past thousands of lines of contract text.
+// The three files in this directory are one artifact and are meant to be read
+// together.
 
-/// The standing instruction block for each `GmAgentRole`.
+/// The standing instruction block for each `OriginalGmccRole`.
 public enum GmAgentInstructions {
 
     /// The raw markdown, exactly as the plugin ships it.
@@ -958,11 +958,11 @@ public enum GmAgentInstructions {
 
         /// The raw text for one role.
         ///
-        /// Exhaustive by construction — a new `GmAgentRole` case that forgets a
+        /// Exhaustive by construction — a new `OriginalGmccRole` case that forgets a
         /// block fails to compile here rather than returning an empty string at
         /// runtime, which is the whole reason this is a `switch` and not a
         /// dictionary.
-        public static func text(for role: GmAgentRole) -> String {
+        public static func text(for role: OriginalGmccRole) -> String {
             switch role {
             case .primary: return primary
             case .doper: return doper
@@ -984,7 +984,7 @@ public enum GmAgentInstructions {
     /// tool schemas do, and `LanguageModelError.contextSizeExceeded` is thrown
     /// at request time, far from the line that chose the persona. A caller
     /// composing several blocks can see the bill before the session does.
-    public static func approximateTokenCost(of role: GmAgentRole) -> Int {
+    public static func approximateTokenCost(of role: OriginalGmccRole) -> Int {
         (Text.text(for: role).count + 3) / 4
     }
 
@@ -992,8 +992,8 @@ public enum GmAgentInstructions {
     ///
     /// The roster, and what makes a drift test possible at all — same role
     /// `GmAgentTools.all` plays for the tool surface.
-    public static let allText: [(role: GmAgentRole, text: String)] =
-        GmAgentRole.allCases.map { ($0, Text.text(for: $0)) }
+    public static let allText: [(role: OriginalGmccRole, text: String)] =
+        OriginalGmccRole.allCases.map { ($0, Text.text(for: $0)) }
 }
 
 // MARK: - FoundationModels values
@@ -1002,7 +1002,7 @@ public enum GmAgentInstructions {
 extension GmAgentInstructions {
 
     /// The standing `Instructions` for one role.
-    public static func instructions(for role: GmAgentRole) -> Instructions {
+    public static func instructions(for role: OriginalGmccRole) -> Instructions {
         Instructions(Text.text(for: role))
     }
 
@@ -1018,7 +1018,7 @@ extension GmAgentInstructions {
     ///
     /// Prepending `primary` to `primary` would be a duplicate paid for twice in
     /// tokens, so that case returns the single block.
-    public static func groundedInstructions(for role: GmAgentRole) -> Instructions {
+    public static func groundedInstructions(for role: OriginalGmccRole) -> Instructions {
         guard role != .primary else { return instructions(for: .primary) }
         return Instructions(Text.primary + "\n\n---\n\n" + Text.text(for: role))
     }
@@ -1036,7 +1036,7 @@ extension GmAgentInstructions {
     /// description in its own instructions, and instructions that argue with
     /// themselves are worse than instructions that are merely long.
     public static func instructions(
-        for role: GmAgentRole,
+        for role: OriginalGmccRole,
         methodology: ExplorationAgentType
     ) -> Instructions {
         guard role.takesMethodology else { return instructions(for: role) }

@@ -1,41 +1,26 @@
 import Foundation
 
-// The AGENT roster: which personas GMCC runs, and the facts about each that are
-// true regardless of what is being said to it.
+// The ARCHIVE's own role vocabulary.
 //
-// TOP LEVEL RATHER THAN `Templates/`, and the placement is the point. This type
-// was born inside `Templates/Instructions.swift` because instructions were the
-// first thing that needed it, but "which agents exist" is not a fact about
-// templates — it is package-level vocabulary, the agent-side parallel to
-// `GmAgentToolFamily` in `GmAgentTool.swift`. Anything that later spawns,
-// schedules, budgets or routes an agent needs this enum and has no business
-// importing a templates file to get it.
+// `original/` IS SEALED: nothing in this directory references anything outside
+// it, and nothing outside it references anything in here. That is why this enum
+// exists at all rather than the archive sharing `GmAgentRole` from `Templates/`.
+// A shared enum looks like the obvious economy and is the thing that rots the
+// archive — every later edit to the live vocabulary would silently rewrite what
+// this transcription claims the plugin said.
 //
-// NO FoundationModels IMPORT, deliberately. Nothing here is a `Tool`, an
-// `Instructions` or a `Prompt`, so nothing here needs the availability floor
-// that the rest of this package carries. A role can be named, switched on,
-// logged, encoded and decoded on any platform; only turning one INTO an
-// `Instructions` value costs macOS 27, and that conversion lives in
-// `GmAgentInstructions` where the cost belongs.
+// The duplication is therefore LOAD-BEARING, not an oversight. These two enums
+// are expected to diverge: `GmAgentRole` follows whatever the execution layer
+// grows into, and `OriginalGmccRole` only ever changes when `plugins/gmcc/`
+// changes and the archive is re-synced by copying.
 //
-// WHAT IS DELIBERATELY NOT HERE: the text. A role knows WHERE its contract was
-// copied from (`sourcePath`) but not WHAT it says. Keeping the blocks in
-// `Templates/` is what lets this file stay small enough to read in one screen
-// while the contracts themselves run to thousands of lines.
+// WHAT THIS CARRIES THAT THE LIVE ENUM DOES NOT: `sourcePath` and
+// `subagentType`. Both are facts about the PLUGIN — where a contract was
+// transcribed from, and how Claude Code spawns it. They belong to the record of
+// what exists today, not to whatever replaces it.
 
-/// The personas GMCC runs, each backed by one standing instruction block.
-///
-/// A role is not a tool family (`GmAgentToolFamily`) and does not map onto one:
-/// families partition the tool SURFACE, roles partition the AGENTS that call
-/// into it. The clarifier and the reviewer both reach the `cde` family and are
-/// nothing alike.
-///
-/// `Codable` with explicit raw values on the two multi-word cases, because a
-/// role is a thing that gets written down — into a spawn record, a log line, a
-/// db row — and Swift's default camelCase raw value would make the on-disk
-/// spelling a hostage to the Swift identifier. The snake_case spellings match
-/// the vocabulary every other persisted enum in this stack uses.
-public enum GmAgentRole: String, Sendable, Hashable, Codable, CaseIterable {
+/// The personas GMCC runs today, as transcribed from `plugins/gmcc/`.
+public enum OriginalGmccRole: String, Sendable, Hashable, Codable, CaseIterable {
 
     /// The GMB itself — the primary, in-session contract every other role
     /// assumes is already loaded.
@@ -79,8 +64,7 @@ public enum GmAgentRole: String, Sendable, Hashable, Codable, CaseIterable {
         }
     }
 
-    /// Whether this role is spawned WITH a methodology
-    /// (`ExplorationAgentType`) and commits fully to it.
+    /// Whether this role is spawned WITH a methodology and commits fully to it.
     ///
     /// Exactly the three fan-out roles. The doper and the clarifier are
     /// deliberately single-instance — one calibrates, one pre-selects — and
