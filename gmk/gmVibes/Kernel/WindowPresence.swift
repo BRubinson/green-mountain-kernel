@@ -26,19 +26,35 @@ final class WindowPresence {
     static let shared = WindowPresence()
 
     private var openWindows = 0
+    /// Invalidates a scheduled demotion. See `release()`.
+    private var demotionToken = 0
 
     private init() {}
+
+    /// Raise the policy BEFORE asking for a window — the lease below cannot do
+    /// this job on its own, and the failure is invisible until you tile.
+    ///
+    /// A window's lease is taken from `.task`, which SwiftUI runs AFTER the
+    /// view appears: by then the `NSWindow` has been created and ordered on
+    /// screen. A window manager classifies a window when it is CREATED, so the
+    /// first window of an accessory process is classified as unmanageable and
+    /// stays that way — raising the policy afterwards does not make it
+    /// re-evaluate a window it has already seen. Every SUBSEQUENT window then
+    /// tiles correctly, because by then the process is already `.regular`,
+    /// which is exactly the "first one floats, the rest are fine" shape.
+    ///
+    /// Only the menu bar needs to call this. The zero-window state means no
+    /// window exists, so a menu bar item is the ONLY surface that can open one
+    /// from there; every other `openWindow` call site already runs inside a
+    /// window, where the policy is necessarily raised already.
+    func prepareForWindow() {
+        raise()
+    }
 
     /// Balanced against window lifetime by the caller's `.task`.
     func acquire() {
         openWindows += 1
-        guard openWindows == 1 else { return }
-        NSApp.setActivationPolicy(.regular)
-        // Raising the policy does not focus the app. AppKit grants the Dock
-        // entry and the main menu and leaves the window behind whatever the
-        // user was in — the same failure the menu bar's New Window item guards
-        // against, one layer down, and it reads as "the window never opened".
-        NSApp.activate()
+        raise()
     }
 
     func release() {
@@ -49,9 +65,30 @@ final class WindowPresence {
         // its window down) passes through zero on the way, and demoting there
         // drops the Dock icon and takes it straight back — AppKit renders that
         // as a visible flicker and a lost activation.
+        //
+        // The token is what makes that deferral safe. Without it a demotion
+        // scheduled by the last close could land AFTER `prepareForWindow` had
+        // raised the policy for the next window but BEFORE that window's lease
+        // was taken — dropping the process back to accessory at precisely the
+        // moment the new window is created, which is the bug this whole type
+        // exists to prevent, reintroduced through the back door.
+        demotionToken += 1
+        let token = demotionToken
         Task { @MainActor in
-            guard self.openWindows == 0 else { return }
+            guard self.openWindows == 0, self.demotionToken == token else { return }
             NSApp.setActivationPolicy(.accessory)
         }
+    }
+
+    /// Idempotent, and it cancels any pending demotion.
+    private func raise() {
+        demotionToken += 1
+        guard NSApp.activationPolicy() != .regular else { return }
+        NSApp.setActivationPolicy(.regular)
+        // Raising the policy does not focus the app. AppKit grants the Dock
+        // entry and the main menu and leaves the window behind whatever the
+        // user was in — the same failure the menu bar's New Window item guards
+        // against, one layer down, and it reads as "the window never opened".
+        NSApp.activate()
     }
 }

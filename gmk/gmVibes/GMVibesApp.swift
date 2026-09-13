@@ -68,7 +68,13 @@ struct GMVibesApp: App {
                 vitals: vitals,
                 protocolVersion: services.daemon.ping?.protocolVersion,
                 buildSha: services.daemon.ping?.buildSha,
-                onNewWindow: { openWindow(value: WindowSeed()) },
+                // BEFORE the open, not after: the window manager classifies a
+                // window when it is created, and the per-window lease is taken
+                // too late to affect the FIRST one. See WindowPresence.
+                onNewWindow: {
+                    WindowPresence.shared.prepareForWindow()
+                    openWindow(value: WindowSeed())
+                },
                 onQuit: { NSApp.terminate(nil) },
                 onActivateHolder: nil)
         } label: {
