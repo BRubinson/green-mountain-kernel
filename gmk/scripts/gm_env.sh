@@ -78,6 +78,26 @@ guard_not_prod() {
 
 env_root() { gm_env_root "$1"; }
 
+# The pid out of a root's daemon.pid, or empty if there is no live kernel.
+#
+# THE PIDFILE IS NOT ONE LINE. It carries the pid AND the absolute path of the
+# binary that wrote it, so `kill -0 "$(cat daemon.pid)"` passes the whole blob
+# and fails with `illegal pid` against a perfectly healthy kernel. Read the
+# FIRST LINE.
+#
+# That is cosmetic in `doctor` and is NOT cosmetic in `reap`, which deletes the
+# run root of anything it believes is dead: misparsing every live pid as dead
+# makes `reap` rm -rf the root out from under a running kernel mid-test.
+env_live_pid() {
+    [ -f "$1/daemon.pid" ] || return 1
+    _pid="$(head -1 "$1/daemon.pid" 2>/dev/null | tr -d '[:space:]')"
+    case "$_pid" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    kill -0 "$_pid" 2>/dev/null || return 1
+    echo "$_pid"
+}
+
 # ── create / refresh ─────────────────────────────────────────────────────────
 
 env_create() {
@@ -123,18 +143,40 @@ env_seed_repo() {
     echo "[GMB] $_dest on branch $_branch"
 
     # Boot the environment's kernel so it migrates an empty database into a full
-    # schema, then register the clone and ingest its dope. Those rows — and
-    # nothing else — are what this environment starts with.
+    # schema, then register the clone and validate its dope tree. Those rows —
+    # and nothing else — are what this environment starts with.
+    #
+    # Registration goes through `context ensure`, NOT through a raw
+    # `call CONTEXT_ENSURE`. The verb takes three context objects
+    # (project/instance/session), not a path; ContextBuilder is what assembles
+    # them from $PWD and the branch, and duplicating that assembly in shell
+    # would be a second source of truth for instance identity — which is
+    # md5(absolute repo path) and must agree with what a real session computes.
+    # Hence the subshell cd: $PWD IS the argument.
     _hook="$_root/bin/gm_hook"
     if [ -x "$_hook" ]; then
         echo "[GMB] registering the clone"
-        GM_FS_ROOT="$_root" "$_hook" call CONTEXT_ENSURE \
-            --json "{\"repo_path\":\"$_dest\"}" >/dev/null 2>&1 \
-            || echo "[GMB] note: CONTEXT_ENSURE declined; register by opening a session there"
-        if [ -d "$_dest/.gmcc" ]; then
-            GM_FS_ROOT="$_root" "$_hook" call DOPE_READ_REPO \
-                --json "{\"repo_path\":\"$_dest\"}" >/dev/null 2>&1 \
-                || echo "[GMB] note: dope ingestion declined"
+        # Errors are SHOWN, not swallowed. These calls were previously
+        # redirected to /dev/null, which turned a permanent wire-shape bug into
+        # a soft "declined" note that read like a transient hiccup for as long
+        # as it took someone to check the database and find it empty.
+        if ! ( cd "$_dest" && GM_FS_ROOT="$_root" "$_hook" context ensure >/dev/null ); then
+            echo "[GMB] note: context ensure declined; register by opening a session there"
+        fi
+        if [ -f "$_dest/.gmcc/scope.doped.json" ]; then
+            # DOPE_READ_REPO parses and validates the on-disk tree; it does not
+            # ingest. Shell-side ingestion is deliberately NOT attempted here:
+            # the adopt sequence (READ_REPO -> LIST -> INIT -> INGEST) is
+            # DopeBootSync's job, and reimplementing it in sh would be a second
+            # copy of a reconciliation that has to agree about revisions. So
+            # this validates the tree and says plainly that a session boot is
+            # what populates it.
+            if GM_FS_ROOT="$_root" "$_hook" call DOPE_READ_REPO \
+                --json "{\"dir_path\":\"$_dest\"}" >/dev/null; then
+                echo "[GMB] dope tree valid; it ingests on the first session boot there"
+            else
+                echo "[GMB] note: dope tree did not validate (see the error above)"
+            fi
         fi
     else
         echo "[GMB] note: no gm_hook staged at $_hook — skipping registration"
@@ -189,8 +231,8 @@ env_reap() {
     [ -d "$_root/runs" ] || { echo "[GMB] no runs"; return 0; }
     for _run in "$_root"/runs/*; do
         [ -d "$_run" ] || continue
-        if [ -f "$_run/daemon.pid" ] && kill -0 "$(cat "$_run/daemon.pid" 2>/dev/null)" 2>/dev/null; then
-            echo "[GMB] live: $_run"
+        if _pid="$(env_live_pid "$_run")"; then
+            echo "[GMB] live: $_run (pid $_pid)"
         else
             echo "[GMB] reaping $_run"
             rm -rf "$_run"
@@ -208,8 +250,8 @@ env_doctor() {
     echo "db          : $([ -f "$_root/gm.db" ] && echo yes || echo no)"
     echo "binaries    : $([ -x "$_root/bin/gm_hook" ] && echo yes || echo NO)"
     echo "version     : $(cat "$_root/bin/.gm_version" 2>/dev/null || echo none)"
-    if [ -f "$_root/daemon.pid" ] && kill -0 "$(cat "$_root/daemon.pid" 2>/dev/null)" 2>/dev/null; then
-        echo "daemon      : running (pid $(cat "$_root/daemon.pid"))"
+    if _pid="$(env_live_pid "$_root")"; then
+        echo "daemon      : running (pid $_pid)"
     else
         echo "daemon      : not running"
     fi
