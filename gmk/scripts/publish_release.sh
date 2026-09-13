@@ -314,7 +314,22 @@ mkdir -p "$APP_DL"
 cp "$DMG_BUILT" "$(gm_app_dmg "$VERSION")"
 
 # BEST EFFORT, DELIBERATELY. Everything above this line is already on GitHub;
-# a running GMVibes must not turn a successful publish into a failed script.
+# a running app must not turn a successful publish into a failed script.
+#
+# The two calls below are the SAME PREPARATION install_gm.sh does, and this path
+# needs them for the same reasons — it was publishing straight into
+# gm_install_app and skipping both, which left this machine holding
+# gm_kernel.app AND GMVibes.app under one bundle identifier on the very first
+# 51.0.0 publish.
+#
+# Stop the writer first: the app is becoming the kernel host, and
+# gm_install_app refuses while it is running.
+gm_stop_kernel_and_wait 3
+# Then drop the superseded bundle. Two apps sharing `rube.GMVibes` make
+# LaunchServices ambiguous AND defeat the same-bundle-id check a second copy
+# uses to recognise the first.
+gm_retire_legacy_app
+
 if gm_install_app "$(gm_app_dmg "$VERSION")" "$VERSION"; then
     :
 else
