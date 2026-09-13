@@ -168,11 +168,11 @@ nobody had run. Dispatch it manually when the local path is unavailable.
 ## Layout
 
 - `gmk/` — the new home of every Swift deliverable: one Xcode project
-  (`gmk/gmk.xcodeproj`) over six shipped packages, plus a seventh that ships
-  nothing and holds the repository's own contract tests, plus an eighth that is
+  (`gmk/gmk.xcodeproj`) over seven shipped packages, plus an eighth that ships
+  nothing and holds the repository's own contract tests, plus a ninth that is
   **vendored third-party source and authored nowhere in this repo**.
   - **Open `gmk/gmk.xcworkspace`, not the project.** The workspace lists the
-    project alongside all seven packages as first-class members, which is the
+    project alongside seven packages as first-class members, which is the
     only arrangement in which Xcode generates schemes for a package's TEST
     targets — `GmToolchainTests` and `GmMcpTests` exist under the workspace and
     do not exist under the project. The project is deliberately kept
@@ -246,7 +246,7 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     away the key-value cache silently, which is why the order is documented
     rather than incidental.
     **Its floor is macOS 27, not 26** — see the runner note below.
-  - `gmk/gmClaudeForFoundationModels/` — the eighth package: Anthropic's
+  - `gmk/gmClaudeForFoundationModels/` — the ninth package: Anthropic's
     **ClaudeForFoundationModels, vendored** (Apache-2.0). It conforms Claude to
     Apple's `LanguageModel` protocol so a `LanguageModelSession` can be driven by
     a server-side Claude model. **Do not edit it** — the only local modification
@@ -260,9 +260,33 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     must be reachable the same way. Zero external dependencies of its own, which
     is what keeps it a self-contained copy rather than the head of a tree.
   - `gmk/gmMcp/` — the `gm_mcp` MCP pen server.
-  - `gmk/gmVibes/` — the GMVibes macOS app (Swift/SwiftUI). Release via the
-    `release-dmg` skill.
-  - `gmk/gmToolchain/` — the seventh package, and the only one that **ships
+  - `gmk/gmVibes/` — the GMVibes macOS app target, and now a **THIN** one: it
+    holds `GMVibesApp.swift` (the `@main` entry point), `Assets.xcassets` and a
+    README, and nothing else. Release via the `release-dmg` skill.
+  - `gmk/gmVibesCore/` — the seventh shipped package, holding the app's ~99
+    sources. They
+    moved out of the Xcode target so that **sourcekit-lsp can resolve them**: the
+    language server reads SwiftPM, `compile_commands.json` or `buildServer.json`
+    and is **not** an Xcode client, so a source that lives only in an Xcode
+    target gets no build settings and reports `No such module 'GmDaemonSdk'` on
+    every import. See the root `Package.swift` note below. Depends on
+    `gmDaemonSdk` and `gmUxComponentLibrary` and on nothing else — **not** on
+    `gmDaemon`: the app target links `GmKernelHost` for future writer hosting but
+    nothing imports it, so that link stays on the APP target.
+    Its manifest is **swift-tools-version 6.2** while the rest of the repo is on
+    6.0, because `defaultIsolation` does not exist before 6.2. That setting is
+    not a preference: `project.pbxproj` compiles the app target with
+    `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and `SWIFT_VERSION = 5.0`, these
+    sources were written against both, and the package restates them in
+    `appTargetSettings`. **The two halves compile the same code — if the app
+    target's settings move, these must move with them.**
+    The app/package boundary is deliberately narrow. `GMVibesServices` exposes a
+    four-property FACADE (`vitalsReport`, `kernelRole`, `protocolVersion`,
+    `buildSha`) rather than a public `daemon`, because publishing
+    `DaemonConnectionModel` would drag an entire observable model into the public
+    surface to serve a handful of reads. Raise nothing to `public` that
+    `GMVibesApp.swift` does not name.
+  - `gmk/gmToolchain/` — the eighth package, and the only one that **ships
     nothing** (`products: []`). Membership rule: the tests that read FILES rather
     than call symbols — the docs and hook-launcher contracts, the retired-name
     contract, the pen-roster check against `gm_mcp`'s source text, and the
@@ -297,9 +321,9 @@ Dependency graph, acyclic and 5 deep:
 
 ```
 gmDaemonSdk ──┬── gmDaemon ─────────────┐
-              ├── gmUxComponentLibrary ─┤
-              ├── gmMcp ────────────────┼── gmVibes  (the app = the kernel host)
-              ├─────────────────────────┘
+              ├── gmUxComponentLibrary ─┼── gmVibesCore ── gmVibes  (the app)
+              ├── gmMcp ────────────────┤                  (a THIN target:
+              ├─────────────────────────┘                   @main + Assets)
               ├── gmAgententicsSdk ──┐
               │                      │  (vendored, zero deps of its own)
               │ gmClaudeForFoundationModels ──┘
@@ -478,6 +502,7 @@ swift test --package-path gmk/gmUxComponentLibrary
 swift test --package-path gmk/gmMcp
 swift test --package-path gmk/gmToolchain
 swift test --package-path gmk/gmAgententicsSdk      # roster + template contracts
+swift test --package-path gmk/gmVibesCore           # the app's code
 swift build --package-path gmk/gmKernel            # BUILD, not test — see below
 # gmk/gmClaudeForFoundationModels is VENDORED. It gets NO CI job of its own, and
 # that is a decision, not an oversight: it is already COMPILE-GATED in CI as a
@@ -507,6 +532,42 @@ entirely by needing no repo at all.
 There is no BuildInfo stamping step anywhere. A SwiftPM **prebuild plugin** in
 `gmk/gmDaemon` does it inside the build graph, so Xcode and every CI job get it
 free and a clean clone compiles with no prior shell step.
+
+### The language server, and why `Package.swift` sits at the repo root
+
+The root `Package.swift` is a **tooling-only shim**: no targets, no products, and
+nothing in the repo reads it. It exists because `sourcekit-lsp` selects a build
+system by looking for `Package.swift` / `compile_commands.json` /
+`buildServer.json` **at the workspace root**, and it does **not** search
+downward. The editor integration launches the server rooted at the repo root, so
+without a manifest there every request fails `No language service found` — which
+is what the whole `gmk/` tree did before this landed.
+
+Three things a reader would otherwise re-derive wrongly:
+
+- **sourcekit-lsp is not an Xcode client.** It reads neither `.xcworkspace` nor
+  `.xcodeproj`, and Xcode's `DerivedData/Index.noindex` is private to Xcode. So
+  moving code TOWARD the Xcode project **reduces** code intelligence — the exact
+  opposite of the natural assumption, and the reason `gmVibesCore` exists. This
+  is unrelated to "Open `gmk/gmk.xcworkspace`, not the project" above, which is
+  about Xcode generating schemes for package test targets.
+- **A server with no language service still publishes CLEAN diagnostics.** The
+  failure mode is a false NEGATIVE, not noise, so an absence of errors is not
+  evidence of correctness. `swift build` / `swift test` / `xcodebuild` remain the
+  verification authority; the language server is for NAVIGATION
+  (goToDefinition, findReferences, workspaceSymbol). The smoke check is
+  `documentSymbol` on a known file returning its expected top-level symbol — it
+  fails loudly where diagnostics stay quiet.
+- The server starts **at session start**, so a fresh session is needed before any
+  change here is observable.
+
+Cross-file search additionally needs an index store, which plain `swift build`
+does not write. Background indexing is the current answer; index-while-building
+(`-Xswiftc -index-store-path`) is a deliberate follow-up, not an oversight.
+
+`Package.swift` itself reports `No such module 'PackageDescription'` forever — a
+manifest belongs to no target, so it gets the same fallback settings described
+above. Harmless; do not chase it.
 
 ### Guard rails
 

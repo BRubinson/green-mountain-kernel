@@ -36,5 +36,6 @@ let package = Package(
         .package(path: "gmk/gmKernel"),
         .package(path: "gmk/gmAgententicsSdk"),
         .package(path: "gmk/gmClaudeForFoundationModels"),
+        .package(path: "gmk/gmVibesCore"),
     ]
 )

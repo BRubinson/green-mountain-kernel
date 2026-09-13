@@ -127,8 +127,10 @@ final class PromptFlushRegistry {
     }
 }
 
-final class GMVibesAppDelegate: NSObject, NSApplicationDelegate {
-    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+public final class GMVibesAppDelegate: NSObject, NSApplicationDelegate {
+    public override init() { super.init() }
+
+    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let registry = PromptFlushRegistry.shared
         guard registry.hasDirtyDrafts else { return .terminateNow }
         // Reply on a deadline that never awaits the flush: the save path

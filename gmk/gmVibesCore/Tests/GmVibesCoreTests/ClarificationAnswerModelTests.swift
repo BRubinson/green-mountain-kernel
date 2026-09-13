@@ -1,6 +1,6 @@
 import Testing
 import GmDaemonSdk
-@testable import GMVibes
+@testable import GmVibesCore
 
 /// `ClarificationAnswerModel` is the app's ONLY report-subsystem write, and the
 /// one place in GMVibes where a bug destroys work the user typed. These tests

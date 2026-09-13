@@ -1,4 +1,5 @@
 import GmDaemonSdk
+import GmVibesCore
 import SwiftUI
 
 @main
@@ -22,28 +23,15 @@ struct GMVibesApp: App {
     init() {
         let services = GMVibesServices()
         _services = State(initialValue: services)
-        _vitals = State(initialValue: KernelVitals(report: {
-            guard let ping = services.daemon.ping else { return nil }
-            return KernelVitalsReport(
-                uptimeSeconds: ping.uptimeSeconds,
-                residentMemoryBytes: ping.residentMemoryBytes,
-                cpuPercent: ping.cpuPercent)
-        }))
+        _vitals = State(initialValue: KernelVitals(report: { services.vitalsReport }))
     }
 
     /// Who holds the database, as the answering kernel reports it.
     ///
-    /// `writerRole` and `writerBundlePath` are additive optionals, so a kernel
-    /// that predates them answers nil and this reads `.unknown` — which is
-    /// correct rather than merely safe: this app does not yet host the writer, so
-    /// claiming either role would be a lie.
-    private var role: KernelRole {
-        guard let ping = services.daemon.ping else { return .unknown }
-        return KernelRole(
-            writerRole: ping.writerRole,
-            holderPid: ping.daemonPid,
-            bundlePath: ping.writerBundlePath)
-    }
+    /// The mapping lives on `GMVibesServices` in `GmVibesCore`, beside the
+    /// connection model it reads — see the facade note there for why the app
+    /// target is handed four scalars rather than the model itself.
+    private var role: KernelRole { services.kernelRole }
 
     var body: some Scene {
         // THE MENU BAR IS DECLARED FIRST, BEFORE THE WindowGroup, AND THE ORDER
@@ -66,8 +54,8 @@ struct GMVibesApp: App {
             KernelMenuBarContent(
                 role: role,
                 vitals: vitals,
-                protocolVersion: services.daemon.ping?.protocolVersion,
-                buildSha: services.daemon.ping?.buildSha,
+                protocolVersion: services.protocolVersion,
+                buildSha: services.buildSha,
                 // BEFORE the open, not after: the window manager classifies a
                 // window when it is created, and the per-window lease is taken
                 // too late to affect the FIRST one. See WindowPresence.

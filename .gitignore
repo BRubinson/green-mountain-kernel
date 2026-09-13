@@ -36,6 +36,14 @@ xcuserdata/
 gmk/*/.build/
 gmk/*/.swiftpm/
 
+# The ROOT Package.swift is a tooling-only LSP shim (see its header). It ships
+# nothing and is consumed by no build, so its resolved pins are local tooling
+# state — committing them would add a SECOND GRDB pin that nothing verifies
+# against the real one in gmDaemon. ANCHORED, so the packages under gmk/ keep
+# their own Package.resolved. The repo-root `.build/` the shim creates is
+# already covered by the unanchored `.build/` above.
+/Package.resolved
+
 # Distribution / signing secrets
 ExportOptions.plist
 *.p12

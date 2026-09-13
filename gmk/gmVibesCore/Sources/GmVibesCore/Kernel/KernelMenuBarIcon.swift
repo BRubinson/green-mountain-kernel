@@ -15,7 +15,7 @@ import AppKit
 /// alpha survives. SF Symbols' proportions are the reference, which is why the
 /// line weight is a fraction of the box rather than a fixed number: the glyph
 /// has to sit at the same visual weight as the symbols on either side of it.
-enum KernelMenuBarIcon {
+public enum KernelMenuBarIcon {
     /// 18pt is the status bar's usable height; AppKit scales for Retina from
     /// the point size, so the drawing handler stays resolution-independent.
     private static let side: CGFloat = 18
@@ -26,7 +26,7 @@ enum KernelMenuBarIcon {
     /// see `snowLine`.
     private static let stroke: CGFloat = 1.15
 
-    static let image: NSImage = {
+    public static let image: NSImage = {
         let image = NSImage(
             size: NSSize(width: side, height: side),
             flipped: false

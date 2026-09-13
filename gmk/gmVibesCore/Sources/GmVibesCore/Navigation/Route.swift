@@ -60,8 +60,8 @@ struct SearchSeed: Codable, Hashable {
 /// dedupes — two windows on one session are legal (SessionScopeCache makes
 /// them safe). Decoding always yields a landing seed: restored windows land
 /// on the landing page by design.
-struct WindowSeed: Codable, Hashable, Identifiable {
-    let id: UUID
+public struct WindowSeed: Codable, Hashable, Identifiable {
+    public let id: UUID
     let route: Route?
 
     init(_ route: Route? = nil) {
@@ -69,7 +69,15 @@ struct WindowSeed: Codable, Hashable, Identifiable {
         self.route = route
     }
 
-    init(from decoder: Decoder) throws {
+    /// The app target's door. `Route` stays INTERNAL deliberately — the app only
+    /// ever asks for a fresh landing seed (`WindowSeed()`), so making the routing
+    /// vocabulary public to satisfy one call site would widen the module boundary
+    /// for nothing and turn every later routing change into a public API change.
+    public init() {
+        self.init(nil)
+    }
+
+    public init(from decoder: Decoder) throws {
         self.init(nil)
     }
 }

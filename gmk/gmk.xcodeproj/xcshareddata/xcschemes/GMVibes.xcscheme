@@ -32,16 +32,6 @@
             skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "1B4010812FDCA09300DAF751"
-               BuildableName = "GMVibesTests.xctest"
-               BlueprintName = "GMVibesTests"
-               ReferencedContainer = "container:gmk.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
                BlueprintIdentifier = "1B40108B2FDCA09300DAF751"
                BuildableName = "GMVibesUITests.xctest"
                BlueprintName = "GMVibesUITests"

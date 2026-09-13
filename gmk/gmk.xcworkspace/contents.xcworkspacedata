@@ -25,5 +25,8 @@
       <FileRef
          location = "group:gmToolchain">
       </FileRef>
+      <FileRef
+         location = "group:gmVibesCore">
+      </FileRef>
    </Group>
 </Workspace>

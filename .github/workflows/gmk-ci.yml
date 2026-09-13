@@ -86,6 +86,13 @@ jobs:
             mode: test
           - package: gmToolchain
             mode: test
+          # The GMVibes app's code. It lives in a package rather than in the
+          # Xcode target so sourcekit-lsp can resolve it — see the root
+          # Package.swift — and getting its own row is what that buys on the CI
+          # side: the app's 99 sources are now compiled and unit-tested here,
+          # where previously they were only ever built by the gmvibes job.
+          - package: gmVibesCore
+            mode: test
           # BUILD, not test, and that is deliberate rather than an omission.
           #
           # gmKernel is the multi-call dispatcher: top-level code in an

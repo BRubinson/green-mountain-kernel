@@ -1,6 +1,6 @@
 import Testing
 import GmDaemonSdk
-@testable import GMVibes
+@testable import GmVibesCore
 
 /// The first real tests in this target.
 ///

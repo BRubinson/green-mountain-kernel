@@ -6,7 +6,7 @@
 //
 
 import Testing
-@testable import GMVibes
+@testable import GmVibesCore
 
 struct GMVibesTests {
 

@@ -22,8 +22,8 @@ import AppKit
 /// `WindowGroup` dedupe structurally impossible, so many windows can be open at
 /// once and the policy must retire on the last close, not the first.
 @MainActor
-final class WindowPresence {
-    static let shared = WindowPresence()
+public final class WindowPresence {
+    public static let shared = WindowPresence()
 
     private var openWindows = 0
     /// Invalidates a scheduled demotion. See `release()`.
@@ -47,7 +47,7 @@ final class WindowPresence {
     /// window exists, so a menu bar item is the ONLY surface that can open one
     /// from there; every other `openWindow` call site already runs inside a
     /// window, where the policy is necessarily raised already.
-    func prepareForWindow() {
+    public func prepareForWindow() {
         raise()
     }
 

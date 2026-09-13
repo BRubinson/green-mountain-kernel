@@ -7,7 +7,7 @@ import SwiftUI
 /// the kit, so this view's inputs stay three plain values: an unrecognised role
 /// degrades to `.unknown` instead of asserting, because a menu bar that cannot
 /// name the role is still better than one that refuses to draw.
-enum KernelRole: Equatable, Sendable {
+public enum KernelRole: Equatable, Sendable {
     case writer
     /// Another copy of the app owns the store. `holderPid` is the owning
     /// process, `bundlePath` the bundle it was launched from — both optional
@@ -35,7 +35,7 @@ enum KernelRole: Equatable, Sendable {
 /// Every action is INJECTED. The scene, the `WindowGroup` value and the quit
 /// path all belong to the app struct; this view knows the order of the rows and
 /// the words on them, and nothing about how a window is opened.
-struct KernelMenuBarContent: View {
+public struct KernelMenuBarContent: View {
     let role: KernelRole
     let vitals: KernelVitals
     let protocolVersion: Int?
@@ -53,7 +53,7 @@ struct KernelMenuBarContent: View {
     /// would flash and vanish, reading as a quit that did not happen.
     @State private var confirmingQuit = false
 
-    init(role: KernelRole,
+    public init(role: KernelRole,
          vitals: KernelVitals,
          protocolVersion: Int? = nil,
          buildSha: String? = nil,
@@ -69,7 +69,7 @@ struct KernelMenuBarContent: View {
         self.onActivateHolder = onActivateHolder
     }
 
-    var body: some View {
+    public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             roleRow
             if case .client = role, let onActivateHolder {
