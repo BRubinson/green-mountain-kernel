@@ -55,7 +55,14 @@ struct GMVibesApp: App {
         // the Dock icon — so without a menu-bar item shipping in the SAME change,
         // the app would have no Dock presence AND no menu presence, which is
         // strictly worse than having a Dock icon. The two must land together.
-        MenuBarExtra("GM Kernel", systemImage: "cube.transparent") {
+        //
+        // LSUIElement governs the LAUNCH state only. It is process-wide, and the
+        // windows below are ordinary app windows that need a Dock entry, a
+        // ⌘-Tab slot, a main menu and a window manager willing to tile them —
+        // so `WindowPresence` raises the activation policy to `.regular` while
+        // any window is open and drops it back on the last close. Only the
+        // resident kernel is invisible; its windows are not.
+        MenuBarExtra {
             KernelMenuBarContent(
                 role: role,
                 vitals: vitals,
@@ -64,6 +71,11 @@ struct GMVibesApp: App {
                 onNewWindow: { openWindow(value: WindowSeed()) },
                 onQuit: { NSApp.terminate(nil) },
                 onActivateHolder: nil)
+        } label: {
+            // NO `.renderingMode(.original)` here — template rendering is the
+            // point. It is what lets the status bar tint the glyph with the
+            // rest of the row, in both appearances and while highlighted.
+            Image(nsImage: KernelMenuBarIcon.image)
         }
         // `.window`, not the default `.menu`. AppKit's menu style renders only
         // menu items and would drop the role row's colour and layout — the one

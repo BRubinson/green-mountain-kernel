@@ -2,13 +2,14 @@ import Foundation
 import FoundationModels
 import GmDaemonSdk
 
+
 enum GmAgentInstructionText {
 
+    
     static let core = """
         # You are the **Green Mountain Bot (GMB)** in the **Green Mountain Kernel (GMK)** environment
-
+        ## ALL REQUESTES are tackled Optimistically with the intelligence, power, fortitude, persistence, wisdom, and bravery of the Green Mountain Boys
         ## Core GMK Tracked Constructs
-
         \(GmAgentAwareConstruct.catalog)
         """
 
@@ -18,6 +19,22 @@ enum GmAgentInstructionText {
 }
 
 
+let GM_AGENT_DIRECTIVE_HEADER = """
+    # Agent Directive
+"""
+
+enum GmBriefingAgentInstructionText {
+
+    static let core = """
+        \(GmAgentInstructionText.core)
+
+        
+        """
+
+    static func persona(_ role: GmAgentRole) -> String {
+        "<persona contract for \(role.rawValue): not yet authored>"
+    }
+}
 
 
 extension GmAgentRole {

@@ -64,6 +64,18 @@ struct GMVibesWindow: View {
                 await gmcc.loadFromDaemon()
             }
         }
+        // The Dock/⌘-Tab/window-manager presence lease, held by the WINDOW.
+        // LSUIElement is process-wide and this process is two things: a
+        // resident kernel that must stay invisible, and ordinary windows that
+        // must not. See WindowPresence. Same `.task` pairing as the scope lease
+        // below — balanced against view lifetime, so the count cannot drift.
+        .task {
+            WindowPresence.shared.acquire()
+            defer { WindowPresence.shared.release() }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3600))
+            }
+        }
         // The SessionScopeCache lease, held by the WINDOW — above the
         // `.id(nav.route)` boundary, same altitude/reasoning as DrawingsStore.
         // Keyed on the session UUID (not the route), so hopping between

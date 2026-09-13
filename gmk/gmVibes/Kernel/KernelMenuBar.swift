@@ -91,6 +91,12 @@ struct KernelMenuBarContent: View {
                 // window then sits unfocused behind whatever the user was in.
                 // Read as "the button does nothing", which is the single
                 // easiest way to lose trust in a menu bar app.
+                //
+                // Still needed with `WindowPresence` in place, and the two are
+                // not redundant: this activates the CURRENT (accessory) process
+                // so the open is seen, while WindowPresence re-activates after
+                // the policy is raised. Opening from zero windows needs both,
+                // and opening from one needs only this one.
                 NSApp.activate()
                 onNewWindow()
             }
