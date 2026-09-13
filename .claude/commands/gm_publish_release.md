@@ -1,6 +1,6 @@
 ---
 name: gm_publish_release
-description: Publish the locally staged BETA build as a daemon-v* GitHub release — verify, run the suites, tag, upload, and promote the machine onto the release. Owner-only and repo-side; requires a checkout and push access. Pair with /gm_rebuild_local, which produces the artifact this ships.
+description: Publish the locally staged BETA build as a gm_kernel-v* GitHub release — verify, run the suites, tag, upload, and promote the machine onto the release. Owner-only and repo-side; requires a checkout and push access. Pair with /gm_rebuild_local, which produces the artifact this ships.
 argument-hint: "[--dry-run]"
 disable-model-invocation: true
 allowed-tools: Bash, Read, AskUserQuestion
@@ -46,7 +46,7 @@ bash gmk/scripts/publish_release.sh
 ## What it checks, in order
 
 1. `gh` authenticated, and push on the repo.
-2. Working tree clean; `daemon-v<version>` unused both locally and on the remote.
+2. Working tree clean; `gm_kernel-v<version>` unused both locally and on the remote.
 3. The staged `<version>-BETA` exists, matches its own `SHA256SUMS`, carries
    **both** arm64 and x86_64 slices (read with `lipo`, not from the manifest —
    a `--fast` build is caught exactly here), is signed, and was built from

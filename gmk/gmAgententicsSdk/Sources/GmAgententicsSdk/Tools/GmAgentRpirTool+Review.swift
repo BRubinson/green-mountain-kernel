@@ -6,7 +6,7 @@ import GmDaemonSdk
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeOpenReviewArguments: Sendable {
+public struct GmAgentRpirOpenReviewArguments: Sendable {
     @Guide(description: promptUuidGuide("to review"))
     public var promptUuid: String
 
@@ -16,13 +16,13 @@ public struct GmAgentCdeOpenReviewArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeOpenReviewTool: GmAgentCdeTool {
-    public let name = "cde_open_review"
+public struct GmAgentRpirOpenReviewTool: GmAgentRpirTool {
+    public let name = "rpir_open_review"
     public let description = "Start the complaints list."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeOpenReviewArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirOpenReviewArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_OPEN")
     }
 }
@@ -70,7 +70,7 @@ public struct GmAgentReviewFinding: Sendable {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeWriteReviewsArguments: Sendable {
+public struct GmAgentRpirWriteReviewsArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "complaints list"))
     public var summaryUuid: String
 
@@ -88,20 +88,20 @@ public struct GmAgentCdeWriteReviewsArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeWriteReviewsTool: GmAgentCdeTool {
-    public let name = "cde_write_reviews"
+public struct GmAgentRpirWriteReviewsTool: GmAgentRpirTool {
+    public let name = "rpir_write_reviews"
     public let description = "Write down many complaints."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeWriteReviewsArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirWriteReviewsArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_FINDING_ADD (looped)")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeRankReviewsArguments: Sendable {
+public struct GmAgentRpirRankReviewsArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "rank", "complaints list"))
     public var summaryUuid: String
 
@@ -115,20 +115,20 @@ public struct GmAgentCdeRankReviewsArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeRankReviewsTool: GmAgentCdeTool {
-    public let name = "cde_rank_reviews"
+public struct GmAgentRpirRankReviewsTool: GmAgentRpirTool {
+    public let name = "rpir_rank_reviews"
     public let description = "Give every complaint a number, all at once."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeRankReviewsArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirRankReviewsArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_RANK")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeCompleteReviewArguments: Sendable {
+public struct GmAgentRpirCompleteReviewArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "seal", "complaints list"))
     public var summaryUuid: String
 
@@ -150,20 +150,20 @@ public struct GmAgentCdeCompleteReviewArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeCompleteReviewTool: GmAgentCdeTool {
-    public let name = "cde_complete_review"
+public struct GmAgentRpirCompleteReviewTool: GmAgentRpirTool {
+    public let name = "rpir_complete_review"
     public let description = "Complaints done, here is the verdict."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeCompleteReviewArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirCompleteReviewArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_COMPLETE")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeResolveReviewFindingArguments: Sendable {
+public struct GmAgentRpirResolveReviewFindingArguments: Sendable {
     @Guide(description: "Which problem was handled, by uuid.")
     public var findingUuid: String
 
@@ -181,14 +181,14 @@ public struct GmAgentCdeResolveReviewFindingArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeResolveReviewFindingTool: GmAgentCdeTool {
-    public let name = "cde_resolve_review_finding"
+public struct GmAgentRpirResolveReviewFindingTool: GmAgentRpirTool {
+    public let name = "rpir_resolve_review_finding"
     public let description = "This complaint is handled."
 
     public init() {}
 
     public func call(
-        arguments: GmAgentCdeResolveReviewFindingArguments
+        arguments: GmAgentRpirResolveReviewFindingArguments
     ) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_RESOLVE")
     }
@@ -196,7 +196,7 @@ public struct GmAgentCdeResolveReviewFindingTool: GmAgentCdeTool {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeGetReviewArguments: Sendable {
+public struct GmAgentRpirGetReviewArguments: Sendable {
     @Guide(description: promptUuidGuide("'s review to read"))
     public var promptUuid: String
 
@@ -213,13 +213,13 @@ public struct GmAgentCdeGetReviewArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeGetReviewTool: GmAgentCdeTool {
-    public let name = "cde_get_review"
+public struct GmAgentRpirGetReviewTool: GmAgentRpirTool {
+    public let name = "rpir_get_review"
     public let description = "Show me the complaints so far."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeGetReviewArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirGetReviewArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_GET")
     }
 }

@@ -143,8 +143,8 @@ public struct GmAgentCdeNextArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeNextTool: GmAgentCdeTool {
-    public let name = "cde_next"
+public struct GmAgentRpirNextTool: GmAgentRpirTool {
+    public let name = "rpir_next"
     public let description = "What phase am I in and what do I do now?"
 
     public init() {}

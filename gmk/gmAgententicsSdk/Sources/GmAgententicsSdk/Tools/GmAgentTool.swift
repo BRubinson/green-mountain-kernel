@@ -13,6 +13,8 @@ public enum GmAgentToolFamily: String, Sendable, CaseIterable {
 
     case cde
 
+    case rpir
+
     case projects
 
     case system
@@ -55,6 +57,14 @@ public protocol GmAgentCdeTool: GmAgentTool {}
 @available(GmAgentOs 1.0, *)
 extension GmAgentCdeTool {
     public var family: GmAgentToolFamily { .cde }
+}
+
+@available(GmAgentOs 1.0, *)
+public protocol GmAgentRpirTool: GmAgentTool {}
+
+@available(GmAgentOs 1.0, *)
+extension GmAgentRpirTool {
+    public var family: GmAgentToolFamily { .rpir }
 }
 
 @available(GmAgentOs 1.0, *)

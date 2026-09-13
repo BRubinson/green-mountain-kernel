@@ -55,7 +55,19 @@ let package = Package(
     // adding one is a graph decision, not a convenience.
     dependencies: [],
     targets: [
-        .target(name: "GmDaemonSdk"),
+        // StampVersion generates the public `GmVersion.current` from gmk/VERSION
+        // inside the build graph. It stamps HERE, in the base package, so every
+        // consumer gets the one version symbol without a new edge or a second
+        // copy of the plugin. It adds no external dependency — the zero-
+        // dependency property above is untouched.
+        .target(
+            name: "GmDaemonSdk",
+            plugins: [.plugin(name: "StampVersion")]
+        ),
+        .plugin(
+            name: "StampVersion",
+            capability: .buildTool()
+        ),
         // NO ArgumentParser. That dependency earns its place for a large
         // declarative command tree; this is a dozen ops verbs plus a raw
         // passthrough, and it parses argv by hand.

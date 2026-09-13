@@ -1,82 +1,6 @@
-// The procedure text for each agent role, and the assembly that composes a fan-out or solo session.
+// The step-set text for each agent role.
 
 import Foundation
-
-enum GmAgentInstruction: String, CaseIterable {
-
-    case primarch
-    case briefer
-    case explorer
-    case intentClarifier
-    case architect
-    case implementor
-    case reviewer
-    case kbiteChewer
-
-    var text: String {
-        switch self {
-        case .primarch: return GM_AGENT_PRIMARCH_INSTRUCTION
-        case .briefer: return GM_AGENT_BRIEFER_INSTRUCTION
-        case .explorer: return GM_CDE_AGENT_EXPLORE_INSTRUCTION
-        case .intentClarifier: return GM_CDE_AGENT_INTENT_CLARIFIER_INSTRUCTION
-        case .architect: return GM_CDE_AGENT_ARCHITECT_INSTRUCTION
-        case .implementor: return GM_CDE_AGENT_IMPLEMENTOR_INSTRUCTION
-        case .reviewer: return GM_CDE_AGENT_REVIEWER_INSTRUCTION
-        case .kbiteChewer: return GM_AGENT_KBITE_CHEWER_INSTRUCTION
-        }
-    }
-
-    var directive: AgentGmkDirective {
-        switch self {
-        case .primarch: return .primarch
-        case .briefer: return .briefer
-        case .explorer: return .explorer
-        case .intentClarifier: return .intentClarifier
-        case .architect: return .architect
-        case .implementor: return .implementor
-        case .reviewer: return .reviewer
-        case .kbiteChewer: return .kbiteChewer
-        }
-    }
-
-    func session(personality: GmAgentPersonality) -> String {
-        Self.assemble(
-            personality: personality,
-            directives: directive.text,
-            instructions: text)
-    }
-
-    func solo(personality: GmAgentPersonality = .compliant) -> String {
-        Self.assemble(
-            personality: personality,
-            directives: Self.everyDirective,
-            instructions: text)
-    }
-
-    static var primary: String {
-        GmAgentInstruction.primarch.solo()
-    }
-
-    private static var everyDirective: String {
-        AgentGmkDirective.allCases.map(\.text).joined(separator: "\n\n")
-    }
-
-    private static func assemble(
-        personality: GmAgentPersonality,
-        directives: String,
-        instructions: String
-    ) -> String {
-        """
-        \(GM_AGENT_CORE)
-
-        \(personality.text)
-
-        \(directives)
-
-        \(instructions)
-        """
-    }
-}
 
 let GM_AGENT_INSTRUCTION_HEADER = """
     # Agent Instruction
@@ -92,20 +16,20 @@ let GM_AGENT_PRIMARCH_INSTRUCTION = """
 
     **Steps:**
         1. Resolve or raise the prompt — `cde_init`. A selector that matches nothing creates nothing unless you say so; a typo must never mint a prompt.
-        2. Read the machine before you act — `cde_next`. It returns the derived phase, that phase's instructions, your uuid bundle and what blocks the next move. Call it first, and again after every seal.
-        3. Open each phase's own page as you reach it — `cde_open_briefing`, `cde_open_exploration`, `cde_open_clarification`, `cde_open_care_package`, `cde_open_review`. Nothing opens as a side effect of anything else.
-        4. Dispatch the agents the phase calls for, one ask each, and let them work. Their pens are theirs.
-        5. Calibrate across them when they are done — `cde_rank_explorations`, `cde_rank_reviews`. One reader, one pass, every agent's rows at once.
-        6. Put the questions to the Endotherm in ONE batch, record the answers — `cde_answer_clarification_question` — then settle the intent with `cde_write_care_package` and seal it with `cde_close_care_package` and `cde_finalize_clarification`.
-        7. Pick the plan — `cde_decide_architecture` — and expand only the winner into `cde_write_architecture_persistence_changes` then `cde_write_architecture_general_changes`.
-        8. Rule on the review — `cde_resolve_review_finding` for what is settled, `cde_complete_review` for the verdict.
+        2. Read the machine before you act — `rpir_next`. It returns the derived phase, that phase's instructions, your uuid bundle and what blocks the next move. Call it first, and again after every seal.
+        3. Open each phase's own page as you reach it — `rpir_open_briefing`, `rpir_open_exploration`, `rpir_open_clarification`, `rpir_open_care_package`, `rpir_open_review`. Nothing opens as a side effect of anything else.
+        4. Dispatch the agents the phase calls for, one ask each, and let them work. Their writes are their own.
+        5. Calibrate across them when they are done — `rpir_rank_explorations`, `rpir_rank_reviews`. One reader, one pass, every agent's rows at once.
+        6. Put the questions to the Endotherm in ONE batch, record the answers — `rpir_answer_clarification_question` — then settle the intent with `rpir_write_care_package` and seal it with `rpir_close_care_package` and `rpir_finalize_clarification`.
+        7. Pick the plan — `rpir_decide_architecture` — and expand only the winner into `rpir_write_architecture_persistence_changes` then `rpir_write_architecture_general_changes`.
+        8. Rule on the review — `rpir_resolve_review_finding` for what is settled, `rpir_complete_review` for the verdict.
         9. Close the prompt — `cde_set_status`. The machine holds the claim until you release it.
 
     **Contract:**
         1. Thread `expected_version` on every mutation. A version conflict means someone else moved first: re-read, take the new version, retry. It is a normal outcome, not a failure to report.
         2. The record is APPEND-ONLY. A row written in error is corrected by writing again, never by deletion.
         3. A summary reported absent was never opened. Open it. It is never a reason to fall back to a file.
-        4. You seal; agents write. Never take a pen that belongs to an agent, and never hand one of yours away.
+        4. You seal; agents write. Never take a write that belongs to an agent, and never hand one of yours away.
     """
 
 let GM_AGENT_BRIEFER_INSTRUCTION = """
@@ -117,13 +41,13 @@ let GM_AGENT_BRIEFER_INSTRUCTION = """
         2. briefing_uuid
 
     **Steps:**
-        1. Load the current state of the briefing — `cde_load_exploration_brief(briefingUuid)`. It comes back `building` and already opened for you; you never open it and you never wait on it.
+        1. Load the current state of the briefing — `rpir_load_exploration_brief(briefingUuid)`. It comes back `building` and already opened for you; you never open it and you never wait on it.
         2. Load the prompt — `cde_load_prompt`. Its goal, detail and backstory are what "relevant" means for this run; nothing else defines your target.
         3. Search the dope, never dump it — `dope_search_session` first, then `dope_search_global` for what the session tree does not answer. Take the dot-path CODES the hits return. Browsing to adjacent nodes is forbidden.
         4. Search the kbites — `kbite_search`. Read the ranked briefs and keep at most 5 genuinely relevant files. That is a hard cap, not a target.
         5. Check recent file changes — `cde_search_file_changes`. Keep them only when the changes themselves ARE the context: an in-flight or just-finished prompt this work builds on.
-        6. Write the refs — `cde_write_brief(briefingUuid, expectedVersion, dopeRefs, kbiteRefs, fileChangeRefs)`. All three lists are required. An empty list means you looked and found none, which is an answer; an omitted list is indistinguishable from never having looked.
-        7. Close the page — `cde_close_brief(briefingUuid, expectedVersion)`. Nothing leaves the briefing phase until this lands, and whoever is blocked on you stays blocked until it does.
+        6. Write the refs — `rpir_write_brief(briefingUuid, expectedVersion, dopeRefs, kbiteRefs, fileChangeRefs)`. All three lists are required. An empty list means you looked and found none, which is an answer; an omitted list is indistinguishable from never having looked.
+        7. Close the page — `rpir_close_brief(briefingUuid, expectedVersion)`. Nothing leaves the briefing phase until this lands, and whoever is blocked on you stays blocked until it does.
 
     **Contract:**
         1. There is no body field. You write no narrative — consumers pull the refs and search deeper themselves.
@@ -143,12 +67,12 @@ let GM_CDE_AGENT_EXPLORE_INSTRUCTION = """
         3. explore_uuid
 
     **Steps:**
-        1. Load the brief — `cde_load_exploration_brief(briefingUuid)`. The Briefer's refs MUST baseline your branching exploration.
+        1. Load the brief — `rpir_load_exploration_brief(briefingUuid)`. The Briefer's refs MUST baseline your branching exploration.
         2. Load the prompt — `cde_load_prompt(promptUuid)`. Its goal, detail and backstory will guide your path.
         3. Dump the names of all briefed files into your mind. Start with what sounds most important, prioritizing briefed files over new files in the earlier passes.
         4. Leverage Read and the LSP primarily to explore the codebase as it stands, and use BASH/GREP to search non-GMK-managed or non-code files.
-        5. Write findings as you go — `cde_write_explorations(exploreUuid, agentName, findings)`. Kind, title, body, anchoring file. Key files are findings too, kind `key_file`.
-        6. Seal your own list — `cde_complete_exploration(exploreUuid, expectedVersion, overview)`. The overview is what they add up to, not a list of them again.
+        5. Write findings as you go — `rpir_write_explorations(exploreUuid, agentName, findings)`. Kind, title, body, anchoring file. Key files are findings too, kind `key_file`.
+        6. Seal your own list — `rpir_complete_exploration(exploreUuid, expectedVersion, overview)`. The overview is what they add up to, not a list of them again.
 
     **Contract:**
         1. Self-rate every finding 0 to 999 — 0 is absolute critical, 999 is ignore, and the read threshold is 100. Rate honestly; one reader calibrates across every lens after you.
@@ -168,12 +92,12 @@ let GM_CDE_AGENT_INTENT_CLARIFIER_INSTRUCTION = """
 
     **Steps:**
         1. Load the prompt — `cde_load_prompt(promptUuid)`. The Endotherm's request is the only measure of what matters.
-        2. Read every explorer's package — `cde_get_exploration(promptUuid)`, each lens in turn. You read them all; no briefing is handed to you.
+        2. Read every explorer's package — `rpir_get_exploration(promptUuid)`, each lens in turn. You read them all; no briefing is handed to you.
         3. Compare them against each other. Agreement across lenses raises weight, contradiction sends you to the code to settle it yourself, and duplicates collapse to the best-evidenced instance.
-        4. Rank the whole prompt in one atomic batch — `cde_rank_explorations(promptUuid, ratings)`. 0 is most load-bearing, under 100 must be read, 100-998 is optional context, 999 is a tombstone for the wrong, the duplicated and the superseded. One bad pair rejects the batch.
-        5. Open and seal the synthesis — `cde_open_exploration(promptUuid, "synthesis")`, then `cde_complete_exploration(summaryUuid, expectedVersion, overview)`. It refuses while any finding is unranked, so step 4 must be complete first.
-        6. Write the questions — `cde_write_clarification_questions(clarifyUuid, agentName, questions)`. Two to four real alternatives with their trade-offs, never yes/no, sharpest decision first.
-        7. Write the notes — `cde_write_clarification_notes(clarifyUuid, agentName, notes)`. Weight 0 to 999, same polarity as the findings.
+        4. Rank the whole prompt in one atomic batch — `rpir_rank_explorations(promptUuid, ratings)`. 0 is most load-bearing, under 100 must be read, 100-998 is optional context, 999 is a tombstone for the wrong, the duplicated and the superseded. One bad pair rejects the batch.
+        5. Open and seal the synthesis — `rpir_open_exploration(promptUuid, "synthesis")`, then `rpir_complete_exploration(summaryUuid, expectedVersion, overview)`. It refuses while any finding is unranked, so step 4 must be complete first.
+        6. Write the questions — `rpir_write_clarification_questions(clarifyUuid, agentName, questions)`. Two to four real alternatives with their trade-offs, never yes/no, sharpest decision first.
+        7. Write the notes — `rpir_write_clarification_notes(clarifyUuid, agentName, notes)`. Weight 0 to 999, same polarity as the findings.
 
     **Contract:**
         1. The rank is ONE atomic batch over every summary at once. A partial pass is not a calibration.
@@ -192,10 +116,10 @@ let GM_CDE_AGENT_ARCHITECT_INSTRUCTION = """
 
     **Steps:**
         1. Load the prompt — `cde_load_prompt(promptUuid)`. Backstory, goal and detail are the Endotherm's own words; never conflate them with what was clarified.
-        2. Load the clarified intent — `cde_get_clarification(promptUuid)`. The care package is your primary input, and its answers are settled. You do not reopen them.
-        3. Read the ranked record — `cde_get_exploration(promptUuid)` for the findings that survived, `cde_get_architecture(promptUuid)` for what is already planned.
+        2. Load the clarified intent — `rpir_get_clarification(promptUuid)`. The care package is your primary input, and its answers are settled. You do not reopen them.
+        3. Read the ranked record — `rpir_get_exploration(promptUuid)` for the findings that survived, `rpir_get_architecture(promptUuid)` for what is already planned.
         4. Design persistence first. Migrations are append-only, a wire bump is for new message types alone, and new persistence means dope changes named by dot-path.
-        5. Write your plan as your own option — `cde_open_architecture_option(archUuid, agentName, agentId, body)`. Goal, approach, components, persistence delta, files, build sequence, acceptance criteria, trade-offs.
+        5. Write your plan as your own option — `rpir_open_architecture_option(archUuid, agentName, agentId, body)`. Goal, approach, components, persistence delta, files, build sequence, acceptance criteria, trade-offs.
 
     **Contract:**
         1. `agentName` is your assigned personality. It is what makes your option distinguishable from its rivals.
@@ -214,7 +138,7 @@ let GM_CDE_AGENT_IMPLEMENTOR_INSTRUCTION = """
         3. change_description
 
     **Steps:**
-        1. Read the plan — `cde_get_architecture(promptUuid)`. Persistence leads; the rest is built over it.
+        1. Read the plan — `rpir_get_architecture(promptUuid)`. Persistence leads; the rest is built over it.
         2. Implement your change description. Navigate by LSP, change through READ/WRITE/EDIT, reach for BASH only where those cannot.
         3. Prove it — satisfy this repo's documented verification requirements and quote the real output.
 
@@ -234,11 +158,11 @@ let GM_CDE_AGENT_REVIEWER_INSTRUCTION = """
         2. review_uuid
 
     **Steps:**
-        1. Load the prompt and the clarified intent — `cde_load_prompt(promptUuid)`, `cde_get_clarification(promptUuid)`. What was asked for is the standard you measure against.
-        2. Load the approved plan — `cde_get_architecture(promptUuid)`. It returns what was planned joined to what was actually touched, including the files changed that no plan ever mentioned.
+        1. Load the prompt and the clarified intent — `cde_load_prompt(promptUuid)`, `rpir_get_clarification(promptUuid)`. What was asked for is the standard you measure against.
+        2. Load the approved plan — `rpir_get_architecture(promptUuid)`. It returns what was planned joined to what was actually touched, including the files changed that no plan ever mentioned.
         3. Scope yourself to the real changes — `cde_search_file_changes(promptUuid)`. Read the changed files and the code around them, never the diff alone.
-        4. Read the list so far — `cde_get_review(promptUuid)`. Every reviewer shares one list, so do not restate what another lens already wrote.
-        5. Write findings as you go — `cde_write_reviews(reviewUuid, agentName, findings)`. Kind, title, body, file and line span.
+        4. Read the list so far — `rpir_get_review(promptUuid)`. Every reviewer shares one list, so do not restate what another lens already wrote.
+        5. Write findings as you go — `rpir_write_reviews(reviewUuid, agentName, findings)`. Kind, title, body, file and line span.
         6. Name the verdict you would give in your receipt — approved, approved with nits, or changes requested — along with anything you believe is already resolved.
 
     **Contract:**

@@ -6,7 +6,7 @@ import GmDaemonSdk
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeOpenClarificationArguments: Sendable {
+public struct GmAgentRpirOpenClarificationArguments: Sendable {
     @Guide(description: promptUuidGuide("to open questions for"))
     public var promptUuid: String
 
@@ -16,13 +16,13 @@ public struct GmAgentCdeOpenClarificationArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeOpenClarificationTool: GmAgentCdeTool {
-    public let name = "cde_open_clarification"
+public struct GmAgentRpirOpenClarificationTool: GmAgentRpirTool {
+    public let name = "rpir_open_clarification"
     public let description = "Start the question list."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeOpenClarificationArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirOpenClarificationArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_OPEN")
     }
 }
@@ -47,7 +47,7 @@ public struct GmAgentClarificationQuestion: Sendable {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeWriteClarificationQuestionsArguments: Sendable {
+public struct GmAgentRpirWriteClarificationQuestionsArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "question list"))
     public var summaryUuid: String
 
@@ -67,14 +67,14 @@ public struct GmAgentCdeWriteClarificationQuestionsArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeWriteClarificationQuestionsTool: GmAgentCdeTool {
-    public let name = "cde_write_clarification_questions"
+public struct GmAgentRpirWriteClarificationQuestionsTool: GmAgentRpirTool {
+    public let name = "rpir_write_clarification_questions"
     public let description = "Write down many questions for the human."
 
     public init() {}
 
     public func call(
-        arguments: GmAgentCdeWriteClarificationQuestionsArguments
+        arguments: GmAgentRpirWriteClarificationQuestionsArguments
     ) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_QUESTION_ADD (looped)")
     }
@@ -97,7 +97,7 @@ public struct GmAgentClarificationNote: Sendable {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeWriteClarificationNotesArguments: Sendable {
+public struct GmAgentRpirWriteClarificationNotesArguments: Sendable {
     @Guide(description: "Which question list the notes belong to, by uuid.")
     public var summaryUuid: String
 
@@ -115,14 +115,14 @@ public struct GmAgentCdeWriteClarificationNotesArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeWriteClarificationNotesTool: GmAgentCdeTool {
-    public let name = "cde_write_clarification_notes"
+public struct GmAgentRpirWriteClarificationNotesTool: GmAgentRpirTool {
+    public let name = "rpir_write_clarification_notes"
     public let description = "Write down many private notes."
 
     public init() {}
 
     public func call(
-        arguments: GmAgentCdeWriteClarificationNotesArguments
+        arguments: GmAgentRpirWriteClarificationNotesArguments
     ) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_NOTE_ADD (looped)")
     }
@@ -130,7 +130,7 @@ public struct GmAgentCdeWriteClarificationNotesTool: GmAgentCdeTool {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeAnswerClarificationQuestionArguments: Sendable {
+public struct GmAgentRpirAnswerClarificationQuestionArguments: Sendable {
     @Guide(description: "Which question was answered, by uuid.")
     public var questionUuid: String
 
@@ -159,14 +159,14 @@ public struct GmAgentCdeAnswerClarificationQuestionArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeAnswerClarificationQuestionTool: GmAgentCdeTool {
-    public let name = "cde_answer_clarification_question"
+public struct GmAgentRpirAnswerClarificationQuestionTool: GmAgentRpirTool {
+    public let name = "rpir_answer_clarification_question"
     public let description = "Human said this."
 
     public init() {}
 
     public func call(
-        arguments: GmAgentCdeAnswerClarificationQuestionArguments
+        arguments: GmAgentRpirAnswerClarificationQuestionArguments
     ) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_ANSWER")
     }
@@ -174,7 +174,7 @@ public struct GmAgentCdeAnswerClarificationQuestionTool: GmAgentCdeTool {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeFinalizeClarificationArguments: Sendable {
+public struct GmAgentRpirFinalizeClarificationArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "finish", "question list"))
     public var summaryUuid: String
 
@@ -188,14 +188,14 @@ public struct GmAgentCdeFinalizeClarificationArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeFinalizeClarificationTool: GmAgentCdeTool {
-    public let name = "cde_finalize_clarification"
+public struct GmAgentRpirFinalizeClarificationTool: GmAgentRpirTool {
+    public let name = "rpir_finalize_clarification"
     public let description = "Questions all done."
 
     public init() {}
 
     public func call(
-        arguments: GmAgentCdeFinalizeClarificationArguments
+        arguments: GmAgentRpirFinalizeClarificationArguments
     ) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_FINALIZE")
     }
@@ -203,7 +203,7 @@ public struct GmAgentCdeFinalizeClarificationTool: GmAgentCdeTool {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeOpenCarePackageArguments: Sendable {
+public struct GmAgentRpirOpenCarePackageArguments: Sendable {
     @Guide(description: "Which question list the box belongs to, by uuid.")
     public var summaryUuid: String
 
@@ -213,13 +213,13 @@ public struct GmAgentCdeOpenCarePackageArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeOpenCarePackageTool: GmAgentCdeTool {
-    public let name = "cde_open_care_package"
+public struct GmAgentRpirOpenCarePackageTool: GmAgentRpirTool {
+    public let name = "rpir_open_care_package"
     public let description = "Get an empty box ready for the next agent."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeOpenCarePackageArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirOpenCarePackageArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CARE_PACKAGE_OPEN")
     }
 }
@@ -259,7 +259,7 @@ public struct GmAgentCareRef: Sendable {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeWriteCarePackageArguments: Sendable {
+public struct GmAgentRpirWriteCarePackageArguments: Sendable {
     @Guide(description: "Which box to fill, by uuid.")
     public var packageUuid: String
 
@@ -273,20 +273,20 @@ public struct GmAgentCdeWriteCarePackageArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeWriteCarePackageTool: GmAgentCdeTool {
-    public let name = "cde_write_care_package"
+public struct GmAgentRpirWriteCarePackageTool: GmAgentRpirTool {
+    public let name = "rpir_write_care_package"
     public let description = "Put the good bits in the box for the next agent."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeWriteCarePackageArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirWriteCarePackageArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CARE_PACKAGE_REF_ADD (looped)")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeCloseCarePackageArguments: Sendable {
+public struct GmAgentRpirCloseCarePackageArguments: Sendable {
     @Guide(description: "Which box to seal, by uuid.")
     public var packageUuid: String
 
@@ -307,20 +307,20 @@ public struct GmAgentCdeCloseCarePackageArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeCloseCarePackageTool: GmAgentCdeTool {
-    public let name = "cde_close_care_package"
+public struct GmAgentRpirCloseCarePackageTool: GmAgentRpirTool {
+    public let name = "rpir_close_care_package"
     public let description = "Box is ready."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeCloseCarePackageArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirCloseCarePackageArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CARE_PACKAGE_COMPLETE")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeGetClarificationArguments: Sendable {
+public struct GmAgentRpirGetClarificationArguments: Sendable {
     @Guide(description: promptUuidGuide("'s questions to read"))
     public var promptUuid: String
 
@@ -337,13 +337,13 @@ public struct GmAgentCdeGetClarificationArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeGetClarificationTool: GmAgentCdeTool {
-    public let name = "cde_get_clarification"
+public struct GmAgentRpirGetClarificationTool: GmAgentRpirTool {
+    public let name = "rpir_get_clarification"
     public let description = "Show me the questions and answers so far."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeGetClarificationArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirGetClarificationArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_GET")
     }
 }

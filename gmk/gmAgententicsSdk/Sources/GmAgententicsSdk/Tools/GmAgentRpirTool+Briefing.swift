@@ -6,7 +6,7 @@ import GmDaemonSdk
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeOpenBriefingArguments: Sendable {
+public struct GmAgentRpirOpenBriefingArguments: Sendable {
     @Guide(description: promptUuidGuide("the briefing belongs to"))
     public var promptUuid: String
 
@@ -20,20 +20,20 @@ public struct GmAgentCdeOpenBriefingArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeOpenBriefingTool: GmAgentCdeTool {
-    public let name = "cde_open_briefing"
+public struct GmAgentRpirOpenBriefingTool: GmAgentRpirTool {
+    public let name = "rpir_open_briefing"
     public let description = "Make empty note page for the dope agent to fill."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeOpenBriefingArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirOpenBriefingArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "BRIEFING_OPEN")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeWriteBriefArguments: Sendable {
+public struct GmAgentRpirWriteBriefArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "briefing"))
     public var briefingUuid: String
 
@@ -62,20 +62,20 @@ public struct GmAgentCdeWriteBriefArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeWriteBriefTool: GmAgentCdeTool {
-    public let name = "cde_write_brief"
+public struct GmAgentRpirWriteBriefTool: GmAgentRpirTool {
+    public let name = "rpir_write_brief"
     public let description = "Put dope, kbite, and file-change notes on the page."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeWriteBriefArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirWriteBriefArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "BRIEFING_COMPLETE")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeCloseBriefArguments: Sendable {
+public struct GmAgentRpirCloseBriefArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "mark ready", "briefing"))
     public var briefingUuid: String
 
@@ -89,20 +89,20 @@ public struct GmAgentCdeCloseBriefArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeCloseBriefTool: GmAgentCdeTool {
-    public let name = "cde_close_brief"
+public struct GmAgentRpirCloseBriefTool: GmAgentRpirTool {
+    public let name = "rpir_close_brief"
     public let description = "Page is done, agent can go away now."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeCloseBriefArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirCloseBriefArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "BRIEFING_COMPLETE")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeLoadBriefArguments: Sendable {
+public struct GmAgentRpirLoadBriefArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "read", "briefing"))
     public var briefingUuid: String
 
@@ -112,13 +112,13 @@ public struct GmAgentCdeLoadBriefArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeLoadBriefTool: GmAgentCdeTool {
-    public let name = "cde_load_exploration_brief"
+public struct GmAgentRpirLoadBriefTool: GmAgentRpirTool {
+    public let name = "rpir_load_exploration_brief"
     public let description = "Read the page everyone should know."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeLoadBriefArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirLoadBriefArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "BRIEFING_GET")
     }
 }

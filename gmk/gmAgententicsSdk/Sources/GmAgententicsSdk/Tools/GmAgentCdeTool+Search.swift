@@ -24,8 +24,8 @@ public struct GmAgentCdeSearchArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeSearchExplorationTool: GmAgentCdeTool {
-    public let name = "cde_search_exploration"
+public struct GmAgentRpirSearchExplorationTool: GmAgentRpirTool {
+    public let name = "rpir_search_exploration"
     public let description = "Find old findings by words in them."
 
     public init() {}
@@ -37,8 +37,8 @@ public struct GmAgentCdeSearchExplorationTool: GmAgentCdeTool {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeSearchClarificationTool: GmAgentCdeTool {
-    public let name = "cde_search_clarification"
+public struct GmAgentRpirSearchClarificationTool: GmAgentRpirTool {
+    public let name = "rpir_search_clarification"
     public let description = "Find old questions and notes by words in them."
 
     public init() {}
@@ -50,8 +50,8 @@ public struct GmAgentCdeSearchClarificationTool: GmAgentCdeTool {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeSearchArchitectureTool: GmAgentCdeTool {
-    public let name = "cde_search_architecture"
+public struct GmAgentRpirSearchArchitectureTool: GmAgentRpirTool {
+    public let name = "rpir_search_architecture"
     public let description = "Find old plans by words in them."
 
     public init() {}
@@ -67,8 +67,8 @@ public struct GmAgentCdeSearchArchitectureTool: GmAgentCdeTool {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeSearchReviewTool: GmAgentCdeTool {
-    public let name = "cde_search_review"
+public struct GmAgentRpirSearchReviewTool: GmAgentRpirTool {
+    public let name = "rpir_search_review"
     public let description = "Find old complaints by words in them."
 
     public init() {}
@@ -80,8 +80,8 @@ public struct GmAgentCdeSearchReviewTool: GmAgentCdeTool {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeSearchArchitectureOptionTool: GmAgentCdeTool {
-    public let name = "cde_search_architecture_option"
+public struct GmAgentRpirSearchArchitectureOptionTool: GmAgentRpirTool {
+    public let name = "rpir_search_architecture_option"
     public let description = "Find one architect's plan by words in it."
 
     public init() {}

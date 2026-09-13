@@ -6,7 +6,7 @@ import GmDaemonSdk
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeOpenArchitectureOptionArguments: Sendable {
+public struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
     @Guide(description: "Which prompt's architecture, by summary uuid.")
     public var summaryUuid: String
 
@@ -28,14 +28,14 @@ public struct GmAgentCdeOpenArchitectureOptionArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeOpenArchitectureOptionTool: GmAgentCdeTool {
-    public let name = "cde_open_architecture_option"
+public struct GmAgentRpirOpenArchitectureOptionTool: GmAgentRpirTool {
+    public let name = "rpir_open_architecture_option"
     public let description = "Start my own plan."
 
     public init() {}
 
     public func call(
-        arguments: GmAgentCdeOpenArchitectureOptionArguments
+        arguments: GmAgentRpirOpenArchitectureOptionArguments
     ) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_OPTION_ADD")
     }
@@ -125,7 +125,7 @@ public struct GmAgentPersistenceChange: Sendable {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeWritePersistenceChangesArguments: Sendable {
+public struct GmAgentRpirWritePersistenceChangesArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "architecture"))
     public var summaryUuid: String
 
@@ -139,14 +139,14 @@ public struct GmAgentCdeWritePersistenceChangesArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeWriteArchitecturePersistenceChangesTool: GmAgentCdeTool {
-    public let name = "cde_write_architecture_persistence_changes"
+public struct GmAgentRpirWriteArchitecturePersistenceChangesTool: GmAgentRpirTool {
+    public let name = "rpir_write_architecture_persistence_changes"
     public let description = "Write down many database changes."
 
     public init() {}
 
     public func call(
-        arguments: GmAgentCdeWritePersistenceChangesArguments
+        arguments: GmAgentRpirWritePersistenceChangesArguments
     ) async throws -> String {
         throw GmAgentToolError.notWired(
             tool: name, verb: "ARCH_PERSIST_ADD + ARCH_FIELD_ADD (looped)")
@@ -188,7 +188,7 @@ public struct GmAgentGeneralChange: Sendable {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeWriteGeneralChangesArguments: Sendable {
+public struct GmAgentRpirWriteGeneralChangesArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "architecture"))
     public var summaryUuid: String
 
@@ -202,20 +202,20 @@ public struct GmAgentCdeWriteGeneralChangesArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeWriteArchitectureGeneralChangesTool: GmAgentCdeTool {
-    public let name = "cde_write_architecture_general_changes"
+public struct GmAgentRpirWriteArchitectureGeneralChangesTool: GmAgentRpirTool {
+    public let name = "rpir_write_architecture_general_changes"
     public let description = "Write down many code changes."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeWriteGeneralChangesArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirWriteGeneralChangesArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_GENERAL_ADD (looped)")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeDecideArchitectureArguments: Sendable {
+public struct GmAgentRpirDecideArchitectureArguments: Sendable {
     @Guide(description: "Which plan won, by option uuid.")
     public var optionUuid: String
 
@@ -236,20 +236,20 @@ public struct GmAgentCdeDecideArchitectureArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeDecideArchitectureTool: GmAgentCdeTool {
-    public let name = "cde_decide_architecture"
+public struct GmAgentRpirDecideArchitectureTool: GmAgentRpirTool {
+    public let name = "rpir_decide_architecture"
     public let description = "Pick the winning plan."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeDecideArchitectureArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirDecideArchitectureArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_DECIDE")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeGetArchitectureArguments: Sendable {
+public struct GmAgentRpirGetArchitectureArguments: Sendable {
     @Guide(description: promptUuidGuide("'s architecture to read"))
     public var promptUuid: String
 
@@ -267,13 +267,13 @@ public struct GmAgentCdeGetArchitectureArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeGetArchitectureTool: GmAgentCdeTool {
-    public let name = "cde_get_architecture"
+public struct GmAgentRpirGetArchitectureTool: GmAgentRpirTool {
+    public let name = "rpir_get_architecture"
     public let description = "Show me the plan and how much of it is built."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeGetArchitectureArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirGetArchitectureArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_GET")
     }
 }

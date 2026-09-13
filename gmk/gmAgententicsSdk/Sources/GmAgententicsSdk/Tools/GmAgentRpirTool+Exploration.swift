@@ -6,7 +6,7 @@ import GmDaemonSdk
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeOpenExplorationArguments: Sendable {
+public struct GmAgentRpirOpenExplorationArguments: Sendable {
     @Guide(description: promptUuidGuide("to explore"))
     public var promptUuid: String
 
@@ -24,13 +24,13 @@ public struct GmAgentCdeOpenExplorationArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeOpenExplorationTool: GmAgentCdeTool {
-    public let name = "cde_open_exploration"
+public struct GmAgentRpirOpenExplorationTool: GmAgentRpirTool {
+    public let name = "rpir_open_exploration"
     public let description = "Start my own finding list."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeOpenExplorationArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirOpenExplorationArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "EXPLORE_OPEN")
     }
 }
@@ -66,7 +66,7 @@ public struct GmAgentExplorationFinding: Sendable {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeWriteExplorationsArguments: Sendable {
+public struct GmAgentRpirWriteExplorationsArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "finding list"))
     public var summaryUuid: String
 
@@ -84,13 +84,13 @@ public struct GmAgentCdeWriteExplorationsArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeWriteExplorationsTool: GmAgentCdeTool {
-    public let name = "cde_write_explorations"
+public struct GmAgentRpirWriteExplorationsTool: GmAgentRpirTool {
+    public let name = "rpir_write_explorations"
     public let description = "Write down many findings at once."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeWriteExplorationsArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirWriteExplorationsArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "EXPLORE_FINDING_ADD (looped)")
     }
 }
@@ -112,7 +112,7 @@ public struct GmAgentFindingRating: Sendable {
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeRankExplorationsArguments: Sendable {
+public struct GmAgentRpirRankExplorationsArguments: Sendable {
     @Guide(description: promptUuidGuide("'s findings to rank"))
     public var promptUuid: String
 
@@ -126,20 +126,20 @@ public struct GmAgentCdeRankExplorationsArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeRankExplorationsTool: GmAgentCdeTool {
-    public let name = "cde_rank_explorations"
+public struct GmAgentRpirRankExplorationsTool: GmAgentRpirTool {
+    public let name = "rpir_rank_explorations"
     public let description = "Give every finding a number, all at once."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeRankExplorationsArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirRankExplorationsArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "EXPLORE_RANK")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeCompleteExplorationArguments: Sendable {
+public struct GmAgentRpirCompleteExplorationArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "seal", "finding list"))
     public var summaryUuid: String
 
@@ -157,20 +157,20 @@ public struct GmAgentCdeCompleteExplorationArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeCompleteExplorationTool: GmAgentCdeTool {
-    public let name = "cde_complete_exploration"
+public struct GmAgentRpirCompleteExplorationTool: GmAgentRpirTool {
+    public let name = "rpir_complete_exploration"
     public let description = "Finding list done, here is what it all means."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeCompleteExplorationArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirCompleteExplorationArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "EXPLORE_COMPLETE")
     }
 }
 
 @available(GmAgentOs 1.0, *)
 @Generable
-public struct GmAgentCdeGetExplorationArguments: Sendable {
+public struct GmAgentRpirGetExplorationArguments: Sendable {
     @Guide(description: promptUuidGuide("'s findings to read"))
     public var promptUuid: String
 
@@ -188,13 +188,13 @@ public struct GmAgentCdeGetExplorationArguments: Sendable {
 }
 
 @available(GmAgentOs 1.0, *)
-public struct GmAgentCdeGetExplorationTool: GmAgentCdeTool {
-    public let name = "cde_get_exploration"
+public struct GmAgentRpirGetExplorationTool: GmAgentRpirTool {
+    public let name = "rpir_get_exploration"
     public let description = "Show me the findings so far."
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeGetExplorationArguments) async throws -> String {
+    public func call(arguments: GmAgentRpirGetExplorationArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "EXPLORE_GET")
     }
 }
