@@ -243,36 +243,6 @@ final class HookPayloadTests: XCTestCase {
         XCTAssertNil(payload.agentType)
     }
 
-    // MARK: - The sandbox marker
-
-    /// WITHOUT THIS A SANDBOX SESSION'S HOOKS WRITE THE PROD DB. The marker is
-    /// parsed as data, never sourced, and the walk climbs from the payload's
-    /// cwd so a tool call in a subdirectory still finds the snapshot root.
-    func testSandboxMarkerIsFoundByClimbingFromThePayloadCwd() throws {
-        let repo = fixtureRoot.appendingPathComponent("snapshot", isDirectory: true)
-        let deep = repo.appendingPathComponent("Sources/Deep", isDirectory: true)
-        try fm.createDirectory(at: deep, withIntermediateDirectories: true)
-        // ONE root in the marker, where this used to carry two. A snapshot
-        // whose marker named a runtime root and a separate content root could
-        // describe a half-sandboxed session; one var cannot.
-        try """
-        # Written by gm sandbox refresh — sourced by gm_session_startup.sh so any
-        # Claude session inside this snapshot auto-sandboxes.
-        export GM_FS_ROOT="/tmp/sandbox/gmfs"
-        """.write(
-            to: repo.appendingPathComponent(".gmcc_sandbox"),
-            atomically: true, encoding: .utf8)
-
-        let roots = try XCTUnwrap(SandboxMarker.find(startingAt: deep.path))
-        XCTAssertEqual(roots.gmFsRoot, "/tmp/sandbox/gmfs")
-    }
-
-    func testNoMarkerMeansNoRetarget() throws {
-        let plain = fixtureRoot.appendingPathComponent("plain", isDirectory: true)
-        try fm.createDirectory(at: plain, withIntermediateDirectories: true)
-        XCTAssertNil(SandboxMarker.find(startingAt: plain.path))
-    }
-
     // MARK: - The Bash write allowlist: what it RECORDS
 
     private func extracted(_ command: String, cwd: String = "/repo") -> [String] {

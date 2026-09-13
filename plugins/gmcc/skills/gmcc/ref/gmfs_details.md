@@ -109,9 +109,8 @@ A project corresponds to exactly one git repo (by basename). An instance is a un
 
 On every SessionStart, `gm_session_startup.sh`:
 
-1. Confirms the git repo, locates the plugin root, and locates the right
-   `gm_hook` binary (prod runtime, or the sandbox runtime named by a
-   `.gmcc_sandbox` marker). It computes nothing the daemon computes.
+1. Confirms the git repo, locates the plugin root, and locates the `gm_hook`
+   binary under the one runtime root. It computes nothing the daemon computes.
 2. Calls `gm_hook context ensure --hook-payload` (best-effort):
    idempotently upserts the project → instance → session rows in the db
    (reusing existing uuids, seeding kbite inheritance at create time), pins

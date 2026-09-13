@@ -64,9 +64,9 @@ final class LiveRuntimeIsolationTests: XCTestCase {
         let banned = [
             "Paths.root", "Paths.bin", "Paths.db", "Paths.backups",
             "Paths.socket", "Paths.pidfile", "Paths.log",
-            "Paths.binGm", "Paths.binDaemon", "Paths.binMcp", "Paths.binHook",
+            "Paths.binKernel", "Paths.binDaemon", "Paths.binMcp", "Paths.binHook",
             "Paths.contentRoot", "Paths.projectsRoot", "Paths.kbitesRoot",
-            "Paths.development", "Paths.versionStamp",
+            "Paths.versionStamp",
             "Paths.ensureRuntimeDirs",
         ]
         var violations: [String] = []

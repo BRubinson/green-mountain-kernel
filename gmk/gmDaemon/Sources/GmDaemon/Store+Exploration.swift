@@ -27,31 +27,31 @@ extension Store {
     // MARK: - Verbs
 
     public func exploreOpen(_ req: ExploreOpenRequest) throws -> ExploreSummaryResponse {
-        try dbQueue.write { db in try ExplorationRepository(db: db, core: core).open(req) }
+        try boundary { db in try ExplorationRepository(db: db, core: core).open(req) }
     }
 
     public func exploreKeyFileAdd(_ req: ExploreKeyFileAddRequest) throws -> ExploreKeyFileAddResponse {
-        try dbQueue.write { db in try ExplorationRepository(db: db, core: core).keyFileAdd(req) }
+        try boundary { db in try ExplorationRepository(db: db, core: core).keyFileAdd(req) }
     }
 
     public func exploreFindingAdd(_ req: ExploreFindingAddRequest) throws -> ExploreFindingRowResponse {
-        try dbQueue.write { db in try ExplorationRepository(db: db, core: core).findingAdd(req) }
+        try boundary { db in try ExplorationRepository(db: db, core: core).findingAdd(req) }
     }
 
     public func exploreRank(_ req: ExploreRankRequest) throws -> ExploreRankResponse {
-        try dbQueue.write { db in try ExplorationRepository(db: db, core: core).rank(req) }
+        try boundary { db in try ExplorationRepository(db: db, core: core).rank(req) }
     }
 
     public func exploreComplete(_ req: ExploreCompleteRequest) throws -> ExploreSummaryResponse {
-        try dbQueue.write { db in try ExplorationRepository(db: db, core: core).complete(req) }
+        try boundary { db in try ExplorationRepository(db: db, core: core).complete(req) }
     }
 
     public func exploreReopen(_ req: ExploreReopenRequest) throws -> ExploreSummaryResponse {
-        try dbQueue.write { db in try ExplorationRepository(db: db, core: core).reopen(req) }
+        try boundary { db in try ExplorationRepository(db: db, core: core).reopen(req) }
     }
 
     public func exploreGet(_ req: ExploreGetRequest) throws -> ExploreGetResponse {
-        try dbQueue.read { db in try ExplorationRepository(db: db, core: core).get(req) }
+        try boundaryRead { db in try ExplorationRepository(db: db, core: core).get(req) }
     }
 
     // MARK: - Cross-domain helper forwards

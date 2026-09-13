@@ -34,7 +34,6 @@ import XCTest
 ///
 ///   `plugins/gmcc/`          the plugin directory keeps its name
 ///   `.gmcc/`                 the in-repo DOPE directory keeps its name
-///   `.gmcc_sandbox`          the sandbox marker filename keeps its name
 ///   `gmcc:`                  the command/skill namespace keeps its name
 ///   `mcp__plugin_gmcc_pen__`  the pen MCP server keeps its name
 ///   `gmcc`                   the dope scope code keeps its name
@@ -48,6 +47,32 @@ import XCTest
 /// So the repo deliberately holds BOTH prefixes: gm-prefixed on the runtime
 /// side, `gmcc` on the plugin side. `testAllowedSpellingsAreNotFlagged` is what
 /// keeps a future sweep from "tidying" the second list into the first.
+///
+/// ════════════════════════════════════════════════════════════════════════════
+/// THE SANDBOX VOCABULARY — MOVED from the list above, not merely added below
+/// ════════════════════════════════════════════════════════════════════════════
+///
+/// `.gmcc_sandbox` used to sit in the never-flag list, because the marker
+/// filename was deliberately preserved while the runtime around it was renamed.
+/// The snapshot runtime it named has since been DELETED outright, so the
+/// spelling moved to the retired list. It had to MOVE rather than be added:
+/// leaving it in both lists makes `testAllowedSpellingsAreNotFlagged` and
+/// `testNoRetiredSandboxVocabulary` assert opposite things about the same
+/// string, and one of them must then fail.
+///
+/// `sandbox` is a THREE-WAY HOMONYM in this repo, so the pattern below is keyed
+/// on the runtime vocabulary and never on the bare word. These three are
+/// unrelated to the deleted dev loop and must survive:
+///
+///   `DopeRepoSandbox`        write containment for `.gmcc/` — a value type
+///                            whose public surface can only name paths under
+///                            {instanceRoot}/.gmcc/. Deleting it removes dope
+///                            repo writing entirely.
+///   `ENABLE_APP_SANDBOX`     an Xcode build setting that must stay NO forever:
+///                            an App-Sandboxed kernel cannot open the db, bind
+///                            the socket, or read the user's repos.
+///   `ENABLE_USER_SCRIPT_SANDBOXING`
+///                            unrelated Xcode setting, stays YES.
 final class RetiredNameContractTests: XCTestCase {
 
     // MARK: - Scope
@@ -63,7 +88,19 @@ final class RetiredNameContractTests: XCTestCase {
             else { continue }
             while let url = walker.nextObject() as? URL {
                 // Build products are generated, not authored.
-                if url.path.contains("/.build/") || url.path.contains("/.swiftpm/") {
+                //
+                // `/build/` and `.xcarchive` are here for a reason worth
+                // recording: an xcodebuild archive lands at `gmk/build/` (no
+                // leading dot, so the `/.build/` test misses it) and its dSYM
+                // relocation maps are `.yml` files listing every MANGLED SWIFT
+                // SYMBOL in the binary. A type that has just been deleted from
+                // the sources therefore lives on in those maps until the next
+                // clean, and the contract would fail against a name the repo no
+                // longer contains — pointing the reader at a file nobody wrote.
+                // Both directories are gitignored; a retired name can only be
+                // fixed where it was authored.
+                if url.path.contains("/.build/") || url.path.contains("/.swiftpm/")
+                    || url.path.contains("/build/") || url.path.contains(".xcarchive/") {
                     continue
                 }
                 if ["swift", "md", "sh", "yml", "yaml", "json"].contains(url.pathExtension) {
@@ -202,6 +239,43 @@ final class RetiredNameContractTests: XCTestCase {
             """)
     }
 
+    // MARK: - Retired sandbox vocabulary
+
+    /// The snapshot dev loop is GONE, along with the second filesystem root it
+    /// existed to provide. These four spellings are the runtime vocabulary of
+    /// that mechanism.
+    ///
+    /// KEYED ON THE VOCABULARY, NEVER ON THE WORD. A pattern matching bare
+    /// `sandbox` would flag `DopeRepoSandbox` (write containment for `.gmcc/`)
+    /// and `ENABLE_APP_SANDBOX` (which must stay NO or the kernel cannot open
+    /// its own database) — two subsystems with nothing to do with the dev loop.
+    /// That is why each alternative below names a specific symbol or filename.
+    func testNoRetiredSandboxVocabulary() throws {
+        // CLAUDE.md is exempt for THIS pattern ONLY, and for the same reason
+        // `Envelope.swift` is exempt for the wire-version ledger and
+        // `migrate_to_gmfs.sh` is exempt wholesale: it is where the retirement
+        // is RECORDED. Its "The sandbox dev loop is GONE" section has to name
+        // the four retired spellings in order to say which sweep deleted them,
+        // and — more importantly — to name the three HOMONYMS that must not be
+        // swept with them. A reader who does not know that `DopeRepoSandbox` is
+        // unrelated is one grep away from deleting dope repo writing.
+        //
+        // Scoped to this one test rather than added to `allExempt`, so CLAUDE.md
+        // stays covered by the binary, env, root, filename, CKFS, module and
+        // package-path patterns. A doc that may name ONE retired thing must not
+        // thereby be licensed to name all of them.
+        let hits = try violations(
+            pattern: #"\.gmcc_sandbox|SandboxMarker|SandboxRetarget|local_sandbox"#,
+            allowFiles: allExempt.union(["CLAUDE.md"]))
+        XCTAssertEqual(hits, [], """
+            retired sandbox vocabulary. The snapshot dev loop and its second \
+            filesystem root were deleted; there is ONE root, ~/gmfs, and \
+            `gm_hook call BACKUP` is the pre-risk snapshot. NOTE: DopeRepoSandbox \
+            and ENABLE_APP_SANDBOX are unrelated and must NOT be swept:
+            \(hits.joined(separator: "\n"))
+            """)
+    }
+
     // MARK: - Retired env vars
 
     /// The four that became three. `GM_FS_ROOT` subsumes both roots.
@@ -303,7 +377,6 @@ final class RetiredNameContractTests: XCTestCase {
             "plugins/gmcc/skills/gmcc/SKILL.md",
             ".gmcc/scope.doped.json",
             ".gmcc/persistence/project/project.index.persistence.doped.json",
-            ".gmcc_sandbox",
             "/gmcc:code-explorer",
             "mcp__plugin_gmcc_pen__arch_get",
             "mcp__gmcc__whatever",
@@ -315,6 +388,10 @@ final class RetiredNameContractTests: XCTestCase {
             // letters spell the retired word in the middle of a live name.
             "GmEnvironment.fallbackFsRoot(env: env)",
             "let root = fallbackFsRoot()",
+            // The sandbox HOMONYMS. Unrelated to the deleted dev loop, and the
+            // reason the retired pattern names symbols instead of the word.
+            "DopeRepoSandbox", "DopeSandboxTests", "Store+DopeRepoVerbs",
+            "ENABLE_APP_SANDBOX = NO", "ENABLE_USER_SCRIPT_SANDBOXING = YES",
             // The live vocabulary must obviously survive its own contract.
             "gm_daemon", "gm_mcp", "gm_hook", "~/gmfs", "gm.db", ".gm_version",
             "GM_BOOTED", "GM_PLUGIN_ROOT", "GM_FS_ROOT",
@@ -327,6 +404,7 @@ final class RetiredNameContractTests: XCTestCase {
             ("fs root",    #"(~|\$HOME)/gmcc(_ckfs)?(?![A-Za-z0-9_])"#),
             ("filename",   #"gmcc\.db|\.gmcc_version"#),
             ("ckfs",       #"(?<![A-Za-z])[Cc][Kk][Ff][Ss]"#),
+            ("sandbox",    #"\.gmcc_sandbox|SandboxMarker|SandboxRetarget|local_sandbox"#),
             ("module",     #"GMCCDaemonKit"#),
             ("package",    #"plugins/gmcc/daemon"#),
         ]
@@ -460,14 +538,22 @@ final class RetiredNameContractTests: XCTestCase {
     /// runtime root as a side effect, on a machine where the old runtime is
     /// still live.
     func testNothingPopulatesTheRuntimeRoot() throws {
-        // THE ONE LEGITIMATE CALLER: the daemon creating its own runtime
+        // THE ONE LEGITIMATE CALLER: the kernel creating its own runtime
         // directories on first boot. Note the distinction the constraint
         // actually draws — no ensureRuntimeDirs() on a path THE BUILD OR THE
-        // TESTS exercise. This one runs when a person starts the daemon, which
-        // is neither, and a daemon that cannot create its own runtime root
+        // TESTS exercise. This one runs when a person starts the kernel, which
+        // is neither, and a kernel that cannot create its own runtime root
         // would simply not work.
+        //
+        // MOVED with the boot path, from `gm_daemon/main.swift` into
+        // `KernelOwnership.acquire()`. It is STILL one caller, and it landed
+        // there rather than staying beside the boot sequence for a reason worth
+        // keeping: the directories have to exist before the pidfile can be
+        // opened, and the pidfile open is the first step of acquiring the lock.
+        // Anything that created them later would be creating them after
+        // something had already tried to lock inside them.
         let allowed: Set<String> = [
-            "gmk/gmDaemon/Sources/gm_daemon/main.swift",
+            "gmk/gmDaemon/Sources/GmKernelHost/KernelOwnership.swift",
         ]
         var hits: [String] = []
         for file in try scopedFiles() {

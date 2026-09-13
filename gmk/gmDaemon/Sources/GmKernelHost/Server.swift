@@ -292,6 +292,26 @@ final class Server: @unchecked Sendable {
             case .subscribe:
                 return try handleSubscribe(line: line, head: head, client: client)
 
+            case .txBatch:
+                // Re-enters this same function per inner line. Safe because
+                // dispatch is already re-entered once per connection and holds
+                // no per-call state; the transaction comes from the boundary,
+                // and every inner store verb enlists in it rather than opening
+                // its own. `client` is threaded through so an inner verb still
+                // resolves the same caller identity it would have on its own.
+                return try TxBatchHandler.handle(
+                    line: line, head: head, store: store,
+                    dispatch: { [weak client] inner in
+                        guard let client else {
+                            return self.errorResult(
+                                type: .error, requestId: head.requestId,
+                                payload: ErrorPayload(
+                                    code: .badRequest,
+                                    message: "TX_BATCH lost its client connection mid-batch"))
+                        }
+                        return self.dispatch(line: inner, from: client)
+                    })
+
             case .contextEnsure:
                 return try ContextEnsureHandler.handle(line: line, head: head, store: store)
             case .contextGet:

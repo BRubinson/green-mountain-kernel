@@ -13,37 +13,37 @@ import GmDaemonSdk
 
 extension Store {
     public func dopeCogAdd(_ req: DopeCogAddRequest) throws -> DopeCogResponse {
-        try dbQueue.write { db in try DopeCogRepository(db: db, core: core).dopeCogAdd(req) }
+        try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogAdd(req) }
     }
 
     public func dopeCogUpdate(_ req: DopeCogUpdateRequest) throws -> DopeCogResponse {
-        try dbQueue.write { db in try DopeCogRepository(db: db, core: core).dopeCogUpdate(req) }
+        try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogUpdate(req) }
     }
 
     public func dopeCogDelete(_ req: DopeCogDeleteRequest) throws -> DopeCogDeleteResponse {
-        try dbQueue.write { db in try DopeCogRepository(db: db, core: core).dopeCogDelete(req) }
+        try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogDelete(req) }
     }
 
     public func dopeCogElementAdd(
         _ req: DopeCogElementAddRequest
     ) throws -> DopeCogElementResponse {
-        try dbQueue.write { db in try DopeCogRepository(db: db, core: core).dopeCogElementAdd(req) }
+        try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogElementAdd(req) }
     }
 
     public func dopeCogElementUpdate(
         _ req: DopeCogElementUpdateRequest
     ) throws -> DopeCogElementResponse {
-        try dbQueue.write { db in try DopeCogRepository(db: db, core: core).dopeCogElementUpdate(req) }
+        try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogElementUpdate(req) }
     }
 
     public func dopeCogElementDelete(
         _ req: DopeCogElementDeleteRequest
     ) throws -> DopeCogDeleteResponse {
-        try dbQueue.write { db in try DopeCogRepository(db: db, core: core).dopeCogElementDelete(req) }
+        try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogElementDelete(req) }
     }
 
     public func dopeCogGet(_ req: DopeCogGetRequest) throws -> DopeCogGetResponse {
-        try dbQueue.read { db in try DopeCogRepository(db: db, core: core).dopeCogGet(req) }
+        try boundaryRead { db in try DopeCogRepository(db: db, core: core).dopeCogGet(req) }
     }
 
     // MARK: - Cross-domain helper forward

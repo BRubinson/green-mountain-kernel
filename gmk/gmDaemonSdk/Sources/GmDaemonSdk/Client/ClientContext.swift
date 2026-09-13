@@ -26,7 +26,6 @@ public struct GitContext {
 
     /// {repo}_{first 4 hex of md5(abs path)} — matches gm_session_startup.sh's hash4.
     /// Single Swift home of the convention: InstanceIdentity in the kit
-    /// (shared with SandboxRetarget).
     public var instanceCode: String {
         InstanceIdentity.code(repoName: repoName, absolutePath: repoRoot)
     }

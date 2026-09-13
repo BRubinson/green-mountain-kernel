@@ -146,15 +146,29 @@ final class ReleaseStoreContractTests: XCTestCase {
             """)
     }
 
-    /// The per-binary links are RELATIVE. A sandbox is a full copy of the
-    /// runtime tree at a different path, so absolute symlinks would all point
-    /// back at prod — the exact failure the sandbox exists to prevent.
+    /// The per-binary links are RELATIVE, and they all point at the ONE staged
+    /// Mach-O.
+    ///
+    /// The original justification was the sandbox: a snapshot was a full copy of
+    /// the runtime tree at another path, so absolute links would have resolved
+    /// back to prod. That runtime is gone, and the invariant outlived it —
+    /// `GM_FS_ROOT` is still overridable and a staged tree still gets copied by
+    /// test harnesses and machine migrations, so the store has to resolve WITHIN
+    /// ITSELF wherever it sits.
+    ///
+    /// Asserted on the relative PREFIX rather than the whole literal: the target
+    /// is now `$GM_MACHO` (one binary, several names) rather than `$b`, and
+    /// pinning the exact variable would make this test fail for a rename that
+    /// preserved the property it exists to protect.
     func testActivationLinksAreRelative() throws {
         let text = try String(
             contentsOf: gmkScripts.appendingPathComponent("gm_releases.sh"), encoding: .utf8)
-        XCTAssertTrue(text.contains(#"ln -sfn "releases/active/$b""#), """
-            the per-binary links in bin/ are no longer relative. A sandbox copies \
-            the whole runtime tree; absolute links would resolve back to prod.
+        XCTAssertTrue(text.contains(#"ln -sfn "releases/active/"#), """
+            the per-binary links in bin/ are no longer relative. A staged tree \
+            must resolve within itself wherever it is copied.
+            """)
+        XCTAssertFalse(text.contains(#"ln -sfn "$GM_RELEASES/active"#), """
+            an ABSOLUTE activation link appeared. Relative, always.
             """)
     }
 

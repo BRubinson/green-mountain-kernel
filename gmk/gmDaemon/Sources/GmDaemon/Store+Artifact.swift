@@ -8,11 +8,11 @@ import GmDaemonSdk
 
 extension Store {
     public func addArtifact(_ req: ArtifactAddRequest) throws -> ArtifactRow {
-        try dbQueue.write { db in try ArtifactRepository(db: db, core: core).add(req) }
+        try boundary { db in try ArtifactRepository(db: db, core: core).add(req) }
     }
 
     public func listArtifacts(_ req: ArtifactListRequest) throws -> ArtifactListResponse {
-        try dbQueue.read { db in
+        try boundaryRead { db in
             ArtifactListResponse(
                 artifacts: try ArtifactRepository(db: db, core: core).fetchRows(promptUuid: req.promptUuid))
         }

@@ -79,6 +79,23 @@ public enum StoreError: Error, Sendable {
     /// badRequest wire code (no new ErrorCode), so a pinned-Kit GMVibes still
     /// decodes it.
     case hookUnbound(claudeSessionId: String, booted: Bool)
+    /// A verb that CANNOT run inside a caller-opened transaction was called
+    /// inside one. Two families qualify, both for reasons SQLite enforces
+    /// rather than reasons we chose:
+    ///
+    /// - The four-phase repo verbs (dope / diagram write-repo and ingest) run
+    ///   db read → pure projection → filesystem work → db write, and the
+    ///   filesystem phase deliberately holds NO lock. Composing one would pin
+    ///   the single writer across file I/O, so every other writer in the
+    ///   machine — including every hook — would block on someone else's disk.
+    /// - `checkpointTruncate`, because a WAL checkpoint inside a transaction is
+    ///   illegal.
+    ///
+    /// A loud refusal in two files beats an enrolment table listing which of
+    /// ~230 verbs are composable, which nobody would keep accurate. Mapped onto
+    /// the badRequest wire code, so no new ErrorCode and no stale-client
+    /// decode problem.
+    case notComposable(verb: String)
 
     public var errorPayload: ErrorPayload {
         switch self {
@@ -176,6 +193,12 @@ public enum StoreError: Error, Sendable {
                 code: .badRequest,
                 message: "claude session \(claudeSessionId) is not bound to a gmcc "
                     + "session — nothing was recorded (\(repo))")
+        case .notComposable(let verb):
+            return ErrorPayload(
+                code: .badRequest,
+                message: "\(verb) cannot run inside a caller-opened transaction — "
+                    + "it performs work that must not hold the single writer lock. "
+                    + "Call it outside inTransaction / TX_BATCH.")
         }
     }
 }

@@ -86,6 +86,22 @@ jobs:
             mode: test
           - package: gmToolchain
             mode: test
+          # BUILD, not test, and that is deliberate rather than an omission.
+          #
+          # gmKernel is the multi-call dispatcher: top-level code in an
+          # executable target's main.swift, which cannot be imported by a test
+          # target at all. Its contract — argv[0] beating argv[1], a bare
+          # invocation exiting without opening the database, the entry-point
+          # names matching what the release store symlinks — is asserted by
+          # MultiCallBinaryContractTests over in gmToolchain, which reads the
+          # source as a file. What is left for this row is "does the three-way
+          # link still resolve", and that is exactly a build.
+          #
+          # If gmKernel ever gains a test target, flip this to `test` in the same
+          # change — testKernelPackageShipsNoTestTarget fails the build to remind
+          # you, so the tests cannot sit there silently never running.
+          - package: gmKernel
+            mode: build
     steps:
       - uses: actions/checkout@v4
 

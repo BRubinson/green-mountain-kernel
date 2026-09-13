@@ -3,10 +3,10 @@ import GmDaemonSdk
 
 @testable import GmAgententicsSdk
 
-// The template contract — the roster test applied to `Templates/`.
+// The template contract — the roster test applied to `Templates/original/`.
 //
 // WHAT THIS FILE CAN AND CANNOT CHECK, stated plainly because the gap is the
-// interesting part. The blocks in `Instructions.swift` and `Prompts.swift` are
+// interesting part. The blocks in `Templates/original/` are
 // COPIES of markdown under `plugins/gmcc/`, so the defect worth catching is
 // drift between the two. Catching that means READING those files, and a test
 // that reads repo files resolves the repo root through the one `RepoRoot`
@@ -26,6 +26,17 @@ import GmDaemonSdk
 // What IS asserted below is everything structural that needs no file access: a
 // role with no text, a role unreachable from the roster, and the two spawn
 // rules the variant contracts state in prose.
+//
+// THE SEAL BETWEEN THE TWO HALVES IS ALSO UNTESTED HERE, for the same reason.
+// `Templates/original/` must reference nothing outside itself, and
+// `GmAgentInstruction.swift` must reference nothing inside it — which is why
+// `OriginalGmccRole` and `GmAgentRole` are near-identical twins rather than one
+// shared enum. Proving that holds means scanning source TEXT, so it belongs in
+// `gmToolchain` next to the drift guard above. Until then the split is enforced
+// by review, and the giveaway that it broke is this file: the archive-facing
+// assertions below name `OriginalGmccRole`, the execution-facing ones name
+// `GmAgentRole`, and a change that lets one enum serve both will show up here
+// first.
 final class TemplateRosterTests: XCTestCase {
 
     /// Every role has a non-empty instruction block.
@@ -34,7 +45,7 @@ final class TemplateRosterTests: XCTestCase {
     /// but a case wired to an empty literal compiles fine and produces a
     /// persona with no contract, which is the failure this catches.
     func testEveryRoleHasInstructionText() {
-        for role in GmAgentRole.allCases {
+        for role in OriginalGmccRole.allCases {
             let text = GmAgentInstructions.Text.text(for: role)
             XCTAssertFalse(
                 text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -46,8 +57,8 @@ final class TemplateRosterTests: XCTestCase {
     func testInstructionRosterCoversEveryRole() {
         XCTAssertEqual(
             GmAgentInstructions.allText.map(\.role),
-            GmAgentRole.allCases,
-            "GmAgentInstructions.allText and GmAgentRole.allCases disagree")
+            OriginalGmccRole.allCases,
+            "GmAgentInstructions.allText and OriginalGmccRole.allCases disagree")
     }
 
     /// No two roles share an instruction block.
@@ -56,7 +67,7 @@ final class TemplateRosterTests: XCTestCase {
     /// its body not changed — a paste error that produces a reviewer behaving
     /// like an explorer, with nothing in the type system to notice.
     func testRoleInstructionsAreDistinct() {
-        let texts = GmAgentRole.allCases.map { GmAgentInstructions.Text.text(for: $0) }
+        let texts = OriginalGmccRole.allCases.map { GmAgentInstructions.Text.text(for: $0) }
         XCTAssertEqual(
             Set(texts).count, texts.count,
             "two roles share an instruction block — a switch case was pasted without editing its body")
@@ -67,7 +78,7 @@ final class TemplateRosterTests: XCTestCase {
     /// An absolute path would be this machine's, and the provenance note is
     /// only useful to a reader on a different one.
     func testSourcePathsAreRelative() {
-        for role in GmAgentRole.allCases {
+        for role in OriginalGmccRole.allCases {
             XCTAssertFalse(
                 role.sourcePath.hasPrefix("/"),
                 "\(role.rawValue) names an absolute source path")
@@ -148,5 +159,51 @@ final class TemplateRosterTests: XCTestCase {
         let spawn = GmAgentPrompts.doperSpawn(sessionUuid: "U", topic: "vendoring a package")
         XCTAssertTrue(spawn.text.contains("Owner session uuid: U"))
         XCTAssertFalse(spawn.text.contains("Prompt uuid:"))
+    }
+
+    /// No phase is BOTH divergent and convergent.
+    ///
+    /// THIS IS THE ONE THAT CATCHES A SILENT BUG. `GmccAgenticPromptExecution-
+    /// Profile.body` is an if / else-if / else chain, because
+    /// `DynamicProfileBuilder` requires exactly one active profile. A phase
+    /// added to both lists therefore does not fail to build and does not throw
+    /// — it silently takes the divergent branch and runs a calibration pass at
+    /// temperature 0.9. Nothing downstream would look wrong; the rankings would
+    /// just stop being reproducible.
+    func testNoPhaseIsBothDivergentAndConvergent() {
+        for phase in WorkflowSpec.Phase.allCases {
+            XCTAssertFalse(
+                phase.isDivergent && phase.isConvergent,
+                "\(phase.rawValue) is classified as both — the profile's else-if "
+                    + "would silently pick divergent")
+        }
+    }
+
+    /// Every fan-out phase is driven by a role that takes a methodology.
+    ///
+    /// A fan-out phase whose persona ignores methodology would spawn four
+    /// identical agents — the expensive failure that looks like it worked.
+    func testDivergentPhasesAreDrivenByMethodologyRoles() {
+        for phase in WorkflowSpec.Phase.allCases where phase.isDivergent {
+            XCTAssertTrue(
+                GmAgentRole(driving: phase).takesMethodology,
+                "\(phase.rawValue) fans out but its role ignores methodology")
+        }
+    }
+
+    /// The phases with no dedicated persona resolve to `.primary`.
+    ///
+    /// Asserted as a CONTRACT, not a fallback: the variant contracts put the
+    /// user conversation, the care package, the plan gate, implementation, the
+    /// fix loop and the close in the primary's hands specifically.
+    func testUnstaffedPhasesBelongToThePrimary() {
+        let primaryPhases: [WorkflowSpec.Phase] = [
+            .clarifyUser, .carePackage, .planGate, .implement, .reviewFix, .done,
+        ]
+        for phase in primaryPhases {
+            XCTAssertEqual(
+                GmAgentRole(driving: phase), .primary,
+                "\(phase.rawValue) should be the primary's")
+        }
     }
 }

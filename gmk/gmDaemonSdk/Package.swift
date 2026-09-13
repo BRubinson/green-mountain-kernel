@@ -20,11 +20,19 @@
 //
 // Products:
 //   - GmDaemonSdk (library)    every other module depends on this one
-//   - gm_hook     (executable) the shell-callable client and raw-wire passthrough
+//   - GmHookCli   (library)    the shell-client personality, so the one
+//                              multi-call `gm_kernel` Mach-O can carry it
+//   - gm_hook     (executable) a shim over GmHookCli.main()
 //
 // gm_hook ships FROM HERE rather than from a package of its own. It is a socket
 // client and never reaches persistence, so it links the SDK alone — a seventh
 // package for one executable would buy nothing but a seventh manifest.
+//
+// GmHookCli IS A LIBRARY BECAUSE OF THE COLLAPSE, and it ADDS NO DEPENDENCY.
+// The zero-external-dependency property below is untouched: the library is the
+// same code the executable held, moved so `gmk/gmKernel` can link it. Top-level
+// code is legal only in an executable's `main.swift`, so the split is what makes
+// one binary able to answer as three.
 
 import PackageDescription
 
@@ -36,6 +44,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "GmDaemonSdk", targets: ["GmDaemonSdk"]),
+        .library(name: "GmHookCli", targets: ["GmHookCli"]),
         .executable(name: "gm_hook", targets: ["gm_hook"]),
     ],
     // ZERO EXTERNAL DEPENDENCIES, and that is the load-bearing property of this
@@ -50,9 +59,16 @@ let package = Package(
         // NO ArgumentParser. That dependency earns its place for a large
         // declarative command tree; this is a dozen ops verbs plus a raw
         // passthrough, and it parses argv by hand.
+        .target(
+            name: "GmHookCli",
+            dependencies: ["GmDaemonSdk"]
+        ),
+        // A shim over GmHookCli.main(). Kept as a real executable target so
+        // `swift build` still yields a standalone `gm_hook` for the release
+        // store to stage and for the script tests to exercise.
         .executableTarget(
             name: "gm_hook",
-            dependencies: ["GmDaemonSdk"]
+            dependencies: ["GmHookCli"]
         ),
         // Fixtures/ holds wire_keys.golden — the frozen snake_case wire
         // contract, regenerated and diffed by scripts/wire_keys.py. It lives
@@ -61,7 +77,10 @@ let package = Package(
         // would not have been next to the golden that freezes them.
         .testTarget(
             name: "GmDaemonSdkTests",
-            dependencies: ["GmDaemonSdk"],
+            // GmHookCli too: HookPayloadTests and the Env/Call coverage reach
+            // into the CLI's own helpers, which were @testable-reachable while
+            // this was an executable target and must stay so after the move.
+            dependencies: ["GmDaemonSdk", "GmHookCli"],
             exclude: ["Fixtures"]
         ),
     ]

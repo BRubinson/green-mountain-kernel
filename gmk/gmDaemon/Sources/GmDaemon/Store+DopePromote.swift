@@ -8,6 +8,6 @@ import GmDaemonSdk
 
 extension Store {
     public func dopePromote(_ req: DopePromoteRequest) throws -> DopePromoteResponse {
-        try dbQueue.write { db in try DopePromoteRepository(db: db, core: core).promote(req) }
+        try boundary { db in try DopePromoteRepository(db: db, core: core).promote(req) }
     }
 }

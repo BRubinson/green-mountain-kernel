@@ -195,13 +195,35 @@ public final class DaemonClient: @unchecked Sendable {
         throw DaemonClientError.unreachable("daemon did not come up at \(socketPath) after autostart")
     }
 
+    /// Spawn the HEADLESS writer.
+    ///
+    /// ## Why this must never launch the app, and why it says `daemon` out loud
+    ///
+    /// `daemonBinaryPath` points at `~/gmfs/bin/gm_daemon`, which is now a
+    /// SYMLINK at the one multi-call `gm_kernel` Mach-O. Dispatch keys on
+    /// `basename(argv[0])`, so spawning through that name already selects the
+    /// headless personality — and the explicit `daemon` argument below makes it
+    /// true regardless of which name the path resolves under.
+    ///
+    /// The hazard being guarded is specific and severe: `posix_spawn` on a GUI
+    /// binary produces an AppKit process that LaunchServices knows nothing about,
+    /// bypassing one-instance-per-bundle entirely. Since this runs from Claude
+    /// Code hooks, that would be a SECOND WRITER created on every tool call. Two
+    /// independent things now prevent it — a bare `gm_kernel` invocation exits 2
+    /// and opens nothing, and this call names the personality it wants — and the
+    /// ownership lock would refuse a second writer even if both failed.
+    ///
+    /// The extra argument is safe for a standalone `gm_daemon` binary too: that
+    /// shim ignores argv entirely.
     private func spawnDaemon() -> Bool {
         var attr: posix_spawnattr_t?
         posix_spawnattr_init(&attr)
         // Detach into its own session so the daemon outlives the CLI cleanly.
         posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETSID))
         var pid: pid_t = 0
-        let argv: [UnsafeMutablePointer<CChar>?] = [strdup(daemonBinaryPath), nil]
+        let argv: [UnsafeMutablePointer<CChar>?] = [
+            strdup(daemonBinaryPath), strdup("daemon"), nil,
+        ]
         defer { argv.forEach { free($0) } }
         let rc = posix_spawn(&pid, daemonBinaryPath, nil, &attr, argv, environ)
         posix_spawnattr_destroy(&attr)

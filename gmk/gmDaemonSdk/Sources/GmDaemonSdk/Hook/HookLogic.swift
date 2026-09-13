@@ -1,8 +1,8 @@
 import Foundation
 
 // Hoisted VERBATIM out of Sources/gm/Commands/Hook.swift. This block is the
-// parser-free half of the hook surface — payload decoding, sandbox adoption,
-// write-target resolution, and the Bash command scanner — and it moved to the
+// parser-free half of the hook surface — payload decoding, write-target
+// resolution, and the Bash command scanner — and it moved to the
 // kit so both the shell client and anything else that must speak the hook
 // contract share ONE implementation. Two copies of a write-path scanner drift
 // apart in exactly the way that makes capture silently stop capturing.
@@ -18,9 +18,10 @@ import Foundation
 struct HookDryRun: Encodable {
     let event: String
     let repoRoot: String
-    /// The runtime this write would land in. A sandbox session whose marker
-    /// was missed prints the prod root here, which is the single most
-    /// valuable thing this flag can tell its reader.
+    /// The runtime this write would land in. There is exactly ONE legitimate
+    /// value now that the second filesystem root is gone, so this printing
+    /// anything unexpected means the environment is misconfigured rather than
+    /// that the wrong runtime was selected.
     let gmFsRoot: String
     let changes: [FileChangeAdd]
 }
@@ -118,80 +119,6 @@ public struct HookPayload: Equatable {
               let decoded = try? JSONDecoder().decode([StructuredPatchHunk].self, from: data)
         else { return [] }
         return decoded
-    }
-}
-
-// MARK: - The sandbox marker
-
-/// Adopt a snapshot's runtime when the hook fires inside one.
-///
-/// WITHOUT THIS A SANDBOX SESSION'S HOOKS WRITE THE PROD DB. Sandbox sessions
-/// used to be told which runtime they were in by an inherited GM_FS_ROOT; a
-/// hook that reads no inherited env has to find that out for itself, and the
-/// marker on disk is the thing that knows. This is the hazard that removing
-/// env inheritance creates, closed at the same time.
-///
-/// The parse matches gm_session_startup.sh's: the marker is read as DATA,
-/// never sourced — a file that lives in a repo must not get shell execution
-/// out of a hook. The walk starts at the payload's cwd and climbs, so a tool
-/// call made in a subdirectory of the snapshot finds the marker at its root.
-enum SandboxMarker {
-    static let fileName = ".gmcc_sandbox"
-
-    /// No-op when GM_FS_ROOT is already set: an explicit runtime always wins,
-    /// and a sandbox launcher sets it before any client ever runs.
-    static func adopt(startingAt directory: String) {
-        let env = ProcessInfo.processInfo.environment
-        guard env["GM_FS_ROOT"].map({ $0.isEmpty }) ?? true else { return }
-        guard let roots = find(startingAt: directory),
-              let root = roots.gmFsRoot else { return }
-        setenv("GM_FS_ROOT", root, 1)
-    }
-
-    /// ONE root, where this used to carry two (a runtime root and a separate
-    /// content root, which a marker had to keep in agreement by hand).
-    ///
-    /// This is the clearest place the one-root collapse pays off: a sandbox is
-    /// no longer a special env SHAPE — a snapshot whose marker had to name two
-    /// vars, either of which could be missing or could disagree with the other
-    /// — but simply a different VALUE of a single var. There is no longer a
-    /// combination of marker contents that describes a half-sandboxed session.
-    ///
-    /// Kept as a struct rather than flattened to a `String?` so that a future
-    /// marker field is an additive change here rather than a signature change
-    /// at every call site.
-    struct Roots: Equatable {
-        let gmFsRoot: String?
-    }
-
-    /// The nearest marker at or above `directory`, parsed. nil when there is
-    /// none — the ordinary case, since almost every repo is not a snapshot.
-    static func find(startingAt directory: String) -> Roots? {
-        var url = URL(fileURLWithPath: directory, isDirectory: true).standardizedFileURL
-        while url.path != "/" {
-            let marker = url.appendingPathComponent(fileName)
-            if let text = try? String(contentsOf: marker, encoding: .utf8) {
-                return parse(text)
-            }
-            url = url.deletingLastPathComponent()
-        }
-        return nil
-    }
-
-    /// `export NAME="value"` lines, first wins — the same shape the sandbox
-    /// snapshot writes, and now the ONE name it writes.
-    static func parse(_ text: String) -> Roots {
-        func value(_ name: String) -> String? {
-            let prefix = "export \(name)=\""
-            for line in text.split(separator: "\n") {
-                let line = line.trimmingCharacters(in: .whitespaces)
-                guard line.hasPrefix(prefix), line.hasSuffix("\"") else { continue }
-                let value = String(line.dropFirst(prefix.count).dropLast())
-                return value.isEmpty ? nil : value
-            }
-            return nil
-        }
-        return Roots(gmFsRoot: value("GM_FS_ROOT"))
     }
 }
 

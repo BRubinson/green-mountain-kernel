@@ -1,5 +1,5 @@
 //
-//  Prompts.swift
+//  OriginalGmccPrompts.swift
 //  gmAgententicsSdk
 //
 //  Created by Bryce Rubinson on 9/12/26.
@@ -11,7 +11,7 @@ import GmDaemonSdk
 
 // The TURN half of the template surface: what GMCC actually says to a model at
 // invocation time, as FoundationModels `Prompt` values. The standing behavioral
-// contracts are next door in `Instructions.swift`.
+// contracts are next door in `OriginalGmccInstructions.swift`.
 //
 // THE SPLIT IS NOT COSMETIC, and getting it backwards is the expensive mistake
 // this file exists to prevent. Apple's own guidance: a model is trained to obey
@@ -27,7 +27,7 @@ import GmDaemonSdk
 //   1. VARIANT CONTRACTS (`Text.bot` / `.rpi` / `.team` / `.task`) — copied
 //      verbatim from `plugins/gmcc/commands/*.md`. These are the templates the
 //      PRIMARY runs under, and they are what makes /gm_bot different from
-//      /gm_bot_team. Same verbatim rule and the same reason as Instructions.swift:
+//      /gm_bot_team. Same verbatim rule and reason as OriginalGmccInstructions:
 //      re-sync by re-copying.
 //   2. PHASE TEXT (`phasePrompt(variant:phase:)`) — NOT copied. It is read live
 //      from `WorkflowSpec.instructions(variant:phase:)` in gmDaemonSdk, because
@@ -586,7 +586,7 @@ extension GmAgentPrompts {
     public struct Spawn: Sendable, Hashable {
 
         /// Which persona is being spawned.
-        public let role: GmAgentRole
+        public let role: OriginalGmccRole
 
         /// The prompt row this work belongs to. Nil only for a session-owned
         /// `/gm_task` doper briefing, which has no prompt row at all.
@@ -607,7 +607,7 @@ extension GmAgentPrompts {
         public let target: String
 
         public init(
-            role: GmAgentRole,
+            role: OriginalGmccRole,
             promptUuid: String? = nil,
             sessionUuid: String? = nil,
             methodology: ExplorationAgentType? = nil,

@@ -13,6 +13,11 @@ import GmDaemonSdk
 /// than returning an error to the client. Before this type, that safety was
 /// convention enforced by a doc comment repeated in every repository.
 ///
+/// This absence is also what made the ambient transaction boundary cheap: with
+/// every verb body already written against an INJECTED `Database` and no queue
+/// reachable from here, composition needed one re-entrant boundary rather than
+/// a new typed surface over ~230 verbs. See `StoreBoundary.swift`.
+///
 /// `eventSink` is the only stored state here; the other four primitives close
 /// over nothing but the `Database` they are passed.
 ///

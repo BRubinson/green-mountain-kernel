@@ -12,12 +12,12 @@ extension Store {
     /// inheritance down the chain at CREATE time only. Idempotent; one
     /// transaction; returns all three uuids plus created flags.
     public func ensureContext(_ req: ContextEnsureRequest) throws -> ContextEnsureResponse {
-        try dbQueue.write { db in try ContextRepository(db: db, core: core).ensureContext(req) }
+        try boundary { db in try ContextRepository(db: db, core: core).ensureContext(req) }
     }
 
     /// Read-only resolution — never creates rows.
     public func getContext(_ req: ContextGetRequest) throws -> ContextGetResponse {
-        try dbQueue.read { db in try ContextRepository(db: db, core: core).getContext(req) }
+        try boundaryRead { db in try ContextRepository(db: db, core: core).getContext(req) }
     }
 
     // MARK: - Cross-domain helper forwards (ensure chain shared with addFileChange)

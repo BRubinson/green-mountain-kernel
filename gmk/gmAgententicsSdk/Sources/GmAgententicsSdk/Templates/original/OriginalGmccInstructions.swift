@@ -1,5 +1,5 @@
 //
-//  Instructions.swift
+//  OriginalGmccInstructions.swift
 //  gmAgententicsSdk
 //
 //  Created by Bryce Rubinson on 9/12/26.
@@ -12,8 +12,8 @@ import GmDaemonSdk
 // The SYSTEM half of the template surface: every GMCC persona's standing
 // behavioral contract, compiled into the binary as FoundationModels
 // `Instructions`. The PROMPT half — the per-invocation turn text — is next door
-// in `Prompts.swift`, and the split is the framework's own: `Instructions` are
-// evaluated once when a `LanguageModelSession` is created and are trusted over
+// in `OriginalGmccPrompts.swift`, and the split is the framework's own:
+// `Instructions` are evaluated once when a session is created and are trusted over
 // anything a prompt later says, while a `Prompt` is a single request against an
 // already-configured session.
 //
@@ -42,99 +42,31 @@ import GmDaemonSdk
 // can see the size before paying for it, and the eventual fix is composition
 // (see the dynamic-profile note below) rather than silent truncation here.
 //
-// THE DYNAMIC-PROFILE SEAM IS DELIBERATELY NOT TAKEN YET. `DynamicInstructions`,
+// THE DYNAMIC-PROFILE SEAM IS STILL NOT TAKEN, BUT IT IS NO LONGER BLOCKED —
+// and the distinction matters, because the reason recorded here was a hard
+// constraint and is now merely a scheduling choice. `DynamicInstructions`,
 // `LanguageModelSession.Profile` and `LanguageModelSession.DynamicProfile` are
 // the natural home for "load only the persona and toolset the current phase
 // needs", and they would cut the cost above directly. All three are macOS 27
-// ONLY. `Instructions`, `Prompt` and `LanguageModelSession` are macOS 26. CI
-// pins macos-26, and an availability annotation does not save a file that names
-// a symbol the SDK does not contain — it fails to compile. So this file uses
-// only the macOS 26 surface, and the composition layer waits for the floor to
-// move. That is a scheduling decision, not an oversight.
+// only, and this file was written when the package floor was 26 and CI pinned
+// macos-26 — a case where no availability annotation helps, since a file naming
+// a symbol the SDK does not contain fails to compile outright.
+//
+// THAT FLOOR HAS SINCE MOVED TO 27 (the vendored gmClaudeForFoundationModels
+// forced it; see Package.swift). So the three types are now reachable, and what
+// remains is ordinary unwritten work rather than a wall: composing these blocks
+// into per-phase profiles is a design pass on its own, and staging the verbatim
+// baseline first was the point of this file. `approximateTokenCost` is what
+// makes the case for doing it measurable when someone picks it up.
 
-/// The personas GMCC runs, each backed by one standing instruction block.
-///
-/// A role is not a tool family (`GmAgentToolFamily`) and does not map onto one:
-/// families partition the tool SURFACE, roles partition the AGENTS that call
-/// into it. The clarifier and the reviewer both reach the `cde` family and are
-/// nothing alike.
-public enum GmAgentRole: String, Sendable, Hashable, Codable, CaseIterable {
+// `OriginalGmccRole` — the roster of personas these blocks belong to — LIVES NEXT
+// DOOR in `OriginalGmccEnums.swift`. It started inside this file, because
+// instructions were the first thing that needed it, and was split out so the
+// index is readable without scrolling past thousands of lines of contract text.
+// The three files in this directory are one artifact and are meant to be read
+// together.
 
-    /// The GMB itself — the primary, in-session contract every other role
-    /// assumes is already loaded.
-    case primary
-
-    /// Context acquisition. Opinion-free ref pre-selection into a briefing row.
-    case doper
-
-    /// Exploration. Writes its own per-agent summary and finding rows.
-    case explorer
-
-    /// The single reader between exploration and the user conversation.
-    case clarifier
-
-    /// Architecture. Holds the option pen in team flows.
-    case architect
-
-    /// Review. Writes finding rows; never ranks them.
-    case reviewer
-
-    /// KBite crunch: raw sources in, structured chewed analysis out.
-    case kbiteChewer = "kbite_chewer"
-
-    /// Maw web fetch: the Playwright download runner.
-    case mawFetcher = "maw_fetcher"
-
-    /// Where this role's text was copied FROM, relative to `plugins/gmcc/`.
-    ///
-    /// Provenance rather than decoration: it is what makes a re-sync a
-    /// mechanical copy instead of an archaeology exercise.
-    public var sourcePath: String {
-        switch self {
-        case .primary: return "skills/gmcc/SKILL.md"
-        case .doper: return "agents/doper.md"
-        case .explorer: return "agents/code-explorer.md"
-        case .clarifier: return "agents/clarifier.md"
-        case .architect: return "agents/code-architect.md"
-        case .reviewer: return "agents/code-quality-reviewer.md"
-        case .kbiteChewer: return "prompts/gmcc_agent_kbite_crunch_chew.prompt.md"
-        case .mawFetcher: return "prompts/gmcc_agent_maw_web_fetch.prompt.md"
-        }
-    }
-
-    /// Whether this role is spawned WITH a methodology
-    /// (`ExplorationAgentType`) and commits fully to it.
-    ///
-    /// Exactly the three fan-out roles. The doper and the clarifier are
-    /// deliberately single-instance — one calibrates, one pre-selects — and
-    /// giving either a methodology would defeat the point of having one reader.
-    public var takesMethodology: Bool {
-        switch self {
-        case .explorer, .architect, .reviewer: return true
-        case .primary, .doper, .clarifier, .kbiteChewer, .mawFetcher: return false
-        }
-    }
-
-    /// The `subagent_type` the plugin spawns this role by, when it has one.
-    ///
-    /// `primary` has none — it is not spawned; it is the session. The two
-    /// `prompts/*.prompt.md` roles are declared as prompt files rather than
-    /// `agents/*.md` definitions and are spawned by their own names.
-    public var subagentType: String? {
-        switch self {
-        case .primary: return nil
-        case .doper: return "gmcc:doper"
-        case .explorer: return "gmcc:code-explorer"
-        case .clarifier: return "gmcc:clarifier"
-        case .architect: return "gmcc:code-architect"
-        case .reviewer: return "gmcc:code-quality-reviewer"
-        case .kbiteChewer: return "gmcc:gmcc_agent_kbite_crunch_chew"
-        case .mawFetcher: return "gmcc:gmcc_agent_maw_web_fetch"
-        }
-    }
-}
-
-/// The standing instruction block for each `GmAgentRole`.
+/// The standing instruction block for each `OriginalGmccRole`.
 public enum GmAgentInstructions {
 
     /// The raw markdown, exactly as the plugin ships it.
@@ -1026,11 +958,11 @@ public enum GmAgentInstructions {
 
         /// The raw text for one role.
         ///
-        /// Exhaustive by construction — a new `GmAgentRole` case that forgets a
+        /// Exhaustive by construction — a new `OriginalGmccRole` case that forgets a
         /// block fails to compile here rather than returning an empty string at
         /// runtime, which is the whole reason this is a `switch` and not a
         /// dictionary.
-        public static func text(for role: GmAgentRole) -> String {
+        public static func text(for role: OriginalGmccRole) -> String {
             switch role {
             case .primary: return primary
             case .doper: return doper
@@ -1052,7 +984,7 @@ public enum GmAgentInstructions {
     /// tool schemas do, and `LanguageModelError.contextSizeExceeded` is thrown
     /// at request time, far from the line that chose the persona. A caller
     /// composing several blocks can see the bill before the session does.
-    public static func approximateTokenCost(of role: GmAgentRole) -> Int {
+    public static func approximateTokenCost(of role: OriginalGmccRole) -> Int {
         (Text.text(for: role).count + 3) / 4
     }
 
@@ -1060,8 +992,8 @@ public enum GmAgentInstructions {
     ///
     /// The roster, and what makes a drift test possible at all — same role
     /// `GmAgentTools.all` plays for the tool surface.
-    public static let allText: [(role: GmAgentRole, text: String)] =
-        GmAgentRole.allCases.map { ($0, Text.text(for: $0)) }
+    public static let allText: [(role: OriginalGmccRole, text: String)] =
+        OriginalGmccRole.allCases.map { ($0, Text.text(for: $0)) }
 }
 
 // MARK: - FoundationModels values
@@ -1070,7 +1002,7 @@ public enum GmAgentInstructions {
 extension GmAgentInstructions {
 
     /// The standing `Instructions` for one role.
-    public static func instructions(for role: GmAgentRole) -> Instructions {
+    public static func instructions(for role: OriginalGmccRole) -> Instructions {
         Instructions(Text.text(for: role))
     }
 
@@ -1086,7 +1018,7 @@ extension GmAgentInstructions {
     ///
     /// Prepending `primary` to `primary` would be a duplicate paid for twice in
     /// tokens, so that case returns the single block.
-    public static func groundedInstructions(for role: GmAgentRole) -> Instructions {
+    public static func groundedInstructions(for role: OriginalGmccRole) -> Instructions {
         guard role != .primary else { return instructions(for: .primary) }
         return Instructions(Text.primary + "\n\n---\n\n" + Text.text(for: role))
     }
@@ -1104,7 +1036,7 @@ extension GmAgentInstructions {
     /// description in its own instructions, and instructions that argue with
     /// themselves are worse than instructions that are merely long.
     public static func instructions(
-        for role: GmAgentRole,
+        for role: OriginalGmccRole,
         methodology: ExplorationAgentType
     ) -> Instructions {
         guard role.takesMethodology else { return instructions(for: role) }

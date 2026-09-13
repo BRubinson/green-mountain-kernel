@@ -25,15 +25,8 @@
 # a dead-but-running server produces. Never exit 0 here to be polite — a server
 # that stays up and fails every tool call is the silent mode this removes.
 #
-# Sandbox sessions honor GM_FS_ROOT exactly like every other launcher.
+# Root resolution is one line now: explicit GM_FS_ROOT wins, else $HOME/gmfs.
 
-if [ -z "$GM_FS_ROOT" ]; then
-    _repo="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-    if [ -n "$_repo" ] && [ -f "$_repo/.gmcc_sandbox" ]; then
-        _sb=$(sed -n 's/^export GM_FS_ROOT="\(.*\)"$/\1/p' "$_repo/.gmcc_sandbox" | head -1)
-        [ -n "$_sb" ] && GM_FS_ROOT="$_sb"
-    fi
-fi
 GM_BIN="${GM_FS_ROOT:-$HOME/gmfs}/bin"
 
 if [ ! -x "$GM_BIN/gm_mcp" ]; then

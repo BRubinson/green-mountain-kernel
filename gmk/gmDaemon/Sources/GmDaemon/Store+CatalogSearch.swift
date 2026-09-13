@@ -20,7 +20,7 @@ extension Store {
             throw StoreError.badRequest(detail: "search query is empty")
         }
         let limit = min(max(req.limit ?? 200, 1), 1_000)
-        return try dbQueue.read { db in
+        return try boundaryRead { db in
             try CatalogSearchRepository(db: db, core: core)
                 .searchCatalog(req, tokens: tokens, limit: limit)
         }

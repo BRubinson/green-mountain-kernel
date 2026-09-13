@@ -51,7 +51,7 @@ if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/gmk" ]; then
 fi
 GMK="$REPO_ROOT/gmk"
 
-PACKAGES="gmDaemonSdk gmDaemon gmUxComponentLibrary gmAgententicsSdk gmMcp"
+PACKAGES="gmDaemonSdk gmDaemon gmUxComponentLibrary gmAgententicsSdk gmMcp gmKernel"
 
 ARCH_FLAGS="--arch arm64 --arch x86_64"
 ARCHES="arm64,x86_64"
@@ -94,9 +94,10 @@ bin_path() {
     # shellcheck disable=SC2086
     swift build -c release --package-path "$GMK/$1" $ARCH_FLAGS --show-bin-path
 }
-SDK_BIN="$(bin_path gmDaemonSdk)"
-DAEMON_BIN="$(bin_path gmDaemon)"
-MCP_BIN="$(bin_path gmMcp)"
+# ONE bin path now. The three personalities are library targets inside
+# gmDaemonSdk / gmDaemon / gmMcp, and gmKernel links all three into a single
+# Mach-O — so there is exactly one artifact to stage and nothing to keep in sync.
+KERNEL_BIN="$(bin_path gmKernel)"
 
 # --- stage -------------------------------------------------------------------
 # Staged fresh every time: the directory is removed and rebuilt rather than
@@ -106,14 +107,13 @@ STAGE="$(gm_stage_dir local "$STAGE_VERSION")"
 rm -rf "$STAGE"
 STAGE="$(gm_stage_dir local "$STAGE_VERSION")"
 
-# THREE PACKAGES, THREE BIN PATHS. They no longer share one, and staging all
-# three from a single directory would silently ship whatever stale copy was
-# sitting in it.
-cp "$DAEMON_BIN/gm_daemon" "$STAGE/gm_daemon"
-cp "$MCP_BIN/gm_mcp"       "$STAGE/gm_mcp"
-cp "$SDK_BIN/gm_hook"      "$STAGE/gm_hook"
+# ONE MACH-O. This block used to stage three binaries from three different bin
+# paths, with a comment warning that staging them from one directory would ship a
+# stale copy. That risk is gone with the artifact: there is one file, and the
+# entry-point names become SYMLINKS at activation rather than staged files.
+cp "$KERNEL_BIN/$GM_MACHO" "$STAGE/$GM_MACHO"
 
-for b in $GM_BINARIES; do
+for b in $GM_MACHO; do
     # -S drops debug symbols only; exported symbols and functionality are kept.
     strip -S "$STAGE/$b"
     # Stripping INVALIDATES the signature, and arm64 refuses to exec an unsigned
@@ -128,9 +128,10 @@ done
 gm_write_manifest "$STAGE" "$STAGE_VERSION" local "$BUILD_SHA" "$ARCHES"
 
 echo "[GMB] staged $STAGE"
-for b in $GM_BINARIES; do
+for b in $GM_MACHO; do
     echo "         $b  $(lipo -archs "$STAGE/$b" 2>/dev/null || echo '?')"
 done
+echo "         entry points (symlinked at activation): $GM_ENTRYPOINTS"
 
 # --- activate ----------------------------------------------------------------
 if [ "$ACTIVATE" -eq 1 ]; then

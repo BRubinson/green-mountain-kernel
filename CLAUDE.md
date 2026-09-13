@@ -8,8 +8,10 @@ gmcc-booted repo gets them, not just this one.
 
 ## READ THIS FIRST — cutover is DONE; there is ONE stack
 
-The runtime is `gmk/`, the binaries are `gm_daemon` / `gm_mcp` / `gm_hook`, the
-one filesystem root is `~/gmfs`, and `plugins/gmcc/` drives them. The previously
+The runtime is `gmk/`, the binary is **ONE multi-call Mach-O, `gm_kernel`**,
+which answers as `gm_daemon` / `gm_mcp` / `gm_hook` through `argv[0]` — those are
+SYMLINK names in `~/gmfs/bin`, not separate binaries. The one filesystem root is
+`~/gmfs`, and `plugins/gmcc/` drives it. The previously
 shipped stack, under its own binary names and its own runtime root, is retired.
 Those literals are deliberately not repeated in this file — the retired-name
 contract forbids them here, and `gmk/scripts/migrate_to_gmfs.sh` is the one place
@@ -25,8 +27,8 @@ Consequences a reader must not re-derive incorrectly:
   plugin, and **reintroducing one is not the fix for a file that trips it** —
   sweeping that file is.
 - The plugin directory, the `gmcc:` command/skill namespace, the
-  `mcp__plugin_gmcc_pen__*` pen server name, the `.gmcc_sandbox` marker filename
-  and the in-repo `.gmcc/` dope directory all **keep their names**. The repo
+  `mcp__plugin_gmcc_pen__*` pen server name and the in-repo `.gmcc/` dope
+  directory all **keep their names**. The repo
   deliberately holds both prefixes: `gm`-prefixed on the runtime side, `gmcc` on
   the plugin/namespace side. `testAllowedSpellingsAreNotFlagged` is what stops a
   future sweep from "tidying" the second list into the first.
@@ -71,11 +73,17 @@ bash plugins/gmcc/scripts/install_gm.sh --check  # report only, change nothing
 
 ```
 gm_kernel-v50.0.2
-├── gm-daemon-50.0.2-macos-universal.tar.gz   gm_daemon, gm_mcp, gm_hook
+├── gm-daemon-50.0.2-macos-universal.tar.gz   gm_kernel (ONE Mach-O)
 ├── gm-daemon-50.0.2-macos-universal.tar.gz.sha256
-├── GMVibes-50.0.2.dmg
-└── GMVibes-50.0.2.dmg.sha256
+├── gm_kernel-50.0.2.dmg                      the app — and the writer
+└── gm_kernel-50.0.2.dmg.sha256
 ```
+
+The tarball still ships, for ONE more release. It is the only thing a CI-cut
+release can publish — `daemon-release.yml` cannot build a signed and notarized
+DMG, because the runner holds no Developer ID — so dropping it would make a
+fallback publish produce an empty tag. Retiring it is its own later change, and
+`gmk/scripts/release.sh` is the precedent for how (exit 2 with a pointer).
 
 This replaced **two independent tracks** — `daemon-v*` from `gmk/VERSION` and
 `gmvibes-v*` from the app's hand-edited `MARKETING_VERSION` — published by two
@@ -114,13 +122,24 @@ Versions are staged immutably and selected by symlink, so rollback is a swap:
 
 ```
 ~/gmfs/bin/
-├── gm_daemon -> releases/active/gm_daemon      relative links
+├── gm_kernel -> releases/active/gm_kernel      the ONE staged Mach-O
+├── gm_daemon -> releases/active/gm_kernel      entry points: all three point
+├── gm_mcp    -> releases/active/gm_kernel      at the SAME binary, and argv[0]
+├── gm_hook   -> releases/active/gm_kernel      selects the personality
 ├── .gm_version                                 "50.0.1" or "50.0.1-BETA"
 └── releases/
     ├── active -> downloads/50.0.1
     ├── downloads/<version>/                    fetched from a release
     └── local/<version>-BETA/                   built from a working tree
 ```
+
+`gm_releases.sh` splits this into two variables, and the split is the contract:
+**`GM_MACHO`** is what gets staged, hashed, lipo-checked and tarred (one file);
+**`GM_ENTRYPOINTS`** is what gets symlinked (three names). The names are
+load-bearing rather than cosmetic — `hooks.json`, `settings.json`, `.mcp.json`
+and `check_gm_stale.sh` each resolve a binary BY NAME, and the kernel dispatches
+on `basename(argv[0])`. A staged kernel whose entry symlinks are missing is not a
+degraded install; it is a hook that cannot launch.
 
 Symlinks rather than copies because overwriting a signed Mach-O **in place**
 leaves the kernel's code-signature cache pointing at the old inode and the next
@@ -165,9 +184,24 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     workflow spec the bot phases are driven by), the client, and the shared
     domain layer (`Dope/`, `Diagram/` models, `Hook/`, `Kbite/`, `Environment/`,
     `Paths.swift`, `RepoRelativePath.swift`, `GitHead.swift`, `StoreError`), plus
-    the `gm_hook` binary. Zero external dependencies.
-  - `gmk/gmDaemon/` — persistence and the `gm_daemon` server. Owns the sole GRDB
-    pin, so GRDB is not in the app's link closure.
+    **`GmHookCli`**, the shell-client personality as a LIBRARY, and a four-line
+    `gm_hook` shim over it. Still zero external dependencies — the library split
+    added none, and that property is the whole point of this manifest.
+  - `gmk/gmDaemon/` — persistence plus **`GmKernelHost`**: the server, the
+    handlers, the watchers, and the ownership primitives
+    (`KernelOwnership` / `KernelWriter`). Owns the sole GRDB pin.
+    **The app DOES now link this**, reversing what this file said for the whole
+    life of the split — see the manifest's own header for why, and why the
+    single-writer guarantee got STRONGER rather than weaker in the process.
+  - `gmk/gmKernel/` — the multi-call binary: ONE Mach-O linking `GmKernelHost`,
+    `GmMcpServer` and `GmHookCli`, dispatching on `basename(argv[0])` and then on
+    a subcommand. **argv[0] must win**, because `gm_hook call BACKUP` has `call`
+    as `argv[1]` and a subcommand-first rule would try to dispatch it. A bare
+    `gm_kernel` prints usage and **exits 2** — of every possible dispatch default
+    that is the one that could cost data, so it deliberately does not become a
+    writer. Ships NO test target; its contract is asserted by
+    `MultiCallBinaryContractTests` in `gmToolchain`, and its CI row is
+    `swift build` for that reason.
   - `gmk/gmUxComponentLibrary/` — the shared component surface: the diagram UI
     views plus the geometry, routing, layout and organizer helpers they are built
     on. Diagrams only for now, built as a surface that expects to grow.
@@ -182,13 +216,35 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     availability define), which permanently bars it from being consumed as a
     versioned remote dependency — free today, since every gmk package is a local
     `path:` dependency, and the direct cause of the vendoring below.
-    It also owns `Templates/` — the GMCC personas and command contracts compiled
+    It also owns `Templates/`, which is split in two **SEALED** halves.
+    **`Templates/original/` is a quarantined ARCHIVE** — `OriginalGmccEnums` /
+    `OriginalGmccInstructions` / `OriginalGmccPrompts`, one artifact in three
+    files, every block a byte-exact copy of `plugins/gmcc/` markdown. Re-sync it
+    by COPYING, never by editing one side. New work goes in `Templates/` proper.
+    **Neither half references the other, in either direction.** That is why
+    `OriginalGmccRole` and `GmAgentRole` are near-identical twins rather than one
+    shared enum: a shared enum means every later edit to the live vocabulary
+    silently rewrites what the archive claims the plugin said, which is the one
+    failure the archive exists to prevent. **The duplication is load-bearing —
+    do not "unify" them.** They are expected to diverge; if that stops being
+    true, the question is whether the archive still needs to exist, not whether
+    to reintroduce the coupling. The archive holds the GMCC
+    personas and command contracts compiled
     in as FoundationModels `Instructions` and `Prompt` values, copied VERBATIM
     from `plugins/gmcc/` markdown. Personas are `Instructions`, invocations are
     `Prompt`, and the split is load-bearing: a model obeys instructions over
     prompts, so caller-supplied text must never reach the instruction half.
     Phase text is NOT copied — it is read live from
     `WorkflowSpec.instructions(variant:phase:)`.
+    `Templates/GmAgentInstruction.swift` is the first thing that ASSEMBLES that
+    archive: a `DynamicInstructions` + `DynamicProfile` pair keyed on
+    `WorkflowSpec.Phase`, so one session's active persona follows the phase
+    instead of a fresh subagent per phase. **A stub** — it builds nothing and
+    sends nothing, and it deliberately sets no `.model()`, because models stay
+    daemon-managed. Its bodies append longest-lived content first (core contract
+    → persona → phase text → methodology → tools); reordering on phase throws
+    away the key-value cache silently, which is why the order is documented
+    rather than incidental.
     **Its floor is macOS 27, not 26** — see the runner note below.
   - `gmk/gmClaudeForFoundationModels/` — the eighth package: Anthropic's
     **ClaudeForFoundationModels, vendored** (Apache-2.0). It conforms Claude to
@@ -240,14 +296,24 @@ nobody had run. Dispatch it manually when the local path is unavailable.
 Dependency graph, acyclic and 5 deep:
 
 ```
-gmDaemonSdk ──┬── gmDaemon
-              ├── gmUxComponentLibrary ──┐
-              ├── gmMcp                  ├── gmVibes
-              ├──────────────────────────┘
-              └── gmAgententicsSdk ──┐
-                                     │  (vendored, zero deps of its own)
-       gmClaudeForFoundationModels ──┘
+gmDaemonSdk ──┬── gmDaemon ─────────────┐
+              ├── gmUxComponentLibrary ─┤
+              ├── gmMcp ────────────────┼── gmVibes  (the app = the kernel host)
+              ├─────────────────────────┘
+              ├── gmAgententicsSdk ──┐
+              │                      │  (vendored, zero deps of its own)
+              │ gmClaudeForFoundationModels ──┘
+              │
+              └── gmKernel  ← links GmKernelHost + GmMcpServer + GmHookCli
+                              (the CLI half: one Mach-O, three personalities)
 ```
+
+`gmVibes` now takes an edge on `gmDaemon` — the LINK is in place and the app is
+where the writer will be hosted. **It does not host it yet**; see "What this pass
+did NOT land" below before assuming otherwise.
+
+`gmKernel` cannot cycle: nothing depends on it. It is a leaf that happens to link
+three libraries.
 
 The forcing constraint: the wire types already reference the dope and diagram
 document types, so those models cannot sit ABOVE the SDK. Any layering that
@@ -271,6 +337,136 @@ consumer's, and **SwiftPM checks floors at GRAPH RESOLUTION, before any
 the CI runners with it. Reaching for `@available` to keep the floor at 26 is the
 plausible-looking move that cannot work.
 
+## The shared service layer — what "shared memory" actually meant
+
+**Scope note, so the tense below is not misread: the kernel-services and relayed
+MCP halves of this are BUILT and tested. The UI half is not — the app still reads
+over the socket. See "What this pass did NOT land".**
+
+The kernel collapse was asked for in terms of shared memory. Exploration verified
+that `SystemLanguageModel` appears **nowhere** under `gmk/` and the only model
+in-tree is the vendored HTTP+SSE Claude client, so no process merge could put a
+model weight in our address space. Restated in terms of what a merge actually
+buys, the requirement was: **one db connection pool and real transaction
+boundaries** shared by the UI, the relayed MCP surface, and the kernel's own
+background services.
+
+**The verb layer was already built for this and nobody had noticed.**
+`RepositoryContext` is `{ db, core }` plus its accessors, `StoreCore` holds no
+queue and exposes no verb *by design*, and every verb body was already written
+against an **injected** `Database`. The only hard-wired thing was the boundary —
+in 133 places in one directory. So composition needed no new vocabulary:
+
+- `StoreBoundary.swift` makes the boundary **ambient and re-entrant**, and the
+  133 sites became `boundary` / `boundaryRead`.
+- `inTransaction { }` is the ONE new public API. The ~120 already-`public` verbs
+  on the `Store+*` extensions compose inside it unchanged, so there is exactly
+  one implementation per verb and `VerbRegistryTests` never notices.
+- An explicit `uow:` parameter was rejected deliberately: it is the deferred
+  96-handler retype wearing a different hat, because it has to appear in every
+  signature the composition can reach.
+
+**The correctness condition is checked, not assumed.** The ambient handle is
+thread-local, which is only correct while the verb layer performs no thread hops
+inside a boundary — true today at **zero** occurrences of `DispatchQueue`,
+`Task {`, `async` or `await` under `Sources/GmDaemon/` or the handlers, and pinned
+by `TransactionBoundaryTests`. If that test goes red, remove the hop; do not relax
+the boundary.
+
+**Two families cannot compose, and both refuse loudly** (`StoreError.notComposable`):
+`checkpointTruncate`, because a WAL checkpoint inside a transaction is illegal in
+SQLite; and the four-phase repo verbs, because their phase 3 does filesystem work
+holding no db lock, and composing one would pin the single writer across disk I/O.
+A refusal in five places beats an enrolment table listing which of ~230 verbs are
+composable, which nobody would keep accurate.
+
+`TX_BATCH` extends the same property to the relayed MCP surface: N request lines,
+one transaction, results buffered until after the commit, any inner failure
+rolling the whole batch back and naming the failing index. It uses a **deny-list
+of 5 control verbs** rather than an allow-list of ~230, because an allow-list
+silently omits every verb added later — failing in the permissive direction.
+Session-scoped `TX_BEGIN`/`TX_COMMIT` is explicitly rejected: it would park the
+single writer across unbounded model latency and stall every hook write.
+
+**What the collapse does NOT buy: throughput.** It removes only the MIDDLE of
+three stacked serialization points (the socket hop); the server's serial queue and
+GRDB's `DatabaseQueue` remain. That expectation is killed here rather than in a
+bug report.
+
+## Single-writer is now a TYPE, and one hazard survived
+
+The old guarantee was "only `gm_daemon` constructs a `Store`, and it takes a
+`flock` first" — true, but enforced by convention.
+
+`KernelOwnership.Token` is `~Copyable` with a `fileprivate` initialiser that only
+a won `flock` can produce, and `KernelWriter.start` — the **sole** `Store(path:)`
+site in the tree — consumes one. A losing instance cannot open the database
+because no expression exists that opens it. `KernelHostContractTests` scans for a
+second `Store(path:` so that stays true.
+
+**`daemon.pid` and `daemon.sock` are deliberately NOT renamed.** This is the most
+dangerous cosmetic edit available in this area: a new instance locking
+`kernel.pid` while an older one still holds `daemon.pid` takes a **different
+lock**, and both would write the same database believing each was alone. The word
+"daemon" in a runtime filename costs nothing.
+
+**A headless personality survives, and it is load-bearing.** An app-only writer
+was seriously considered and is cleaner — it reduces two-writers to one possible
+cause. It fails on autostart: `DaemonClient.autostart()` `posix_spawn`s a binary
+from Claude Code hooks, over SSH and in CI, none of which can launch an
+application, and spawning a GUI binary directly yields an AppKit process
+LaunchServices does not know about — a second writer created on every hook call.
+So `gm_kernel daemon` stays, AppKit-free, and `spawnDaemon` names the personality
+explicitly rather than relying on which name the path resolved under.
+
+**THE HAZARD THAT SURVIVED EVERY RULING: a second COPY of the app.**
+Deleting the sandbox removed the wrong-ROOT case. It did not remove the
+two-WRITERS case. LaunchServices gives one instance per bundle PATH, so an Xcode
+debug build beside the installed app, a copy in `~/Downloads`, or `open -n` each
+produce a second process — and the Xcode case is now the realistic DAILY one. The
+ownership token makes it safe (the loser cannot open the db), and the intended
+UI answer is a DEGRADED client mode rather than a refusal, because a refusal on
+the daily debug path is a guard that gets deleted.
+
+## What this pass did NOT land
+
+Recorded because every reviewer found the same thing: the documentation above
+described the finished shape while several pieces of it were absent. A gap that is
+written down is a decision; a gap that is not is a lie the next reader inherits.
+
+**The app does not host the writer yet.** `GmKernelHost` is linked into the app
+target and nothing imports it. Every read still goes over the socket, exactly as
+before. So Q1's shared pool and transaction boundaries are REAL for kernel
+services and for relayed MCP tool bodies, and NOT YET real for the UI.
+
+Missing, all of it named in the approved architecture:
+
+- `KernelRole` / `KernelWriterBridge` — ownership arbitration on the app's first
+  line of `init()`, the bounded takeover from a headless writer, and the
+  client-only degradation when another app copy holds the lock.
+- `KernelLifecycle` — the ordered termination path. `SHUTDOWN` still means
+  `exit(0)`, and the draft flush still goes THROUGH THE SOCKET, which is the
+  ordering inversion the plan called out: it must move in-process and run before
+  `closeDatabase()`.
+- `KernelServices` — the public façade over `inTransaction`. The mechanism exists
+  in `StoreBoundary`; the named entry point does not.
+- ⌘Q is still `NSApp.terminate`. `CommandGroup(replacing: .appTermination)` is
+  what Q6's "Cmd-Q closes a window, the writer survives" actually requires.
+- `Contents/Helpers/` is never populated. `build-dmg.sh` signs helpers inside-out
+  and the loop is guarded by `[ -d ]`, so today it is a correct no-op — the DMG
+  carries no CLI, and the binaries come from the tarball Q4 kept for one release.
+- `TX_BATCH` has no caller. It is a capability the pen can use, not a path
+  anything currently takes.
+- The `KernelEventBus` fan-in graft from `aggressive` did not land; `eventSink` is
+  still a single assign-once closure. It has one consumer today, so it works —
+  and it will silently displace the first the moment the app becomes the second.
+- `publish_release.sh` still BUILDS the DMG fresh rather than re-signing staged
+  bits, so "what you tested is what ships" remains false for the app.
+
+**What this means for the release:** the binaries are the deliverable. The app
+ships renamed, menu-bar-resident and reading vitals off the wire, but it is still
+a client. Nothing above is load-bearing for the binary path.
+
 ## Build / test loop — the `gmk/` stack
 
 From the repo root:
@@ -282,6 +478,7 @@ swift test --package-path gmk/gmUxComponentLibrary
 swift test --package-path gmk/gmMcp
 swift test --package-path gmk/gmToolchain
 swift test --package-path gmk/gmAgententicsSdk      # roster + template contracts
+swift build --package-path gmk/gmKernel            # BUILD, not test — see below
 # gmk/gmClaudeForFoundationModels is VENDORED. It gets NO CI job of its own, and
 # that is a decision, not an oversight: it is already COMPILE-GATED in CI as a
 # dependency of gmAgententicsSdk, so a vendored break that can affect us fails
@@ -337,6 +534,19 @@ free and a clean clone compiles with no prior shell step.
   message IS incompatible and DOES bump. So is REMOVING AN ENUM CASE from a type
   an existing message carries: m0028 collapsed `PromptStatus` from six arms to
   three and bumped 26 → 27 for exactly that reason.
+  **Now at v28**, moved by `TX_BATCH` — a NEW MESSAGE TYPE. Worth recording what
+  did NOT move it in the same change, because the rule only means something if
+  the distinction is held: the four vitals/role fields added to `PingResponse` and
+  `StatusResponse` are additive optionals and contributed nothing. Had `TX_BATCH`
+  not been in that pass, those four would have shipped at 27.
+- **`wire_keys.golden` is NOT gated by any test**, and it was stale for many
+  versions before this pass — still carrying the retired root vocabulary this
+  repo renamed away from, and missing whole type families. Nothing reads the fixture (`WireKeyTests` does
+  not), and `.golden` is not in `RetiredNameContractTests`' extension list, so
+  neither guard could see it. Regenerate it with
+  `python3 gmk/gmDaemonSdk/scripts/wire_keys.py > <the golden>` whenever a
+  `Protocol/` type changes, and diff before accepting: the generator is the
+  authority, so a wholesale regeneration accepts all pending drift as intentional.
 - Schema: migrations are append-only. The db is append-only history — **NEVER
   wipe it**. `gm_hook call BACKUP --json '{}'` takes the sanctioned online backup
   before risky work.
@@ -460,18 +670,45 @@ This is ENFORCED, not merely documented: `Paths.assertContained(_:)` in
 repo, and every kit-side file write routes through it. A rule that lives only in
 markdown erodes; this one fails a call.
 
-## Sandbox dev loop
+## The sandbox dev loop is GONE — and `BACKUP` is what replaced it
 
-A sandbox is a full snapshot at `$GM_FS_ROOT/development/local_sandbox` — db
-(`gm_hook call BACKUP --json '{}'` takes the sanctioned online copy), repo clone,
-binaries, launchers. Sessions started inside the snapshot auto-sandbox via the
-`.gmcc_sandbox` marker, which sets `GM_FS_ROOT` to the snapshot; a sandboxed daemon
-opens only the staged db and never touches prod. Nothing in a sandbox should be
-pointed back at the prod runtime.
+There used to be a full snapshot runtime under `$GM_FS_ROOT/development/`, with
+its own db, repo clone, binaries and launchers, selected by a marker file at a
+repo root that set `GM_FS_ROOT` to the snapshot. **All of it was deleted**, and
+the reason is worth keeping because it is not "we stopped using it":
 
-With one root variable, a sandbox is no longer a special SHAPE of the
-environment — it is a different VALUE of `GM_FS_ROOT`. That is the whole
-mechanism now.
+Four independent exploration passes converged on the same silent-data hazard.
+`Paths.root` is resolved ONCE per process from `$GM_FS_ROOT`, and a
+LaunchServices-launched app **inherits no shell environment at all** — so under
+the kernel collapse a snapshot session's hooks would have talked to a socket
+nobody was listening on while the kernel wrote **prod**, with no error and no
+signal. Every available mitigation was a detection mechanism. Deleting the second
+root **dissolves** the hazard instead: `GM_FS_ROOT` now has exactly one
+legitimate value, so there is no wrong-root state left to detect, and "the app
+inherits nothing" became the correct outcome rather than a misconfiguration.
+
+What this costs, and it is a real cost: the snapshot WAS the rehearsal surface
+for db-affecting change. So `gm_hook call BACKUP --json '{}'` stopped being
+advisory. It is now taken **automatically** before any migration whose ledger
+head is behind the binary's, inside `KernelWriter.start` — the machine takes the
+snapshot rather than someone remembering to.
+
+**`sandbox` is a THREE-WAY HOMONYM in this repo**, and a sweep keyed on the word
+destroys two live subsystems. `RetiredNameContractTests` keys on the runtime
+vocabulary only (`.gmcc_sandbox`, `SandboxMarker`, `SandboxRetarget`,
+`local_sandbox`) and explicitly allows:
+
+- **`DopeRepoSandbox`** — write containment for `.gmcc/`, a value type whose
+  public surface can only name paths under `{instanceRoot}/.gmcc/`. Deleting it
+  removes dope repo writing entirely.
+- **`ENABLE_APP_SANDBOX = NO`** — must stay `NO` **forever**. An App-Sandboxed
+  kernel cannot open the db, bind the socket, or read the user's repos.
+- **`HookScriptTests.Sandbox`** — that file's own temp-directory fixture.
+
+`.gmcc_sandbox` **moved** from the allowed-spellings list to the retired list. It
+had to move rather than be added: a spelling in both lists makes
+`testAllowedSpellingsAreNotFlagged` and `testNoRetiredSandboxVocabulary` assert
+opposite things, and one of them must then fail.
 
 ## The one-time migration into `~/gmfs` — ALREADY RUN
 
@@ -491,11 +728,10 @@ refuses anyway, because `~/gmfs/gm.db` already exists.
   prompt path in one statement.
 - Content comes across with it, because the relative paths resolve against it.
 
-**The sandbox marker filename is `.gmcc_sandbox` and is deliberately NOT
-renamed.** `HookLogic.SandboxMarker.fileName` in `gmDaemonSdk` is the authority,
-and the shell launchers must agree with it: a marker only one side recognises is
-a sandbox session writing the prod database. The variable INSIDE it is the single
-`GM_FS_ROOT`.
+`migrate_to_gmfs.sh` is one of TWO files deliberately spared from the sandbox
+sweep (the other is the sealed `Templates/original/` archive). A record of a
+retirement has to be able to name what it retired, which is the same exemption
+that lets it spell the retired runtime names.
 
 ## Working-tree note
 

@@ -193,6 +193,12 @@ public enum VerbRegistry {
         VerbSpec(.pathsGet, gm: "gm paths", aliases: ["gm context env"], role: .read),
         VerbSpec(.configSet, gm: "gm config set", role: .record(agentPhases: nil)),
         VerbSpec(.eventList, gm: "gm events", role: .read),
+        // TX_BATCH is a RECORD verb even though it carries reads as well as
+        // writes: the batch commits as one transaction, so the write role of
+        // the most privileged inner line is the role of the whole envelope.
+        // Registering it as a read would let the guard wave through writes it
+        // cannot see, which is the fail-OPEN direction the guard forbids.
+        VerbSpec(.txBatch, gm: "gm tx batch", role: .record(agentPhases: nil)),
 
         // ── Context bootstrap ────────────────────────────────────────────
         VerbSpec(.contextEnsure, gm: "gm context ensure", role: .record(agentPhases: nil)),

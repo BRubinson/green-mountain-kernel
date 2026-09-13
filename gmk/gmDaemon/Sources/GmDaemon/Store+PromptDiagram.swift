@@ -28,7 +28,7 @@ extension Store {
                 detail: "render_fingerprint must be a JSON object (the render sidecar's contents)")
         }
 
-        return try dbQueue.write { db in
+        return try boundary { db in
             try PromptDiagramRepository(db: db, core: core)
                 .qualify(req, qualification: qualification)
         }
@@ -37,13 +37,13 @@ extension Store {
     public func promptDiagramGet(
         _ req: PromptDiagramGetRequest
     ) throws -> PromptQualifiedDiagramRow {
-        try dbQueue.read { db in try PromptDiagramRepository(db: db, core: core).get(req) }
+        try boundaryRead { db in try PromptDiagramRepository(db: db, core: core).get(req) }
     }
 
     public func promptDiagramList(
         _ req: PromptDiagramListRequest
     ) throws -> PromptDiagramListResponse {
-        try dbQueue.read { db in try PromptDiagramRepository(db: db, core: core).list(req) }
+        try boundaryRead { db in try PromptDiagramRepository(db: db, core: core).list(req) }
     }
 
     // MARK: - Cross-domain helper forwards

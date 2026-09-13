@@ -73,9 +73,12 @@ final class HookScriptTests: XCTestCase {
     }
 
     /// Copy a shipped hook script into the temp tree at `<relativeDir>/<name>`.
-    /// Nothing above a temp directory carries a `.gmcc_sandbox` marker, so a
-    /// copy placed here resolves to `$HOME/gmfs/bin/gm_hook` unless the test puts a
-    /// marker there on purpose.
+    /// A copy placed here resolves to `$HOME/gmfs/bin/gm_hook`, which is the one
+    /// runtime root — `home:` on `run` is what redirects it for a test.
+    ///
+    /// NOTE ON THE NAME: the `Sandbox` parameter below is this file's own
+    /// temp-directory fixture and has nothing to do with the deleted snapshot
+    /// dev loop. It is one of three unrelated uses of the word in this repo.
     private func install(
         _ name: String, into sandbox: Sandbox, at relativeDir: String = "plugin/scripts"
     ) throws -> URL {
@@ -211,37 +214,5 @@ final class HookScriptTests: XCTestCase {
         XCTAssertEqual(result.status, 0)
         XCTAssertEqual(result.stdout, "")
         XCTAssertFalse(sandbox.exists("rec/argv"), "gm ran with no event to hand it")
-    }
-
-    /// A SANDBOX SNAPSHOT'S HOOK MUST DRIVE THE SNAPSHOT'S RUNTIME. The script
-    /// ships inside the snapshot's repo clone, so climbing from its own
-    /// location finds the clone's `.gmcc_sandbox` and the binary named there.
-    /// Without this a snapshot session's every edit lands in the PROD db —
-    /// the hazard that removing the inherited env creates, since a sandbox
-    /// launcher's `GM_FS_ROOT` is exactly the kind of variable a hook does not
-    /// inherit.
-    func testSandboxMarkerRetargetsTheBinary() throws {
-        let sandbox = try Sandbox()
-        let snapshotRoot = try sandbox.dir("snapshot/runtime")
-        _ = try sandbox.write(
-            """
-            export GM_FS_ROOT="\(snapshotRoot.path)"
-            """,
-            to: "snapshot/repo/.gmcc_sandbox")
-        let script = try install(
-            "gm_hook.sh", into: sandbox, at: "snapshot/repo/plugins/gmcc/scripts")
-        // The prod-shaped binary is present too: this test fails if the walk
-        // is skipped, not merely if it finds nothing.
-        try installFakeGm(in: sandbox, at: "gmfs/bin/gm_hook", recordDir: "rec-prod")
-        try installFakeGm(in: sandbox, at: "snapshot/runtime/bin/gm_hook", recordDir: "rec-snapshot")
-
-        let result = try run(
-            script, ["post-tool-use"], stdin: postToolUsePayload, home: sandbox.root)
-
-        XCTAssertEqual(result.status, 0, "hook exited non-zero: \(result.stderr)")
-        XCTAssertEqual(sandbox.read("rec-snapshot/argv"), "hook\npost-tool-use\n")
-        XCTAssertFalse(
-            sandbox.exists("rec-prod/argv"),
-            "the snapshot's hook drove the PROD binary — its writes would land in the prod db")
     }
 }

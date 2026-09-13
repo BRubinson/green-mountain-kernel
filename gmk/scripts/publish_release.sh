@@ -25,10 +25,10 @@
 # ── ONE RELEASE, FOUR ASSETS ─────────────────────────────────────────────────
 #
 #   gm_kernel-v<version>
-#   ├── gm-daemon-<version>-macos-universal.tar.gz   gm_daemon, gm_mcp, gm_hook
+#   ├── gm-daemon-<version>-macos-universal.tar.gz   gm_kernel (one Mach-O)
 #   ├── gm-daemon-<version>-macos-universal.tar.gz.sha256
-#   ├── GMVibes-<version>.dmg                        the app
-#   └── GMVibes-<version>.dmg.sha256
+#   ├── gm_kernel-<version>.dmg                      the app (the kernel host)
+#   └── gm_kernel-<version>.dmg.sha256
 #
 # This replaced TWO independent tracks — `daemon-v*` cut here and `gmvibes-v*`
 # cut by a separate script that shared no code with this one. They had separate
@@ -139,7 +139,7 @@ gm_verify_staged "$STAGE" || die "the staged build does not match its own SHA256
 # lipo, not the manifest. The manifest records what the build INTENDED; lipo
 # reads the bytes that are actually there. A --fast build is caught right here,
 # which is the whole reason that flag is allowed to exist.
-for b in $GM_BINARIES; do
+for b in $GM_MACHO; do
     archs="$(lipo -archs "$STAGE/$b")"
     case "$archs" in
         *arm64*) ;;
@@ -227,7 +227,7 @@ say "6/8  PACKAGE"
 # cannot tell a locally published asset from a CI-built one.
 PKG="$GM_RELEASES/.publish.$VERSION"
 rm -rf "$PKG"; mkdir -p "$PKG"
-( cd "$STAGE" && tar -czf "$PKG/$ASSET" $GM_BINARIES )
+( cd "$STAGE" && tar -czf "$PKG/$ASSET" $GM_MACHO )
 ( cd "$PKG" && shasum -a 256 "$ASSET" > "$ASSET.sha256" )
 echo "  $PKG/$ASSET  ($(du -h "$PKG/$ASSET" | cut -f1))"
 echo "  $(cat "$PKG/$ASSET.sha256")"
@@ -267,7 +267,7 @@ One release, one version: the runtime and the app are both \`$VERSION\`.
 
 | Asset | What it is |
 | --- | --- |
-| \`$ASSET\` | Universal (arm64 + x86_64) \`gm_daemon\`, \`gm_mcp\`, \`gm_hook\` |
+| \`$ASSET\` | Universal (arm64 + x86_64) \`gm_kernel\` — one Mach-O, answering as \`gm_daemon\` / \`gm_mcp\` / \`gm_hook\` via argv[0] |
 | \`$DMG_ASSET\` | The $GM_APP_NAME macOS app |
 
 $SIGNING_NOTE
@@ -301,7 +301,7 @@ say "8/8  PROMOTE"
 # stays put, which is what makes `gm_activate local` a working rollback.
 DL="$(gm_stage_dir downloads "$VERSION")"
 rm -rf "$DL"; DL="$(gm_stage_dir downloads "$VERSION")"
-for b in $GM_BINARIES; do cp "$STAGE/$b" "$DL/$b"; done
+for b in $GM_MACHO; do cp "$STAGE/$b" "$DL/$b"; done
 gm_write_manifest "$DL" "$VERSION" downloads "$HEAD_SHA" "arm64,x86_64"
 gm_activate downloads "$VERSION"
 gm_retire_daemon
@@ -314,7 +314,22 @@ mkdir -p "$APP_DL"
 cp "$DMG_BUILT" "$(gm_app_dmg "$VERSION")"
 
 # BEST EFFORT, DELIBERATELY. Everything above this line is already on GitHub;
-# a running GMVibes must not turn a successful publish into a failed script.
+# a running app must not turn a successful publish into a failed script.
+#
+# The two calls below are the SAME PREPARATION install_gm.sh does, and this path
+# needs them for the same reasons — it was publishing straight into
+# gm_install_app and skipping both, which left this machine holding
+# gm_kernel.app AND GMVibes.app under one bundle identifier on the very first
+# 51.0.0 publish.
+#
+# Stop the writer first: the app is becoming the kernel host, and
+# gm_install_app refuses while it is running.
+gm_stop_kernel_and_wait 3
+# Then drop the superseded bundle. Two apps sharing `rube.GMVibes` make
+# LaunchServices ambiguous AND defeat the same-bundle-id check a second copy
+# uses to recognise the first.
+gm_retire_legacy_app
+
 if gm_install_app "$(gm_app_dmg "$VERSION")" "$VERSION"; then
     :
 else

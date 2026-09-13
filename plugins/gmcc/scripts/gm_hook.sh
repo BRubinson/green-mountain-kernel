@@ -10,9 +10,9 @@
 #
 # THE NO-OP CONTRACT — none of these three lines is negotiable:
 #
-#   1. gm_hook is located from THIS SCRIPT'S OWN LOCATION plus an upward
-#      `.gmcc_sandbox` walk. Never PATH, never `command -v`, never an
-#      inherited GM_* variable. A hook runs with whatever environment the
+#   1. gm_hook is located from $HOME/gmfs, the ONE runtime root. Never PATH,
+#      never `command -v`, never an inherited GM_* variable. A hook runs with
+#      whatever environment the
 #      harness hands it, which is NOT the environment `gm_hook context env`
 #      provisioned the session with — a resolution that depends on either one
 #      is a hook that stops firing without ever saying so.
@@ -30,26 +30,17 @@
 [ -n "$1" ] || exit 0
 
 # ── Locate gm_hook from the filesystem ───────────────────────────────────────
-# A snapshot repo copy carries `.gmcc_sandbox` at its root and this script
-# ships INSIDE that copy, so climbing from the script's own directory finds
-# the snapshot's runtime whenever the hook belongs to one — without which a
-# sandbox session's hooks would write the prod db. The marker is PARSED as
-# data, never sourced: a repo file must not get shell execution out of a hook.
+# There is ONE runtime root, so this is one path with no discovery step. The
+# upward marker walk that used to live here existed only to let a snapshot copy
+# of this repo point its hooks at a second runtime; with that runtime gone, a
+# walk could only ever find the same answer more slowly, and an env var could
+# only ever disagree with it.
 #
-# The marker FILENAME keeps its old spelling on purpose — the Swift side
-# (HookLogic.SandboxMarker) is the authority and both sides must agree — but the
-# variable inside it is the single GM_FS_ROOT.
-d="$(cd "$(dirname "$0")" && pwd)" || exit 0
-sandbox_root=""
-while [ "$d" != "/" ]; do
-  if [ -f "$d/.gmcc_sandbox" ]; then
-    sandbox_root="$(sed -n 's/^export GM_FS_ROOT="\(.*\)"$/\1/p' "$d/.gmcc_sandbox" | head -1)"
-    break
-  fi
-  d="$(dirname "$d")"
-done
-
-HOOK_BIN="${sandbox_root:-$HOME/gmfs}/bin/gm_hook"
+# Still resolved from the filesystem rather than PATH or an inherited GM_*
+# variable, and that half of the contract has not changed: a hook runs with
+# whatever environment the harness hands it, not the one the session was
+# provisioned with.
+HOOK_BIN="$HOME/gmfs/bin/gm_hook"
 [ -x "$HOOK_BIN" ] || exit 0
 
 # "$@" rather than "$1": the event is argv[1] and the harness passes nothing

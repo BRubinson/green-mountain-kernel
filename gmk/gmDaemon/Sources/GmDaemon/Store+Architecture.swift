@@ -19,27 +19,27 @@ extension Store {
     // MARK: - Verbs
 
     public func archOpen(_ req: ArchOpenRequest) throws -> ArchSummaryResponse {
-        try dbQueue.write { db in try ArchitectureRepository(db: db, core: core).open(req) }
+        try boundary { db in try ArchitectureRepository(db: db, core: core).open(req) }
     }
 
     public func archSummarize(_ req: ArchSummarizeRequest) throws -> ArchSummaryResponse {
-        try dbQueue.write { db in try ArchitectureRepository(db: db, core: core).summarize(req) }
+        try boundary { db in try ArchitectureRepository(db: db, core: core).summarize(req) }
     }
 
     public func archPersistAdd(_ req: ArchPersistAddRequest) throws -> ArchPersistAddResponse {
-        try dbQueue.write { db in try ArchitectureRepository(db: db, core: core).persistAdd(req) }
+        try boundary { db in try ArchitectureRepository(db: db, core: core).persistAdd(req) }
     }
 
     public func archFieldAdd(_ req: ArchFieldAddRequest) throws -> ArchFieldAddResponse {
-        try dbQueue.write { db in try ArchitectureRepository(db: db, core: core).fieldAdd(req) }
+        try boundary { db in try ArchitectureRepository(db: db, core: core).fieldAdd(req) }
     }
 
     public func archGeneralAdd(_ req: ArchGeneralAddRequest) throws -> ArchGeneralAddResponse {
-        try dbQueue.write { db in try ArchitectureRepository(db: db, core: core).generalAdd(req) }
+        try boundary { db in try ArchitectureRepository(db: db, core: core).generalAdd(req) }
     }
 
     public func archPropose(_ req: ArchProposeRequest) throws -> ArchSummaryResponse {
-        try dbQueue.write { db in
+        try boundary { db in
             try ArchitectureRepository(db: db, core: core).transition(
                 summaryUuid: req.summaryUuid, expectedVersion: req.expectedVersion,
                 to: .proposed, action: "propose", requireFrom: .drafting)
@@ -47,7 +47,7 @@ extension Store {
     }
 
     public func archApprove(_ req: ArchApproveRequest) throws -> ArchSummaryResponse {
-        try dbQueue.write { db in
+        try boundary { db in
             try ArchitectureRepository(db: db, core: core).transition(
                 summaryUuid: req.summaryUuid, expectedVersion: req.expectedVersion,
                 to: .approved, action: "approve", requireFrom: .proposed)
@@ -55,7 +55,7 @@ extension Store {
     }
 
     public func archRevise(_ req: ArchReviseRequest) throws -> ArchSummaryResponse {
-        try dbQueue.write { db in
+        try boundary { db in
             try ArchitectureRepository(db: db, core: core).transition(
                 summaryUuid: req.summaryUuid, expectedVersion: req.expectedVersion,
                 to: .drafting, action: "revise", requireFrom: .proposed)
@@ -63,15 +63,15 @@ extension Store {
     }
 
     public func archOptionAdd(_ req: ArchOptionAddRequest) throws -> ArchOptionRowResponse {
-        try dbQueue.write { db in try ArchitectureRepository(db: db, core: core).optionAdd(req) }
+        try boundary { db in try ArchitectureRepository(db: db, core: core).optionAdd(req) }
     }
 
     public func archDecide(_ req: ArchDecideRequest) throws -> ArchDecideResponse {
-        try dbQueue.write { db in try ArchitectureRepository(db: db, core: core).decide(req) }
+        try boundary { db in try ArchitectureRepository(db: db, core: core).decide(req) }
     }
 
     public func archGet(_ req: ArchGetRequest) throws -> ArchGetResponse {
-        try dbQueue.read { db in try ArchitectureRepository(db: db, core: core).get(req) }
+        try boundaryRead { db in try ArchitectureRepository(db: db, core: core).get(req) }
     }
 
     // MARK: - Cross-domain helper forwards

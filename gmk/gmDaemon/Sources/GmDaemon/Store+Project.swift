@@ -16,7 +16,7 @@ import GmDaemonSdk
 
 extension Store {
     public func updateProject(_ req: ProjectUpdateRequest) throws -> ProjectRow {
-        try dbQueue.write { db in
+        try boundary { db in
             try ProjectRepository(db: db, core: core).update(req)
         }
     }
