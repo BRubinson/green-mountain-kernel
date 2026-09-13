@@ -1,3 +1,5 @@
+// Agent tools for the architecture phase: options, the decision, and the change rows expanded from it.
+
 import Foundation
 import FoundationModels
 import GmDaemonSdk
@@ -60,13 +62,13 @@ public struct GmAgentPersistenceFieldChange: Sendable {
     @Guide(description: "True if the field points at another table.")
     public var isForeignKey: Bool
 
-    @Guide(description: "What is happening to it.", .anyOf(["add", "modify", "rename", "delete"]))
+    @Guide(description: "What is happening to it.", .anyOf(GM_TOOL_ANYOF_ARCH_CHANGE_KIND))
     public var changeKind: String
 
     @Guide(description: "Old field name, only when renaming.")
     public var renamedFrom: String
 
-    @Guide(description: "Dope dot-path CODE for the property, like domain.entity.property.")
+    @Guide(description: "For the property. " + GM_TOOL_GUIDE_DOPE_CODE)
     public var dopePropertyRef: String
 
     public init(
@@ -98,10 +100,10 @@ public struct GmAgentPersistenceChange: Sendable {
     @Guide(description: "Why this change, in one or two sentences.")
     public var reasonBrief: String
 
-    @Guide(description: "What is happening to it.", .anyOf(["add", "modify", "rename", "delete"]))
+    @Guide(description: "What is happening to it.", .anyOf(GM_TOOL_ANYOF_ARCH_CHANGE_KIND))
     public var changeKind: String
 
-    @Guide(description: "Dope dot-path CODE for the entity, like domain.entity.")
+    @Guide(description: "For the entity. " + GM_TOOL_GUIDE_DOPE_CODE)
     public var dopeRef: String
 
     @Guide(description: "The field-level changes inside this one.")
@@ -124,7 +126,7 @@ public struct GmAgentPersistenceChange: Sendable {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeWritePersistenceChangesArguments: Sendable {
-    @Guide(description: "Which architecture to write to, by summary uuid.")
+    @Guide(description: summaryUuidGuide(to: "write to", "architecture"))
     public var summaryUuid: String
 
     @Guide(description: "All the database changes, in one go.")
@@ -163,7 +165,7 @@ public struct GmAgentGeneralChange: Sendable {
     @Guide(description: "Why this change, in one or two sentences.")
     public var reasonBrief: String
 
-    @Guide(description: "How worked-out it is.", .anyOf(["pseudo", "draft", "actual"]))
+    @Guide(description: "How worked-out it is.", .anyOf(GM_TOOL_ANYOF_CHANGE_DEPTH))
     public var changeDepth: String
 
     @Guide(description: """
@@ -187,7 +189,7 @@ public struct GmAgentGeneralChange: Sendable {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeWriteGeneralChangesArguments: Sendable {
-    @Guide(description: "Which architecture to write to, by summary uuid.")
+    @Guide(description: summaryUuidGuide(to: "write to", "architecture"))
     public var summaryUuid: String
 
     @Guide(description: "All the code changes, in one go.")
@@ -248,7 +250,7 @@ public struct GmAgentCdeDecideArchitectureTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeGetArchitectureArguments: Sendable {
-    @Guide(description: "Which prompt's architecture to read, by uuid.")
+    @Guide(description: promptUuidGuide("'s architecture to read"))
     public var promptUuid: String
 
     @Guide(description: "Read one option in full, by uuid. Leave empty for short versions of all.")

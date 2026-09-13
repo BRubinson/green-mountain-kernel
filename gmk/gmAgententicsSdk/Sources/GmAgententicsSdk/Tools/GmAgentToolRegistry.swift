@@ -1,3 +1,5 @@
+// The namespace that makes every GmAgentTool conformance reachable in one place.
+
 import Foundation
 import FoundationModels
 

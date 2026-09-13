@@ -1,64 +1,10 @@
+// The identity text for each agent role — who it is and what it answers for.
+
 import Foundation
-
-
-// The IDENTITY layer, and nothing else. A directive says who an agent is, what
-// it is for, and what it must comply with. It does NOT say which tool to call,
-// in what order, or what row to write — that is the instruction layer next door
-// in `Template+GmAgentInstructions.swift`, and it is separate for one concrete
-// reason: a solo run (gm_bot, gm_task) wears EVERY directive at once while
-// running a completely different instruction set from the fan-out teams. Fused
-// together, the solo shape would have to inherit eight step lists it will never
-// follow.
-//
-// The other thing that left: the deliverable. "YOUR FINDINGS ARE THE
-// DELIVERABLE" is not a fact about who you are, it is the terms of the ask you
-// were sent — so it lives in `Template+GmAgentPrompts.swift` with the rest of
-// what one agent hands another.
-//
-// What is left here is durable. A directive should only change when the role
-// itself changes.
-
-enum GmAgentDirectives: String, CaseIterable {
-
-    case primarch
-    case briefer
-    case explorer
-    case intentClarifier
-    case architect
-    case implementor
-    case reviewer
-    case kbiteChewer
-
-    var text: String {
-        switch self {
-        case .primarch: return GM_AGENT_PRIMARCH_DIRECTIVE
-        case .briefer: return GM_AGENT_BRIEFER_DIRECTIVE
-        case .explorer: return GM_AGENT_EXPLORER_DIRECTIVE
-        case .intentClarifier: return GM_AGENT_INTENT_CLARIFIER_DIRECTIVE
-        case .architect: return GM_AGENT_ARCHITECT_DIRECTIVE
-        case .implementor: return GM_AGENT_IMPLEMENTOR_DIRECTIVE
-        case .reviewer: return GM_AGENT_REVIEWER_DIRECTIVE
-        case .kbiteChewer: return GM_AGENT_KBITE_CHEWER_DIRECTIVE
-        }
-    }
-
-    /// Whether this role is spawned WITH a lens and commits fully to it.
-    ///
-    /// Exactly the three fan-out roles. The Briefer and the Intent Clarifier are
-    /// deliberately single-instance — one pre-selects, one calibrates — and a
-    /// lens on either defeats the point of having one reader.
-    var takesPersonality: Bool {
-        switch self {
-        case .explorer, .architect, .reviewer: return true
-        case .primarch, .briefer, .intentClarifier, .implementor, .kbiteChewer: return false
-        }
-    }
-}
 
 let GM_AGENT_DIRECTIVE_HEADER = """
     # Agent Directive
     """
-
 
 let GM_AGENT_PRIMARCH_DIRECTIVE = """
     \(GM_AGENT_DIRECTIVE_HEADER)
@@ -79,7 +25,6 @@ let GM_AGENT_PRIMARCH_DIRECTIVE = """
         5. Calibration, the choice among options, and every seal are YOURS. No agent below you ranks across its peers, and none of them rules.
     """
 
-
 let GM_AGENT_BRIEFER_DIRECTIVE = """
     \(GM_AGENT_DIRECTIVE_HEADER)
     ## **BRIEFER** DIRECTIVE ACTIVATED
@@ -95,7 +40,6 @@ let GM_AGENT_BRIEFER_DIRECTIVE = """
         4. Search, never dump. What you drag in wholesale you will make somebody else read.
         5. Speed IS the service. A consumer is foreground-blocked on you the entire time, and every extra read spends their wait.
     """
-
 
 let GM_AGENT_EXPLORER_DIRECTIVE = """
     \(GM_AGENT_DIRECTIVE_HEADER)
@@ -113,7 +57,6 @@ let GM_AGENT_EXPLORER_DIRECTIVE = """
         4. Record as you go. What you carry only in your head dies with you.
         5. You survey; you do not build. Nothing you touch changes the world you are mapping.
     """
-
 
 let GM_AGENT_INTENT_CLARIFIER_DIRECTIVE = """
     \(GM_AGENT_DIRECTIVE_HEADER)
@@ -134,7 +77,6 @@ let GM_AGENT_INTENT_CLARIFIER_DIRECTIVE = """
         6. You never speak to the Endotherm and you never write repo code. The Primarch asks, seals and records the answers.
     """
 
-
 let GM_AGENT_ARCHITECT_DIRECTIVE = """
     \(GM_AGENT_DIRECTIVE_HEADER)
     ## **ARCHITECT** DIRECTIVE ACTIVATED
@@ -152,7 +94,6 @@ let GM_AGENT_ARCHITECT_DIRECTIVE = """
         5. You never decide. The Primarch picks the winner, and only the winner is ever built.
     """
 
-
 let GM_AGENT_IMPLEMENTOR_DIRECTIVE = """
     \(GM_AGENT_DIRECTIVE_HEADER)
     ## **IMPLEMENTOR** DIRECTIVE ACTIVATED
@@ -168,7 +109,6 @@ let GM_AGENT_IMPLEMENTOR_DIRECTIVE = """
         3. No test suites unless you were asked for them.
         4. Quoted output is proof. Everything else is a claim.
     """
-
 
 let GM_AGENT_REVIEWER_DIRECTIVE = """
     \(GM_AGENT_DIRECTIVE_HEADER)
@@ -189,7 +129,6 @@ let GM_AGENT_REVIEWER_DIRECTIVE = """
         5. Read the code around the change, never the diff alone. A correct line in the wrong world is still wrong.
         6. You never resolve a finding and you never decide the verdict. You review; the Primarch rules.
     """
-
 
 let GM_AGENT_KBITE_CHEWER_DIRECTIVE = """
     \(GM_AGENT_DIRECTIVE_HEADER)

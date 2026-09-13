@@ -1,16 +1,6 @@
+// The methodology lenses a fan-out agent is spawned wearing.
+
 import Foundation
-
-
-// The LENS layer. A personality does not tell an agent what to do — the
-// directive does that, and the instruction says how. A personality says which
-// way to lean when two defensible answers present themselves.
-//
-// `compliant` is the odd one and is the reason this enum exists at all: it is
-// the solo shape, worn by a single mind carrying EVERY directive at once
-// (gm_bot, gm_task). The other four are the fan-out lenses, one per agent, and
-// each is worn FULLY — a hedged lens is worth less than a committed one,
-// because the Primarch calibrates across them afterwards and can only do that
-// when each one actually differs from its neighbours.
 
 enum GmAgentPersonality: String, CaseIterable {
 
@@ -30,8 +20,6 @@ enum GmAgentPersonality: String, CaseIterable {
         }
     }
 
-    /// The four fan-out lenses. `compliant` is excluded because it is not a
-    /// lens — it is the absence of one, worn by a mind that holds all of them.
     static var lenses: [GmAgentPersonality] {
         allCases.filter { $0 != .compliant }
     }
@@ -40,7 +28,6 @@ enum GmAgentPersonality: String, CaseIterable {
 let GM_AGENT_PERSONALITY_HEADER = """
     # Agent Personality
     """
-
 
 let GM_AGENT_COMPLIANT_PERSONALITY = """
     \(GM_AGENT_PERSONALITY_HEADER)
@@ -54,7 +41,6 @@ let GM_AGENT_COMPLIANT_PERSONALITY = """
         4. Your restraint is the service. The Endotherm chose one agent over a party; do not spend like a party.
     """
 
-
 let GM_AGENT_AGGRESSIVE_PERSONALITY = """
     \(GM_AGENT_PERSONALITY_HEADER)
     ## **AGGRESSIVE** PERSONALITY ACTIVATED
@@ -66,7 +52,6 @@ let GM_AGENT_AGGRESSIVE_PERSONALITY = """
         3. Retire outright rather than deprecate quietly. A layer kept alive for nobody is a layer everyone must still read at great cost to the endotherms attention.
         4. Reach for every modern capability the floor permits. 
     """
-
 
 let GM_AGENT_PRAGMATIC_PERSONALITY = """
     \(GM_AGENT_PERSONALITY_HEADER)
@@ -80,7 +65,6 @@ let GM_AGENT_PRAGMATIC_PERSONALITY = """
         4. Name what should slip to a later ask rather than dragging it in because you were already here.
     """
 
-
 let GM_AGENT_ALTERNATIVE_PERSONALITY = """
     \(GM_AGENT_PERSONALITY_HEADER)
     ## **ALTERNATIVE** PERSONALITY ACTIVATED
@@ -92,7 +76,6 @@ let GM_AGENT_ALTERNATIVE_PERSONALITY = """
         3. Borrow from other ecosystems. Somebody solved this already and did not use our vocabulary to do it.
         4. Propose the composition nobody proposed, even when you expect to lose. The Primarch cannot weigh an option nobody wrote.
     """
-
 
 let GM_AGENT_CONSERVATIVE_PERSONALITY = """
     \(GM_AGENT_PERSONALITY_HEADER)

@@ -1,3 +1,5 @@
+// Agent tools for the briefing phase: opening, writing and closing a briefing's ref set.
+
 import Foundation
 import FoundationModels
 import GmDaemonSdk
@@ -5,7 +7,7 @@ import GmDaemonSdk
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeOpenBriefingArguments: Sendable {
-    @Guide(description: "Which prompt the briefing belongs to, by uuid.")
+    @Guide(description: promptUuidGuide("the briefing belongs to"))
     public var promptUuid: String
 
     @Guide(description: "Which briefing step. Use 'initial' unless you know otherwise.")
@@ -32,28 +34,19 @@ public struct GmAgentCdeOpenBriefingTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeWriteBriefArguments: Sendable {
-    @Guide(description: "Which briefing to write to, by uuid.")
+    @Guide(description: summaryUuidGuide(to: "write to", "briefing"))
     public var briefingUuid: String
 
     @Guide(description: "Version of the briefing you read, so two writers cannot clobber each other.")
     public var expectedVersion: Int
 
-    @Guide(description: """
-        Dope dot-path CODES like domain.entity.property — never uuids. Put an \
-        empty list if you looked and found none; an empty list is a real answer.
-        """)
+    @Guide(description: GM_TOOL_GUIDE_DOPE_CODE + " " + GM_TOOL_GUIDE_EMPTY_LIST_IS_AN_ANSWER)
     public var dopeRefs: [String]
 
-    @Guide(description: """
-        Kbite file uuids. Put an empty list if you looked and found none; an \
-        empty list is a real answer.
-        """)
+    @Guide(description: GM_TOOL_GUIDE_KBITE_FILE_UUID + " " + GM_TOOL_GUIDE_EMPTY_LIST_IS_AN_ANSWER)
     public var kbiteRefs: [String]
 
-    @Guide(description: """
-        File change uuids. Put an empty list if there are none; an empty list \
-        is a real answer.
-        """)
+    @Guide(description: "File change uuids. " + GM_TOOL_GUIDE_EMPTY_LIST_IS_AN_ANSWER)
     public var fileChangeRefs: [String]
 
     public init(
@@ -83,7 +76,7 @@ public struct GmAgentCdeWriteBriefTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeCloseBriefArguments: Sendable {
-    @Guide(description: "Which briefing to mark ready, by uuid.")
+    @Guide(description: summaryUuidGuide(to: "mark ready", "briefing"))
     public var briefingUuid: String
 
     @Guide(description: "Version of the briefing you read.")
@@ -110,7 +103,7 @@ public struct GmAgentCdeCloseBriefTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeLoadBriefArguments: Sendable {
-    @Guide(description: "Which briefing to read, by uuid.")
+    @Guide(description: summaryUuidGuide(to: "read", "briefing"))
     public var briefingUuid: String
 
     public init(briefingUuid: String) {

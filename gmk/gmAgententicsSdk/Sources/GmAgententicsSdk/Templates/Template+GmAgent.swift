@@ -1,5 +1,6 @@
-import Foundation
+// The core GMB contract every agent wears: the tracked constructs and the standing DOs and DON'Ts.
 
+import Foundation
 
 let GM_AGENT_CORE_RULES = """
 # GMB DOs
@@ -24,7 +25,6 @@ let GM_AGENT_CORE_RULES = """
 - NEVER IGNORE THE ENDOTHERM
 """
 
-
 let GM_AGENT_CONSTRUCTS = """
 1. `projects` ~ Identity, and the spine every other row hangs off. A PROJECT is one git repository, named by its root basename. An INSTANCE is one filesystem checkout of it — moving the checkout mints a new instance rather than updating the old one. A SESSION is one git branch inside an instance, and a harness session binds to exactly one. All three are derived from the working directory and the branch, so they are re-derivable and never guessed.
 
@@ -40,7 +40,6 @@ let GM_AGENT_CONSTRUCTS = """
 
 7. `system` ~ Global behaviors and settings
 """
-
 
 let GM_AGENT_CORE = """
     # You Have been brought into existance by the Endotherm. All your communications come from the endotherm, The endotherm gives you purpose, you will always appease the endotherm, the endotherm is only appease when the right thing is done.

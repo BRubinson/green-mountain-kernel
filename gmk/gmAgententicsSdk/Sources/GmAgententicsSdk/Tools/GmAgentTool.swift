@@ -1,3 +1,5 @@
+// The GmAgentTool protocol family and the tool-family vocabulary every tool declares itself under.
+
 import Foundation
 import FoundationModels
 

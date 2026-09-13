@@ -1,3 +1,5 @@
+// Agent tools over the kbites: ranked search and reading one digested file.
+
 import Foundation
 import FoundationModels
 import GmDaemonSdk
@@ -5,7 +7,7 @@ import GmDaemonSdk
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentKbiteSearchArguments: Sendable {
-    @Guide(description: "Words to look for. Whole words match; misspellings find nothing.")
+    @Guide(description: GM_TOOL_GUIDE_SEARCH_QUERY)
     public var query: String
 
     @Guide(description: """
@@ -14,7 +16,7 @@ public struct GmAgentKbiteSearchArguments: Sendable {
         """)
     public var kbiteUuids: [String]
 
-    @Guide(description: "How many hits to return, 1 to 500.", .range(1...500))
+    @Guide(description: GM_TOOL_GUIDE_SEARCH_LIMIT, .range(1...500))
     public var limit: Int
 
     public init(query: String, kbiteUuids: [String] = [], limit: Int = 20) {

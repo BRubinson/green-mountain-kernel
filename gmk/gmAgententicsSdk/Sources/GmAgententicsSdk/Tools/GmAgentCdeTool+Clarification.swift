@@ -1,3 +1,5 @@
+// Agent tools for the clarification phase: questions, notes, answers and the care package.
+
 import Foundation
 import FoundationModels
 import GmDaemonSdk
@@ -5,7 +7,7 @@ import GmDaemonSdk
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeOpenClarificationArguments: Sendable {
-    @Guide(description: "Which prompt to open questions for, by uuid.")
+    @Guide(description: promptUuidGuide("to open questions for"))
     public var promptUuid: String
 
     public init(promptUuid: String) {
@@ -46,10 +48,10 @@ public struct GmAgentClarificationQuestion: Sendable {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeWriteClarificationQuestionsArguments: Sendable {
-    @Guide(description: "Which question list to write to, by uuid.")
+    @Guide(description: summaryUuidGuide(to: "write to", "question list"))
     public var summaryUuid: String
 
-    @Guide(description: "Who is writing, for the record.")
+    @Guide(description: GM_TOOL_GUIDE_AGENT_NAME)
     public var agentName: String
 
     @Guide(description: "All the questions to write in one go.")
@@ -99,7 +101,7 @@ public struct GmAgentCdeWriteClarificationNotesArguments: Sendable {
     @Guide(description: "Which question list the notes belong to, by uuid.")
     public var summaryUuid: String
 
-    @Guide(description: "Who is writing, for the record.")
+    @Guide(description: GM_TOOL_GUIDE_AGENT_NAME)
     public var agentName: String
 
     @Guide(description: "All the notes to write in one go.")
@@ -173,10 +175,10 @@ public struct GmAgentCdeAnswerClarificationQuestionTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeFinalizeClarificationArguments: Sendable {
-    @Guide(description: "Which question list to finish, by uuid.")
+    @Guide(description: summaryUuidGuide(to: "finish", "question list"))
     public var summaryUuid: String
 
-    @Guide(description: "Version of the list you read.")
+    @Guide(description: GM_TOOL_GUIDE_EXPECTED_VERSION)
     public var expectedVersion: Int
 
     public init(summaryUuid: String, expectedVersion: Int) {
@@ -225,13 +227,13 @@ public struct GmAgentCdeOpenCarePackageTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCareRef: Sendable {
-    @Guide(description: "What sort of thing this is.", .anyOf(["dope", "kbite", "exploration"]))
+    @Guide(description: "What sort of thing this is.", .anyOf(GM_TOOL_ANYOF_CARE_REF_KIND))
     public var kind: String
 
-    @Guide(description: "For a dope ref: the dot-path CODE, never a uuid.")
+    @Guide(description: "For a dope ref. " + GM_TOOL_GUIDE_DOPE_CODE)
     public var dopeCode: String
 
-    @Guide(description: "For a kbite ref: the kbite file uuid.")
+    @Guide(description: "For a kbite ref. " + GM_TOOL_GUIDE_KBITE_FILE_UUID)
     public var kbiteFileUuid: String
 
     @Guide(description: "For an exploration ref: a title for the copied finding.")
@@ -319,7 +321,7 @@ public struct GmAgentCdeCloseCarePackageTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeGetClarificationArguments: Sendable {
-    @Guide(description: "Which prompt's questions to read, by uuid.")
+    @Guide(description: promptUuidGuide("'s questions to read"))
     public var promptUuid: String
 
     @Guide(description: """

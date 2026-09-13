@@ -1,3 +1,5 @@
+// Agent tools that move a prompt through the machine: init, next, load and status.
+
 import Foundation
 import FoundationModels
 import GmDaemonSdk
@@ -98,7 +100,7 @@ public struct GmAgentCdeLoadPromptTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeSetStatusArguments: Sendable {
-    @Guide(description: "Which prompt to move, by uuid.")
+    @Guide(description: promptUuidGuide("to move"))
     public var promptUuid: String
 
     @Guide(description: "Version of the prompt you read, so two writers cannot clobber each other.")
@@ -107,7 +109,7 @@ public struct GmAgentCdeSetStatusArguments: Sendable {
     @Guide(description: """
         Where to move it: 'initiated' to start, 'done' to finish, or 'draft' to \
         send a finished prompt back for editing.
-        """, .anyOf(["draft", "initiated", "done"]))
+        """, .anyOf(GM_TOOL_ANYOF_PROMPT_STATUS))
     public var status: String
 
     public init(promptUuid: String, expectedVersion: Int, status: String) {

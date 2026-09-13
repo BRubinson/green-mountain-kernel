@@ -103,8 +103,18 @@ public enum WorkflowSpec {
 
     /// Compiled-in instruction text per (variant, phase). Less is more: each
     /// block is what its reader needs NOW — the call, the gate, and nothing
-    /// else. WorkflowSpecTests fails the build on an empty pair, and on a
-    /// block that names an invocation the pen already covers.
+    /// else. Never leave a pair empty, and never name an invocation the pen
+    /// already covers.
+    ///
+    /// THOSE TWO RULES ARE NOW CONVENTIONS AND NOTHING ENFORCES THEM.
+    /// `WorkflowSpecTests` used to fail the build on both; it was deleted with
+    /// the rest of the repository contract tier in the test rebuild. Check by
+    /// hand when adding a phase — an empty block ships a phase whose reader is
+    /// told nothing, and it will not fail anything on the way out.
+    ///
+    /// This function has a SECOND consumer now: `gmAgententicsSdk` reads it live
+    /// when assembling a session's per-phase instructions, so its text reaches a
+    /// model directly rather than only a harness.
     public static func instructions(variant: BotVariant, phase: Phase) -> String {
         switch phase {
         case .briefing:

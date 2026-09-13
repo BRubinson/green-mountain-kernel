@@ -248,15 +248,51 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     prompts, so caller-supplied text must never reach the instruction half.
     Phase text is NOT copied — it is read live from
     `WorkflowSpec.instructions(variant:phase:)`.
-    `Templates/GmAgentInstruction.swift` is the first thing that ASSEMBLES that
-    archive: a `DynamicInstructions` + `DynamicProfile` pair keyed on
-    `WorkflowSpec.Phase`, so one session's active persona follows the phase
-    instead of a fresh subagent per phase. **A stub** — it builds nothing and
-    sends nothing, and it deliberately sets no `.model()`, because models stay
-    daemon-managed. Its bodies append longest-lived content first (core contract
-    → persona → phase text → methodology → tools); reordering on phase throws
-    away the key-value cache silently, which is why the order is documented
-    rather than incidental.
+    `AgentConfigurations/` is what ASSEMBLES all of it into native values, and it
+    is the layer to read first. `AgentSessionProfile.swift` holds the
+    `DynamicInstructions` + `DynamicProfile` pair, built with `Profile { }` and
+    its modifier chain rather than a hand-rolled conformance. Assembly order is
+    **core → personality → directive(s) → phase text → step set**, toolset
+    composed last inside the dynamic body; longest-lived content first, because
+    reordering on a phase change throws away the key-value cache silently. One
+    wart in that order is recorded in the file: phase text is the most volatile
+    block and sits ahead of the fixed step set, kept deliberately.
+    Each part is wrapped as `Instructions(...)` because `String` is
+    `InstructionsRepresentable` but NOT `DynamicInstructions` — `Instructions`
+    itself conforms, and that single wrap is the whole adapter.
+    `AgentSessionAsk.swift` is the other half: it wraps a filled ask as a
+    `Prompt` and REFUSES to build one whose `{snake_case}` holes are unfilled,
+    turning a visible-after-the-fact convention into a precondition.
+    **IT IS NO LONGER "DECLARED, NOT WIRED"**, and the earlier claim here that it
+    "deliberately sets no `.model()`" is retired: the profile calls `.model()`
+    with a `ClaudeLanguageModel` from `AgentGmkDirective+ModelChoice`, so model
+    selection lives IN-PACKAGE for this layer rather than being daemon-managed.
+    Tool `call(arguments:)` bodies are still all stubs that throw.
+    **Two reasoning knobs exist and only ONE is used.** `ClaudeModel.Effort` is
+    baked into the model handle via `fixedEffort:`; the framework's own
+    `.reasoningLevel()` is deliberately left UNSET. Setting both leaves two
+    layers deciding one thing with no precedence between them — if reasoning ever
+    moves to the framework side, delete `fixedEffort` in the same change.
+    **`GmCdeRpirWorkflowPhase` is a deliberate MIRROR of `WorkflowSpec.Phase`**,
+    and the source of truth for this layer. The daemon's enum could not be moved
+    here: `gmDaemonSdk` is the zero-dependency base and this package already
+    depends on it, so inverting the edge would cycle AND drag `unsafeFlags` plus
+    the macOS 27 floor into `gm_hook`, `gm_daemon` and every CI job. The two
+    enums are bridged by **exhaustive switches with no `default:`** — with the
+    contract-test tier deleted, that is the only mechanism left that still fails
+    the build when the daemon grows a phase. A `rawValue` bridge would compile
+    forever and return `nil` for a phase the daemon had started serving.
+    `Templates/Template+GmAgentTool.swift` is the tool vocabulary, authored once:
+    the shared field guides are **stems plus tails** (`promptUuid` had 13 distinct
+    descriptions across 13 sites, most contextually correct — collapsing them to
+    one constant makes the schemas worse), and every `.anyOf` now DERIVES from its
+    `GmDaemonSdk` enum. Two are deliberate non-derivations, marked as such:
+    review resolution excludes `open` (not a terminal status), and the
+    architecture change kind has no SDK enum — `ChangeKind` is `edit/create/...`
+    for FILE changes and is a near-miss trap.
+    `@Guide(description:)` and `.anyOf` accept non-literal expressions; verified
+    empirically against the macOS 27 SDK, since the macro signature alone does not
+    settle it.
     **Its floor is macOS 27, not 26** — see the runner note below.
   - `gmk/gmClaudeForFoundationModels/` — the ninth package: Anthropic's
     **ClaudeForFoundationModels, vendored** (Apache-2.0). It conforms Claude to

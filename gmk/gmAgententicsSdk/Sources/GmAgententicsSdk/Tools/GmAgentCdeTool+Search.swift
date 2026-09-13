@@ -1,3 +1,5 @@
+// Agent tools for searching the record: prior work and recorded file changes.
+
 import Foundation
 import FoundationModels
 import GmDaemonSdk
@@ -5,13 +7,13 @@ import GmDaemonSdk
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeSearchArguments: Sendable {
-    @Guide(description: "Words to look for. Whole words match; misspellings find nothing.")
+    @Guide(description: GM_TOOL_GUIDE_SEARCH_QUERY)
     public var query: String
 
     @Guide(description: "Only look in this session, by uuid. Leave empty to search everything.")
     public var sessionUuid: String
 
-    @Guide(description: "How many hits to return, 1 to 500.", .range(1...500))
+    @Guide(description: GM_TOOL_GUIDE_SEARCH_LIMIT, .range(1...500))
     public var limit: Int
 
     public init(query: String, sessionUuid: String = "", limit: Int = 50) {
@@ -99,7 +101,7 @@ public struct GmAgentCdeSearchArchitectureOptionTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeSearchFileChangesArguments: Sendable {
-    @Guide(description: "Only changes for this prompt, by uuid. Leave empty to skip this filter.")
+    @Guide(description: promptUuidGuide("'s changes to filter to") + " Leave empty to skip this filter.")
     public var promptUuid: String
 
     @Guide(description: "Only changes in this session, by uuid. Leave empty to skip this filter.")

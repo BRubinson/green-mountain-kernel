@@ -1,3 +1,5 @@
+// Agent tools over the project, instance and session spine.
+
 import Foundation
 import FoundationModels
 import GmDaemonSdk
@@ -11,7 +13,7 @@ public struct GmAgentProjectsSearchArguments: Sendable {
     @Guide(description: "Only look inside this project, by uuid. Leave empty to look everywhere.")
     public var projectUuid: String
 
-    @Guide(description: "How many hits to return, 1 to 500.", .range(1...500))
+    @Guide(description: GM_TOOL_GUIDE_SEARCH_LIMIT, .range(1...500))
     public var limit: Int
 
     public init(query: String, projectUuid: String = "", limit: Int = 50) {

@@ -1,3 +1,5 @@
+// Agent tools for the review phase: findings, the rank, resolutions and the verdict.
+
 import Foundation
 import FoundationModels
 import GmDaemonSdk
@@ -5,7 +7,7 @@ import GmDaemonSdk
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeOpenReviewArguments: Sendable {
-    @Guide(description: "Which prompt to review, by uuid.")
+    @Guide(description: promptUuidGuide("to review"))
     public var promptUuid: String
 
     public init(promptUuid: String) {
@@ -28,10 +30,7 @@ public struct GmAgentCdeOpenReviewTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentReviewFinding: Sendable {
-    @Guide(description: "What kind of problem this is.", .anyOf([
-        "correctness_bug", "spec_deviation", "regression_risk",
-        "security", "simplification", "other",
-    ]))
+    @Guide(description: "What kind of problem this is.", .anyOf(GM_TOOL_ANYOF_REVIEW_KIND))
     public var kind: String
 
     @Guide(description: "Short title for the problem.")
@@ -72,7 +71,7 @@ public struct GmAgentReviewFinding: Sendable {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeWriteReviewsArguments: Sendable {
-    @Guide(description: "Which complaints list to write to, by uuid.")
+    @Guide(description: summaryUuidGuide(to: "write to", "complaints list"))
     public var summaryUuid: String
 
     @Guide(description: "Who is reviewing. This is what tells reviewers apart.")
@@ -103,7 +102,7 @@ public struct GmAgentCdeWriteReviewsTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeRankReviewsArguments: Sendable {
-    @Guide(description: "Which complaints list to rank, by uuid.")
+    @Guide(description: summaryUuidGuide(to: "rank", "complaints list"))
     public var summaryUuid: String
 
     @Guide(description: "Every problem and its rating, all at once.")
@@ -130,18 +129,16 @@ public struct GmAgentCdeRankReviewsTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeCompleteReviewArguments: Sendable {
-    @Guide(description: "Which complaints list to seal, by uuid.")
+    @Guide(description: summaryUuidGuide(to: "seal", "complaints list"))
     public var summaryUuid: String
 
-    @Guide(description: "Version of the list you read.")
+    @Guide(description: GM_TOOL_GUIDE_EXPECTED_VERSION)
     public var expectedVersion: Int
 
     @Guide(description: "What the review found, taken as a whole.")
     public var overview: String
 
-    @Guide(description: "The verdict.", .anyOf([
-        "approved", "approved_with_nits", "changes_requested",
-    ]))
+    @Guide(description: "The verdict.", .anyOf(GM_TOOL_ANYOF_REVIEW_VERDICT))
     public var verdict: String
 
     public init(summaryUuid: String, expectedVersion: Int, overview: String, verdict: String) {
@@ -173,7 +170,7 @@ public struct GmAgentCdeResolveReviewFindingArguments: Sendable {
     @Guide(description: "Version of the finding you read.")
     public var expectedVersion: Int
 
-    @Guide(description: "How it was handled.", .anyOf(["fixed", "accepted", "wont_fix"]))
+    @Guide(description: "How it was handled.", .anyOf(GM_TOOL_ANYOF_REVIEW_RESOLUTION))
     public var status: String
 
     public init(findingUuid: String, expectedVersion: Int, status: String) {
@@ -200,7 +197,7 @@ public struct GmAgentCdeResolveReviewFindingTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeGetReviewArguments: Sendable {
-    @Guide(description: "Which prompt's review to read, by uuid.")
+    @Guide(description: promptUuidGuide("'s review to read"))
     public var promptUuid: String
 
     @Guide(description: """

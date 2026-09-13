@@ -1,45 +1,6 @@
+// The procedure text for each agent role, and the assembly that composes a fan-out or solo session.
+
 import Foundation
-
-
-// The PROCEDURE layer: every step, in full, with the tool that performs it —
-// and the assembly that turns one into the text an agent runs under.
-//
-// SPLIT FROM THE DIRECTIVE DELIBERATELY, and the reason is a shape the machine
-// has to support rather than a taste for small files. A solo run wears ALL
-// EIGHT directives in one mind and runs its own instruction set; a fan-out team
-// wears one directive each and runs these. Identity and procedure therefore
-// vary independently, and anything that varies independently cannot share a
-// constant.
-//
-// TWO SESSION SHAPES, and the split between them is why the layers are layers:
-//
-//   - `session(personality:)` is the FAN-OUT shape. One directive, one lens,
-//     one instruction set. This is what a team member wears.
-//   - `solo(personality:)` is the gm_bot / gm_task shape. EVERY directive at
-//     once, because a single mind plays every part, paired with a single
-//     instruction set chosen for that run rather than eight stitched together.
-//
-// The assembly ORDER is longest-lived first — core, personality, directive,
-// instructions — and it is documented rather than incidental. Everything a
-// session reuses across turns sits at the front, so a phase change appends
-// rather than rewrites. Reorder it and the key-value cache is thrown away
-// silently, which costs latency nothing will attribute back to this file.
-//
-// `GM_CDE_*` marks the sets that drive the CDE workflow proper — explore,
-// clarify, architect, implement, review. The Primarch, the Briefer and the
-// KBite Chewer are `GM_AGENT_*`: the first straddles every workflow, and the
-// last two serve the machine without advancing a prompt through it.
-//
-// THIS FILE USED TO BE TWO. `GmAgentCdeInstructions` held the step sets and
-// `GmAgentInstruction` was an associated-value enum that composed them; the two
-// carried the same eight cases and could not drift apart usefully. The
-// composition survives as methods. Merging also retired the `Cde` infix, which
-// existed ONLY to dodge the sealed archive's `GmAgentInstructions` in this
-// module; the singular spelling was never taken.
-//
-// A STUB, like the rest of this package: these values are staged for a caller
-// that does not exist yet. Nothing selects a model, nothing opens a session,
-// nothing is sent.
 
 enum GmAgentInstruction: String, CaseIterable {
 
@@ -52,8 +13,6 @@ enum GmAgentInstruction: String, CaseIterable {
     case reviewer
     case kbiteChewer
 
-    /// The step set alone — parameters, steps, contract. No core, no lens, no
-    /// directive.
     var text: String {
         switch self {
         case .primarch: return GM_AGENT_PRIMARCH_INSTRUCTION
@@ -67,12 +26,7 @@ enum GmAgentInstruction: String, CaseIterable {
         }
     }
 
-    /// The directive that owns this step set, one for one.
-    ///
-    /// The mapping lives HERE rather than on `GmAgentDirectives` so the identity
-    /// layer stays ignorant of the procedure layer — the whole point of
-    /// splitting them.
-    var directive: GmAgentDirectives {
+    var directive: AgentGmkDirective {
         switch self {
         case .primarch: return .primarch
         case .briefer: return .briefer
@@ -85,7 +39,6 @@ enum GmAgentInstruction: String, CaseIterable {
         }
     }
 
-    /// The FAN-OUT shape: core, one lens, this role's directive, these steps.
     func session(personality: GmAgentPersonality) -> String {
         Self.assemble(
             personality: personality,
@@ -93,8 +46,6 @@ enum GmAgentInstruction: String, CaseIterable {
             instructions: text)
     }
 
-    /// The SOLO shape: core, one lens, EVERY directive, these steps. What a
-    /// single mind playing every part runs under.
     func solo(personality: GmAgentPersonality = .compliant) -> String {
         Self.assemble(
             personality: personality,
@@ -102,15 +53,12 @@ enum GmAgentInstruction: String, CaseIterable {
             instructions: text)
     }
 
-    /// The conventional solo run: every directive, no lens, the Primarch's step
-    /// set — because a mind holding every role is the one driving the machine.
     static var primary: String {
         GmAgentInstruction.primarch.solo()
     }
 
-    /// Every directive, in declaration order, for the solo shape.
     private static var everyDirective: String {
-        GmAgentDirectives.allCases.map(\.text).joined(separator: "\n\n")
+        AgentGmkDirective.allCases.map(\.text).joined(separator: "\n\n")
     }
 
     private static func assemble(
@@ -133,7 +81,6 @@ enum GmAgentInstruction: String, CaseIterable {
 let GM_AGENT_INSTRUCTION_HEADER = """
     # Agent Instruction
     """
-
 
 let GM_AGENT_PRIMARCH_INSTRUCTION = """
     \(GM_AGENT_INSTRUCTION_HEADER)
@@ -161,7 +108,6 @@ let GM_AGENT_PRIMARCH_INSTRUCTION = """
         4. You seal; agents write. Never take a pen that belongs to an agent, and never hand one of yours away.
     """
 
-
 let GM_AGENT_BRIEFER_INSTRUCTION = """
     \(GM_AGENT_INSTRUCTION_HEADER)
     ## **BRIEFER** INSTRUCTION SET
@@ -187,7 +133,6 @@ let GM_AGENT_BRIEFER_INSTRUCTION = """
         5. YOU MUST FINISH WITHIN 1 to 1.5 minutes at most ever.
     """
 
-
 let GM_CDE_AGENT_EXPLORE_INSTRUCTION = """
     \(GM_AGENT_INSTRUCTION_HEADER)
     ## **CDE EXPLORER** INSTRUCTION SET
@@ -211,7 +156,6 @@ let GM_CDE_AGENT_EXPLORE_INSTRUCTION = """
         3. Retrieval is search-first. Never dump a full tree into your context.
         4. You seal your own summary and no one else's.
     """
-
 
 let GM_CDE_AGENT_INTENT_CLARIFIER_INSTRUCTION = """
     \(GM_AGENT_INSTRUCTION_HEADER)
@@ -238,7 +182,6 @@ let GM_CDE_AGENT_INTENT_CLARIFIER_INSTRUCTION = """
         4. You write the suite. You do not answer it, seal the care package, or decide.
     """
 
-
 let GM_CDE_AGENT_ARCHITECT_INSTRUCTION = """
     \(GM_AGENT_INSTRUCTION_HEADER)
     ## **CDE ARCHITECT** INSTRUCTION SET
@@ -261,7 +204,6 @@ let GM_CDE_AGENT_ARCHITECT_INSTRUCTION = """
         4. You never call the decision, and change rows are expanded from the winner alone.
     """
 
-
 let GM_CDE_AGENT_IMPLEMENTOR_INSTRUCTION = """
     \(GM_AGENT_INSTRUCTION_HEADER)
     ## **CDE IMPLEMENTOR** INSTRUCTION SET
@@ -282,7 +224,6 @@ let GM_CDE_AGENT_IMPLEMENTOR_INSTRUCTION = """
         3. Quote the real output. A summary of a build you ran is not the build you ran.
         4. Changes made through BASH are invisible to the machine. Record them yourself where the harness could not see them.
     """
-
 
 let GM_CDE_AGENT_REVIEWER_INSTRUCTION = """
     \(GM_AGENT_INSTRUCTION_HEADER)
@@ -306,7 +247,6 @@ let GM_CDE_AGENT_REVIEWER_INSTRUCTION = """
         3. Anchor every finding that has a location to its file and its lines.
         4. You suggest a verdict; the recorded one is the Primarch's. You resolve nothing.
     """
-
 
 let GM_AGENT_KBITE_CHEWER_INSTRUCTION = """
     \(GM_AGENT_INSTRUCTION_HEADER)

@@ -1,3 +1,5 @@
+// Agent tools over the dope tree: search by scope and read a subtree by dot-path code.
+
 import Foundation
 import FoundationModels
 import GmDaemonSdk
@@ -5,7 +7,7 @@ import GmDaemonSdk
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentDopeSearchArguments: Sendable {
-    @Guide(description: "Words to look for. Whole words match; misspellings find nothing.")
+    @Guide(description: GM_TOOL_GUIDE_SEARCH_QUERY)
     public var query: String
 
     @Guide(description: """
@@ -14,7 +16,7 @@ public struct GmAgentDopeSearchArguments: Sendable {
         """)
     public var sources: [String]
 
-    @Guide(description: "How many hits to return, 1 to 500.", .range(1...500))
+    @Guide(description: GM_TOOL_GUIDE_SEARCH_LIMIT, .range(1...500))
     public var limit: Int
 
     public init(query: String, sources: [String] = [], limit: Int = 50) {
@@ -63,7 +65,7 @@ public struct GmAgentDopeSearchSessionTool: GmAgentDopeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentDopeNodeUpdate: Sendable {
-    @Guide(description: "Dot-path code of the node to change, like domain.entity.property.")
+    @Guide(description: "The node to change. " + GM_TOOL_GUIDE_DOPE_CODE)
     public var code: String
 
     @Guide(description: "New title for the node, or empty to leave it alone.")

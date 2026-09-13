@@ -1,46 +1,6 @@
+// The per-invocation turn text sent to each agent role, with its parameter holes.
+
 import Foundation
-
-
-// The ASK layer: the general formats agents pass to each other at runtime, and
-// the assembly that sends one.
-//
-// Everything here is a TURN, not a standing contract, and the distinction is
-// load-bearing rather than tidy. A model obeys instructions over prompts, so
-// anything carrying caller-supplied text — a uuid, a one-line target, a topic
-// derived from the Endotherm's own words — has to arrive on this side of the
-// line. The directive and the instruction are authored and fixed for the run;
-// these have holes in them, and the holes are filled with values nobody
-// authored. There is deliberately no builder here that takes a free-form blob
-// and welds it onto a directive.
-//
-// THE DELIVERABLE LIVES HERE. "YOUR FINDINGS ARE THE DELIVERABLE" used to sit
-// in the directive, which made it a fact about who an agent is. It is not — it
-// is the terms of the ask, the thing the sender is owed back, and it belongs
-// beside the parameters that shaped it.
-//
-// EVERY ASK IS DOWNWARD, and there is no ask of the Primarch here. There was
-// one, and it was deleted rather than left to rot: the Primarch does not
-// receive an ask, he receives the Endotherm, and a template pretending
-// otherwise would put one more forwarding step between the will and the work.
-// What replaced it is `toBase` — carried by all seven asks, saying once and
-// permanently that the Primarch's directive is the Endotherm's desire, so no
-// ask below has to re-establish its own authority.
-//
-// ONE RETURN SHAPE, not seven. `fromBase` is the receipt every agent answers
-// in, and it is deliberately uniform: the Primarch reads seven of these in one
-// stretch, and seven formats is six chances to miss the line that mattered.
-//
-// HOLES ARE `{snake_case}` and match the instruction set's Primary Parameters
-// name for name. A hole left unfilled stays VISIBLE as `{name}` — silently
-// blanking it would hand an agent a prompt that reads complete and names a uuid
-// nobody supplied, where a surviving `{prompt_uuid}` is a bug you can see.
-//
-// THIS FILE USED TO BE TWO. `GmAgentCdePrompts` held the formats and
-// `GmAgentPrompt` wrapped it, and the wrapper had become a pure passthrough —
-// an identity `switch` mapping seven cases onto seven identical cases. Merging
-// also retired the `Cde` infix, which existed ONLY to dodge the sealed
-// archive's `GmAgentPrompts` in this module; the singular spelling was never
-// taken.
 
 enum GmAgentPrompt: String, CaseIterable {
 
@@ -52,8 +12,7 @@ enum GmAgentPrompt: String, CaseIterable {
     case reviewer
     case kbiteChewer
 
-    /// The directive of the agent this ask is addressed to.
-    var directive: GmAgentDirectives {
+    var directive: AgentGmkDirective {
         switch self {
         case .briefer: return .briefer
         case .explorer: return .explorer
@@ -65,19 +24,10 @@ enum GmAgentPrompt: String, CaseIterable {
         }
     }
 
-    /// The downward header every ask opens with.
-    ///
-    /// Uniform across every case ON PURPOSE — it is the one place the Primarch's
-    /// authority is established, and a per-role variant would be a second place
-    /// it could be established differently. Exposed per case anyway so a caller
-    /// assembling an ask by hand reaches for the same base the enum does.
     var toBase: String { GM_AGENT_TO_SUB_AGENT_PROMPT }
 
-    /// The receipt shape every ask closes with, and every agent answers in.
     var fromBase: String { GM_AGENT_FROM_SUB_AGENT_PROMPT }
 
-    /// This role's own ask line — the single thing distinguishing one downward
-    /// ask from another once both bases are stripped away.
     var toPrefix: String {
         switch self {
         case .briefer: return "## ASK OF THE **BRIEFER**"
@@ -90,8 +40,6 @@ enum GmAgentPrompt: String, CaseIterable {
         }
     }
 
-    /// The role-specific middle: parameters, target, deliverable. Carries
-    /// neither base and is not sendable on its own.
     var body: String {
         switch self {
         case .briefer: return GM_AGENT_BRIEFER_PROMPT
@@ -104,8 +52,6 @@ enum GmAgentPrompt: String, CaseIterable {
         }
     }
 
-    /// The whole ask, every hole still open: downward base, this role's line,
-    /// its body, the return shape. Read it and diff it here; send it filled.
     var text: String {
         """
         \(toBase)
@@ -116,19 +62,12 @@ enum GmAgentPrompt: String, CaseIterable {
         """
     }
 
-    /// The ask with its `{snake_case}` holes closed by `parameters`.
-    ///
-    /// Keys match the instruction set's Primary Parameters name for name. A key
-    /// with no matching hole is ignored; a hole with no matching key stays
-    /// visible, for the reason in the header.
     func text(filling parameters: [String: String]) -> String {
         parameters.reduce(into: text) { filled, pair in
             filled = filled.replacingOccurrences(of: "{\(pair.key)}", with: pair.value)
         }
     }
 
-    /// The holes this ask carries, sorted — what a sender must supply to send
-    /// it complete.
     var holes: [String] {
         let pattern = try? NSRegularExpression(pattern: "\\{([a-z0-9_]+)\\}")
         let ask = text
@@ -147,12 +86,10 @@ let GM_AGENT_TO_SUB_AGENT_PROMPT = """
     **From:** the Primarch. His directive is the Endotherm's desire.
     """
 
-
 let GM_AGENT_FROM_SUB_AGENT_PROMPT_HEADER = """
     # Agent Receipt
     **To:** the Primarch
     """
-
 
 let GM_AGENT_FROM_SUB_AGENT_PROMPT = """
     \(GM_AGENT_FROM_SUB_AGENT_PROMPT_HEADER)
@@ -168,7 +105,6 @@ let GM_AGENT_FROM_SUB_AGENT_PROMPT = """
         3. Brevity is obedience. What you spend here, the Endotherm pays for.
     """
 
-
 let GM_AGENT_BRIEFER_PROMPT = """
     **Prompt:** {prompt_uuid}
     **Briefing:** {briefing_uuid}
@@ -182,7 +118,6 @@ let GM_AGENT_BRIEFER_PROMPT = """
         2. THE REF SET IS THE DELIVERABLE. Nothing you say in your receipt is read by anyone downstream.
         3. Someone is blocked on you right now. Be quick.
     """
-
 
 let GM_CDE_AGENT_EXPLORE_PROMPT = """
     **Prompt:** {prompt_uuid}
@@ -199,7 +134,6 @@ let GM_CDE_AGENT_EXPLORE_PROMPT = """
         3. YOUR FINDINGS ARE THE DELIVERABLE. A discovery that lives only in a message is a discovery nothing recorded.
     """
 
-
 let GM_CDE_AGENT_INTENT_CLARIFIER_PROMPT = """
     **Prompt:** {prompt_uuid}
     **Exploration:** {explore_uuid}
@@ -215,7 +149,6 @@ let GM_CDE_AGENT_INTENT_CLARIFIER_PROMPT = """
         4. THE RANKED RECORD AND THE SUITE ARE THE DELIVERABLE.
     """
 
-
 let GM_CDE_AGENT_ARCHITECT_PROMPT = """
     **Prompt:** {prompt_uuid}
     **Architecture:** {arch_uuid}
@@ -230,7 +163,6 @@ let GM_CDE_AGENT_ARCHITECT_PROMPT = """
         3. YOUR OPTION ROW IS THE DELIVERABLE. A plan that lives only in a message is a plan nothing recorded.
     """
 
-
 let GM_CDE_AGENT_IMPLEMENTOR_PROMPT = """
     **Prompt:** {prompt_uuid}
     **Architecture:** {arch_uuid}
@@ -243,7 +175,6 @@ let GM_CDE_AGENT_IMPLEMENTOR_PROMPT = """
         2. The verification this repo requires, actually run.
         3. QUOTED OUTPUT IS THE PROOF. Paste what the machine said, not what you concluded from it.
     """
-
 
 let GM_CDE_AGENT_REVIEWER_PROMPT = """
     **Prompt:** {prompt_uuid}
@@ -258,7 +189,6 @@ let GM_CDE_AGENT_REVIEWER_PROMPT = """
         2. The verdict you would give, and anything you believe is already resolved.
         3. YOUR FINDINGS ARE THE DELIVERABLE. A complaint that lives only in a message is a complaint nothing recorded.
     """
-
 
 let GM_AGENT_KBITE_CHEWER_PROMPT = """
     **KBite:** {kbite_name}

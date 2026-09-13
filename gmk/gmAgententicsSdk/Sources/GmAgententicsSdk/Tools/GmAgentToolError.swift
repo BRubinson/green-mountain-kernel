@@ -1,3 +1,5 @@
+// The typed error surface every agent tool throws through.
+
 import Foundation
 
 @available(GmAgentOs 1.0, *)

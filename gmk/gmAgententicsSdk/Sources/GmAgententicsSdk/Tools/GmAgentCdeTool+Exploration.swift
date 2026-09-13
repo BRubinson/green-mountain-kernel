@@ -1,3 +1,5 @@
+// Agent tools for the exploration phase: findings, key files, the calibrated rank and the seal.
+
 import Foundation
 import FoundationModels
 import GmDaemonSdk
@@ -5,15 +7,13 @@ import GmDaemonSdk
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeOpenExplorationArguments: Sendable {
-    @Guide(description: "Which prompt to explore, by uuid.")
+    @Guide(description: promptUuidGuide("to explore"))
     public var promptUuid: String
 
-    @Guide(description: "Which methodology you are.", .anyOf([
-        "aggressive", "conservative", "pragmatic", "alternative", "general", "synthesis",
-    ]))
+    @Guide(description: "Which methodology you are.", .anyOf(GM_TOOL_ANYOF_AGENT_TYPE))
     public var agentType: String
 
-    @Guide(description: "Your own agent id, so two agents cannot share one list.")
+    @Guide(description: GM_TOOL_GUIDE_AGENT_ID)
     public var agentId: String
 
     public init(promptUuid: String, agentType: String, agentId: String = "") {
@@ -38,10 +38,7 @@ public struct GmAgentCdeOpenExplorationTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentExplorationFinding: Sendable {
-    @Guide(description: "What kind of finding this is.", .anyOf([
-        "persistence_model", "implementation_pattern", "existing_functionality",
-        "scope_creep_risk", "general_relevant_change", "key_file", "other",
-    ]))
+    @Guide(description: "What kind of finding this is.", .anyOf(GM_TOOL_ANYOF_FINDING_KIND))
     public var kind: String
 
     @Guide(description: "Short title for the finding.")
@@ -53,10 +50,7 @@ public struct GmAgentExplorationFinding: Sendable {
     @Guide(description: "Repo-relative file this is about, or empty.")
     public var filePath: String
 
-    @Guide(description: """
-        How important, 0 is most important and 999 is ignore. Leave it out \
-        unless you were told to rate; ranking is one reader's job.
-        """)
+    @Guide(description: GM_TOOL_GUIDE_RATING_OPTIONAL)
     public var rating: Int?
 
     public init(
@@ -73,10 +67,10 @@ public struct GmAgentExplorationFinding: Sendable {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeWriteExplorationsArguments: Sendable {
-    @Guide(description: "Which finding list to write to, by uuid.")
+    @Guide(description: summaryUuidGuide(to: "write to", "finding list"))
     public var summaryUuid: String
 
-    @Guide(description: "Who is writing, for the record.")
+    @Guide(description: GM_TOOL_GUIDE_AGENT_NAME)
     public var agentName: String
 
     @Guide(description: "All the findings to write in one go.")
@@ -107,7 +101,7 @@ public struct GmAgentFindingRating: Sendable {
     @Guide(description: "Which finding, by uuid.")
     public var findingUuid: String
 
-    @Guide(description: "How important: 0 is most important, 999 means ignore.", .range(0...999))
+    @Guide(description: GM_TOOL_GUIDE_RATING, .range(0...999))
     public var rating: Int
 
     public init(findingUuid: String, rating: Int) {
@@ -119,7 +113,7 @@ public struct GmAgentFindingRating: Sendable {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeRankExplorationsArguments: Sendable {
-    @Guide(description: "Which prompt's findings to rank, by uuid.")
+    @Guide(description: promptUuidGuide("'s findings to rank"))
     public var promptUuid: String
 
     @Guide(description: "Every finding and its rating, all at once.")
@@ -146,10 +140,10 @@ public struct GmAgentCdeRankExplorationsTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeCompleteExplorationArguments: Sendable {
-    @Guide(description: "Which finding list to seal, by uuid.")
+    @Guide(description: summaryUuidGuide(to: "seal", "finding list"))
     public var summaryUuid: String
 
-    @Guide(description: "Version of the list you read.")
+    @Guide(description: GM_TOOL_GUIDE_EXPECTED_VERSION)
     public var expectedVersion: Int
 
     @Guide(description: "What the findings add up to, written out.")
@@ -177,13 +171,10 @@ public struct GmAgentCdeCompleteExplorationTool: GmAgentCdeTool {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeGetExplorationArguments: Sendable {
-    @Guide(description: "Which prompt's findings to read, by uuid.")
+    @Guide(description: promptUuidGuide("'s findings to read"))
     public var promptUuid: String
 
-    @Guide(description: """
-        Only return findings this important or better, 0 to 999. Use a small \
-        number to keep the answer short.
-        """, .range(0...999))
+    @Guide(description: GM_TOOL_GUIDE_MAX_RATING, .range(0...999))
     public var maxRating: Int
 
     @Guide(description: "Only one methodology's list, or empty for all of them.")
