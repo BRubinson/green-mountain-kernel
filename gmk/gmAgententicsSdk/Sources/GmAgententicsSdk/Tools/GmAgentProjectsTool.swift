@@ -2,8 +2,6 @@ import Foundation
 import FoundationModels
 import GmDaemonSdk
 
-// The projects family: find things above a prompt, and edit a session.
-
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentProjectsSearchArguments: Sendable {
@@ -23,18 +21,6 @@ public struct GmAgentProjectsSearchArguments: Sendable {
     }
 }
 
-/// Find projects, sessions, and instances by name or id.
-///
-/// PARTIALLY BACKED, and the missing third is the one named first in the tool's
-/// own description. `CATALOG_SEARCH` returns instances and sessions; it accepts
-/// `projectUuid` only as a FILTER, and never returns a project. The only verb
-/// that yields projects is `PROJECT_LIST`, which takes no query at all.
-///
-/// So a real implementation is a composition — catalog-search for instances and
-/// sessions, plus a client-side filter over the full project list — and it must
-/// be built that way rather than implying the daemon searches all three. This
-/// throws instead of quietly returning two of the three kinds, because a caller
-/// that asked for projects and got none would reasonably conclude none matched.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentProjectsSearchTool: GmAgentProjectsTool {
     public let name = "projects_search"
@@ -88,19 +74,6 @@ public struct GmAgentProjectsUpdateSessionArguments: Sendable {
     }
 }
 
-/// Change session kbites and backstory.
-///
-/// THIS IS THREE VERBS BEHIND ONE TOOL, and the partial-failure story has to be
-/// decided before it is wired rather than discovered after. `SESSION_UPDATE`
-/// carries backstory and goal and takes an `expected_version`; kbite
-/// registration is `KBITE_ADD` and `KBITE_REMOVE` against a scope, and they do
-/// not share that version. A call that updates the backstory and then fails
-/// half way through the kbite changes leaves the session genuinely half-edited,
-/// in a db that is never wiped.
-///
-/// The honest options are to order the writes so the survivable one goes last,
-/// or to split this back into two tools. It is left as one tool because that is
-/// what was asked for, with the hazard written down rather than hidden.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentProjectsUpdateSessionTool: GmAgentProjectsTool {
     public let name = "projects_update_session"

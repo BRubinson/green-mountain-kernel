@@ -144,13 +144,20 @@ public enum ChewedArtifactParser {
         )
     }
 
+    /// Cells are trimmed of backticks as well as whitespace: chew agents
+    /// routinely code-quote the File column, and a `` `path` `` cell resolves to
+    /// nothing — the extension comes back as ``swift` `` and the synthesized path
+    /// carries literal backticks, so the row digests empty and SILENTLY. Stripping
+    /// here is what keeps the File column a real path.
+    private static let cellTrim = CharacterSet.whitespaces.union(CharacterSet(charactersIn: "`"))
+
     /// Split a `| a | b | c |` line into trimmed cells; nil when not a table row.
     private static func tableRowCells(_ trimmed: String) -> [String]? {
         guard trimmed.hasPrefix("|") else { return nil }
         let cells = trimmed
             .trimmingCharacters(in: CharacterSet(charactersIn: "|"))
             .split(separator: "|", omittingEmptySubsequences: false)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .map { $0.trimmingCharacters(in: cellTrim) }
         return cells.isEmpty ? nil : cells
     }
 
@@ -183,13 +190,20 @@ public enum ChewedArtifactParser {
 
     /// Text types get their full content inlined into the db; everything else
     /// (images, archives, media, unknown binaries) stays filesystem-only.
+    /// `m`/`mm` are here for the same reason `c`/`cc` are: they are the
+    /// IMPLEMENTATION half of a language whose headers were already inlined.
+    /// Omitting them made every Objective-C body digest as an empty row while
+    /// its `.h` digested fine — a whole-language blind spot in the search index.
     private static let textExtensions: Set<String> = [
         "md", "markdown", "mdx", "txt", "rst",
         "swift", "py", "rb", "go", "rs", "c", "h", "cc", "cpp", "hpp", "java", "kt",
+        "m", "mm", "hh", "cxx", "hxx",
         "ts", "tsx", "js", "jsx", "mjs", "cjs", "json", "yaml", "yml",
         "vue", "svelte",
         "html", "htm", "css", "scss",
-        "sh", "bash", "zsh", "sql", "toml", "xml", "csv", "tsv",
+        "sh", "bash", "zsh", "fish", "tcsh", "ksh",
+        "sql", "toml", "xml", "csv", "tsv",
+        "proto", "plist", "entitlements", "sdef",
         "log", "conf", "ini", "env",
     ]
 

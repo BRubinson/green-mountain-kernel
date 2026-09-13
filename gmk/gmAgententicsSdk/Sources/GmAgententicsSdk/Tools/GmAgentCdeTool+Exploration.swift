@@ -2,8 +2,6 @@ import Foundation
 import FoundationModels
 import GmDaemonSdk
 
-// The exploration family: open, write, rank, complete, read.
-
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeOpenExplorationArguments: Sendable {
@@ -25,15 +23,6 @@ public struct GmAgentCdeOpenExplorationArguments: Sendable {
     }
 }
 
-/// Start my own finding list.
-///
-/// One row per agent type, deduped automatically — every explorer opens its own
-/// and writes only to that one. Sealing another agent's row is not something
-/// this surface offers.
-///
-/// `synthesis` is the odd one: it is the prompt-level row the single reader
-/// opens last, and completing it is the seal for the whole exploration rather
-/// than for one methodology.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeOpenExplorationTool: GmAgentCdeTool {
     public let name = "cde_open_exploration"
@@ -46,7 +35,6 @@ public struct GmAgentCdeOpenExplorationTool: GmAgentCdeTool {
     }
 }
 
-/// One exploration finding.
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentExplorationFinding: Sendable {
@@ -65,16 +53,6 @@ public struct GmAgentExplorationFinding: Sendable {
     @Guide(description: "Repo-relative file this is about, or empty.")
     public var filePath: String
 
-    /// OPTIONAL, AND THE nil IS LOAD-BEARING. nil means UNRANKED, which is a
-    /// real state rather than a missing value: `EXPLORE_COMPLETE` on the
-    /// synthesis row refuses while any finding in the prompt is unranked, and
-    /// that refusal is what makes the cross-agent calibration pass mandatory
-    /// instead of merely recommended.
-    ///
-    /// A non-optional Int here would give every finding a rating the moment it
-    /// was written, drive `promptUnrankedCount` permanently to zero, and
-    /// silently retire the gate while every doc comment still described it. The
-    /// wire type is `Int?` for exactly this reason; match it.
     @Guide(description: """
         How important, 0 is most important and 999 is ignore. Leave it out \
         unless you were told to rate; ranking is one reader's job.
@@ -111,22 +89,6 @@ public struct GmAgentCdeWriteExplorationsArguments: Sendable {
     }
 }
 
-/// Write down many findings at once.
-///
-/// PLURAL BY DESIGN, SINGULAR UNDERNEATH — and the gap between those two is a
-/// real hazard, not a detail. `EXPLORE_FINDING_ADD` takes ONE finding, so until
-/// a plural wire verb exists an implementation of this loops. A ten-finding call
-/// that fails at the seventh leaves six findings committed, in a database that
-/// is append-only and never wiped: there is no rollback, and retrying the whole
-/// batch duplicates the six.
-///
-/// The plural shape is still the right thing to declare now, because argument
-/// shapes are the expensive thing to change once anything depends on them. What
-/// is not acceptable is shipping the shape while implying atomicity it does not
-/// have — hence this paragraph.
-///
-/// Contrast `rank_explorations`, which IS atomic on the wire: one bad pair
-/// rejects the whole batch.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeWriteExplorationsTool: GmAgentCdeTool {
     public let name = "cde_write_explorations"
@@ -139,7 +101,6 @@ public struct GmAgentCdeWriteExplorationsTool: GmAgentCdeTool {
     }
 }
 
-/// One finding's rating.
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentFindingRating: Sendable {
@@ -170,18 +131,6 @@ public struct GmAgentCdeRankExplorationsArguments: Sendable {
     }
 }
 
-/// Give every finding a number, all at once.
-///
-/// DERIVED — the prompt behind this surface names writing and completing an
-/// exploration but not ranking it, and without ranking the exploration can never
-/// be sealed: `EXPLORE_COMPLETE` on the synthesis row REFUSES while any finding
-/// in the prompt is unranked. So this is not an enhancement, it is a missing
-/// link in the chain the other tools form.
-///
-/// Prompt-wide and cross-agent: a rating means the same thing whichever
-/// methodology wrote the finding, which is why it is one calibration pass by one
-/// reader rather than each agent scoring its own. Atomic — one bad pair rejects
-/// the whole batch — which is also why the argument is a single list.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeRankExplorationsTool: GmAgentCdeTool {
     public let name = "cde_rank_explorations"
@@ -213,10 +162,6 @@ public struct GmAgentCdeCompleteExplorationArguments: Sendable {
     }
 }
 
-/// Finding list done, here is what it all means.
-///
-/// Seals one row — your own. Sealing the `synthesis` row is the prompt-level
-/// seal, and it refuses while any finding anywhere in the prompt is unranked.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeCompleteExplorationTool: GmAgentCdeTool {
     public let name = "cde_complete_exploration"
@@ -251,17 +196,6 @@ public struct GmAgentCdeGetExplorationArguments: Sendable {
     }
 }
 
-/// Show me the findings so far.
-///
-/// DERIVED. The prompt names no read beside these writes, and that would be a
-/// real hole: an agent that cannot read its own exploration rows through this
-/// surface will go get them another way, and once it is outside the surface for
-/// reading it is outside it for writing too.
-///
-/// NARROWED ON PURPOSE. `maxRating` and `agentType` exist so the answer can be
-/// made smaller, because an unnarrowable read is the other way an agent ends up
-/// leaving — a tool that can only return everything eventually returns more than
-/// the caller can hold, and then it stops being used.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeGetExplorationTool: GmAgentCdeTool {
     public let name = "cde_get_exploration"

@@ -2,15 +2,6 @@ import Foundation
 import FoundationModels
 import GmDaemonSdk
 
-// The kbite family: search, open a maw, digest.
-//
-// WHAT IS DELIBERATELY ABSENT. Chewing — the step between opening a maw and
-// digesting it — stays in the plugin for now, so there is no chew tool here.
-// So do KBITE_EXPORT / IMPORT / DELETE / KEYWORD_TAG / LIST / ADD / REMOVE,
-// all of which the daemon serves. This surface is an intentionally constrained
-// subset of the daemon client interface, and the constraint only holds if
-// "the verb exists" stops being a reason to add a tool.
-
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentKbiteSearchArguments: Sendable {
@@ -33,14 +24,6 @@ public struct GmAgentKbiteSearchArguments: Sendable {
     }
 }
 
-/// Find stuff in chewed-up kbites.
-///
-/// Returns ranked STUBS with briefs, never file content — read a brief, then
-/// fetch the one file you want. That shape is the verb's, not a choice made
-/// here, and it is what keeps a broad search from blowing a context window.
-///
-/// FTS5 token matching with bm25 ranking. Not typo-tolerant: a query with no
-/// searchable tokens is refused rather than answered emptily.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentKbiteSearchTool: GmAgentKbiteTool {
     public let name = "kbite_search"
@@ -68,7 +51,6 @@ public struct GmAgentKbiteOpenMawArguments: Sendable {
     }
 }
 
-/// Open big mouth to collect stuff.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentKbiteOpenMawTool: GmAgentKbiteTool {
     public let name = "kbite_open_maw"
@@ -96,11 +78,6 @@ public struct GmAgentKbiteDigestArguments: Sendable {
     }
 }
 
-/// Swallow the chewed stuff into the brain.
-///
-/// Digestion is the step that moves chewed files into the db and archives the
-/// raw sources. Chewing itself happens in the plugin and is not reachable from
-/// this surface.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentKbiteDigestTool: GmAgentKbiteTool {
     public let name = "kbite_digest"

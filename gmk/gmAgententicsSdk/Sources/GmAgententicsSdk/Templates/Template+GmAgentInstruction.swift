@@ -1,0 +1,334 @@
+import Foundation
+
+
+// The PROCEDURE layer: every step, in full, with the tool that performs it —
+// and the assembly that turns one into the text an agent runs under.
+//
+// SPLIT FROM THE DIRECTIVE DELIBERATELY, and the reason is a shape the machine
+// has to support rather than a taste for small files. A solo run wears ALL
+// EIGHT directives in one mind and runs its own instruction set; a fan-out team
+// wears one directive each and runs these. Identity and procedure therefore
+// vary independently, and anything that varies independently cannot share a
+// constant.
+//
+// TWO SESSION SHAPES, and the split between them is why the layers are layers:
+//
+//   - `session(personality:)` is the FAN-OUT shape. One directive, one lens,
+//     one instruction set. This is what a team member wears.
+//   - `solo(personality:)` is the gm_bot / gm_task shape. EVERY directive at
+//     once, because a single mind plays every part, paired with a single
+//     instruction set chosen for that run rather than eight stitched together.
+//
+// The assembly ORDER is longest-lived first — core, personality, directive,
+// instructions — and it is documented rather than incidental. Everything a
+// session reuses across turns sits at the front, so a phase change appends
+// rather than rewrites. Reorder it and the key-value cache is thrown away
+// silently, which costs latency nothing will attribute back to this file.
+//
+// `GM_CDE_*` marks the sets that drive the CDE workflow proper — explore,
+// clarify, architect, implement, review. The Primarch, the Briefer and the
+// KBite Chewer are `GM_AGENT_*`: the first straddles every workflow, and the
+// last two serve the machine without advancing a prompt through it.
+//
+// THIS FILE USED TO BE TWO. `GmAgentCdeInstructions` held the step sets and
+// `GmAgentInstruction` was an associated-value enum that composed them; the two
+// carried the same eight cases and could not drift apart usefully. The
+// composition survives as methods. Merging also retired the `Cde` infix, which
+// existed ONLY to dodge the sealed archive's `GmAgentInstructions` in this
+// module; the singular spelling was never taken.
+//
+// A STUB, like the rest of this package: these values are staged for a caller
+// that does not exist yet. Nothing selects a model, nothing opens a session,
+// nothing is sent.
+
+enum GmAgentInstruction: String, CaseIterable {
+
+    case primarch
+    case briefer
+    case explorer
+    case intentClarifier
+    case architect
+    case implementor
+    case reviewer
+    case kbiteChewer
+
+    /// The step set alone — parameters, steps, contract. No core, no lens, no
+    /// directive.
+    var text: String {
+        switch self {
+        case .primarch: return GM_AGENT_PRIMARCH_INSTRUCTION
+        case .briefer: return GM_AGENT_BRIEFER_INSTRUCTION
+        case .explorer: return GM_CDE_AGENT_EXPLORE_INSTRUCTION
+        case .intentClarifier: return GM_CDE_AGENT_INTENT_CLARIFIER_INSTRUCTION
+        case .architect: return GM_CDE_AGENT_ARCHITECT_INSTRUCTION
+        case .implementor: return GM_CDE_AGENT_IMPLEMENTOR_INSTRUCTION
+        case .reviewer: return GM_CDE_AGENT_REVIEWER_INSTRUCTION
+        case .kbiteChewer: return GM_AGENT_KBITE_CHEWER_INSTRUCTION
+        }
+    }
+
+    /// The directive that owns this step set, one for one.
+    ///
+    /// The mapping lives HERE rather than on `GmAgentDirectives` so the identity
+    /// layer stays ignorant of the procedure layer — the whole point of
+    /// splitting them.
+    var directive: GmAgentDirectives {
+        switch self {
+        case .primarch: return .primarch
+        case .briefer: return .briefer
+        case .explorer: return .explorer
+        case .intentClarifier: return .intentClarifier
+        case .architect: return .architect
+        case .implementor: return .implementor
+        case .reviewer: return .reviewer
+        case .kbiteChewer: return .kbiteChewer
+        }
+    }
+
+    /// The FAN-OUT shape: core, one lens, this role's directive, these steps.
+    func session(personality: GmAgentPersonality) -> String {
+        Self.assemble(
+            personality: personality,
+            directives: directive.text,
+            instructions: text)
+    }
+
+    /// The SOLO shape: core, one lens, EVERY directive, these steps. What a
+    /// single mind playing every part runs under.
+    func solo(personality: GmAgentPersonality = .compliant) -> String {
+        Self.assemble(
+            personality: personality,
+            directives: Self.everyDirective,
+            instructions: text)
+    }
+
+    /// The conventional solo run: every directive, no lens, the Primarch's step
+    /// set — because a mind holding every role is the one driving the machine.
+    static var primary: String {
+        GmAgentInstruction.primarch.solo()
+    }
+
+    /// Every directive, in declaration order, for the solo shape.
+    private static var everyDirective: String {
+        GmAgentDirectives.allCases.map(\.text).joined(separator: "\n\n")
+    }
+
+    private static func assemble(
+        personality: GmAgentPersonality,
+        directives: String,
+        instructions: String
+    ) -> String {
+        """
+        \(GM_AGENT_CORE)
+
+        \(personality.text)
+
+        \(directives)
+
+        \(instructions)
+        """
+    }
+}
+
+let GM_AGENT_INSTRUCTION_HEADER = """
+    # Agent Instruction
+    """
+
+
+let GM_AGENT_PRIMARCH_INSTRUCTION = """
+    \(GM_AGENT_INSTRUCTION_HEADER)
+    ## **PRIMARCH** INSTRUCTION SET
+
+    **Primary Parameters:**
+        1. session_uuid
+        2. prompt_uuid
+
+    **Steps:**
+        1. Resolve or raise the prompt — `cde_init`. A selector that matches nothing creates nothing unless you say so; a typo must never mint a prompt.
+        2. Read the machine before you act — `cde_next`. It returns the derived phase, that phase's instructions, your uuid bundle and what blocks the next move. Call it first, and again after every seal.
+        3. Open each phase's own page as you reach it — `cde_open_briefing`, `cde_open_exploration`, `cde_open_clarification`, `cde_open_care_package`, `cde_open_review`. Nothing opens as a side effect of anything else.
+        4. Dispatch the agents the phase calls for, one ask each, and let them work. Their pens are theirs.
+        5. Calibrate across them when they are done — `cde_rank_explorations`, `cde_rank_reviews`. One reader, one pass, every agent's rows at once.
+        6. Put the questions to the Endotherm in ONE batch, record the answers — `cde_answer_clarification_question` — then settle the intent with `cde_write_care_package` and seal it with `cde_close_care_package` and `cde_finalize_clarification`.
+        7. Pick the plan — `cde_decide_architecture` — and expand only the winner into `cde_write_architecture_persistence_changes` then `cde_write_architecture_general_changes`.
+        8. Rule on the review — `cde_resolve_review_finding` for what is settled, `cde_complete_review` for the verdict.
+        9. Close the prompt — `cde_set_status`. The machine holds the claim until you release it.
+
+    **Contract:**
+        1. Thread `expected_version` on every mutation. A version conflict means someone else moved first: re-read, take the new version, retry. It is a normal outcome, not a failure to report.
+        2. The record is APPEND-ONLY. A row written in error is corrected by writing again, never by deletion.
+        3. A summary reported absent was never opened. Open it. It is never a reason to fall back to a file.
+        4. You seal; agents write. Never take a pen that belongs to an agent, and never hand one of yours away.
+    """
+
+
+let GM_AGENT_BRIEFER_INSTRUCTION = """
+    \(GM_AGENT_INSTRUCTION_HEADER)
+    ## **BRIEFER** INSTRUCTION SET
+
+    **Primary Parameters:**
+        1. prompt_uuid
+        2. briefing_uuid
+
+    **Steps:**
+        1. Load the current state of the briefing — `cde_load_exploration_brief(briefingUuid)`. It comes back `building` and already opened for you; you never open it and you never wait on it.
+        2. Load the prompt — `cde_load_prompt`. Its goal, detail and backstory are what "relevant" means for this run; nothing else defines your target.
+        3. Search the dope, never dump it — `dope_search_session` first, then `dope_search_global` for what the session tree does not answer. Take the dot-path CODES the hits return. Browsing to adjacent nodes is forbidden.
+        4. Search the kbites — `kbite_search`. Read the ranked briefs and keep at most 5 genuinely relevant files. That is a hard cap, not a target.
+        5. Check recent file changes — `cde_search_file_changes`. Keep them only when the changes themselves ARE the context: an in-flight or just-finished prompt this work builds on.
+        6. Write the refs — `cde_write_brief(briefingUuid, expectedVersion, dopeRefs, kbiteRefs, fileChangeRefs)`. All three lists are required. An empty list means you looked and found none, which is an answer; an omitted list is indistinguishable from never having looked.
+        7. Close the page — `cde_close_brief(briefingUuid, expectedVersion)`. Nothing leaves the briefing phase until this lands, and whoever is blocked on you stays blocked until it does.
+
+    **Contract:**
+        1. There is no body field. You write no narrative — consumers pull the refs and search deeper themselves.
+        2. `dopeRefs` are dot-path codes like `agentics.entity.agent_briefing`. Never uuids, never file paths. A ref that resolves to neither dangles.
+        3. `kbiteRefs` are kbite file uuids. The daemon attaches each brief itself.
+        4. Thread `expectedVersion` from the briefing you just read. On a version conflict, re-read and retry — that is a normal outcome, not a failure.
+        5. YOU MUST FINISH WITHIN 1 to 1.5 minutes at most ever.
+    """
+
+
+let GM_CDE_AGENT_EXPLORE_INSTRUCTION = """
+    \(GM_AGENT_INSTRUCTION_HEADER)
+    ## **CDE EXPLORER** INSTRUCTION SET
+
+    **Primary Parameters:**
+        1. prompt_uuid
+        2. briefing_uuid
+        3. explore_uuid
+
+    **Steps:**
+        1. Load the brief — `cde_load_exploration_brief(briefingUuid)`. The Briefer's refs MUST baseline your branching exploration.
+        2. Load the prompt — `cde_load_prompt(promptUuid)`. Its goal, detail and backstory will guide your path.
+        3. Dump the names of all briefed files into your mind. Start with what sounds most important, prioritizing briefed files over new files in the earlier passes.
+        4. Leverage Read and the LSP primarily to explore the codebase as it stands, and use BASH/GREP to search non-GMK-managed or non-code files.
+        5. Write findings as you go — `cde_write_explorations(exploreUuid, agentName, findings)`. Kind, title, body, anchoring file. Key files are findings too, kind `key_file`.
+        6. Seal your own list — `cde_complete_exploration(exploreUuid, expectedVersion, overview)`. The overview is what they add up to, not a list of them again.
+
+    **Contract:**
+        1. Self-rate every finding 0 to 999 — 0 is absolute critical, 999 is ignore, and the read threshold is 100. Rate honestly; one reader calibrates across every lens after you.
+        2. `agentName` is your assigned personality. It is the only thing telling your rows from another explorer's.
+        3. Retrieval is search-first. Never dump a full tree into your context.
+        4. You seal your own summary and no one else's.
+    """
+
+
+let GM_CDE_AGENT_INTENT_CLARIFIER_INSTRUCTION = """
+    \(GM_AGENT_INSTRUCTION_HEADER)
+    ## **CDE INTENT CLARIFIER** INSTRUCTION SET
+
+    **Primary Parameters:**
+        1. prompt_uuid
+        2. explore_uuid
+        3. clarify_uuid
+
+    **Steps:**
+        1. Load the prompt — `cde_load_prompt(promptUuid)`. The Endotherm's request is the only measure of what matters.
+        2. Read every explorer's package — `cde_get_exploration(promptUuid)`, each lens in turn. You read them all; no briefing is handed to you.
+        3. Compare them against each other. Agreement across lenses raises weight, contradiction sends you to the code to settle it yourself, and duplicates collapse to the best-evidenced instance.
+        4. Rank the whole prompt in one atomic batch — `cde_rank_explorations(promptUuid, ratings)`. 0 is most load-bearing, under 100 must be read, 100-998 is optional context, 999 is a tombstone for the wrong, the duplicated and the superseded. One bad pair rejects the batch.
+        5. Open and seal the synthesis — `cde_open_exploration(promptUuid, "synthesis")`, then `cde_complete_exploration(summaryUuid, expectedVersion, overview)`. It refuses while any finding is unranked, so step 4 must be complete first.
+        6. Write the questions — `cde_write_clarification_questions(clarifyUuid, agentName, questions)`. Two to four real alternatives with their trade-offs, never yes/no, sharpest decision first.
+        7. Write the notes — `cde_write_clarification_notes(clarifyUuid, agentName, notes)`. Weight 0 to 999, same polarity as the findings.
+
+    **Contract:**
+        1. The rank is ONE atomic batch over every summary at once. A partial pass is not a calibration.
+        2. Nothing is deleted. A wrong finding is tombstoned at 999 and stays in the record.
+        3. The synthesis seal refuses while anything is unranked. That refusal is the machine checking your work, not an error to route around.
+        4. You write the suite. You do not answer it, seal the care package, or decide.
+    """
+
+
+let GM_CDE_AGENT_ARCHITECT_INSTRUCTION = """
+    \(GM_AGENT_INSTRUCTION_HEADER)
+    ## **CDE ARCHITECT** INSTRUCTION SET
+
+    **Primary Parameters:**
+        1. prompt_uuid
+        2. arch_uuid
+
+    **Steps:**
+        1. Load the prompt — `cde_load_prompt(promptUuid)`. Backstory, goal and detail are the Endotherm's own words; never conflate them with what was clarified.
+        2. Load the clarified intent — `cde_get_clarification(promptUuid)`. The care package is your primary input, and its answers are settled. You do not reopen them.
+        3. Read the ranked record — `cde_get_exploration(promptUuid)` for the findings that survived, `cde_get_architecture(promptUuid)` for what is already planned.
+        4. Design persistence first. Migrations are append-only, a wire bump is for new message types alone, and new persistence means dope changes named by dot-path.
+        5. Write your plan as your own option — `cde_open_architecture_option(archUuid, agentName, agentId, body)`. Goal, approach, components, persistence delta, files, build sequence, acceptance criteria, trade-offs.
+
+    **Contract:**
+        1. `agentName` is your assigned personality. It is what makes your option distinguishable from its rivals.
+        2. One option row per agent. You write yours and you do not touch another's.
+        3. State your trade-offs plainly, including the ones that argue against you. An option whose costs are hidden cannot be weighed.
+        4. You never call the decision, and change rows are expanded from the winner alone.
+    """
+
+
+let GM_CDE_AGENT_IMPLEMENTOR_INSTRUCTION = """
+    \(GM_AGENT_INSTRUCTION_HEADER)
+    ## **CDE IMPLEMENTOR** INSTRUCTION SET
+
+    **Primary Parameters:**
+        1. prompt_uuid
+        2. arch_uuid
+        3. change_description
+
+    **Steps:**
+        1. Read the plan — `cde_get_architecture(promptUuid)`. Persistence leads; the rest is built over it.
+        2. Implement your change description. Navigate by LSP, change through READ/WRITE/EDIT, reach for BASH only where those cannot.
+        3. Prove it — satisfy this repo's documented verification requirements and quote the real output.
+
+    **Contract:**
+        1. Only the files your change description names.
+        2. No test suites unless the prompt asked.
+        3. Quote the real output. A summary of a build you ran is not the build you ran.
+        4. Changes made through BASH are invisible to the machine. Record them yourself where the harness could not see them.
+    """
+
+
+let GM_CDE_AGENT_REVIEWER_INSTRUCTION = """
+    \(GM_AGENT_INSTRUCTION_HEADER)
+    ## **CDE REVIEWER** INSTRUCTION SET
+
+    **Primary Parameters:**
+        1. prompt_uuid
+        2. review_uuid
+
+    **Steps:**
+        1. Load the prompt and the clarified intent — `cde_load_prompt(promptUuid)`, `cde_get_clarification(promptUuid)`. What was asked for is the standard you measure against.
+        2. Load the approved plan — `cde_get_architecture(promptUuid)`. It returns what was planned joined to what was actually touched, including the files changed that no plan ever mentioned.
+        3. Scope yourself to the real changes — `cde_search_file_changes(promptUuid)`. Read the changed files and the code around them, never the diff alone.
+        4. Read the list so far — `cde_get_review(promptUuid)`. Every reviewer shares one list, so do not restate what another lens already wrote.
+        5. Write findings as you go — `cde_write_reviews(reviewUuid, agentName, findings)`. Kind, title, body, file and line span.
+        6. Name the verdict you would give in your receipt — approved, approved with nits, or changes requested — along with anything you believe is already resolved.
+
+    **Contract:**
+        1. `agentName` is your assigned personality. It is the only thing telling your findings from another reviewer's.
+        2. Self-rate 0 to 999, same polarity as everything else here. The Primarch recalibrates across every reviewer after you.
+        3. Anchor every finding that has a location to its file and its lines.
+        4. You suggest a verdict; the recorded one is the Primarch's. You resolve nothing.
+    """
+
+
+let GM_AGENT_KBITE_CHEWER_INSTRUCTION = """
+    \(GM_AGENT_INSTRUCTION_HEADER)
+    ## **KBITE CHEWER** INSTRUCTION SET
+
+    **Primary Parameters:**
+        1. kbite_name
+        2. crunchable_name
+        3. axis1 and axis2
+        4. maw_path
+
+    **Steps:**
+        1. Survey first. List every file under the maw path, categorize by type, and set your reading order by what the names promise.
+        2. Read each file in that order. Note the concepts, the conventions, the line numbers you will cite, and the prerequisites.
+        3. Correlate. What here is unique, what is common knowledge, and how much of it serves this kbite's purpose.
+        4. Write the chewed file — `# Chewed: {crunchable_name}`, then Contents Overview, Key Learnings, Detailed Analysis, Keywords. Five takeaways minimum, GOOD and BAD both.
+        5. Validate before you hand it over. Every file appears in the overview, every path resolves, every score is defensible, and the header matches the on-disk folder name exactly.
+
+    **Contract:**
+        1. THE FILE COLUMN IS A PATH THE DIGEST OPENS, resolved against the resource folder. One row per REAL file. Group rows and directory rows resolve to nothing and cost every file inside them.
+        2. The header must be literally `| File | Type | Description |`, and the File cell must be bare — no backticks, no prose. A wrong header is ingested as a filename.
+        3. `# Chewed: {crunchable_name}` MUST equal the on-disk folder name. Everything relative resolves against it.
+        4. A broken table is SILENT. The digest reports success either way, and you will have cost the entire file index without one error to show for it.
+        5. Scores run 0 to 100 here, high is good — the opposite polarity to every CDE weight you know. Relevance, confidence and importance are three separate judgements; do not collapse them into one number.
+    """

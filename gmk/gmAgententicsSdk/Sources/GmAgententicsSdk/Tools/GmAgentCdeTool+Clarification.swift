@@ -2,14 +2,6 @@ import Foundation
 import FoundationModels
 import GmDaemonSdk
 
-// The clarification family and the care package.
-//
-// ONE COUPLING TO KNOW. `open_clarification` used to be unnecessary: the
-// clarification summary appeared as a side effect of moving the prompt's status
-// to `clarifying`. That status no longer exists, so the summary has to be opened
-// deliberately — this tool is what replaces the side effect, not an addition
-// beside it.
-
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeOpenClarificationArguments: Sendable {
@@ -21,7 +13,6 @@ public struct GmAgentCdeOpenClarificationArguments: Sendable {
     }
 }
 
-/// Start the question list.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeOpenClarificationTool: GmAgentCdeTool {
     public let name = "cde_open_clarification"
@@ -34,7 +25,6 @@ public struct GmAgentCdeOpenClarificationTool: GmAgentCdeTool {
     }
 }
 
-/// One question for the human, with its options.
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentClarificationQuestion: Sendable {
@@ -74,16 +64,6 @@ public struct GmAgentCdeWriteClarificationQuestionsArguments: Sendable {
     }
 }
 
-/// Write down many questions for the human.
-///
-/// The nested `options` array is worth noting as precedent: it is ALREADY a
-/// batch of child rows on the wire — `CLARIFY_QUESTION_ADD` takes
-/// `options: [String]` and writes one option row each — so batching a child
-/// collection inside its parent is an existing pattern here, not an invention of
-/// this surface.
-///
-/// The questions themselves still loop, with the same partial-write hazard as
-/// every other plural write in this package.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeWriteClarificationQuestionsTool: GmAgentCdeTool {
     public let name = "cde_write_clarification_questions"
@@ -98,7 +78,6 @@ public struct GmAgentCdeWriteClarificationQuestionsTool: GmAgentCdeTool {
     }
 }
 
-/// One internal note — for the record, never shown to the user as a question.
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentClarificationNote: Sendable {
@@ -133,12 +112,6 @@ public struct GmAgentCdeWriteClarificationNotesArguments: Sendable {
     }
 }
 
-/// Write down many private notes.
-///
-/// Notes are what is SETTLED — decisions, constraints and corrections that need
-/// recording but do not need asking. Questions are for what genuinely needs the
-/// human. Writing a settled thing as a question wastes the one scarce resource
-/// in the loop, which is the user's attention.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeWriteClarificationNotesTool: GmAgentCdeTool {
     public let name = "cde_write_clarification_notes"
@@ -183,12 +156,6 @@ public struct GmAgentCdeAnswerClarificationQuestionArguments: Sendable {
     }
 }
 
-/// Human said this.
-///
-/// Record the answer as given. When the human answers with something other than
-/// the offered options — which is common and usually the most valuable answer —
-/// `answerText` is the record and `selectedOptionUuids` stays empty. Do not
-/// round a free-form answer to the nearest option.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeAnswerClarificationQuestionTool: GmAgentCdeTool {
     public let name = "cde_answer_clarification_question"
@@ -218,14 +185,6 @@ public struct GmAgentCdeFinalizeClarificationArguments: Sendable {
     }
 }
 
-/// Questions all done.
-///
-/// A PURE GATE and nothing more. The prompt behind this surface describes
-/// finalize as also writing the summarised intent and opening the care package;
-/// on the wire those are three separate things, and the clarified intent belongs
-/// to `close_care_package`, not here. They are kept separate because folding
-/// them would make one call that half-fails leave two records disagreeing about
-/// whether clarification finished.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeFinalizeClarificationTool: GmAgentCdeTool {
     public let name = "cde_finalize_clarification"
@@ -251,11 +210,6 @@ public struct GmAgentCdeOpenCarePackageArguments: Sendable {
     }
 }
 
-/// Get an empty box ready for the next agent.
-///
-/// DERIVED. The prompt folds opening into `finalize_clarification`; on the wire
-/// `CARE_PACKAGE_OPEN` is its own verb and has to be called before anything can
-/// be put in the box.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeOpenCarePackageTool: GmAgentCdeTool {
     public let name = "cde_open_care_package"
@@ -268,7 +222,6 @@ public struct GmAgentCdeOpenCarePackageTool: GmAgentCdeTool {
     }
 }
 
-/// One thing put in the care package.
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCareRef: Sendable {
@@ -317,13 +270,6 @@ public struct GmAgentCdeWriteCarePackageArguments: Sendable {
     }
 }
 
-/// Put the good bits in the box for the next agent.
-///
-/// Exploration refs are COPIES of findings already made, rewritten with more
-/// intent for the agent who will read them next. They are never a fresh
-/// exploration — the curation is the value, and re-exploring here would both
-/// duplicate work and quietly produce a second, unranked set of findings that
-/// nothing calibrated.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeWriteCarePackageTool: GmAgentCdeTool {
     public let name = "cde_write_care_package"
@@ -358,13 +304,6 @@ public struct GmAgentCdeCloseCarePackageArguments: Sendable {
     }
 }
 
-/// Box is ready.
-///
-/// THE CLARIFIED INTENT LIVES ONLY HERE. It is never written back to the prompt
-/// row, which keeps the prompt as what the human actually typed and this as what
-/// it was understood to mean. Everything downstream reads the intent from the
-/// package rather than re-deriving it from raw exploration — which is the entire
-/// reason the package exists.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeCloseCarePackageTool: GmAgentCdeTool {
     public let name = "cde_close_care_package"
@@ -395,10 +334,6 @@ public struct GmAgentCdeGetClarificationArguments: Sendable {
     }
 }
 
-/// Show me the questions and answers so far.
-///
-/// DERIVED, and narrowed by `noteWeightMax` for the same reason every read here
-/// is narrowed.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeGetClarificationTool: GmAgentCdeTool {
     public let name = "cde_get_clarification"

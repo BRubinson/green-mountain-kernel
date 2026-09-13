@@ -2,22 +2,6 @@ import Foundation
 import FoundationModels
 import GmDaemonSdk
 
-// THE ENTIRE REVIEW FAMILY IS DERIVED.
-//
-// The prompt behind this surface asks for it in one bracketed aside and names
-// none of the tools: "Add the a similar explore + clarify type stage for the
-// writing of the review stuff where each agent opens review then one goes
-// through them and proposes clarify like questions then implements (implements
-// is currently off the books besides change detection".
-//
-// So the shape below is inferred from the exploration family it is told to
-// mirror — open, write, rank, complete, plus the resolve that exploration has no
-// equivalent of. Every type here needs sign-off in a way the explicitly-named
-// tools do not.
-//
-// AND THE MIRROR IS NOT EXACT, which is the part that must not be papered over.
-// See `GmAgentCdeOpenReviewTool`.
-
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeOpenReviewArguments: Sendable {
@@ -29,24 +13,6 @@ public struct GmAgentCdeOpenReviewArguments: Sendable {
     }
 }
 
-/// Start the complaints list.
-///
-/// ONE ROW PER PROMPT, NOT PER AGENT — and the aside this family is derived from
-/// says "each agent opens review", so the difference is worth being explicit
-/// about rather than quietly resolving.
-///
-/// `EXPLORE_OPEN` takes `agent_type` and `agent_id` and gives each explorer its
-/// own summary row. `REVIEW_OPEN` takes ONLY `prompt_uuid`. There is no
-/// `agent_type` column on `review_summary` at all, so reviewers share a single
-/// summary and are distinguished only by the `agentName` recorded on each
-/// finding they write.
-///
-/// Making review genuinely per-agent is therefore a SCHEMA change, not a tool
-/// change: it needs a new column and a new uniqueness shape. Dropping
-/// `review_summary`'s per-prompt UNIQUE constraint is a precondition for it but
-/// nowhere near sufficient. Adding an `agentType` parameter here that the verb
-/// ignores would be the worst of both — it would read as supported and do
-/// nothing.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeOpenReviewTool: GmAgentCdeTool {
     public let name = "cde_open_review"
@@ -59,7 +25,6 @@ public struct GmAgentCdeOpenReviewTool: GmAgentCdeTool {
     }
 }
 
-/// One review finding.
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentReviewFinding: Sendable {
@@ -87,10 +52,6 @@ public struct GmAgentReviewFinding: Sendable {
     @Guide(description: "Last line it covers, or 0 if not line-specific.")
     public var lineEnd: Int
 
-    /// OPTIONAL for the same reason `GmAgentExplorationFinding.rating` is: nil
-    /// means UNRANKED, and `REVIEW_COMPLETE` refuses while any finding is
-    /// unranked. Making it non-optional would satisfy that gate automatically
-    /// and silently, which is the failure that looks like success.
     @Guide(description: "How bad, 0 is most severe and 999 is ignore. Leave it out unless ranking.")
     public var rating: Int?
 
@@ -127,11 +88,6 @@ public struct GmAgentCdeWriteReviewsArguments: Sendable {
     }
 }
 
-/// Write down many complaints.
-///
-/// `agentName` carries more weight here than in exploration: since every
-/// reviewer writes into ONE shared summary, it is the only thing distinguishing
-/// one reviewer's findings from another's.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeWriteReviewsTool: GmAgentCdeTool {
     public let name = "cde_write_reviews"
@@ -159,12 +115,6 @@ public struct GmAgentCdeRankReviewsArguments: Sendable {
     }
 }
 
-/// Give every complaint a number, all at once.
-///
-/// Cross-agent calibration by one reader: a rating has to mean the same thing
-/// whichever reviewer wrote the finding, which it cannot if each reviewer scores
-/// only its own. Atomic on the wire, and `complete_review` refuses while
-/// anything is unranked — so this is a required step, not a tidying one.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeRankReviewsTool: GmAgentCdeTool {
     public let name = "cde_rank_reviews"
@@ -202,10 +152,6 @@ public struct GmAgentCdeCompleteReviewArguments: Sendable {
     }
 }
 
-/// Complaints done, here is the verdict.
-///
-/// Refuses while any finding is unranked — rank first. The verdict is stored
-/// only here, and a complete review must have one.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeCompleteReviewTool: GmAgentCdeTool {
     public let name = "cde_complete_review"
@@ -237,13 +183,6 @@ public struct GmAgentCdeResolveReviewFindingArguments: Sendable {
     }
 }
 
-/// This complaint is handled.
-///
-/// Legal AFTER the review is sealed, by design — the fix loop runs post-seal, so
-/// this is the one write in the family that a completed summary still accepts.
-/// `accepted` and `wont_fix` are real outcomes, not evasions: a finding the
-/// author disagrees with is resolved by saying so, on the record, rather than by
-/// leaving it open forever.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeResolveReviewFindingTool: GmAgentCdeTool {
     public let name = "cde_resolve_review_finding"
@@ -276,9 +215,6 @@ public struct GmAgentCdeGetReviewArguments: Sendable {
     }
 }
 
-/// Show me the complaints so far.
-///
-/// DERIVED, and narrowed by `maxRating` like every other read here.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeGetReviewTool: GmAgentCdeTool {
     public let name = "cde_get_review"

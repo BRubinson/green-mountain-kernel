@@ -103,6 +103,32 @@ A glossary/table of contents of the raw source contents:
 - `{full_path_to_file_1}`
 - `{full_path_to_file_2}`
 
+> **The `File` column is a PATH THE DIGEST OPENS**, resolved against
+> `{maw}/{axis1}/{axis2}/{resource_name}/`. When it resolves, that file's text
+> is inlined into the db and becomes searchable; when it does not, you still get
+> a row — an empty one — and **the digest reports success either way**. A broken
+> File column is therefore silent, and costs the entire file index.
+>
+> Four rules, all load-bearing:
+>
+> 1. **One row per REAL file**, spelled relative to the resource folder
+>    (`sources/VT100/VT100Parser.m`). Group rows (`sources/VT100/*.m (65 files)`)
+>    and directory rows (`sources/VT100/`) resolve to nothing — they cost every
+>    file inside them.
+> 2. **Never quote the cell.** `` `path.m` `` is trimmed of backticks by the
+>    parser now, but the Type column is what you describe it with — keep the
+>    File cell bare so it reads as a path, not prose.
+> 3. **The header must be literally `| File | Type | Description |`.** Variants
+>    like `| File / Group | ...` are not recognized as a header, so the header
+>    cells get ingested as filenames.
+> 4. **`# Chewed: {resource_name}` must equal the on-disk folder name.** It is
+>    what every relative path resolves against; a drifting header silently points
+>    the whole table at a directory that does not exist.
+>
+> If a resource has more files than is reasonable to table (hundreds), do NOT
+> collapse them into group rows. Table the files that carry the knowledge, and
+> leave the rest to a generated index file inside the resource.
+
 ---
 
 ## 2. Key Learnings Summary

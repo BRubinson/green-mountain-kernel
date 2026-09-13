@@ -2,8 +2,6 @@ import Foundation
 import FoundationModels
 import GmDaemonSdk
 
-// The briefing trio, plus the read every explorer pulls at spawn.
-
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeOpenBriefingArguments: Sendable {
@@ -19,20 +17,6 @@ public struct GmAgentCdeOpenBriefingArguments: Sendable {
     }
 }
 
-/// Make empty note page for the dope agent to fill.
-///
-/// THIS CALL STARTS THE PROMPT. Opening a briefing moves the prompt from draft
-/// to initiated, daemon-side and idempotently — it is not a separate step the
-/// caller has to remember.
-///
-/// It is here rather than on `load_prompt` for one reason: loading has to stay a
-/// pure read. If merely looking at a prompt advanced it, inspection would be
-/// destructive, and in an append-only db that cannot be taken back. Opening a
-/// briefing is the first act of real work, so it is the honest trigger.
-///
-/// Opening an existing briefing RESETS it rather than duplicating, and the reset
-/// TRUNCATES its refs — a step's briefing is its current briefing, and stale
-/// refs must not leak into the rebuilt one.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeOpenBriefingTool: GmAgentCdeTool {
     public let name = "cde_open_briefing"
@@ -84,18 +68,6 @@ public struct GmAgentCdeWriteBriefArguments: Sendable {
     }
 }
 
-/// Put dope, kbite, and file-change notes on the page.
-///
-/// GENUINELY BATCH, unlike most writes in this surface: `BRIEFING_COMPLETE`
-/// takes all three ref arrays in one call, so there is no loop and no
-/// partial-write hazard here.
-///
-/// ALL THREE CLASSES ARE REQUIRED, and the schema enforces it by making them
-/// non-optional arrays. The contract is that a briefing records what it LOOKED
-/// FOR, not only what it found: an empty list means "searched, found none",
-/// which is information, while an omitted list is indistinguishable from never
-/// having looked. That distinction is the whole reason the arrays are not
-/// optional — a model given `[String]?` will omit the one it has nothing for.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeWriteBriefTool: GmAgentCdeTool {
     public let name = "cde_write_brief"
@@ -123,11 +95,6 @@ public struct GmAgentCdeCloseBriefArguments: Sendable {
     }
 }
 
-/// Page is done, agent can go away now.
-///
-/// The last thing a doper does. Marking the briefing ready is what releases
-/// whoever is waiting on it — the machine refuses to leave the briefing phase
-/// until this lands.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeCloseBriefTool: GmAgentCdeTool {
     public let name = "cde_close_brief"
@@ -151,11 +118,6 @@ public struct GmAgentCdeLoadBriefArguments: Sendable {
     }
 }
 
-/// Read the page everyone should know.
-///
-/// What every exploration agent pulls at spawn: the pre-seeded refs its whole
-/// cohort shares, so each agent starts from the same ground rather than
-/// rediscovering it in parallel.
 @available(GmAgentOs 1.0, *)
 public struct GmAgentCdeLoadBriefTool: GmAgentCdeTool {
     public let name = "cde_load_exploration_brief"
