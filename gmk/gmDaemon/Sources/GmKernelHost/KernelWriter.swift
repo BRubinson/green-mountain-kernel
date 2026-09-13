@@ -42,6 +42,33 @@ public final class KernelWriter {
         //
         // Only when the ledger is actually behind: an up-to-date kernel starting
         // for the thousandth time must not copy a ~800MB database every launch.
+        // REFUSE A DATABASE FROM THE FUTURE, before touching it.
+        //
+        // The check below catches a db BEHIND this binary. This one catches a
+        // db AHEAD of it, which is the direction nothing caught and which fails
+        // SILENTLY: GRDB applies unapplied registered migrations and does not
+        // object to applied ones it has never heard of, so an older kernel
+        // opening a newer database sees no pending work and simply carries on —
+        // writing rows through a model that disagrees with the schema.
+        //
+        // With more than one environment on a machine this stops being
+        // theoretical. A root seeded from a newer source, or a stale
+        // `releases/active` in one root while another was rebuilt, reaches it
+        // on an ordinary day.
+        //
+        // Refusing loudly here costs a confusing startup failure. Not refusing
+        // costs quiet corruption of an append-only database, which is not
+        // recoverable by any amount of care afterwards.
+        if try store.hasBeenSuperseded() {
+            throw StoreError.corruptState(
+                entity: "schema",
+                detail: "\(Paths.db.path) carries migrations this binary does not know — "
+                    + "it was written by NEWER bits (this kernel is at schema "
+                    + "\(Migrations.currentSchemaVersion)). Refusing to open it rather than "
+                    + "writing through a schema we cannot model. Update the binaries in this "
+                    + "root, or point GM_FS_ROOT at the environment these bits belong to.")
+        }
+
         if try store.hasPendingMigrations() {
             let destination = try store.backupBeforeMigration()
             log("pre-migration backup: \(destination)")

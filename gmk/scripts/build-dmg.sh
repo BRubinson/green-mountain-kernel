@@ -99,6 +99,30 @@ xcodebuild archive \
 APP="$ARCHIVE/Products/Applications/$APP_NAME.app"
 [ -d "$APP" ] || { echo "error: archive did not produce $APP" >&2; exit 1; }
 
+# ── The baked root must BE THERE, and a missing one is FATAL ─────────────────
+#
+# The app resolves its filesystem root from this Info.plist key first, precisely
+# so that no launch context can redirect it. The failure mode when the key is
+# absent is the dangerous direction: resolution falls through to ~/gmfs and the
+# bundle writes PRODUCTION while believing it is isolated.
+#
+# That is not hypothetical. `INFOPLIST_KEY_GMFSRoot` — the obvious way to set
+# this — is silently DROPPED, because that build-setting prefix is a declared
+# allow-list Xcode filters against. It builds clean and produces a bundle with
+# no key. Verified empirically; hence a real Info.plist, and hence this gate.
+#
+# Fail the BUILD rather than ship a bundle whose root is a guess.
+BAKED_ROOT="$(plutil -extract GMFSRoot raw "$APP/Contents/Info.plist" 2>/dev/null || true)"
+case "$BAKED_ROOT" in
+    ""|*'$('*)
+        echo "error: $APP has no usable GMFSRoot in Info.plist (got '${BAKED_ROOT:-<absent>}')." >&2
+        echo "       Without it the app falls through to ~/gmfs and writes PRODUCTION." >&2
+        exit 1
+        ;;
+esac
+BAKED_ENV="$(plutil -extract GMEnvironment raw "$APP/Contents/Info.plist" 2>/dev/null || echo '?')"
+echo "  baked environment: $BAKED_ENV -> $BAKED_ROOT"
+
 # ── Signing: INSIDE-OUT, and `--deep` is gone ────────────────────────────────
 #
 # `--deep` is deprecated by Apple and is the wrong tool for a bundle that carries

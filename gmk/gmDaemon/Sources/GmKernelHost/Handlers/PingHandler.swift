@@ -26,7 +26,12 @@ enum PingHandler {
             residentMemoryBytes: KernelVitalsSource.residentMemoryBytes(),
             cpuPercent: KernelVitalsSource.cpuPercent(),
             writerRole: KernelVitalsSource.writerRole,
-            writerBundlePath: KernelVitalsSource.writerBundlePath
+            writerBundlePath: KernelVitalsSource.writerBundlePath,
+            // Answered by the process that RESOLVED it, which is the only
+            // honest source. A client cannot infer this from its own
+            // environment — a LaunchServices-launched app inherits none — so
+            // asking is the difference between knowing and guessing.
+            gmfsRoot: Paths.root.path
         )
         return try okResult(.ping, head, response)
     }

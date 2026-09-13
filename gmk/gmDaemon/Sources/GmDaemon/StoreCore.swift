@@ -50,6 +50,22 @@ final class StoreCore: @unchecked Sendable {
         isoFormatter.string(from: Date())
     }
 
+    /// A stamp `offsetSeconds` in the future, in the same format as `isoNow`.
+    /// Used only by the test lock's LEASE mode — the degraded liveness path for
+    /// a holder that cannot keep a file descriptor open. The flock probe is the
+    /// primary test and needs no clock at all.
+    static func isoNow(offsetSeconds: Int) -> String {
+        isoFormatter.string(from: Date().addingTimeInterval(TimeInterval(offsetSeconds)))
+    }
+
+    /// Parse a stamp this type wrote. Returns nil rather than throwing: every
+    /// caller is comparing against a deadline, and an unparseable stamp must
+    /// degrade to "no opinion" rather than to a decision — reading a bad lease
+    /// as expired would break a live holder's lock.
+    static func parseIso(_ value: String) -> Date? {
+        isoFormatter.date(from: value)
+    }
+
     static func newUuid() -> String {
         UUID().uuidString.lowercased()
     }

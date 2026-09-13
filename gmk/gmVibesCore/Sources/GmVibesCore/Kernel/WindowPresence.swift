@@ -85,6 +85,12 @@ public final class WindowPresence {
         demotionToken += 1
         guard NSApp.activationPolicy() != .regular else { return }
         NSApp.setActivationPolicy(.regular)
+        // The Dock tile exists ONLY from here. Badging is therefore hung off the
+        // policy change rather than off launch: under LSUIElement there is no
+        // tile to draw on until this moment, which is exactly why the Dock badge
+        // is the CONDITIONAL signal and the menu-bar glyph and banner are the
+        // always-visible ones.
+        EnvironmentDockBadge.apply()
         // Raising the policy does not focus the app. AppKit grants the Dock
         // entry and the main menu and leaves the window behind whatever the
         // user was in — the same failure the menu bar's New Window item guards

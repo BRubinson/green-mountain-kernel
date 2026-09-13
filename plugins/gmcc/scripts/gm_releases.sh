@@ -125,10 +125,38 @@ GM_APP_NAME="gm_kernel"
 # behind — which is precisely the population an installer exists to serve.
 GM_APP_NAME_LEGACY="GMVibes"
 
+# ── Environments ─────────────────────────────────────────────────────────────
+#
+# THREE environments, each a complete root: prod, beta, test.
+#
+#   prod  $HOME/gmfs           the primary environment, what is actually used
+#   beta  $HOME/beta_gmfs      a refreshable copy-of-prod for trying things
+#   test  $HOME/test_gmfs      the CHANNEL under which ephemeral run roots live
+#
+# PRODUCTION KEEPS $HOME/gmfs and does NOT become $HOME/prod_gmfs. Renaming it
+# would mean rewriting the absolute daemon_config roots against the documented
+# rollback anchor and tripping migrate_to_gmfs.sh's own refusal check — a
+# machine-wide migration of a ~600MB database purchased purely so three names
+# look alike. A symlink buys the symmetry for anyone who wants it, and the
+# inode-keyed root comparison in Paths tolerates one.
+#
+# Called GM_ENV rather than "channel" on purpose: `channel` already means
+# `local` vs `downloads` in gm_stage_dir below, and reusing it would make two
+# different axes share one word in one file.
+gm_env_root() {
+    case "${1:-prod}" in
+        prod)  printf '%s\n' "$HOME/gmfs" ;;
+        beta)  printf '%s\n' "$HOME/beta_gmfs" ;;
+        test)  printf '%s\n' "$HOME/test_gmfs" ;;
+        *) echo "[GMB] unknown environment '$1' (prod|beta|test)" >&2; return 2 ;;
+    esac
+}
+
 # ── Roots ────────────────────────────────────────────────────────────────────
 #
 # ONE root variable, and now ONE resolution step: an explicit GM_FS_ROOT wins,
-# otherwise $HOME/gmfs.
+# otherwise the root for GM_ENV (default prod, i.e. $HOME/gmfs — unchanged for
+# every existing caller).
 #
 # The marker walk that used to sit here selected a second, snapshot runtime. That
 # runtime is gone, so the walk could only ever return the same answer — while
@@ -136,8 +164,15 @@ GM_APP_NAME_LEGACY="GMVibes"
 # being consulted by an installer). GM_FS_ROOT stays overridable, which is what
 # a test harness uses; it simply no longer has a filesystem fallback to disagree
 # with.
+#
+# EVERY environment gets a FULL release store, not just a database. The app
+# autostarts $ROOT/bin/gm_daemon, and the hook shim exits 0 SILENTLY when its
+# binary is missing — so a root with an unpopulated bin/ does not fail loudly,
+# it simply records nothing. That is why gm_env create stages binaries rather
+# than only making directories.
 gm_resolve_fs_root() {
-    GM_FS_ROOT="${GM_FS_ROOT:-$HOME/gmfs}"
+    GM_ENV="${GM_ENV:-prod}"
+    GM_FS_ROOT="${GM_FS_ROOT:-$(gm_env_root "$GM_ENV")}"
     GM_BIN="$GM_FS_ROOT/bin"
     GM_RELEASES="$GM_BIN/releases"
     GM_DOWNLOADS="$GM_RELEASES/downloads"

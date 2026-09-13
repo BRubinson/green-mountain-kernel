@@ -46,8 +46,18 @@ final class GMVibesEnvironment {
 
     /// Synchronous fallback resolution (daemon-down path). Kept as the
     /// "Re-scan" affordance too.
+    ///
+    /// THE ROOT COMES FROM `Paths.root`, NOT FROM A PROBE. This used to read
+    /// `$GM_FS_ROOT` and otherwise look for `~/gmfs` on disk, which was wrong
+    /// in the one case that matters: a LaunchServices-launched app inherits no
+    /// environment, so the probe ALWAYS answered `~/gmfs` — and a non-production
+    /// build would have painted production chrome over its own data until the
+    /// daemon's `PATHS_GET` arrived, which is after first paint.
+    ///
+    /// `Paths.root` reads the bundle's baked key first and resolves
+    /// synchronously in-process, so the answer is correct at frame zero and
+    /// cannot be changed by how the app was started.
     func refresh() {
-        let home = FileManager.default.homeDirectoryForCurrentUser
         let env = ProcessInfo.processInfo.environment
 
         var out: [GMVibesEnvKey: String] = [:]
@@ -56,14 +66,11 @@ final class GMVibesEnvironment {
                 out[key] = value
             }
         }
-        // Conventional-location probe: the standard install puts the gmfs at
-        // ~/gmfs (and kbites under it).
-        if out[.gmFsRoot] == nil {
-            let conventional = home.appendingPathComponent("gmfs")
-            if FileManager.default.fileExists(atPath: conventional.path) {
-                out[.gmFsRoot] = conventional.path
-            }
-        }
+        // One resolver for the whole tree. Overrides whatever the environment
+        // claimed: the bundle's baked root is the more authoritative answer,
+        // and letting an inherited variable win here would reopen exactly the
+        // redirection the baked key closed.
+        out[.gmFsRoot] = Paths.root.path
         if let root = out[.gmFsRoot] {
             let kbites = URL(fileURLWithPath: root).appendingPathComponent("kbites")
             if out[.kbiteDigested] == nil {

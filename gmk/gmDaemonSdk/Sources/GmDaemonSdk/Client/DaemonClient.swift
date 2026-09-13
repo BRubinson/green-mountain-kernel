@@ -225,7 +225,30 @@ public final class DaemonClient: @unchecked Sendable {
             strdup(daemonBinaryPath), strdup("daemon"), nil,
         ]
         defer { argv.forEach { free($0) } }
-        let rc = posix_spawn(&pid, daemonBinaryPath, nil, &attr, argv, environ)
+
+        // THE CHILD'S ROOT IS SET EXPLICITLY, ALWAYS — production included.
+        //
+        // This used to pass `environ` straight through, which is correct for a
+        // CLI caller (a harness that `setenv`s the root gets propagation for
+        // free) and SILENTLY WRONG for the app. An app resolves its root from
+        // its BUNDLE, and a LaunchServices-launched process carries no
+        // GM_FS_ROOT in its environment at all — so the spawned kernel
+        // inherited nothing, fell back to `~/gmfs`, and you got the right
+        // binary pointed at the WRONG ROOT: the app reading one database while
+        // the writer it just started wrote another.
+        //
+        // Injecting the RESOLVED root covers both callers, because
+        // `Paths.root` is already whatever this process actually resolved —
+        // bundle key, env, or default. Production is included deliberately
+        // rather than left implicit: an explicit value cannot be silently
+        // redirected by a stray export in whatever shell happened to launch us.
+        var env = ProcessInfo.processInfo.environment
+        env["GM_FS_ROOT"] = Paths.root.path
+        let envp: [UnsafeMutablePointer<CChar>?] =
+            env.map { strdup("\($0.key)=\($0.value)") } + [nil]
+        defer { envp.forEach { free($0) } }
+
+        let rc = posix_spawn(&pid, daemonBinaryPath, nil, &attr, argv, envp)
         posix_spawnattr_destroy(&attr)
         return rc == 0
     }

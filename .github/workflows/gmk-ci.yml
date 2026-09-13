@@ -74,39 +74,29 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # EVERY package is BUILD now. The repository has ONE test package.
+          #
+          # These rows used to be `test`, each running its own suite. Those
+          # suites were deleted in a single deliberate commit — ~647 cases
+          # across seven targets — and replaced by Gm_Kernel_test below. What is
+          # left for a package row is "does it still compile", which is exactly
+          # a build.
+          #
+          # The rows are KEPT rather than collapsed into one because they are
+          # what makes a break legible: a red `gmMcp` row names the package
+          # immediately, where a single job would just say the graph failed.
           - package: gmDaemonSdk
-            mode: test
+            mode: build
           - package: gmDaemon
-            mode: test
+            mode: build
           - package: gmUxComponentLibrary
-            mode: test
+            mode: build
           - package: gmMcp
-            mode: test
+            mode: build
           - package: gmAgententicsSdk
-            mode: test
-          - package: gmToolchain
-            mode: test
-          # The GMVibes app's code. It lives in a package rather than in the
-          # Xcode target so sourcekit-lsp can resolve it — see the root
-          # Package.swift — and getting its own row is what that buys on the CI
-          # side: the app's 99 sources are now compiled and unit-tested here,
-          # where previously they were only ever built by the gmvibes job.
+            mode: build
           - package: gmVibesCore
-            mode: test
-          # BUILD, not test, and that is deliberate rather than an omission.
-          #
-          # gmKernel is the multi-call dispatcher: top-level code in an
-          # executable target's main.swift, which cannot be imported by a test
-          # target at all. Its contract — argv[0] beating argv[1], a bare
-          # invocation exiting without opening the database, the entry-point
-          # names matching what the release store symlinks — is asserted by
-          # MultiCallBinaryContractTests over in gmToolchain, which reads the
-          # source as a file. What is left for this row is "does the three-way
-          # link still resolve", and that is exactly a build.
-          #
-          # If gmKernel ever gains a test target, flip this to `test` in the same
-          # change — testKernelPackageShipsNoTestTarget fails the build to remind
-          # you, so the tests cannot sit there silently never running.
+            mode: build
           - package: gmKernel
             mode: build
     steps:
@@ -135,6 +125,42 @@ jobs:
       # step, which was not true before.
       - name: swift ${{ matrix.mode }}
         run: swift ${{ matrix.mode }} --package-path gmk/${{ matrix.package }}
+
+  # THE SUITE. One job, because there is one test package.
+  #
+  # It boots a REAL gm_kernel against a temporary root and drives the whole kit
+  # over the wire, so the kernel has to be built first and handed over
+  # explicitly. GM_TEST_KERNEL_BIN is how: without it the harness falls back to
+  # searching .build, and it deliberately NEVER falls back to ~/gmfs — a suite
+  # that silently tested the installed release instead of the working tree would
+  # be green for code that is not in this commit.
+  kernel_tests:
+    name: Gm_Kernel_test
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Build the kernel under test
+        run: swift build --package-path gmk/gmKernel
+
+      - name: Run the suite
+        run: |
+          set -o pipefail
+          GM_TEST_KERNEL_BIN="$PWD/gmk/gmKernel/.build/debug/gm_kernel" \
+            swift test --package-path gmk/Gm_Kernel_test 2>&1 | tee test.log
+
+      # A suite that executed nothing is not a pass. `swift test` succeeds on a
+      # package whose cases all skipped, and the harness DOES skip when it cannot
+      # find a kernel — so without this, a broken build path would report green.
+      - name: Refuse a vacuous run
+        run: |
+          n="$(grep -cE "' passed \(" test.log || true)"
+          echo "$n cases passed"
+          [ "${n:-0}" -gt 0 ] || { echo "::error::the suite ran ZERO cases"; exit 1; }
 
   # gmVibes has NEVER been built in CI. It is built here for the first time.
   #

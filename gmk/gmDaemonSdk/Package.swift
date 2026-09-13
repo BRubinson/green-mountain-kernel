@@ -75,13 +75,14 @@ let package = Package(
         // in THIS package because the wire types do; it was previously filed
         // with the persistence tests, where a change to the Protocol types
         // would not have been next to the golden that freezes them.
-        .testTarget(
-            name: "GmDaemonSdkTests",
-            // GmHookCli too: HookPayloadTests and the Env/Call coverage reach
-            // into the CLI's own helpers, which were @testable-reachable while
-            // this was an executable target and must stay so after the move.
-            dependencies: ["GmDaemonSdk", "GmHookCli"],
-            exclude: ["Fixtures"]
-        ),
+        // TEST TARGET REMOVED. The repository's tests live in ONE package now,
+        // gmk/Gm_Kernel_test, which boots a shared environment and drives the
+        // whole kit through its PUBLIC surface plus read-only SQL.
+        //
+        // This was a deliberate clean break, not attrition: ~647 cases across
+        // seven targets were deleted in one commit, including ten repository
+        // contract tests whose invariants are now unenforced. That cost was
+        // weighed and accepted rather than discovered. Do not re-add a test
+        // target here — a second home is how the suite fragmented last time.
     ]
 )

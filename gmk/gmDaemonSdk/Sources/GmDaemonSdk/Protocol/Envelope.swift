@@ -146,7 +146,21 @@ public enum GmWireProtocol {
     /// vitals. They needed no bump of their own. They DO move
     /// `wire_keys.golden`, which is a frozen fixture rather than a protocol
     /// version, and it is regenerated in the same commit.
-    public static let version = 28
+    ///
+    /// v28 → v29: the test-run lock surface. SIX NEW MESSAGE TYPES
+    /// (`TEST_SUITE_LIST`, `TEST_LOCK_STATUS`, `TEST_LOCK_ACQUIRE`,
+    /// `TEST_LOCK_RELEASE`, `TEST_RUN_START`, `TEST_RUN_STATUS`) — the first of
+    /// the two documented reasons this number moves, and one bump covers all
+    /// six because they land together.
+    ///
+    /// What did NOT bump this and rides along: `PingResponse.gmfsRoot`. An
+    /// additive OPTIONAL on an existing message, so it decodes safely in both
+    /// directions and a nil means exactly what the absent field meant — the peer
+    /// does not report its root. The four vitals/role fields at v28 are the
+    /// precedent. Recorded because the rule only means something if the
+    /// distinction is actually held: had the six message types not been in this
+    /// pass, `gmfsRoot` would have shipped at 28 and moved nothing.
+    public static let version = 29
 }
 
 /// Discriminator for every NDJSON message on the socket. One case per spec
@@ -321,6 +335,26 @@ public enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     // the inner lines stay opaque so this verb needs no knowledge of the
     // ~230 it can carry.
     case txBatch = "TX_BATCH"
+    // Agent-scoped test mutual exclusion (v29).
+    //
+    // This is a mutex for AGENTS, layered ABOVE the kernel's own flock
+    // single-writer guarantee and not to be confused with it: flock stops two
+    // kernels writing one database; this stops two agents building and testing
+    // one repository. They protect different things, and once a test run owns
+    // its own ephemeral root there is no database contention left for this to
+    // protect — what stays contended is the BUILD and the CHECKOUT.
+    //
+    // Deliberately does NOT include a "run the tests" verb. Execution needs
+    // supervision, output streaming and cancellation, and none of those are
+    // this change; TEST_RUN_START records that a run was started and what will
+    // signal its completion, which is what lets another agent decide whether to
+    // wait. The suites themselves are configured in the REPO, not here.
+    case testSuiteList = "TEST_SUITE_LIST"
+    case testLockStatus = "TEST_LOCK_STATUS"
+    case testLockAcquire = "TEST_LOCK_ACQUIRE"
+    case testLockRelease = "TEST_LOCK_RELEASE"
+    case testRunStart = "TEST_RUN_START"
+    case testRunStatus = "TEST_RUN_STATUS"
     // Daemon → client only
     case event = "EVENT"
     case error = "ERROR"

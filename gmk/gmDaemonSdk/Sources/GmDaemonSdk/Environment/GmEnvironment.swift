@@ -19,22 +19,28 @@ public enum GmEnvironment {
         }
     }
 
-    /// `$GM_FS_ROOT` when set, else `~/gmfs` — the daemon-free
-    /// resolution used when the db value is unavailable.
+    /// The daemon-free root resolution used when the db value is unavailable.
     ///
-    /// `env` is injectable so a test can state the claim it is testing instead
-    /// of inheriting the ambient machine's. A test that reads the real process
-    /// environment is a test whose result depends on whether the runtime
-    /// happens to be installed — which is exactly how the mismatch assertion
-    /// below came to pass vacuously.
+    /// DELEGATES TO `Paths.root` for the ambient case rather than re-deriving
+    /// it. Three separate resolvers used to exist — this one, `Paths.root`, and
+    /// the app's own — and they agreed only by coincidence. The moment the
+    /// baked Info.plist key landed they would have disagreed for real, with a
+    /// shell-facing surface reporting one root while the process actually wrote
+    /// another. One resolver cannot disagree with itself.
+    ///
+    /// `env` stays injectable, and the explicit-env path stays env-only ON
+    /// PURPOSE: a caller passing a dictionary is stating a hypothetical ("what
+    /// would a session with THIS environment resolve?"), and answering that
+    /// from this process's bundle would ignore the question. Only the default
+    /// — the ambient case — goes through `Paths.root`.
     public static func fallbackFsRoot(
-        env: [String: String] = ProcessInfo.processInfo.environment
+        env: [String: String]? = nil
     ) -> URL {
+        guard let env else { return Paths.root }
         if let override = env["GM_FS_ROOT"], !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("gmfs", isDirectory: true)
+        return Paths.defaultProductionRoot
     }
 
     /// The full CLAUDE_ENV_FILE line set — one `export KEY='VALUE'` per line.

@@ -124,16 +124,14 @@ let package = Package(
         // namespace — which is VerbRegistryTests' guarantee applied to this
         // surface: a tool that exists but is unreachable fails the build rather
         // than being discovered missing later.
-        .testTarget(
-            name: "GmAgententicsSdkTests",
-            dependencies: [
-                "GmAgententicsSdk",
-                .product(name: "GmDaemonSdk", package: "gmDaemonSdk"),
-                .product(
-                    name: "ClaudeForFoundationModels",
-                    package: "gmClaudeForFoundationModels"),
-            ],
-            swiftSettings: [gmAgentOs]
-        ),
+        // TEST TARGET REMOVED. The repository's tests live in ONE package now,
+        // gmk/Gm_Kernel_test, which boots a shared environment and drives the
+        // whole kit through its PUBLIC surface plus read-only SQL.
+        //
+        // This was a deliberate clean break, not attrition: ~647 cases across
+        // seven targets were deleted in one commit, including ten repository
+        // contract tests whose invariants are now unenforced. That cost was
+        // weighed and accepted rather than discovered. Do not re-add a test
+        // target here — a second home is how the suite fragmented last time.
     ]
 )

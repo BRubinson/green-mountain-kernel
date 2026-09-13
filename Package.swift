@@ -32,7 +32,7 @@ let package = Package(
         .package(path: "gmk/gmDaemon"),
         .package(path: "gmk/gmUxComponentLibrary"),
         .package(path: "gmk/gmMcp"),
-        .package(path: "gmk/gmToolchain"),
+        .package(path: "gmk/Gm_Kernel_test"),
         .package(path: "gmk/gmKernel"),
         .package(path: "gmk/gmAgententicsSdk"),
         .package(path: "gmk/gmClaudeForFoundationModels"),

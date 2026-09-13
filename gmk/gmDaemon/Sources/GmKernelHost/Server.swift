@@ -353,6 +353,20 @@ final class Server: @unchecked Sendable {
                 return try BotNextHandler.handle(line: line, head: head, store: store)
             case .botGet:
                 return try BotGetHandler.handle(line: line, head: head, store: store)
+
+            // Agent test mutual exclusion (v29).
+            case .testSuiteList:
+                return try TestSuiteListHandler.handle(line: line, head: head, store: store)
+            case .testLockStatus:
+                return try TestLockStatusHandler.handle(line: line, head: head, store: store)
+            case .testLockAcquire:
+                return try TestLockAcquireHandler.handle(line: line, head: head, store: store)
+            case .testLockRelease:
+                return try TestLockReleaseHandler.handle(line: line, head: head, store: store)
+            case .testRunStart:
+                return try TestRunStartHandler.handle(line: line, head: head, store: store)
+            case .testRunStatus:
+                return try TestRunStatusHandler.handle(line: line, head: head, store: store)
             case .agentRegister:
                 return try AgentRegisterHandler.handle(line: line, head: head, store: store)
 

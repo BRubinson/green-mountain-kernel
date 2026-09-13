@@ -14,30 +14,14 @@
 		1B4010D02FDCA09300DAF751 /* GmVibesCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1B4010D22FDCA09300DAF751 /* GmVibesCore */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
-		1B40108D2FDCA09300DAF751 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 1B40106B2FDCA09200DAF751 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 1B4010722FDCA09200DAF751;
-			remoteInfo = GMVibes;
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXFileReference section */
 		1B4010732FDCA09200DAF751 /* GMVibes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = GMVibes.app; path = gm_kernel.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		1B40108C2FDCA09300DAF751 /* GMVibesUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GMVibesUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1B4010752FDCA09200DAF751 /* gmVibes */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = gmVibes;
-			sourceTree = "<group>";
-		};
-		1B40108F2FDCA09300DAF751 /* gmVibesUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = gmVibesUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -55,13 +39,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		1B4010892FDCA09300DAF751 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -69,8 +46,6 @@
 			isa = PBXGroup;
 			children = (
 				1B4010752FDCA09200DAF751 /* gmVibes */,
-				1B4010852FDCA09300DAF751 /* gmVibesTests */,
-				1B40108F2FDCA09300DAF751 /* gmVibesUITests */,
 				1B4010742FDCA09200DAF751 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -79,7 +54,6 @@
 			isa = PBXGroup;
 			children = (
 				1B4010732FDCA09200DAF751 /* GMVibes.app */,
-				1B40108C2FDCA09300DAF751 /* GMVibesUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -113,29 +87,6 @@
 			productName = GMVibes;
 			productReference = 1B4010732FDCA09200DAF751 /* GMVibes.app */;
 			productType = "com.apple.product-type.application";
-		};
-		1B40108B2FDCA09300DAF751 /* GMVibesUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 1B40109C2FDCA09300DAF751 /* Build configuration list for PBXNativeTarget "GMVibesUITests" */;
-			buildPhases = (
-				1B4010882FDCA09300DAF751 /* Sources */,
-				1B4010892FDCA09300DAF751 /* Frameworks */,
-				1B40108A2FDCA09300DAF751 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				1B40108E2FDCA09300DAF751 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				1B40108F2FDCA09300DAF751 /* gmVibesUITests */,
-			);
-			name = GMVibesUITests;
-			packageProductDependencies = (
-			);
-			productName = GMVibesUITests;
-			productReference = 1B40108C2FDCA09300DAF751 /* GMVibesUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
 
@@ -171,7 +122,7 @@
 				1B4010A62FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmUxComponentLibrary" */,
 				1B4010A72FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmAgententicsSdk" */,
 				1B4010A82FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmMcp" */,
-				1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmToolchain" */,
+				1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "Gm_Kernel_test" */,
 				1B4010D32FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmVibesCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -180,20 +131,12 @@
 			projectRoot = "";
 			targets = (
 				1B4010722FDCA09200DAF751 /* GMVibes */,
-				1B40108B2FDCA09300DAF751 /* GMVibesUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		1B4010712FDCA09200DAF751 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		1B40108A2FDCA09300DAF751 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -210,22 +153,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		1B4010882FDCA09300DAF751 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		1B40108E2FDCA09300DAF751 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 1B4010722FDCA09200DAF751 /* GMVibes */;
-			targetProxy = 1B40108D2FDCA09300DAF751 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1B4010942FDCA09300DAF751 /* Debug */ = {
@@ -365,6 +293,10 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				GM_BUNDLE_SUFFIX = ".test";
+				GM_ENV = test;
+				GM_FS_ROOT_BAKED = "~/test_gmfs";
+				INFOPLIST_FILE = gmVibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -372,7 +304,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 3.9;
-				PRODUCT_BUNDLE_IDENTIFIER = rube.GMVibes;
+				PRODUCT_BUNDLE_IDENTIFIER = "rube.GMVibes$(GM_BUNDLE_SUFFIX)";
 				PRODUCT_NAME = gm_kernel;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -402,6 +334,10 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				GM_BUNDLE_SUFFIX = "";
+				GM_ENV = prod;
+				GM_FS_ROOT_BAKED = "~/gmfs";
+				INFOPLIST_FILE = gmVibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -409,7 +345,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 3.9;
-				PRODUCT_BUNDLE_IDENTIFIER = rube.GMVibes;
+				PRODUCT_BUNDLE_IDENTIFIER = "rube.GMVibes$(GM_BUNDLE_SUFFIX)";
 				PRODUCT_NAME = gm_kernel;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -419,44 +355,6 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-			};
-			name = Release;
-		};
-		1B40109D2FDCA09300DAF751 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
-				DEVELOPMENT_TEAM = 4VL4UGNPQQ;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 3.9;
-				PRODUCT_BUNDLE_IDENTIFIER = rube.GMVibesUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = GMVibes;
-			};
-			name = Debug;
-		};
-		1B40109E2FDCA09300DAF751 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 8;
-				DEVELOPMENT_TEAM = 4VL4UGNPQQ;
-				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 3.9;
-				PRODUCT_BUNDLE_IDENTIFIER = rube.GMVibesUITests;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = GMVibes;
 			};
 			name = Release;
 		};
@@ -477,15 +375,6 @@
 			buildConfigurations = (
 				1B4010972FDCA09300DAF751 /* Debug */,
 				1B4010982FDCA09300DAF751 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		1B40109C2FDCA09300DAF751 /* Build configuration list for PBXNativeTarget "GMVibesUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				1B40109D2FDCA09300DAF751 /* Debug */,
-				1B40109E2FDCA09300DAF751 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -513,9 +402,9 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = gmMcp;
 		};
-		1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmToolchain" */ = {
+		1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "Gm_Kernel_test" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = gmToolchain;
+			relativePath = Gm_Kernel_test;
 		};
 		1B4010D32FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmVibesCore" */ = {
 			isa = XCLocalSwiftPackageReference;

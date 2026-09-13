@@ -59,4 +59,5 @@ extension RepositoryContext {
     var review: ReviewRepository { .init(db: db, core: core) }
     var search: SearchRepository { .init(db: db, core: core) }
     var session: SessionRepository { .init(db: db, core: core) }
+    var testRun: TestRunRepository { .init(db: db, core: core) }
 }

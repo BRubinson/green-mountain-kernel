@@ -23,9 +23,11 @@ Consequences a reader must not re-derive incorrectly:
 - **`plugins/gmcc/` is no longer frozen.** It was, for the length of the reorg,
   because it drove the machine through a runtime installed under the old names.
   It has since been swept, and the retired-name contract now covers it like
-  everything else. `RetiredNameContractTests` has no path exemption for the
-  plugin, and **reintroducing one is not the fix for a file that trips it** —
-  sweeping that file is.
+  everything else. `RetiredNameContractTests` had no path exemption for the
+  plugin, and reintroducing one was never the fix for a file that tripped it.
+  **That test has since been DELETED** with the rest of the contract tier, so
+  the retired-name contract is now a convention nothing enforces — the rule
+  stands, the scanner does not.
 - The plugin directory, the `gmcc:` command/skill namespace, the
   `mcp__plugin_gmcc_pen__*` pen server name and the in-repo `.gmcc/` dope
   directory all **keep their names**. The repo
@@ -94,7 +96,8 @@ the other way:
 
 - **`build-dmg.sh` STAMPS `MARKETING_VERSION` from `gmk/VERSION`** as a build
   setting override. Do not hand-edit the version in `project.pbxproj` and do not
-  make the script read it back out — `ReleaseStoreContractTests` fails on both.
+  make the script read it back out. (`ReleaseStoreContractTests` used to fail
+  the build on both; it is deleted, so this is now a convention.)
   The override is used rather than a file edit so a build never dirties the tree
   that publish requires to be clean.
 - **`GM_TAG_PREFIX` in `gm_releases.sh` is the only spelling of the namespace.**
@@ -152,8 +155,10 @@ marketplace install materialises `plugins/gmcc/` alone, so the plugin's installe
 cannot source a library under `gmk/`, and it must not climb out of the cache to
 look for one — on a machine whose `$HOME` is a git repo, `git rev-parse
 --show-toplevel` from the plugin cache confidently returns the home directory.
-`ReleaseStoreContractTests` fails the build if the two copies drift; fix that by
-copying, never by editing both.
+**NOTHING CHECKS THAT THE TWO COPIES AGREE ANY MORE.**
+`ReleaseStoreContractTests` used to fail the build on drift and was deleted in
+the test rebuild. Fix drift by COPYING, never by editing both — and know that
+you will get no warning if you forget.
 
 **The publish path is repo-side only.** `gmk/scripts/` is not in the plugin
 payload (`source: ./plugins/gmcc`), so installing the plugin does not distribute
@@ -169,13 +174,17 @@ nobody had run. Dispatch it manually when the local path is unavailable.
 
 - `gmk/` — the new home of every Swift deliverable: one Xcode project
   (`gmk/gmk.xcodeproj`) over seven shipped packages, plus an eighth that ships
-  nothing and holds the repository's own contract tests, plus a ninth that is
+  nothing and holds the repository's ONE test suite, plus a ninth that is
   **vendored third-party source and authored nowhere in this repo**.
+  (The eighth slot used to be `gmToolchain`, the contract-test package. It was
+  DELETED in the test rebuild; `Gm_Kernel_test` occupies the slot now, and the
+  count is unchanged by coincidence rather than by design.)
   - **Open `gmk/gmk.xcworkspace`, not the project.** The workspace lists the
     project alongside seven packages as first-class members, which is the
     only arrangement in which Xcode generates schemes for a package's TEST
-    targets — `GmToolchainTests` and `GmMcpTests` exist under the workspace and
-    do not exist under the project. The project is deliberately kept
+    targets — `GmKernelTests` exists under the workspace and does not exist
+    under the project. (It used to name `GmToolchainTests` and `GmMcpTests`;
+    both are gone, and `Gm_Kernel_test` is the sole test package now.) The project is deliberately kept
     SELF-SUFFICIENT anyway (it still carries its own local package references),
     because `gmk-ci.yml` and `build-dmg.sh` both drive it with `-project`;
     the workspace is an additional door, not a replacement, and neither file
@@ -199,9 +208,12 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     as `argv[1]` and a subcommand-first rule would try to dispatch it. A bare
     `gm_kernel` prints usage and **exits 2** — of every possible dispatch default
     that is the one that could cost data, so it deliberately does not become a
-    writer. Ships NO test target; its contract is asserted by
-    `MultiCallBinaryContractTests` in `gmToolchain`, and its CI row is
-    `swift build` for that reason.
+    writer. Ships NO test target, and its CI row is `swift build` for that
+    reason. Its contract USED to be asserted by `MultiCallBinaryContractTests`,
+    which read the source as a file; that test was deleted in the test rebuild,
+    so argv[0]-beats-argv[1] and the exit-2 default are now conventions held by
+    the code and this note alone. `Gm_Kernel_test` does exercise the binary — it
+    boots one — but it does not assert the dispatch rules.
   - `gmk/gmUxComponentLibrary/` — the shared component surface: the diagram UI
     views plus the geometry, routing, layout and organizer helpers they are built
     on. Diagrams only for now, built as a surface that expects to grow.
@@ -286,22 +298,19 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     `DaemonConnectionModel` would drag an entire observable model into the public
     surface to serve a handful of reads. Raise nothing to `public` that
     `GMVibesApp.swift` does not name.
-  - `gmk/gmToolchain/` — the eighth package, and the only one that **ships
-    nothing** (`products: []`). Membership rule: the tests that read FILES rather
-    than call symbols — the docs and hook-launcher contracts, the retired-name
-    contract, the pen-roster check against `gm_mcp`'s source text, and the
-    live-runtime isolation scan. None of them tests a module's internals; they
-    test the repository. It also owns `RepoRoot`, the one `#filePath`-to-repo-root
-    resolver, as a TARGET SOURCE rather than a library product: exporting it made
-    `gmDaemonSdk` depend on this package while this package needs the SDK for
-    `DopeVocabulary`, which SwiftPM rejects as a cycle. **The one dependency edge
-    points DOWN at `gmDaemonSdk` and never the reverse** — the SDK has ZERO
-    dependencies, and that is what keeps the graph acyclic. **Do not reintroduce
-    that edge**: making `RepoRoot` a library product so other packages' test
-    targets can import it is the convenient-looking change that recreates the
-    cycle, and SwiftPM will reject it. Named `gmToolchain`,
-    not `...Tests`, because a directory ending in "Tests" reads as a mistake the
-    moment a manifest names it in a `.package(path:)` line.
+  - `gmk/Gm_Kernel_test/` — the eighth package, and the only one that **ships
+    nothing** (`products: []`). The repository's ENTIRE test suite: one shared
+    environment per test process, a real `gm_kernel` booted against a temporary
+    root, driven over the wire and read back with read-only SQL. Subfoldered per
+    package under `Tests/GmKernelTests/` for navigation, not isolation — they
+    share the one environment.
+    Depends on `gmDaemonSdk` (the public wire surface it is written against) and
+    `gmDaemon` (for `Migrations` ONLY — never `Store`, which would be the second
+    writer the ownership token forbids).
+    **It replaced `gmToolchain`**, the contract-test package, which was deleted
+    outright along with ~647 cases across seven targets. `RepoRoot` went with it.
+    See "ONE test package — and what was given up to get it" for the full cost,
+    including the ten invariants that are now unenforced.
   - `gmk/scripts/` — the build and install path for the binaries (see below),
     plus the app's DMG build and release scripts used by the `release-dmg`
     skill. Scripts live HERE and not beside the app sources: `gmk/gmVibes/` is a
@@ -385,7 +394,9 @@ in 133 places in one directory. So composition needed no new vocabulary:
   133 sites became `boundary` / `boundaryRead`.
 - `inTransaction { }` is the ONE new public API. The ~120 already-`public` verbs
   on the `Store+*` extensions compose inside it unchanged, so there is exactly
-  one implementation per verb and `VerbRegistryTests` never notices.
+  one implementation per verb, so nothing downstream notices. (The composition
+  used to be pinned by `VerbRegistryTests`; `Gm_Kernel_test` re-asserts the
+  registry-row half of that check.)
 - An explicit `uow:` parameter was rejected deliberately: it is the deferred
   96-handler retype wearing a different hat, because it has to appear in every
   signature the composition can reach.
@@ -394,8 +405,9 @@ in 133 places in one directory. So composition needed no new vocabulary:
 thread-local, which is only correct while the verb layer performs no thread hops
 inside a boundary — true today at **zero** occurrences of `DispatchQueue`,
 `Task {`, `async` or `await` under `Sources/GmDaemon/` or the handlers, and pinned
-by `TransactionBoundaryTests`. If that test goes red, remove the hop; do not relax
-the boundary.
+by `TransactionBoundaryTests` — **which is now deleted**. The invariant is
+unchanged and unenforced: if you add a thread hop inside a boundary, nothing
+will tell you. Remove the hop; do not relax the boundary.
 
 **Two families cannot compose, and both refuse loudly** (`StoreError.notComposable`):
 `checkpointTruncate`, because a WAL checkpoint inside a transaction is illegal in
@@ -425,8 +437,9 @@ The old guarantee was "only `gm_daemon` constructs a `Store`, and it takes a
 `KernelOwnership.Token` is `~Copyable` with a `fileprivate` initialiser that only
 a won `flock` can produce, and `KernelWriter.start` — the **sole** `Store(path:)`
 site in the tree — consumes one. A losing instance cannot open the database
-because no expression exists that opens it. `KernelHostContractTests` scans for a
-second `Store(path:` so that stays true.
+because no expression exists that opens it. `KernelHostContractTests` used to
+scan for a second `Store(path:` and is now deleted — the TYPE still enforces
+ownership, but nothing scans for a second construction site.
 
 **`daemon.pid` and `daemon.sock` are deliberately NOT renamed.** This is the most
 dangerous cosmetic edit available in this area: a new instance locking
@@ -496,14 +509,17 @@ a client. Nothing above is load-bearing for the binary path.
 From the repo root:
 
 ```bash
-swift test --package-path gmk/gmDaemonSdk           # per package; all must stay green
-swift test --package-path gmk/gmDaemon
-swift test --package-path gmk/gmUxComponentLibrary
-swift test --package-path gmk/gmMcp
-swift test --package-path gmk/gmToolchain
-swift test --package-path gmk/gmAgententicsSdk      # roster + template contracts
-swift test --package-path gmk/gmVibesCore           # the app's code
-swift build --package-path gmk/gmKernel            # BUILD, not test — see below
+# ONE test package. Build the kernel first — the suite BOOTS it.
+swift build --package-path gmk/gmKernel
+swift test  --package-path gmk/Gm_Kernel_test       # the whole suite
+
+# The shipped packages are BUILD-only now; they carry no test targets.
+swift build --package-path gmk/gmDaemonSdk
+swift build --package-path gmk/gmDaemon
+swift build --package-path gmk/gmUxComponentLibrary
+swift build --package-path gmk/gmMcp
+swift build --package-path gmk/gmAgententicsSdk
+swift build --package-path gmk/gmVibesCore
 # gmk/gmClaudeForFoundationModels is VENDORED. It gets NO CI job of its own, and
 # that is a decision, not an oversight: it is already COMPILE-GATED in CI as a
 # dependency of gmAgententicsSdk, so a vendored break that can affect us fails
@@ -516,6 +532,53 @@ bash gmk/scripts/rebuild_local.sh                   # universal build → staged
 
 See **The release loop** above for how `rebuild_local.sh`, `publish_release.sh`
 and the plugin's `install_gm.sh` divide the work.
+
+### ONE test package — and what was given up to get it
+
+`gmk/Gm_Kernel_test` is the repository's only test package. It boots ONE real
+`gm_kernel` against a temporary root and drives the whole kit through its
+**public** surface — the wire protocol, a real socket — plus **read-only** SQL.
+
+This replaced seven per-package test targets: **~647 cases, 66 files, ~19,000
+lines, deleted in one commit**. That was a deliberate clean break, taken with
+the cost stated in advance, and the cost is real enough to write down:
+
+- **Ten repository contract tests are GONE and their invariants are now
+  unenforced.** `LiveRuntimeIsolationTests`, `KernelHostContractTests`,
+  `RetiredNameContractTests`, `DocsContractTests`, `ReleaseStoreContractTests`,
+  `MultiCallBinaryContractTests`, `WorkflowSpecTests`, `HookScriptTests`,
+  `VerbRegistryTests`, `TransactionBoundaryTests`. Several are named as guard
+  rails elsewhere in this file; those mentions now describe history, not
+  enforcement. **Nothing replaced them** — a shell-script tier and a
+  compile-time substitute were both considered and declined.
+  Consequences a reader must not re-derive incorrectly: the `gm_releases.sh`
+  vendored twin is no longer checked for drift (fix it by COPYING, and know that
+  nothing will tell you if you forget); `wire_keys.golden` is still gated by
+  nothing; and no test now proves a test cannot write the production database.
+- `gmk/gmToolchain` is **deleted outright** — it shipped nothing but those
+  tests. `RepoRoot` went with it.
+- The CI matrix rows are now `build`, with ONE `test` job.
+
+Three rules the new suite runs on, all load-bearing:
+
+- **`Paths.root` is a `static let` — one root per PROCESS, forever.** A
+  per-suite or per-test root cannot take effect. "One shared environment" is not
+  a simplification; it is the only shape the type permits.
+- **DB access is READ-ONLY.** The booted kernel holds the `flock` and owns
+  `gm.db` as sole writer. A test-side `Store(path:)` would be the second writer
+  the ownership token exists to forbid, reintroduced inside the suite meant to
+  defend it. Writes go over the wire.
+- **XCTest, not swift-testing.** swift-testing parallelises by default and a
+  shared append-only database will not survive that; `XCTestObservation` also
+  gives real once-per-process teardown, which is what reaps the spawned kernel.
+
+Isolation is now **by construction** rather than by a guard: the harness mints a
+root under `NSTemporaryDirectory()`, string-appends every path (it never calls
+`Paths.*` to DISCOVER one), and WRITES `GM_FS_ROOT` into the spawned child.
+It deliberately never falls back to `~/gmfs/bin/gm_kernel` — a suite that
+silently tested the last RELEASE instead of the working tree would be green for
+code that is not there. Keep run ids SHORT: `sun_path` is **104 bytes** on
+macOS and the kernel binds a socket under the run root.
 
 CI `bash -n` syntax-checks the scripts and never runs them — they write to
 `~/gmfs` and, in publish's case, tag and upload. That is a preserved invariant,
@@ -569,45 +632,62 @@ does not write. Background indexing is the current answer; index-while-building
 manifest belongs to no target, so it gets the same fallback settings described
 above. Harmless; do not chase it.
 
-### Guard rails
+### Guard rails — MOSTLY REVOKED, deliberately
 
-- `VerbRegistryTests` fails the build when a `MessageType` ships without a
-  `VerbRegistry` row. It lives in `gmDaemonSdk` (with the protocol it guards), so
-  it stays armed in the base package.
-- `DocsContractTests` fails the build when the plugin's docs regress (hardcoded
-  binary paths, retired env names, retired DOPE acronym) or when `hooks.json` /
-  `settings.json` / `.mcp.json` name a path that is not there.
-- `RetiredNameContractTests` carries the **retired-name contract** — binaries,
-  env vars, filesystem roots, the db and stamp filenames, the retired
-  content-root vocabulary, the old module name and the old package path. It is scoped in this
-  era to `gmk/**` plus `CLAUDE.md` and `README.md` only, with `plugins/gmcc/**`
-  EXEMPT, because those files still name the running stack on purpose. Two narrow
-  exceptions are legal by design: a record of a retirement has to be able to name
-  what was retired, so the wire-version note and the migration body that perform
-  the rename may spell the old column name.
-- Every `#filePath`-walking test resolves the repo root through the ONE
-  `RepoRoot` helper in `gmk/gmToolchain`. Copies of a directory-counting walk
-  used to encode "this file is four levels below the plugin root", and every one
-  of them broke when the package moved; the next move costs one edit.
+**Read this before trusting any "X fails the build" claim elsewhere in this
+file.** The ten repository contract tests were DELETED in the test rebuild (see
+"ONE test package" above). What follows is what is still true.
+
+**STILL ENFORCED:**
+
+- **The dispatcher switch is exhaustive.** A new `MessageType` with no handler
+  arm does not COMPILE. Same for `DaemonEventKind` in the app's event router.
+  This is stronger than the test it outlived and cannot be deleted by a sweep.
+- `Gm_Kernel_test` re-asserts the verb registry (every non-transport
+  `MessageType` has a `VerbRegistry` row) and the m0029 schema shape, because
+  both guard hazards worth keeping.
+- Migrations are append-only and the ledger is asserted DENSE from 1 to head —
+  a gap means a migration did not record itself.
+- CI still `bash -n`s every shipped script and JSON-parses every plugin
+  manifest, and still checks `gmk/VERSION` is semver.
+- `Paths.assertContained` still throws on a write outside the filesystem root or
+  the working repo. That was always code, never a test.
+
+**NO LONGER ENFORCED — these are now conventions you must hold by hand:**
+
+- The **retired-name contract**. Nothing scans for retired binaries, env vars,
+  roots, db filenames or the retired sandbox vocabulary any more.
+- **`gm_releases.sh` exists TWICE and nothing checks the copies agree.** Authored
+  at `gmk/scripts/`, vendored byte-identical into `plugins/gmcc/scripts/`. Fix
+  drift by COPYING, and know that nothing will tell you if you forget.
+- The **docs contract** over `plugins/gmcc/` markdown, `hooks.json`,
+  `settings.json` and `.mcp.json`.
+- The **release-store contract**, the **multi-call binary contract**, the
+  **hook-launcher** checks, the **workflow-spec/pen-roster** cross-check and the
+  **transaction-boundary** thread-hop scan.
+- **`wire_keys.golden` is still gated by nothing**, as it always was.
+  Regenerate with `python3 gmk/gmDaemonSdk/scripts/wire_keys.py > <the golden>`
+  and **diff before accepting** — the generator is the authority, so a wholesale
+  regeneration accepts all pending drift as intentional. (It carried a stale
+  `TxBatchResponse.failedIndex` for exactly this reason until v29.)
+- Nothing proves a test cannot write the production database. The new harness
+  achieves that BY CONSTRUCTION instead — which is stronger in practice and
+  unenforced in principle.
+
 - Wire protocol: bump `GmWireProtocol.version` only for a new message type or an
   incompatible change. Additive OPTIONAL fields on existing messages do NOT bump
   — they decode safely in both directions. Renaming a field on an existing
   message IS incompatible and DOES bump. So is REMOVING AN ENUM CASE from a type
   an existing message carries: m0028 collapsed `PromptStatus` from six arms to
   three and bumped 26 → 27 for exactly that reason.
-  **Now at v28**, moved by `TX_BATCH` — a NEW MESSAGE TYPE. Worth recording what
-  did NOT move it in the same change, because the rule only means something if
-  the distinction is held: the four vitals/role fields added to `PingResponse` and
-  `StatusResponse` are additive optionals and contributed nothing. Had `TX_BATCH`
-  not been in that pass, those four would have shipped at 27.
-- **`wire_keys.golden` is NOT gated by any test**, and it was stale for many
-  versions before this pass — still carrying the retired root vocabulary this
-  repo renamed away from, and missing whole type families. Nothing reads the fixture (`WireKeyTests` does
-  not), and `.golden` is not in `RetiredNameContractTests`' extension list, so
-  neither guard could see it. Regenerate it with
-  `python3 gmk/gmDaemonSdk/scripts/wire_keys.py > <the golden>` whenever a
-  `Protocol/` type changes, and diff before accepting: the generator is the
-  authority, so a wholesale regeneration accepts all pending drift as intentional.
+  **Now at v29**, moved by the SIX test-lock message types — `TEST_SUITE_LIST`,
+  `TEST_LOCK_STATUS`, `TEST_LOCK_ACQUIRE`, `TEST_LOCK_RELEASE`,
+  `TEST_RUN_START`, `TEST_RUN_STATUS` — one bump for all six because they landed
+  together. Worth recording what did NOT move it, because the rule only means
+  something if the distinction is held: `PingResponse.gmfsRoot` is an additive
+  optional and contributed nothing. Had the six not been in that pass, it would
+  have shipped at 28. (v27 → v28 was `TX_BATCH`, on the same new-message-type
+  ground; the four vitals/role fields rode along and moved nothing.)
 - Schema: migrations are append-only. The db is append-only history — **NEVER
   wipe it**. `gm_hook call BACKUP --json '{}'` takes the sanctioned online backup
   before risky work.
@@ -619,9 +699,10 @@ above. Harmless; do not chase it.
   leave search pointing at the wrong rows), recreate the AFTER
   INSERT/UPDATE/DELETE triggers that die with the table, and keep
   `legacy_alter_table = ON` across the renames so SQLite does not rewrite the
-  child FK clauses that already name the final table. `MigrationTests`'
-  m0002 case is the reference for what to assert afterwards: uuid→id PAIRS,
-  child FK clauses, indexes, UNIQUEs and `sqlite_sequence`.
+  child FK clauses that already name the final table.
+  m0029 deliberately takes that cost ONCE, with eyes open: `project_test_lock`
+  carries an inline `UNIQUE(project_uuid)` because that constraint IS the
+  one-lock-per-project rule, and a lock table without uniqueness is not a lock.
 
 ### The prompt lifecycle is THREE states
 
@@ -710,12 +791,14 @@ app from a Mac that holds the identity.
 - Sessions are provisioned by `gm_hook context env` at SessionStart; the only env
   vars are `GM_BOOTED`, `GM_PLUGIN_ROOT`, `GM_FS_ROOT` and `PATH`. Everything
   else: `gm_hook paths --json`.
-- **ONE root variable.** `GM_FS_ROOT` points at the single top-level filesystem
-  (`~/gmfs` by default), which holds both the runtime and the content that used
-  to live in a second root. That is not a cosmetic collapse: env-and-db agreement
-  goes from "compare two vars against two config rows, one of which may
-  legitimately be absent" to "compare one always-present var against one config
-  row", and containment becomes a single prefix test.
+- **ONE root VARIABLE, three possible roots.** `GM_FS_ROOT` names the top-level
+  filesystem a process uses — `~/gmfs` for production, `~/beta_gmfs` and
+  `~/test_gmfs` (plus its per-run roots) for the others. Each root holds both the
+  runtime and the content; containment is still a single prefix test, and
+  env-and-db agreement is still one var against one config row.
+  **For the APP the variable is not the authority** — the bundle's baked
+  `GMFSRoot` key wins, because a LaunchServices-launched app inherits no
+  environment. See "THREE ENVIRONMENTS" below.
 - env and db must always agree on the roots (mismatch = warning at boot).
 - GMCC never writes the user's shell profile. The binaries reach a session through
   the PATH entry in that env block, and remediation lines are printed, not
@@ -731,6 +814,133 @@ This is ENFORCED, not merely documented: `Paths.assertContained(_:)` in
 repo, and every kit-side file write routes through it. A rule that lives only in
 markdown erodes; this one fails a call.
 
+## THREE ENVIRONMENTS — and why this is not the deleted sandbox loop
+
+`prod`, `beta`, `test`. Each is a COMPLETE root: its own database, socket,
+pidfile, `flock`, release store and repo clone.
+
+```
+$HOME/gmfs         prod   the primary environment. NOT managed by gm_env.sh —
+                          `destroy prod` is refused, on purpose.
+$HOME/beta_gmfs    beta   long-lived, refreshable, for trying things
+$HOME/test_gmfs    test   a CHANNEL. Runs get EPHEMERAL roots beneath it.
+```
+
+```bash
+bash gmk/scripts/gm_env.sh create  beta     # stage binaries, clone repo, branch, ingest dope
+bash gmk/scripts/gm_env.sh refresh beta     # same code path — a refresh IS a create
+bash gmk/scripts/gm_env.sh doctor  beta
+bash gmk/scripts/gm_env.sh reap    test     # drop run roots whose kernel is gone
+bash gmk/scripts/rebuild_local.sh --env beta
+```
+
+**PRODUCTION KEEPS `~/gmfs`** and does not become `~/prod_gmfs`. Renaming it
+means rewriting the absolute `daemon_config` roots against the documented
+rollback anchor and tripping `migrate_to_gmfs.sh`'s own refusal check — a
+machine-wide migration of a ~770MB database bought purely so three names look
+alike.
+
+### Why this is a DISSOLUTION and the old loop was a DETECTION
+
+This is the crucial paragraph, because the predecessor died for a reason that
+applies word-for-word to a careless version of this feature.
+
+The old snapshot runtime was selected by `$GM_FS_ROOT`, and `Paths.root` reads
+that **once per process**. A LaunchServices-launched app inherits **no shell
+environment at all** — so the app always landed on `~/gmfs` no matter what the
+session thought it had selected, and every available mitigation was a way to
+DETECT the wrong state rather than prevent it. It was deleted for that.
+
+A T overlay and a red bar **are detection mechanisms**. They were in the ask,
+they are implemented, and they are not the safety property.
+
+The safety property is that **the root is a property of the BITS**:
+
+```
+Paths.root =
+    1. Bundle.main["GMFSRoot"]   ← BAKED IN AT BUILD TIME
+    2. $GM_FS_ROOT               ← CLI only; a Mach-O has no such key
+    3. ~/gmfs
+```
+
+Each bundle carries its own root, production included and set EXPLICITLY. No
+launch context — Finder, Dock, `open -n`, Xcode Run, a LaunchServices
+crash-relaunch — can change any app's database. There is no wrong-root state
+left to detect.
+
+Consequences that must not be re-derived incorrectly:
+
+- **An `<EnvironmentVariables>` block in the scheme is STRICTLY WORSE than what
+  was deleted.** It works only for Xcode Run, so the same bits would mean two
+  different databases depending on how they were started.
+- **`INFOPLIST_KEY_GMFSRoot` DOES NOT WORK.** That build-setting prefix is a
+  declared allow-list; Xcode silently drops unknown keys, producing a bundle
+  with no key that falls through to `~/gmfs` and writes PRODUCTION while
+  believing it is isolated. Verified empirically. Hence the real
+  `gmk/gmVibes/Info.plist`, and hence the `plutil` assertion in `build-dmg.sh`
+  that makes a missing key FATAL.
+- **Chrome is derived from the RESOLVED ROOT, never a `#if`.** A compile-time
+  flag is a second source of truth, and the failure it enables is a red bar over
+  live production data — the badge lying exactly when it matters.
+- **Root comparison is by INODE** (`st_dev`, `st_ino` of `gm.db`), not by path.
+  `standardizedFileURL` does not resolve symlinks, so a symlink or an APFS
+  firmlink would make one root look like two.
+- **`daemon.pid` and `daemon.sock` keep the SAME NAMES in every root.** Distinct
+  roots make them safe; distinct NAMES would be a latent two-writer bug, which
+  is the same reason this file has always forbidden renaming them.
+- **Every environment needs a FULL release store**, not just a database. The app
+  autostarts `$ROOT/bin/gm_daemon`, and `gm_hook.sh` exits 0 **silently** when
+  its binary is missing — so an unpopulated `bin/` does not fail loudly, it
+  records nothing at all.
+- **Debug builds are the TEST environment** (`rube.GMVibes.test` → `~/test_gmfs`).
+  That dissolves the "second COPY of the app" hazard this file records as having
+  survived every ruling: an Xcode debug build beside the installed app is now a
+  different application writing a different database.
+
+### The concurrency AC is FREE — do not build a coordinator
+
+`flock` is per-inode on `$ROOT/daemon.pid`. N roots are N locks over N
+databases, and every instance is legitimately its own single writer. The
+guarantee is not weakened; it is REPLICATED.
+
+### TEST is N ephemeral roots, not one
+
+A single persistent test root re-creates the collision the test lock exists to
+prevent: the second agent's kernel loses the `flock` and either fails or
+attaches as a CLIENT to the first run's kernel, sharing an append-only database
+the first run is counting rows in. So runs get roots at
+`$HOME/test_gmfs/runs/<short-id>/`.
+
+**Run ids must be SHORT.** `sun_path` is 104 bytes on macOS and the server binds
+`NWEndpoint.unix(path:)` beneath the run root; overrun it and the failure is a
+listener that never binds, not an error message.
+
+### A refresh copies the BITS and the REPO — never the database
+
+`gm_env refresh beta` clones the repo into the environment, checks out its own
+branch, registers it, and ingests dope. The environment's registered project and
+its dope are the ONLY rows in that database to start.
+
+It does **not** copy production's `gm.db`, and that is a correctness decision
+rather than a shortcut. That database holds ABSOLUTE paths: `daemon_config`'s
+root rows, and every instance's checkout path. A kernel on such a copy reports
+one root from config while resolving another from `Paths` — one `PATHS_GET`
+answer naming two roots — and `WatcherSupervisor` starts an FSEvent lane over
+every instance path it finds, which means a non-production kernel WATCHING YOUR
+REAL WORKING CHECKOUT and writing its `.gmcc/` tree, which write-containment
+permits because that repo genuinely is a permitted root.
+
+Instance identity is `md5(absolute repo path)`, which is what makes the clone
+approach work: a checkout at its own path is legitimately its own instance.
+
+### Schema direction, both ways
+
+`hasPendingMigrations` catches a database BEHIND the binary and takes the
+automatic pre-migration `BACKUP`. `hasBeenSuperseded` now catches one AHEAD of
+it and **refuses to open**. That second case used to be silent — GRDB applies
+unapplied registered migrations and does not object to applied ones it has never
+heard of — and with several environments it is reachable on an ordinary day.
+
 ## The sandbox dev loop is GONE — and `BACKUP` is what replaced it
 
 There used to be a full snapshot runtime under `$GM_FS_ROOT/development/`, with
@@ -744,9 +954,17 @@ LaunchServices-launched app **inherits no shell environment at all** — so unde
 the kernel collapse a snapshot session's hooks would have talked to a socket
 nobody was listening on while the kernel wrote **prod**, with no error and no
 signal. Every available mitigation was a detection mechanism. Deleting the second
-root **dissolves** the hazard instead: `GM_FS_ROOT` now has exactly one
-legitimate value, so there is no wrong-root state left to detect, and "the app
-inherits nothing" became the correct outcome rather than a misconfiguration.
+root **dissolves** the hazard instead: `GM_FS_ROOT` had exactly one legitimate
+value, so there was no wrong-root state left to detect, and "the app inherits
+nothing" became the correct outcome rather than a misconfiguration.
+
+**THAT LAST SENTENCE IS NOW OUT OF DATE, AND THE WAY IT CHANGED MATTERS.** There
+are three environments again — see "THREE ENVIRONMENTS" above. The hazard did
+NOT come back, because the second root is no longer selected by an environment
+variable the app cannot see: each bundle BAKES its root into its own Info.plist,
+so "the app inherits nothing" is still the correct outcome and is no longer a
+problem. The lesson survives intact: a second root selected by `$GM_FS_ROOT`
+alone would reintroduce the exact deleted hazard. Do not build one.
 
 What this costs, and it is a real cost: the snapshot WAS the rehearsal surface
 for db-affecting change. So `gm_hook call BACKUP --json '{}'` stopped being
@@ -755,9 +973,11 @@ head is behind the binary's, inside `KernelWriter.start` — the machine takes t
 snapshot rather than someone remembering to.
 
 **`sandbox` is a THREE-WAY HOMONYM in this repo**, and a sweep keyed on the word
-destroys two live subsystems. `RetiredNameContractTests` keys on the runtime
+destroys two live subsystems. `RetiredNameContractTests` keyed on the runtime
 vocabulary only (`.gmcc_sandbox`, `SandboxMarker`, `SandboxRetarget`,
-`local_sandbox`) and explicitly allows:
+`local_sandbox`) — **that test is deleted, so nothing enforces this now**, and
+the four literals below are a rule you keep by hand. The protected spellings
+were, and remain:
 
 - **`DopeRepoSandbox`** — write containment for `.gmcc/`, a value type whose
   public surface can only name paths under `{instanceRoot}/.gmcc/`. Deleting it

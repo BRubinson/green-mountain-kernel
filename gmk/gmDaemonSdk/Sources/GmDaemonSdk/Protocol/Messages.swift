@@ -111,6 +111,13 @@ public enum DaemonEventKind: String, Codable, Hashable, CaseIterable, Sendable {
     /// uuid. On reconnect ask INSTANCE_CURRENT_SESSION once rather than
     /// replaying.
     case checkoutChange = "CHECKOUT_CHANGE"
+    /// v29 — durable rows: the agent test mutex. Every claim, release and
+    /// reclaim events, including a LAZY RECLAIM of a lock whose holder died.
+    /// That last one is the reason this kind exists rather than the state
+    /// living only in the mutable cell: a lock that silently changed hands
+    /// because a process was SIGKILLed is exactly the history someone will
+    /// need when two agents disagree about who was running what.
+    case testLockChange = "TEST_LOCK_CHANGE"
 }
 
 /// The four registry levels a kbite can be activated at. rawValue drives the
@@ -464,6 +471,20 @@ public struct PingResponse: Codable, Hashable, Sendable {
     /// Bundle path of the instance actually holding the db lock, so a
     /// client-mode kernel can name BOTH bundles rather than only its own.
     public let writerBundlePath: String?
+    /// The filesystem root this kernel actually resolved.
+    ///
+    /// Reported for the same reason as `writerRole`: with more than one
+    /// environment on a machine, "which database am I looking at" stops being
+    /// rhetorical, and a client that cannot ask has to GUESS from its own
+    /// environment — which is exactly the guess that is wrong for a
+    /// LaunchServices-launched app, since it inherits no environment at all.
+    ///
+    /// ADDITIVE OPTIONAL: it decodes safely in both directions and nil means
+    /// what the absent field meant — the peer does not report its root. It
+    /// contributed NOTHING to the v29 bump; the six new test-lock message types
+    /// did. Recorded because the rule only means something if the distinction
+    /// is held.
+    public let gmfsRoot: String?
 
     public init(
         daemonPid: Int32,
@@ -475,7 +496,8 @@ public struct PingResponse: Codable, Hashable, Sendable {
         residentMemoryBytes: UInt64? = nil,
         cpuPercent: Double? = nil,
         writerRole: String? = nil,
-        writerBundlePath: String? = nil
+        writerBundlePath: String? = nil,
+        gmfsRoot: String? = nil
     ) {
         self.daemonPid = daemonPid
         self.protocolVersion = protocolVersion
@@ -487,6 +509,7 @@ public struct PingResponse: Codable, Hashable, Sendable {
         self.cpuPercent = cpuPercent
         self.writerRole = writerRole
         self.writerBundlePath = writerBundlePath
+        self.gmfsRoot = gmfsRoot
     }
 }
 
@@ -5156,4 +5179,345 @@ struct AnyEncodable: Encodable {
     }
 
     func encode(to encoder: Encoder) throws { try encodeTo(encoder) }
+}
+
+// MARK: - Agent test mutual exclusion (v29)
+
+/// Run lifecycle. Lives here rather than as a SQL `CHECK` because post-m0021
+/// the vocabulary is Swift's job: an inline CHECK cannot be dropped without the
+/// documented twelve-step table rebuild, so encoding five arms in the schema
+/// buys a rebuild the first time a sixth is wanted.
+public enum TestRunState: String, Codable, Hashable, CaseIterable, Sendable {
+    case queued
+    case running
+    case passed
+    case failed
+    /// The holder died or released without reporting. Distinct from `failed`
+    /// on purpose — "we never found out" is not "it went red", and collapsing
+    /// them would let a crashed run masquerade as a real result.
+    case abandoned
+}
+
+/// How a caller can tell the run finished. The MACHINE-checkable half; the
+/// human sentence is `doneHint`.
+public enum TestDoneKind: String, Codable, Hashable, CaseIterable, Sendable {
+    /// A file appears at `done_condition.path`.
+    case exitFile = "exit_file"
+    /// The `test_run` row itself reaches a terminal state.
+    case dbRow = "db_row"
+    /// The supervised process exits (`exitCode` becomes non-nil).
+    case process
+}
+
+/// The claim cell's two states. The ask spelled the release edge explicitly —
+/// a run holds its target "until it is modified back into an open state".
+public enum TestLockState: String, Codable, Hashable, CaseIterable, Sendable {
+    case open
+    case held
+}
+
+/// How liveness is decided for the current holder.
+public enum TestHolderKind: String, Codable, Hashable, CaseIterable, Sendable {
+    /// DEFAULT, and the one that makes the lock safe. Liveness is a
+    /// `flock(LOCK_NB)` probe on `lockPath`: if the probe succeeds the holder
+    /// is gone, full stop. Authority is DERIVED from a won lock exactly as
+    /// `KernelOwnership` derives it, so SIGKILLing a holder frees the lock at
+    /// the next status call with no timeout, no reaper and nothing to tune.
+    case process
+    /// Degraded fallback for a holder that cannot keep a file descriptor open.
+    /// Uses `expiresAt`, which is strictly worse: a TTL fails toward HOLDING a
+    /// stuck lock, and for a mutex that is the worst available direction.
+    case lease
+}
+
+/// One runnable suite, declared in the REPO rather than the database — the ask
+/// was that repo tests be configured in the repo, and a manifest that travels
+/// with the checkout is the only version of that which survives cloning the
+/// repo into another environment.
+public struct TestSuiteSpec: Codable, Hashable, Sendable {
+    public let id: String
+    public let command: String
+    public let doneKind: TestDoneKind
+    public let doneHint: String?
+
+    public init(id: String, command: String, doneKind: TestDoneKind, doneHint: String? = nil) {
+        self.id = id
+        self.command = command
+        self.doneKind = doneKind
+        self.doneHint = doneHint
+    }
+}
+
+public struct TestSuiteListRequest: Codable, Hashable, Sendable {
+    public let projectUuid: String
+
+    public init(projectUuid: String) {
+        self.projectUuid = projectUuid
+    }
+}
+
+public struct TestSuiteListResponse: Codable, Hashable, Sendable {
+    public let suites: [TestSuiteSpec]
+    /// Where the manifest was read from, so a caller that got an empty list can
+    /// tell "no suites declared" from "looked in the wrong checkout".
+    public let manifestPath: String?
+
+    public init(suites: [TestSuiteSpec], manifestPath: String? = nil) {
+        self.suites = suites
+        self.manifestPath = manifestPath
+    }
+}
+
+public struct TestLockStatusRequest: Codable, Hashable, Sendable {
+    public let projectUuid: String
+
+    public init(projectUuid: String) {
+        self.projectUuid = projectUuid
+    }
+}
+
+public struct TestLockAcquireRequest: Codable, Hashable, Sendable {
+    public let projectUuid: String
+    /// The checkout being claimed — the ask's "targets an instance".
+    public let targetInstanceUuid: String?
+    public let sessionUuid: String?
+    public let agentId: String?
+    public let suiteId: String
+    /// The ephemeral root this run owns.
+    ///
+    /// HARD CONSTRAINT on whatever generates it: `sun_path` is 104 bytes on
+    /// macOS and the server binds `NWEndpoint.unix(path:)` under this root, so
+    /// a long root yields a listener that cannot bind. Keep run ids SHORT.
+    public let runRoot: String
+    /// The file the holder `flock`s. Absent means lease mode, which is the
+    /// degraded path — see `TestHolderKind`.
+    public let lockPath: String?
+    public let holderPid: Int32?
+    public let gitSha: String?
+    public let gitBranch: String?
+    public let doneKind: TestDoneKind
+    /// JSON keyed by `doneKind` (e.g. `{"path": "…/result.json"}`). JSON rather
+    /// than columns because the shape varies per kind and none of it is queried.
+    public let doneCondition: String
+    /// The human sentence another agent reads to decide whether to wait. The
+    /// ask's "a description of how to tell when the test is done running" —
+    /// deliberately free text, because it is documentation for a reader rather
+    /// than a predicate for the machine.
+    public let doneHint: String?
+    /// Lease mode only. Ignored when a `lockPath` is given.
+    public let leaseSeconds: Int?
+
+    public init(
+        projectUuid: String,
+        targetInstanceUuid: String? = nil,
+        sessionUuid: String? = nil,
+        agentId: String? = nil,
+        suiteId: String,
+        runRoot: String,
+        lockPath: String? = nil,
+        holderPid: Int32? = nil,
+        gitSha: String? = nil,
+        gitBranch: String? = nil,
+        doneKind: TestDoneKind,
+        doneCondition: String,
+        doneHint: String? = nil,
+        leaseSeconds: Int? = nil
+    ) {
+        self.projectUuid = projectUuid
+        self.targetInstanceUuid = targetInstanceUuid
+        self.sessionUuid = sessionUuid
+        self.agentId = agentId
+        self.suiteId = suiteId
+        self.runRoot = runRoot
+        self.lockPath = lockPath
+        self.holderPid = holderPid
+        self.gitSha = gitSha
+        self.gitBranch = gitBranch
+        self.doneKind = doneKind
+        self.doneCondition = doneCondition
+        self.doneHint = doneHint
+        self.leaseSeconds = leaseSeconds
+    }
+}
+
+public struct TestLockReleaseRequest: Codable, Hashable, Sendable {
+    public let projectUuid: String
+    /// The run releasing. Required: releasing a lock you do not hold is the
+    /// mistake worth refusing, and without this the verb cannot tell.
+    public let runUuid: String
+    /// Terminal state to stamp on the run as it lets go.
+    public let finalState: TestRunState
+    public let exitCode: Int32?
+    public let summary: String?
+    /// Break a lock held by someone else. AUDITED — it events like any other
+    /// transition, so a forced release is visible afterwards rather than
+    /// indistinguishable from a clean one.
+    public let force: Bool
+
+    public init(
+        projectUuid: String,
+        runUuid: String,
+        finalState: TestRunState,
+        exitCode: Int32? = nil,
+        summary: String? = nil,
+        force: Bool = false
+    ) {
+        self.projectUuid = projectUuid
+        self.runUuid = runUuid
+        self.finalState = finalState
+        self.exitCode = exitCode
+        self.summary = summary
+        self.force = force
+    }
+}
+
+public struct TestLockResponse: Codable, Hashable, Sendable {
+    public let projectUuid: String
+    public let state: TestLockState
+    public let heldByRunUuid: String?
+    public let targetInstanceUuid: String?
+    public let holderKind: TestHolderKind?
+    public let lockPath: String?
+    public let holderPid: Int32?
+    public let claimedAt: String?
+    public let expiresAt: String?
+    public let version: Int64
+    /// The run currently holding, inlined so a waiting agent gets `doneHint`
+    /// and `doneCondition` without a second round trip — the whole point of
+    /// asking is "can I go yet", and that answer lives on the run.
+    public let run: TestRunSummary?
+    /// True when this call RECLAIMED a lock whose holder was gone. Surfaced
+    /// rather than silent: a caller that believes it queued cleanly should be
+    /// able to see that it actually stepped over a corpse.
+    public let reclaimed: Bool
+
+    public init(
+        projectUuid: String,
+        state: TestLockState,
+        heldByRunUuid: String? = nil,
+        targetInstanceUuid: String? = nil,
+        holderKind: TestHolderKind? = nil,
+        lockPath: String? = nil,
+        holderPid: Int32? = nil,
+        claimedAt: String? = nil,
+        expiresAt: String? = nil,
+        version: Int64,
+        run: TestRunSummary? = nil,
+        reclaimed: Bool = false
+    ) {
+        self.projectUuid = projectUuid
+        self.state = state
+        self.heldByRunUuid = heldByRunUuid
+        self.targetInstanceUuid = targetInstanceUuid
+        self.holderKind = holderKind
+        self.lockPath = lockPath
+        self.holderPid = holderPid
+        self.claimedAt = claimedAt
+        self.expiresAt = expiresAt
+        self.version = version
+        self.run = run
+        self.reclaimed = reclaimed
+    }
+}
+
+/// The append-only ledger row, as the wire sees it.
+public struct TestRunSummary: Codable, Hashable, Sendable {
+    public let uuid: String
+    public let projectUuid: String
+    public let instanceUuid: String?
+    public let sessionUuid: String?
+    public let agentId: String?
+    public let runRoot: String
+    public let suiteId: String
+    public let gitSha: String?
+    public let gitBranch: String?
+    public let state: TestRunState
+    public let doneKind: TestDoneKind
+    public let doneCondition: String
+    public let doneHint: String?
+    public let startedAt: String?
+    public let finishedAt: String?
+    public let exitCode: Int32?
+    public let summary: String?
+    public let createdAt: String
+    public let updatedAt: String
+    public let version: Int64
+
+    public init(
+        uuid: String,
+        projectUuid: String,
+        instanceUuid: String? = nil,
+        sessionUuid: String? = nil,
+        agentId: String? = nil,
+        runRoot: String,
+        suiteId: String,
+        gitSha: String? = nil,
+        gitBranch: String? = nil,
+        state: TestRunState,
+        doneKind: TestDoneKind,
+        doneCondition: String,
+        doneHint: String? = nil,
+        startedAt: String? = nil,
+        finishedAt: String? = nil,
+        exitCode: Int32? = nil,
+        summary: String? = nil,
+        createdAt: String,
+        updatedAt: String,
+        version: Int64
+    ) {
+        self.uuid = uuid
+        self.projectUuid = projectUuid
+        self.instanceUuid = instanceUuid
+        self.sessionUuid = sessionUuid
+        self.agentId = agentId
+        self.runRoot = runRoot
+        self.suiteId = suiteId
+        self.gitSha = gitSha
+        self.gitBranch = gitBranch
+        self.state = state
+        self.doneKind = doneKind
+        self.doneCondition = doneCondition
+        self.doneHint = doneHint
+        self.startedAt = startedAt
+        self.finishedAt = finishedAt
+        self.exitCode = exitCode
+        self.summary = summary
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.version = version
+    }
+}
+
+/// Mark a claimed run as actually started. Split from acquire because claiming
+/// the lock and beginning to run are genuinely different moments, and a run
+/// that was claimed but never started is a state worth being able to see.
+public struct TestRunStartRequest: Codable, Hashable, Sendable {
+    public let runUuid: String
+    public let expectedVersion: Int64
+
+    public init(runUuid: String, expectedVersion: Int64) {
+        self.runUuid = runUuid
+        self.expectedVersion = expectedVersion
+    }
+}
+
+public struct TestRunStatusRequest: Codable, Hashable, Sendable {
+    /// One run by uuid, or — when nil — the recent runs for `projectUuid`.
+    public let runUuid: String?
+    public let projectUuid: String?
+    public let limit: Int?
+
+    public init(runUuid: String? = nil, projectUuid: String? = nil, limit: Int? = nil) {
+        self.runUuid = runUuid
+        self.projectUuid = projectUuid
+        self.limit = limit
+    }
+}
+
+public struct TestRunResponse: Codable, Hashable, Sendable {
+    public let runs: [TestRunSummary]
+
+    public init(runs: [TestRunSummary]) {
+        self.runs = runs
+    }
 }

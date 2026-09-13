@@ -200,6 +200,23 @@ public enum VerbRegistry {
         // cannot see, which is the fail-OPEN direction the guard forbids.
         VerbSpec(.txBatch, gm: "gm tx batch", role: .record(agentPhases: nil)),
 
+        // ── Agent test mutual exclusion (v29) ────────────────────────────
+        // A mutex for AGENTS, above the kernel's own flock: flock stops two
+        // kernels writing one db, these stop two agents building and testing
+        // one repo.
+        //
+        // `agentPhases: nil` on all three writes is deliberate rather than
+        // unconsidered. Claiming the test lock is not a workflow phase — an
+        // agent validating a build may be anywhere in its prompt, or in no
+        // prompt at all, and pinning these to a phase list would refuse the
+        // exact ad-hoc validation the lock exists to serialise.
+        VerbSpec(.testSuiteList, gm: "gm test suites", role: .read),
+        VerbSpec(.testLockStatus, gm: "gm test lock-status", role: .read),
+        VerbSpec(.testLockAcquire, gm: "gm test lock-acquire", role: .record(agentPhases: nil)),
+        VerbSpec(.testLockRelease, gm: "gm test lock-release", role: .record(agentPhases: nil)),
+        VerbSpec(.testRunStart, gm: "gm test run-start", role: .record(agentPhases: nil)),
+        VerbSpec(.testRunStatus, gm: "gm test run-status", role: .read),
+
         // ── Context bootstrap ────────────────────────────────────────────
         VerbSpec(.contextEnsure, gm: "gm context ensure", role: .record(agentPhases: nil)),
         VerbSpec(.contextGet, gm: "gm context get", role: .read),

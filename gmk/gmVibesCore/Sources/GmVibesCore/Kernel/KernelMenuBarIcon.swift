@@ -27,17 +27,52 @@ public enum KernelMenuBarIcon {
     private static let stroke: CGFloat = 1.15
 
     public static let image: NSImage = {
+        // The environment letter rides the glyph itself, so the menu bar says
+        // which database this instance writes even when no window is open —
+        // which, under LSUIElement, is most of the time.
+        let kind = EnvironmentKind.current
         let image = NSImage(
             size: NSSize(width: side, height: side),
             flipped: false
         ) { _ in
             draw()
+            if !kind.isProduction { drawEnvironmentBadge(kind.badge) }
             return true
         }
+        // TEMPLATE STAYS TRUE, and the badge is drawn in black rather than red
+        // for that reason: template rendering is what lets the status bar tint
+        // the glyph with the rest of the row, in both appearances and while
+        // highlighted. Opting out to get a red letter would make the icon wrong
+        // in dark mode and while the menu is open — the two moments someone is
+        // most likely to be looking at it. The COLOURED signal is the banner;
+        // this one is a shape.
         image.isTemplate = true
-        image.accessibilityDescription = "GM Kernel"
+        image.accessibilityDescription = kind.isProduction
+            ? "GM Kernel"
+            : "GM Kernel — \(kind.displayName)"
         return image
     }()
+
+    /// A filled corner disc carrying the environment letter, knocked out of the
+    /// glyph. Drawn as a shape rather than a colour so the icon stays a template.
+    private static func drawEnvironmentBadge(_ letter: String) {
+        let diameter: CGFloat = 9
+        let rect = NSRect(
+            x: side - diameter, y: 0, width: diameter, height: diameter)
+        NSColor.black.setFill()
+        NSBezierPath(ovalIn: rect).fill()
+
+        let text = letter as NSString
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 7, weight: .bold),
+            .foregroundColor: NSColor.white,
+        ]
+        let textSize = text.size(withAttributes: attributes)
+        text.draw(
+            at: NSPoint(x: rect.midX - textSize.width / 2,
+                        y: rect.midY - textSize.height / 2),
+            withAttributes: attributes)
+    }
 
     private static func draw() {
         NSColor.black.setStroke()

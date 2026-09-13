@@ -164,11 +164,32 @@ echo "  built from $STAGED_SHA, which is HEAD"
 
 # ── 4. Tests ─────────────────────────────────────────────────────────────────
 say "4/8  TESTS — never ship what was not tested"
-for p in gmDaemonSdk gmDaemon gmUxComponentLibrary gmMcp gmToolchain gmAgententicsSdk; do
-    echo "  swift test $p"
-    swift test --package-path "$GMK/$p" >/dev/null || die "$p tests failed — not publishing"
-done
-echo "  all suites green"
+# ONE package now. The six-name loop that used to live here iterated targets
+# that no longer exist, and a loop over a stale list is the WORST failure
+# available on this path: `swift test` on a package with no test target SUCCEEDS,
+# so the gate would have printed "all suites green" having run nothing at all.
+# Failing permissively, on the publish path, is exactly the shape of bug this
+# gate exists to prevent — so it now counts what it ran and refuses zero.
+#
+# The suite boots a real gm_kernel, so it needs one built. Point it at the
+# artifact that is about to SHIP rather than at whatever is in .build: testing
+# bits other than the ones being published is how "what you tested is what
+# ships" quietly stops being true.
+TEST_PACKAGE="Gm_Kernel_test"
+TMP_TEST_LOG="$(mktemp "${TMPDIR:-/tmp}/gm-test.XXXXXX")"
+trap 'rm -f "$TMP_TEST_LOG"' EXIT
+[ -d "$GMK/$TEST_PACKAGE" ] || die "$TEST_PACKAGE is missing — refusing to publish untested binaries"
+
+echo "  swift test $TEST_PACKAGE (against the staged kernel)"
+GM_TEST_KERNEL_BIN="$STAGE/$GM_MACHO" \
+    swift test --package-path "$GMK/$TEST_PACKAGE" 2>&1 | tee "$TMP_TEST_LOG" >/dev/null \
+    || die "$TEST_PACKAGE failed — not publishing"
+
+# Prove the run was not vacuous. A suite that executed nothing is not a pass.
+EXECUTED="$(grep -cE "' passed \(" "$TMP_TEST_LOG" || true)"
+[ "${EXECUTED:-0}" -gt 0 ] \
+    || die "$TEST_PACKAGE reported success but ran ZERO cases — refusing to ship on a vacuous gate"
+echo "  $EXECUTED cases green"
 
 # ── 5. The app ───────────────────────────────────────────────────────────────
 say "5/8  APP"

@@ -23,7 +23,7 @@
          location = "group:gmMcp">
       </FileRef>
       <FileRef
-         location = "group:gmToolchain">
+         location = "group:Gm_Kernel_test">
       </FileRef>
       <FileRef
          location = "group:gmVibesCore">

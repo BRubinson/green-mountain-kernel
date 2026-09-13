@@ -15,19 +15,129 @@ public enum Paths {
 
     // MARK: - The root
 
-    /// `~/gmfs/`, or `$GM_FS_ROOT` when set — the sandbox escape hatch, and now
-    /// the ONLY root var. Resolved once per process: the daemon env is a
-    /// posix_spawn snapshot, so a per-request read would be stale by design.
-    /// HOME overrides cannot work here (homeDirectoryForCurrentUser resolves
-    /// via getpwuid, not $HOME).
+    /// The Info.plist key an app bundle bakes its root into.
+    ///
+    /// A bare Mach-O has no such key, which is why the resolution order below
+    /// is correct rather than merely convenient: the arm that cannot apply to
+    /// the CLI simply does not fire for it.
+    public static let bakedRootInfoKey = "GMFSRoot"
+
+    /// The environment name an app bundle declares. Purely informational —
+    /// **nothing resolves a path from it**, and it must never become a second
+    /// way to answer "which root am I on". The root is the truth; this is a
+    /// label for humans reading a plist.
+    public static let environmentInfoKey = "GMEnvironment"
+
+    /// The resolved filesystem root. **A property of the BITS, not of the
+    /// environment.**
+    ///
+    /// Order — and the first arm coming FIRST is the whole point:
+    ///   1. `Bundle.main`'s `GMFSRoot`, baked in at build time
+    ///   2. `$GM_FS_ROOT`
+    ///   3. `~/gmfs`
+    ///
+    /// ## Why the bundle key has to win
+    ///
+    /// A LaunchServices-launched `.app` inherits **no shell environment at
+    /// all**, so arm 2 is unreachable from a GUI launch and the app would
+    /// always land on `~/gmfs` no matter what the session that "selected" an
+    /// environment said. That is exactly the silent-data hazard that got the
+    /// previous snapshot dev loop deleted, and the recorded verdict was that
+    /// "every available mitigation was a detection mechanism". A T overlay and
+    /// a red bar are detection mechanisms: they make a wrong state visible,
+    /// they do not make it impossible.
+    ///
+    /// Baking the root into the bundle DISSOLVES the hazard instead. Each
+    /// bundle carries its own root — production included, set EXPLICITLY rather
+    /// than left to the fallback — so no launch context (Finder, Dock,
+    /// `open -n`, Xcode Run, a LaunchServices crash-relaunch) can change any
+    /// app's database.
+    ///
+    /// The tempting alternative — an `<EnvironmentVariables>` block in the
+    /// scheme — is STRICTLY WORSE than what was deleted: the same bits would
+    /// mean two different databases depending on whether you hit Run or
+    /// double-clicked.
+    ///
+    /// This also closes a live bug. Before this ordering, any shell that
+    /// exported `GM_FS_ROOT` and then ran `open -a` handed the PRODUCTION app a
+    /// different database.
+    ///
+    /// The CLI keeps env resolution, and the asymmetry is correct rather than
+    /// inconsistent: it mirrors the asymmetry in reality, where one shape
+    /// inherits an environment and the other does not.
+    ///
+    /// Resolved once per process: the daemon env is a `posix_spawn` snapshot,
+    /// so a per-request read would be stale by design — and ONE ROOT PER
+    /// PROCESS is a property callers depend on, not an accident.
+    /// HOME overrides cannot work here (`homeDirectoryForCurrentUser` resolves
+    /// via `getpwuid`, not `$HOME`), so `$HOME` and `GM_FS_ROOT` are different
+    /// levers and setting one does not move the other.
     public static let root: URL = {
+        if let baked = Bundle.main.object(forInfoDictionaryKey: bakedRootInfoKey) as? String,
+           !baked.isEmpty {
+            return URL(fileURLWithPath: (baked as NSString).expandingTildeInPath,
+                       isDirectory: true)
+        }
         if let override = ProcessInfo.processInfo.environment["GM_FS_ROOT"],
            !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
-        return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("gmfs", isDirectory: true)
+        return defaultProductionRoot
     }()
+
+    /// `~/gmfs` — where production lives, and the fallback when nothing else
+    /// answers.
+    ///
+    /// Production deliberately keeps this path rather than becoming
+    /// `~/prod_gmfs` for symmetry with the other environments: renaming it
+    /// would mean rewriting the absolute `daemon_config` roots against the
+    /// documented rollback anchor and tripping `migrate_to_gmfs.sh`'s own
+    /// refusal check, all to make three names look alike.
+    public static var defaultProductionRoot: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("gmfs", isDirectory: true)
+    }
+
+    /// Whether this process is looking at the production root.
+    ///
+    /// **Compares INODES, not paths**, and that is load-bearing rather than
+    /// fastidious. `standardizedFileURL` does not resolve symlinks, so a
+    /// `~/prod_gmfs` symlink, an APFS firmlink, or `/Users` vs
+    /// `/System/Volumes/Data/Users` would all make one root look like two. A
+    /// false answer here paints the non-production chrome — the red bar — over
+    /// LIVE PRODUCTION DATA, which is the badge lying at the exact moment it
+    /// matters most, and precisely the failure the baked-root design exists to
+    /// prevent.
+    ///
+    /// Keyed on `gm.db` rather than the directory because the database is the
+    /// thing whose identity actually matters; two roots sharing a `gm.db` inode
+    /// ARE the same environment whatever their paths say.
+    public static var isProductionRoot: Bool {
+        isSameRoot(root, defaultProductionRoot)
+    }
+
+    /// Inode-equality of two roots, via their `gm.db`.
+    ///
+    /// Returns false when either database is absent — an environment that has
+    /// never booted is not yet provably production, and guessing "yes" would
+    /// suppress the warning chrome on a root we know nothing about.
+    public static func isSameRoot(_ a: URL, _ b: URL) -> Bool {
+        var sa = stat(), sb = stat()
+        let pa = a.appendingPathComponent("gm.db", isDirectory: false).path
+        let pb = b.appendingPathComponent("gm.db", isDirectory: false).path
+        guard stat(pa, &sa) == 0, stat(pb, &sb) == 0 else { return false }
+        return sa.st_dev == sb.st_dev && sa.st_ino == sb.st_ino
+    }
+
+    /// The environment label this bundle declares, or nil for the CLI and for
+    /// production bundles that declare none.
+    ///
+    /// FOR DISPLAY ONLY. Never resolve a path from it: a label and a root that
+    /// can disagree is a second source of truth, and the whole point of the
+    /// baked root is that there is exactly one.
+    public static var declaredEnvironmentName: String? {
+        Bundle.main.object(forInfoDictionaryKey: environmentInfoKey) as? String
+    }
 
     // MARK: - Daemon runtime state
 

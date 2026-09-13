@@ -30,8 +30,11 @@
 #   rebuild_local.sh --fast       # arm64 only — quicker, NOT releasable
 #   rebuild_local.sh --no-activate
 #
+#   rebuild_local.sh --env beta   # build into the beta environment's store
+#
 # Env:
-#   GM_FS_ROOT                    # the one filesystem root (default: $HOME/gmfs)
+#   GM_ENV                        # prod | beta | test (default: prod)
+#   GM_FS_ROOT                    # explicit root; WINS over GM_ENV when set
 
 set -e
 
@@ -56,13 +59,19 @@ PACKAGES="gmDaemonSdk gmDaemon gmUxComponentLibrary gmAgententicsSdk gmMcp gmKer
 ARCH_FLAGS="--arch arm64 --arch x86_64"
 ARCHES="arm64,x86_64"
 ACTIVATE=1
-for arg in "$@"; do
-    case "$arg" in
+while [ $# -gt 0 ]; do
+    case "$1" in
         --fast)        ARCH_FLAGS=""; ARCHES="arm64" ;;
         --no-activate) ACTIVATE=0 ;;
+        # Which environment's store to build into. Default prod — unchanged for
+        # every existing caller. GM_FS_ROOT still wins if it is set explicitly,
+        # so a harness minting a scratch root needs no flag at all.
+        --env)         shift; GM_ENV="${1:?--env needs prod|beta|test}" ;;
+        --env=*)       GM_ENV="${1#--env=}" ;;
         "") ;;
-        *) echo "[GMB] rebuild_local.sh: unknown flag $arg" >&2; exit 2 ;;
+        *) echo "[GMB] rebuild_local.sh: unknown flag $1" >&2; exit 2 ;;
     esac
+    shift
 done
 
 [ -f "$GMK/gmDaemonSdk/Package.swift" ] || {
@@ -76,6 +85,10 @@ BUILD_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unkn
 
 gm_resolve_fs_root
 
+# PRINT THE ROOT BEFORE DOING ANYTHING. This script shuts down a daemon and
+# rewrites a release store; an inherited GM_FS_ROOT silently retargeting both
+# was previously invisible, which is the kind of quiet that costs an afternoon.
+echo "[GMB] environment: $GM_ENV   root: $GM_FS_ROOT"
 echo "[GMB] building v$STAGE_VERSION ($ARCHES) from $REPO_ROOT @ $BUILD_SHA"
 
 # --- build -------------------------------------------------------------------

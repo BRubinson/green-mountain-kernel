@@ -405,6 +405,15 @@ final class DaemonConnectionModel {
             if let prompt = payloadUuids(event)?.promptUuid?.lowercased() {
                 hub.invalidate(.prompt(prompt))
             }
+        case .testLockChange:
+            // m0029 test-lock transitions. Payload carries project_uuid and
+            // run_uuid, and the subject is the lock cell — no surface renders
+            // either yet, so this routes to topology rather than inventing an
+            // invalidation key nothing subscribes to. It is wired now because
+            // the switch is exhaustive by design: adding the event kind without
+            // an arm would not compile, which is exactly the property that stops
+            // a new kind reaching the app unnoticed.
+            hub.invalidate(.topology)
         case .diagramChange:
             // Subject IS the diagram uuid — the open editor's key. The
             // payload's owner chain (project always, session/prompt when the

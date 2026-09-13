@@ -123,10 +123,16 @@ jobs:
       - name: swift test
         run: |
           set -euo pipefail
-          for p in gmDaemonSdk gmDaemon gmUxComponentLibrary gmMcp gmToolchain gmAgententicsSdk; do
-            echo "--- swift test $p"
-            swift test --package-path "gmk/$p"
-          done
+          # ONE package. The loop that used to be here named six targets that no
+          # longer exist, and `swift test` on a package with no test target
+          # SUCCEEDS — so a stale list would have passed this gate having run
+          # nothing, on the release path.
+          swift build --package-path gmk/gmKernel
+          GM_TEST_KERNEL_BIN="$PWD/gmk/gmKernel/.build/debug/gm_kernel" \
+            swift test --package-path gmk/Gm_Kernel_test 2>&1 | tee test.log
+          n="$(grep -cE "' passed \(" test.log || true)"
+          echo "$n cases passed"
+          [ "${n:-0}" -gt 0 ] || { echo "::error::the suite ran ZERO cases"; exit 1; }
 
       # SwiftPM emits a genuinely universal Mach-O when handed both --arch flags
       # (no lipo step); the verification below is what makes that a fact rather

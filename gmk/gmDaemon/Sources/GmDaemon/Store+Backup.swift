@@ -85,6 +85,30 @@ extension Store {
         }
     }
 
+    /// The OTHER direction, and the one that is silent today.
+    ///
+    /// `hasPendingMigrations` catches a db BEHIND the binary. Nothing catches a
+    /// db AHEAD of it, and GRDB will not complain: it applies the registered
+    /// migrations that have not run and does not object to APPLIED ones it has
+    /// never heard of. So an older binary opening a newer database sees
+    /// `hasCompletedMigrations == true`, `hasPendingMigrations() == false`, and
+    /// proceeds — no backup, no migration, no error, straight into reading a
+    /// schema whose shape it does not know.
+    ///
+    /// That was a theoretical hazard while one root existed. With several
+    /// environments it is a ROUTINE one: an environment seeded from a
+    /// newer-than-its-binary source, or simply a stale `releases/active` in one
+    /// root while another has been rebuilt, reaches it on an ordinary day.
+    ///
+    /// Refusing is the only safe answer. The alternative — carrying on and
+    /// writing rows through a model that disagrees with the schema — corrupts
+    /// quietly, and an append-only database cannot take that back.
+    public func hasBeenSuperseded() throws -> Bool {
+        try boundaryRead { db in
+            try Migrations.migrator.hasBeenSuperseded(db)
+        }
+    }
+
     /// The automatic pre-migration snapshot.
     ///
     /// This is what REPLACED the sandbox dev loop. That snapshot runtime was the
