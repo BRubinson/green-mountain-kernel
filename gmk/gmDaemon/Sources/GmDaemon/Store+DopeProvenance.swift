@@ -60,7 +60,7 @@ extension Store {
     /// report rather than to decide, which is what keeps the documented
     /// "boot must never block on a domain model" contract true.
     public func dopeMergePlan(scopeUuid: String) throws -> [DopeMerge.Outcome] {
-        let (scope, root) = try dbQueue.read { db -> (DopeScopeRow, String) in
+        let (scope, root) = try boundaryRead { db -> (DopeScopeRow, String) in
             guard let scope = try self.fetchDopeScope(db, uuid: scopeUuid) else {
                 throw StoreError.notFound(entity: "dope_scope", key: scopeUuid)
             }
@@ -76,7 +76,7 @@ extension Store {
             throw StoreError.badRequest(detail: error.description)
         }
 
-        return try dbQueue.read { db in
+        return try boundaryRead { db in
             let tree = try self.fetchDopeTree(db, scope: scope, forProjection: true)
             let ours = DopeMerge.elements(of: DopeProjection.documents(from: tree))
             let base = try self.dopeProvenance(db, scopeUuid: scopeUuid)
@@ -121,7 +121,7 @@ extension Store {
         guard !targets.isEmpty else { return [] }
 
         // The file side's current hashes — what "ours wins" must re-base onto.
-        let theirHashes = try dbQueue.read { db -> [String: String] in
+        let theirHashes = try boundaryRead { db -> [String: String] in
             guard let scope = try self.fetchDopeScope(db, uuid: scopeUuid) else {
                 throw StoreError.notFound(entity: "dope_scope", key: scopeUuid)
             }
@@ -134,7 +134,7 @@ extension Store {
             return out
         }
 
-        try dbQueue.write { db in
+        try boundary { db in
             let now = Store.isoNow()
             for target in targets {
                 if takeOurs {

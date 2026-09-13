@@ -20,7 +20,13 @@ enum StatusHandler {
             tableCounts: try store.tableCounts(),
             lastEventId: try store.lastEventId(),
             startedAt: startedAt,
-            uptimeSeconds: Int(Date().timeIntervalSince(startedDate))
+            uptimeSeconds: Int(Date().timeIntervalSince(startedDate)),
+            // Parity with PING so the menu bar reads one shape whichever verb
+            // it polled.
+            residentMemoryBytes: KernelVitalsSource.residentMemoryBytes(),
+            cpuPercent: KernelVitalsSource.cpuPercent(),
+            writerRole: KernelVitalsSource.writerRole,
+            writerBundlePath: KernelVitalsSource.writerBundlePath
         )
         return try okResult(.status, head, response)
     }

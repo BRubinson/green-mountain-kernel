@@ -44,8 +44,8 @@ public enum GmEnvironment {
     ///
     /// - `export`, because a bare assignment sets a shell variable that no
     ///   child process inherits. Without it `getenv("GM_FS_ROOT")` is empty in
-    ///   every gm/daemon/script invocation the session makes — the sandbox
-    ///   split-brain this file exists to prevent.
+    ///   every gm/daemon/script invocation the session makes, and a session
+    ///   that cannot name its own runtime is the failure this file prevents.
     /// - single quotes, because an unquoted value stops at the first space.
     ///   A PATH carrying a component like `/Applications/VMware Fusion.app/…`
     ///   truncates the assignment, so PATH is never set at all and the
@@ -63,20 +63,19 @@ public enum GmEnvironment {
         bin: URL = Paths.bin
     ) -> [String] {
         var pairs = [("GM_BOOTED", "1"), ("GM_PLUGIN_ROOT", pluginRoot)]
-        // ONE root, emitted ONCE. This used to be two lines — a runtime-root
-        // passthrough (present only when sandboxed) and a content-root
-        // computation (always present). Collapsing them is the whole point of
-        // the one-root shape: the sandbox is now a different VALUE of this var
-        // rather than a different SHAPE of the env block, so the emitted set no
-        // longer varies by whether a session is sandboxed.
+        // ONE root, emitted ONCE, and now exactly one legitimate value. This
+        // was two lines when there were two filesystem roots, then one line
+        // whose value could still legitimately vary per session; with the
+        // snapshot runtime gone it is one line with one answer, and a
+        // disagreement is a misconfiguration rather than a mode.
         //
         // Precedence, and the reason for it:
         //   1. the db value when the daemon answered — emitting the db's own
         //      answer makes the env/db agreement invariant true by construction
-        //   2. the inherited claim (a sandbox launcher or the SessionStart hook
-        //      set it, and Paths.root already resolved against it) — dropping
-        //      it here is the split-brain bug: the session believes it is
-        //      sandboxed while its in-session clients drive prod
+        //   2. the inherited claim (the SessionStart hook set it, and
+        //      Paths.root already resolved against it) — forwarding rather than
+        //      recomputing keeps the session and its in-session clients
+        //      pointed at the same runtime
         //   3. the daemon-free fallback
         pairs.append(("GM_FS_ROOT", dbFsRoot ?? fallbackFsRoot(env: env).path))
         pairs.append(("PATH", pathValue(current: inheritedPath, bin: bin)))
@@ -92,8 +91,8 @@ public enum GmEnvironment {
 
     /// This runtime's bin first, deduped: prepend `Paths.bin` and drop any
     /// other component that already points at it, so re-boots are idempotent
-    /// and a sandbox session can never resolve a bare binary name to the prod
-    /// build through a stale leading entry.
+    /// and a stale leading entry can never win a bare binary name over the
+    /// install this session is actually running.
     public static func pathValue(current: String, bin: URL = Paths.bin) -> String {
         let mine = bin.path
         let survivors = current
@@ -107,12 +106,12 @@ public enum GmEnvironment {
     /// or we get worried"). The db is the source; the env is the claim.
     ///
     /// ONE comparison, because there is now one root. This used to be two
-    /// checks against two vars, and the weaker of the two was the runtime root,
-    /// which was set only when sandboxed — so on an unsandboxed session that
-    /// check silently did nothing. One always-present var turns the rule from
-    /// "compare two vars against two config rows, one of which may legitimately
-    /// be absent" into "compare one var against one config row, always
-    /// present," which is a check that cannot quietly stop running.
+    /// checks against two vars, and the weaker of the two was set only in a
+    /// snapshot runtime — so on an ordinary session that check silently did
+    /// nothing. One always-present var turns the rule from "compare two vars
+    /// against two config rows, one of which may legitimately be absent" into
+    /// "compare one var against one config row, always present," which is a
+    /// check that cannot quietly stop running.
     ///
     /// `env` is injectable. The claim is an INPUT to this check, so a test must
     /// be able to supply it: reading the process environment made the mismatch
@@ -129,21 +128,21 @@ public enum GmEnvironment {
             findings.append(Finding(code: "gmfs_root_mismatch", message:
                 "[GMB] WARN: gmfs_root disagreement — env \(claimed) vs daemon \(paths.gmFsRoot). "
                 + "Either the daemon answering this socket lives elsewhere, or the db "
-                + "disagrees with the session. In a sandbox: gm_hook sandbox refresh. "
-                + "In prod: gm_hook call CONFIG_SET "
+                + "disagrees with the session. Fix with: gm_hook call CONFIG_SET "
                 + "--json '{\"key\":\"gmfs_root\",\"value\":\"<correct>\"}'."))
         }
         return findings
     }
 
-    /// The installable resolver shim. Resolves at CALL time so one install
-    /// serves prod and every sandbox generation; sandbox launchers and the
-    /// SessionStart hook set GM_FS_ROOT.
+    /// The installable resolver shim. Resolves at CALL time rather than baking
+    /// a path in, so one installed shim keeps working across upgrades and
+    /// rollbacks — the release store swaps what `bin/` points at, and this
+    /// follows it. The SessionStart hook sets GM_FS_ROOT.
     public static let shimScript = """
         #!/bin/sh
         # GM client resolver. Do not edit.
-        # Resolves at call time so one install serves prod and every sandbox
-        # generation; sandbox launchers and the SessionStart hook set GM_FS_ROOT.
+        # Resolves at call time so one install survives upgrade and rollback;
+        # the SessionStart hook sets GM_FS_ROOT.
         exec "${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook" "$@"
         """
 }

@@ -9,7 +9,7 @@ import GmDaemonSdk
 extension Store {
     public func addFileChange(_ req: FileChangeAdd) throws -> FileChangeAddResponse {
         do {
-            return try dbQueue.write { db in try FileChangeRepository(db: db, core: core).add(req) }
+            return try boundary { db in try FileChangeRepository(db: db, core: core).add(req) }
         } catch StoreError.hookUnbound(let claudeSessionId, let booted) {
             // The ONE refusal that must leave a trace, and it needs its own
             // transaction to do it: the write that discovered the missing
@@ -19,7 +19,7 @@ extension Store {
             // daemon does not know gets no event; a hook firing in somebody
             // else's repo is ordinary.
             if booted {
-                try dbQueue.write { db in
+                try boundary { db in
                     try FileChangeRepository(db: db, core: core)
                         .recordUnbound(req, claudeSessionId: claudeSessionId)
                 }
@@ -29,7 +29,7 @@ extension Store {
     }
 
     public func listFileChanges(_ req: FileChangeListRequest) throws -> FileChangeListResponse {
-        try dbQueue.read { db in try FileChangeRepository(db: db, core: core).list(req) }
+        try boundaryRead { db in try FileChangeRepository(db: db, core: core).list(req) }
     }
 
     // MARK: - Cross-domain helper forward

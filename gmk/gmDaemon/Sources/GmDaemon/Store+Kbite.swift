@@ -14,15 +14,15 @@ extension Store {
     /// after the child row was created. `all: true` bypasses scope resolution
     /// and returns every kbite row.
     public func listKbites(_ req: KbiteListRequest) throws -> KbiteListResponse {
-        try dbQueue.read { db in try KbiteRepository(db: db, core: core).listKbites(req) }
+        try boundaryRead { db in try KbiteRepository(db: db, core: core).listKbites(req) }
     }
 
     public func addKbite(_ req: KbiteAddRequest) throws -> KbiteAddResponse {
-        try dbQueue.write { db in try KbiteRepository(db: db, core: core).addKbite(req) }
+        try boundary { db in try KbiteRepository(db: db, core: core).addKbite(req) }
     }
 
     public func removeKbite(_ req: KbiteRemoveRequest) throws -> KbiteRemoveResponse {
-        try dbQueue.write { db in try KbiteRepository(db: db, core: core).removeKbite(req) }
+        try boundary { db in try KbiteRepository(db: db, core: core).removeKbite(req) }
     }
 
     // MARK: - Cross-domain helper forward

@@ -1,13 +1,14 @@
 name: daemon-release
 
-# Builds the universal `gm_daemon` / `gm_mcp` / `gm_hook` binaries once and
+# Builds the universal `gm_kernel` binary once and
 # attaches them to a `gm_kernel-v<version>` release. The plugin's install_gm.sh
 # fetches exactly this asset.
 #
 #
 # THE BINARIES NOW COME FROM THREE PACKAGES, not one:
-#   gm_daemon <- gmk/gmDaemon        gm_mcp <- gmk/gmMcp        gm_hook <- gmk/gmDaemonSdk
-# gm_hook ships from the base SDK deliberately: it links the SDK alone, so
+#   gm_kernel <- gmk/gmKernel, which links GmKernelHost (gmDaemon),
+#   GmMcpServer (gmMcp) and GmHookCli (gmDaemonSdk) into ONE Mach-O.
+# gm_hook's personality ships from the base SDK deliberately: it links the SDK alone, so
 # bundling it with the persistence layer would drag GRDB into a client that
 # never opens the database.
 #
@@ -137,7 +138,9 @@ jobs:
       - name: Build universal (arm64 + x86_64)
         run: |
           set -euo pipefail
-          for p in gmDaemonSdk gmDaemon gmMcp; do
+          # gmKernel alone pulls the other three transitively: it links
+          # GmKernelHost, GmMcpServer and GmHookCli, so building it builds them.
+          for p in gmKernel; do
             swift build -c release --package-path "gmk/$p" --arch arm64 --arch x86_64
           done
 
@@ -149,14 +152,13 @@ jobs:
             swift build -c release --package-path "gmk/$1" \
               --arch arm64 --arch x86_64 --show-bin-path
           }
-          SDK_BIN="$(bin_path gmDaemonSdk)"
-          DAEMON_BIN="$(bin_path gmDaemon)"
-          MCP_BIN="$(bin_path gmMcp)"
+          KERNEL_BIN="$(bin_path gmKernel)"
           mkdir -p dist
-          cp "$DAEMON_BIN/gm_daemon" dist/gm_daemon
-          cp "$MCP_BIN/gm_mcp"       dist/gm_mcp
-          cp "$SDK_BIN/gm_hook"      dist/gm_hook
-          for b in gm_daemon gm_mcp gm_hook; do
+          # ONE Mach-O. The three personalities are library targets now and
+          # gmKernel links them into a single binary; the entry-point names
+          # become symlinks at activation, not staged files.
+          cp "$KERNEL_BIN/gm_kernel" dist/gm_kernel
+          for b in gm_kernel; do
             # -S drops debug symbols only; the binaries keep their exported
             # symbols and stay fully functional. Measured on this package:
             # 55MB -> 45MB raw, 15MB -> 12MB compressed, per architecture.
@@ -185,7 +187,7 @@ jobs:
           cd dist
           # Flat archive: install_gm.sh extracts into a temp dir and expects the
           # three binaries at the root, with no version directory to guess.
-          tar -czf "../${{ steps.v.outputs.asset }}" gm_daemon gm_mcp gm_hook
+          tar -czf "../${{ steps.v.outputs.asset }}" gm_kernel
           cd ..
           shasum -a 256 "${{ steps.v.outputs.asset }}" > "${{ steps.v.outputs.asset }}.sha256"
           cat "${{ steps.v.outputs.asset }}.sha256"
@@ -201,7 +203,9 @@ jobs:
           # fenced code blocks has to start lines at column 0, and a column-0
           # line inside a YAML block scalar ends the scalar.
           cat > release-notes.md <<'NOTES'
-          Universal (arm64 + x86_64) macOS binaries for `gm_daemon`, `gm_mcp`, `gm_hook`.
+          Universal (arm64 + x86_64) macOS binary `gm_kernel` — one Mach-O that
+          answers as `gm_daemon`, `gm_mcp` and `gm_hook` through argv[0], with the
+          installer creating those entry-point symlinks in `~/gmfs/bin`.
 
           Installed by the plugin's `install_gm.sh`, which fetches the newest
           `gm_kernel-v*` release and verifies the SHA-256 sidecar before unpacking.

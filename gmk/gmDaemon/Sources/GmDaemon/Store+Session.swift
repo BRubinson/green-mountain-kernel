@@ -7,11 +7,11 @@ import GmDaemonSdk
 
 extension Store {
     public func getSession(_ req: SessionGetRequest) throws -> SessionGetResponse {
-        try dbQueue.read { db in try SessionRepository(db: db, core: core).getSession(req) }
+        try boundaryRead { db in try SessionRepository(db: db, core: core).getSession(req) }
     }
 
     public func updateSession(_ req: SessionUpdateRequest) throws -> SessionRow {
-        try dbQueue.write { db in try SessionRepository(db: db, core: core).updateSession(req) }
+        try boundary { db in try SessionRepository(db: db, core: core).updateSession(req) }
     }
 
     // MARK: - Liveness statics

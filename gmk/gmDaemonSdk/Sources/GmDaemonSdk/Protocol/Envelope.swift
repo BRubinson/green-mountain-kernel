@@ -131,7 +131,22 @@ public enum GmWireProtocol {
     /// both directions, and whose nil means exactly what the absent field meant
     /// — every union arm. It needed no bump of its own and simply travels with
     /// this one.
-    public static let version = 27
+    ///
+    /// v27 → v28: TX_BATCH. A NEW MESSAGE TYPE, which is the first of the two
+    /// documented reasons this number moves. It carries N opaque NDJSON request
+    /// lines executed inside ONE transaction, which is what gives a relayed MCP
+    /// tool body multi-step atomicity now that the kernel hosts the writer in
+    /// the same process as the UI.
+    ///
+    /// What did NOT bump this and rides along: the four vitals/role fields on
+    /// `PingResponse` and `StatusResponse` (`residentMemoryBytes`, `cpuPercent`,
+    /// `writerRole`, `writerBundlePath`). Every one is an additive OPTIONAL on
+    /// an existing message, so they decode safely in both directions and a nil
+    /// means exactly what the absent field meant — the peer does not report
+    /// vitals. They needed no bump of their own. They DO move
+    /// `wire_keys.golden`, which is a frozen fixture rather than a protocol
+    /// version, and it is regenerated in the same commit.
+    public static let version = 28
 }
 
 /// Discriminator for every NDJSON message on the socket. One case per spec
@@ -301,6 +316,11 @@ public enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case configSet = "CONFIG_SET"
     // Audit
     case eventList = "EVENT_LIST"
+    // Transactional batching (v28) — N inner request lines, ONE transaction.
+    // The dispatcher re-enters itself, which it already does per connection;
+    // the inner lines stay opaque so this verb needs no knowledge of the
+    // ~230 it can carry.
+    case txBatch = "TX_BATCH"
     // Daemon → client only
     case event = "EVENT"
     case error = "ERROR"

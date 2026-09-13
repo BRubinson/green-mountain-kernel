@@ -4,9 +4,31 @@ import GmDaemonSdk
 
 // StoreError lives in StoreError.swift; PersistedEvent in PersistedEvent.swift.
 
-/// SQLite access layer. The daemon is the ONLY caller — every other client
-/// (gm_hook, gm_mcp, GMVibes) reaches the db through the socket. DatabaseQueue serializes all access,
-/// making the single-writer invariant structural rather than conventional.
+/// SQLite access layer.
+///
+/// **This used to say "the daemon is the ONLY caller".** That became false BY
+/// DESIGN when the kernel collapsed the daemon, the relayed MCP surface and the
+/// UI into one process, and the sentence is kept here — corrected rather than
+/// deleted — so nobody reads the new shape as a mistake and "fixes" it back.
+///
+/// What is true now:
+///
+/// - **One process opens this db, and cannot be two.** The single-writer
+///   invariant moved UP, from "only the daemon calls Store" to "only the holder
+///   of the ownership lock can construct one". `KernelWriter` is the sole
+///   `Store(path:)` site and it consumes a token that only a won `flock` can
+///   produce, so a second instance cannot reach this type at all. That is a
+///   stronger guarantee than the old comment described, not a weaker one.
+/// - **In-process callers are now legitimate**, and they reach verbs through
+///   the same public methods the socket handlers call — never a parallel
+///   implementation. `DatabaseQueue` still serializes every access and IS the
+///   one connection pool.
+/// - **Out-of-process clients (`gm_hook`, and the MCP relay on behalf of a
+///   Claude session) still reach the db through the socket**, unchanged.
+///
+/// The transaction boundary lives in `StoreBoundary.swift`; `boundary` /
+/// `boundaryRead` replace what were direct `dbQueue.write` / `dbQueue.read`
+/// calls, so a verb called inside `inTransaction` enlists instead of trapping.
 ///
 /// Domain methods live in per-family extensions (Store+Context, Store+Session,
 /// Store+Prompt, Store+Artifact, Store+FileChange, Store+Event, Store+Backup);
@@ -150,13 +172,13 @@ public final class Store: @unchecked Sendable {
     // MARK: - Lifecycle events
 
     public func recordDaemonStart() throws {
-        _ = try dbQueue.write { db in
+        _ = try boundary { db in
             try self.appendEvent(db, kind: .daemonStart, payload: Store.jsonPayload(["pid": Int(getpid())]))
         }
     }
 
     public func recordDaemonStop() throws {
-        _ = try dbQueue.write { db in
+        _ = try boundary { db in
             try self.appendEvent(db, kind: .daemonStop, payload: Store.jsonPayload(["pid": Int(getpid())]))
         }
     }
@@ -164,13 +186,13 @@ public final class Store: @unchecked Sendable {
     // MARK: - Health reads
 
     public func schemaVersion() throws -> Int {
-        try dbQueue.read { db in
+        try boundaryRead { db in
             try Int.fetchOne(db, sql: "SELECT MAX(version) FROM schema_migrations") ?? 0
         }
     }
 
     public func tableCounts() throws -> [TableCount] {
-        try dbQueue.read { db in
+        try boundaryRead { db in
             let tables = try String.fetchAll(db, sql: """
                 SELECT name FROM sqlite_master
                 WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'grdb_migrations'
@@ -187,13 +209,30 @@ public final class Store: @unchecked Sendable {
 
     /// Truncate the WAL back into the main db file — part of the SHUTDOWN
     /// contract ("checkpoint WAL").
+    ///
+    /// Keeps `writeWithoutTransaction` and is the ONLY place in the module that
+    /// does. A checkpoint inside a transaction is illegal in SQLite, so this
+    /// deliberately does not route through `boundary` — and it refuses when a
+    /// caller has one open rather than failing deeper in with a SQLite error
+    /// whose text would not name the cause.
     public func checkpointTruncate() throws {
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "checkpointTruncate")
+        }
         try dbQueue.writeWithoutTransaction { db in
             _ = try db.checkpoint(.truncate)
         }
     }
 
     public func closeDatabase() throws {
+        // Closing the queue from inside one of its own transactions is the same
+        // re-entrancy trap as `backup` and `checkpointTruncate`, and it is
+        // reachable now that in-process callers exist: a termination path that
+        // composed its final flush and then closed would take the process down
+        // with a trap instead of shutting down cleanly.
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "closeDatabase")
+        }
         try dbQueue.close()
     }
 }

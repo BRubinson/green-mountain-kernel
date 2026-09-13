@@ -8,12 +8,17 @@ import GmDaemonSdk
 
 /// The three whole-tree repo verbs, each a four-phase orchestration:
 ///
-///   1. `dbQueue.read`  — resolve scope, instance root, tree, revision;
-///   2. pure            — projection + validation, no db, no fs;
-///   3. filesystem      — sandbox read or atomic write, NO db lock held
-///                        (Server's serial dispatch queue means no other
-///                        client's commit can interleave with phase 3);
-///   4. `dbQueue.write` — ingest's tree replace, or the audit event alone.
+///   1. db read     — resolve scope, instance root, tree, revision;
+///   2. pure        — projection + validation, no db, no fs;
+///   3. filesystem  — contained read or atomic write, NO db lock held
+///                    (Server's serial dispatch queue means no other
+///                    client's commit can interleave with phase 3);
+///   4. db write    — ingest's tree replace, or the audit event alone.
+///
+/// Phase 3 is why these verbs REFUSE to run inside a caller-opened transaction
+/// (`StoreError.notComposable`): composing one would hold the single writer
+/// across filesystem I/O, blocking every other writer in the machine on
+/// someone else's disk.
 ///
 /// Filesystem work never enters a db transaction — the Store+Backup /
 /// digestKbite rule, load-bearing here because these verbs write into a
@@ -42,13 +47,22 @@ extension Store {
     // MARK: - read-repo
 
     public func dopeReadRepo(_ req: DopeReadRepoRequest) throws -> DopeReadRepoResponse {
+        // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
+        // Phase 3 does filesystem work while holding NO db lock, by design.
+        // Composing this would pin the single writer across file I/O and block
+        // every other writer in the machine, hooks included, on someone else's
+        // disk. Refusing loudly in five places beats maintaining a list of
+        // which of ~230 verbs are composable.
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "dopeReadRepo")
+        }
         // Phase 1 — resolve the root (and the db revision when a scope is
         // named).
         let root: String
         var dbRevision: Int64?
         switch (req.scopeUuid, req.dirPath) {
         case (let scopeUuid?, nil):
-            (root, dbRevision) = try dbQueue.read { db in
+            (root, dbRevision) = try boundaryRead { db in
                 guard let scope = try self.fetchDopeScope(db, uuid: scopeUuid) else {
                     throw StoreError.notFound(entity: "dope_scope", key: scopeUuid)
                 }
@@ -95,8 +109,17 @@ extension Store {
     // MARK: - write-repo
 
     public func dopeWriteRepo(_ req: DopeWriteRepoRequest) throws -> DopeWriteRepoResponse {
+        // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
+        // Phase 3 does filesystem work while holding NO db lock, by design.
+        // Composing this would pin the single writer across file I/O and block
+        // every other writer in the machine, hooks included, on someone else's
+        // disk. Refusing loudly in five places beats maintaining a list of
+        // which of ~230 verbs are composable.
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "dopeWriteRepo")
+        }
         // Phase 1 — scope + root + full tree.
-        let (scope, root, tree, cogs) = try dbQueue.read {
+        let (scope, root, tree, cogs) = try boundaryRead {
             db -> (DopeScopeRow, String, DopeScopeTree, [DopeCogNode]) in
             guard let scope = try self.fetchDopeScope(db, uuid: req.scopeUuid) else {
                 throw StoreError.notFound(entity: "dope_scope", key: req.scopeUuid)
@@ -129,7 +152,7 @@ extension Store {
 
         // Phase 4 — audit event only; write-repo is a projection and does
         // NOT bump revision (that is what makes a repeat run idempotent).
-        try dbQueue.write { db in
+        try boundary { db in
             var payload: [String: Any] = [
                 "action": "write_repo",
                 "scope_uuid": scope.uuid,
@@ -153,8 +176,17 @@ extension Store {
     // MARK: - ingest
 
     public func dopeIngest(_ req: DopeIngestRequest) throws -> DopeIngestResponse {
+        // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
+        // Phase 3 does filesystem work while holding NO db lock, by design.
+        // Composing this would pin the single writer across file I/O and block
+        // every other writer in the machine, hooks included, on someone else's
+        // disk. Refusing loudly in five places beats maintaining a list of
+        // which of ~230 verbs are composable.
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "dopeIngest")
+        }
         // Phase 1 — scope + root.
-        let (scopeBefore, ownRoot) = try dbQueue.read { db -> (DopeScopeRow, String) in
+        let (scopeBefore, ownRoot) = try boundaryRead { db -> (DopeScopeRow, String) in
             guard let scope = try self.fetchDopeScope(db, uuid: req.scopeUuid) else {
                 throw StoreError.notFound(entity: "dope_scope", key: req.scopeUuid)
             }
@@ -210,7 +242,7 @@ extension Store {
             }
         }
         let expectedRevision = adopt ? scopeBefore.revision : incoming - 1
-        return try dbQueue.write { db in
+        return try boundary { db in
             try db.execute(sql: """
                 UPDATE dope_scope
                    SET revision = ?,

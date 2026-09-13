@@ -10,23 +10,23 @@ import GmDaemonSdk
 
 extension Store {
     public func createPrompt(_ req: PromptCreateRequest) throws -> PromptRow {
-        try dbQueue.write { db in try PromptRepository(db: db, core: core).create(req) }
+        try boundary { db in try PromptRepository(db: db, core: core).create(req) }
     }
 
     public func listPrompts(_ req: PromptListRequest) throws -> PromptListResponse {
-        try dbQueue.read { db in try PromptRepository(db: db, core: core).list(req) }
+        try boundaryRead { db in try PromptRepository(db: db, core: core).list(req) }
     }
 
     public func getPrompt(_ req: PromptGetRequest) throws -> PromptGetResponse {
-        try dbQueue.read { db in try PromptRepository(db: db, core: core).get(req) }
+        try boundaryRead { db in try PromptRepository(db: db, core: core).get(req) }
     }
 
     public func updatePromptContent(_ req: PromptUpdateContentRequest) throws -> PromptRow {
-        try dbQueue.write { db in try PromptRepository(db: db, core: core).updateContent(req) }
+        try boundary { db in try PromptRepository(db: db, core: core).updateContent(req) }
     }
 
     public func setPromptStatus(_ req: PromptSetStatusRequest) throws -> PromptRow {
-        try dbQueue.write { db in try PromptRepository(db: db, core: core).setStatus(req) }
+        try boundary { db in try PromptRepository(db: db, core: core).setStatus(req) }
     }
 
     // MARK: - Cross-domain helper forward

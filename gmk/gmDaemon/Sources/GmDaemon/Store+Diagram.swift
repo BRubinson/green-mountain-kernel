@@ -23,22 +23,22 @@ extension Store {
     // MARK: - Verbs (bodies in DiagramRepository; these wrappers own the transaction)
 
     public func diagramInit(_ req: DiagramInitRequest) throws -> DiagramResponse {
-        try dbQueue.write { db in try DiagramRepository(db: db, core: core).diagramInit(req) }
+        try boundary { db in try DiagramRepository(db: db, core: core).diagramInit(req) }
     }
 
     public func diagramList(_ req: DiagramListRequest) throws -> DiagramListResponse {
-        try dbQueue.read { db in try DiagramRepository(db: db, core: core).diagramList(req) }
+        try boundaryRead { db in try DiagramRepository(db: db, core: core).diagramList(req) }
     }
 
     public func diagramGet(_ req: DiagramGetRequest) throws -> DiagramGetResponse {
-        try dbQueue.read { db in try DiagramRepository(db: db, core: core).diagramGet(req) }
+        try boundaryRead { db in try DiagramRepository(db: db, core: core).diagramGet(req) }
     }
 
     public func diagramBatchApply(_ req: DiagramBatchApplyRequest) throws -> DiagramBatchApplyResponse {
         guard !req.mutations.isEmpty else {
             throw StoreError.badRequest(detail: "batch-apply carried no mutations")
         }
-        return try dbQueue.write { db in
+        return try boundary { db in
             try DiagramRepository(db: db, core: core).diagramBatchApply(req)
         }
     }
@@ -152,7 +152,7 @@ extension Store {
     }
 
     private func owningDiagramUuid(elementUuid: String) throws -> String {
-        try dbQueue.read { db in
+        try boundaryRead { db in
             guard let uuid = try String.fetchOne(
                 db, sql: "SELECT diagram_uuid FROM diagram_element WHERE uuid = ?",
                 arguments: [elementUuid]

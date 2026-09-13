@@ -27,6 +27,15 @@ extension Store {
     // MARK: - write-repo
 
     public func diagramWriteRepo(_ req: DiagramWriteRepoRequest) throws -> DiagramWriteRepoResponse {
+        // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
+        // Phase 3 does filesystem work while holding NO db lock, by design.
+        // Composing this would pin the single writer across file I/O and block
+        // every other writer in the machine, hooks included, on someone else's
+        // disk. Refusing loudly in five places beats maintaining a list of
+        // which of ~230 verbs are composable.
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "diagramWriteRepo")
+        }
         // Phase 1 — root + every PUBLIC SESSION-tier tree, in one read.
         struct Projected {
             let code: String
@@ -34,7 +43,7 @@ extension Store {
             let document: DiagramDocument
         }
         let (root, projected, knownRevisions):
-            (String, [Projected], [String: Int64]) = try dbQueue.read { db in
+            (String, [Projected], [String: Int64]) = try boundaryRead { db in
             guard try Row.fetchOne(
                 db, sql: "SELECT 1 FROM session WHERE uuid = ?", arguments: [req.sessionUuid]
             ) != nil else {
@@ -120,7 +129,7 @@ extension Store {
 
         // Phase 4 — audit event only: a projection never bumps revision,
         // which is what makes a repeat run idempotent.
-        try dbQueue.write { db in
+        try boundary { db in
             var payload: [String: Any] = [
                 "action": "diagram_write_repo",
                 "session_uuid": req.sessionUuid,
@@ -139,8 +148,17 @@ extension Store {
     // MARK: - ingest (files → db, strictly forward-only)
 
     public func diagramIngest(_ req: DiagramIngestRequest) throws -> DiagramIngestResponse {
+        // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
+        // Phase 3 does filesystem work while holding NO db lock, by design.
+        // Composing this would pin the single writer across file I/O and block
+        // every other writer in the machine, hooks included, on someone else's
+        // disk. Refusing loudly in five places beats maintaining a list of
+        // which of ~230 verbs are composable.
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "diagramIngest")
+        }
         // Phase 1 — root.
-        let root = try dbQueue.read { db -> String in
+        let root = try boundaryRead { db -> String in
             guard try Row.fetchOne(
                 db, sql: "SELECT 1 FROM session WHERE uuid = ?", arguments: [req.sessionUuid]
             ) != nil else {
@@ -190,7 +208,7 @@ extension Store {
         //   - file version >  db revision         → replace tree in place
         //     (row uuid stable — registrations/qualifications survive);
         //   - no row                              → create SESSION + PUBLIC.
-        return try dbQueue.write { db in
+        return try boundary { db in
             var ingested: [String] = []
             var skipped: [String] = []
             for document in documents {

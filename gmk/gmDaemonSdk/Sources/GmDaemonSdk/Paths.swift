@@ -63,12 +63,20 @@ public enum Paths {
         root.appendingPathComponent("bin", isDirectory: true)
     }
 
-    /// `~/gmfs/bin/gm`
-    public static var binGm: URL {
-        bin.appendingPathComponent("gm", isDirectory: false)
+    /// `~/gmfs/bin/gm_kernel` — the ONE staged Mach-O.
+    ///
+    /// `binDaemon`, `binMcp` and `binHook` below are now SYMLINK names pointing
+    /// here, not separate binaries. Keeping them as named accessors rather than
+    /// collapsing every caller onto this one is deliberate: the entry-point
+    /// names are what `hooks.json`, `.mcp.json`, `run_mcp.sh` and
+    /// `check_gm_stale.sh` resolve, and argv[0] is what the multi-call dispatch
+    /// reads — so the names are load-bearing even though the inode is shared.
+    public static var binKernel: URL {
+        bin.appendingPathComponent("gm_kernel", isDirectory: false)
     }
 
-    /// `~/gmfs/bin/gm_daemon`
+    /// `~/gmfs/bin/gm_daemon` — a symlink to `gm_kernel`; argv[0] selects the
+    /// headless daemon personality.
     public static var binDaemon: URL {
         bin.appendingPathComponent("gm_daemon", isDirectory: false)
     }
@@ -119,14 +127,6 @@ public enum Paths {
     /// `~/gmfs/kbites/digested/`
     public static var kbitesDigestedRoot: URL {
         kbitesRoot.appendingPathComponent("digested", isDirectory: true)
-    }
-
-    /// `~/gmfs/development/` — sandbox snapshots and other regenerable
-    /// scratch. Already inside the root, which is what makes the sandbox
-    /// mechanism consistent with the containment rule rather than an exception
-    /// to it.
-    public static var development: URL {
-        contentRoot.appendingPathComponent("development", isDirectory: true)
     }
 
     // MARK: - Write containment

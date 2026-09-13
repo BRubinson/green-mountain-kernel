@@ -27,7 +27,6 @@ public enum HookRunner {
         }
         // BEFORE ANY OTHER WORK: Paths.root resolves GM_FS_ROOT once per process,
         // and DaemonClient resolves the socket through it.
-        SandboxMarker.adopt(startingAt: cwd)
 
         // CHEAPEST QUESTION FIRST. The manifest fires this hook on every Bash
         // call, and most Bash traffic writes nothing — `ls`, `cat`, `grep`,
@@ -97,10 +96,15 @@ public enum HookRunner {
     /// - Returns: the JSON line to print on stdout (the dry-run report under
     ///   `dryRun`, otherwise the SubagentStart `additionalContext` response).
     public static func subagentStart(stdin: Data, dryRun: Bool, sheetText: String) -> String? {
-        guard let payload = HookPayload.decode(stdin), let cwd = payload.cwd else {
+        // The cwd is still REQUIRED even though nothing here reads it: a payload
+        // without one is a payload this hook cannot trust, and returning nil is
+        // the silent no-op the contract asks for. It used to be consumed by the
+        // snapshot-marker walk, which is gone with the sandbox — but the guard
+        // outlived its consumer on purpose, because "no cwd" still means "not a
+        // hook firing in a repo we can identify".
+        guard let payload = HookPayload.decode(stdin), payload.cwd != nil else {
             return nil
         }
-        SandboxMarker.adopt(startingAt: cwd)
 
         // The gmcc session and prompt are NOT resolved here. The daemon derives
         // both from claude_session_id through the binding, so a registration and

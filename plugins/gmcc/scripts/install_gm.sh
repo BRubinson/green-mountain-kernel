@@ -160,8 +160,42 @@ fi
 
 TAG="$FOUND_PREFIX$VERSION"
 ASSET="gm-daemon-$VERSION-macos-universal.tar.gz"
-DMG_ASSET="$GM_APP_NAME-$VERSION.dmg"
 BASE="https://github.com/$RELEASE_REPO/releases/download/$TAG"
+
+# THE DMG ASSET NAME IS RESOLVED, NOT ASSUMED.
+#
+# The bundle was renamed GMVibes -> gm_kernel when the app became the kernel
+# host, so the asset name changed with it. Every DMG PUBLISHED BEFORE that still
+# carries the old name, and those releases cannot be rewritten — so an installer
+# that only ever asks for `gm_kernel-<v>.dmg` 404s on its entire back-catalogue,
+# including the release that was newest the day this landed.
+#
+# Asked of the release itself rather than inferred from the version number: a
+# version comparison would need a cutover constant that is wrong the moment
+# anyone re-publishes, and `gh` already knows the answer. The curl fallback keeps
+# a machine without `gh` working, and defaults to the CURRENT name so a fresh
+# install does not pay for the compatibility path.
+resolve_dmg_asset() {
+    _new="$GM_APP_NAME-$VERSION.dmg"
+    _old="$GM_APP_NAME_LEGACY-$VERSION.dmg"
+    if command -v gh >/dev/null 2>&1; then
+        _names="$(gh release view "$TAG" --repo "$RELEASE_REPO" --json assets \
+                    -q '.assets[].name' 2>/dev/null || true)"
+        if [ -n "$_names" ]; then
+            printf '%s\n' "$_names" | grep -qx "$_new" && { printf '%s' "$_new"; return 0; }
+            printf '%s\n' "$_names" | grep -qx "$_old" && { printf '%s' "$_old"; return 0; }
+        fi
+    fi
+    # No gh, or it told us nothing: probe the new name, fall back to the old.
+    if curl -fsI --connect-timeout 10 "$BASE/$_new" >/dev/null 2>&1; then
+        printf '%s' "$_new"
+    elif curl -fsI --connect-timeout 10 "$BASE/$_old" >/dev/null 2>&1; then
+        printf '%s' "$_old"
+    else
+        printf '%s' "$_new"
+    fi
+}
+DMG_ASSET="$(resolve_dmg_asset)"
 
 # A release under the retired namespace contains binaries only. Asking it for a
 # DMG would be a guaranteed 404 dressed up as a network problem.
@@ -234,6 +268,19 @@ if [ "$BIN_WORK" -eq 0 ] && [ "$APP_WORK" -eq 0 ]; then
     exit 0
 fi
 
+# ── Stop the writer FIRST ────────────────────────────────────────────────────
+#
+# This moved UP, from after activation to before any work, and the move is the
+# whole fix for the upgrade circularity. `gm_install_app` refuses while the app
+# is running; the app is now the writer and is menu-bar-resident, so it is always
+# running. Retiring after activation — where `gm_retire_daemon` used to sit —
+# would mean the app install had already refused by the time we stopped anything.
+#
+# Once, here, rather than once per section: the two sections used to each retire
+# the daemon, which was harmless when it was a separate process that autostarted
+# again. Now it would terminate a user's windows twice in one install.
+gm_stop_kernel_and_wait 3
+
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/gm-install.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -272,13 +319,26 @@ if [ "$BIN_WORK" -eq 1 ]; then
        && gm_verify_staged "$GM_DOWNLOADS/$VERSION" 2>/dev/null; then
         echo "[GMB] binaries v$VERSION are already in the store — activating without a download"
         gm_activate downloads "$VERSION"
-        gm_retire_daemon
     else
         echo "[GMB] fetching $TAG binaries from $RELEASE_REPO..."
         fetch_asset "$ASSET" || exit 1
 
         tar -xzf "$TMP/$ASSET" -C "$TMP"
-        for b in $GM_BINARIES; do
+
+        # ONE Mach-O expected. A legacy `daemon-v*` tarball carries the three old
+        # binaries instead, so accept either shape: if `gm_kernel` is absent but
+        # `gm_daemon` is present, this is a pre-collapse release and the old names
+        # ARE the artifacts. Q4 keeps that path alive for one more release.
+        if [ -f "$TMP/$GM_MACHO" ]; then
+            _staged="$GM_MACHO"
+        elif [ -f "$TMP/gm_daemon" ]; then
+            echo "[GMB] $ASSET predates the kernel collapse — installing its three binaries as-is"
+            _staged="gm_daemon gm_mcp gm_hook"
+        else
+            echo "[GMB] ERROR: $ASSET contains neither $GM_MACHO nor gm_daemon" >&2
+            exit 1
+        fi
+        for b in $_staged; do
             [ -f "$TMP/$b" ] || {
                 echo "[GMB] ERROR: $ASSET does not contain $b — refusing a partial install" >&2
                 exit 1; }
@@ -286,14 +346,15 @@ if [ "$BIN_WORK" -eq 1 ]; then
 
         DL="$(gm_stage_dir downloads "$VERSION")"
         rm -rf "$DL"; DL="$(gm_stage_dir downloads "$VERSION")"
-        for b in $GM_BINARIES; do cp "$TMP/$b" "$DL/$b"; chmod +x "$DL/$b"; done
-        gm_write_manifest "$DL" "$VERSION" downloads "$TAG" "$(lipo -archs "$DL/gm_daemon" 2>/dev/null | tr ' ' ',')"
+        for b in $_staged; do cp "$TMP/$b" "$DL/$b"; chmod +x "$DL/$b"; done
+        _arch_probe="$(printf '%s\n' $_staged | head -1)"
+        gm_write_manifest "$DL" "$VERSION" downloads "$TAG" "$(lipo -archs "$DL/$_arch_probe" 2>/dev/null | tr ' ' ',')"
 
         gm_activate downloads "$VERSION"
-        gm_retire_daemon
     fi
     echo "[GMB] installed binaries v$VERSION"
-    echo "      $GM_BIN/gm_daemon -> releases/downloads/$VERSION/gm_daemon"
+    echo "      $GM_BIN/$GM_MACHO -> releases/downloads/$VERSION/$GM_MACHO"
+    echo "      entry points: $(for b in $GM_ENTRYPOINTS; do printf '%s ' "$b"; done)-> $GM_MACHO"
 fi
 
 # ── The app ──────────────────────────────────────────────────────────────────
@@ -311,6 +372,11 @@ if [ "$APP_WORK" -eq 1 ]; then
     else
         echo "[GMB] $GM_APP_NAME $VERSION is already in the store — installing without a download"
     fi
+
+    # Before replacing: drop a GMVibes.app this library installed. Two bundles
+    # sharing one identifier make LaunchServices ambiguous AND defeat the
+    # same-bundle-id check a second copy uses to recognise the first.
+    gm_retire_legacy_app
 
     if gm_install_app "$STAGED_DMG" "$VERSION"; then
         # `if`, not `[ ... ] && echo` — under `set -e` a trailing false test

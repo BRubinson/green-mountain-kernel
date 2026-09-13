@@ -28,7 +28,7 @@ extension Store {
             pattern = parsed
         }
 
-        return try dbQueue.read { db in
+        return try boundaryRead { db in
             try DiagramStudioRepository(db: db, core: core).diagramSearch(req, pattern: pattern)
         }
     }
@@ -36,7 +36,7 @@ extension Store {
     // MARK: - Delete
 
     public func diagramDelete(_ req: DiagramDeleteRequest) throws -> DiagramDeleteResponse {
-        try dbQueue.write { db in
+        try boundary { db in
             try DiagramStudioRepository(db: db, core: core).diagramDelete(req)
         }
     }

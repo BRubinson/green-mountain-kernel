@@ -7,11 +7,11 @@ import GmDaemonSdk
 
 extension Store {
     public func listEvents(_ req: EventListRequest) throws -> EventListResponse {
-        try dbQueue.read { db in try EventRepository(db: db).listEvents(req) }
+        try boundaryRead { db in try EventRepository(db: db).listEvents(req) }
     }
 
     /// Highest daemon_event.id — the replay horizon SUBSCRIBE acks with.
     public func lastEventId() throws -> Int64 {
-        try dbQueue.read { db in try EventRepository(db: db).lastEventId() }
+        try boundaryRead { db in try EventRepository(db: db).lastEventId() }
     }
 }

@@ -32,9 +32,11 @@
 #   3. A version directory is IMMUTABLE once staged, so the sha256 recorded in
 #      its manifest keeps describing the bytes that are actually there.
 #
-# THE SYMLINKS ARE RELATIVE ON PURPOSE. A sandbox is a full copy of the runtime
-# tree at a different path; absolute symlinks would all point back at prod, which
-# is the exact failure the sandbox exists to prevent.
+# THE SYMLINKS ARE RELATIVE ON PURPOSE, and the invariant outlived the reason it
+# was written for. GM_FS_ROOT is overridable, and a staged tree gets copied — by
+# a test harness, by a machine migration, by anyone inspecting a release — so the
+# store has to resolve WITHIN ITSELF wherever it sits. Absolute links would make
+# a copied tree silently drive whatever lives at the original path.
 #
 # ── THE TWO CHANNELS ─────────────────────────────────────────────────────────
 #
@@ -74,7 +76,27 @@
 [ -n "${GM_RELEASES_SH:-}" ] && return 0
 GM_RELEASES_SH=1
 
-GM_BINARIES="gm_daemon gm_mcp gm_hook"
+# ── The binary contract: ONE Mach-O, THREE entry-point names ────────────────
+#
+# These were one variable when there were three binaries. They are two now
+# because the two lists mean genuinely different things, and conflating them is
+# how a staged kernel ends up with entry points that resolve to nothing:
+#
+#   GM_MACHO       what gets STAGED, hashed, lipo-checked and tarred. One file.
+#   GM_ENTRYPOINTS what gets SYMLINKED in $GM_BIN. Names, not files.
+#
+# The entry-point names are load-bearing rather than cosmetic. `hooks.json`,
+# `settings.json`, `.mcp.json` and `check_gm_stale.sh` each resolve a binary BY
+# NAME, and the kernel dispatches on `basename(argv[0])` — so the symlink name is
+# what selects the personality. A staged kernel whose symlinks are missing is not
+# a degraded install; it is a hook that cannot launch.
+# MultiCallBinaryContractTests asserts this list and the dispatcher agree.
+GM_MACHO="gm_kernel"
+GM_ENTRYPOINTS="gm_daemon gm_mcp gm_hook"
+
+# Kept as the union for the paths that genuinely mean "everything in $GM_BIN":
+# the quarantine strip and the staleness stat do not care which is a real file.
+GM_BINARIES="$GM_MACHO $GM_ENTRYPOINTS"
 
 # The unified release tag namespace. GitHub's own "latest release" is the wrong
 # question for a monorepo that has shipped more than one kind of artifact, so
@@ -85,27 +107,36 @@ GM_TAG_PREFIX="gm_kernel-v"
 # back to it rather than telling a working machine that nothing is published.
 GM_LEGACY_TAG_PREFIX="daemon-v"
 
-GM_APP_NAME="GMVibes"
+# The app bundle's name. GMVibes became gm_kernel: the bundle IS the kernel now,
+# hosting the writer rather than talking to it over a socket.
+#
+# The BUNDLE IDENTIFIER deliberately did NOT change (`rube.GMVibes`). A new id is
+# a new NSUserDefaults domain, so window restoration, recents and every
+# preference would reset once for zero functional gain — and same-bundle-id
+# detection is what lets a second copy recognise the first.
+GM_APP_NAME="gm_kernel"
+
+# The name the bundle shipped under BEFORE it became the kernel host.
+#
+# Two things still carry it and neither can be rewritten retroactively: every
+# DMG already published (the asset is `GMVibes-<version>.dmg` and it contains
+# `GMVibes.app`), and any machine that installed one. A rename that cannot read
+# its own back-catalogue is a rename that breaks upgrade for everyone who is
+# behind — which is precisely the population an installer exists to serve.
+GM_APP_NAME_LEGACY="GMVibes"
 
 # ── Roots ────────────────────────────────────────────────────────────────────
 #
-# ONE root variable. An explicit GM_FS_ROOT wins; otherwise a repo carrying the
-# sandbox marker selects its snapshot runtime; otherwise $HOME/gmfs.
+# ONE root variable, and now ONE resolution step: an explicit GM_FS_ROOT wins,
+# otherwise $HOME/gmfs.
 #
-# THE MARKER IS PARSED AS DATA, NEVER SOURCED. A file that lives in a repo must
-# not get shell execution out of an installer. The filename is `.gmcc_sandbox`
-# and it is deliberately NOT renamed — HookLogic.SandboxMarker.fileName in
-# gmDaemonSdk is the authority, the Swift and the shell have to agree on it, and
-# a marker that only one side recognises is a sandbox session writing the prod
-# database.
+# The marker walk that used to sit here selected a second, snapshot runtime. That
+# runtime is gone, so the walk could only ever return the same answer — while
+# still carrying the risk that made it delicate in the first place (a repo file
+# being consulted by an installer). GM_FS_ROOT stays overridable, which is what
+# a test harness uses; it simply no longer has a filesystem fallback to disagree
+# with.
 gm_resolve_fs_root() {
-    if [ -z "${GM_FS_ROOT:-}" ]; then
-        _repo="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-        if [ -n "$_repo" ] && [ -f "$_repo/.gmcc_sandbox" ]; then
-            _sb="$(sed -n 's/^export GM_FS_ROOT="\(.*\)"$/\1/p' "$_repo/.gmcc_sandbox" | head -1)"
-            [ -n "$_sb" ] && GM_FS_ROOT="$_sb"
-        fi
-    fi
     GM_FS_ROOT="${GM_FS_ROOT:-$HOME/gmfs}"
     GM_BIN="$GM_FS_ROOT/bin"
     GM_RELEASES="$GM_BIN/releases"
@@ -118,8 +149,8 @@ gm_resolve_fs_root() {
     GM_APPS="$GM_FS_ROOT/apps"
     GM_APP_DOWNLOADS="$GM_APPS/downloads"
     GM_APP_VERSION_STAMP="$GM_APPS/.gmvibes_version"
-    # Overridable so a sandbox — or a machine where /Applications is not
-    # writable — can install somewhere else without editing this library.
+    # Overridable so a machine where /Applications is not writable — or a test
+    # harness — can install somewhere else without editing this library.
     GM_APP_DEST="${GM_APP_DEST:-/Applications}"
 }
 
@@ -150,10 +181,36 @@ gm_write_manifest() {
   "source_sha": "$_sha",
   "arches": "$_arches",
   "staged_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-  "binaries": [$(printf '"%s", ' $GM_BINARIES | sed 's/, $//')]
+  "macho": "$(gm_staged_binaries "$_dir")",
+  "entrypoints": [$(printf '"%s", ' $GM_ENTRYPOINTS | sed 's/, $//')]
 }
 EOF
-    ( cd "$_dir" && shasum -a 256 $GM_BINARIES > SHA256SUMS )
+    # Hash WHAT IS THERE. For the kernel shape that is the one Mach-O; for a
+    # pre-collapse directory it is the three binaries. Hashing the entry-point
+    # NAMES would be wrong in both cases — they are symlinks created in $GM_BIN at
+    # activation, and never staged files.
+    ( cd "$_dir" && shasum -a 256 $(gm_staged_binaries "$_dir") > SHA256SUMS )
+}
+
+# gm_staged_binaries <dir> — the executable file set a staged version actually
+# holds, as a space-separated list. Empty means the directory is not a usable
+# staged version.
+#
+# TWO SHAPES COEXIST ON DISK, and that is not a transition artifact — it is the
+# permanent consequence of keeping rollback honest. A version staged before the
+# kernel collapse holds three binaries; one staged after holds a single
+# multi-call Mach-O. Both must verify and both must activate, or
+# `gm_activate local <old>-BETA` — the whole point of the store — refuses on
+# exactly the day someone needs it.
+gm_staged_binaries() {
+    if [ -f "$1/$GM_MACHO" ]; then
+        printf '%s' "$GM_MACHO"
+    elif [ -f "$1/gm_daemon" ]; then
+        # Pre-collapse: the entry-point names WERE the artifacts.
+        printf '%s' "gm_daemon gm_mcp gm_hook"
+    else
+        printf ''
+    fi
 }
 
 # gm_verify_staged <dir> — every binary present, executable, and matching the
@@ -161,7 +218,12 @@ EOF
 # half-staged directory that gets activated is three dead symlinks.
 gm_verify_staged() {
     _dir="$1"
-    for b in $GM_BINARIES; do
+    _set="$(gm_staged_binaries "$_dir")"
+    if [ -z "$_set" ]; then
+        echo "[GMB] ERROR: $_dir holds neither $GM_MACHO nor gm_daemon — not a staged version" >&2
+        return 1
+    fi
+    for b in $_set; do
         if [ ! -f "$_dir/$b" ]; then
             echo "[GMB] ERROR: $_dir is missing $b — refusing to activate a partial set" >&2
             return 1
@@ -215,15 +277,40 @@ gm_activate() {
     mv -fh "$GM_RELEASES/.active.tmp.$$" "$GM_ACTIVE"
 
     # The per-binary links are relative to $GM_BIN so the whole tree can be
-    # copied to a sandbox path and still resolve within itself.
+    # copied anywhere and still resolve within itself.
     #
     # -h here too. These point at FILES, so today `mv -f` would replace them
     # correctly — but the flag costs nothing and stops the pair from diverging
     # the moment someone points one of them at a directory.
-    for b in $GM_BINARIES; do
-        ln -sfn "releases/active/$b" "$GM_BIN/.$b.tmp.$$"
-        mv -fh "$GM_BIN/.$b.tmp.$$" "$GM_BIN/$b"
-    done
+    # LINK BY SHAPE.
+    #
+    # Kernel shape: every name points at the ONE staged Mach-O. `gm_kernel` gets
+    # its own name so a person can invoke it directly; the three entry points get
+    # theirs so argv[0] dispatch selects a personality and every command string in
+    # hooks.json / .mcp.json keeps resolving.
+    #
+    # Legacy shape: each name points at ITS OWN binary, because a pre-collapse
+    # version has no dispatcher to select a personality — the names were the
+    # artifacts. Linking them all at one file would produce three paths to a
+    # binary that only knows how to be the daemon.
+    _staged="$(gm_staged_binaries "$_dir")"
+    if [ "$_staged" = "$GM_MACHO" ]; then
+        for b in $GM_MACHO $GM_ENTRYPOINTS; do
+            ln -sfn "releases/active/$GM_MACHO" "$GM_BIN/.$b.tmp.$$"
+            mv -fh "$GM_BIN/.$b.tmp.$$" "$GM_BIN/$b"
+        done
+        # A rollback FROM the kernel shape TO legacy leaves a stale `gm_kernel`
+        # link behind; the reverse case removes it below.
+    else
+        for b in $_staged; do
+            ln -sfn "releases/active/$b" "$GM_BIN/.$b.tmp.$$"
+            mv -fh "$GM_BIN/.$b.tmp.$$" "$GM_BIN/$b"
+        done
+        # No dispatcher in this version, so a `gm_kernel` name would resolve to
+        # nothing. Remove it rather than leave a dangling link that `-x` reports
+        # as absent in a confusing way.
+        rm -f "$GM_BIN/$GM_MACHO"
+    fi
 
     # A failed or interrupted activation can leave a temp link behind inside a
     # version directory. Swept here rather than left to accumulate.
@@ -252,7 +339,97 @@ gm_installed_version() {
 gm_retire_daemon() {
     [ -x "$GM_BIN/gm_hook" ] || return 0
     "$GM_BIN/gm_hook" call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
-    echo "[GMB] retired the running daemon (if any) — the next client call autostarts the new build"
+    echo "[GMB] retired the running kernel (if any) — the next client call autostarts the new build"
+}
+
+# gm_stop_kernel_and_wait — SHUTDOWN, then WAIT for the lock to actually free.
+#
+# ── THE CIRCULARITY THIS EXISTS TO BREAK ────────────────────────────────────
+#
+# `gm_install_app` refuses while the app is running, because replacing a live
+# bundle corrupts it in ways that surface later as a crash rather than here as an
+# error. That refusal was harmless when the writer was a separate process: the
+# daemon hot-swapped by symlink and the next client autostarted it.
+#
+# After the collapse, "the app is running" and "the writer is running" are ONE
+# STATEMENT, and a menu-bar-resident kernel is always running. So every upgrade
+# now needs the writer stopped FIRST — which is why this is called before
+# `gm_install_app` rather than after activation, where the old `gm_retire_daemon`
+# sat.
+#
+# The WAIT is the load-bearing half. `SHUTDOWN` returns as soon as the verb is
+# accepted, but the kernel then drains its queue, checkpoints the WAL and
+# releases the flock. Firing and continuing races the install: `gm_install_app`
+# would see a still-running app and refuse, and the upgrade would fail on a
+# perfectly healthy machine. Polling the lock rather than the process is what
+# makes this correct — the lock is what the next writer actually needs.
+gm_stop_kernel_and_wait() {
+    _timeout="${1:-3}"
+    [ -x "$GM_BIN/gm_hook" ] || return 0
+
+    # Nothing listening means nothing to stop; not an error.
+    "$GM_BIN/gm_hook" call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
+
+    # POLL THE LOCK OWNER, NEVER A VERB.
+    #
+    # The obvious probe — `gm_hook call PING` — is WRONG here, and wrong in a way
+    # that inverts this function. `gm_hook call` builds a `DaemonClient()` whose
+    # `autostart` defaults to TRUE, so a PING that finds nothing listening SPAWNS
+    # A KERNEL. This loop would then shut the writer down, immediately restart it
+    # while checking whether it had stopped, observe that it answers, and time out
+    # — leaving a freshly-spawned writer running and `gm_install_app` refusing, the
+    # exact failure the reordering exists to prevent.
+    #
+    # The pidfile is the lock file, its first line is the owner's pid, and the
+    # kernel unlinks it on the way out. Reading it starts nothing.
+    _pidfile="$GM_FS_ROOT/daemon.pid"
+    _waited=0
+    while [ "$_waited" -lt "$((_timeout * 10))" ]; do
+        # No pidfile means a clean exit already unlinked it.
+        if [ ! -f "$_pidfile" ]; then
+            [ "$_waited" -gt 0 ] && echo "[GMB] kernel stopped after $((_waited / 10)).$((_waited % 10))s"
+            return 0
+        fi
+        # A pidfile whose owner is gone is a crash leftover, not a live writer.
+        # The flock auto-released with the process, so the db is free.
+        _owner="$(head -1 "$_pidfile" 2>/dev/null | tr -d '[:space:]')"
+        if [ -z "$_owner" ] || ! kill -0 "$_owner" 2>/dev/null; then
+            [ "$_waited" -gt 0 ] && echo "[GMB] kernel stopped after $((_waited / 10)).$((_waited % 10))s"
+            return 0
+        fi
+        sleep 0.1
+        _waited=$((_waited + 1))
+    done
+
+    echo "[GMB] WARN: the kernel still answers after ${_timeout}s — the app install may refuse." >&2
+    echo "[GMB]       Quit GM Kernel from its menu bar and re-run." >&2
+    return 0
+}
+
+# gm_retire_legacy_app — remove a GMVibes.app THIS library installed.
+#
+# The bundle was renamed GMVibes.app -> gm_kernel.app, so an upgraded machine can
+# end up holding both. That is not merely untidy: they share a bundle identifier
+# (deliberately — see GM_APP_NAME), so LaunchServices has two candidates for one
+# id, and the same-bundle-id check that lets a second copy recognise the first
+# stops meaning what it says.
+#
+# Gated on all THREE conditions. It never touches an app we did not install, and
+# never one that is running.
+gm_retire_legacy_app() {
+    _legacy="$GM_APP_DEST/GMVibes.app"
+    [ -d "$_legacy" ] || return 0
+    if pgrep -x "GMVibes" >/dev/null 2>&1; then
+        echo "[GMB] WARN: GMVibes.app is still running — leaving it in place. Quit it and re-run." >&2
+        return 0
+    fi
+    _id="$(defaults read "$_legacy/Contents/Info.plist" CFBundleIdentifier 2>/dev/null || echo "")"
+    if [ "$_id" != "rube.GMVibes" ]; then
+        echo "[GMB] leaving $_legacy alone — bundle id '$_id' is not ours"
+        return 0
+    fi
+    rm -rf "$_legacy"
+    echo "[GMB] removed the superseded $_legacy"
 }
 
 # ── The app ──────────────────────────────────────────────────────────────────
@@ -285,7 +462,19 @@ gm_installed_app_version() {
 # inodes, the on-disk bundle becomes a mixture of two versions, and the symptom
 # is a crash on the next window it opens rather than an error here.
 gm_app_is_running() {
-    pgrep -x "$GM_APP_NAME" >/dev/null 2>&1
+    # MATCHED BY BUNDLE PATH, NOT BY PROCESS NAME.
+    #
+    # `pgrep -x gm_kernel` looks right and is wrong: the app's executable and the
+    # headless CLI now share that name. A `gm_kernel daemon` running in a terminal
+    # would make this report the APP as running, `gm_install_app` would refuse,
+    # and the upgrade would fail on a machine where no app is open at all.
+    #
+    # The bundle path is unambiguous — only a process launched from inside the
+    # .app carries it — and the legacy name is still checked so an upgrade from a
+    # machine running the old bundle is caught too.
+    pgrep -f "$GM_APP_DEST/$GM_APP_NAME.app/Contents/MacOS/" >/dev/null 2>&1 && return 0
+    pgrep -f "$GM_APP_DEST/$GM_APP_NAME_LEGACY.app/Contents/MacOS/" >/dev/null 2>&1 && return 0
+    return 1
 }
 
 # gm_install_app <dmg> <version> — mount, copy out, swap into place.
@@ -324,13 +513,21 @@ gm_install_app() {
         return 1
     fi
 
+    # EITHER BUNDLE NAME. A DMG built before the rename contains GMVibes.app; one
+    # built after contains gm_kernel.app. Both install to $GM_APP_NAME.app, so a
+    # machine ends up with one bundle under the current name regardless of which
+    # release it came from.
     _src="$_mnt/$GM_APP_NAME.app"
+    if [ ! -d "$_src" ] && [ -d "$_mnt/$GM_APP_NAME_LEGACY.app" ]; then
+        _src="$_mnt/$GM_APP_NAME_LEGACY.app"
+        echo "[GMB] $(basename "$_dmg") predates the kernel rename — installing $GM_APP_NAME_LEGACY.app as $GM_APP_NAME.app"
+    fi
     _new="$GM_APP_DEST/.$GM_APP_NAME.new.$$"
     _old="$GM_APP_DEST/.$GM_APP_NAME.old.$$"
     _rc=0
 
     if [ ! -d "$_src" ]; then
-        echo "[GMB] ERROR: $_dmg does not contain $GM_APP_NAME.app" >&2
+        echo "[GMB] ERROR: $_dmg contains neither $GM_APP_NAME.app nor $GM_APP_NAME_LEGACY.app" >&2
         _rc=1
     else
         rm -rf "$_new"

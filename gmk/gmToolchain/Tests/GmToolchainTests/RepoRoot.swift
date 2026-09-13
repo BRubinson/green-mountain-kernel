@@ -73,10 +73,10 @@ enum RepoRoot {
     /// code it was written to guard.
     static let sourcePackages = [
         "gmDaemonSdk", "gmDaemon", "gmUxComponentLibrary",
-        "gmAgententicsSdk", "gmMcp",
+        "gmAgententicsSdk", "gmMcp", "gmKernel",
     ]
 
-    /// Every `.swift` file under all five packages' `Sources/` trees.
+    /// Every `.swift` file under all six packages' `Sources/` trees.
     static func swiftSources(from file: StaticString = #filePath) -> [URL] {
         let fm = FileManager.default
         var out: [URL] = []

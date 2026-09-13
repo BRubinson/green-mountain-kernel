@@ -15,27 +15,27 @@ extension Store {
     // MARK: - Verbs
 
     public func dopeInit(_ req: DopeInitRequest) throws -> DopeScopeResponse {
-        try dbQueue.write { db in try DopeRepository(db: db, core: core).dopeInit(req) }
+        try boundary { db in try DopeRepository(db: db, core: core).dopeInit(req) }
     }
 
     public func dopeList(_ req: DopeListRequest) throws -> DopeListResponse {
-        try dbQueue.read { db in try DopeRepository(db: db, core: core).dopeList(req) }
+        try boundaryRead { db in try DopeRepository(db: db, core: core).dopeList(req) }
     }
 
     public func dopeGet(_ req: DopeGetRequest) throws -> DopeGetResponse {
-        try dbQueue.read { db in try DopeRepository(db: db, core: core).dopeGet(req) }
+        try boundaryRead { db in try DopeRepository(db: db, core: core).dopeGet(req) }
     }
 
     public func dopeNodeAdd(_ req: DopeNodeAddRequest) throws -> DopeNodeResponse {
-        try dbQueue.write { db in try DopeRepository(db: db, core: core).dopeNodeAdd(req) }
+        try boundary { db in try DopeRepository(db: db, core: core).dopeNodeAdd(req) }
     }
 
     public func dopeNodeUpdate(_ req: DopeNodeUpdateRequest) throws -> DopeNodeResponse {
-        try dbQueue.write { db in try DopeRepository(db: db, core: core).dopeNodeUpdate(req) }
+        try boundary { db in try DopeRepository(db: db, core: core).dopeNodeUpdate(req) }
     }
 
     public func dopeNodeDelete(_ req: DopeNodeDeleteRequest) throws -> DopeNodeDeleteResponse {
-        try dbQueue.write { db in try DopeRepository(db: db, core: core).dopeNodeDelete(req) }
+        try boundary { db in try DopeRepository(db: db, core: core).dopeNodeDelete(req) }
     }
 
     // MARK: - Cross-family helper forwards (bodies in DopeRepository)

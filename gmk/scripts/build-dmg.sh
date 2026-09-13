@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
-# build-dmg.sh — Build GMVibes (gmk/gmVibes/ in the green-mountain-kernel monorepo) into a distributable .dmg.
+# build-dmg.sh — Build the GM kernel app (gmk/gmVibes/ in the green-mountain-kernel
+# monorepo) into a distributable .dmg. The bundle is gm_kernel.app; the Xcode
+# target and scheme are still named GMVibes.
 # Run from anywhere; it resolves gmk/ from its own location.
 #
 # Auto-detects signing capability:
@@ -25,9 +27,11 @@
 #   NOTARIZE=1 scripts/build-dmg.sh      # also notarize + staple (needs Dev ID
 #                                        # + a `notarytool` keychain profile)
 #
-# Output: build/GMVibes-<version>.dmg — the name carries the version because it
-# becomes a release asset, and an asset named GMVibes.dmg forces every installer
-# to guess what is inside it.
+# Output: build/gm_kernel-<version>.dmg — the name carries the version because it
+# becomes a release asset, and an asset named gm_kernel.dmg forces every installer
+# to guess what is inside it. The BUNDLE was renamed GMVibes.app -> gm_kernel.app
+# when the app became the kernel host; gm_releases.sh's GM_APP_NAME and this
+# script's APP_NAME are the two spellings that must agree.
 #
 # Notarization prerequisites (one-time):
 #   xcrun notarytool store-credentials gmcc-ui \
@@ -36,7 +40,14 @@
 set -euo pipefail
 
 SCHEME="GMVibes"
-APP_NAME="GMVibes"
+# The BUNDLE name, which is now gm_kernel — the app hosts the writer, so the
+# bundle IS the kernel. The Xcode TARGET and SCHEME stay named GMVibes (this
+# script and gmk-ci.yml both drive `-scheme GMVibes`), and the BUNDLE IDENTIFIER
+# stays `rube.GMVibes` on purpose: a new id is a new NSUserDefaults domain, so
+# every preference and window position would reset once for no functional gain.
+# gm_releases.sh's GM_APP_NAME must agree with this or the installer looks for a
+# bundle the build never produced.
+APP_NAME="gm_kernel"
 PROJECT="gmk.xcodeproj"
 CONFIG="Release"
 NOTARY_PROFILE="${NOTARY_PROFILE:-gmcc-ui}"
@@ -88,15 +99,64 @@ xcodebuild archive \
 APP="$ARCHIVE/Products/Applications/$APP_NAME.app"
 [ -d "$APP" ] || { echo "error: archive did not produce $APP" >&2; exit 1; }
 
+# ── Signing: INSIDE-OUT, and `--deep` is gone ────────────────────────────────
+#
+# `--deep` is deprecated by Apple and is the wrong tool for a bundle that carries
+# embedded executables. It became the wrong tool for THIS bundle the moment the
+# kernel CLI moved inside it: helpers must be signed INDIVIDUALLY, innermost
+# first, each with the hardened runtime and the same Team ID, and the outer bundle
+# LAST — otherwise the outer signature is computed over helper signatures that are
+# then replaced, and the seal no longer describes the contents.
+#
+# THE FAILURE IS REMOTE AND LATE, which is why this is worth the words: `--deep`
+# signs without complaint and `codesign --verify` passes locally. Notarization
+# rejects the submission minutes later, on a machine you are not looking at, with
+# a message about nested code. Nothing on the build host tells you.
+#
+# `--deep` survives on --verify, where it is the correct flag: verifying deeply is
+# reading, not writing.
+sign_inside_out() {
+  _identity="$1"
+  _runtime_flags="$2"
+
+  # Helpers first, deepest last-modified order irrelevant — each is independent.
+  # `-perm +111 -type f` rather than a hardcoded list: a helper added later must
+  # not silently ship unsigned.
+  if [ -d "$APP/Contents/Helpers" ]; then
+    find "$APP/Contents/Helpers" -type f -perm +111 -print | while IFS= read -r helper; do
+      echo "    helper: $(basename "$helper")"
+      # shellcheck disable=SC2086
+      codesign --force --timestamp $_runtime_flags --sign "$_identity" "$helper"
+    done
+  fi
+
+  # Frameworks and dylibs, if any ever appear.
+  for _dir in "$APP/Contents/Frameworks" "$APP/Contents/XPCServices"; do
+    [ -d "$_dir" ] || continue
+    find "$_dir" -depth 1 -print | while IFS= read -r item; do
+      echo "    nested: $(basename "$item")"
+      # shellcheck disable=SC2086
+      codesign --force --timestamp $_runtime_flags --sign "$_identity" "$item"
+    done
+  done
+
+  # The outer bundle LAST.
+  echo "    bundle: $(basename "$APP")"
+  # shellcheck disable=SC2086
+  codesign --force --timestamp $_runtime_flags --sign "$_identity" "$APP"
+}
+
 if [ -n "$DEV_ID" ]; then
-  echo "==> Signing with: $DEV_ID (hardened runtime)"
-  codesign --deep --force --options runtime --timestamp \
-    --sign "$DEV_ID" "$APP"
+  echo "==> Signing with: $DEV_ID (hardened runtime, inside-out)"
+  sign_inside_out "$DEV_ID" "--options runtime"
 else
-  echo "==> No Developer ID found — ad-hoc signing."
+  echo "==> No Developer ID found — ad-hoc signing (inside-out)."
   echo "    Recipients must clear quarantine once (see README)."
-  codesign --deep --force --sign - "$APP"
+  sign_inside_out "-" ""
 fi
+
+# Verify DEEPLY — this is the one place --deep is correct, because it reads.
+codesign --verify --strict --deep-verify -vv "$APP" 2>&1 | sed 's/^/    /'
 
 echo "==> Staging DMG contents…"
 mkdir -p "$STAGE"

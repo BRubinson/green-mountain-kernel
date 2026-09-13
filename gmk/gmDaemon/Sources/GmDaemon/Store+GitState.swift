@@ -13,13 +13,13 @@ import GmDaemonSdk
 
 extension Store {
     public func sessionResolve(_ req: SessionResolveRequest) throws -> SessionResolveResponse {
-        try dbQueue.read { db in try GitStateRepository(db: db, core: core).sessionResolve(req) }
+        try boundaryRead { db in try GitStateRepository(db: db, core: core).sessionResolve(req) }
     }
 
     public func instanceCurrentSession(
         _ req: InstanceCurrentSessionRequest
     ) throws -> InstanceCurrentSessionResponse {
-        try dbQueue.read { db in
+        try boundaryRead { db in
             try GitStateRepository(db: db, core: core).instanceCurrentSession(req)
         }
     }

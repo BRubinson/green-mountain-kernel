@@ -76,13 +76,17 @@ final class WorkflowSpecTests: XCTestCase {
     // name — and the parity below is BIDIRECTIONAL, so neither side can grow
     // a tool the other has not heard of.
 
-    /// gmk/gmMcp/Sources/gm_mcp — resolved by MARKER, not by counting
+    /// gmk/gmMcp/Sources/GmMcpServer — resolved by MARKER, not by counting
     /// directories. The old four-level `deletingLastPathComponent()` walk
     /// encoded this file's depth below the repo root and broke the moment the
     /// package moved; `RepoRoot` climbs until it finds the repo instead.
+    ///
+    /// Repointed from `Sources/gm_mcp` when the server became a LIBRARY target so
+    /// the multi-call `gm_kernel` binary could carry it. `gm_mcp` is now a
+    /// four-line shim and declares no tools at all.
     private var mcpSources: URL {
         RepoRoot.package("gmMcp")
-            .appendingPathComponent("Sources/gm_mcp", isDirectory: true)
+            .appendingPathComponent("Sources/GmMcpServer", isDirectory: true)
     }
 
     /// plugins/gmcc/ — the agent definitions and workflow prompts this test
@@ -109,9 +113,22 @@ final class WorkflowSpecTests: XCTestCase {
         // anchored on a single filename would have reported them as absent while
         // the binary served them — a parity check that reads the wrong half of
         // the surface is worse than none.
+        // RECURSIVE, and that is the fix for a real hole rather than a tidy-up.
+        //
+        // The emptiness guard below already caught a MOVED directory loudly. What
+        // it could not catch was a PARTIAL read: `contentsOfDirectory` is
+        // non-recursive, so a tool declared in a subdirectory would simply not be
+        // scanned, the top level would still be non-empty, and the parity check
+        // would pass having read half the surface. The comment above shows the
+        // single-file version of this bug was already fought once.
         let dir = mcpSources
-        let files = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
-            .filter { $0.pathExtension == "swift" }
+        guard let walker = FileManager.default.enumerator(
+            at: dir, includingPropertiesForKeys: nil)
+        else {
+            XCTFail("cannot enumerate \(dir.path) — the roster read is broken")
+            return []
+        }
+        let files = walker.compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
         XCTAssertFalse(files.isEmpty, "no gm_mcp sources found — the roster read is broken")
         let pattern = try NSRegularExpression(pattern: #"\bTool\(\s*\n\s*name:\s*"([a-z0-9_]+)""#)
         var found: [String] = []

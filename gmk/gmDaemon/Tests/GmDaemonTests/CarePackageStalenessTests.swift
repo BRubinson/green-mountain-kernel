@@ -224,8 +224,17 @@ final class CarePackageStalenessTests: XCTestCase {
     /// than a side effect — only a new message type or an incompatible change
     /// may move this number, and GMVibes' local package reference rides on
     /// that rule holding.
+    ///
+    /// Moved 27 → 28 for `TX_BATCH`, a NEW MESSAGE TYPE — the first of the two
+    /// sanctioned reasons. It is worth recording what did NOT move it in the
+    /// same change, because the pin only means something if the distinction is
+    /// held: the four vitals/role fields added to `PingResponse` and
+    /// `StatusResponse` (`resident_memory_bytes`, `cpu_percent`, `writer_role`,
+    /// `writer_bundle_path`) are additive optionals and contributed nothing to
+    /// this number. Had `TX_BATCH` not been in the same pass, those four would
+    /// have shipped at 27.
     func testWireProtocolVersionIsPinned() {
-        XCTAssertEqual(GmWireProtocol.version, 27)
+        XCTAssertEqual(GmWireProtocol.version, 28)
     }
 
     func testStalenessOmittedByAPeerDecodesToNil() throws {

@@ -21,12 +21,6 @@ struct GMVibesWindow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Sandbox stacks are visually indistinguishable from prod except
-            // for this strip: GM_FS_ROOT is set only by the sandbox launcher
-            // (gm sandbox refresh), never in a normal launch.
-            if let sandboxRoot = Self.sandboxRoot {
-                SandboxBanner(root: sandboxRoot)
-            }
             // The rail SLIDES OVER content (ZStack) rather than pushing it aside:
             // an HStack would add its 200pt to the content's own minWidth and
             // over-constrain a minimum-size window.
@@ -90,14 +84,6 @@ struct GMVibesWindow: View {
         .environment(diagrams)
     }
 
-    /// Non-empty GM_FS_ROOT == sandboxed. Read once: the env of a process
-    /// never changes after launch.
-    private static let sandboxRoot: String? = {
-        guard let root = ProcessInfo.processInfo.environment["GM_FS_ROOT"],
-              !root.isEmpty else { return nil }
-        return root
-    }()
-
     @ViewBuilder
     private var content: some View {
         // Every arm mounts exactly ONE navigation container (ScreenScaffold,
@@ -135,28 +121,6 @@ struct GMVibesWindow: View {
 /// The yellow "you are sandboxed" strip pinned above all window content.
 /// Deliberately loud and always present — a sandboxed window must never be
 /// mistakable for prod.
-private struct SandboxBanner: View {
-    let root: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "shippingbox.fill")
-            Text("SANDBOX")
-                .fontWeight(.bold)
-            Text(root)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .opacity(0.75)
-            Spacer(minLength: 0)
-        }
-        .font(.caption)
-        .foregroundStyle(.black.opacity(0.85))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 4)
-        .frame(maxWidth: .infinity)
-        .background(Color.yellow)
-    }
-}
 
 /// The app-wide top-bar group: Back · daemon status pill · rail toggle · new
 /// window · ⌘K actions. Declared once, by GMVibesWindow, with `.navigation`

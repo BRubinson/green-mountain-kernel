@@ -10,18 +10,18 @@ import GmDaemonSdk
 extension Store {
 
     public func promptStart(_ req: PromptStartRequest) throws -> BotWorkflowResponse {
-        try dbQueue.write { db in try BotWorkflowRepository(db: db, core: core).start(req) }
+        try boundary { db in try BotWorkflowRepository(db: db, core: core).start(req) }
     }
 
     public func promptResume(_ req: PromptResumeRequest) throws -> BotWorkflowResponse {
-        try dbQueue.write { db in try BotWorkflowRepository(db: db, core: core).resume(req) }
+        try boundary { db in try BotWorkflowRepository(db: db, core: core).resume(req) }
     }
 
     public func botNext(_ req: BotNextRequest) throws -> BotNextResponse {
-        try dbQueue.write { db in try BotWorkflowRepository(db: db, core: core).next(req) }
+        try boundary { db in try BotWorkflowRepository(db: db, core: core).next(req) }
     }
 
     public func botGet(_ req: BotGetRequest) throws -> BotWorkflowResponse {
-        try dbQueue.read { db in try BotWorkflowRepository(db: db, core: core).get(req) }
+        try boundaryRead { db in try BotWorkflowRepository(db: db, core: core).get(req) }
     }
 }

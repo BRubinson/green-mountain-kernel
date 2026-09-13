@@ -7,7 +7,15 @@
 // socket — never a second writer to the database.
 //
 // Products:
-//   - gm_mcp (executable)
+//   - GmMcpServer (library)    the pen server, so the one multi-call
+//                              `gm_kernel` Mach-O can serve it
+//   - gm_mcp      (executable) a shim over GmMcpServer.main()
+//
+// THE LIBRARY SPLIT CHANGES NO BEHAVIOUR. `gm_mcp` is still spawned per Claude
+// session by the harness, still speaks stdio, still never touches the db. The
+// split exists because top-level code is legal only in an executable's
+// `main.swift`, and the kernel binary needs this personality as a callable
+// entry point.
 
 import PackageDescription
 
@@ -15,6 +23,7 @@ let package = Package(
     name: "gmMcp",
     platforms: [.macOS(.v14)],
     products: [
+        .library(name: "GmMcpServer", targets: ["GmMcpServer"]),
         .executable(name: "gm_mcp", targets: ["gm_mcp"]),
     ],
     dependencies: [
@@ -34,16 +43,23 @@ let package = Package(
         .package(path: "../gmDaemon"),
     ],
     targets: [
-        .executableTarget(
-            name: "gm_mcp",
+        .target(
+            name: "GmMcpServer",
             dependencies: [
                 .product(name: "GmDaemonSdk", package: "gmDaemonSdk"),
             ]
         ),
+        // A shim over GmMcpServer.main(). Kept as a real executable target so
+        // `swift build` still yields a standalone `gm_mcp` — `run_mcp.sh` execs
+        // that path by name, and the release store stages it.
+        .executableTarget(
+            name: "gm_mcp",
+            dependencies: ["GmMcpServer"]
+        ),
         .testTarget(
             name: "GmMcpTests",
             dependencies: [
-                "gm_mcp",
+                "GmMcpServer",
                 .product(name: "GmDaemon", package: "gmDaemon"),
             ]
         ),

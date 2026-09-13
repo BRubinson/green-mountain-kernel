@@ -14,7 +14,12 @@ extension Store {
     /// Assemble the scrubbed export document and write it at
     /// `req.dbExportPath`. Read-only against the db — no event.
     public func exportKbite(_ req: KbiteExportRequest) throws -> KbiteExportResponse {
-        let (document, fileKeywordCount) = try dbQueue.read { db in
+        // FOUR-PHASE VERB — see StoreError.notComposable. Filesystem work
+        // between the read and the write must not hold the single writer.
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "exportKbite")
+        }
+        let (document, fileKeywordCount) = try boundaryRead { db in
             try KbiteArchiveRepository(db: db, core: core)
                 .exportDocument(code: req.code, anonymize: req.anonymize)
         }
@@ -45,6 +50,11 @@ extension Store {
     /// One-transaction import of a db_export.json (decode + rehydrate happen
     /// outside the write lock; the apply body lives in the repository).
     public func importKbite(_ req: KbiteImportRequest) throws -> KbiteImportResponse {
+        // FOUR-PHASE VERB — see StoreError.notComposable. Filesystem work
+        // between the read and the write must not hold the single writer.
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "importKbite")
+        }
         // Decode + rehydrate outside the write lock.
         let data = try Data(contentsOf: URL(fileURLWithPath: req.dbExportPath))
         let document = try KbiteArchive.decode(data)
@@ -63,14 +73,14 @@ extension Store {
         }
         let rehydrated = document.rehydrated(rules: req.rehydrate)
 
-        return try dbQueue.write { db in
+        return try boundary { db in
             try KbiteArchiveRepository(db: db, core: core)
                 .importApply(rehydrated: rehydrated, onCollision: req.onCollision)
         }
     }
 
     public func deleteKbite(_ req: KbiteDeleteRequest) throws -> KbiteDeleteResponse {
-        try dbQueue.write { db in
+        try boundary { db in
             try KbiteArchiveRepository(db: db, core: core).deleteKbite(req)
         }
     }

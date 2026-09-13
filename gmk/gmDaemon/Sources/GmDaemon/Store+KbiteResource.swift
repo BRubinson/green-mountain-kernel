@@ -22,6 +22,11 @@ extension Store {
     /// Chewed files are deleted only AFTER the commit succeeds (a rollback
     /// never destroys the artifacts); raw sources are always kept.
     public func digestKbite(_ req: KbiteDigestRequest) throws -> KbiteDigestResponse {
+        // FOUR-PHASE VERB — see StoreError.notComposable. Filesystem work
+        // between the read and the write must not hold the single writer.
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "digestKbite")
+        }
         let fm = FileManager.default
         let openURL = URL(fileURLWithPath: req.kbiteOpenPath, isDirectory: true)
 
@@ -70,7 +75,7 @@ extension Store {
         var fileCount = 0
         var attachedKeywords: Set<String> = []
 
-        let kbiteUuid = try dbQueue.write { db -> String in
+        let kbiteUuid = try boundary { db -> String in
             var rc = resourceCount
             var fc = fileCount
             var kw = attachedKeywords
@@ -113,26 +118,26 @@ extension Store {
     }
 
     public func getKbite(_ req: KbiteGetRequest) throws -> KbiteGetResponse {
-        try dbQueue.read { db in try KbiteResourceRepository(db: db, core: core).getKbite(req) }
+        try boundaryRead { db in try KbiteResourceRepository(db: db, core: core).getKbite(req) }
     }
 
     /// The targeted load replacing "cat the chewed file".
     public func getKbiteFile(_ req: KbiteFileGetRequest) throws -> KbiteFileGetResponse {
-        try dbQueue.read { db in try KbiteResourceRepository(db: db, core: core).getKbiteFile(req) }
+        try boundaryRead { db in try KbiteResourceRepository(db: db, core: core).getKbiteFile(req) }
     }
 
     public func searchKbites(_ req: KbiteSearchRequest) throws -> KbiteSearchResponse {
         guard let pattern = FTS5Pattern(matchingAllTokensIn: req.query) else {
             return KbiteSearchResponse(hits: [])
         }
-        return try dbQueue.read { db in
+        return try boundaryRead { db in
             try KbiteResourceRepository(db: db, core: core).searchKbites(req, pattern: pattern)
         }
     }
 
     /// Attach/detach normalized keywords at kbite or resource-file level.
     public func tagKeyword(_ req: KbiteKeywordTagRequest) throws -> KbiteKeywordTagResponse {
-        try dbQueue.write { db in try KbiteResourceRepository(db: db, core: core).tagKeyword(req) }
+        try boundary { db in try KbiteResourceRepository(db: db, core: core).tagKeyword(req) }
     }
 
     // MARK: - Cross-domain helper forwards (Store+KbiteArchive's import reuses these)

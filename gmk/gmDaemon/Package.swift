@@ -6,14 +6,33 @@
 // migration ledger) plus `gm_daemon`, the server that owns the database file.
 //
 // Products:
-//   - GmDaemon  (library)    the Store surface
-//   - gm_daemon (executable) the single-writer daemon
+//   - GmDaemon      (library)    the Store surface
+//   - GmKernelHost  (library)    the server + the ownership primitives, so the
+//                                app bundle and the headless binary are two
+//                                HOSTS over ONE implementation
+//   - gm_daemon     (executable) a shim over KernelHost.bootHeadlessAndRun()
 //
-// THE APP DOES NOT LINK THIS, and that is the structural win of the split. The
-// old monolith made every GMVibes build carry GRDB because one target held both
-// the wire types and the Store. Measured before the split: GMVibes had zero
-// references to GRDB, `GMCCStore`, `DatabaseQueue` or `StoreError` across 97
-// files — it never wanted persistence, it merely inherited it.
+// THE APP NOW LINKS THIS, AND THAT REVERSES THE PREVIOUS HEADER ON PURPOSE.
+//
+// What this file used to say: "THE APP DOES NOT LINK THIS, and that is the
+// structural win of the split" — measured at zero references to GRDB,
+// `DatabaseQueue` or `StoreError` across 97 GMVibes files. That was true and it
+// was worth having. It is now deliberately false, and the sentence is kept
+// (corrected, not deleted) so the change reads as a decision rather than a
+// regression someone should undo.
+//
+// The reason is that the collapse asked for ONE connection pool and REAL shared
+// transaction boundaries across the UI, the relayed MCP surface and the kernel's
+// own background services. A process boundary cannot provide a shared
+// transaction: every wire call is its own. So the app hosts the writer, and the
+// cost is exactly the one the old header was protecting against — GRDB is in the
+// app's link closure again.
+//
+// What keeps that from being a regression is that the guarantee it protected got
+// STRONGER rather than weaker. Single-writer used to mean "only this executable
+// constructs a Store". It now means "only the holder of the ownership lock can
+// construct one", enforced by a `~Copyable` token whose initialiser no other file
+// can reach. See `KernelOwnership`.
 
 import PackageDescription
 
@@ -22,6 +41,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "GmDaemon", targets: ["GmDaemon"]),
+        .library(name: "GmKernelHost", targets: ["GmKernelHost"]),
         .executable(name: "gm_daemon", targets: ["gm_daemon"]),
     ],
     dependencies: [
@@ -45,12 +65,23 @@ let package = Package(
                 .product(name: "GRDB", package: "GRDB.swift"),
             ]
         ),
-        // The plugin is on THIS target, not on the library: BuildInfo is what
-        // the PING handler reports, and the handler lives here.
-        .executableTarget(
-            name: "gm_daemon",
+        // The server, the handlers, the watchers, and the ownership primitives.
+        //
+        // THE BUILD PLUGIN MOVED HERE WITH PingHandler. BuildInfo is what PING
+        // reports, and the handler that reports it is in this target now — a
+        // plugin left on the executable would have stamped a target that no
+        // longer contains the reader.
+        .target(
+            name: "GmKernelHost",
             dependencies: ["GmDaemon"],
             plugins: [.plugin(name: "StampBuildInfo")]
+        ),
+        // A shim over KernelHost.bootHeadlessAndRun(). Kept as a real executable
+        // target because the headless writer is load-bearing: autostart spawns a
+        // binary from contexts that cannot launch an app.
+        .executableTarget(
+            name: "gm_daemon",
+            dependencies: ["GmKernelHost"]
         ),
         // The build-time stamp, inside the build graph. See the plugin's own
         // source for why this replaced a shell step.
@@ -69,6 +100,9 @@ let package = Package(
             name: "GmDaemonTests",
             dependencies: [
                 "GmDaemon",
+                // GmKernelHost too: the handler and server tests reach into it,
+                // and KernelOwnershipTests exercises the lock directly.
+                "GmKernelHost",
                 .product(name: "GmUxComponentLibrary", package: "gmUxComponentLibrary"),
             ]
         ),

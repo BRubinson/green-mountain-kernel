@@ -131,7 +131,7 @@ final class DocsContractTests: XCTestCase {
                 "plugins/gmcc/skills/gmcc_boot/SKILL.md",        // gm-missing remediation block
                 "plugins/gmcc/skills/gmcc_cleanup_system/SKILL.md", // grant literal it audits
             ],
-            allowLine: { $0.contains("local_sandbox") })  // sandbox launchers are deliberately absolute
+            allowLine: { _ in false })  // the sandbox launchers that needed an absolute path are gone
         XCTAssertEqual(hits, [], "hardcoded gm binary path in docs:\n" + hits.joined(separator: "\n"))
     }
 
@@ -555,14 +555,16 @@ final class DocsContractTests: XCTestCase {
                         guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
                         checked += 1
 
-                        // PRESENT — the two halves of the resolution. The
-                        // script's own location anchors it, the marker walk
-                        // retargets a sandbox snapshot, and `$HOME/gmfs` is
-                        // the default when there is no marker.
+                        // PRESENT — what is left of the resolution now that
+                        // there is ONE runtime root. The marker walk that used
+                        // to be required here selected a second, snapshot
+                        // runtime; that runtime was deleted, so requiring the
+                        // walk would now require dead code. `$HOME/gmfs` is
+                        // the whole answer, and it is still required, because a
+                        // launcher that resolves through PATH or an inherited
+                        // GM_* variable is a hook that stops firing silently.
                         for (needle, what) in [
-                            (#"dirname"#, "resolve its binary from its own script location"),
-                            (#".gmcc_sandbox"#, "walk up for a sandbox marker, or a snapshot's hooks write the prod db"),
-                            (#"$HOME/gmfs"#, "fall back to the default runtime root"),
+                            (#"$HOME/gmfs"#, "resolve the one runtime root from the filesystem"),
                         ] {
                             XCTAssertTrue(
                                 text.contains(needle),

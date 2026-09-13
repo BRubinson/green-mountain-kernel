@@ -27,7 +27,7 @@ extension Store {
         guard let pattern = FTS5Pattern(matchingAllTokensIn: req.query) else {
             throw StoreError.badRequest(detail: "search query has no searchable tokens")
         }
-        return try dbQueue.read { db in
+        return try boundaryRead { db in
             try SearchRepository(db: db, core: core).search(req, pattern: pattern)
         }
     }

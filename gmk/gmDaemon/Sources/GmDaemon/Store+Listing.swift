@@ -10,15 +10,15 @@ import GmDaemonSdk
 
 extension Store {
     public func listProjects() throws -> ProjectListResponse {
-        try dbQueue.read { db in try ListingRepository(db: db, core: core).listProjects() }
+        try boundaryRead { db in try ListingRepository(db: db, core: core).listProjects() }
     }
 
     public func listInstances(_ req: InstanceListRequest) throws -> InstanceListResponse {
-        try dbQueue.read { db in try ListingRepository(db: db, core: core).listInstances(req) }
+        try boundaryRead { db in try ListingRepository(db: db, core: core).listInstances(req) }
     }
 
     public func listSessions(_ req: SessionListRequest) throws -> SessionListResponse {
-        try dbQueue.read { db in try ListingRepository(db: db, core: core).listSessions(req) }
+        try boundaryRead { db in try ListingRepository(db: db, core: core).listSessions(req) }
     }
 
 }

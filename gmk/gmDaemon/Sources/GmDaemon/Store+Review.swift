@@ -20,31 +20,31 @@ import GmDaemonSdk
 
 extension Store {
     public func reviewOpen(_ req: ReviewOpenRequest) throws -> ReviewSummaryResponse {
-        try dbQueue.write { db in try ReviewRepository(db: db, core: core).open(req) }
+        try boundary { db in try ReviewRepository(db: db, core: core).open(req) }
     }
 
     public func reviewFindingAdd(_ req: ReviewFindingAddRequest) throws -> ReviewFindingRowResponse {
-        try dbQueue.write { db in try ReviewRepository(db: db, core: core).findingAdd(req) }
+        try boundary { db in try ReviewRepository(db: db, core: core).findingAdd(req) }
     }
 
     public func reviewRank(_ req: ReviewRankRequest) throws -> ReviewRankResponse {
-        try dbQueue.write { db in try ReviewRepository(db: db, core: core).rank(req) }
+        try boundary { db in try ReviewRepository(db: db, core: core).rank(req) }
     }
 
     public func reviewResolve(_ req: ReviewResolveRequest) throws -> ReviewFindingRowResponse {
-        try dbQueue.write { db in try ReviewRepository(db: db, core: core).resolve(req) }
+        try boundary { db in try ReviewRepository(db: db, core: core).resolve(req) }
     }
 
     public func reviewComplete(_ req: ReviewCompleteRequest) throws -> ReviewSummaryResponse {
-        try dbQueue.write { db in try ReviewRepository(db: db, core: core).complete(req) }
+        try boundary { db in try ReviewRepository(db: db, core: core).complete(req) }
     }
 
     public func reviewReopen(_ req: ReviewReopenRequest) throws -> ReviewSummaryResponse {
-        try dbQueue.write { db in try ReviewRepository(db: db, core: core).reopen(req) }
+        try boundary { db in try ReviewRepository(db: db, core: core).reopen(req) }
     }
 
     public func reviewGet(_ req: ReviewGetRequest) throws -> ReviewGetResponse {
-        try dbQueue.read { db in try ReviewRepository(db: db, core: core).get(req) }
+        try boundaryRead { db in try ReviewRepository(db: db, core: core).get(req) }
     }
 
     // MARK: - Cross-domain helper forwards

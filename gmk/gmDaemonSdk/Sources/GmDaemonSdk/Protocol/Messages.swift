@@ -386,6 +386,51 @@ public struct HelloAck: Codable, Hashable, Sendable {
     }
 }
 
+// MARK: - TX_BATCH
+
+/// N inner request lines, executed in order inside ONE transaction.
+///
+/// The inner lines stay RAW NDJSON on purpose. A typed union over the ~230
+/// dispatchable requests would be a second hand-maintained vocabulary whose
+/// arms could drift from `MessageType`, and it would have to grow every time a
+/// verb is added. Keeping them opaque means the batch verb needs no knowledge
+/// of what it carries: the dispatcher re-enters itself, which it already does
+/// once per connection, and the handlers' existing JSON welding — normally the
+/// obstacle to in-process composition — is what makes this cheap.
+///
+/// Atomicity is the whole point. Today every verb is its own implicit
+/// transaction because each arrives as a separate wire message, so an agent
+/// writing twelve findings writes twelve commits and a failure at the seventh
+/// leaves six behind. Inside one batch those twelve either all land or none do.
+public struct TxBatchRequest: Codable, Hashable, Sendable {
+    /// Raw NDJSON request lines, executed in order.
+    public let requests: [String]
+
+    public init(requests: [String]) {
+        self.requests = requests
+    }
+}
+
+/// Result envelope for `TX_BATCH`.
+///
+/// Results are BUFFERED and emitted only after the commit, so a partial batch
+/// is not expressible to an observer any more than it is to the database.
+///
+/// THERE IS NO `failedIndex` FIELD, and its absence is deliberate. An earlier
+/// version carried one, which could never be populated: a failure THROWS (an
+/// `ok: false` envelope with no `error` is read as success by the client), and a
+/// throw carries no payload. The failing index is named in the error MESSAGE
+/// instead, which is where a caller actually reads it.
+public struct TxBatchResponse: Codable, Hashable, Sendable {
+    /// Raw NDJSON result lines, one per request, in request order. Present only
+    /// on success, because a rolled-back batch throws.
+    public let results: [String]
+
+    public init(results: [String]) {
+        self.results = results
+    }
+}
+
 // MARK: - PING
 
 public struct PingRequest: Codable, Hashable, Sendable {
@@ -399,6 +444,26 @@ public struct PingResponse: Codable, Hashable, Sendable {
     public let buildDate: String
     public let startedAt: String
     public let uptimeSeconds: Int
+    /// Resident footprint, from `task_info`/`TASK_VM_INFO` `phys_footprint`.
+    ///
+    /// The vitals ride the WIRE rather than being read in-process, and that is
+    /// deliberate: a kernel that lost the ownership lock runs CLIENT-ONLY with
+    /// no store of its own, and its menu bar still has to show the numbers. An
+    /// in-process-only source would go blank in exactly the mode that most
+    /// needs to explain itself.
+    public let residentMemoryBytes: UInt64?
+    /// CPU percentage, from a `proc_pid_rusage` delta.
+    public let cpuPercent: Double?
+    /// `"writer"` | `"client"` — which role the answering kernel holds.
+    ///
+    /// Client mode is the mitigation for a second app copy, chosen over a hard
+    /// refusal because a refusal on the daily Xcode-debug path is a guard that
+    /// gets deleted. A mitigation nobody can see is cosmetic, so the role is
+    /// reportable.
+    public let writerRole: String?
+    /// Bundle path of the instance actually holding the db lock, so a
+    /// client-mode kernel can name BOTH bundles rather than only its own.
+    public let writerBundlePath: String?
 
     public init(
         daemonPid: Int32,
@@ -406,7 +471,11 @@ public struct PingResponse: Codable, Hashable, Sendable {
         buildSha: String,
         buildDate: String,
         startedAt: String,
-        uptimeSeconds: Int
+        uptimeSeconds: Int,
+        residentMemoryBytes: UInt64? = nil,
+        cpuPercent: Double? = nil,
+        writerRole: String? = nil,
+        writerBundlePath: String? = nil
     ) {
         self.daemonPid = daemonPid
         self.protocolVersion = protocolVersion
@@ -414,6 +483,10 @@ public struct PingResponse: Codable, Hashable, Sendable {
         self.buildDate = buildDate
         self.startedAt = startedAt
         self.uptimeSeconds = uptimeSeconds
+        self.residentMemoryBytes = residentMemoryBytes
+        self.cpuPercent = cpuPercent
+        self.writerRole = writerRole
+        self.writerBundlePath = writerBundlePath
     }
 }
 
@@ -449,6 +522,13 @@ public struct StatusResponse: Codable, Hashable, Sendable {
     public let lastEventId: Int64
     public let startedAt: String
     public let uptimeSeconds: Int
+    /// Vitals and role, in parity with `PingResponse` so the menu bar has ONE
+    /// shape to read whichever verb it polls. All four are additive optionals
+    /// and contribute no protocol bump — see the v28 note in `GmWireProtocol`.
+    public let residentMemoryBytes: UInt64?
+    public let cpuPercent: Double?
+    public let writerRole: String?
+    public let writerBundlePath: String?
 
     public init(
         daemonPid: Int32,
@@ -459,7 +539,11 @@ public struct StatusResponse: Codable, Hashable, Sendable {
         tableCounts: [TableCount],
         lastEventId: Int64,
         startedAt: String,
-        uptimeSeconds: Int
+        uptimeSeconds: Int,
+        residentMemoryBytes: UInt64? = nil,
+        cpuPercent: Double? = nil,
+        writerRole: String? = nil,
+        writerBundlePath: String? = nil
     ) {
         self.daemonPid = daemonPid
         self.protocolVersion = protocolVersion
@@ -470,6 +554,10 @@ public struct StatusResponse: Codable, Hashable, Sendable {
         self.lastEventId = lastEventId
         self.startedAt = startedAt
         self.uptimeSeconds = uptimeSeconds
+        self.residentMemoryBytes = residentMemoryBytes
+        self.cpuPercent = cpuPercent
+        self.writerRole = writerRole
+        self.writerBundlePath = writerBundlePath
     }
 }
 

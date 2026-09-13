@@ -57,25 +57,25 @@ extension Store {
     // MARK: - Verbs
 
     public func briefingOpen(_ req: BriefingOpenRequest) throws -> BriefingRowResponse {
-        try dbQueue.write { db in try BriefingRepository(db: db, core: core).open(req) }
+        try boundary { db in try BriefingRepository(db: db, core: core).open(req) }
     }
 
     public func briefingComplete(_ req: BriefingCompleteRequest) throws -> BriefingRowResponse {
-        try dbQueue.write { db in try BriefingRepository(db: db, core: core).complete(req) }
+        try boundary { db in try BriefingRepository(db: db, core: core).complete(req) }
     }
 
     public func briefingGet(_ req: BriefingGetRequest) throws -> BriefingGetResponse {
-        try dbQueue.read { db in try BriefingRepository(db: db, core: core).get(req) }
+        try boundaryRead { db in try BriefingRepository(db: db, core: core).get(req) }
     }
 
     public func briefingList(_ req: BriefingListRequest) throws -> BriefingListResponse {
-        try dbQueue.read { db in try BriefingRepository(db: db, core: core).list(req) }
+        try boundaryRead { db in try BriefingRepository(db: db, core: core).list(req) }
     }
 
     /// The SubagentStart hook's one call. Empty stub + success when nothing
     /// applies — the hook must never wedge a spawn.
     public func briefingStub(_ req: BriefingStubRequest) throws -> BriefingStubResponse {
-        try dbQueue.read { db in try BriefingRepository(db: db, core: core).stub(req) }
+        try boundaryRead { db in try BriefingRepository(db: db, core: core).stub(req) }
     }
 
     // MARK: - Cross-domain helper forward

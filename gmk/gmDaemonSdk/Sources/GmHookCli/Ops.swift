@@ -18,7 +18,6 @@ callers that cannot: a shell hook, and a person at a terminal.
   paths [--json]                     resolved runtime roots
   status | ping | doctor | backup    health and safety
   verbs [--json] [--writes-only]     the verb catalogue: MessageType, pen tool, read/write
-  sandbox refresh|status             snapshot dev environment
 
   call <MESSAGE_TYPE> [--json '<payload>' | --json-file <path>]
                                      the raw wire. Every verb the daemon serves,

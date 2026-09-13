@@ -13,7 +13,7 @@ import GmDaemonSdk
 
 extension Store {
     public func pathsGet() throws -> PathsGetResponse {
-        try dbQueue.read { db in try ConfigRepository(db: db, core: core).pathsGet() }
+        try boundaryRead { db in try ConfigRepository(db: db, core: core).pathsGet() }
     }
 
     public func configSet(_ req: ConfigSetRequest) throws -> ConfigSetResponse {
@@ -21,7 +21,7 @@ extension Store {
         guard !value.isEmpty else {
             throw StoreError.badRequest(detail: "config value is empty")
         }
-        return try dbQueue.write { db in
+        return try boundary { db in
             try ConfigRepository(db: db, core: core).configSet(req, value: value)
         }
     }
@@ -29,11 +29,11 @@ extension Store {
     /// The watcher's root, read outside a request cycle. nil until config
     /// exists (a daemon booted before m0002 seeded it simply has no watcher).
     public func configValue(_ key: ConfigKey) throws -> String? {
-        try dbQueue.read { db in try ConfigRepository(db: db, core: core).configValue(key) }
+        try boundaryRead { db in try ConfigRepository(db: db, core: core).configValue(key) }
     }
 
     /// MemoryWatcher's reverse lookup: prompt by its gmfs folder path.
     public func promptUuid(byStoragePath path: String) throws -> String? {
-        try dbQueue.read { db in try ConfigRepository(db: db, core: core).promptUuid(byStoragePath: path) }
+        try boundaryRead { db in try ConfigRepository(db: db, core: core).promptUuid(byStoragePath: path) }
     }
 }
