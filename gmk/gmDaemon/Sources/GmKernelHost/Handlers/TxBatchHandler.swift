@@ -50,7 +50,15 @@ enum TxBatchHandler {
     ///   transaction by construction.
     /// - `txBatch` itself: no nesting. The boundary would enlist happily, but a
     ///   nested batch makes `failedIndex` ambiguous about which level failed.
-    static let denied: Set<MessageType> = [.hello, .subscribe, .shutdown, .backup, .txBatch]
+    /// - `mcpCall` and `hookEvent` (v30): both DISPATCH ANOTHER VERB, so either
+    ///   one is a nesting alias. An `MCP_CALL` naming a batched tool expands
+    ///   into a `TX_BATCH`, which would defeat the no-nesting rule above by
+    ///   going through a different door — the deny on `txBatch` only stops the
+    ///   direct spelling. This is the whole reason a deny-list has to be
+    ///   maintained as new verbs land rather than written once.
+    static let denied: Set<MessageType> = [
+        .hello, .subscribe, .shutdown, .backup, .txBatch, .mcpCall, .hookEvent,
+    ]
 
     /// Runs every inner line inside one transaction.
     ///

@@ -98,7 +98,7 @@ enum WorkflowGates {
             unmet.append(
                 "persistence-first ordering not respected (a general change landed "
                     + "\(generalEarliestFirstTouch), a persistence change only "
-                    + "\(persistenceLatestFirstTouch)) — see mcp__plugin_gmcc_pen__arch_get")
+                    + "\(persistenceLatestFirstTouch)) — see mcp__plugin_gmcc_cde__rpir_get_architecture")
         }
 
         // (3) a plan with general rows and not one recorded change.

@@ -46,7 +46,7 @@ import Foundation
 /// Instruction prose is compiled into the binary and drift-guarded by
 /// WorkflowSpecTests, which asserts more than presence: WHERE A PEN TOOL
 /// EXISTS, THE PROSE MUST NAME THE PEN TOOL. This text is served verbatim
-/// through bot_next to the agents doing the work, so a block that names the
+/// through rpir_next to the agents doing the work, so a block that names the
 /// wrong write path is the wrong write path, everywhere, at once.
 ///
 /// Verbs with no pen tool are written the way every other daemon verb is
@@ -119,11 +119,11 @@ public enum WorkflowSpec {
         switch phase {
         case .briefing:
             return """
-            mcp__plugin_gmcc_pen__init_briefing opens the briefing row (step: initial). \
+            mcp__plugin_gmcc_cde__rpir_open_briefing opens the briefing row (step: initial). \
             Spawn the haiku doper: it orients itself with \
-            mcp__plugin_gmcc_pen__bot_current_prompt and writes the ref set \
-            with mcp__plugin_gmcc_pen__briefing_complete. Then gate on \
-            mcp__plugin_gmcc_pen__wait_for_briefing. The machine refuses to leave this \
+            mcp__plugin_gmcc_cde__cde_load_prompt and writes the ref set \
+            with mcp__plugin_gmcc_cde__rpir_write_brief. Then gate on \
+            mcp__plugin_gmcc_cde__rpir_await_briefing. The machine refuses to leave this \
             phase until the briefing row is ready.
             """
         case .explore:
@@ -144,10 +144,10 @@ public enum WorkflowSpec {
             }
             return """
             \(spawnNote) Every explorer works through the pen: \
-            mcp__plugin_gmcc_pen__bot_summary opens its own row (agent_type: \(agents)), \
-            mcp__plugin_gmcc_pen__explore_key_file_add and \
-            mcp__plugin_gmcc_pen__explore_finding_add write it, and \
-            mcp__plugin_gmcc_pen__explore_complete seals THAT row. Leave the findings \
+            mcp__plugin_gmcc_cde__rpir_open_exploration opens its own row (agent_type: \(agents)), \
+            mcp__plugin_gmcc_cde__rpir_write_exploration_key_files and \
+            mcp__plugin_gmcc_cde__rpir_write_explorations write it, and \
+            mcp__plugin_gmcc_cde__rpir_complete_exploration seals THAT row. Leave the findings \
             unranked here — calibration is cross-agent and belongs to one reader.
             When every expected row is complete, \(clarifierNote) for the merged pass — \
             rank, seal the synthesis row, then author the question and note suite. Sealing \
@@ -159,18 +159,18 @@ public enum WorkflowSpec {
         case .clarifyOpen:
             return """
             The merged clarifier pass — one reader, one sequence, all pen:
-            1. mcp__plugin_gmcc_pen__explore_get — every summary and finding. The default \
+            1. mcp__plugin_gmcc_cde__rpir_get_exploration — every summary and finding. The default \
             window is ratings under 100; unranked findings always come back as full rows.
-            2. mcp__plugin_gmcc_pen__explore_rank — ONE atomic prompt-wide batch \
+            2. mcp__plugin_gmcc_cde__rpir_rank_explorations — ONE atomic prompt-wide batch \
             (0 = critical … 999 = tombstone). The ratings are cross-agent: a rating means \
             the same thing whichever persona wrote the finding.
-            3. mcp__plugin_gmcc_pen__bot_summary with agent_type synthesis — the clarifier \
+            3. mcp__plugin_gmcc_cde__rpir_open_exploration with agent_type synthesis — the clarifier \
             OPENS the synthesis row itself; nothing else has opened one for it. Then \
-            mcp__plugin_gmcc_pen__explore_complete seals it with the cross-agent \
+            mcp__plugin_gmcc_cde__rpir_complete_exploration seals it with the cross-agent \
             synthesis. That seal is the prompt-level one and it refuses while any finding \
             is unranked.
-            4. mcp__plugin_gmcc_pen__clarify_question_add (with ordered options) and \
-            mcp__plugin_gmcc_pen__clarify_note_add (weight 0-999, 0 = critical), written \
+            4. mcp__plugin_gmcc_cde__rpir_write_clarification_questions (with ordered options) and \
+            mcp__plugin_gmcc_cde__rpir_write_clarification_notes (weight 0-999, 0 = critical), written \
             from the ranked record rather than from a re-read of the repo.
             When the pass returns, the primary seals the suite: \
             gm_hook call CLARIFY_SEAL --json \
@@ -199,9 +199,9 @@ public enum WorkflowSpec {
             return """
             Open the package: gm_hook call CARE_PACKAGE_OPEN --json \
             '{"summary_uuid":"<clarification summary>"}'. Then curate through the pen: \
-            mcp__plugin_gmcc_pen__care_ref_add with kind dope|kbite|exploration \
+            mcp__plugin_gmcc_cde__rpir_write_care_package with kind dope|kbite|exploration \
             (exploration entries are COPIES of ranked findings written with more intent — \
-            never re-explore). Finish with mcp__plugin_gmcc_pen__care_package_complete, \
+            never re-explore). Finish with mcp__plugin_gmcc_cde__rpir_close_care_package, \
             clarified_intent being backstory+goal+detail as clarified. The intent \
             lives ONLY here — it is never written back to the prompt row. Then \
             gm_hook call CLARIFY_FINALIZE --json \
@@ -211,15 +211,15 @@ public enum WorkflowSpec {
         case .archOptions:
             return """
             Spawn one architect per methodology. Each loads the clarified intent with \
-            mcp__plugin_gmcc_pen__care_package_get — not raw exploration — and writes its \
-            OWN proposal with mcp__plugin_gmcc_pen__arch_option_add (one row per \
+            mcp__plugin_gmcc_cde__rpir_get_care_package — not raw exploration — and writes its \
+            OWN proposal with mcp__plugin_gmcc_cde__rpir_open_architecture_option (one row per \
             agent_name). Wait for every option before deciding.
             """
         case .architecture:
             if variant == .team {
                 return """
-                Read the options (mcp__plugin_gmcc_pen__arch_get) and pick the winner with \
-                mcp__plugin_gmcc_pen__arch_decide (option_uuid, expected_version, \
+                Read the options (mcp__plugin_gmcc_cde__rpir_get_architecture) and pick the winner with \
+                mcp__plugin_gmcc_cde__rpir_decide_architecture (option_uuid, expected_version, \
                 rationale — it stamps selected, rejects siblings, records why; offer \
                 unused-option features to the user later). Then expand ONLY the selected \
                 option into rows, persistence FIRST: gm_hook call ARCH_PERSIST_ADD \
@@ -264,7 +264,7 @@ public enum WorkflowSpec {
                 build loop this repo documents and report its real output, quoted; a \
                 claim is not a result. Do NOT write or run test suites unless the prompt \
                 asked for them. Your file writes are captured for you — there is nothing \
-                to self-report. mcp__plugin_gmcc_pen__arch_get audits progress: planned \
+                to self-report. mcp__plugin_gmcc_cde__rpir_get_architecture audits progress: planned \
                 rows joined to what has actually been touched, plus the unplanned set.
                 """
             case .rpi:
@@ -274,7 +274,7 @@ public enum WorkflowSpec {
                 say plainly that another agent owns every other file. Each proves its work \
                 by running the repo's documented build loop and reporting the real output; \
                 none of them writes or runs tests unless the prompt asked. Capture is \
-                automatic — no self-reporting. mcp__plugin_gmcc_pen__arch_get audits \
+                automatic — no self-reporting. mcp__plugin_gmcc_cde__rpir_get_architecture audits \
                 progress.
                 """
             case .team:
@@ -286,7 +286,7 @@ public enum WorkflowSpec {
                 touch another's. Each proves its work with the repo's documented build \
                 loop and reports the real output; tests are not written or run unless the \
                 prompt asked. Capture is automatic — no self-reporting. \
-                mcp__plugin_gmcc_pen__arch_get audits progress.
+                mcp__plugin_gmcc_cde__rpir_get_architecture audits progress.
                 """
             }
         case .review:
@@ -298,12 +298,12 @@ public enum WorkflowSpec {
             }
             return """
             Open the summary: gm_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'. \
-            \(spawn) Reviewers scope themselves with mcp__plugin_gmcc_pen__arch_get and \
-            mcp__plugin_gmcc_pen__file_change_list, read the record so far with \
-            mcp__plugin_gmcc_pen__review_get, and write their findings with \
-            mcp__plugin_gmcc_pen__review_finding_add, each rating its own. The primary \
+            \(spawn) Reviewers scope themselves with mcp__plugin_gmcc_cde__rpir_get_architecture and \
+            mcp__plugin_gmcc_cde__cde_search_file_changes, read the record so far with \
+            mcp__plugin_gmcc_cde__rpir_get_review, and write their findings with \
+            mcp__plugin_gmcc_cde__rpir_write_reviews, each rating its own. The primary \
             then runs the one cross-agent calibration pass \
-            (mcp__plugin_gmcc_pen__review_rank) and seals with gm_hook call \
+            (mcp__plugin_gmcc_cde__rpir_rank_reviews) and seals with gm_hook call \
             REVIEW_COMPLETE, whose payload is summary_uuid, expected_version, overview and \
             verdict (approved|approved_with_nits|changes_requested). It refuses unranked \
             findings. Write the payload to a file and pass --json-file: an overview is \
@@ -321,7 +321,7 @@ public enum WorkflowSpec {
             """
         case .done:
             return """
-            mcp__plugin_gmcc_pen__prompt_set_status status: done (it releases the \
+            mcp__plugin_gmcc_cde__cde_set_status status: done (it releases the \
             activation claim and closes the workflow row). Present the completion summary \
             — the db rows are the record, and there are no phase-history files.
             """

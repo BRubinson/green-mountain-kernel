@@ -53,14 +53,13 @@ let package = Package(
     dependencies: [
         .package(path: "../gmDaemonSdk"),
         .package(path: "../gmDaemon"),
-        .package(path: "../gmMcp"),
     ],
     targets: [
         .executableTarget(
             name: "gm_kernel",
             dependencies: [
                 .product(name: "GmKernelHost", package: "gmDaemon"),
-                .product(name: "GmMcpServer", package: "gmMcp"),
+                .product(name: "GmMcpServer", package: "gmDaemonSdk"),
                 .product(name: "GmHookCli", package: "gmDaemonSdk"),
                 .product(name: "GmDaemonSdk", package: "gmDaemonSdk"),
             ]

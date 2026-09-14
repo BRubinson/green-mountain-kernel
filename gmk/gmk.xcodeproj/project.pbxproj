@@ -121,7 +121,6 @@
 				1B4010A52FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmDaemon" */,
 				1B4010A62FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmUxComponentLibrary" */,
 				1B4010A72FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmAgententicsSdk" */,
-				1B4010A82FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmMcp" */,
 				1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "Gm_Kernel_test" */,
 				1B4010D32FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmVibesCore" */,
 			);
@@ -397,10 +396,6 @@
 		1B4010A72FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmAgententicsSdk" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = gmAgententicsSdk;
-		};
-		1B4010A82FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmMcp" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = gmMcp;
 		};
 		1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "Gm_Kernel_test" */ = {
 			isa = XCLocalSwiftPackageReference;

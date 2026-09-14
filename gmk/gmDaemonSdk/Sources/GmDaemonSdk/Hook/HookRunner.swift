@@ -21,7 +21,15 @@ public enum HookRunner {
     /// a change from a `file_path` that was only ever read.
     ///
     /// - Returns: the dry-run report when `dryRun` is set, otherwise nil.
-    public static func postToolUse(stdin: Data, dryRun: Bool) -> String? {
+    /// - Parameter caller: how to reach the daemon. `nil` opens a short-lived
+    ///   socket client, which is what the shell-form hook front-end does. The
+    ///   kernel passes its own in-process caller instead, so a `HOOK_EVENT`
+    ///   served in-process does not dial the daemon it is already inside — that
+    ///   would be a self-connection queued behind the very call that must
+    ///   service it, which is a deadlock rather than a slow path.
+    public static func postToolUse(
+        stdin: Data, dryRun: Bool, caller: (any GmVerbCaller)? = nil
+    ) -> String? {
         guard let payload = HookPayload.decode(stdin), let cwd = payload.cwd else {
             return nil
         }
@@ -77,7 +85,7 @@ public enum HookRunner {
         // Per-change `try?`: one refused path must not cost the others their
         // row, and a refusal is already durable daemon-side. A dead daemon loses
         // the write — with one capture method there is no net under it.
-        _ = try? withKitClient { client in
+        _ = try? withKitClient(caller) { client in
             for change in changes { _ = try? client.addFileChange(change) }
         }
         return nil
@@ -95,7 +103,10 @@ public enum HookRunner {
     ///   CLI's is gone.
     /// - Returns: the JSON line to print on stdout (the dry-run report under
     ///   `dryRun`, otherwise the SubagentStart `additionalContext` response).
-    public static func subagentStart(stdin: Data, dryRun: Bool, sheetText: String) -> String? {
+    /// - Parameter caller: see `postToolUse(stdin:dryRun:caller:)`.
+    public static func subagentStart(
+        stdin: Data, dryRun: Bool, sheetText: String, caller: (any GmVerbCaller)? = nil
+    ) -> String? {
         // The cwd is still REQUIRED even though nothing here reads it: a payload
         // without one is a payload this hook cannot trust, and returning nil is
         // the silent no-op the contract asks for. It used to be consumed by the
@@ -133,7 +144,7 @@ public enum HookRunner {
         if registration == nil {
             warning = "[GMB] WARNING: this spawn carried no agent_id, so no agent_registration row exists for you. Your file changes cannot be attributed to you — report this rather than working around it."
         }
-        _ = try? withKitClient { client in
+        _ = try? withKitClient(caller) { client in
             if let registration {
                 if (try? client.agentRegister(registration)) == nil {
                     warning = "[GMB] WARNING: your agent registration did not land. Your file changes will not be attributed to you — report this rather than working around it."
@@ -190,7 +201,21 @@ public enum HookRunner {
 /// front-end's, it maps NO error onto an exit code, because a hook has no exit
 /// code to map onto — every failure here is swallowed by the caller's `try?`
 /// and the hook returns quietly.
-private func withKitClient<T>(_ body: (DaemonClient) throws -> T) throws -> T {
+/// Runs `body` against a verb caller, opening a short-lived socket client only
+/// when one was not supplied.
+///
+/// THE INJECTED CASE IS NOT AN OPTIMISATION. When the kernel serves `HOOK_EVENT`
+/// it passes its own in-process caller; opening a `DaemonClient` there would
+/// connect the kernel to itself, on the serial queue that would have to answer
+/// — a deadlock. The `nil` default keeps every existing shell-form front-end
+/// reading exactly as it did.
+///
+/// Only the socket case is closed, because only the socket case was opened here.
+private func withKitClient<T>(
+    _ caller: (any GmVerbCaller)?,
+    _ body: (any GmVerbCaller) throws -> T
+) throws -> T {
+    if let caller { return try body(caller) }
     let client = DaemonClient()
     defer { client.close() }
     return try body(client)

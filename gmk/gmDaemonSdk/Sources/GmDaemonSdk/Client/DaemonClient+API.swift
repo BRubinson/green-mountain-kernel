@@ -3,8 +3,19 @@ import Foundation
 // Typed one-method-per-message facade — the entire integration surface for
 // gm_hook, gm_mcp and GMVibes. Wraps the generic request plumbing; callers never touch
 // MessageType or responseType.
+//
+// HUNG OFF `GmVerbCaller`, NOT `DaemonClient` (v30). Every method below is the
+// same one-liner over `request(type:payload:responseType:)`, so binding them to
+// the protocol instead of the concrete socket client hands this entire surface
+// to the kernel's in-process caller as well — for the cost of this one line.
+// That is what lets MCP tool bodies and hook bodies run kernel-side unchanged
+// instead of dialing the daemon they are already inside. See
+// `Client/GmVerbCaller.swift`.
+//
+// Nothing else in this file changed, and nothing else needs to: `DaemonClient`
+// conforms, so every existing caller resolves exactly as before.
 
-extension DaemonClient {
+extension GmVerbCaller {
     // MARK: - Infra
 
     public func ping() throws -> PingResponse {
@@ -197,7 +208,7 @@ extension DaemonClient {
 
 // MARK: - Clarification (v7)
 
-extension DaemonClient {
+extension GmVerbCaller {
     public func clarifyOpen(_ req: ClarifyOpenRequest) throws -> ClarifySummaryResponse {
         try request(type: .clarifyOpen, payload: req, responseType: ClarifySummaryResponse.self)
     }
@@ -249,7 +260,7 @@ extension DaemonClient {
 
 // MARK: - Exploration (v9)
 
-extension DaemonClient {
+extension GmVerbCaller {
     public func exploreOpen(_ req: ExploreOpenRequest) throws -> ExploreSummaryResponse {
         try request(type: .exploreOpen, payload: req, responseType: ExploreSummaryResponse.self)
     }
@@ -281,7 +292,7 @@ extension DaemonClient {
 
 // MARK: - Review (v9)
 
-extension DaemonClient {
+extension GmVerbCaller {
     public func reviewOpen(_ req: ReviewOpenRequest) throws -> ReviewSummaryResponse {
         try request(type: .reviewOpen, payload: req, responseType: ReviewSummaryResponse.self)
     }
@@ -313,7 +324,7 @@ extension DaemonClient {
 
 // MARK: - Briefing (v21)
 
-extension DaemonClient {
+extension GmVerbCaller {
     public func briefingOpen(_ req: BriefingOpenRequest) throws -> BriefingRowResponse {
         try request(type: .briefingOpen, payload: req, responseType: BriefingRowResponse.self)
     }
@@ -337,7 +348,7 @@ extension DaemonClient {
 
 // MARK: - Architecture (v7)
 
-extension DaemonClient {
+extension GmVerbCaller {
     public func archOpen(_ req: ArchOpenRequest) throws -> ArchSummaryResponse {
         try request(type: .archOpen, payload: req, responseType: ArchSummaryResponse.self)
     }
@@ -405,7 +416,7 @@ extension DaemonClient {
 
 // MARK: - Git state + config (v7)
 
-extension DaemonClient {
+extension GmVerbCaller {
     public func sessionResolve(_ req: SessionResolveRequest) throws -> SessionResolveResponse {
         try request(type: .sessionResolve, payload: req, responseType: SessionResolveResponse.self)
     }
@@ -429,7 +440,7 @@ extension DaemonClient {
 
 // MARK: - Dope (v11)
 
-extension DaemonClient {
+extension GmVerbCaller {
     public func dopeInit(_ req: DopeInitRequest) throws -> DopeScopeResponse {
         try request(type: .dopeInit, payload: req, responseType: DopeScopeResponse.self)
     }
@@ -519,7 +530,7 @@ extension DaemonClient {
 
 // MARK: - Diagram (v15)
 
-extension DaemonClient {
+extension GmVerbCaller {
     public func diagramInit(_ req: DiagramInitRequest) throws -> DiagramResponse {
         try request(type: .diagramInit, payload: req, responseType: DiagramResponse.self)
     }

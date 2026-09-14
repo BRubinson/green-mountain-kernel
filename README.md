@@ -195,7 +195,8 @@ kbites/
 - **Swift packages** — `gmk/` holds six: `gmDaemonSdk` (wire protocol, client and the
   shared domain layer, plus the `gm_hook` client binary), `gmDaemon` (persistence and the
   `gm_daemon` server), `gmUxComponentLibrary` (shared SwiftUI components),
-  `gmAgententicsSdk` (agent-tool protocols), `gmMcp` (the `gm_mcp` pen server) and
+  `gmAgententicsSdk` (agent-tool protocols; the `gm_mcp` pen server moved into
+  `gmDaemonSdk` at v30) and
   `gmVibes` (the macOS app). One Xcode project, `gmk/gmk.xcodeproj`, spans them, and
   `gmk/gmk.xcworkspace` opens that project together with every package as an editable
   workspace member.

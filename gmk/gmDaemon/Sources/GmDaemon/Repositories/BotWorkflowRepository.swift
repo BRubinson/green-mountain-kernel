@@ -314,7 +314,7 @@ struct BotWorkflowRepository: RepositoryContext {
             var unmet: [String] = []
             if !clarifyDone { unmet.append("clarification not finalized") }
             if promptStatus == "draft" || promptStatus == "clarifying" {
-                unmet.append("prompt not yet architecting (mcp__plugin_gmcc_pen__prompt_set_status)")
+                unmet.append("prompt not yet architecting (mcp__plugin_gmcc_cde__cde_set_status)")
             }
             return unmet
         case .planGate:
@@ -355,7 +355,7 @@ struct BotWorkflowRepository: RepositoryContext {
             return complete ? [] : ["review not complete"]
         case .done:
             return try promptStatus(promptUuid: promptUuid) == "done"
-                ? [] : ["prompt not done (mcp__plugin_gmcc_pen__prompt_set_status status: done)"]
+                ? [] : ["prompt not done (mcp__plugin_gmcc_cde__cde_set_status status: done)"]
         }
     }
 
@@ -451,7 +451,7 @@ struct BotWorkflowRepository: RepositoryContext {
         }
         throw StoreError.badRequest(
             detail: "no workflow resolvable — pass prompt_uuid "
-                + "(or start one with mcp__plugin_gmcc_pen__prompt_init)")
+                + "(or start one with mcp__plugin_gmcc_cde__cde_init)")
     }
 
     func fetchActive(promptUuid: String) throws -> BotWorkflowRow? {

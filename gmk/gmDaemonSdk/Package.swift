@@ -45,6 +45,12 @@ let package = Package(
     products: [
         .library(name: "GmDaemonSdk", targets: ["GmDaemonSdk"]),
         .library(name: "GmHookCli", targets: ["GmHookCli"]),
+        // The pen server, MOVED HERE from the deleted gmMcp package (v30).
+        // It belongs beside GmHookCli: both are harness-side CLIENTS of the
+        // daemon, both are pure relays with no persistence of their own, and
+        // both floor at macOS 14. gmMcp existed only to own these three files
+        // and a GRDB checkout it never used.
+        .library(name: "GmMcpServer", targets: ["GmMcpServer"]),
         .executable(name: "gm_hook", targets: ["gm_hook"]),
     ],
     // ZERO EXTERNAL DEPENDENCIES, and that is the load-bearing property of this
@@ -73,6 +79,16 @@ let package = Package(
         // passthrough, and it parses argv by hand.
         .target(
             name: "GmHookCli",
+            dependencies: ["GmDaemonSdk"]
+        ),
+        // The MCP pen server. Moved from gmk/gmMcp, which is now deleted.
+        //
+        // It keeps ZERO external dependencies, so the zero-dependency property
+        // of this manifest survives the move — that was the precondition for
+        // choosing this package over gmDaemon, which owns the GRDB pin and
+        // would have dragged it into the pen's link closure for nothing.
+        .target(
+            name: "GmMcpServer",
             dependencies: ["GmDaemonSdk"]
         ),
         // A shim over GmHookCli.main(). Kept as a real executable target so

@@ -20,9 +20,6 @@
          location = "group:gmAgententicsSdk">
       </FileRef>
       <FileRef
-         location = "group:gmMcp">
-      </FileRef>
-      <FileRef
          location = "group:Gm_Kernel_test">
       </FileRef>
       <FileRef

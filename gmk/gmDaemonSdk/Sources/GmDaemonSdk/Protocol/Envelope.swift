@@ -160,7 +160,36 @@ public enum GmWireProtocol {
     /// precedent. Recorded because the rule only means something if the
     /// distinction is actually held: had the six message types not been in this
     /// pass, `gmfsRoot` would have shipped at 28 and moved nothing.
-    public static let version = 29
+    ///
+    /// v29 → v30: the harness envelope. TWO NEW MESSAGE TYPES — `MCP_CALL` and
+    /// `HOOK_EVENT` — landed together so the bump is spent ONCE, which is the
+    /// same reasoning the six test-lock types used at v29. They turn the MCP
+    /// surface and the hook surface into two transports over one `(verb, json)`
+    /// envelope, with the tool and hook bodies moving kernel-side where
+    /// `inTransaction` is reachable.
+    ///
+    /// Both carry the IDENTITY TRIPLE — `client_key`, `cwd`, `project_dir` — as
+    /// explicit REQUIRED fields, and that is the load-bearing part rather than a
+    /// convenience. `ClientKey.resolve()` walks process ancestry for a `claude`
+    /// parent and returns `claude:<pid>:<starttime>`; that string IS the
+    /// activation-claim key. A kernel process is not a descendant of any Claude
+    /// instance, so it resolves nil and the activation registry would silently
+    /// degrade to last-writer-wins across concurrent prompts. The harness-side
+    /// child therefore survives — thinned, not deleted — and resolves the triple
+    /// before forwarding. Same for `cwd`: `main()` chdirs to
+    /// `$CLAUDE_PROJECT_DIR` so `GitContext.detect()` resolves the right repo,
+    /// and one long-lived process cannot hold N cwds.
+    ///
+    /// `HOOK_EVENT` additionally carries `hook_safe`. It is a WIRE field rather
+    /// than a client convention on purpose: with it set the daemon never returns
+    /// an error envelope for a business failure, because a hook may never exit
+    /// non-zero and `gm_hook call` currently does. Making it part of the message
+    /// stops that being something a caller can forget.
+    ///
+    /// Both join `TxBatchHandler.denied`. `TX_BATCH` denies itself for
+    /// no-nesting, and an `MCP_CALL` that expands into a batch would defeat that
+    /// through an alias.
+    public static let version = 30
 }
 
 /// Discriminator for every NDJSON message on the socket. One case per spec
@@ -355,6 +384,20 @@ public enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case testLockRelease = "TEST_LOCK_RELEASE"
     case testRunStart = "TEST_RUN_START"
     case testRunStatus = "TEST_RUN_STATUS"
+    // The harness envelope (v30). MCP tools and hooks become two TRANSPORTS
+    // over one (verb, json) envelope, with the bodies kernel-side where
+    // `inTransaction` is reachable.
+    //
+    // TWO cases rather than one HARNESS_CALL{kind, name}: the exhaustive
+    // dispatcher switch is one of the very few guard rails still ENFORCED — a
+    // new MessageType with no handler arm does not COMPILE — and a single case
+    // discriminated by a payload field moves that check from the compiler to a
+    // runtime string comparison. The duplication buys a build failure.
+    //
+    // Both carry the identity triple explicitly; see the version note above for
+    // why the harness-side child cannot be deleted, only thinned.
+    case mcpCall = "MCP_CALL"
+    case hookEvent = "HOOK_EVENT"
     // Daemon → client only
     case event = "EVENT"
     case error = "ERROR"

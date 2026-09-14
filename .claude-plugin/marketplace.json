@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "green-mountain-kernel",
   "version": "1.0.0",
-  "description": "Green Mountain Kernel — the GM-CDE monorepo and marketplace home of the GMCC plugin",
+  "description": "Green Mountain Kernel \u2014 the GM-CDE monorepo and marketplace home of the GMCC plugin",
   "owner": {
     "name": "brycerubinson",
     "email": "bryce@example.com"
@@ -10,8 +10,8 @@
   "plugins": [
     {
       "name": "gmcc",
-      "description": "Green Mountain Coding Collection — a harness integration for the Green Mountain Kernel, bringing integrated, opinionated coding practices.",
-      "version": "51.1.0",
+      "description": "Green Mountain Coding Collection \u2014 a harness integration for the Green Mountain Kernel, bringing integrated, opinionated coding practices.",
+      "version": "53.0.0",
       "author": {
         "name": "brycerubinson"
       },

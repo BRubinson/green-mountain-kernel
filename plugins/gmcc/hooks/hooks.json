@@ -1,39 +1,39 @@
 {
-  "hooks": {
-    "SessionStart": [
+  "hooks" : {
+    "PostToolUse" : [
       {
-        "matcher": "*",
-        "hooks": [
+        "hooks" : [
           {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gm_session_startup.sh"
+            "async" : true,
+            "command" : "[ -x \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" ] || exit 0; exec \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" hook post-tool-use",
+            "type" : "command"
+          }
+        ],
+        "matcher" : "Edit|Write|NotebookEdit|Bash"
+      }
+    ],
+    "SessionStart" : [
+      {
+        "hooks" : [
+          {
+            "command" : "${CLAUDE_PLUGIN_ROOT}/scripts/gm_session_startup.sh",
+            "type" : "command"
           },
           {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/check_gm_stale.sh"
+            "command" : "if [ ! -x \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" ]; then \\\n  echo \"[GMB] gm_hook missing at ${GM_FS_ROOT:-$HOME/gmfs}/bin — run: bash \\\"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\\\"\" >&2; \\\nfi; exit 0",
+            "type" : "command"
           }
-        ]
+        ],
+        "matcher" : "*"
       }
     ],
-    "SubagentStart": [
+    "SubagentStart" : [
       {
-        "hooks": [
+        "hooks" : [
           {
-            "type": "command",
-            "timeout": 5,
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gm_hook.sh subagent-start"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write|NotebookEdit|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "async": true,
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/gm_hook.sh post-tool-use"
+            "command" : "[ -x \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" ] || exit 0; exec \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" hook subagent-start",
+            "timeout" : 5,
+            "type" : "command"
           }
         ]
       }

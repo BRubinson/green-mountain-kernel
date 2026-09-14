@@ -245,12 +245,15 @@ Edit/Write/NotebookEdit with real line ranges from the tool's own patch,
 and a Bash write only when the command NAMES its target — so nothing
 self-reports its own edits.
 
-`file_change_add` exists for a change no tool call made:
+For a change no tool call made, the verb is reached directly — there is no
+pen door for it, deliberately, because the capture hook is the channel that
+should be recording writes:
 
 ```
-mcp__plugin_gmcc_pen__file_change_add
-  path: <repo-relative>   kind: edit|create|delete|rename
-  prompt_uuid: <U>
+gm_hook call FILE_CHANGE_ADD --json '{
+  "path": "<repo-relative>", "kind": "edit|create|delete|rename",
+  "prompt_uuid": "<U>"
+}'
 ```
 
 Run from inside the repo — git context is auto-detected. Run completion is

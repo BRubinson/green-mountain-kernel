@@ -8,7 +8,7 @@ phase's instructions. This file describes the machine, not the prose.
 
 ## The two write channels
 
-Pen tools are `mcp__plugin_gmcc_pen__<name>`; this file names them bare.
+Pen tools are `mcp__plugin_gmcc_cde__<name>`; this file names them bare.
 Where a pen tool exists it is the write path — typed, threading
 `expected_version`. Where none exists, the verb is reached the way every
 daemon verb is reached:
@@ -186,7 +186,7 @@ CARE PACKAGE.
 ## Who writes what
 
 Spawned agents write their own rows through the **pen tools**
-(`mcp__plugin_gmcc_pen__*` — the plugin's `pen` server): that is the typed,
+(`mcp__plugin_gmcc_cde__*` — the plugin's `cde` server): that is the typed,
 version-threaded channel, and it is what their tool list gives them. An
 agent's Bash is for reading the repo.
 

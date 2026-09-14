@@ -189,7 +189,13 @@ public enum ContextBuilder {
 
     /// Idempotent resolve: ensure the chain and return the session uuid.
     /// Used by session/prompt subcommands when no --session-uuid is given.
-    public static func resolveSessionUuid(_ client: DaemonClient) throws -> String {
+    ///
+    /// Takes `any GmVerbCaller` rather than `DaemonClient` (v30) because the pen
+    /// tool bodies that call it now run kernel-side as well as over the socket.
+    /// The body is one facade call, and the facade hangs off the protocol — so
+    /// widening the parameter costs nothing and every existing caller still
+    /// passes a `DaemonClient`.
+    public static func resolveSessionUuid(_ client: any GmVerbCaller) throws -> String {
         try client.ensureContext(try ensureRequest()).sessionUuid
     }
 }

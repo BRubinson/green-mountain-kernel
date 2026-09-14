@@ -8,40 +8,12 @@ import GmDaemonSdk
 /// the hello handshake, the protocol-version check, the reconnect-once retry and
 /// the server-error mapping. A hand-rolled socket write would inherit none of
 /// that and would be a second wire client to keep in step.
-enum JSONValue: Codable, Sendable {
-    case null
-    case bool(Bool)
-    case int(Int64)
-    case double(Double)
-    case string(String)
-    case array([JSONValue])
-    case object([String: JSONValue])
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.singleValueContainer()
-        if container.decodeNil() { self = .null; return }
-        if let value = try? container.decode(Bool.self) { self = .bool(value); return }
-        if let value = try? container.decode(Int64.self) { self = .int(value); return }
-        if let value = try? container.decode(Double.self) { self = .double(value); return }
-        if let value = try? container.decode(String.self) { self = .string(value); return }
-        if let value = try? container.decode([JSONValue].self) { self = .array(value); return }
-        if let value = try? container.decode([String: JSONValue].self) { self = .object(value); return }
-        throw DecodingError.dataCorruptedError(in: container, debugDescription: "unrepresentable JSON")
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .null: try container.encodeNil()
-        case .bool(let value): try container.encode(value)
-        case .int(let value): try container.encode(value)
-        case .double(let value): try container.encode(value)
-        case .string(let value): try container.encode(value)
-        case .array(let value): try container.encode(value)
-        case .object(let value): try container.encode(value)
-        }
-    }
-}
+///
+/// THE TYPE ITSELF MOVED TO `GmDaemonSdk` AT v30 (`GmJsonValue`), because the
+/// harness envelope — `MCP_CALL` and `HOOK_EVENT` — needs the same shape on the
+/// protocol side. The alias keeps every use site below reading as it did; see
+/// `Protocol/GmJsonValue.swift` for why one type beat two copies.
+typealias JSONValue = GmJsonValue
 
 /// `gm_hook call <MESSAGE_TYPE> [--json '<payload>' | --json-file <path>]`
 ///

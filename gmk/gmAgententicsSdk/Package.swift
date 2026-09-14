@@ -86,6 +86,13 @@ let package = Package(
     // takes the whole package graph down with it.
     platforms: [.macOS("27.0")],
     products: [
+        // The plugin generator. An EXECUTABLE here rather than a gm_kernel
+        // subcommand because this package floors at macOS 27 and the kernel
+        // floors at 14; SwiftPM checks floors at graph resolution, so linking
+        // the bridge into the kernel would move gm_hook, gm_daemon and every CI
+        // job to 27. Generation is a developer-machine act, so the split costs
+        // nothing.
+        .executable(name: "gm_bridge_writer", targets: ["gm_bridge_writer"]),
         .library(name: "GmAgententicsSdk", targets: ["GmAgententicsSdk"]),
     ],
     dependencies: [
@@ -109,6 +116,10 @@ let package = Package(
         .package(path: "../gmClaudeForFoundationModels"),
     ],
     targets: [
+        .executableTarget(
+            name: "gm_bridge_writer",
+            dependencies: ["GmAgententicsSdk"]
+        ),
         .target(
             name: "GmAgententicsSdk",
             dependencies: [

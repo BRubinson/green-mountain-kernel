@@ -29,8 +29,11 @@ Consequences a reader must not re-derive incorrectly:
   the retired-name contract is now a convention nothing enforces — the rule
   stands, the scanner does not.
 - The plugin directory, the `gmcc:` command/skill namespace, the
-  `mcp__plugin_gmcc_pen__*` pen server name and the in-repo `.gmcc/` dope
-  directory all **keep their names**. The repo
+  `mcp__plugin_gmcc_*__*` pen server name and the in-repo `.gmcc/` dope
+  directory all **keep the `gmcc` half of their names**. (The SERVER KEY moved
+  `pen` → `cde` at v30 — see "The pen vocabulary is `cde`" — but the
+  `plugin_gmcc_` prefix is fixed by the harness's plugin namespacing and is not
+  ours to change.) The repo
   deliberately holds both prefixes: `gm`-prefixed on the runtime side, `gmcc` on
   the plugin/namespace side. `testAllowedSpellingsAreNotFlagged` is what stops a
   future sweep from "tidying" the second list into the first.
@@ -173,12 +176,14 @@ nobody had run. Dispatch it manually when the local path is unavailable.
 ## Layout
 
 - `gmk/` — the new home of every Swift deliverable: one Xcode project
-  (`gmk/gmk.xcodeproj`) over seven shipped packages, plus an eighth that ships
-  nothing and holds the repository's ONE test suite, plus a ninth that is
+  (`gmk/gmk.xcodeproj`) over SIX shipped packages, plus one that ships
+  nothing and holds the repository's ONE test suite, plus one that is
   **vendored third-party source and authored nowhere in this repo**.
-  (The eighth slot used to be `gmToolchain`, the contract-test package. It was
-  DELETED in the test rebuild; `Gm_Kernel_test` occupies the slot now, and the
-  count is unchanged by coincidence rather than by design.)
+  (There were seven shipped packages until v30, when `gmMcp` was deleted and its
+  three sources became the `GmMcpServer` target inside `gmDaemonSdk` — see the
+  entry below for why that package existed only to own them. Before that, the
+  test slot held `gmToolchain`, the contract-test package, deleted in the test
+  rebuild; `Gm_Kernel_test` occupies it now.)
   - **Open `gmk/gmk.xcworkspace`, not the project.** The workspace lists the
     project alongside seven packages as first-class members, which is the
     only arrangement in which Xcode generates schemes for a package's TEST
@@ -228,26 +233,31 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     availability define), which permanently bars it from being consumed as a
     versioned remote dependency — free today, since every gmk package is a local
     `path:` dependency, and the direct cause of the vendoring below.
-    It also owns `Templates/`, which is split in two **SEALED** halves.
-    **`Templates/original/` is a quarantined ARCHIVE** — `OriginalGmccEnums` /
-    `OriginalGmccInstructions` / `OriginalGmccPrompts`, one artifact in three
-    files, every block a byte-exact copy of `plugins/gmcc/` markdown. Re-sync it
-    by COPYING, never by editing one side. New work goes in `Templates/` proper.
-    **Neither half references the other, in either direction.** That is why
-    `OriginalGmccRole` and `GmAgentRole` are near-identical twins rather than one
-    shared enum: a shared enum means every later edit to the live vocabulary
-    silently rewrites what the archive claims the plugin said, which is the one
-    failure the archive exists to prevent. **The duplication is load-bearing —
-    do not "unify" them.** They are expected to diverge; if that stops being
-    true, the question is whether the archive still needs to exist, not whether
-    to reintroduce the coupling. The archive holds the GMCC
-    personas and command contracts compiled
-    in as FoundationModels `Instructions` and `Prompt` values, copied VERBATIM
-    from `plugins/gmcc/` markdown. Personas are `Instructions`, invocations are
-    `Prompt`, and the split is load-bearing: a model obeys instructions over
-    prompts, so caller-supplied text must never reach the instruction half.
-    Phase text is NOT copied — it is read live from
-    `WorkflowSpec.instructions(variant:phase:)`.
+    It also owns `Templates/`. **`Templates/original/` IS DELETED (v30)** —
+    `OriginalGmccEnums` / `OriginalGmccInstructions` / `OriginalGmccPrompts`, the
+    quarantined byte-exact archive of the hand-written plugin markdown, is gone,
+    and nothing referenced it. It existed to preserve what the plugin USED to say
+    while the native templates were written; now that the plugin is GENERATED
+    from those templates, an archive of the pre-generation text is a third
+    description of the same thing and a standing invitation to generate from the
+    wrong one. Git holds the history.
+    Personas are `Instructions` and invocations are `Prompt`, and that split is
+    load-bearing: a model obeys instructions over prompts, so caller-supplied
+    text must never reach the instruction half.
+    **PHASE TEXT LIVES IN `Template+GmCdeWpirWorkflowTemplate.swift`, AND THAT IS
+    THE NEWER DESCRIPTION.** This file used to claim phase text was "read live
+    from `WorkflowSpec.instructions(variant:phase:)`" — it never was, and the
+    claim is what makes the mistake tempting. The twelve
+    `GM_CDE_PHASE_*_TEMPLATE` constants are structured (**Calls** / **Gate**) and
+    speak the `cde` vocabulary natively; `WorkflowSpec` is the older prose that
+    only acquired those names by a mechanical rename. **The direction of travel
+    is `WorkflowSpec` → the templates, never the reverse.** A v30 change briefly
+    repointed the templates at `WorkflowSpec` on the theory that they were the
+    duplicate, which fed the new layer the old text.
+    TWO DESCRIPTIONS DO COEXIST, and the platform floor is why: `WorkflowSpec`
+    lives in the macOS 14 base and is what `BOT_NEXT` serves at runtime, while
+    these constants are macOS 27 and cannot be read by the daemon. They are
+    reconcilable only where both are reachable — the generator.
     `AgentConfigurations/` is what ASSEMBLES all of it into native values, and it
     is the layer to read first. `AgentSessionProfile.swift` holds the
     `DynamicInstructions` + `DynamicProfile` pair, built with `Profile { }` and
@@ -307,7 +317,19 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     `gmk/` package is consumed by local `path:`, and anything joining that graph
     must be reachable the same way. Zero external dependencies of its own, which
     is what keeps it a self-contained copy rather than the head of a tree.
-  - `gmk/gmMcp/` — the `gm_mcp` MCP pen server.
+  - **`gmk/gmMcp/` IS DELETED (v30).** Its three sources — `GmMcpServer.swift`,
+    `FastPath.swift`, `PrimaryDoors.swift` — are the `GmMcpServer` target inside
+    `gmDaemonSdk` now, beside `GmHookCli`. They belong together: both are
+    harness-side CLIENTS of the daemon, both are pure relays with no persistence
+    of their own, and both floor at macOS 14. The package existed only to own
+    those files and a GRDB checkout it never used.
+    **THE `gm_mcp` NAME IS NOT DELETED, and the distinction is load-bearing.**
+    It is an ENTRYPOINT in the release-store contract — `GM_ENTRYPOINTS` in
+    `gm_releases.sh`, which drives the symlink loop and the manifest's
+    `entrypoints` array — plus the installer, the stale check, both CI workflows
+    and `project.pbxproj`. `gm_kernel` still dispatches it through `argv[0]`.
+    Deleting the PACKAGE was asked for; deleting the NAME was not, and would
+    break every install that upgrades.
   - `gmk/gmVibes/` — the GMVibes macOS app target, and now a **THIN** one: it
     holds `GMVibesApp.swift` (the `@main` entry point), `Assets.xcassets` and a
     README, and nothing else. Release via the `release-dmg` skill.
@@ -353,10 +375,13 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     filesystem-synchronized Xcode group, so anything dropped in it becomes part
     of the app target's source directory.
   - `gmk/VERSION` — the version pin for the three shipped binaries.
-- `plugins/gmcc/` — the Claude Code plugin: skills, commands, prompts, hooks,
-  scripts and `.mcp.json`, plus the installer and the vendored release-store
-  library. It ships **no Swift sources** — the package left this directory for
-  `gmk/` and did not come back.
+- `plugins/gmcc/` — the Claude Code plugin. **ENTIRELY GENERATED SINCE v30 — DO
+  NOT HAND-EDIT ANY FILE IN IT.** Every byte comes from the bridge values in
+  `gmk/gmAgententicsSdk/Sources/GmAgententicsSdk/HarnessBridge/`, and the next
+  regeneration overwrites whatever you changed. To change the plugin, change the
+  bridge. See "The plugin is GENERATED" below.
+  It ships **no Swift sources** — the package left this directory for `gmk/` and
+  did not come back.
 - `.gmcc/` — this repo's committed DOPE tree (Domain Optimized Project Essence);
   sessions boot-sync their dope scope from it. **The directory keeps this name.**
   Any rename pass must exclude the `.gmcc/` path segment — a blind sweep would
@@ -365,16 +390,20 @@ nobody had run. Dispatch it manually when the local path is unavailable.
 Dependency graph, acyclic and 5 deep:
 
 ```
-gmDaemonSdk ──┬── gmDaemon ─────────────┐
-              ├── gmUxComponentLibrary ─┼── gmVibesCore ── gmVibes  (the app)
-              ├── gmMcp ────────────────┤                  (a THIN target:
-              ├─────────────────────────┘                   @main + Assets)
-              ├── gmAgententicsSdk ──┐
-              │                      │  (vendored, zero deps of its own)
-              │ gmClaudeForFoundationModels ──┘
-              │
-              └── gmKernel  ← links GmKernelHost + GmMcpServer + GmHookCli
-                              (the CLI half: one Mach-O, three personalities)
+gmDaemonSdk ──┬── gmDaemon ─────────────┐      (gmDaemonSdk now also holds the
+   │          ├── gmUxComponentLibrary ─┼──┐    GmMcpServer target; gmMcp the
+   │          └──────────────────────────┐ │    PACKAGE is deleted)
+   │                                     │ ├── gmVibesCore ── gmVibes (the app)
+   │                                     │ │                  (a THIN target:
+   │                                     └─┘                   @main + Assets)
+   ├── gmAgententicsSdk ──┐
+   │        │             │  (vendored, zero deps of its own)
+   │        │  gmClaudeForFoundationModels ──┘
+   │        │
+   │        └── gm_bridge_writer  (executable: emits plugins/gmcc)
+   │
+   └── gmKernel  ← links GmKernelHost + GmMcpServer + GmHookCli
+                   (the CLI half: one Mach-O, three personalities)
 ```
 
 `gmVibes` now takes an edge on `gmDaemon` — the LINK is in place and the app is
@@ -553,9 +582,10 @@ swift test  --package-path gmk/Gm_Kernel_test       # the whole suite
 swift build --package-path gmk/gmDaemonSdk
 swift build --package-path gmk/gmDaemon
 swift build --package-path gmk/gmUxComponentLibrary
-swift build --package-path gmk/gmMcp
-swift build --package-path gmk/gmAgententicsSdk
+swift build --package-path gmk/gmAgententicsSdk   # also builds gm_bridge_writer
 swift build --package-path gmk/gmVibesCore
+# gmk/gmMcp is GONE (v30) — GmMcpServer is a target inside gmDaemonSdk, so the
+# gmDaemonSdk line above already builds it.
 # gmk/gmClaudeForFoundationModels is VENDORED. It gets NO CI job of its own, and
 # that is a decision, not an oversight: it is already COMPILE-GATED in CI as a
 # dependency of gmAgententicsSdk, so a vendored break that can affect us fails
@@ -693,19 +723,28 @@ file.** The ten repository contract tests were DELETED in the test rebuild (see
 
 - The **retired-name contract**. Nothing scans for retired binaries, env vars,
   roots, db filenames or the retired sandbox vocabulary any more.
-- **`gm_releases.sh` exists TWICE and nothing checks the copies agree.** Authored
-  at `gmk/scripts/`, vendored byte-identical into `plugins/gmcc/scripts/`. Fix
-  drift by COPYING, and know that nothing will tell you if you forget.
+- ~~**`gm_releases.sh` exists TWICE and nothing checks the copies agree.**~~
+  **THIS IS FIXED AT v30, and by construction rather than by a check.** The
+  plugin's copy is GENERATED: `gm_bridge_writer` embeds the authored
+  `gmk/scripts/gm_releases.sh` as a Swift constant and emits it into
+  `plugins/gmcc/scripts/`. There is one authoring site, so drift is not
+  something that goes unnoticed — it is something that cannot be expressed.
+  Edit `gmk/scripts/gm_releases.sh` and regenerate; never edit the plugin's copy,
+  which the next regeneration overwrites.
 - The **docs contract** over `plugins/gmcc/` markdown, `hooks.json`,
-  `settings.json` and `.mcp.json`.
+  `settings.json` and `.mcp.json`. Largely moot since v30: those files are
+  GENERATED, so the question is no longer whether they agree with the code but
+  whether the bridge that emits them is right. What replaced it is the
+  bidirectional roster gate — see "The plugin is GENERATED" below.
 - The **release-store contract**, the **multi-call binary contract**, the
   **hook-launcher** checks, the **workflow-spec/pen-roster** cross-check and the
   **transaction-boundary** thread-hop scan.
-- **`wire_keys.golden` is still gated by nothing**, as it always was.
-  Regenerate with `python3 gmk/gmDaemonSdk/scripts/wire_keys.py > <the golden>`
-  and **diff before accepting** — the generator is the authority, so a wholesale
-  regeneration accepts all pending drift as intentional. (It carried a stale
-  `TxBatchResponse.failedIndex` for exactly this reason until v29.)
+- **`wire_keys.golden` DOES NOT EXIST ANY MORE.** This file described it as
+  "gated by nothing"; in fact the fixture itself went with the deleted test tier,
+  so there is no golden to diff and nothing to regenerate. The generator
+  `gmk/gmDaemonSdk/scripts/wire_keys.py` still runs and still prints the
+  snake_case wire contract — it is a useful thing to eyeball when changing a
+  payload — but nothing compares its output to anything.
 - Nothing proves a test cannot write the production database. The new harness
   achieves that BY CONSTRUCTION instead — which is stronger in practice and
   unenforced in principle.
@@ -716,7 +755,13 @@ file.** The ten repository contract tests were DELETED in the test rebuild (see
   message IS incompatible and DOES bump. So is REMOVING AN ENUM CASE from a type
   an existing message carries: m0028 collapsed `PromptStatus` from six arms to
   three and bumped 26 → 27 for exactly that reason.
-  **Now at v29**, moved by the SIX test-lock message types — `TEST_SUITE_LIST`,
+  **Now at v30**, moved by TWO new message types — `MCP_CALL` and `HOOK_EVENT`,
+  the harness envelope — landed together so the bump is spent once. They carry
+  the identity triple (`client_key`, `cwd`, `project_dir`) as REQUIRED fields,
+  because `ClientKey.resolve()` walks process ancestry for a `claude` parent and
+  a kernel is not one; the harness-side child survives, thinned, to supply them.
+  Both join `TxBatchHandler.denied`, since either would be a nesting alias.
+  v28 → v29 was moved by the SIX test-lock message types — `TEST_SUITE_LIST`,
   `TEST_LOCK_STATUS`, `TEST_LOCK_ACQUIRE`, `TEST_LOCK_RELEASE`,
   `TEST_RUN_START`, `TEST_RUN_STATUS` — one bump for all six because they landed
   together. Worth recording what did NOT move it, because the rule only means
@@ -780,9 +825,9 @@ gh workflow run daemon-release.yml -f version=$(cat gmk/VERSION)
 
 It refuses to publish when the tag and the file disagree, runs the suites, builds
 universal (arm64 + x86_64), verifies both slices are present, and attaches the
-tarball plus its `.sha256`. The three binaries are staged from THREE package bin
-paths — `gm_daemon` from `gmDaemon`, `gm_mcp` from `gmMcp`, `gm_hook` from
-`gmDaemonSdk` — because they no longer share one.
+tarball plus its `.sha256`. The binaries are staged from their package bin
+paths — `gm_daemon` from `gmDaemon`, `gm_hook` and (since v30) the pen server
+from `gmDaemonSdk`.
 
 **The fallback publishes BINARIES ONLY.** It cannot build the app, because a
 release DMG must be signed with a Developer ID and notarized and the runner has
@@ -791,16 +836,20 @@ every machine that downloaded it. A release cut in CI is therefore missing its
 app, and `install_gm.sh` skips the app step rather than 404-ing on it. Cut the
 app from a Mac that holds the identity.
 
-- The binary version is DECOUPLED from the plugin version on purpose. The plugin
-  is markdown that changes constantly; the Swift is 44k lines that does not.
-  Coupling them would make every prompt tweak force every install to re-download
-  ~15MB of unchanged binaries. Move `gmk/VERSION` only when the code behind it
-  actually changed.
-- That decoupling is PLUGIN-vs-BINARIES and is unrelated to the app, which IS
-  coupled: `gmk/VERSION` now moves the DMG too, so an app-only change costs a
-  binary re-download. That was the accepted price of one release with one
-  version — the alternative was keeping two numbers whose relationship nothing
-  recorded.
+- ~~The binary version is DECOUPLED from the plugin version on purpose.~~
+  **REVERSED AT v30: `gmk/VERSION` NOW DRIVES THE PLUGIN TOO.** It is the one
+  number behind the binaries, the DMG, `plugins/gmcc/.claude-plugin/plugin.json`
+  (via `GmVersion.current` inside the generator) and the `plugins[0].version`
+  entry in the repo-root `.claude-plugin/marketplace.json` (written by
+  `generate_plugin.sh`). Both manifests read the same source, so they cannot
+  drift from each other.
+  The old decoupling argument still describes a real cost, and it is now the
+  ACCEPTED price rather than the avoided one: a markdown-only plugin change
+  forces every install to re-download ~15MB of unchanged binaries. It was
+  accepted because the plugin stopped being hand-edited markdown — it is
+  generated from Swift that ships in the same release, so "the plugin changed
+  but the binaries did not" is a much rarer state than it used to be.
+- The app was already coupled and stays so: `gmk/VERSION` moves the DMG too.
 - **CI runs on `xcode-27`, and that is NOT a typo for `macos-27`.** GitHub
   publishes no `macos-27` label at all — the macOS 27 image ships under the
   Xcode-versioned name (`xcode-27` / `xcode-27-xlarge`), arm64 only, GA since
@@ -821,6 +870,113 @@ app from a Mac that holds the identity.
   gmDaemon) rather than carrying a hand-maintained path-filter copy of the
   dependency graph. The gmVibes job builds with `CODE_SIGNING_ALLOWED=NO`;
   release signing stays on the `release-dmg` path.
+
+## The plugin is GENERATED — `plugins/gmcc` has no hand-written files
+
+```bash
+bash gmk/scripts/generate_plugin.sh            # regenerate + bump the version
+bash gmk/scripts/generate_plugin.sh --check    # report only, change nothing
+```
+
+The whole plugin is emitted from the bridge values in `gmAgententicsSdk`. The
+writer imports nothing from `gmDaemonSdk`, reads no file out of the existing
+plugin, and consults no hand-kept list — so "the plugin says X but the code says
+Y" is not a state it can produce. Adding a file to the plugin means declaring a
+bridge type; the writer itself does not change.
+
+Consequences a reader must not re-derive incorrectly:
+
+- **EDITING `plugins/gmcc` IS EDITING A BUILD ARTIFACT.** The tree is committed
+  (a marketplace install materialises it directly, so it has to be), which makes
+  it look hand-maintained. It is not. The next `generate_plugin.sh` silently
+  discards the edit.
+- **THE GENERATOR IS ITS OWN EXECUTABLE, and cannot be a `gm_kernel` subcommand.**
+  `gmAgententicsSdk` is macOS 27 with `unsafeFlags`; the kernel is macOS 14; and
+  SwiftPM checks platform floors at GRAPH RESOLUTION, before any `@available`
+  scope exists. `gm_kernel bridge emit` would move `gm_hook`, `gm_daemon` and
+  every CI job to 27. Reaching for `@available` is the plausible move that
+  cannot work. Generation is a developer-machine act, like `rebuild_local.sh`.
+- **TWO OWNERS, TWO DIRECTORIES, and confusing them is the trap.**
+  `gm_bridge_writer` owns everything inside `plugins/gmcc/` and REFUSES to touch
+  anything outside it — which is why it cannot bump the repo-ROOT
+  `.claude-plugin/marketplace.json`, a different `.claude-plugin/` directory from
+  the plugin's own. `generate_plugin.sh` does that half. A writer that could
+  reach both is a writer whose delete step can eat the marketplace manifest.
+- **The write is STAGE-AND-SWAP, not rm-then-write.** The tree is built beside
+  the target and moved in through a trash directory, so the destructive window is
+  two renames wide and a failure rolls back. The writer also refuses a target
+  that exists but has no `.claude-plugin/plugin.json`, so it cannot be pointed at
+  a source tree.
+- **`verify()` runs before anything is deleted.** A declared file that renders
+  nothing is reported, and a BOOT-CRITICAL one (the manifests, the three
+  scripts) is a refusal. This is not hypothetical: all six `GmBridgeScript`
+  bodies were the empty string, and a writer without this guard would have
+  emitted `hooks.json` and `.mcp.json` pointing at scripts that do not exist —
+  a plugin that installs, boots, and records nothing, silently, because
+  `gm_hook`'s own contract is to exit 0 when its binary is missing.
+- **Three scripts stopped being files** and are inline shell strings in
+  `hooks.json` / `.mcp.json`: `gm_hook.sh`, `run_mcp.sh`, `check_gm_stale.sh`.
+  Shell form is the ONLY hook handler type that expands
+  `${GM_FS_ROOT:-$HOME/gmfs}` at hook time, and the only one that can hold the
+  silent exit-0 no-op contract. `check_gm_stale.sh` could NOT become a
+  `gm_hook doctor` subcommand — it works precisely because it needs no binary,
+  and a subcommand cannot report that its own binary is absent.
+- **`.mcp.json` runs `/bin/sh -c`, not the binary directly.** MCP stdio
+  `command`/`args` substitute exactly three placeholders (`CLAUDE_PLUGIN_ROOT`,
+  `CLAUDE_PLUGIN_DATA`, `CLAUDE_PROJECT_DIR`) and are spawned with NO SHELL. The
+  obvious `"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_mcp"` yields a pen that never starts
+  on any machine where `GM_FS_ROOT` is unset — every first session.
+- **Regenerating the working tree changes NOTHING in a running session.** The
+  marketplace registers a REMOTE git source and pins `gmcc` to a version-keyed
+  cache. Nothing sees a regeneration until it is committed and pushed, and every
+  regeneration burns a version — which is what makes the bump the delivery
+  mechanism rather than bookkeeping.
+- **What the plugin lost, deliberately:** the MAW subsystem (`gm_maw_fetch`,
+  `maw_web_fetch.mjs`, its skill and prompt) has no bridge representation, so the
+  crunch pipeline has no fetch step. Ten commands and eight skills were
+  consolidated into the concept skills. This was accepted as intentional
+  re-authoring rather than discovered afterwards.
+
+## The pen vocabulary is `cde`, and the bridge owns it
+
+The MCP server key is **`cde`**, tools are `mcp__plugin_gmcc_cde__<name>`, and
+the roster is **exactly the 50 tools `GmAgentTools` declares in the bridge** — no
+more, and no fewer.
+
+- **THE BRIDGE IS THE ONLY SOURCE OF TOOL NAMES.** A name the server invents is a
+  name the generated plugin will never grant; a name the bridge declares that the
+  server does not serve is a grant that resolves to nothing. Both are silent at
+  runtime, which is why both are checked.
+- **`GmPenTools.rosterProblems()` is BIDIRECTIONAL, and the second direction is
+  the one that matters.** "Every served tool has a `VerbSpec`" passes a pen that
+  serves nothing; "every declared pen tool is served" is what catches a
+  capability the pen advertises and cannot deliver. Seven such gaps went
+  unnoticed until the reverse check existed.
+- **Tools that REFUSE are published, not omitted.** The bridge's `notSupported`
+  and `notImplemented` cases are deliberate answers, and an omitted tool is
+  indistinguishable from a capability nobody thought of — an agent that cannot
+  see a refusal invents a workaround. They carry `refuses: true`, which is what
+  exempts them from the orphan check (they have no verb by construction).
+- **SERVED and GRANTABLE are different sets, and conflating them is a real
+  cost.** `GmBridgeMcpTool.all` is what the server answers to; `.grantable` is
+  that minus the three `*_not_supported` family placeholders, and it is what
+  `allowed-tools` frontmatter is built from. A grant spends a slot in every
+  skill, command and agent that takes the family — the `gmcc` skill was
+  advertising `diagram_not_supported`, and the `.diagram` family contributes
+  nothing else at all. Serving them keeps the answer discoverable; granting them
+  buys nothing. Today: 50 served, 47 granted, and the difference is exactly
+  those three.
+- **A skill's reference documents are INDEXED, not orphaned.** `skills/gmcc/`
+  ships four `ref/*.md` totalling ~38KB beside a ~2KB `SKILL.md`, and until v30
+  nothing named them — a file on disk is not a file in context. The skill body
+  now carries an index built from `GmBridgeResource.index(for:)`, so a reference
+  added to the bridge is cited automatically and one removed stops being cited.
+  **Do not roll their content up into the skill**: the body loads into every
+  session that boots gmcc, the refs load only when a reader follows the index.
+  That split is the whole point — progressive disclosure, with the index as the
+  cheap thing that names the door.
+- **`PenSheet.instructions` has a 2048-byte budget and the roster check enforces
+  it.** It sits at ~1.8KB. If it crosses, trim PROSE, never names.
 
 ## Environment rules
 

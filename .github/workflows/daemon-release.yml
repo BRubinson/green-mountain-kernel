@@ -7,7 +7,7 @@ name: daemon-release
 #
 # THE BINARIES NOW COME FROM THREE PACKAGES, not one:
 #   gm_kernel <- gmk/gmKernel, which links GmKernelHost (gmDaemon),
-#   GmMcpServer (gmMcp) and GmHookCli (gmDaemonSdk) into ONE Mach-O.
+#   GmMcpServer and GmHookCli (both gmDaemonSdk) into ONE Mach-O.
 # gm_hook's personality ships from the base SDK deliberately: it links the SDK alone, so
 # bundling it with the persistence layer would drag GRDB into a client that
 # never opens the database.
@@ -74,7 +74,7 @@ jobs:
     # See the runner note in gmk-ci.yml for the full reasoning.
     #
     # THIS JOB NEEDS THE 27 FLOOR FOR ITS TEST LOOP, NOT ITS BUILD. The universal
-    # build below covers gmDaemonSdk / gmDaemon / gmMcp, none of which reach
+    # build below covers gmDaemonSdk / gmDaemon, neither of which reaches
     # gmAgententicsSdk — but the "never ship what was not tested" loop runs
     # `swift test` against gmAgententicsSdk, and that package's graph now
     # includes the vendored gmClaudeForFoundationModels at macOS 27. Dropping

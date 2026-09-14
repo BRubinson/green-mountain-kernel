@@ -1,5 +1,5 @@
 {
-  "name": "gmcc",
-  "version": "51.1.0",
-  "description": "Green Mountain Coding Collection — a harness integration for the Green Mountain Kernel, bringing integrated, opinionated coding practices."
+  "description" : "Green Mountain Coding Collection — a harness integration for the Green Mountain Kernel, bringing integrated, opinionated coding practices.",
+  "name" : "gmcc",
+  "version" : "53.0.0"
 }

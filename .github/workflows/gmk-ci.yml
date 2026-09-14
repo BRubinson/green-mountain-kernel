@@ -83,7 +83,7 @@ jobs:
           # a build.
           #
           # The rows are KEPT rather than collapsed into one because they are
-          # what makes a break legible: a red `gmMcp` row names the package
+          # what makes a break legible: a red `gmDaemon` row names the package
           # immediately, where a single job would just say the graph failed.
           - package: gmDaemonSdk
             mode: build
@@ -91,8 +91,12 @@ jobs:
             mode: build
           - package: gmUxComponentLibrary
             mode: build
-          - package: gmMcp
-            mode: build
+          # gmMcp's row is GONE, not disabled: the package was deleted at v30
+          # and its three sources moved into gmDaemonSdk as the GmMcpServer
+          # target, which the gmDaemonSdk row above already builds. A row for a
+          # path that does not exist fails the checkout step, not the build,
+          # which reads as infrastructure trouble rather than as the deliberate
+          # deletion it is.
           - package: gmAgententicsSdk
             mode: build
           - package: gmVibesCore
@@ -170,7 +174,7 @@ jobs:
   # Developer ID cert to be present on the runner. Release signing stays on the
   # existing release-dmg path, which is where a real identity belongs.
   # This job's graph does NOT include gmAgententicsSdk — gmVibes depends on
-  # gmUxComponentLibrary, gmMcp and gmDaemonSdk, and nothing in the repo depends
+  # gmUxComponentLibrary and gmDaemonSdk, and nothing in the repo depends
   # on the agentics package. It is moved to the same image anyway, so the repo
   # has ONE runner story rather than two that have to be kept straight; a lower
   # floor builds fine on a higher SDK.

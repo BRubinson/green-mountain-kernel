@@ -22,7 +22,7 @@ public enum PenSheet {
         return """
             The GMCC pen: the GM-CDE workflow machine's record, as tools.
 
-            START HERE — bot_next returns your current phase, its instructions, \
+            START HERE — rpir_next returns your current phase, its instructions, \
             your uuid bundle, and the gate blockers. Call it before anything else, \
             and again after every seal. It answers without being told a uuid.
 
@@ -80,10 +80,10 @@ public enum PenSheet {
         var primaryCalls: [String]
     }
 
-    /// Orientation before record before write: an agent that calls bot_next
+    /// Orientation before record before write: an agent that calls rpir_next
     /// first never needs the rest of this text.
     static var roster: Roster {
-        let leadReads = ["bot_next", "bot_get", "bot_current_prompt"]
+        let leadReads = ["rpir_next", "rpir_get_workflow", "cde_load_prompt"]
         var reads: [String] = leadReads
         var writes: [String] = []
         var primaryCalls: [String] = []

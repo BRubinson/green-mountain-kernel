@@ -54,7 +54,7 @@ if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/gmk" ]; then
 fi
 GMK="$REPO_ROOT/gmk"
 
-PACKAGES="gmDaemonSdk gmDaemon gmUxComponentLibrary gmAgententicsSdk gmMcp gmKernel"
+PACKAGES="gmDaemonSdk gmDaemon gmUxComponentLibrary gmAgententicsSdk gmKernel"
 
 ARCH_FLAGS="--arch arm64 --arch x86_64"
 ARCHES="arm64,x86_64"
@@ -108,7 +108,8 @@ bin_path() {
     swift build -c release --package-path "$GMK/$1" $ARCH_FLAGS --show-bin-path
 }
 # ONE bin path now. The three personalities are library targets inside
-# gmDaemonSdk / gmDaemon / gmMcp, and gmKernel links all three into a single
+# gmDaemonSdk / gmDaemon (the pen server now lives in gmDaemonSdk), and
+# gmKernel links all three personalities into a single
 # Mach-O — so there is exactly one artifact to stage and nothing to keep in sync.
 KERNEL_BIN="$(bin_path gmKernel)"
 

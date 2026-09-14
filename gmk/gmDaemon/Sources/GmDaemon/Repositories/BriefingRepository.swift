@@ -379,14 +379,14 @@ struct BriefingRepository: RepositoryContext {
                         "WARNING: briefing is STALE — dope scope moved "
                         + "\(staleness.stampedRevision.map(String.init) ?? "?") → "
                         + "\(staleness.currentRevision.map(String.init) ?? "?"); "
-                        + "prefer a fresh mcp__plugin_gmcc_pen__dope_search for anything load-bearing")
+                        + "prefer a fresh mcp__plugin_gmcc_cde__dope_search_session for anything load-bearing")
                 }
-                lines.append("Pull the full briefing FIRST: mcp__plugin_gmcc_pen__briefing_get "
+                lines.append("Pull the full briefing FIRST: mcp__plugin_gmcc_cde__rpir_load_exploration_brief "
                              + "briefing_uuid: \(row.uuid)")
             } else {
                 lines.append("briefing: none for step '\(step)' — proceed without; "
-                             + "mcp__plugin_gmcc_pen__dope_search and "
-                             + "mcp__plugin_gmcc_pen__kbite_search are available")
+                             + "mcp__plugin_gmcc_cde__dope_search_session and "
+                             + "mcp__plugin_gmcc_cde__kbite_search are available")
             }
         }
         return BriefingStubResponse(stub: lines.joined(separator: "\n"))

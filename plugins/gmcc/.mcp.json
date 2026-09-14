@@ -1,8 +1,12 @@
 {
-  "mcpServers": {
-    "pen": {
-      "command": "${CLAUDE_PLUGIN_ROOT}/scripts/run_mcp.sh",
-      "alwaysLoad": true
+  "mcpServers" : {
+    "cde" : {
+      "alwaysLoad" : true,
+      "args" : [
+        "-c",
+        "GM_BIN=\"${GM_FS_ROOT:-$HOME/gmfs}/bin\"; \\\nif [ ! -x \"$GM_BIN/gm_mcp\" ]; then \\\n  echo \"[GMB] gm_mcp missing at $GM_BIN/gm_mcp — run: bash \\\"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\\\"\" >&2; \\\n  exit 1; \\\nfi; exec \"$GM_BIN/gm_mcp\""
+      ],
+      "command" : "/bin/sh"
     }
   }
 }

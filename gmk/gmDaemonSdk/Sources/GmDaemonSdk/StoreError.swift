@@ -118,8 +118,8 @@ public enum StoreError: Error, Sendable {
             }
             let hint: String
             switch entity {
-            case "exploration": hint = "mcp__plugin_gmcc_pen__bot_summary"
-            case "briefing": hint = "mcp__plugin_gmcc_pen__init_briefing"
+            case "exploration": hint = "mcp__plugin_gmcc_cde__rpir_open_exploration"
+            case "briefing": hint = "mcp__plugin_gmcc_cde__rpir_open_briefing"
             case "review": hint = rawOpen("REVIEW_OPEN")
             case "architecture": hint = rawOpen("ARCH_OPEN")
             case "clarification": hint = rawOpen("CLARIFY_OPEN")

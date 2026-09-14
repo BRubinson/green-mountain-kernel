@@ -177,7 +177,7 @@ struct ReviewRepository: RepositoryContext {
                 entity: "review", from: summary.status,
                 to: ReviewSummaryStatus.complete.rawValue,
                 reason: "\(unranked) finding(s) unranked — run the review rank pass "
-                    + "(mcp__plugin_gmcc_pen__review_rank) first")
+                    + "(mcp__plugin_gmcc_cde__rpir_rank_reviews) first")
         }
         let overview = try Store.validatedOverview(req.overview, entity: "review")
         try core.updateBase(

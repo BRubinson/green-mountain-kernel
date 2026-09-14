@@ -215,7 +215,7 @@ struct ExplorationRepository: RepositoryContext {
                     entity: "exploration", from: summary.status,
                     to: ExplorationStatus.complete.rawValue,
                     reason: "\(unranked) finding(s) unranked across the prompt — run "
-                        + "mcp__plugin_gmcc_pen__explore_rank first")
+                        + "mcp__plugin_gmcc_cde__rpir_rank_explorations first")
             }
         }
         let overview = try Store.validatedOverview(req.overview, entity: "exploration")

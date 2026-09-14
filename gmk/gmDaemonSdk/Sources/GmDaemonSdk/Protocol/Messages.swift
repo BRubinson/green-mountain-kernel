@@ -5521,3 +5521,160 @@ public struct TestRunResponse: Codable, Hashable, Sendable {
         self.runs = runs
     }
 }
+
+// MARK: - The harness envelope (v30)
+
+/// The identity a harness-side caller must supply, because the kernel cannot
+/// derive it.
+///
+/// THIS STRUCT IS THE REASON THE HARNESS CHILD PROCESS SURVIVES. It was tempting
+/// to read `MCP_CALL` as "the kernel serves MCP, so the child goes away", and
+/// three separate things forbid it:
+///
+/// 1. `ClientKey.resolve()` starts at `getpid()` and walks `e_ppid` up to 64
+///    hops looking for a `claude`-prefixed `p_comm`, returning
+///    `claude:<pid>:<starttime>`. THAT STRING IS THE ACTIVATION-CLAIM KEY. A
+///    kernel process is not a descendant of any Claude instance, so it resolves
+///    nil — or worse, its own unrelated ancestry — and the activation registry
+///    degrades to last-writer-wins across concurrent prompts. That is a
+///    data-integrity failure, and a silent one.
+/// 2. `main()` chdirs to `$CLAUDE_PROJECT_DIR` so `GitContext.detect()` resolves
+///    the right repo. One long-lived process cannot hold N cwds.
+/// 3. MCP stdio transport is per-server-process; a long-lived kernel has no
+///    per-session stdin.
+///
+/// So the child stays and gets THIN, resolving the triple once at startup and
+/// forwarding it. `clientKey` is resolved BEFORE any chdir and cached — process
+/// ancestry cannot change for a live process, and the walk is up to 64 sysctl
+/// hops. `cwd` is read AFTER the chdir.
+public struct GmHarnessIdentity: Codable, Hashable, Sendable {
+    /// `claude:<pid>:<starttime>`, resolved by the child from ITS ancestry.
+    ///
+    /// Optional, and the nil case DEGRADES rather than refuses. A refusal here
+    /// is a dead pen, and the pen is the repair tool — the one thing a user
+    /// reaches for when the machine is already broken. The kernel logs one line
+    /// and proceeds unclaimed.
+    public let clientKey: String?
+    /// The child's working directory, read after it chdirs to the project dir.
+    public let cwd: String?
+    /// `$CLAUDE_PROJECT_DIR` as the harness reported it.
+    public let projectDir: String?
+
+    public init(clientKey: String? = nil, cwd: String? = nil, projectDir: String? = nil) {
+        self.clientKey = clientKey
+        self.cwd = cwd
+        self.projectDir = projectDir
+    }
+}
+
+/// `MCP_CALL` — one MCP `tools/call`, relayed to the kernel.
+///
+/// `arguments` stays an untyped `GmJsonValue` for the same reason `TX_BATCH`
+/// keeps its inner lines opaque: this verb needs no knowledge of the ~57 tool
+/// schemas it can carry, and teaching it would make every roster change a wire
+/// change.
+public struct McpCallRequest: Codable, Hashable, Sendable {
+    /// The tool name as the harness spelled it, unqualified (`explore_get`,
+    /// not `mcp__plugin_gmcc_cde__explore_get`).
+    public let tool: String
+    public let arguments: GmJsonValue?
+    public let identity: GmHarnessIdentity
+
+    public init(tool: String, arguments: GmJsonValue? = nil, identity: GmHarnessIdentity) {
+        self.tool = tool
+        self.arguments = arguments
+        self.identity = identity
+    }
+}
+
+/// Result of an `MCP_CALL`.
+///
+/// RENDERED TEXT, NOT A STRUCTURED RESULT, and that is deliberate. Rendering
+/// lives kernel-side with the tool bodies so `PenResultBudget`'s per-tool
+/// narrowing and degrade paths apply to the bytes that actually go back. If the
+/// child rendered, the budget and the renderer would be in two processes and
+/// free to drift — and the failure mode of that drift is a result that blows the
+/// harness limit, which is exactly what the budget exists to prevent.
+public struct McpCallResponse: Codable, Hashable, Sendable {
+    /// The rendered tool result, already budget-checked.
+    ///
+    /// THERE IS NO SEPARATE `budget` FIELD, and its absence is deliberate — an
+    /// earlier draft carried one. `PenResultBudget.render` does not return a
+    /// payload plus a report; on an over-budget result it returns the
+    /// `gmcc_oversize` ENVELOPE, which already contains both the note and the
+    /// narrowed payload under `result`. A sibling field would either duplicate
+    /// what is inside this string or sit permanently nil, and a field nothing
+    /// ever populates is a claim the wire does not honour. The same reasoning
+    /// removed `TxBatchResponse.failedIndex`.
+    public let text: String
+    /// A tool-level failure. Rides the RESULT envelope rather than the protocol
+    /// error, matching what the MCP server already does: a tool that fails is
+    /// not a malformed request, and an MCP client is built to read the
+    /// difference.
+    public let isError: Bool
+
+    public init(text: String, isError: Bool = false) {
+        self.text = text
+        self.isError = isError
+    }
+}
+
+/// `HOOK_EVENT` — one Claude Code lifecycle hook, relayed to the kernel.
+///
+/// The logic this reaches (`HookLogic` / `HookRunner`) ALREADY compiles into the
+/// kernel and `postToolUse` already takes its cwd from the payload rather than
+/// the process, so this verb moves the CALL SITE rather than the ~957 lines.
+///
+/// THE LAUNCHER STAYS A SHELL-FORM `command` HOOK, and that is not a
+/// half-measure. `SessionStart` accepts only `command` and `mcp_tool`, never
+/// `http`; an `mcp_tool` handler there is documented to expect a "not connected"
+/// error on first run; and `SessionStart` is precisely where the claude-session
+/// binding every later write depends on is created. Shell form is also the only
+/// handler type that resolves `${GM_FS_ROOT:-$HOME/gmfs}` at hook time and the
+/// only one that can honour the silent exit-0 no-op contract. `async` is
+/// command-only too, which keeps `PostToolUse` off the tool-call critical path.
+public struct HookEventRequest: Codable, Hashable, Sendable {
+    /// The lifecycle event name as the harness spells it (`PostToolUse`,
+    /// `SessionStart`, `SubagentStart`, …). A raw string rather than an enum:
+    /// the harness owns this vocabulary and adds to it, and an unknown event
+    /// must be a recorded no-op here, never a decode failure that fails a hook.
+    public let event: String
+    public let payload: GmJsonValue?
+    public let identity: GmHarnessIdentity
+    /// When true the daemon returns `ok` for a BUSINESS failure and reports the
+    /// problem in `note` instead of throwing.
+    ///
+    /// A WIRE FIELD, NOT A CLIENT CONVENTION. A hook may never exit non-zero —
+    /// a non-zero PostToolUse is a blocked tool call — and `gm_hook call`
+    /// currently does exit non-zero on error. Putting the contract in the
+    /// message means a caller cannot forget it, and the daemon cannot answer the
+    /// wrong way by accident. Transport-level failures still fail: a malformed
+    /// envelope is not a business failure.
+    public let hookSafe: Bool
+
+    public init(event: String, payload: GmJsonValue? = nil, identity: GmHarnessIdentity, hookSafe: Bool = true) {
+        self.event = event
+        self.payload = payload
+        self.identity = identity
+        self.hookSafe = hookSafe
+    }
+}
+
+/// Result of a `HOOK_EVENT`.
+public struct HookEventResponse: Codable, Hashable, Sendable {
+    /// Whether the event produced a recorded write.
+    public let recorded: Bool
+    /// Human-readable outcome. Under `hookSafe` this is where a suppressed
+    /// business failure is reported, so a swallowed error is still SAID
+    /// somewhere rather than vanishing.
+    public let note: String?
+    /// Text the harness should inject as additional context, for the events that
+    /// honour it (`SessionStart` provisioning being the one that matters).
+    public let additionalContext: String?
+
+    public init(recorded: Bool, note: String? = nil, additionalContext: String? = nil) {
+        self.recorded = recorded
+        self.note = note
+        self.additionalContext = additionalContext
+    }
+}

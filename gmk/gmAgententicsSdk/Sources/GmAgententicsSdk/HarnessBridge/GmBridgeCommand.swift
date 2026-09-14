@@ -149,7 +149,7 @@ extension GmBridgeCommand {
     /// bridged MCP tool, each carried as a typed value so a renamed or deleted
     /// tool fails the build instead of leaving a dead name in frontmatter.
     static var everyGmCapability: [Tool] {
-        Native.allCases.map(Tool.native) + GmBridgeMcpTool.all.map(Tool.mcp)
+        Native.allCases.map(Tool.native) + GmBridgeMcpTool.grantable.map(Tool.mcp)
     }
 
     /// The tools a workflow command needs to drive the RPIR phase machine.

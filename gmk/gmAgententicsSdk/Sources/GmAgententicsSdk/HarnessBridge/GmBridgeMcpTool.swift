@@ -86,7 +86,27 @@ public struct GmBridgeMcpTool: Codable, Equatable, Hashable, Sendable {
 @available(GmAgentOs 1.0, *)
 extension GmBridgeMcpTool {
 
+    /// Every tool the bridge declares — the SERVED roster. The MCP server
+    /// answers to exactly this set, refusals included.
     public static let all: [GmBridgeMcpTool] = GmAgentTools.all.map(GmBridgeMcpTool.init)
+
+    /// The tools worth GRANTING in an `allowed-tools` list.
+    ///
+    /// SERVED AND GRANTABLE ARE DIFFERENT SETS, and conflating them is what put
+    /// `diagram_not_supported` in a skill's tool list. The `*_not_supported`
+    /// family placeholders are deliberately served — they appear in
+    /// `tools/list` with a description naming why the family is unavailable, so
+    /// an agent that goes looking finds an answer rather than a silence. But a
+    /// GRANT costs a slot in the frontmatter of every skill, command and agent
+    /// that takes the family, for a tool whose only behaviour is to throw.
+    ///
+    /// Keyed on the `_not_supported` suffix, the bridge's own convention for the
+    /// three families that are unavailable in full. It does NOT filter the
+    /// individually-refusing tools that name a real capability — those are
+    /// meaningful, and a caller should be able to reach the specific refusal.
+    public static var grantable: [GmBridgeMcpTool] {
+        all.filter { !$0.name.hasSuffix("_not_supported") }
+    }
 
     public static func tools(in family: GmAgentToolFamily) -> [GmBridgeMcpTool] {
         GmAgentTools.tools(in: family).map(GmBridgeMcpTool.init)

@@ -312,6 +312,33 @@ final class Server: @unchecked Sendable {
                         return self.dispatch(line: inner, from: client)
                     })
 
+            case .mcpCall, .hookEvent:
+                // The harness envelope (v30). Both re-enter this dispatcher for
+                // the verb they actually carry, exactly as TX_BATCH does — the
+                // caller below is `KernelVerbCaller`, which encodes an envelope
+                // and hands it back here, so all 96 handlers are reached with no
+                // socket hop and no second client to keep in step.
+                //
+                // Threading `client` through matters for the same reason it does
+                // in TX_BATCH: an inner verb must resolve the same caller
+                // identity it would have resolved on its own.
+                let caller = KernelVerbCaller(dispatch: { [weak client] inner in
+                    guard let client else {
+                        return self.errorResult(
+                            type: .error, requestId: head.requestId,
+                            payload: ErrorPayload(
+                                code: .badRequest,
+                                message: "\(head.type.rawValue) lost its client connection mid-call"))
+                    }
+                    return self.dispatch(line: inner, from: client)
+                })
+                if head.type == .mcpCall {
+                    return try McpCallHandler.handle(
+                        line: line, head: head, store: store, caller: caller)
+                }
+                return try HookEventHandler.handle(
+                    line: line, head: head, store: store, caller: caller)
+
             case .contextEnsure:
                 return try ContextEnsureHandler.handle(line: line, head: head, store: store)
             case .contextGet:

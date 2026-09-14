@@ -73,7 +73,16 @@ let package = Package(
         // longer contains the reader.
         .target(
             name: "GmKernelHost",
-            dependencies: ["GmDaemon"],
+            dependencies: [
+                "GmDaemon",
+                // The pen's tool bodies, so MCP_CALL runs the SAME `Tool` values
+                // the stdio door runs rather than a second dispatch table (v30).
+                // GmMcpServer has zero external dependencies and floors at
+                // macOS 14, so this edge adds nothing to the link closure but
+                // the pen itself — and it cannot cycle, because GmMcpServer
+                // depends only on GmDaemonSdk.
+                .product(name: "GmMcpServer", package: "gmDaemonSdk"),
+            ],
             plugins: [.plugin(name: "StampBuildInfo")]
         ),
         // A shim over KernelHost.bootHeadlessAndRun(). Kept as a real executable

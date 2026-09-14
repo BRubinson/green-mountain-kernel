@@ -31,7 +31,13 @@ let package = Package(
         .package(path: "gmk/gmDaemonSdk"),
         .package(path: "gmk/gmDaemon"),
         .package(path: "gmk/gmUxComponentLibrary"),
-        .package(path: "gmk/gmMcp"),
+        // gmk/gmMcp is GONE (v30). Its three sources are the GmMcpServer target
+        // inside gmDaemonSdk now, so they are still reachable from here through
+        // the entry above — which is what keeps the language server resolving
+        // them. A stale path here is worse than a missing one: manifest
+        // resolution fails for the WHOLE graph, so every file in the repo loses
+        // code intelligence at once, and it does so QUIETLY, because a server
+        // with no language service still publishes clean diagnostics.
         .package(path: "gmk/Gm_Kernel_test"),
         .package(path: "gmk/gmKernel"),
         .package(path: "gmk/gmAgententicsSdk"),
