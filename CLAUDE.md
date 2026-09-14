@@ -54,11 +54,31 @@ bash gmk/scripts/rebuild_local.sh     # build this working tree, stage <version>
 bash gmk/scripts/publish_release.sh   # verify, run the suites, tag, upload, promote
 ```
 
-`rebuild_local.sh` builds **universal** (arm64 + x86_64) so the artifact it
-stages is already releasable — `publish_release.sh` uploads exactly those bytes
-rather than rebuilding, so what you tested is what ships. `--fast` builds arm64
-only for the edit-compile loop and is refused by publish, which reads slices with
-`lipo` rather than trusting the manifest.
+`rebuild_local.sh` builds **arm64** so the artifact it stages is already
+releasable — `publish_release.sh` uploads exactly those bytes rather than
+rebuilding, so what you tested is what ships.
+
+**THIS INVERTED. It used to build universal, and `--fast` opted DOWN to arm64
+and produced something publish REFUSED.** The x86_64 slice was dropped: it
+doubled every compile and link, the toolchain emits "the x86_64 architecture is
+deprecated for your deployment target", and the machines this ships to are Apple
+Silicon. `--universal` now opts back UP; `--fast` is kept as an inert synonym for
+the default so existing callers do not break. Publish still reads slices with
+`lipo` rather than trusting the manifest, and still REFUSES an artifact with no
+arm64 slice — only the x86_64 requirement is gone. **Published binaries no longer
+run on Intel Macs, and nothing checks the host architecture at install time.**
+
+The release asset keeps the name `gm-daemon-<v>-macos-universal.tar.gz`. That
+word is now historical and the name is deliberately frozen: the literal is
+derived independently in `install_gm.sh` and `daemon-release.yml`, and renaming
+it would 404 every installer not upgraded in lockstep.
+
+**`rebuild_local.sh` ALSO GENERATES THE PLUGIN**, by calling
+`generate_plugin.sh` after staging and before activation. It previously did not,
+so a build could report success while `plugins/gmcc/` still reflected an older
+bridge. This is why the script builds `gmAgententicsSdk` even though that package
+was removed from its `PACKAGES` list — it is not built for the artifact, it is
+built because it *is* the generator.
 
 A local build is **always** stamped `-BETA`. There is no flag to suppress it: the
 suffix is the only thing distinguishing bits that were merely built from bits
@@ -343,6 +363,20 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     `gmDaemonSdk` and `gmUxComponentLibrary` and on nothing else — **not** on
     `gmDaemon`: the app target links `GmKernelHost` for future writer hosting but
     nothing imports it, so that link stays on the APP target.
+    **IT FLOORS AT macOS 26, AND SO DOES THE APP.** Both were 27, and neither
+    needed to be: the GMVibes target also linked `GmAgententicsSdk`, which depends
+    on the vendored `gmClaudeForFoundationModels` — both at 27 — and SwiftPM
+    checks floors at GRAPH RESOLUTION, so that one link pinned the whole app.
+    Nothing imported it. The link is gone from `project.pbxproj` (product
+    dependency, build file, frameworks entry and the local package reference, all
+    four) and `MACOSX_DEPLOYMENT_TARGET` is 26.0 in both configurations.
+    Verified rather than assumed: a macOS 26 build of the scheme failed ONLY
+    inside `ClaudeForFoundationModels` before the link was cut, and succeeds after.
+    **`GmKernelHost` must NOT be removed alongside it** — that link is the
+    deliberate future writer-hosting one and floors at 14, so it costs nothing.
+    A consequence worth holding: `gm_bridge_writer` can no longer be built from
+    the Xcode project. It is built by `swift build --package-path
+    gmk/gmAgententicsSdk` via `generate_plugin.sh`, and CI builds it directly.
     Its manifest is **swift-tools-version 6.2** while the rest of the repo is on
     6.0, because `defaultIsolation` does not exist before 6.2. That setting is
     not a preference: `project.pbxproj` compiles the app target with
@@ -825,7 +859,10 @@ gh workflow run daemon-release.yml -f version=$(cat gmk/VERSION)
 
 It refuses to publish when the tag and the file disagree, runs the suites, builds
 universal (arm64 + x86_64), verifies both slices are present, and attaches the
-tarball plus its `.sha256`. The binaries are staged from their package bin
+tarball plus its `.sha256`. **This CI fallback still builds universal while the
+local path now builds arm64 only** — the workflow was not moved in the same
+change, so a release cut here is a different shape from one cut locally. Worth
+fixing the next time the fallback is touched. The binaries are staged from their package bin
 paths — `gm_daemon` from `gmDaemon`, `gm_hook` and (since v30) the pen server
 from `gmDaemonSdk`.
 
@@ -977,6 +1014,20 @@ more, and no fewer.
   cheap thing that names the door.
 - **`PenSheet.instructions` has a 2048-byte budget and the roster check enforces
   it.** It sits at ~1.8KB. If it crosses, trim PROSE, never names.
+- **AN UNKNOWN KEY IN `plugin.json` DISABLES THE ENTIRE PLUGIN.** Claude Code
+  validates the manifest strictly and answers an unrecognised field with
+  `<field>: Invalid input`, refusing to load *any* of it — commands, agents,
+  hooks and the MCP server included. This is not hypothetical: v54.0.0 shipped
+  an `outputStyles` key that is not in the schema and took the whole plugin down.
+  **Output styles are shipped by EXISTING in `output-styles/`** and applied by
+  `force-for-plugin: true` in the style file's own frontmatter; the manifest
+  never lists them. The field was deleted from `GmBridgeClaudePlugin.File`
+  outright so it cannot be re-added as a convenience.
+- **`verify()` checks that a file RENDERED, never that it is VALID.** That is the
+  exact gap the above fell through: every file rendered, verify passed, the
+  artifact was unloadable. The bridge types are hand-written Swift mirrors of an
+  external schema with no cross-check, so **eyeball the emitted
+  `plugin.json` after any change to the bridge's manifest types.**
 
 ## Environment rules
 
