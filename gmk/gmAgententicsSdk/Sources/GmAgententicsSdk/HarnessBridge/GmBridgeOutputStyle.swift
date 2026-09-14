@@ -30,10 +30,16 @@ extension GmBridgeOutputStyle {
     /// NO `displayName`, DELIBERATELY. Setting it emits a frontmatter `name:`
     /// key, and "the file name becomes the style name UNLESS you set name in the
     /// frontmatter" — so a pretty display name would make the style's real name
-    /// `GMB Primarch` while the file stem and the `outputStyles` entry in
-    /// plugin.json both said `primarch`. Three spellings of one identifier, with
-    /// `force-for-plugin` masking the disagreement by applying the style anyway.
-    /// Omitting it makes all three `primarch` by construction.
+    /// `GMB Primarch` while the file stem said `primarch`. Two spellings of one
+    /// identifier, with `force-for-plugin` masking the disagreement by applying
+    /// the style anyway. Omitting it makes both `primarch` by construction.
+    ///
+    /// This used to name a third spelling, an `outputStyles` entry in
+    /// plugin.json. THAT KEY IS GONE and must not come back: the manifest schema
+    /// does not accept it, and Claude Code rejects the ENTIRE manifest rather
+    /// than ignoring the key. A style is shipped by existing in `output-styles/`
+    /// and applied by its own `force-for-plugin` frontmatter — the manifest has
+    /// no part in either.
     public static let all: [File] = [
         File(
             name: "primarch",

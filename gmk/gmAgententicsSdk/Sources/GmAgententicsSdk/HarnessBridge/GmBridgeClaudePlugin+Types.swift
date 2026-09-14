@@ -78,7 +78,16 @@ public enum GmBridgeClaudePlugin {
 
         public var mcpServers: [String]?
 
-        public var outputStyles: [String]?
+        // THERE IS DELIBERATELY NO `outputStyles` FIELD.
+        //
+        // It existed, it was set, and it took the whole plugin down: Claude Code
+        // validates this manifest strictly and answers an unknown key with
+        // "outputStyles: Invalid input", refusing to load ANY of the plugin —
+        // commands, agents, hooks and the MCP server included. An unrecognised
+        // key here is not inert.
+        //
+        // Output styles are shipped by EXISTING in `output-styles/`; the
+        // manifest never lists them. Do not re-add this as a convenience.
 
         public var lspServers: [String]?
 
@@ -102,7 +111,6 @@ public enum GmBridgeClaudePlugin {
             workflows: [String]? = nil,
             hooks: [String]? = nil,
             mcpServers: [String]? = nil,
-            outputStyles: [String]? = nil,
             lspServers: [String]? = nil,
             experimental: Experimental? = nil
         ) {
@@ -123,7 +131,6 @@ public enum GmBridgeClaudePlugin {
             self.workflows = workflows
             self.hooks = hooks
             self.mcpServers = mcpServers
-            self.outputStyles = outputStyles
             self.lspServers = lspServers
             self.experimental = experimental
         }
