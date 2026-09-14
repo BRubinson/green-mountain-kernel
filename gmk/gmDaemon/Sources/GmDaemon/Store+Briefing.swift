@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 import GmDaemonSdk
 
-// BRIEFING_* (v21) — the agent-briefing machine: the context package a doper
+// BRIEFING_* (v21) — the agent-briefing machine: the context package a briefer
 // agent assembles for a phase, pulled by spawned agents at start.
 //
 // Modeled on m0022's RESTRAINT, not the report families: a briefing is
@@ -32,7 +32,7 @@ public enum BriefingStepSpec {
     /// their stub — deliberately, not an error. code-architect dropped out
     /// with pre_architecture: architects load the care package instead.
     public static let roleStepMap: [String: String] = [
-        "doper": "initial",
+        "briefer": "initial",
         "code-explorer": "initial",
     ]
 

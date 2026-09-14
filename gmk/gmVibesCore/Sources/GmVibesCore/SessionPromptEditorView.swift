@@ -651,7 +651,7 @@ private struct PromptEditorPane: View {
                         sectionEditor("Detail", field: .detail, text: $detail,
                                       minHeight: 220, hint: "The approach, constraints, specifics.")
                         // Briefings lead the stack chronologically: the
-                        // doper's initial briefing precedes clarification.
+                        // briefer's initial briefing precedes clarification.
                         // UNGATED like Exploration/Review — BRIEFING_OPEN is
                         // explicit-only and legally exists at draft.
                         phaseCard("Briefing", systemImage: "shippingbox",

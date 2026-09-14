@@ -3661,7 +3661,7 @@ public struct BriefingRowResponse: Codable, Hashable, Sendable {
     public let briefing: AgentBriefingRow
     public let created: Bool
     /// Well-formed dope dot-paths the briefing asked for that resolve to
-    /// NOTHING in the dope tree. Reported back in the tool result so a doper
+    /// NOTHING in the dope tree. Reported back in the tool result so a briefer
     /// sees its own unresolvable refs instead of discovering them as silence.
     /// Additive OPTIONAL field (nil = this build did not compute it), so it
     /// decodes safely in both directions — no wire bump.
@@ -3681,7 +3681,7 @@ public struct BriefingRowResponse: Codable, Hashable, Sendable {
 /// building → ready. The daemon stamps dope_scope_uuid + dope_scope_revision
 /// ITSELF from the session's SESSION_INSTANCE scope (the writing agent cannot
 /// mis-stamp), and denormalizes each kbite ref's brief by joining the kbite
-/// tables — the doper passes file uuids only.
+/// tables — the briefer passes file uuids only.
 public struct BriefingCompleteRequest: Codable, Hashable, Sendable {
     public let briefingUuid: String
     public let expectedVersion: Int64
@@ -3692,7 +3692,7 @@ public struct BriefingCompleteRequest: Codable, Hashable, Sendable {
     public let kbiteRefs: [String]?
     /// file_change uuids (agent_session_file_change children).
     public let fileChangeRefs: [String]?
-    /// Doper self-report for dedup/tracking.
+    /// Briefer self-report for dedup/tracking.
     public let agentId: String?
 
     public init(

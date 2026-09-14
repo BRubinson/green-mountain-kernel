@@ -38,7 +38,7 @@ struct ExplorationRepository: RepositoryContext {
                     + ExplorationAgentType.allCases.map(\.rawValue).joined(separator: "|"))
         }
         // The enum check ALONE used to be the whole gate, which is how a
-        // doper opened a stray sealed `general` summary on a TEAM-variant
+        // briefer opened a stray sealed `general` summary on a TEAM-variant
         // prompt: `general` is a legal ExplorationAgentType under every
         // variant, so nothing refused it — and a stray summary is returned by
         // explore_get, which is the clarifier's entire input. The variant is

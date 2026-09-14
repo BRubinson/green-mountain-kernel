@@ -5,7 +5,7 @@
   "options" : [
     {
       "code" : "building",
-      "description" : "Row reserved (open); doper composing. Open on existing (owner, step) resets here",
+      "description" : "Row reserved (open); briefer composing. Open on existing (owner, step) resets here",
       "name" : "Building",
       "sort_order" : 1
     },
@@ -17,5 +17,5 @@
     }
   ],
   "sort_order" : 15,
-  "version" : 765
+  "version" : 767
 }

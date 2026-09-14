@@ -2,7 +2,7 @@ import SwiftUI
 import GmDaemonSdk
 
 /// Read-only briefing section (BRIEFING_LIST + per-row BRIEFING_GET): the
-/// context packages a doper agent assembled per phase step. One sub-section
+/// context packages a briefer agent assembled per phase step. One sub-section
 /// per row, keyed by `briefing_for_step` (registry-extensible — whatever LIST
 /// returns is rendered, never a hardcoded step set). Staleness is the
 /// daemon's read-time computation; it renders as a subtle amber badge with
@@ -42,7 +42,7 @@ struct BriefingPane: View {
     }
 
     private var notOpened: some View {
-        Label("No briefings yet — the doper writes one at each phase boundary.",
+        Label("No briefings yet — the briefer writes one at each phase boundary.",
               systemImage: "shippingbox")
             .font(.callout)
             .foregroundStyle(.secondary)

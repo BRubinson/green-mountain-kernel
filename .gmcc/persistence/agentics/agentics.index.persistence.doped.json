@@ -1,6 +1,6 @@
 {
   "code" : "agentics",
-  "description" : "Bot workflow state: the workflow machine, agent briefing ref children, exploration per-agent reports, the clarification split (questions/options/answers/notes), the care package, architecture options, the Claude-session binding and agent registry that attribute a file change, plus the prompt itself with its lifecycle status, file-change tracking and prompt artifacts",
+  "description" : "Bot workflow state: the workflow machine, agent briefing ref children, exploration per-agent reports, the clarification split (questions/options/answers/notes), the care package, architecture options, the Claude-session binding and agent registry that attribute a file change, plus file-change tracking and prompt artifacts",
   "entities" : {
     "agent_briefing" : "agentics.entity.agent_briefing.persistence.doped.json",
     "agent_briefing_dope_kbite" : "agentics.entity.agent_briefing_dope_kbite.persistence.doped.json",
@@ -24,7 +24,6 @@
     "file_change" : "agentics.entity.file_change.persistence.doped.json",
     "file_change_range" : "agentics.entity.file_change_range.persistence.doped.json",
     "internal_clarification_note" : "agentics.entity.internal_clarification_note.persistence.doped.json",
-    "prompt" : "agentics.entity.prompt.persistence.doped.json",
     "prompt_activation" : "agentics.entity.prompt_activation.persistence.doped.json",
     "prompt_artifact" : "agentics.entity.prompt_artifact.persistence.doped.json",
     "prompt_qualified_diagram" : "agentics.entity.prompt_qualified_diagram.persistence.doped.json",
@@ -51,7 +50,6 @@
     "explore_status" : "agentics.enum.explore_status.persistence.doped.json",
     "file_change_kind" : "agentics.enum.file_change_kind.persistence.doped.json",
     "file_change_origin" : "agentics.enum.file_change_origin.persistence.doped.json",
-    "prompt_status" : "agentics.enum.prompt_status.persistence.doped.json",
     "review_finding_kind" : "agentics.enum.review_finding_kind.persistence.doped.json",
     "review_finding_status" : "agentics.enum.review_finding_status.persistence.doped.json",
     "review_status" : "agentics.enum.review_status.persistence.doped.json",
@@ -60,5 +58,5 @@
   },
   "name" : "Agentics",
   "sort_order" : 4,
-  "version" : 765
+  "version" : 767
 }

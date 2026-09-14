@@ -298,7 +298,7 @@ final class PromptPhaseStore {
                 items.append(BriefingItem(briefing: got.briefing, staleness: got.staleness))
             }
             // Empty is NORMAL: briefings have no SUMMARY_ABSENT on LIST — a
-            // prompt whose doper never ran simply lists zero rows.
+            // prompt whose briefer never ran simply lists zero rows.
             return .loaded(items)
         } catch let error as DaemonError {
             return .failed(error.userMessage)

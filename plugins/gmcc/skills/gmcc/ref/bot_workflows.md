@@ -75,10 +75,10 @@ CARE PACKAGE.
 ## Phases (what the machine will tell you, in brief)
 
 1. **briefing** — `init_briefing` opens the row (step `initial`), spawn
-   `gmcc:doper` (haiku), gate on `wait_for_briefing`. Briefings are
+   `gmcc:briefer` (haiku), gate on `wait_for_briefing`. Briefings are
    OPINION-FREE ref sets (dope dot-paths, kbite files, file changes) — no
    body, and all three ref classes are named even when a class is empty
-   (`[]` is a real answer; omitting a class is not). The dead-doper policy:
+   (`[]` is a real answer; omitting a class is not). The dead-briefer policy:
    on timeout, one plain `briefing_get`; still building → re-open +
    re-spawn once; then proceed briefing-less with an explicit note.
 2. **explore** — one summary per expected agent (bot/rpi: general; team: the

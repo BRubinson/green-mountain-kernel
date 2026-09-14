@@ -316,7 +316,7 @@ public enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case reviewComplete = "REVIEW_COMPLETE"
     case reviewReopen = "REVIEW_REOPEN"
     case reviewGet = "REVIEW_GET"
-    // Agent briefing (v21): the context package a doper agent assembles for a
+    // Agent briefing (v21): the context package a briefer agent assembles for a
     // phase; consumed by spawned agents via the stub -> get pull.
     case briefingOpen = "BRIEFING_OPEN"
     case briefingComplete = "BRIEFING_COMPLETE"

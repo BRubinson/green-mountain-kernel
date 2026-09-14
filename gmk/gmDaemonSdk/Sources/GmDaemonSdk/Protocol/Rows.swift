@@ -1355,7 +1355,7 @@ public struct ExplorationSummaryRow: Codable, Hashable, Sendable {
 }
 
 /// One agent briefing (m0025 shape): an opinion-free ref pre-selection a
-/// doper agent assembles for a phase. The old body/dope_refs/kbite_refs TEXT
+/// briefer agent assembles for a phase. The old body/dope_refs/kbite_refs TEXT
 /// columns are gone — refs are typed child rows.
 public struct AgentBriefingRow: Codable, Hashable, Sendable {
     public let uuid: String

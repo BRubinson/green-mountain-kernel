@@ -248,7 +248,7 @@ func makeFastPathTools() -> [Tool] { [
     Tool(
         name: "rpir_open_briefing",
         description: """
-            Open the briefing row a doper then fills. The only legal response to the \
+            Open the briefing row a briefer then fills. The only legal response to the \
             'initial briefing not ready' gate blocker, and the very next call after cde_init \
             for a prompt whose briefing is absent.
             """,

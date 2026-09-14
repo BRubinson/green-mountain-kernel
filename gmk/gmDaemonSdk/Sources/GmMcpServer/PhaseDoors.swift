@@ -78,7 +78,7 @@ func makePhaseDoorTools() -> [Tool] {
 
         Tool(
             name: "rpir_close_brief",
-            description: "Seal the briefing — the doper's page is done and the agent can go away. Same verb as rpir_write_brief: BRIEFING_COMPLETE both writes the ref set and moves building → ready.",
+            description: "Seal the briefing — the briefer's page is done and the agent can go away. Same verb as rpir_write_brief: BRIEFING_COMPLETE both writes the ref set and moves building → ready.",
             params: [
                 ("briefing_uuid", "string", "The briefing to complete", true),
                 ("expected_version", "number", "The briefing version this write is based on", true),

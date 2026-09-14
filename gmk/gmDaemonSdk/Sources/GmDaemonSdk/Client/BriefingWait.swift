@@ -11,7 +11,7 @@ public enum BriefingWaitOutcome {
 /// The client-side loop behind every "wait until the briefing is ready": re-issue
 /// the GET until the briefing reads `ready`, sleeping between polls. `fetch`
 /// returns nil for a RETRYABLE absence (SUMMARY_ABSENT under a selector form —
-/// the doper-opens-it-itself window) and throws everything else immediately.
+/// the briefer-opens-it-itself window) and throws everything else immediately.
 /// The deadline is WALL-CLOCK so fetch latency spends the budget too — the
 /// timeout must fire before the caller's own harness timeout, however slow the
 /// daemon answers. Injected sleeper/clock keep it testable without a live daemon

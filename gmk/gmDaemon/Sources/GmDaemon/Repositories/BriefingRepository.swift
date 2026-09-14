@@ -174,7 +174,7 @@ struct BriefingRepository: RepositoryContext {
     /// ONE ref policy, not three. This function used to run three mutually
     /// incompatible policies in adjacent loops — dope refs inserted RAW,
     /// kbite refs silently DROPPED on an unknown uuid, file-change refs
-    /// THROWN on — which is how a doper wrote twenty-three FILE PATHS into
+    /// THROWN on — which is how a briefer wrote twenty-three FILE PATHS into
     /// `--dope-ref`, twice, and had every one accepted silently; they
     /// surfaced only as ghost dot-paths at read, long after the agent that
     /// could have fixed them was gone. The policy is now single, with one

@@ -26,7 +26,7 @@ Two channels reach the db: the **pen** (`mcp__plugin_gmcc_pen__*`, served by
 │   ├── gmcc_boot/                 # Boot validation
 │   └── gmcc_cleanup/              # Environment auditing
 ├── commands/gm_*.md               # All GM commands
-├── agents/*.md                    # Native agent defs (gmcc:code-explorer, doper, …) — identity + pen contract
+├── agents/*.md                    # Native agent defs (gmcc:code-explorer, briefer, …) — identity + pen contract
 ├── prompts/gmcc_agent_*.md        # Crunch/maw agent prompts (the bot roles live in agents/)
 ├── scripts/gm_session_startup.sh         # SessionStart hook script
 ├── scripts/gm_hook.sh                    # Every non-SessionStart hook; event as argv, payload to `gm_hook hook`

@@ -32,12 +32,15 @@ extension GmBridgeAgent {
                 GmAgentTools.rpir.rankReviews,
                 GmAgentTools.rpir.resolveReviewFinding,
                 GmAgentTools.cde.searchFileChanges,
+                GmAgentTools.dope.searchSession,
+                GmAgentTools.dope.searchGlobal,
+                GmAgentTools.dope.updateSessionDope,
             ]
         ),
         file(
             .briefer,
-            name: "doper",
-            description: "GMCC doping agent. Writes the briefing ref set. Never auto-delegate.",
+            name: "briefer",
+            description: "GMCC briefing agent. Writes the briefing ref set. Never auto-delegate.",
             model: .haiku,
             native: [.read, .grep, .glob],
             tools: [
@@ -47,6 +50,7 @@ extension GmBridgeAgent {
                 GmAgentTools.rpir.closeBrief,
                 GmAgentTools.cde.searchFileChanges,
                 GmAgentTools.dope.searchSession,
+                GmAgentTools.dope.searchGlobal,
                 GmAgentTools.kbite.search,
             ]
         ),
@@ -63,6 +67,7 @@ extension GmBridgeAgent {
                 GmAgentTools.rpir.writeExplorations,
                 GmAgentTools.rpir.completeExploration,
                 GmAgentTools.dope.searchSession,
+                GmAgentTools.dope.searchGlobal,
                 GmAgentTools.kbite.search,
             ]
         ),
@@ -80,6 +85,7 @@ extension GmBridgeAgent {
                 GmAgentTools.rpir.openClarification,
                 GmAgentTools.rpir.writeClarificationQuestions,
                 GmAgentTools.rpir.writeClarificationNotes,
+                GmAgentTools.dope.searchSession,
             ]
         ),
         file(

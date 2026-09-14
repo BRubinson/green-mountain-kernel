@@ -120,7 +120,7 @@ public enum WorkflowSpec {
         case .briefing:
             return """
             mcp__plugin_gmcc_cde__rpir_open_briefing opens the briefing row (step: initial). \
-            Spawn the haiku doper: it orients itself with \
+            Spawn the haiku briefer: it orients itself with \
             mcp__plugin_gmcc_cde__cde_load_prompt and writes the ref set \
             with mcp__plugin_gmcc_cde__rpir_write_brief. Then gate on \
             mcp__plugin_gmcc_cde__rpir_await_briefing. The machine refuses to leave this \

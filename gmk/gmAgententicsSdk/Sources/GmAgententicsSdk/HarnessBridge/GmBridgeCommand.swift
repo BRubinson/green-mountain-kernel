@@ -22,7 +22,7 @@ extension GmBridgeCommand {
             description: """
                 Lightweight GMCC workflow (variant bot). Authors a prompt into the current \
                 session, enters the kernel's workflow machine, and runs every phase in \
-                primary context — the only spawn is the haiku doper briefing.
+                primary context — the only spawn is the haiku briefer briefing.
                 """,
             argumentHint: "<prompt-name|seq> <task/prompt content>",
             disableModelInvocation: true,
@@ -59,7 +59,7 @@ extension GmBridgeCommand {
             description: """
                 Load GMCC session context, then just do the task. Writes no prompt rows or \
                 report summaries — persistence happens only via the automatic file-change \
-                hook, an optional doper briefing for meaty tasks, or an explicitly requested \
+                hook, an optional briefer briefing for meaty tasks, or an explicitly requested \
                 retroactive write-back.
                 """,
             argumentHint: "<task / request>",

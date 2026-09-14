@@ -263,7 +263,7 @@ actor GMCCDaemonService {
 
     // MARK: - Briefing (v21, read-only)
 
-    /// One LIST returns every step row the doper has opened for the prompt —
+    /// One LIST returns every step row the briefer has opened for the prompt —
     /// the step vocabulary is registry-governed daemon-side, so the app never
     /// enumerates it. An empty list is NORMAL (no SUMMARY_ABSENT on LIST).
     func briefings(promptUuid: String) async throws -> BriefingListResponse {

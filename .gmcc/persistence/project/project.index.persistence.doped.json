@@ -1,16 +1,17 @@
 {
   "code" : "project",
-  "description" : "The project hierarchy — project through instance and session — plus the daemon's own configuration rows. Prompt moved to the agentics domain, where 11 of its 14 referring entities already lived",
+  "description" : "The project hierarchy: project through instance, session, and prompts",
   "entities" : {
-    "daemon_config" : "project.entity.daemon_config.persistence.doped.json",
     "instance" : "project.entity.instance.persistence.doped.json",
     "project" : "project.entity.project.persistence.doped.json",
+    "prompt" : "project.entity.prompt.persistence.doped.json",
     "session" : "project.entity.session.persistence.doped.json"
   },
   "enums" : {
+    "prompt_status" : "project.enum.prompt_status.persistence.doped.json",
     "session_status" : "project.enum.session_status.persistence.doped.json"
   },
   "name" : "Project",
   "sort_order" : 3,
-  "version" : 765
+  "version" : 767
 }

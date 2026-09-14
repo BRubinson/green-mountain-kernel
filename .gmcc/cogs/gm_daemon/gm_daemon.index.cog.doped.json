@@ -1,6 +1,6 @@
 {
   "code" : "gm_daemon",
-  "description" : "The single-writer daemon and the persistence layer: the only writer of the db and the owner of every persistence domain. Holds the sole GRDB pin",
+  "description" : "The single-writer daemon, GMCCDaemonKit and the gm CLI: the only writer of the gmcc db and the owner of every persistence domain",
   "elements" : [
     {
       "code" : "gm_daemon",
@@ -16,10 +16,10 @@
         ]
       },
       "name" : "GM Daemon",
-      "primary_path" : "gmk/gmDaemon",
+      "primary_path" : "plugins/gmcc/daemon",
       "sort_order" : 0
     }
   ],
   "name" : "GM Daemon",
-  "sort_order" : 2
+  "sort_order" : 1
 }

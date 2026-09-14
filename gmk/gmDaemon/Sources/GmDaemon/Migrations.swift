@@ -2526,7 +2526,7 @@ public enum Migrations {
         }
 
         // m0023 — agent_briefing + prompt_activation: the context package a
-        // doper agent assembles for a phase, and the activation registry that
+        // briefer agent assembles for a phase, and the activation registry that
         // lets hooks attribute work without arguments.
         //
         // agent_briefing follows m0022's restraint, not the report families:

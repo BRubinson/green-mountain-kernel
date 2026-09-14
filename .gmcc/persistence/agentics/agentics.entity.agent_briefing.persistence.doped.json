@@ -1,7 +1,7 @@
 {
   "base_composable_ref" : "base.base_entity",
   "code" : "agent_briefing",
-  "description" : "A point-in-time OPINION-FREE ref pre-selection a doper assembles per (owner, step); open on an existing pair RESETS to building and truncates the ref children. Refs are typed child rows (dope children carry ghost-legal dot-path CODES; kbite/file-change children carry uuid FKs). Staleness = server-stamped scope revision, compared live at read (warn, never block). BOUNDARY: a briefing answers 'what refs did this agent get'; agent_registration answers 'who is agent X'.",
+  "description" : "A point-in-time OPINION-FREE ref pre-selection a briefer assembles per (owner, step); open on an existing pair RESETS to building and truncates the ref children. Refs are typed child rows (dope children carry ghost-legal dot-path CODES; kbite/file-change children carry uuid FKs). Staleness = server-stamped scope revision, compared live at read (warn, never block). BOUNDARY: a briefing answers 'what refs did this agent get'; agent_registration answers 'who is agent X'.",
   "entity_type" : "MODEL",
   "name" : "Agent Briefing",
   "properties" : [
@@ -32,7 +32,7 @@
       "is_unique" : false,
       "name" : "Prompt",
       "nullable" : true,
-      "relationship_target_ref" : "agentics.prompt.uuid",
+      "relationship_target_ref" : "project.prompt.uuid",
       "sort_order" : 2
     },
     {
@@ -77,14 +77,14 @@
     {
       "code" : "agent_id",
       "data_type" : "text",
-      "description" : "Doper self-reported agent id (agent-abc123) for dedup/behavior tracking",
+      "description" : "Briefer self-reported agent id (agent-abc123) for dedup/behavior tracking",
       "is_unique" : false,
       "name" : "Agent Id",
       "nullable" : true,
       "sort_order" : 10
     }
   ],
-  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Store+Briefing.swift",
+  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Store+Briefing.swift",
   "sort_order" : 21,
-  "version" : 765
+  "version" : 767
 }
