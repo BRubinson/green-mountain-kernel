@@ -96,7 +96,9 @@ struct DopeSearchRepository: RepositoryContext {
 
     /// Which scopes a search scope covers. PROMPT means that prompt's own
     /// overlay plus the session base it reads through; SESSION is the
-    /// session's scopes; PROJECT is every scope in the project.
+    /// session's scopes; PROJECT is every scope in the project — or, when no
+    /// project uuid is supplied, every scope in the DATABASE. That last case is
+    /// what makes `dope_search_global` global.
     private func searchScopeRows(req: DopeSearchRequest) throws -> [DopeScopeRow] {
         switch req.scope {
         case .prompt:
@@ -126,8 +128,16 @@ struct DopeSearchRepository: RepositoryContext {
                 SELECT * FROM dope_scope WHERE session_uuid = ? ORDER BY code
                 """, arguments: [sessionUuid]).map { $0.wireRow() }
         case .project:
+            // A nil project_uuid means EVERY project. Safe to define this way
+            // rather than a behaviour change to worry about: nil previously
+            // threw unconditionally, so no caller can be relying on the old
+            // answer — and one caller, `dope_search_global`, was DEAD for its
+            // whole life because of it. The precedent is on the same message:
+            // `DopeSearchRequest.sources` already reads nil as "every arm".
             guard let projectUuid = req.projectUuid else {
-                throw StoreError.badRequest(detail: "--scope project requires --project-uuid")
+                return try DopeScopeRecord.fetchAll(db, sql: """
+                    SELECT * FROM dope_scope ORDER BY project_uuid, code
+                    """).map { $0.wireRow() }
             }
             guard try Row.fetchOne(db, sql: "SELECT 1 FROM project WHERE uuid = ?",
                                    arguments: [projectUuid]) != nil else {

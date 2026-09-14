@@ -121,6 +121,34 @@ struct KbiteResourceRepository: RepositoryContext {
     /// GRDB from the raw query — user text never reaches SQL.
     func searchKbites(_ req: KbiteSearchRequest, pattern: FTS5Pattern) throws -> KbiteSearchResponse {
         let limit = min(max(req.limit ?? 50, 1), 500)
+
+        // The field is called matchedKeywords, so make that true. The subquery
+        // below is keyed on the file uuid alone and knows nothing of the query,
+        // so it returns every keyword the file carries — one hit was observed
+        // emitting ~250 of them, and `limit` bounds hits, not keywords per hit.
+        //
+        // Filtered HERE rather than in the SQL on purpose: that subquery sits in
+        // the SELECT list, ahead of the `MATCH ?` placeholder, so adding
+        // predicates to it means re-ordering StatementArguments — a silent
+        // mis-binding hazard bought for nothing, since the cost being removed is
+        // the size of the RESPONSE, not of the query.
+        //
+        // Split the way FTS5's default unicode61 tokenizer does: on anything
+        // that is not alphanumeric. Keywords are normalised underscore
+        // compounds (`pre_start_init_container`), so they split the same way and
+        // the comparison below is SEGMENT-to-token, not substring.
+        //
+        // Substring containment was tried first and measured worse on real
+        // data: against settings-reference.md's 267 keywords, the query
+        // "a daemon" kept 213 of them — the token "a" appears inside almost
+        // every compound, so the flood came straight back. Segment matching
+        // keeps 0 for that query, 39 for "sandbox network proxy", and 3 for
+        // "daemon process lifecycle socket server hosting in-process".
+        let queryTokens = Set(
+            req.query
+                .lowercased()
+                .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                .map(String.init))
         var sql = """
             SELECT k.code AS kbite_code, kr.kbite_uuid AS kbite_uuid,
                    kr.resource_name AS resource_name,
@@ -155,7 +183,15 @@ struct KbiteResourceRepository: RepositoryContext {
                 fileUuid: row["file_uuid"],
                 fileName: row["file_name"],
                 fileSummary: row["file_summary"],
-                matchedKeywords: joined?.split(separator: ",").map(String.init) ?? [],
+                // A keyword matches when ANY of its segments is a query token —
+                // so "container" matches `pre_start_init_container` while "a"
+                // matches nothing.
+                matchedKeywords: (joined?.split(separator: ",").map(String.init) ?? [])
+                    .filter { keyword in
+                        keyword.lowercased()
+                            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                            .contains { queryTokens.contains(String($0)) }
+                    },
                 score: row["score"]
             )
         })

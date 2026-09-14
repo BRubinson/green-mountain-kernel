@@ -22,7 +22,8 @@ extension Store {
         // search contract demands (never a silent empty list).
         var pattern: FTS5Pattern?
         if !trimmed.isEmpty {
-            guard let parsed = FTS5Pattern(matchingAllTokensIn: trimmed) else {
+            // ORs the query tokens (see Store+DopeSearch for why AND was wrong).
+            guard let parsed = FTS5Pattern(matchingAnyTokenIn: trimmed) else {
                 throw StoreError.badRequest(detail: "search query has no searchable tokens")
             }
             pattern = parsed

@@ -127,7 +127,11 @@ extension Store {
     }
 
     public func searchKbites(_ req: KbiteSearchRequest) throws -> KbiteSearchResponse {
-        guard let pattern = FTS5Pattern(matchingAllTokensIn: req.query) else {
+        // ORs the query tokens (see Store+DopeSearch for why AND was wrong).
+        // The empty-hit-list answer to an untokenizable query is a DELIBERATE
+        // divergence from DOPE_SEARCH and SEARCH, which throw badRequest; it
+        // predates this change and is left alone.
+        guard let pattern = FTS5Pattern(matchingAnyTokenIn: req.query) else {
             return KbiteSearchResponse(hits: [])
         }
         return try boundaryRead { db in

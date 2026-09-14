@@ -82,9 +82,18 @@ func makeRecallDoors() -> [Tool] {
                 parameters: ["limit"],
                 retryWith: "dope_search_global with a smaller limit, or dope_search_session to stay local"),
             run: { args, client in
-                // scope .project with NO session is what makes this global: the
-                // session-scoped door resolves a session when one is absent, and
-                // that resolution is precisely what this tool must not do.
+                // scope .project with NO session AND NO project_uuid is what
+                // makes this global: a nil project_uuid means every project
+                // (DopeSearchRepository.searchScopeRows), and the session-scoped
+                // door's habit of resolving an absent session is precisely what
+                // this tool must not do.
+                //
+                // BOTH NILS ARE LOAD-BEARING. Filling either one in narrows this
+                // tool to one project or one session and silently un-globals it.
+                // This door already carried the first half of that comment while
+                // the daemon refused a nil project_uuid outright, so every call
+                // it ever made returned BAD_REQUEST. Stating the contract on
+                // both sides is what stops that recurring.
                 try client.dopeSearch(DopeSearchRequest(
                     query: try args.string("query"),
                     scope: .project,

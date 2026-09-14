@@ -24,7 +24,8 @@ extension Store {
         // query is BAD_REQUEST rather than an empty hit list — a silent empty
         // result for a nonsense query is the antipattern the listing
         // contract rejects.
-        guard let pattern = FTS5Pattern(matchingAllTokensIn: req.query) else {
+        // ORs the query tokens (see Store+DopeSearch for why AND was wrong).
+        guard let pattern = FTS5Pattern(matchingAnyTokenIn: req.query) else {
             throw StoreError.badRequest(detail: "search query has no searchable tokens")
         }
         return try boundaryRead { db in
