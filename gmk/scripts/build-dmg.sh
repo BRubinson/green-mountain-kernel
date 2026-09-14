@@ -67,6 +67,16 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-gmcc-ui}"
 CONFIG="Release"
 CONFIG_SUFFIX=""
 
+# arm64 alone by default, matching rebuild_local.sh: the archive was compiling
+# every dependency in the app's graph a second time for x86_64, and the machines
+# this ships to are Apple Silicon. `--universal` opts back up.
+#
+# IT MUST BE A REAL FLAG. rebuild_local.sh --universal used to build its packages
+# universal and then call this script, which hardcoded arm64 — so the published
+# helper was arm64-only while the caller believed otherwise. A flag that is
+# accepted and ignored is worse than one that does not exist.
+ARCH_LIST="arm64"
+
 # gmk/ — the directory holding the one Xcode project, one level up from
 # gmk/scripts/. This script sits beside build_gm.sh rather than under
 # gmk/gmVibes/ because everything in the app's source directory is inside its
@@ -86,6 +96,7 @@ while [ $# -gt 0 ]; do
                 *) echo "error: --config must be Release, Beta or Debug (got '$CONFIG')" >&2; exit 1 ;;
             esac
             ;;
+        --universal) ARCH_LIST="arm64 x86_64"; shift ;;
         -*) echo "error: unknown flag $1" >&2; exit 1 ;;
         *)  VERSION="$1"; shift ;;
     esac
@@ -126,9 +137,13 @@ DEV_ID="$(security find-identity -v -p codesigning 2>/dev/null \
 # ARCHS must match the archive's. A universal app around an arm64-only helper is
 # a bundle that half-works on an Intel machine, which is worse than one that
 # plainly does not.
-echo "==> Building the gm_kernel CLI…"
-swift build -c release --package-path "$ROOT/gmKernel" --arch arm64 >/dev/null
-GM_KERNEL_MACHO="$(swift build -c release --package-path "$ROOT/gmKernel" --arch arm64 --show-bin-path)/gm_kernel"
+echo "==> Building the gm_kernel CLI ($ARCH_LIST)…"
+SWIFT_ARCH_FLAGS=""
+for a in $ARCH_LIST; do SWIFT_ARCH_FLAGS="$SWIFT_ARCH_FLAGS --arch $a"; done
+# shellcheck disable=SC2086
+swift build -c release --package-path "$ROOT/gmKernel" $SWIFT_ARCH_FLAGS >/dev/null
+# shellcheck disable=SC2086
+GM_KERNEL_MACHO="$(swift build -c release --package-path "$ROOT/gmKernel" $SWIFT_ARCH_FLAGS --show-bin-path)/gm_kernel"
 [ -x "$GM_KERNEL_MACHO" ] || {
     echo "error: the CLI build produced no executable at $GM_KERNEL_MACHO" >&2; exit 1; }
 echo "  CLI: $GM_KERNEL_MACHO ($(lipo -archs "$GM_KERNEL_MACHO"))"
@@ -159,7 +174,7 @@ xcodebuild archive \
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$VERSION" \
   GM_KERNEL_MACHO="$GM_KERNEL_MACHO" \
-  ARCHS=arm64 \
+  ARCHS="$ARCH_LIST" \
   ONLY_ACTIVE_ARCH=NO \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGNING_ALLOWED=NO \

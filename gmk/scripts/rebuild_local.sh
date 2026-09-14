@@ -224,7 +224,14 @@ STAGE="$(gm_stage_dir local "$STAGE_VERSION")"
 #             release staging identical instead of merely similar.
 if [ "$BUILD_APP" = 1 ]; then
     echo "[GMB] building the app ($APP_CONFIG) — its helper becomes the staged CLI"
-    bash "$SCRIPT_DIR/build-dmg.sh" --config "$APP_CONFIG" "$VERSION"
+    # FORWARD THE ARCHITECTURE. `--universal` used to stop at the package
+    # builds: this script built arm64+x86_64 and then called a build-dmg.sh that
+    # hardcoded arm64, so the helper it staged — the one that actually ships —
+    # was arm64-only while the caller had every reason to believe otherwise.
+    APP_ARCH_FLAG=""
+    [ "$ARCHES" = "arm64,x86_64" ] && APP_ARCH_FLAG="--universal"
+    # shellcheck disable=SC2086
+    bash "$SCRIPT_DIR/build-dmg.sh" --config "$APP_CONFIG" $APP_ARCH_FLAG "$VERSION"
     APP_BUILT="$GMK/build/gm_kernel.xcarchive/Products/Applications/gm_kernel.app"
     [ -d "$APP_BUILT" ] || {
         echo "[GMB] ERROR: build-dmg.sh produced no app at $APP_BUILT" >&2; exit 1; }
