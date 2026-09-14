@@ -89,6 +89,15 @@ RELEASE_REPO="${GM_DAEMON_RELEASE_REPO:-BRubinson/green-mountain-kernel}"
 
 VERSION="$(cat "$GMK/VERSION")"
 TAG="$GM_TAG_PREFIX$VERSION"
+# "universal" IS HISTORICAL AND THE NAME IS DELIBERATELY FROZEN. The artifact is
+# arm64-only since the Intel slice was dropped, so the word no longer describes
+# the bytes — and it stays anyway. This exact literal is derived INDEPENDENTLY in
+# two other places that are not upgraded in lockstep with this script:
+# plugins/gmcc/scripts/install_gm.sh and .github/workflows/daemon-release.yml.
+# Renaming it here would 404 every installed plugin that has not been regenerated
+# and re-installed, which is precisely the cross-version break the unified
+# release exists to prevent. An inaccurate filename costs nothing; a filename
+# nobody can fetch costs every upgrade.
 ASSET="gm-daemon-$VERSION-macos-universal.tar.gz"
 DMG_ASSET="$GM_APP_NAME-$VERSION.dmg"
 STAGE_VERSION="$VERSION-BETA"
@@ -137,18 +146,26 @@ say "3/8  STAGED ARTIFACT"
 gm_verify_staged "$STAGE" || die "the staged build does not match its own SHA256SUMS"
 
 # lipo, not the manifest. The manifest records what the build INTENDED; lipo
-# reads the bytes that are actually there. A --fast build is caught right here,
-# which is the whole reason that flag is allowed to exist.
+# reads the bytes that are actually there. That distinction is the whole reason
+# this check exists and is unchanged.
+#
+# WHAT CHANGED: x86_64 IS NO LONGER REQUIRED. This loop used to `die` when the
+# Intel slice was absent, telling the operator "this looks like a --fast build".
+# rebuild_local.sh now builds arm64 by default, so that message would fire on
+# every correct release and make publishing impossible. The slice was dropped
+# deliberately — it doubled every compile and link, the toolchain calls it
+# deprecated for this deployment target, and the machines this ships to are
+# Apple Silicon.
+#
+# arm64 IS STILL REQUIRED, and that refusal is kept exactly as it was: an
+# artifact with no arm64 slice cannot execute on any machine this ships to, so
+# shipping one is strictly worse than failing here. The resolved architectures
+# are printed below so an operator can always see what is about to go out.
 for b in $GM_MACHO; do
     archs="$(lipo -archs "$STAGE/$b")"
     case "$archs" in
         *arm64*) ;;
         *) die "$b is missing the arm64 slice (has: $archs)" ;;
-    esac
-    case "$archs" in
-        *x86_64*) ;;
-        *) die "$b is missing the x86_64 slice (has: $archs).
-       This looks like a --fast build. Re-run: bash $SCRIPT_DIR/rebuild_local.sh" ;;
     esac
     codesign --verify --strict "$STAGE/$b" || die "$b fails signature verification"
     echo "  $b  $archs  signed"

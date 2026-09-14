@@ -43,9 +43,24 @@ let appTargetSettings: [SwiftSetting] = [
 let package = Package(
     name: "gmVibesCore",
     // Matches the app target's MACOSX_DEPLOYMENT_TARGET. The string form rather
-    // than `.v27` because that enum case requires swift-tools-version 6.4 and
+    // than `.v26` because that enum case requires swift-tools-version 6.4 and
     // every package in this repo is on 6.0.
-    platforms: [.macOS("27.0")],
+    //
+    // 26, NOT 27, AND THAT IS LOAD-BEARING. The app used to floor at 27 and this
+    // package matched it — but nothing in these sources ever needed 27. The floor
+    // came in sideways: the GMVibes target linked GmAgententicsSdk, which depends
+    // on the vendored gmClaudeForFoundationModels, and BOTH floor at 27. SwiftPM
+    // checks platform floors at GRAPH RESOLUTION, so that one link pinned the
+    // whole app. Nothing imported it. The link is gone from project.pbxproj and
+    // the floor came down with it.
+    //
+    // Verified rather than assumed: building this package at 26 succeeds with
+    // zero errors, and a macOS 26 build of the GMVibes scheme failed ONLY inside
+    // ClaudeForFoundationModels before that link was cut.
+    //
+    // Do not lower it further. There is no requirement to, and a lower number
+    // would widen the support claim to OS versions nobody has built against.
+    platforms: [.macOS("26.0")],
     products: [
         .library(name: "GmVibesCore", targets: ["GmVibesCore"])
     ],

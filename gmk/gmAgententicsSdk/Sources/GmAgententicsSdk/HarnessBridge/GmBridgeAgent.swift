@@ -9,7 +9,12 @@ extension GmBridgeAgent {
     /// harness matches on when deciding whether to delegate — it is a routing
     /// signal, not documentation. "Never auto-delegate" is the load-bearing half
     /// of every workflow agent's line: these are spawned by the phase machine,
-    /// and each carries only the tools its one phase needs.
+    /// and each carries only the tools its one phase needs — except the
+    /// primarch, which walks every phase.
+    ///
+    /// THE RULE: every tool an agent's instruction set names is granted here.
+    /// A withheld one yields no visible refusal — the agent falls back to
+    /// guessing a wire verb through BASH, or, holding no BASH, goes idle.
     public static let all: [File] = [
         file(
             .primarch,
@@ -21,16 +26,34 @@ extension GmBridgeAgent {
                 GmAgentTools.cde.loadPrompt,
                 GmAgentTools.cde.setStatus,
                 GmAgentTools.rpir.next,
+
+                GmAgentTools.rpir.openBriefing,
+                GmAgentTools.rpir.loadExplorationBrief,
+
+                GmAgentTools.rpir.openExploration,
                 GmAgentTools.rpir.getExploration,
                 GmAgentTools.rpir.rankExplorations,
+
+                GmAgentTools.rpir.openClarification,
                 GmAgentTools.rpir.getClarification,
+                GmAgentTools.rpir.answerClarificationQuestion,
                 GmAgentTools.rpir.finalizeClarification,
+
+                GmAgentTools.rpir.openCarePackage,
+                GmAgentTools.rpir.writeCarePackage,
                 GmAgentTools.rpir.closeCarePackage,
+
                 GmAgentTools.rpir.getArchitecture,
                 GmAgentTools.rpir.decideArchitecture,
+                GmAgentTools.rpir.writeArchitecturePersistenceChanges,
+                GmAgentTools.rpir.writeArchitectureGeneralChanges,
+
+                GmAgentTools.rpir.openReview,
                 GmAgentTools.rpir.getReview,
                 GmAgentTools.rpir.rankReviews,
                 GmAgentTools.rpir.resolveReviewFinding,
+                GmAgentTools.rpir.completeReview,
+
                 GmAgentTools.cde.searchFileChanges,
                 GmAgentTools.dope.searchSession,
                 GmAgentTools.dope.searchGlobal,
@@ -46,6 +69,7 @@ extension GmBridgeAgent {
             tools: [
                 GmAgentTools.cde.loadPrompt,
                 GmAgentTools.rpir.openBriefing,
+                GmAgentTools.rpir.loadExplorationBrief,
                 GmAgentTools.rpir.writeBrief,
                 GmAgentTools.rpir.closeBrief,
                 GmAgentTools.cde.searchFileChanges,
@@ -82,6 +106,7 @@ extension GmBridgeAgent {
                 GmAgentTools.rpir.getExploration,
                 GmAgentTools.rpir.rankExplorations,
                 GmAgentTools.rpir.completeExploration,
+                GmAgentTools.rpir.openExploration,
                 GmAgentTools.rpir.openClarification,
                 GmAgentTools.rpir.writeClarificationQuestions,
                 GmAgentTools.rpir.writeClarificationNotes,
@@ -130,6 +155,7 @@ extension GmBridgeAgent {
             tools: [
                 GmAgentTools.cde.loadPrompt,
                 GmAgentTools.rpir.loadExplorationBrief,
+                GmAgentTools.rpir.getClarification,
                 GmAgentTools.rpir.getArchitecture,
                 GmAgentTools.cde.searchFileChanges,
                 GmAgentTools.rpir.openReview,

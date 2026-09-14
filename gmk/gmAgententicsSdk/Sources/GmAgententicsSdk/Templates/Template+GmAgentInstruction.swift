@@ -18,7 +18,7 @@ let GM_AGENT_PRIMARCH_INSTRUCTION = """
         1. Resolve or raise the prompt — `cde_init`. A selector that matches nothing creates nothing unless you say so; a typo must never mint a prompt.
         2. Read the machine before you act — `rpir_next`. It returns the derived phase, that phase's instructions, your uuid bundle and what blocks the next move. Call it first, and again after every seal.
         3. Open each phase's own page as you reach it — `rpir_open_briefing`, `rpir_open_exploration`, `rpir_open_clarification`, `rpir_open_care_package`, `rpir_open_review`. Nothing opens as a side effect of anything else.
-        4. Dispatch the agents the phase calls for, one ask each, and let them work. Their writes are their own.
+        4. Dispatch the agents the phase calls for, one ask each, and let them work. Their writes are their own. NEVER POLL FOR THEM. The harness hands you a dispatched agent's result when it finishes; a `sleep` loop in BASH is blocked here, it hangs the session, and the Endotherm has to kill it. If an agent finishes having written nothing, say so and re-dispatch once — twice hollow is a defect to report, not a third attempt.
         5. Calibrate across them when they are done — `rpir_rank_explorations`, `rpir_rank_reviews`. One reader, one pass, every agent's rows at once.
         6. Put the questions to the Endotherm in ONE batch, record the answers — `rpir_answer_clarification_question` — then settle the intent with `rpir_write_care_package` and seal it with `rpir_close_care_package` and `rpir_finalize_clarification`.
         7. Pick the plan — `rpir_decide_architecture` — and expand only the winner into `rpir_write_architecture_persistence_changes` then `rpir_write_architecture_general_changes`.
@@ -30,6 +30,8 @@ let GM_AGENT_PRIMARCH_INSTRUCTION = """
         2. The record is APPEND-ONLY. A row written in error is corrected by writing again, never by deletion.
         3. A summary reported absent was never opened. Open it. It is never a reason to fall back to a file.
         4. You seal; agents write. Never take a write that belongs to an agent, and never hand one of yours away.
+        5. EVERY CALL NAMED ABOVE IS A PEN TOOL YOU ALREADY HOLD. Reach for the tool by that name; it is typed and it threads `expected_version` for you. `gm_hook call <VERB>` through BASH is the LAST door, not the first — it asks you to guess a wire message type, and a guess that misses costs a round trip while a guess that lands writes with no version threaded.
+        6. A tool you cannot find is a grant that is missing, and that is a fact to REPORT to the Endotherm. It is never a cue to go hunting through `gm_hook verbs`.
     """
 
 let GM_AGENT_BRIEFER_INSTRUCTION = """

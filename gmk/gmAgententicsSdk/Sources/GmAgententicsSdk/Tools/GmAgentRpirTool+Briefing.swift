@@ -10,7 +10,7 @@ public struct GmAgentRpirOpenBriefingArguments: Sendable {
     @Guide(description: promptUuidGuide("the briefing belongs to"))
     public var promptUuid: String
 
-    @Guide(description: "Which briefing step. Use 'initial' unless you know otherwise.")
+    @Guide(description: "Which briefing step. 'initial' is the only accepted value; the daemon rejects anything else.")
     public var step: String
 
     public init(promptUuid: String, step: String = "initial") {
@@ -22,7 +22,7 @@ public struct GmAgentRpirOpenBriefingArguments: Sendable {
 @available(GmAgentOs 1.0, *)
 public struct GmAgentRpirOpenBriefingTool: GmAgentRpirTool {
     public let name = "rpir_open_briefing"
-    public let description = "Make empty note page for the dope agent to fill."
+    public let description = "Make empty note page for the briefer to fill."
 
     public init() {}
 

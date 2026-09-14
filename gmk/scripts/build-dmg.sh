@@ -85,6 +85,19 @@ echo "==> Archiving $SCHEME ($CONFIG) at ${VERSION}…"
 # rather than written into project.pbxproj: the number lives in gmk/VERSION, and
 # a build that edits the project file would dirty the tree that
 # publish_release.sh requires to be clean.
+# ARCHS=arm64 for the same reason rebuild_local.sh dropped the Intel slice: the
+# archive was compiling every dependency in the app's graph — GRDB included —
+# a second time for x86_64, and the machines this ships to are Apple Silicon.
+# This is the app-side half of that saving.
+#
+# ONLY_ACTIVE_ARCH=NO is set alongside it DELIBERATELY. Left at YES the output
+# would depend on the architecture of whatever machine happened to run the
+# archive, which means the same command producing different bits on different
+# builders — exactly the ambiguity a release build must not have.
+#
+# Passed on the COMMAND LINE, like MARKETING_VERSION above and for the same
+# reason: a build that edits project.pbxproj dirties the tree publish_release.sh
+# requires to be clean.
 xcodebuild archive \
   -project "$PROJECT" \
   -scheme "$SCHEME" \
@@ -92,6 +105,8 @@ xcodebuild archive \
   -archivePath "$ARCHIVE" \
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$VERSION" \
+  ARCHS=arm64 \
+  ONLY_ACTIVE_ARCH=NO \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGNING_ALLOWED=NO \
   | grep -E "^(===|\*\*|note:|error:|warning:)" || true

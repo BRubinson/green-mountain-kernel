@@ -10,6 +10,7 @@ extension GmBridgeClaudePlugin {
             Green Mountain Coding Collection — a harness integration for the \
             Green Mountain Kernel, bringing integrated, opinionated coding \
             practices.
-            """
+            """,
+        outputStyles: ["primarch"]
     )
 }
