@@ -295,6 +295,24 @@ final class DaemonConnectionModel {
         let currentSessionCode: String?
     }
 
+    /// The IN-PROCESS event door.
+    ///
+    /// In client mode events arrive over the socket as SUBSCRIBE notifications
+    /// and `route` is reached from the read loop. When this app hosts the writer
+    /// there is no socket and no SUBSCRIBE — the store's post-commit fan-out
+    /// delivers the same `EventNotification` directly, and it needs a way in.
+    ///
+    /// A named door rather than widening `route` itself: the two arrival paths
+    /// should be greppable, and `route` staying private keeps the socket read
+    /// loop the only thing that can reach it by accident.
+    ///
+    /// The CALLER is responsible for being on MainActor by this point. The
+    /// fan-out fires on GRDB's writer thread inside the commit hook, and doing
+    /// UI work there would stall the single writer.
+    func routeInProcess(_ event: EventNotification) {
+        route(event)
+    }
+
     private func route(_ event: EventNotification) {
         guard let kind = DaemonEventKind(rawValue: event.kind) else {
             return // forward compat: unknown kinds bump nothing

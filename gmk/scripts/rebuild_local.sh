@@ -84,18 +84,38 @@ PACKAGES="gmDaemonSdk gmDaemon gmKernel"
 ARCH_FLAGS=""
 ARCHES="arm64"
 ACTIVATE=1
+# Build the APP as well, and stage the CLI out of the bundle it produces.
+#
+# OPT-IN, AND THAT IS DELIBERATE. The default path is the edit-compile loop:
+# three `swift build`s and a symlink swap, a few seconds. Archiving and signing
+# an app bundle on every rebuild is a loop nobody would run, so they would stop
+# running this script — which is worse than the drift `--app` exists to close.
+#
+# WHAT `--app` BUYS: publish no longer BUILDS anything. It promotes the signed
+# bundle this produces. So `--app` is how release bits come into existence, and
+# running it before publishing is what makes "what you tested is what ships"
+# true rather than aspirational.
+BUILD_APP=0
+ENV_EXPLICIT=0
 while [ $# -gt 0 ]; do
     case "$1" in
         # Accepted and intentionally inert — arm64 IS the default now. Kept so an
         # existing caller or habit does not break. See the header.
         --fast)        ;;
         --universal)   ARCH_FLAGS="--arch arm64 --arch x86_64"; ARCHES="arm64,x86_64" ;;
+        --app)         BUILD_APP=1 ;;
         --no-activate) ACTIVATE=0 ;;
         # Which environment's store to build into. Default prod — unchanged for
         # every existing caller. GM_FS_ROOT still wins if it is set explicitly,
         # so a harness minting a scratch root needs no flag at all.
-        --env)         shift; GM_ENV="${1:?--env needs prod|beta|test}" ;;
-        --env=*)       GM_ENV="${1#--env=}" ;;
+        #
+        # THAT PRECEDENCE IS A TRAP WHEN BOTH ARE GIVEN, and it bit during this
+        # change: a shell with GM_FS_ROOT=~/gmfs exported makes `--env beta`
+        # print "environment: beta" and write the PROD store. Silent, and the
+        # kind of silent that costs an afternoon. So an EXPLICIT --env is
+        # recorded and cross-checked below rather than merely absorbed.
+        --env)         shift; GM_ENV="${1:?--env needs prod|beta|test}"; ENV_EXPLICIT=1 ;;
+        --env=*)       GM_ENV="${1#--env=}"; ENV_EXPLICIT=1 ;;
         "") ;;
         *) echo "[GMB] rebuild_local.sh: unknown flag $1" >&2; exit 2 ;;
     esac
@@ -112,6 +132,44 @@ STAGE_VERSION="$VERSION-BETA"
 BUILD_SHA="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
 gm_resolve_fs_root
+
+# ── THE ENVIRONMENT SELECTS THE BUILD CONFIGURATION, one to one ─────────────
+#
+# Each configuration BAKES its root into the bundle's Info.plist, and the baked
+# key — never $GM_FS_ROOT, which a LaunchServices-started app cannot see — is
+# what decides which database that app writes. So an app built for one
+# environment and staged into another is a bundle whose menu bar and whose
+# writes disagree, silently.
+#
+# This is the fix for what used to be a refusal. `--app --env beta` had no
+# configuration to build, so the honest answer was "no". Beta now has one.
+case "$GM_ENV" in
+    prod) APP_CONFIG="Release" ;;
+    beta) APP_CONFIG="Beta" ;;
+    test) APP_CONFIG="Debug" ;;
+    *)    APP_CONFIG="" ;;
+esac
+if [ "$BUILD_APP" = 1 ] && [ -z "$APP_CONFIG" ]; then
+    echo "[GMB] ERROR: --app has no build configuration for environment '$GM_ENV'" >&2
+    exit 2
+fi
+
+# ── AN EXPLICIT --env MUST NOT BE SILENTLY OVERRULED ────────────────────────
+#
+# `gm_resolve_fs_root` lets an inherited GM_FS_ROOT win, which is right for a
+# harness minting a scratch root and wrong the moment somebody ALSO typed --env.
+# The combination prints one environment name and writes another store.
+#
+# Refuse rather than pick. Either value is defensible on its own; together they
+# are a question only the caller can answer, and guessing writes to a store they
+# did not name.
+if [ "$ENV_EXPLICIT" = 1 ] && [ "$GM_FS_ROOT" != "$(gm_env_root "$GM_ENV")" ]; then
+    echo "[GMB] ERROR: --env $GM_ENV means $(gm_env_root "$GM_ENV")," >&2
+    echo "             but GM_FS_ROOT is set to $GM_FS_ROOT." >&2
+    echo "       Drop one of them. Unset GM_FS_ROOT to use --env, or drop --env" >&2
+    echo "       to use the root you exported." >&2
+    exit 2
+fi
 
 # PRINT THE ROOT BEFORE DOING ANYTHING. This script shuts down a daemon and
 # rewrites a release store; an inherited GM_FS_ROOT silently retargeting both
@@ -153,19 +211,82 @@ STAGE="$(gm_stage_dir local "$STAGE_VERSION")"
 # paths, with a comment warning that staging them from one directory would ship a
 # stale copy. That risk is gone with the artifact: there is one file, and the
 # entry-point names become SYMLINKS at activation rather than staged files.
-cp "$KERNEL_BIN/$GM_MACHO" "$STAGE/$GM_MACHO"
+# ── WHERE THE STAGED MACH-O COMES FROM ──────────────────────────────────────
+#
+# Two sources, and which one is used is the whole point of `--app`:
+#
+#   default   the SwiftPM product, copied straight out of the build directory.
+#             Fast, unsigned, right for the edit-compile loop.
+#
+#   --app     the bundle's Contents/Helpers/gm_kernel — the SAME bytes the DMG
+#             ships and the SAME bytes publish promotes, already signed with the
+#             Developer ID. This is the path that makes local staging and
+#             release staging identical instead of merely similar.
+if [ "$BUILD_APP" = 1 ]; then
+    echo "[GMB] building the app ($APP_CONFIG) — its helper becomes the staged CLI"
+    bash "$SCRIPT_DIR/build-dmg.sh" --config "$APP_CONFIG" "$VERSION"
+    APP_BUILT="$GMK/build/gm_kernel.xcarchive/Products/Applications/gm_kernel.app"
+    [ -d "$APP_BUILT" ] || {
+        echo "[GMB] ERROR: build-dmg.sh produced no app at $APP_BUILT" >&2; exit 1; }
 
-for b in $GM_MACHO; do
-    # -S drops debug symbols only; exported symbols and functionality are kept.
-    strip -S "$STAGE/$b"
-    # Stripping INVALIDATES the signature, and arm64 refuses to exec an unsigned
-    # Mach-O at all — so the re-sign is mandatory and must come after the strip,
-    # not before. Ad-hoc is sufficient: these are CLIs installed by curl or built
-    # here, never delivered through Gatekeeper's quarantine path.
-    codesign --force --sign - --timestamp=none "$STAGE/$b" 2>/dev/null
-    codesign --verify --strict "$STAGE/$b" || {
-        echo "[GMB] ERROR: $b failed signature verification after strip" >&2; exit 1; }
-done
+    # BELT AND BRACES ON THE ROOT. build-dmg.sh already refuses a bundle whose
+    # baked root disagrees with its own configuration. This asks a DIFFERENT
+    # question: does it match the store we are about to stage into?
+    #
+    # COMPARE AGAINST $GM_FS_ROOT, NEVER AGAINST THE ENV NAME. An earlier version
+    # of this check derived the expected root from $GM_ENV and therefore agreed
+    # with itself while the actual store was somewhere else entirely — the exact
+    # inherited-GM_FS_ROOT case the refusal above now catches. The root being
+    # WRITTEN is the only thing worth comparing to.
+    BAKED="$(plutil -extract GMFSRoot raw "$APP_BUILT/Contents/Info.plist" 2>/dev/null || echo '')"
+    # The plist stores a tilde path; expand it rather than string-matching two
+    # spellings of the same directory.
+    BAKED_ABS="${BAKED/#\~/$HOME}"
+    if [ "$BAKED_ABS" != "$GM_FS_ROOT" ]; then
+        echo "[GMB] ERROR: the app bakes '$BAKED' ($BAKED_ABS)" >&2
+        echo "             but this run stages into $GM_FS_ROOT." >&2
+        echo "       That app would write one database while sitting beside another's" >&2
+        echo "       binaries. Refusing." >&2
+        exit 1
+    fi
+
+    cp -p "$APP_BUILT/Contents/Helpers/$GM_MACHO" "$STAGE/$GM_MACHO"
+else
+    cp "$KERNEL_BIN/$GM_MACHO" "$STAGE/$GM_MACHO"
+fi
+
+# ── DO NOT TOUCH BITS THAT CAME OUT OF A SIGNED BUNDLE ──────────────────────
+#
+# The strip-and-re-sign below is right for a SwiftPM product: it is unsigned,
+# arm64 refuses to exec an unsigned Mach-O at all, and ad-hoc is all a locally
+# built CLI ever needs.
+#
+# It is WRONG for `--app` bits. That helper was signed with the Developer ID
+# inside the bundle, stripping invalidates that signature, and re-signing ad-hoc
+# replaces it with one Gatekeeper rejects on every machine except this one. The
+# whole reason to stage from the bundle is that these are the shipped bytes —
+# rewriting them here would make the local store and the release disagree in the
+# one way this path exists to prevent.
+if [ "$BUILD_APP" = 1 ]; then
+    for b in $GM_MACHO; do
+        codesign --verify --strict "$STAGE/$b" || {
+            echo "[GMB] ERROR: $b lost its signature on the way out of the bundle" >&2; exit 1; }
+    done
+    echo "[GMB] staged from the signed bundle — not stripped, not re-signed"
+else
+    for b in $GM_MACHO; do
+        # -S drops debug symbols only; exported symbols and functionality are kept.
+        strip -S "$STAGE/$b"
+        # Stripping INVALIDATES the signature, and arm64 refuses to exec an
+        # unsigned Mach-O at all — so the re-sign is mandatory and must come
+        # after the strip, not before. Ad-hoc is sufficient: these are CLIs
+        # installed by curl or built here, never delivered through Gatekeeper's
+        # quarantine path.
+        codesign --force --sign - --timestamp=none "$STAGE/$b" 2>/dev/null
+        codesign --verify --strict "$STAGE/$b" || {
+            echo "[GMB] ERROR: $b failed signature verification after strip" >&2; exit 1; }
+    done
+fi
 
 gm_write_manifest "$STAGE" "$STAGE_VERSION" local "$BUILD_SHA" "$ARCHES"
 

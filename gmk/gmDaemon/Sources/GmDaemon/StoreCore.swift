@@ -30,12 +30,71 @@ import GmDaemonSdk
 final class StoreCore: @unchecked Sendable {
 
     /// Post-commit event fan-out. appendEvent registers each event via GRDB's
-    /// afterNextTransaction(onCommit:), so the sink fires only for committed
+    /// afterNextTransaction(onCommit:), so events fire only for committed
     /// transactions (a rolled-back write can never leak a phantom event) and
-    /// never while the db lock is held. The server registers this once (through
-    /// `Store.eventSink`, which is a real get/set forward onto this property)
-    /// and broadcasts every kind to subscribers.
-    var eventSink: ((PersistedEvent) -> Void)?
+    /// never while the db lock is held.
+    ///
+    /// ## Why this is a TABLE and not one closure
+    ///
+    /// This was `var eventSink: ((PersistedEvent) -> Void)?` — a plain settable
+    /// property, assigned once by the server. Not assign-once: a SECOND
+    /// assignment silently DISPLACED the first, and nothing anywhere reported
+    /// it. That was harmless only while exactly one consumer existed.
+    ///
+    /// The app hosting the writer in-process is the second consumer. Under the
+    /// old shape, `GMVibesServices` taking the sink would have stopped every
+    /// socket client receiving events — no error, no log, just a UI that
+    /// updates and a `gm_hook` that never hears anything again. So the sink
+    /// became a subscription.
+    ///
+    /// ## What a subscriber may do, and it is narrow
+    ///
+    /// `emit` runs INSIDE GRDB's commit hook, on the writer thread, with the
+    /// transaction boundary's thread-local still live. A subscriber that blocks
+    /// stalls the single writer for every other client; one that calls back into
+    /// the store DEADLOCKS. Hand off immediately — queue it, or hop to a
+    /// different executor — and do nothing else here.
+    ///
+    /// Hopping in a subscriber does NOT violate the no-thread-hops-inside-a-
+    /// boundary rule that `StoreBoundary` documents. The commit has already
+    /// landed by the time this fires; the hop is after the boundary's work, not
+    /// inside it.
+    private var subscribers: [UUID: (PersistedEvent) -> Void] = [:]
+
+    /// Guards `subscribers` alone. Subscription happens on whatever thread the
+    /// host boots on; `emit` reads on GRDB's writer thread.
+    private let subscriberLock = NSLock()
+
+    /// Register a post-commit consumer. Returns the token to unsubscribe with.
+    ///
+    /// Subscriptions must be SYMMETRIC: a subscriber that captures `self` and
+    /// never unsubscribes outlives whatever it belonged to.
+    func subscribe(_ sink: @escaping (PersistedEvent) -> Void) -> UUID {
+        let token = UUID()
+        subscriberLock.lock()
+        defer { subscriberLock.unlock() }
+        subscribers[token] = sink
+        return token
+    }
+
+    func unsubscribe(_ token: UUID) {
+        subscriberLock.lock()
+        defer { subscriberLock.unlock() }
+        subscribers.removeValue(forKey: token)
+    }
+
+    /// Fan out to EVERY subscriber. Called from the commit hook only.
+    ///
+    /// The snapshot-then-call shape is deliberate: a subscriber that
+    /// unsubscribes from inside its own callback would otherwise mutate the
+    /// dictionary being iterated, and holding the lock across the callbacks
+    /// would deadlock that same subscriber.
+    func emit(_ event: PersistedEvent) {
+        subscriberLock.lock()
+        let sinks = Array(subscribers.values)
+        subscriberLock.unlock()
+        for sink in sinks { sink(event) }
+    }
 
     // MARK: - Base-field helpers
 
@@ -232,7 +291,7 @@ final class StoreCore: @unchecked Sendable {
             createdAt: createdAt
         )
         db.afterNextTransaction(
-            onCommit: { [weak self] _ in self?.eventSink?(event) },
+            onCommit: { [weak self] _ in self?.emit(event) },
             onRollback: { _ in }
         )
         return uuid

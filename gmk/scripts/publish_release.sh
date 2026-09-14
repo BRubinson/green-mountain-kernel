@@ -25,10 +25,14 @@
 # ── ONE RELEASE, FOUR ASSETS ─────────────────────────────────────────────────
 #
 #   gm_kernel-v<version>
-#   ├── gm-daemon-<version>-macos-universal.tar.gz   gm_kernel (one Mach-O)
-#   ├── gm-daemon-<version>-macos-universal.tar.gz.sha256
-#   ├── gm_kernel-<version>.dmg                      the app (the kernel host)
+#   ├── gm_kernel-<version>.dmg        THE release: the app, with the CLI inside
 #   └── gm_kernel-<version>.dmg.sha256
+#
+# ONE ASSET. The tarball is gone: it carried the same Mach-O the app bundle now
+# holds at Contents/Helpers/gm_kernel, staged twice and versioned by two
+# mechanisms. install_gm.sh mounts the DMG, installs the app, and extracts the
+# CLI out of the installed bundle — so the binary in bin/ is provably the one
+# inside the app beside it.
 #
 # This replaced TWO independent tracks — `daemon-v*` cut here and `gmvibes-v*`
 # cut by a separate script that shared no code with this one. They had separate
@@ -98,7 +102,6 @@ TAG="$GM_TAG_PREFIX$VERSION"
 # and re-installed, which is precisely the cross-version break the unified
 # release exists to prevent. An inaccurate filename costs nothing; a filename
 # nobody can fetch costs every upgrade.
-ASSET="gm-daemon-$VERSION-macos-universal.tar.gz"
 DMG_ASSET="$GM_APP_NAME-$VERSION.dmg"
 STAGE_VERSION="$VERSION-BETA"
 
@@ -241,9 +244,76 @@ else
     export NOTARIZE=1
 fi
 
-bash "$SCRIPT_DIR/build-dmg.sh" "$VERSION" || die "the GMVibes build failed — not publishing"
+# ── PUBLISH PROMOTES. IT DOES NOT BUILD. ────────────────────────────────────
+#
+# This line used to be `bash build-dmg.sh "$VERSION"` — a fresh archive of
+# whatever is in the tree right now, which is not the bundle anyone tested. That
+# made "what you tested is what ships" false for the app, and under
+# bundle-as-artifact it would be false for the CLI too, because the CLI now comes
+# OUT of this bundle.
+#
+# So the division is: `rebuild_local.sh --app --universal` builds and signs;
+# this script notarizes, packages and uploads those exact bytes.
+#
+# THERE IS NO FALLBACK TO BUILDING, deliberately. A fallback is how the old
+# behaviour survived unnoticed for so long: it always worked, so nobody saw that
+# it was working on the wrong bits.
 DMG_BUILT="$GMK/build/$DMG_ASSET"
-[ -f "$DMG_BUILT" ] || die "build-dmg.sh did not produce $DMG_BUILT"
+APP_BUILT="$GMK/build/gm_kernel.xcarchive/Products/Applications/$GM_APP_NAME.app"
+[ -f "$DMG_BUILT" ] || die "no staged DMG at $DMG_BUILT.
+
+       Publish promotes bits that were already built and signed; it does not
+       build them. Produce them first:
+
+           bash gmk/scripts/rebuild_local.sh --app --universal
+
+       That stages the CLI into bin/ from the same bundle this will ship, which
+       is what makes the published binary the one you just tested."
+[ -d "$APP_BUILT" ] || die "the DMG is staged but its archive is gone ($APP_BUILT).
+       Re-run: bash gmk/scripts/rebuild_local.sh --app --universal"
+
+# ── THE STAGED BUNDLE MUST BE A PRODUCTION BUNDLE ───────────────────────────
+#
+# The worst thing this script can do is publish a Beta or Debug bundle to the
+# release namespace: it installs to /Applications AS the production app and
+# writes the wrong database on every machine that upgrades. The baked root is the
+# only honest evidence of which one this is — the filename and the tag are both
+# just labels.
+PUB_ROOT="$(plutil -extract GMFSRoot raw "$APP_BUILT/Contents/Info.plist" 2>/dev/null || echo '')"
+PUB_ENV="$(plutil -extract GMEnvironment raw "$APP_BUILT/Contents/Info.plist" 2>/dev/null || echo '?')"
+[ "$PUB_ROOT" = "~/gmfs" ] && [ "$PUB_ENV" = "prod" ] || die \
+    "the staged bundle bakes '$PUB_ENV' -> '$PUB_ROOT', not 'prod' -> '~/gmfs'.
+
+       Publishing it would install a non-production app AS production and point
+       it at the wrong database. Rebuild for prod:
+
+           bash gmk/scripts/rebuild_local.sh --app --universal"
+
+# ── SLICES, read off the bundle now that there is no tarball to read ─────────
+PUB_HELPER="$APP_BUILT/Contents/Helpers/$GM_MACHO"
+[ -x "$PUB_HELPER" ] || die "the staged bundle carries no $GM_MACHO helper.
+       install_gm.sh takes the CLI out of the bundle, so a helperless app
+       installs and leaves bin/ empty — and gm_hook exits 0 silently when its
+       binary is missing, so the machine records nothing rather than failing."
+PUB_ARCHS="$(lipo -archs "$PUB_HELPER")"
+case "$PUB_ARCHS" in
+    *arm64*) : ;;
+    *) die "the staged helper is [$PUB_ARCHS] — no arm64 slice." ;;
+esac
+echo "  bundle: $PUB_ENV -> $PUB_ROOT, helper [$PUB_ARCHS]"
+
+# The signature has to be a REAL one, and it has to still be intact. A staged
+# bundle that was ad-hoc signed is the case --allow-adhoc exists for; one whose
+# signature no longer verifies has been modified since it was built.
+codesign --verify --strict --deep-verify "$APP_BUILT" >/dev/null 2>&1 \
+    || die "the staged bundle fails signature verification — it was modified after signing."
+if [ "$ALLOW_ADHOC" -eq 0 ]; then
+    codesign -dv "$APP_BUILT" 2>&1 | grep -q "Authority=Developer ID Application" \
+        || die "the staged bundle is not signed with a Developer ID.
+
+       Gatekeeper blocks it on every machine except this one.
+       Publish anyway (private/test release):  --allow-adhoc"
+fi
 
 # The version INSIDE the bundle, read back rather than assumed. The stamp is a
 # build-setting override, and an override that silently failed to apply would
@@ -260,19 +330,26 @@ echo "  $DMG_ASSET  bundle version $BUNDLE_VERSION  ($(du -h "$DMG_BUILT" | cut 
 
 # ── 6. Package ───────────────────────────────────────────────────────────────
 say "6/8  PACKAGE"
-# Flat archive with the three binaries at the root and no version directory to
-# guess — byte-for-byte the shape daemon-release.yml produces, so the installer
-# cannot tell a locally published asset from a CI-built one.
+# ── ONE ARTIFACT ────────────────────────────────────────────────────────────
+#
+# THE TARBALL IS GONE. It held the same Mach-O the app bundle now carries at
+# Contents/Helpers/gm_kernel — one piece of code, staged twice, versioned by two
+# mechanisms (.gm_version for the tarball, MARKETING_VERSION for the app). That
+# is the two-track drift the single-tag release was created to end, reproduced
+# inside a single tag.
+#
+# So the DMG is the release. `install_gm.sh` mounts it, installs the app, and
+# extracts the CLI out of the bundle into $GM_FS_ROOT/bin — which is also what
+# makes the installed binary provably the one inside the installed app.
+#
+# The cost, paid knowingly: the CI fallback could publish a tarball and cannot
+# publish a signed, notarized DMG, so it is deleted. Every release now requires a
+# Mac holding the Developer ID.
 PKG="$GM_RELEASES/.publish.$VERSION"
 rm -rf "$PKG"; mkdir -p "$PKG"
-( cd "$STAGE" && tar -czf "$PKG/$ASSET" $GM_MACHO )
-( cd "$PKG" && shasum -a 256 "$ASSET" > "$ASSET.sha256" )
-echo "  $PKG/$ASSET  ($(du -h "$PKG/$ASSET" | cut -f1))"
-echo "  $(cat "$PKG/$ASSET.sha256")"
 
-# The DMG gets the same sidecar treatment as the tarball. install_gm.sh verifies
-# both before it unpacks or mounts anything, so an asset without a sidecar is an
-# asset the installer refuses.
+# The DMG keeps its sidecar. install_gm.sh verifies the checksum before it mounts
+# anything, so an asset without one is an asset the installer refuses.
 cp "$DMG_BUILT" "$PKG/$DMG_ASSET"
 ( cd "$PKG" && shasum -a 256 "$DMG_ASSET" > "$DMG_ASSET.sha256" )
 echo "  $PKG/$DMG_ASSET  ($(du -h "$PKG/$DMG_ASSET" | cut -f1))"
@@ -305,19 +382,17 @@ One release, one version: the runtime and the app are both \`$VERSION\`.
 
 | Asset | What it is |
 | --- | --- |
-| \`$ASSET\` | Universal (arm64 + x86_64) \`gm_kernel\` — one Mach-O, answering as \`gm_daemon\` / \`gm_mcp\` / \`gm_hook\` via argv[0] |
-| \`$DMG_ASSET\` | The $GM_APP_NAME macOS app |
+| \`$DMG_ASSET\` | **The whole release.** The $GM_APP_NAME app — a menu-bar-resident kernel that owns the database and serves every client — with the \`gm_kernel\` CLI inside it at \`Contents/Helpers\`. The installer takes the app to \`/Applications\` and the CLI to \`\$GM_FS_ROOT/bin\`, where \`gm_daemon\`, \`gm_mcp\` and \`gm_hook\` are symlinks at it. |
 
 $SIGNING_NOTE
 
 Built from \`$HEAD_SHA\` and published with \`gmk/scripts/publish_release.sh\`.
 
-Install or upgrade BOTH with the plugin's installer — it fetches the newest
-\`${GM_TAG_PREFIX}*\` release, verifies each SHA-256 sidecar before unpacking or
-mounting, stages the binaries under
-\`\$GM_FS_ROOT/bin/releases/downloads/$VERSION/\` and the DMG under
-\`\$GM_FS_ROOT/apps/downloads/$VERSION/\`, then installs the app to
-\`/Applications\`:
+Install or upgrade with the plugin's installer — it fetches the newest
+\`${GM_TAG_PREFIX}*\` release, verifies the SHA-256 sidecar before mounting
+anything, stages the DMG under \`\$GM_FS_ROOT/apps/downloads/$VERSION/\`,
+installs the app to \`/Applications\`, and extracts the CLI out of the installed
+bundle into \`\$GM_FS_ROOT/bin/releases/downloads/$VERSION/\`:
 
 \`\`\`bash
 bash plugins/gmcc/scripts/install_gm.sh
@@ -327,9 +402,7 @@ NOTES
 gh release create "$TAG" --repo "$RELEASE_REPO" \
     --title "GM kernel v$VERSION" --notes-file "$PKG/notes.md"
 gh release upload "$TAG" --repo "$RELEASE_REPO" \
-    "$PKG/$ASSET" "$PKG/$ASSET.sha256" \
     "$PKG/$DMG_ASSET" "$PKG/$DMG_ASSET.sha256" --clobber
-echo "  uploaded $ASSET + .sha256"
 echo "  uploaded $DMG_ASSET + .sha256"
 
 # ── 8. Promote locally ───────────────────────────────────────────────────────

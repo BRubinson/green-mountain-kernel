@@ -66,6 +66,7 @@
 				1B40106F2FDCA09200DAF751 /* Sources */,
 				1B4010702FDCA09200DAF751 /* Frameworks */,
 				1B4010712FDCA09200DAF751 /* Resources */,
+				1B4010E02FDCA09300DAF751 /* Embed gm_kernel CLI */,
 			);
 			buildRules = (
 			);
@@ -86,6 +87,26 @@
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1B4010E02FDCA09300DAF751 /* Embed gm_kernel CLI */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(GM_KERNEL_MACHO)",
+			);
+			name = "Embed gm_kernel CLI";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/gm_kernel",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\n# Embed the gm_kernel CLI Mach-O at Contents/Helpers.\n#\n# IT IS COPIED, NEVER BUILT HERE. The CLI is a SwiftPM executable, and running\n# `swift build` from inside an xcodebuild phase means two build systems\n# contending for one build directory. build-dmg.sh builds it FIRST and passes\n# the path in as GM_KERNEL_MACHO.\n#\n# `set -eu` IS LOAD-BEARING. Without it a failed cp leaves the phase green and\n# the bundle helperless, and the only symptom is an install that puts no CLI in\n# bin/ — which, because gm_hook exits 0 silently when its binary is missing,\n# records nothing rather than failing.\n#\n# WHEN GM_KERNEL_MACHO IS UNSET THIS IS A DELIBERATE NO-OP, so a plain Xcode\n# Run still works: a debug build talks to ~/test_gmfs and hosts its own writer\n# in-process, so it needs no helper in its bundle. A RELEASE bundle absolutely\n# does, and build-dmg.sh makes a missing helper FATAL rather than relying on\n# anyone reading this note.\nif [ -z \"${GM_KERNEL_MACHO:-}\" ]; then\n  echo \"note: GM_KERNEL_MACHO unset - no CLI embedded (expected for Xcode Run; build-dmg.sh sets it)\"\n  exit 0\nfi\nif [ ! -x \"$GM_KERNEL_MACHO\" ]; then\n  echo \"error: GM_KERNEL_MACHO=$GM_KERNEL_MACHO is not an executable file\" >&2\n  exit 1\nfi\nHELPERS=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nmkdir -p \"$HELPERS\"\n# -p preserves the mode so the `find -perm +111` signing loop in build-dmg.sh\n# still finds it.\ncp -p \"$GM_KERNEL_MACHO\" \"$HELPERS/gm_kernel\"\ntest -x \"$HELPERS/gm_kernel\" || { echo \"error: helper did not land at $HELPERS/gm_kernel\" >&2; exit 1; }\necho \"embedded gm_kernel ($(lipo -archs \"$HELPERS/gm_kernel\")) at $HELPERS\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXProject section */
 		1B40106B2FDCA09200DAF751 /* Project object */ = {
@@ -271,6 +292,62 @@
 			};
 			name = Release;
 		};
+1B4010B92FDCA09300DAF751 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 4VL4UGNPQQ;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Beta;
+		};
 		1B4010972FDCA09300DAF751 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -353,6 +430,47 @@
 			};
 			name = Release;
 		};
+1B4010BA2FDCA09300DAF751 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=macosx*]" = 4VL4UGNPQQ;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				GM_BUNDLE_SUFFIX = ".beta";
+				GM_ENV = beta;
+				GM_FS_ROOT_BAKED = "~/beta_gmfs";
+				INFOPLIST_FILE = gmVibes/Info.plist;
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 3.9;
+				PRODUCT_BUNDLE_IDENTIFIER = "rube.GMVibes$(GM_BUNDLE_SUFFIX)";
+				PRODUCT_NAME = gm_kernel;
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Beta;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -360,6 +478,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1B4010942FDCA09300DAF751 /* Debug */,
+				1B4010B92FDCA09300DAF751 /* Beta */,
 				1B4010952FDCA09300DAF751 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
@@ -369,6 +488,7 @@
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1B4010972FDCA09300DAF751 /* Debug */,
+				1B4010BA2FDCA09300DAF751 /* Beta */,
 				1B4010982FDCA09300DAF751 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;

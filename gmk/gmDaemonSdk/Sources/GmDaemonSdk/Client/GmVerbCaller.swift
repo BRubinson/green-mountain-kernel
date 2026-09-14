@@ -27,7 +27,14 @@ import Foundation
 /// thread-local `StoreBoundary` correct. An `async` requirement here would
 /// invite an `await` inside a boundary and silently break it — the invariant
 /// `TransactionBoundaryTests` used to pin before it was deleted. Keep it sync.
-public protocol GmVerbCaller {
+/// SENDABLE IS A REQUIREMENT, not decoration. A caller is handed across
+/// executors by design — the app trampolines every verb from MainActor onto a
+/// serial queue, because the verb layer is synchronous and a write against a
+/// large FTS database would otherwise stall the UI. `DaemonClient` is already
+/// `Sendable` (its state is one fd behind a lock) and the kernel's in-process
+/// caller is a struct holding one closure, so this constrains nothing that
+/// existed; it just stops the next conformer from being the one that is not.
+public protocol GmVerbCaller: Sendable {
     /// One request/response round-trip, however the conformer gets there —
     /// over the unix socket, or in-process against the store it already holds.
     func request<Req: Codable & Sendable, Resp: Codable & Sendable>(

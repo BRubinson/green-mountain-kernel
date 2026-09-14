@@ -59,23 +59,29 @@ public final class Store: @unchecked Sendable {
     public let dbPath: String
 
     /// The shared write core. `let`, never `var`: a recreated core would
-    /// silently drop an already-registered event sink, and the daemon would go
-    /// mute while still looking healthy. Held strongly so the retain graph
-    /// Server → Store → core keeps the post-commit closure alive for exactly
-    /// the lifetime it had when appendEvent lived here.
+    /// silently drop every already-registered subscriber, and the daemon would
+    /// go mute while still looking healthy. Held strongly so the retain graph
+    /// Server → Store → core keeps the post-commit closures alive for exactly
+    /// the lifetime they had when appendEvent lived here.
     let core = StoreCore()
 
-    /// Post-commit event fan-out. See StoreCore.eventSink for the contract.
+    /// Register a post-commit event consumer. See `StoreCore.subscribe` for what
+    /// a subscriber is permitted to do — it is narrow, and the fan-out runs on
+    /// the writer thread inside the commit hook.
     ///
-    /// This MUST stay a real get/set forward. Server assigns it AFTER Store
-    /// construction, so a stored property copied into the core at init would
-    /// accept the assignment and quietly discard it — every SUBSCRIBE client,
-    /// GMVibes live refresh and watcher rebuild would go dead with the suite
-    /// still green. EventSinkTests.testSinkIsReassignableAndClearable exists
-    /// for exactly this.
-    public var eventSink: ((PersistedEvent) -> Void)? {
-        get { core.eventSink }
-        set { core.eventSink = newValue }
+    /// THERE IS DELIBERATELY NO `eventSink` SETTER ANY MORE. This was a plain
+    /// settable property, and a second assignment displaced the first with no
+    /// error anywhere. Keeping a compatibility setter alongside the table would
+    /// mean the displacing assignment still compiles, which is the whole bug.
+    /// Two consumers now exist — the socket server and the in-process app host —
+    /// so the old shape is not merely untidy, it is wrong.
+    @discardableResult
+    public func subscribeToEvents(_ sink: @escaping (PersistedEvent) -> Void) -> UUID {
+        core.subscribe(sink)
+    }
+
+    public func unsubscribeFromEvents(_ token: UUID) {
+        core.unsubscribe(token)
     }
 
     public init(path: String) throws {

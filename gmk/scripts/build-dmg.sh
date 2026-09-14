@@ -49,8 +49,23 @@ SCHEME="GMVibes"
 # bundle the build never produced.
 APP_NAME="gm_kernel"
 PROJECT="gmk.xcodeproj"
-CONFIG="Release"
 NOTARY_PROFILE="${NOTARY_PROFILE:-gmcc-ui}"
+
+# ── Which environment's bundle is this? ──────────────────────────────────────
+#
+# THE CONFIGURATION IS THE ENVIRONMENT. Each one bakes its own GMFSRoot into the
+# Info.plist, and the baked key — not $GM_FS_ROOT, which a LaunchServices-started
+# app never sees — is what decides the database an app writes:
+#
+#   Release → ~/gmfs        (prod)    the ONLY thing publish_release.sh may ship
+#   Beta    → ~/beta_gmfs   (beta)    hand-built, hand-delivered, never published
+#   Debug   → ~/test_gmfs   (test)    what Xcode Run produces
+#
+# A Beta bundle is a DIFFERENT APPLICATION to LaunchServices (its bundle id
+# carries `.beta`), so it is its own single writer over its own root rather than
+# a second writer over prod's.
+CONFIG="Release"
+CONFIG_SUFFIX=""
 
 # gmk/ — the directory holding the one Xcode project, one level up from
 # gmk/scripts/. This script sits beside build_gm.sh rather than under
@@ -59,14 +74,35 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-gmcc-ui}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${1:-$(cat "$ROOT/VERSION")}"
+VERSION=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --config)
+            CONFIG="${2:-}"; shift 2
+            case "$CONFIG" in
+                Release) CONFIG_SUFFIX="" ;;
+                Beta)    CONFIG_SUFFIX="-beta" ;;
+                Debug)   CONFIG_SUFFIX="-debug" ;;
+                *) echo "error: --config must be Release, Beta or Debug (got '$CONFIG')" >&2; exit 1 ;;
+            esac
+            ;;
+        -*) echo "error: unknown flag $1" >&2; exit 1 ;;
+        *)  VERSION="$1"; shift ;;
+    esac
+done
+
+VERSION="${VERSION:-$(cat "$ROOT/VERSION")}"
 VERSION="${VERSION#v}"
 [ -n "$VERSION" ] || { echo "error: no version — gmk/VERSION is empty and none was passed" >&2; exit 1; }
 
 BUILD_DIR="$ROOT/build"
 ARCHIVE="$BUILD_DIR/$APP_NAME.xcarchive"
 STAGE="$BUILD_DIR/dmg"
-DMG_PATH="$BUILD_DIR/$APP_NAME-$VERSION.dmg"
+# THE ENVIRONMENT IS IN THE FILENAME. Two DMGs named identically that install
+# two different applications writing two different databases is exactly the
+# ambiguity the per-bundle baked root exists to remove; reintroducing it in the
+# filename would be a joke at our own expense.
+DMG_PATH="$BUILD_DIR/$APP_NAME-$VERSION$CONFIG_SUFFIX.dmg"
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
@@ -80,6 +116,23 @@ DEV_ID="$(security find-identity -v -p codesigning 2>/dev/null \
 # absorbs its leading byte into an unbraced variable name — `$VERSION…` expands
 # a name that does not exist, which under `set -u` kills the script on a line
 # that is only printing a message.
+# ── The CLI comes FIRST, and it is built here rather than by Xcode ──────────
+#
+# `gm_kernel` is a SwiftPM executable. Building it from inside an xcodebuild
+# script phase would put two build systems on one build directory, so the phase
+# only COPIES — this is where the bytes come from, and the path is handed over
+# as GM_KERNEL_MACHO.
+#
+# ARCHS must match the archive's. A universal app around an arm64-only helper is
+# a bundle that half-works on an Intel machine, which is worse than one that
+# plainly does not.
+echo "==> Building the gm_kernel CLI…"
+swift build -c release --package-path "$ROOT/gmKernel" --arch arm64 >/dev/null
+GM_KERNEL_MACHO="$(swift build -c release --package-path "$ROOT/gmKernel" --arch arm64 --show-bin-path)/gm_kernel"
+[ -x "$GM_KERNEL_MACHO" ] || {
+    echo "error: the CLI build produced no executable at $GM_KERNEL_MACHO" >&2; exit 1; }
+echo "  CLI: $GM_KERNEL_MACHO ($(lipo -archs "$GM_KERNEL_MACHO"))"
+
 echo "==> Archiving $SCHEME ($CONFIG) at ${VERSION}…"
 # MARKETING_VERSION/CURRENT_PROJECT_VERSION are overridden on the command line
 # rather than written into project.pbxproj: the number lives in gmk/VERSION, and
@@ -105,6 +158,7 @@ xcodebuild archive \
   -archivePath "$ARCHIVE" \
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$VERSION" \
+  GM_KERNEL_MACHO="$GM_KERNEL_MACHO" \
   ARCHS=arm64 \
   ONLY_ACTIVE_ARCH=NO \
   CODE_SIGN_STYLE=Manual \
@@ -137,6 +191,61 @@ case "$BAKED_ROOT" in
 esac
 BAKED_ENV="$(plutil -extract GMEnvironment raw "$APP/Contents/Info.plist" 2>/dev/null || echo '?')"
 echo "  baked environment: $BAKED_ENV -> $BAKED_ROOT"
+
+# ── …AND IT MUST BE THE ROOT THIS CONFIGURATION ASKED FOR ───────────────────
+#
+# The check above catches an ABSENT key. This one catches a WRONG one, which is
+# the worse failure by a distance: a bundle labelled beta that bakes ~/gmfs
+# writes production while its own menu bar says otherwise, and every safeguard
+# downstream reads the label rather than the root.
+#
+# Cross-check both keys against the configuration, because they come from two
+# separate build settings and disagreeing is itself the bug.
+case "$CONFIG" in
+    Release) WANT_ENV="prod"; WANT_ROOT="~/gmfs" ;;
+    Beta)    WANT_ENV="beta"; WANT_ROOT="~/beta_gmfs" ;;
+    Debug)   WANT_ENV="test"; WANT_ROOT="~/test_gmfs" ;;
+esac
+if [ "$BAKED_ENV" != "$WANT_ENV" ] || [ "$BAKED_ROOT" != "$WANT_ROOT" ]; then
+    echo "error: $CONFIG baked '$BAKED_ENV' -> '$BAKED_ROOT', expected '$WANT_ENV' -> '$WANT_ROOT'." >&2
+    echo "       A bundle whose baked root disagrees with its configuration writes" >&2
+    echo "       the wrong database and says nothing about it. Refusing to build." >&2
+    exit 1
+fi
+
+# ── The CLI must actually be IN the bundle ──────────────────────────────────
+#
+# The bundle is the ONLY shipped artifact now: `install_gm.sh` takes the app from
+# the DMG and the CLI out of the app. A bundle with no helper installs cleanly
+# and leaves $GM_FS_ROOT/bin empty — and because `gm_hook` exits 0 SILENTLY when
+# its binary is missing, the result is a machine that records nothing rather than
+# one that reports a problem.
+#
+# The embed phase is sandboxed and declares this exact path as its output, so it
+# either landed or the build already failed. Check anyway: this assertion is
+# cheap and the failure it guards is silent.
+HELPER="$APP/Contents/Helpers/gm_kernel"
+[ -x "$HELPER" ] || {
+    echo "error: $APP carries no Contents/Helpers/gm_kernel." >&2
+    echo "       The 'Embed gm_kernel CLI' phase did not run or did not land." >&2
+    exit 1; }
+
+# ── Slice verification, which used to live in publish ───────────────────────
+#
+# publish_release.sh read slices off the TARBALL with lipo. The tarball is gone,
+# so the check has to happen where the bits are made or it does not happen at
+# all. Verify the helper and the app's own Mach-O carry the same architectures —
+# a universal app around an arm64-only helper half-works, which is worse than a
+# clean refusal.
+HELPER_ARCHS="$(lipo -archs "$HELPER")"
+APP_ARCHS="$(lipo -archs "$APP/Contents/MacOS/$APP_NAME")"
+echo "  slices: app [$APP_ARCHS], helper [$HELPER_ARCHS]"
+if [ "$HELPER_ARCHS" != "$APP_ARCHS" ]; then
+    echo "error: app is [$APP_ARCHS] but its helper is [$HELPER_ARCHS]." >&2
+    echo "       A bundle whose halves disagree on architecture fails on one machine" >&2
+    echo "       and not another. Refusing to build." >&2
+    exit 1
+fi
 
 # ── Signing: INSIDE-OUT, and `--deep` is gone ────────────────────────────────
 #

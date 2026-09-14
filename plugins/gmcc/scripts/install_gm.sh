@@ -162,6 +162,31 @@ TAG="$FOUND_PREFIX$VERSION"
 ASSET="gm-daemon-$VERSION-macos-universal.tar.gz"
 BASE="https://github.com/$RELEASE_REPO/releases/download/$TAG"
 
+# ── WHICH SHAPE IS THIS RELEASE? ────────────────────────────────────────────
+#
+# Two layouts exist and both must install, because the older one is the rollback
+# target for every machine already running:
+#
+#   current  ONE asset, the DMG. The app carries the CLI at Contents/Helpers, so
+#            the binaries are EXTRACTED FROM THE APP rather than downloaded
+#            separately. One artifact, used twice, which is what stops the
+#            installed binary and the installed app from ever disagreeing.
+#
+#   legacy   the retired `daemon-v*` namespace: a tarball, and no DMG at all.
+#            Those releases cannot be rewritten, so the tarball path stays for
+#            them — and ONLY for them. Deleting it would make the entire
+#            back-catalogue uninstallable.
+#
+# Keyed on the TAG PREFIX rather than on version arithmetic: the prefix is what
+# the release actually was published under, and comparing version numbers to
+# guess a layout is how an installer ends up confidently fetching an asset that
+# was never uploaded.
+if [ "$FOUND_PREFIX" = "$GM_LEGACY_TAG_PREFIX" ]; then
+    LEGACY_NAMESPACE=1
+else
+    LEGACY_NAMESPACE=0
+fi
+
 # THE DMG ASSET NAME IS RESOLVED, NOT ASSUMED.
 #
 # The bundle was renamed GMVibes -> gm_kernel when the app became the kernel
@@ -311,24 +336,50 @@ EOF
     return 0
 }
 
+# ── THE DMG IS THE RELEASE, so it is fetched before anything needs it ───────
+#
+# Both halves come out of this one file: the app is installed from it, and the
+# CLI is EXTRACTED FROM THE APP INSIDE IT. That is what makes the binary in
+# $GM_BIN provably the same build as the app beside it — not two artifacts that
+# agree, but one artifact used twice.
+#
+# Staged under $GM_FS_ROOT first and used FROM the store, never straight out of
+# $TMP, so a re-install or a rollback to this version needs no network.
+STAGED_DMG=""
+if [ "$LEGACY_NAMESPACE" -eq 0 ]; then
+    STAGED_DMG="$(gm_app_dmg "$VERSION")"
+    if [ ! -f "$STAGED_DMG" ] || [ "$MODE" = "force" ]; then
+        echo "[GMB] fetching $TAG from $RELEASE_REPO..."
+        fetch_asset "$DMG_ASSET" || exit 1
+        mkdir -p "$(dirname "$STAGED_DMG")"
+        cp "$TMP/$DMG_ASSET" "$STAGED_DMG"
+    else
+        echo "[GMB] $VERSION is already in the store — using it without a download"
+    fi
+fi
+
 # ── Binaries ─────────────────────────────────────────────────────────────────
 if [ "$BIN_WORK" -eq 1 ]; then
-    # A version that was downloaded before is re-activated rather than
-    # re-fetched. This is what makes rolling between versions cheap and offline.
+    # A version already in the store is re-activated rather than re-extracted.
+    # This is what makes rolling between versions cheap and offline.
     if [ -d "$GM_DOWNLOADS/$VERSION" ] && [ "$MODE" != "force" ] \
        && gm_verify_staged "$GM_DOWNLOADS/$VERSION" 2>/dev/null; then
         echo "[GMB] binaries v$VERSION are already in the store — activating without a download"
         gm_activate downloads "$VERSION"
-    else
-        echo "[GMB] fetching $TAG binaries from $RELEASE_REPO..."
+    elif [ "$LEGACY_NAMESPACE" -eq 1 ]; then
+        # ── THE BACK-CATALOGUE PATH, and it is not optional ─────────────────
+        #
+        # Releases in the retired `daemon-v*` namespace carry a TARBALL and no
+        # DMG. Deleting this branch along with the tarball would make every
+        # release published before the cutover uninstallable — which turns a
+        # rollback, the thing the release store exists for, into a dead end.
+        echo "[GMB] fetching $TAG binaries from $RELEASE_REPO (legacy tarball)..."
         fetch_asset "$ASSET" || exit 1
-
         tar -xzf "$TMP/$ASSET" -C "$TMP"
 
-        # ONE Mach-O expected. A legacy `daemon-v*` tarball carries the three old
-        # binaries instead, so accept either shape: if `gm_kernel` is absent but
-        # `gm_daemon` is present, this is a pre-collapse release and the old names
-        # ARE the artifacts. Q4 keeps that path alive for one more release.
+        # Either shape: a post-collapse tarball holds the one Mach-O; a
+        # pre-collapse one holds three binaries, and back then the NAMES were
+        # the artifacts.
         if [ -f "$TMP/$GM_MACHO" ]; then
             _staged="$GM_MACHO"
         elif [ -f "$TMP/gm_daemon" ]; then
@@ -349,6 +400,38 @@ if [ "$BIN_WORK" -eq 1 ]; then
         for b in $_staged; do cp "$TMP/$b" "$DL/$b"; chmod +x "$DL/$b"; done
         _arch_probe="$(printf '%s\n' $_staged | head -1)"
         gm_write_manifest "$DL" "$VERSION" downloads "$TAG" "$(lipo -archs "$DL/$_arch_probe" 2>/dev/null | tr ' ' ',')"
+        gm_activate downloads "$VERSION"
+    else
+        # ── THE CURRENT PATH: the CLI comes OUT of the app ──────────────────
+        echo "[GMB] extracting the CLI from $GM_APP_NAME $VERSION..."
+        _mnt="$(mktemp -d "${TMPDIR:-/tmp}/gm-cli.XXXXXX")"
+        hdiutil attach "$STAGED_DMG" -nobrowse -readonly -quiet -mountpoint "$_mnt" >/dev/null 2>&1 || {
+            rmdir "$_mnt" 2>/dev/null || true
+            echo "[GMB] ERROR: could not mount $STAGED_DMG" >&2; exit 1; }
+
+        # EITHER BUNDLE NAME, the same allowance gm_install_app makes: a DMG
+        # built before the rename carries GMVibes.app.
+        _app="$_mnt/$GM_APP_NAME.app"
+        [ -d "$_app" ] || _app="$_mnt/$GM_APP_NAME_LEGACY.app"
+
+        _ok=0
+        if [ -x "$_app/Contents/Helpers/$GM_MACHO" ]; then
+            rm -rf "$GM_DOWNLOADS/$VERSION"
+            if gm_stage_from_bundle "$_app" downloads "$VERSION" "$TAG" >/dev/null; then
+                _ok=1
+            fi
+        fi
+
+        # DETACH BEFORE DECIDING. An early exit with the image still attached
+        # leaves a mount behind that the next run cannot replace.
+        hdiutil detach "$_mnt" -quiet >/dev/null 2>&1 || hdiutil detach "$_mnt" -force -quiet >/dev/null 2>&1 || true
+        rmdir "$_mnt" 2>/dev/null || true
+
+        [ "$_ok" -eq 1 ] || {
+            echo "[GMB] ERROR: $DMG_ASSET carries no $GM_MACHO at Contents/Helpers." >&2
+            echo "       It predates the one-bundle layout but is not in the legacy" >&2
+            echo "       namespace either. Install a newer version." >&2
+            exit 1; }
 
         gm_activate downloads "$VERSION"
     fi
@@ -358,21 +441,7 @@ if [ "$BIN_WORK" -eq 1 ]; then
 fi
 
 # ── The app ──────────────────────────────────────────────────────────────────
-#
-# Staged under $GM_FS_ROOT first and installed FROM the store, never straight
-# out of $TMP. A re-install or a roll back to this version then needs no network
-# at all, which is the same property the binary store has.
 if [ "$APP_WORK" -eq 1 ]; then
-    STAGED_DMG="$(gm_app_dmg "$VERSION")"
-    if [ ! -f "$STAGED_DMG" ] || [ "$MODE" = "force" ]; then
-        echo "[GMB] fetching $TAG $GM_APP_NAME from $RELEASE_REPO..."
-        fetch_asset "$DMG_ASSET" || exit 1
-        mkdir -p "$(dirname "$STAGED_DMG")"
-        cp "$TMP/$DMG_ASSET" "$STAGED_DMG"
-    else
-        echo "[GMB] $GM_APP_NAME $VERSION is already in the store — installing without a download"
-    fi
-
     # Before replacing: drop a GMVibes.app this library installed. Two bundles
     # sharing one identifier make LaunchServices ambiguous AND defeat the
     # same-bundle-id check a second copy uses to recognise the first.

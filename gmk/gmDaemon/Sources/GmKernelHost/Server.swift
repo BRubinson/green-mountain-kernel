@@ -48,6 +48,11 @@ final class Server: @unchecked Sendable {
     /// A8 dedupe: instanceUuid → "state|branch" last emitted. Server-queue-
     /// confined; only a genuine head change broadcasts.
     private var lastCheckoutState: [String: String] = [:]
+    /// Our row in the store's post-commit subscriber table. Released in
+    /// `performShutdown` so a stopped server stops being fanned out to — under
+    /// the old single-sink shape there was nothing to release, because there was
+    /// nothing another consumer could have been holding.
+    private var eventToken: UUID?
 
     init(store: Store) throws {
         self.store = store
@@ -64,7 +69,12 @@ final class Server: @unchecked Sendable {
         // only because the server-queue turn that issued the write is blocked
         // inside dbQueue.write for the duration. Do NOT add a
         // dispatchPrecondition(.onQueue(queue)) here; it would trap.
-        store.eventSink = { [weak self] event in
+        //
+        // SUBSCRIBE, never assign. This used to be `store.eventSink = { ... }`,
+        // which a second consumer would have overwritten silently — and the app
+        // hosting the writer in-process IS that second consumer. Both rows now
+        // coexist; see StoreCore.subscribe.
+        self.eventToken = store.subscribeToEvents { [weak self] event in
             self?.broadcast(event.notification)
             self?.watchedStateMayHaveChanged(event.kind)
         }
@@ -203,14 +213,55 @@ final class Server: @unchecked Sendable {
         queue.async { self.performShutdown() }
     }
 
+    /// The HOSTED shutdown: everything `performShutdown` does except `exit(0)`,
+    /// plus one caller-supplied step in the one place it can be correct.
+    ///
+    /// `beforeClose` runs after the listener is cancelled and after DAEMON_STOP
+    /// has gone out, but BEFORE the database closes. That ordering is the whole
+    /// reason this exists. The app's dirty prompt-edit flush used to go through
+    /// the SOCKET, which cannot work once both ends are one process — and even
+    /// in-process it must not run while the listener is still accepting, or a
+    /// write can arrive after the flush has decided what was dirty.
+    ///
+    /// Runs SYNCHRONOUSLY on the caller's thread rather than hopping to the
+    /// server queue: this is called from a terminating app, and an async hop
+    /// would let the process die before the flush landed. The listener is
+    /// already cancelled by then, so there is no concurrent turn to race.
+    func shutdownForHost(beforeClose: () -> Void) {
+        listener.cancel()
+        if let token = eventToken {
+            store.unsubscribeFromEvents(token)
+            eventToken = nil
+        }
+        let group = DispatchGroup()
+        goodbyeGroup = group
+        try? store.recordDaemonStop()
+        goodbyeGroup = nil
+
+        beforeClose()
+
+        try? store.checkpointTruncate()
+        try? store.closeDatabase()
+        unlink(Paths.socket.path)
+        unlink(Paths.pidfile.path)
+        // Deliberately no exit(0) and no group.notify: the app decides when the
+        // process ends, and a goodbye that has not finished sending is a worse
+        // outcome than a slightly late one only when something is waiting to
+        // exit. Nothing here is.
+    }
+
     private func performShutdown() {
         listener.cancel()
+        if let token = eventToken {
+            store.unsubscribeFromEvents(token)
+            eventToken = nil
+        }
         // The DAEMON_STOP goodbye is subscribers' clean-termination signal —
         // gate exit(0) on its send completions (with a timeout fallback)
         // instead of racing the async sends.
         let group = DispatchGroup()
         goodbyeGroup = group
-        try? store.recordDaemonStop()   // sink → subscribers see DAEMON_STOP, then EOF
+        try? store.recordDaemonStop()   // fan-out → subscribers see DAEMON_STOP, then EOF
         goodbyeGroup = nil
         try? store.checkpointTruncate()
         try? store.closeDatabase()
@@ -228,7 +279,19 @@ final class Server: @unchecked Sendable {
     /// is the stale binary — reply, then self-exit so the client's retry
     /// autostarts the fresh build. An older client (a pinned-Kit GMVibes) is
     /// rejected but the daemon stays up — it must never be kill-loopable.
-    func dispatch(line: Data, from client: ClientConnection) -> HandlerResult {
+    /// `client` is OPTIONAL, and nil means an IN-PROCESS caller — the app host
+    /// reaching the same 96 handlers with no socket between them. Only two
+    /// things in this function actually use it: SUBSCRIBE, which registers a
+    /// connection to stream events to, and the re-entrant TX_BATCH / harness
+    /// paths, which thread it so an inner verb resolves the same caller
+    /// identity. Everything else already ignored it.
+    ///
+    /// SUBSCRIBE WITH NO CLIENT IS REFUSED rather than made to work. An
+    /// in-process consumer has a better door — `Store.subscribeToEvents` — and
+    /// faking a connection to reach the socket path would put an in-process
+    /// caller into `connections`, which is server-queue-confined state this
+    /// path never otherwise touches.
+    func dispatch(line: Data, from client: ClientConnection?) -> HandlerResult {
         // Version-FIRST: the pre-head keeps `type` raw so a newer client
         // invoking a message name this build doesn't know still reaches the
         // mismatch branch (and its directional self-exit) instead of dying as
@@ -290,6 +353,17 @@ final class Server: @unchecked Sendable {
                 return try BackupHandler.handle(line: line, head: head, store: store)
 
             case .subscribe:
+                // See the note on `dispatch`: an in-process caller has no
+                // connection to stream to, and Store.subscribeToEvents is the
+                // door it should be using instead.
+                guard let client else {
+                    return errorResult(
+                        type: .error, requestId: head.requestId,
+                        payload: ErrorPayload(
+                            code: .badRequest,
+                            message: "SUBSCRIBE requires a socket connection — an in-process "
+                                + "caller subscribes through the store directly"))
+                }
                 return try handleSubscribe(line: line, head: head, client: client)
 
             case .txBatch:

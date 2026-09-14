@@ -68,10 +68,10 @@ the default so existing callers do not break. Publish still reads slices with
 arm64 slice — only the x86_64 requirement is gone. **Published binaries no longer
 run on Intel Macs, and nothing checks the host architecture at install time.**
 
-The release asset keeps the name `gm-daemon-<v>-macos-universal.tar.gz`. That
-word is now historical and the name is deliberately frozen: the literal is
-derived independently in `install_gm.sh` and `daemon-release.yml`, and renaming
-it would 404 every installer not upgraded in lockstep.
+The tarball asset name `gm-daemon-<v>-macos-universal.tar.gz` survives in ONE
+place — the installer's legacy branch, which is the only thing that still fetches
+one. Frozen rather than tidied: those releases are already published and cannot
+be rewritten, so renaming the literal would 404 the entire back-catalogue.
 
 **`rebuild_local.sh` ALSO GENERATES THE PLUGIN**, by calling
 `generate_plugin.sh` after staging and before activation. It previously did not,
@@ -92,23 +92,36 @@ bash plugins/gmcc/scripts/install_gm.sh          # binaries AND the app
 bash plugins/gmcc/scripts/install_gm.sh --check  # report only, change nothing
 ```
 
-### ONE RELEASE, ONE VERSION — the app ships with the binaries
+### ONE RELEASE, ONE VERSION, ONE ARTIFACT
 
-`gm_kernel-v<version>` carries four assets, all pinned by `gmk/VERSION`:
+`gm_kernel-v<version>` carries TWO assets, both pinned by `gmk/VERSION`:
 
 ```
-gm_kernel-v50.0.2
-├── gm-daemon-50.0.2-macos-universal.tar.gz   gm_kernel (ONE Mach-O)
-├── gm-daemon-50.0.2-macos-universal.tar.gz.sha256
-├── gm_kernel-50.0.2.dmg                      the app — and the writer
-└── gm_kernel-50.0.2.dmg.sha256
+gm_kernel-v54.0.2
+├── gm_kernel-54.0.2.dmg        THE release: the app, with the CLI inside it
+└── gm_kernel-54.0.2.dmg.sha256
 ```
 
-The tarball still ships, for ONE more release. It is the only thing a CI-cut
-release can publish — `daemon-release.yml` cannot build a signed and notarized
-DMG, because the runner holds no Developer ID — so dropping it would make a
-fallback publish produce an empty tag. Retiring it is its own later change, and
-`gmk/scripts/release.sh` is the precedent for how (exit 2 with a pointer).
+**THE TARBALL IS GONE.** It held the same Mach-O the bundle now carries at
+`Contents/Helpers/gm_kernel` — one piece of code, staged twice, versioned by two
+mechanisms (`.gm_version` for the tarball, `MARKETING_VERSION` for the app). That
+is the two-track drift the single-tag release was created to end, reproduced
+inside a single tag.
+
+`install_gm.sh` mounts the DMG, installs the app, and EXTRACTS the CLI out of the
+bundle into `$GM_FS_ROOT/bin`. So the binary in `bin/` is not merely the same
+version as the installed app — it is the same file, taken out of it.
+
+The price, paid knowingly: a CI runner cannot build a signed and notarized DMG,
+so there is **no automated publish path at all**. Every release requires a Mac
+holding the Developer ID. Both workflows were deleted rather than left to fail
+(see "CI is GONE" below).
+
+**Legacy releases still install.** The retired `daemon-v*` namespace carries a
+tarball and no DMG, and those releases cannot be rewritten — so the installer
+keeps the tarball path FOR THAT NAMESPACE ONLY, keyed on the tag prefix rather
+than on version arithmetic. Deleting it would make the entire back-catalogue
+uninstallable, which turns a rollback into a dead end.
 
 This replaced **two independent tracks** — `daemon-v*` from `gmk/VERSION` and
 `gmvibes-v*` from the app's hand-edited `MARKETING_VERSION` — published by two
@@ -188,10 +201,46 @@ payload (`source: ./plugins/gmcc`), so installing the plugin does not distribute
 `publish_release.sh`. On top of that it refuses unless the authenticated `gh`
 user holds push on the repo.
 
-`.github/workflows/daemon-release.yml` is the **fallback**, not the default. Its
-tag trigger was deliberately removed: it would have fired on the tag
-`publish_release.sh` pushes and clobbered the verified assets with a fresh build
-nobody had run. Dispatch it manually when the local path is unavailable.
+**PUBLISH PROMOTES; IT DOES NOT BUILD.** `publish_release.sh` used to run
+`build-dmg.sh` itself — a fresh archive of whatever was in the tree, which is not
+the bundle anyone tested. It now requires a staged signed bundle and refuses,
+loudly and without a fallback, when there is none:
+
+```bash
+bash gmk/scripts/rebuild_local.sh --app --universal   # builds, SIGNS, stages
+bash gmk/scripts/publish_release.sh                   # notarizes, packages, uploads
+```
+
+There is deliberately no fall-back-to-building. A fallback is exactly how the old
+behaviour survived unnoticed: it always worked, so nobody saw it was working on
+the wrong bits.
+
+Publish refuses on any of: no staged DMG, no archive beside it, a bundle whose
+baked `GMFSRoot` is not `~/gmfs`, a bundle whose signature no longer verifies, an
+ad-hoc signature without `--allow-adhoc`, a helper with no arm64 slice, or a
+bundle version that disagrees with `gmk/VERSION`. **The baked-root check is the
+important one** — publishing a Beta or Debug bundle installs it to
+`/Applications` AS production and points it at the wrong database on every
+machine that upgrades.
+
+### CI is GONE — both workflows were DELETED
+
+`.github/workflows/` no longer exists. `daemon-release.yml` went because it could
+only ever publish the tarball and cannot build a signed, notarized DMG — a
+workflow that cannot succeed is worse than an absent one, because it sits in the
+Actions tab inviting a dispatch that cuts an empty tag. `gmk-ci.yml` went with it
+by decision.
+
+What was lost, so nobody rediscovers it as a surprise: per-package `swift build`
+on every push, the `xcodebuild` job for the app, `bash -n` over every shipped
+script, JSON-parsing of the plugin manifests, the semver check on `gmk/VERSION`,
+and the one `swift test` job. **Nothing replaced them.** Verification is now
+whatever a person runs:
+
+```bash
+swift build --package-path gmk/gmKernel
+swift test  --package-path gmk/Gm_Kernel_test
+```
 
 ## Layout
 
@@ -211,7 +260,7 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     under the project. (It used to name `GmToolchainTests` and `GmMcpTests`;
     both are gone, and `Gm_Kernel_test` is the sole test package now.) The project is deliberately kept
     SELF-SUFFICIENT anyway (it still carries its own local package references),
-    because `gmk-ci.yml` and `build-dmg.sh` both drive it with `-project`;
+    because `build-dmg.sh` drives it with `-project`;
     the workspace is an additional door, not a replacement, and neither file
     needed to change.
   - `gmk/gmDaemonSdk/` — the base layer: the wire protocol (including the
@@ -564,44 +613,91 @@ ownership token makes it safe (the loser cannot open the db), and the intended
 UI answer is a DEGRADED client mode rather than a refusal, because a refusal on
 the daily debug path is a guard that gets deleted.
 
-## What this pass did NOT land
+## THE APP IS THE KERNEL — the collapse is DONE
 
-Recorded because every reviewer found the same thing: the documentation above
-described the finished shape while several pieces of it were absent. A gap that is
-written down is a decision; a gap that is not is a lie the next reader inherits.
+This section used to be "What this pass did NOT land", and it was STALE in a way
+that cost real time: it listed `KernelRole`, the menu bar and ⌘Q as missing long
+after they had shipped, so the next reader budgeted to build things that already
+existed. Nothing in here is aspirational. If a claim below is not true of the
+working tree, the section is wrong and must be corrected rather than worked
+around.
 
-**The app does not host the writer yet.** `GmKernelHost` is linked into the app
-target and nothing imports it. Every read still goes over the socket, exactly as
-before. So Q1's shared pool and transaction boundaries are REAL for kernel
-services and for relayed MCP tool bodies, and NOT YET real for the UI.
+**`gm_kernel.app` holds the database, serves the socket, and opens vibe windows
+on demand.** `GMVibesServices.init()` calls `KernelHostRole.arbitrate()` as its
+first statement — before any stored property could reach the store — and the
+three outcomes are:
 
-Missing, all of it named in the approved architecture:
+- **won the flock** → `KernelServices.bootWriter` opens, migrates and binds; the
+  app IS the writer, and `GMCCDaemonService` adopts the in-process verb caller.
+- **lost to a HEADLESS holder** (`Holder.bundlePath == nil`) → bounded takeover:
+  SIGTERM, poll for the lock, boot. Falls back to client mode on timeout.
+  NEVER SIGKILL — the polite signal is what runs the other kernel's ordered
+  shutdown, which is the entire reason the takeover is safe.
+- **lost to ANOTHER APP COPY** (`bundlePath != nil`) → client mode, no fight.
+  An Xcode debug build beside the installed app is the daily case, and each is a
+  different bundle id over a different root anyway.
 
-- `KernelRole` / `KernelWriterBridge` — ownership arbitration on the app's first
-  line of `init()`, the bounded takeover from a headless writer, and the
-  client-only degradation when another app copy holds the lock.
-- `KernelLifecycle` — the ordered termination path. `SHUTDOWN` still means
-  `exit(0)`, and the draft flush still goes THROUGH THE SOCKET, which is the
-  ordering inversion the plan called out: it must move in-process and run before
-  `closeDatabase()`.
-- `KernelServices` — the public façade over `inTransaction`. The mechanism exists
-  in `StoreBoundary`; the named entry point does not.
-- ⌘Q is still `NSApp.terminate`. `CommandGroup(replacing: .appTermination)` is
-  what Q6's "Cmd-Q closes a window, the writer survives" actually requires.
-- `Contents/Helpers/` is never populated. `build-dmg.sh` signs helpers inside-out
-  and the loop is guarded by `[ -d ]`, so today it is a correct no-op — the DMG
-  carries no CLI, and the binaries come from the tarball Q4 kept for one release.
-- `TX_BATCH` has no caller. It is a capability the pen can use, not a path
-  anything currently takes.
-- The `KernelEventBus` fan-in graft from `aggressive` did not land; `eventSink` is
-  still a single assign-once closure. It has one consumer today, so it works —
-  and it will silently displace the first the moment the app becomes the second.
-- `publish_release.sh` still BUILDS the DMG fresh rather than re-signing staged
-  bits, so "what you tested is what ships" remains false for the app.
+**Reads are IN-PROCESS, and the migration was two lines.** Every one of the ~110
+verb methods is declared in `extension GmVerbCaller`; `DaemonClient: GmVerbCaller
+{}` is an EMPTY conformance. So the app's entire data layer — ~50 wrappers in
+`GMCCDaemonService`, ~99 UI sources behind them — swaps transport by changing
+what `perform` is handed. Nothing else moved.
 
-**What this means for the release:** the binaries are the deliverable. The app
-ships renamed, menu-bar-resident and reading vitals off the wire, but it is still
-a client. Nothing above is load-bearing for the binary path.
+**The trampoline in `GMCCDaemonService` is LOAD-BEARING on both transports.** It
+existed because `DaemonClient` is blocking POSIX I/O; it matters at least as much
+in-process, because the verb layer is SYNCHRONOUS and running it on MainActor
+stalls the UI on every write. Do not "simplify" it away now that there is no
+socket.
+
+The thread-hop invariant `TransactionBoundaryTests` used to pin is, for this
+caller, held by the TYPE: `inTransaction` takes a NON-`async` closure, so `await`
+inside a boundary does not compile. That is NARROWER than the deleted test — it
+scanned the verb-layer SOURCES — and must not be described as replacing it.
+
+**Termination is ordered.** `GMVibesAppDelegate.applicationShouldTerminate`
+flushes dirty prompt drafts on a bounded deadline and THEN calls
+`shutdownKernel()`, on both the flush-completed and the timed-out path. The old
+ordering inversion (the flush travelling through the socket) is gone because the
+transport is in-process, not because anything was reordered around it.
+
+**⌘Q closes every window; it does not end the kernel.** `KernelTerminationCommands`
+replaces `.appTermination`. `WindowPresence` drops the activation policy to
+`.accessory` on the last close, so the Dock icon and ⌘-Tab slot disappear exactly
+as on a real quit. The kernel is stopped from ONE place: the menu bar's two-step
+`confirmingQuit`. Filter windows on `canBecomeMain` — the MenuBarExtra's own panel
+is an `NSWindow` and closing it tears down the status item.
+
+**`Contents/Helpers/` IS populated**, by a sandboxed Run Script phase that COPIES
+a prebuilt Mach-O (`GM_KERNEL_MACHO`). It does not build one: `swift build` inside
+an xcodebuild phase puts two build systems on one directory. The phase declares
+its input and output paths because `ENABLE_USER_SCRIPT_SANDBOXING = YES` — without
+that declaration `mkdir` inside the bundle fails with EPERM, and without `set -eu`
+the failure is SILENT and the phase reports success.
+
+**`eventSink` is gone; the store has a SUBSCRIBER TABLE.** It was a plain settable
+property, and a second assignment displaced the first with no error anywhere. That
+was survivable with one consumer. The app is now the second, so
+`Store.subscribeToEvents` / `unsubscribeFromEvents` replace it and there is
+deliberately NO compatibility setter — leaving one means the displacing assignment
+still compiles.
+
+Fan-out runs inside the commit hook on GRDB's writer thread. A subscriber must
+hand off immediately: blocking stalls the single writer for every client, and
+calling back into the store deadlocks. The app's hop to MainActor is OUTSIDE the
+boundary (the commit has landed), which is why it does not violate the rule above.
+
+### Still genuinely absent
+
+- `TX_BATCH` has no caller. A capability the pen can use, not a path anything takes.
+- Nothing app-side is covered by a test. `Gm_Kernel_test` boots a headless binary
+  into a temp root; XCTest cannot launch an app bundle, and the baked `GMFSRoot`
+  would override `GM_FS_ROOT` anyway. Arbitration, takeover, ordered termination,
+  ⌘Q and the event fan-out rest on review and on hand-running in `~/test_gmfs`.
+  This was accepted explicitly, not overlooked.
+- The headless personality is NOT deleted and must not be. `DaemonClient.autostart()`
+  `posix_spawn`s it from hooks, SSH and CI, where LaunchServices cannot launch an
+  application — and spawning a GUI binary directly there mints an AppKit process
+  LaunchServices does not track, i.e. a second writer on every hook call.
 
 ## Build / test loop — the `gmk/` stack
 
@@ -758,13 +854,28 @@ file.** The ten repository contract tests were DELETED in the test rebuild (see
 - The **retired-name contract**. Nothing scans for retired binaries, env vars,
   roots, db filenames or the retired sandbox vocabulary any more.
 - ~~**`gm_releases.sh` exists TWICE and nothing checks the copies agree.**~~
-  **THIS IS FIXED AT v30, and by construction rather than by a check.** The
-  plugin's copy is GENERATED: `gm_bridge_writer` embeds the authored
-  `gmk/scripts/gm_releases.sh` as a Swift constant and emits it into
-  `plugins/gmcc/scripts/`. There is one authoring site, so drift is not
-  something that goes unnoticed — it is something that cannot be expressed.
-  Edit `gmk/scripts/gm_releases.sh` and regenerate; never edit the plugin's copy,
-  which the next regeneration overwrites.
+  ~~**THIS IS FIXED AT v30, and by construction rather than by a check.**~~
+  **THAT CLAIM WAS FALSE, and it was believed for two versions.** It said
+  `gm_bridge_writer` "embeds the authored `gmk/scripts/gm_releases.sh`" so that
+  "drift ... cannot be expressed". The writer embeds NOTHING of the sort: the
+  plugin's copy is rendered from `GmBridgeScript.releaseStoreBody`, a Swift
+  string constant that is a SECOND HAND-MAINTAINED COPY of the same shell.
+
+  **SO THE FILE STILL EXISTS TWICE, and the second site is easy to miss because
+  it does not look like a script.** Caught the only way it could be: a function
+  added to `gmk/scripts/gm_releases.sh` regenerated the plugin cleanly and the
+  plugin's copy did not have it.
+
+  Editing the release store means editing BOTH:
+
+  1. `gmk/scripts/gm_releases.sh` — what the repo-side scripts source.
+  2. `GmBridgeScript.releaseStoreBody` — what the plugin ships.
+
+  Then regenerate, then `diff` the two. Never edit `plugins/gmcc/scripts/gm_releases.sh`
+  directly; it is the artifact, and the next regeneration overwrites it. The
+  proper fix is to make the writer read the authored file at generation time —
+  it runs from the repo, so it could — and that is a real follow-up, not a
+  rewording.
 - The **docs contract** over `plugins/gmcc/` markdown, `hooks.json`,
   `settings.json` and `.mcp.json`. Largely moot since v30: those files are
   GENERATED, so the question is no longer whether they agree with the code but
@@ -851,27 +962,14 @@ bash gmk/scripts/rebuild_local.sh
 bash gmk/scripts/publish_release.sh          # --dry-run to rehearse
 ```
 
-`.github/workflows/daemon-release.yml` is the **fallback**, dispatched manually:
+**THERE IS NO FALLBACK AND NO CI.** Both workflows are deleted. Every release
+requires a Mac holding a Developer ID Application certificate, because the single
+shipped asset is a signed, notarized DMG and a GitHub runner cannot produce one.
 
-```bash
-gh workflow run daemon-release.yml -f version=$(cat gmk/VERSION)
-```
-
-It refuses to publish when the tag and the file disagree, runs the suites, builds
-universal (arm64 + x86_64), verifies both slices are present, and attaches the
-tarball plus its `.sha256`. **This CI fallback still builds universal while the
-local path now builds arm64 only** — the workflow was not moved in the same
-change, so a release cut here is a different shape from one cut locally. Worth
-fixing the next time the fallback is touched. The binaries are staged from their package bin
-paths — `gm_daemon` from `gmDaemon`, `gm_hook` and (since v30) the pen server
-from `gmDaemonSdk`.
-
-**The fallback publishes BINARIES ONLY.** It cannot build the app, because a
-release DMG must be signed with a Developer ID and notarized and the runner has
-no certificate; an unsigned DMG attached there would be refused by Gatekeeper on
-every machine that downloaded it. A release cut in CI is therefore missing its
-app, and `install_gm.sh` skips the app step rather than 404-ing on it. Cut the
-app from a Mac that holds the identity.
+The two commands above are the whole path, and the ORDER matters: `--app` is what
+builds and signs the bundle, and `publish_release.sh` promotes exactly those
+bytes rather than building its own. Publishing without having run `--app` first
+is refused with a pointer, not worked around.
 
 - ~~The binary version is DECOUPLED from the plugin version on purpose.~~
   **REVERSED AT v30: `gmk/VERSION` NOW DRIVES THE PLUGIN TOO.** It is the one
@@ -882,32 +980,19 @@ app from a Mac that holds the identity.
   drift from each other.
   The old decoupling argument still describes a real cost, and it is now the
   ACCEPTED price rather than the avoided one: a markdown-only plugin change
-  forces every install to re-download ~15MB of unchanged binaries. It was
-  accepted because the plugin stopped being hand-edited markdown — it is
-  generated from Swift that ships in the same release, so "the plugin changed
-  but the binaries did not" is a much rarer state than it used to be.
+  forces every install to re-download the DMG. It was accepted because the plugin
+  stopped being hand-edited markdown — it is generated from Swift that ships in
+  the same release, so "the plugin changed but the binaries did not" is a much
+  rarer state than it used to be.
 - The app was already coupled and stays so: `gmk/VERSION` moves the DMG too.
-- **CI runs on `xcode-27`, and that is NOT a typo for `macos-27`.** GitHub
-  publishes no `macos-27` label at all — the macOS 27 image ships under the
-  Xcode-versioned name (`xcode-27` / `xcode-27-xlarge`), arm64 only, GA since
-  2026-09-10; `macos-latest` still resolves to macOS 26. "Correcting" it to
-  `macos-27` yields an unresolvable label and a job that never starts.
-  The floor is 27 rather than 26 because `gmAgententicsSdk` depends on the
-  vendored `gmClaudeForFoundationModels`, whose own floor is 27, and floors are
-  checked at graph resolution. An older runner does not degrade — the package
-  does not resolve at all. This moved with the SDK once already (26 → 27) and
-  will again.
-- All four jobs share the one label so the repo has ONE runner story. Only the
-  `packages` matrix and the `daemon-release` test loop strictly need 27; `gmvibes`
-  and `contracts` moved for consistency and can drop back safely if
-  `xcode-27` capacity ever makes them queue.
-- `.github/workflows/gmk-ci.yml` is one workflow with a matrix: one job per
-  package plus an `xcodebuild` job for gmVibes, so every module gets its own
-  visible check. It over-triggers by design (a gmVibes change also rebuilds
-  gmDaemon) rather than carrying a hand-maintained path-filter copy of the
-  dependency graph. The gmVibes job builds with `CODE_SIGNING_ALLOWED=NO`;
-  release signing stays on the `release-dmg` path.
-
+- **THE macOS 27 FLOOR IS NOT A CI FACT AND SURVIVES CI'S DELETION.**
+  `gmAgententicsSdk` depends on the vendored `gmClaudeForFoundationModels`, whose
+  own floor is 27, and SwiftPM checks platform floors at GRAPH RESOLUTION —
+  before any `@available` scope exists. An older toolchain does not degrade; the
+  package does not resolve at all. Reaching for `@available` to lower it is the
+  plausible-looking move that cannot work. (The `xcode-27` runner-label note that
+  used to sit here went with the workflows: it documented a label nothing selects
+  any more. The FLOOR is unrelated to runners and stays.)
 ## The plugin is GENERATED — `plugins/gmcc` has no hand-written files
 
 ```bash
@@ -1063,19 +1148,44 @@ markdown erodes; this one fails a call.
 pidfile, `flock`, release store and repo clone.
 
 ```
-$HOME/gmfs         prod   the primary environment. NOT managed by gm_env.sh —
-                          `destroy prod` is refused, on purpose.
-$HOME/beta_gmfs    beta   long-lived, refreshable, for trying things
-$HOME/test_gmfs    test   a CHANNEL. Runs get EPHEMERAL roots beneath it.
+root              env    build config   notes
+$HOME/gmfs        prod   Release        the primary environment. NOT managed by
+                                        gm_env.sh — `destroy prod` is refused.
+$HOME/beta_gmfs   beta   Beta           long-lived, refreshable, for trying things
+$HOME/test_gmfs   test   Debug          a CHANNEL. Runs get EPHEMERAL roots beneath it.
 ```
+
+**EACH ENVIRONMENT HAS ITS OWN BUILD CONFIGURATION, and that is what makes it
+real.** The configuration sets three build settings — `GM_FS_ROOT_BAKED`,
+`GM_ENV`, `GM_BUNDLE_SUFFIX` — which the Info.plist and the bundle identifier
+read. So a Beta bundle is a DIFFERENT APPLICATION to LaunchServices, holding its
+own `flock` over its own root. Three roots, three locks, three legitimate single
+writers: the concurrency guarantee REPLICATES rather than weakening.
+
+`Beta` is cloned from **Release**, not Debug — it is something you hand to
+someone, so it carries release optimisation and release signing. Debug exists as
+the test environment only because it is what Xcode Run produces.
+
+Three places cross-check the baked root, and they ask different questions:
+`build-dmg.sh` (does the bundle match the configuration it was built with?),
+`rebuild_local.sh` (does it match the store being staged into?), and
+`publish_release.sh` (is it `~/gmfs`, i.e. may it be published at all?). A build
+labelled beta that bakes `~/gmfs` is the worst outcome available on this path.
 
 ```bash
 bash gmk/scripts/gm_env.sh create  beta     # stage binaries, clone repo, branch, ingest dope
 bash gmk/scripts/gm_env.sh refresh beta     # same code path — a refresh IS a create
 bash gmk/scripts/gm_env.sh doctor  beta
 bash gmk/scripts/gm_env.sh reap    test     # drop run roots whose kernel is gone
-bash gmk/scripts/rebuild_local.sh --env beta
+bash gmk/scripts/rebuild_local.sh --env beta          # binaries only
+bash gmk/scripts/rebuild_local.sh --env beta --app    # + the Beta app bundle
 ```
+
+**`--env` AND AN INHERITED `GM_FS_ROOT` NOW REFUSE TO COEXIST.** `gm_resolve_fs_root`
+lets an exported `GM_FS_ROOT` win, which is right for a harness minting a scratch
+root and silently wrong the moment someone also typed `--env` — it prints one
+environment name and writes another store. That combination cost real time during
+the kernel collapse, so it is now an error rather than a precedence rule.
 
 **PRODUCTION KEEPS `~/gmfs`** and does not become `~/prod_gmfs`. Renaming it
 means rewriting the absolute `daemon_config` roots against the documented

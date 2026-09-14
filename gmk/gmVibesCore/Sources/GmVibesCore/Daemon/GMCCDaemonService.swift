@@ -1,39 +1,96 @@
 import Foundation
 import GmDaemonSdk
 
-/// The single off-main boundary for all daemon socket I/O.
+/// The single off-main boundary for all daemon verb traffic.
 ///
-/// `DaemonClient` is blocking POSIX I/O, so calls are trampolined onto a
-/// dedicated serial DispatchQueue rather than run on a cooperative-pool
-/// thread. The probe client has autostart OFF so health checks report true
-/// daemon state instead of resurrecting a daemon the user killed;
-/// `startDaemon()` is the only autostart path in the app.
+/// ## Two transports, one surface
+///
+/// Every wrapper below calls a method on `GmVerbCaller`, and BOTH transports
+/// conform to it: `DaemonClient` over the unix socket, and the kernel's
+/// in-process caller which re-enters the dispatcher directly. `DaemonClient`'s
+/// conformance is literally empty — all ~110 verb methods live in
+/// `extension GmVerbCaller` — so swapping the transport changes nothing here
+/// and nothing in the ~99 UI sources behind it.
+///
+/// When this app hosts the writer, `adopt(inProcess:)` swaps the socket out and
+/// the socket hop disappears. When another kernel owns the store, the socket
+/// client stays and everything works as it always did.
+///
+/// ## THE QUEUE IS LOAD-BEARING ON BOTH TRANSPORTS
+///
+/// It was introduced because `DaemonClient` is blocking POSIX I/O. It matters
+/// at least as much in-process, for a different reason: the verb layer is
+/// SYNCHRONOUS, so a call runs the handler, the store boundary and the SQLite
+/// write on the calling thread's turn. On MainActor that is a UI stall against
+/// a multi-hundred-megabyte FTS database. This trampoline is what guarantees
+/// that never happens.
+///
+/// It is also half the answer to the transaction-boundary question. `Store`'s
+/// ambient handle is thread-local and correct only while no thread hop occurs
+/// INSIDE a boundary; `inTransaction` takes a non-`async` closure, so `await`
+/// within one does not compile. Hopping to get ONTO the verb layer, as here, is
+/// outside any boundary and is exactly what should happen.
+///
+/// The probe client has autostart OFF so health checks report true daemon state
+/// instead of resurrecting a daemon the user killed; `startDaemon()` is the only
+/// autostart path in the app.
 actor GMCCDaemonService {
     static let shared = GMCCDaemonService()
 
-    private let client = DaemonClient(clientName: "gmvibes", autostart: false)
+    /// The socket transport. Non-nil in CLIENT mode only — in-process there is
+    /// no file descriptor, so there is nothing to redial and nothing to close.
+    ///
+    /// ONE object, referenced twice: `caller` is what verbs go through and
+    /// `socketClient` is what the redial guard needs. Constructing two would
+    /// give the app two connections and make the guard clear a descriptor the
+    /// failing call never used.
+    private var socketClient: DaemonClient?
+    private var caller: any GmVerbCaller
     private let queue = DispatchQueue(label: "gmvibes.daemon.client", qos: .userInitiated)
+
+    init() {
+        let client = DaemonClient(clientName: "gmvibes", autostart: false)
+        self.socketClient = client
+        self.caller = client
+    }
+
+    /// Switch to the in-process transport. Called ONCE, by `GMVibesServices`,
+    /// after arbitration finds this process holds the store.
+    ///
+    /// Adoption rather than injection at init because `shared` is a static
+    /// singleton built eagerly, while arbitration happens later inside
+    /// `App.init()`. A second call is a bug — two adoptions means two
+    /// arbitrations, which means something ran the ownership dance twice.
+    func adopt(inProcess newCaller: any GmVerbCaller) {
+        assert(socketClient != nil, "adopt(inProcess:) called twice")
+        socketClient?.close()
+        socketClient = nil
+        caller = newCaller
+    }
 
     nonisolated static var isInstalled: Bool {
         FileManager.default.isExecutableFile(atPath: Paths.binDaemon.path)
     }
 
     private func perform<T: Sendable>(
-        _ body: @escaping @Sendable (DaemonClient) throws -> T
+        _ body: @escaping @Sendable (any GmVerbCaller) throws -> T
     ) async throws -> T {
         try await withCheckedThrowingContinuation { continuation in
-            queue.async { [client] in
+            queue.async { [caller, socketClient] in
                 do {
-                    continuation.resume(returning: try body(client))
+                    continuation.resume(returning: try body(caller))
                 } catch {
                     // A transport-level failure leaves a dead fd cached inside
                     // DaemonClient (nothing closes it on a thrown roundTrip),
                     // and the next call would skip redialing forever. Force a
                     // fresh dial; a server-reported domain error means the
                     // connection itself is healthy.
-                    if let clientError = error as? DaemonClientError {
+                    //
+                    // Guarded on the SOCKET client: in-process there is no fd
+                    // to go stale, and `GmVerbCaller` has no `close()`.
+                    if let socketClient, let clientError = error as? DaemonClientError {
                         switch clientError {
-                        case .wire, .unreachable, .protocolMismatch: client.close()
+                        case .wire, .unreachable, .protocolMismatch: socketClient.close()
                         case .server: break
                         }
                     }
@@ -51,8 +108,18 @@ actor GMCCDaemonService {
     /// The ONLY call site permitted to spawn the daemon: a throwaway
     /// autostart-enabled client, reached exclusively from the explicit
     /// "Start daemon" affordance.
+    ///
+    /// IN WRITER MODE THIS SPAWNS NOTHING. The kernel is already up, in this
+    /// very process — spawning `$GM_FS_ROOT/bin/gm_daemon` would produce a
+    /// second process that loses the flock and exits 0, which is harmless but
+    /// pointless, and the affordance would appear to do nothing. Answer with
+    /// the local ping instead, which is the truthful response to "is the kernel
+    /// running?" when the asker IS the kernel.
     func startDaemon() async throws -> PingResponse {
-        try await withCheckedThrowingContinuation { continuation in
+        guard socketClient != nil else {
+            return try await ping()
+        }
+        return try await withCheckedThrowingContinuation { continuation in
             queue.async {
                 let launcher = DaemonClient(clientName: "gmvibes-launch", autostart: true)
                 do {

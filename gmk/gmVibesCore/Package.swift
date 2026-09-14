@@ -65,17 +65,22 @@ let package = Package(
         .library(name: "GmVibesCore", targets: ["GmVibesCore"])
     ],
     dependencies: [
-        // EXACTLY TWO, established by counting every import under the old
-        // gmk/gmVibes/: 67 files import GmDaemonSdk, 17 import
-        // GmUxComponentLibrary, and NOTHING imports GmDaemon.
+        // THREE. This was TWO, with a note explaining that nothing imported
+        // GmDaemon and that the app target's GmKernelHost link existed only for
+        // "future writer hosting". THAT FUTURE IS NOW: `GMVibesServices`
+        // arbitrates database ownership and hosts the writer in-process, so it
+        // imports GmKernelHost and the edge belongs here.
         //
-        // That last point is not an oversight to be corrected: the app target
-        // links GmKernelHost for future writer hosting but does not import it,
-        // exactly as CLAUDE.md records. The link stays on the APP target — moving
-        // it here would quietly misrepresent the documented "the app does not
-        // host the writer yet" state.
+        // The edge is safe in both directions that matter. Nothing under
+        // gmDaemon depends on this package, so the graph stays acyclic. And
+        // gmDaemon's platform floor (macOS 14) is BELOW this package's 26, so
+        // adding it moves no floor — the opposite of the gmAgententicsSdk case,
+        // where a macOS 27 dependency pinned the whole app at graph resolution.
+        // Do not confuse the two: floors propagate UPWARD to consumers, and
+        // this consumer is already higher.
         .package(path: "../gmDaemonSdk"),
         .package(path: "../gmUxComponentLibrary"),
+        .package(path: "../gmDaemon"),
     ],
     targets: [
         .target(
@@ -83,6 +88,7 @@ let package = Package(
             dependencies: [
                 .product(name: "GmDaemonSdk", package: "gmDaemonSdk"),
                 .product(name: "GmUxComponentLibrary", package: "gmUxComponentLibrary"),
+                .product(name: "GmKernelHost", package: "gmDaemon"),
             ],
             swiftSettings: appTargetSettings
         ),

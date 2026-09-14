@@ -39,7 +39,14 @@ struct KernelVerbCaller: GmVerbCaller {
     /// Injected rather than reached through a stored `Server`, matching what
     /// `TxBatchHandler` already does — it keeps this testable without standing
     /// up a socket, and it keeps the retain cycle out.
-    let dispatch: (Data) -> HandlerResult
+    ///
+    /// `@Sendable` because `GmVerbCaller` requires `Sendable`, and it requires
+    /// it because a caller genuinely crosses executors: the app hands this one
+    /// from MainActor to the serial queue every verb call is trampolined onto.
+    /// The closure is safe to send — `Server.dispatch` is a `Data -> Data`
+    /// function holding no per-call state, which is the same property that lets
+    /// TX_BATCH and the harness envelope re-enter it.
+    let dispatch: @Sendable (Data) -> HandlerResult
 
     func request<Req: Codable & Sendable, Resp: Codable & Sendable>(
         type: MessageType,

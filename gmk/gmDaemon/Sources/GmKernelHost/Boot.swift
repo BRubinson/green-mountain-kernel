@@ -73,44 +73,47 @@ public enum KernelHost {
             fflush(stdout)
         }
 
-        // --- the writer ---------------------------------------------------
-        let writer: KernelWriter
+        // --- the writer + the server --------------------------------------
+        // ONE sequence, shared with the app host. `KernelServices.bootWriter`
+        // opens the database, refuses one written by newer bits, takes the
+        // pre-migration backup when the ledger is behind, migrates, records the
+        // start and binds the socket. It THROWS rather than exiting, because an
+        // app has to be able to show the refusal; here, exiting is right.
+        //
+        // Watchers (memory + checkout) are owned by the Server's
+        // WatcherSupervisor, built inside server.start() and rebuilt on
+        // CONFIG_SET / CREATE_INSTANCE through the post-commit fan-out. The
+        // supervisor's first rebuild logs the watched state.
+        let services: KernelServices
         do {
-            writer = try KernelWriter.start(consume token, log: log)
+            services = try KernelServices.bootWriter(
+                consume token, personality: "headless", log: log)
         } catch {
             log("db bootstrap failed: \(error)")
             exit(1)
         }
 
-        // --- server -------------------------------------------------------
-        let server: Server
-        do {
-            server = try Server(store: writer.store)
-        } catch {
-            log("cannot bind \(Paths.socket.path): \(error)")
-            exit(1)
-        }
-        server.start()
-        log("kernel pid \(getpid()) protocol v\(GmWireProtocol.version) "
-            + "listening at \(Paths.socket.path) [headless]")
-        // Watchers (memory + checkout) are owned by the Server's
-        // WatcherSupervisor, built inside server.start() and rebuilt on
-        // CONFIG_SET / CREATE_INSTANCE via the post-commit event sink. The
-        // supervisor's first rebuild logs the watched state.
-
         // --- signals ------------------------------------------------------
+        // THE HEADLESS SHUTDOWN STILL EXITS. `Server.shutdown()` ends in
+        // exit(0) after the goodbye lands, which is what a signalled daemon
+        // should do and what `KernelHostRole.takeOver` relies on: an app taking
+        // over sends SIGTERM and then polls for the lock, so this process must
+        // actually go away rather than merely stop serving.
+        //
+        // The app host takes the OTHER door — `KernelServices.shutdown` — which
+        // performs the same ordered teardown and does not exit.
         signal(SIGTERM, SIG_IGN)
         signal(SIGINT, SIG_IGN)
         let sigtermSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
         sigtermSource.setEventHandler {
             log("SIGTERM — shutting down")
-            server.shutdown()
+            services.serverShutdownAndExit()
         }
         sigtermSource.resume()
         let sigintSource = DispatchSource.makeSignalSource(signal: SIGINT, queue: .main)
         sigintSource.setEventHandler {
             log("SIGINT — shutting down")
-            server.shutdown()
+            services.serverShutdownAndExit()
         }
         sigintSource.resume()
 

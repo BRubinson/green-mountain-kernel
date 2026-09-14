@@ -203,6 +203,48 @@ gm_stage_dir() {
     printf '%s\n' "$_d"
 }
 
+# gm_stage_from_bundle <app-path> <channel> <version> [sha]
+#
+# Take the CLI Mach-O OUT of a gm_kernel.app and stage it as a version.
+#
+# ## Why this exists
+#
+# A release used to carry two artifacts: a tarball holding the Mach-O, and a DMG
+# holding the app. The same code, staged twice, versioned by two mechanisms. Once
+# the app hosts the writer they are literally the same binary, and shipping both
+# is how the two-track drift this store was built to end comes back.
+#
+# So the DMG is the artifact and this is the extraction. The app carries the CLI
+# at Contents/Helpers/gm_kernel; everything downstream — the version directory,
+# the manifest, SHA256SUMS, the symlink activation, rollback by swap — is
+# UNCHANGED. Only the source of the bytes moved.
+#
+# ## Do not re-sign what comes out
+#
+# A helper copied out of a signed bundle keeps its signature, and re-signing it
+# here would replace a Developer ID signature with whatever this machine happens
+# to hold — usually nothing.
+gm_stage_from_bundle() {
+    _app="$1"; _channel="$2"; _version="$3"; _sha="${4:-unknown}"
+    _helper="$_app/Contents/Helpers/$GM_MACHO"
+
+    if [ ! -x "$_helper" ]; then
+        echo "[GMB] ERROR: $_app carries no Contents/Helpers/$GM_MACHO" >&2
+        echo "       Nothing to stage. The bundle was built without the embed phase." >&2
+        return 1
+    fi
+
+    _dir="$(gm_stage_dir "$_channel" "$_version")" || return 1
+    # -p so the executable bit survives; gm_staged_binaries tests for it.
+    cp -p "$_helper" "$_dir/$GM_MACHO" || return 1
+
+    _arches="$(lipo -archs "$_dir/$GM_MACHO" 2>/dev/null | tr ' ' ',')"
+    gm_write_manifest "$_dir" "$_version" "$_channel" "$_sha" "${_arches:-unknown}" || return 1
+
+    echo "[GMB] staged $GM_MACHO [$_arches] from $_app"
+    printf '%s\n' "$_dir"
+}
+
 # gm_write_manifest <dir> <version> <channel> <sha> <arches>
 #
 # The manifest answers "what exactly is this and where did it come from" without

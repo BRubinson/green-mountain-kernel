@@ -130,17 +130,46 @@ final class PromptFlushRegistry {
 public final class GMVibesAppDelegate: NSObject, NSApplicationDelegate {
     public override init() { super.init() }
 
+    /// The kernel this process hosts, if it does. Assigned once by
+    /// `GMVibesApp.init` — the delegate is constructed by
+    /// `@NSApplicationDelegateAdaptor` before the services exist, so it cannot
+    /// build its own.
+    ///
+    /// WEAK IS WRONG HERE and strong is deliberate: the whole job is to run
+    /// during termination, which is exactly when other references are going
+    /// away.
+    public var services: GMVibesServices?
+
+    /// TERMINATION IS ORDERED, and the order is the point.
+    ///
+    ///   1. flush dirty prompt drafts, on a bounded deadline
+    ///   2. stop the kernel — listener down, DAEMON_STOP sent, WAL checkpointed,
+    ///      database closed, socket and pidfile unlinked
+    ///
+    /// Step 1 before step 2 because the flush is a WRITE and step 2 closes the
+    /// database. This is the ordering inversion the old code had: the flush went
+    /// through the socket, so it could not have run after the listener was
+    /// cancelled — and once the app hosts the writer, the socket is its own.
+    /// The transport is in-process now, so the flush is an ordinary write and
+    /// only has to beat the close.
+    ///
+    /// The deadline is unchanged and still does not gate on the flush: the save
+    /// path can bottom out in blocking I/O, so a quit must never be hostage to
+    /// it. What DID change is that the kernel shutdown now runs on both
+    /// completion paths — a flush that timed out must not also skip closing the
+    /// database, or the WAL is left for the next boot to recover.
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let registry = PromptFlushRegistry.shared
-        guard registry.hasDirtyDrafts else { return .terminateNow }
-        // Reply on a deadline that never awaits the flush: the save path
-        // bottoms out in non-cancellable blocking socket I/O (no SO_RCVTIMEO),
-        // so gating the reply on it could hang the quit indefinitely. Both
-        // completions run on the main actor, so the fired-once flag is safe.
+        guard registry.hasDirtyDrafts else {
+            services?.shutdownKernel()
+            return .terminateNow
+        }
+        // Both completions run on the main actor, so the fired-once flag is safe.
         var replied = false
-        let finish = {
+        let finish = { [services] in
             if !replied {
                 replied = true
+                services?.shutdownKernel()
                 sender.reply(toApplicationShouldTerminate: true)
             }
         }
