@@ -308,7 +308,10 @@ echo "  bundle: $PUB_ENV -> $PUB_ROOT, helper [$PUB_ARCHS]"
 codesign --verify --strict --deep-verify "$APP_BUILT" >/dev/null 2>&1 \
     || die "the staged bundle fails signature verification — it was modified after signing."
 if [ "$ALLOW_ADHOC" -eq 0 ]; then
-    codesign -dv "$APP_BUILT" 2>&1 | grep -q "Authority=Developer ID Application" \
+    # -dvv, NOT -dv. Single -v prints the identifier and format and NO Authority
+    # lines at all, so the grep never matches and a correctly signed bundle is
+    # rejected as ad-hoc. Both write to stderr, hence the 2>&1.
+    codesign -dvv "$APP_BUILT" 2>&1 | grep -q "Authority=Developer ID Application" \
         || die "the staged bundle is not signed with a Developer ID.
 
        Gatekeeper blocks it on every machine except this one.
