@@ -430,12 +430,6 @@ struct SessionPromptListSidebar: View {
     }
 }
 
-/// THE ONLY BADGE CALL SITE THAT OPTS INTO THE LAUNCH TINT, and that is a
-/// choice rather than a first step. `PromptStatusHeader` sits ~40 points from
-/// the run bar's own swatch, so tinting it duplicates a signal the reader is
-/// already looking at; `SessionScreen`'s search row and `SearchResultsList` are
-/// different scanning contexts. THE PROMPT LIST IS WHERE "which window is this
-/// prompt?" IS ACTUALLY ASKED.
 struct PromptNavRow: View {
     @Environment(LaunchColorRegistry.self) private var launchColors
     let stub: PromptStub

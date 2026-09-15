@@ -7,10 +7,7 @@ import GmDaemonSdk
 // stubs). Right: a three-section code-style editor (backstory / goal / detail)
 // over the selected prompt's daemon row, with version-threaded autosave,
 // in-memory undo/redo, per-section copy, and a toolbar "Run" button that
-// exports the `/gm_bot {seq}` resume command — plus, above the phase pills, a
-// run bar that LAUNCHES that command directly into a coloured iTerm2 pane. The
-// export still exists and is still the fallback when a launch fails; the editor
-// now does both. Drawings/dope tabs live
+// exports the `/gm_bot {seq}` resume command. Drawings/dope tabs live
 // on the SESSION view (SessionScreen); prompt switching here is in-screen so
 // the editor keeps its fast .id(stub.uuid) recreation path.
 
@@ -258,11 +255,6 @@ private struct PromptEditorPane: View {
     @Environment(GMVibesEnvironment.self) private var gmcc
     @Environment(DaemonConnectionModel.self) private var daemon
     @Environment(CatalogStore.self) private var catalog
-    /// Declared here, read by `PromptRunBar`. Both are app-lifetime services
-    /// this pane's run bar depends on — the live branch per instance (its gate)
-    /// and the in-memory launch colours (its swatch) — and naming them at the
-    /// pane's declaration site is how the pane's environment requirements stay
-    /// readable in one place.
     @Environment(CheckoutWatcher.self) private var checkout
     @Environment(LaunchColorRegistry.self) private var launchColors
     let stub: PromptStub
@@ -634,18 +626,11 @@ private struct PromptEditorPane: View {
                 }
                 ScrollView {
                     VStack(spacing: 16) {
-                        // THREE SIBLINGS, never nested: the strip has no say in
+                        // SIBLINGS, never nested: the strip has no say in
                         // whether the header renders, so a strip that draws
                         // nothing (no workflow row, an unrecognised variant,
                         // a failed BOT_NEXT) still leaves a working
                         // lifecycle control behind.
-                        //
-                        // The run bar joins them on the same terms, and the
-                        // invariant matters MORE for it than for the other two:
-                        // it must not gate on `phases.workflow`, because a
-                        // prompt with no workflow row is exactly the one you
-                        // want to press Play on. Gating on the strip's data
-                        // would disable the control in the case it exists for.
                         PromptStatusHeader(stub: stub, phases: phases, store: store)
                         PromptRunBar(stub: stub,
                                      windowID: windowID,
@@ -1057,11 +1042,6 @@ private struct PromptEditorPane: View {
         VSCode.open(url)
     }
 
-    // The ONE caller of ITerm.open. The call site is unchanged, but what is
-    // behind it is not: ITerm.open is now MainActor, awaits the Dynamic Profile
-    // write before launching (closing the cold-start race), and reaches iTerm2
-    // over its API with an NSWorkspace/Finder fallback rather than through
-    // AppleScript.
     private func openInITerm(_ url: URL?) {
         guard let url else { return }
         ITerm.open(dir: url, instanceUUID: windowID.instanceUUID,

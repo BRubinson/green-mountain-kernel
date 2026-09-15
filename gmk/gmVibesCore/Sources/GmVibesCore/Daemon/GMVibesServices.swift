@@ -18,11 +18,6 @@ public final class GMVibesServices {
     /// App-lifetime, like CatalogStore: the project rail, the session pane
     /// and every prompt row read one store.
     let diagramCatalog: DiagramCatalogStore
-    /// Which colour each prompt's launched iTerm2 pane wears. APP-LIFETIME
-    /// because `PromptRunBar` and `PromptNavRow` must read ONE store, and
-    /// IN-MEMORY because the launch colour is deliberately not persisted — it
-    /// describes a window that is open now, and is absent after a restart by
-    /// design.
     let launchColors: LaunchColorRegistry
 
     public init() {

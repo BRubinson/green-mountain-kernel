@@ -15,15 +15,10 @@ import SwiftUI
 /// behavioural contract of Feature 1, and it is why the highlight is bound to
 /// `BotLauncherPreference` rather than to a `@State` selection.
 ///
-/// GMVibes has no RETURN channel into the session it launches; the launch is
-/// fire-and-forget. So there is deliberately nothing here about reconcile
-/// behavior or per-role model/effort — no stub, no disabled control, no
-/// "coming soon". A disabled control is a promise this architecture cannot
-/// keep.
-///
-/// `PromptRunBar`'s disabled Play is NOT a counterexample to that last rule: it
-/// is disabled for a STATED, ACTIONABLE reason shown next to it ("On `x`, this
-/// prompt needs `y`"), which is the opposite of a stub.
+/// GMVibes has no channel into the session it launches, so there is
+/// deliberately nothing here about reconcile behavior or per-role
+/// model/effort — no stub, no disabled control, no "coming soon". A disabled
+/// control is a promise this architecture cannot keep.
 struct BotLauncherCluster: View {
     /// The prompt's daemon-allocated per-session seq — bot commands resolve
     /// prompts by seq, not uuid.

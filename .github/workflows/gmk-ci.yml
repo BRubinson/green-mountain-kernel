@@ -85,13 +85,6 @@ jobs:
           # The rows are KEPT rather than collapsed into one because they are
           # what makes a break legible: a red `gmMcp` row names the package
           # immediately, where a single job would just say the graph failed.
-          #
-          # THE gmITerm2Client ROW IS THE ONLY THING THAT COMPILES THE COMMITTED
-          # GENERATED PROTOBUF, so a bad regeneration is caught HERE AND NOWHERE
-          # ELSE. Do NOT add a protoc step to fix that: this runner has no
-          # protobuf toolchain, and the generated Swift is committed for exactly
-          # that reason (see gmk/gmITerm2Client/PROTO.md for the regeneration
-          # recipe and the read-the-diff rule).
           - package: gmDaemonSdk
             mode: build
           - package: gmDaemon

@@ -10,7 +10,7 @@
 // to any Swift file in this repo and every request fails
 // `No language service found`.
 //
-// Declaring the nine real packages as path dependencies puts them all in one
+// Declaring the eight real packages as path dependencies puts them all in one
 // resolved graph that the language server can answer from. Nothing else in the
 // repo reads this file: the build and release path is `gmk/scripts/`, CI drives
 // the packages individually, and `gmk/` remains the one home for every Swift
@@ -37,10 +37,6 @@ let package = Package(
         .package(path: "gmk/gmAgententicsSdk"),
         .package(path: "gmk/gmClaudeForFoundationModels"),
         .package(path: "gmk/gmVibesCore"),
-        // NOT cosmetic. A package missing from this list gets NO LANGUAGE
-        // SERVICE at all, and every import inside it reports "No such module" —
-        // sourcekit-lsp picks its build system from a manifest AT THE WORKSPACE
-        // ROOT and does not search downward.
         .package(path: "gmk/gmITerm2Client"),
     ]
 )
