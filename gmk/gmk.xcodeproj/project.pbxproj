@@ -124,6 +124,7 @@
 				1B4010A82FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmMcp" */,
 				1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "Gm_Kernel_test" */,
 				1B4010D32FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmVibesCore" */,
+				1B4010E42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmITerm2Client" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1B4010742FDCA09200DAF751 /* Products */;
@@ -298,6 +299,7 @@
 				GM_FS_ROOT_BAKED = "~/test_gmfs";
 				INFOPLIST_FILE = gmVibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "GMVibes opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -339,6 +341,7 @@
 				GM_FS_ROOT_BAKED = "~/gmfs";
 				INFOPLIST_FILE = gmVibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "GMVibes opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -409,6 +412,10 @@
 		1B4010D32FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmVibesCore" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = gmVibesCore;
+		};
+		1B4010E42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmITerm2Client" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = gmITerm2Client;
 		};
 /* End XCLocalSwiftPackageReference section */
 

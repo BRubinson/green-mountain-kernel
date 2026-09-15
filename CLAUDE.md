@@ -173,14 +173,14 @@ nobody had run. Dispatch it manually when the local path is unavailable.
 ## Layout
 
 - `gmk/` — the new home of every Swift deliverable: one Xcode project
-  (`gmk/gmk.xcodeproj`) over seven shipped packages, plus an eighth that ships
-  nothing and holds the repository's ONE test suite, plus a ninth that is
+  (`gmk/gmk.xcodeproj`) over EIGHT shipped packages, plus a ninth that ships
+  nothing and holds the repository's ONE test suite, plus a tenth that is
   **vendored third-party source and authored nowhere in this repo**.
-  (The eighth slot used to be `gmToolchain`, the contract-test package. It was
-  DELETED in the test rebuild; `Gm_Kernel_test` occupies the slot now, and the
-  count is unchanged by coincidence rather than by design.)
+  (The test slot used to be `gmToolchain`, the contract-test package. It was
+  DELETED in the test rebuild; `Gm_Kernel_test` occupies it now. The eighth
+  shipped package is `gmITerm2Client`, which arrived with the run bar.)
   - **Open `gmk/gmk.xcworkspace`, not the project.** The workspace lists the
-    project alongside seven packages as first-class members, which is the
+    project alongside eight packages as first-class members, which is the
     only arrangement in which Xcode generates schemes for a package's TEST
     targets — `GmKernelTests` exists under the workspace and does not exist
     under the project. (It used to name `GmToolchainTests` and `GmMcpTests`;
@@ -272,19 +272,43 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     must be reachable the same way. Zero external dependencies of its own, which
     is what keeps it a self-contained copy rather than the head of a tree.
   - `gmk/gmMcp/` — the `gm_mcp` MCP pen server.
+  - `gmk/gmITerm2Client/` — the iTerm2 transport, and the only way the app opens
+    a pane. It holds the vendored `api.proto`, the **COMMITTED** generated Swift
+    (CI has no `protoc`, and that cost was accepted at decision time — `PROTO.md`
+    carries the regeneration recipe and the rule that the diff is read before it
+    is accepted), four lifted transport files, a typed error enum and ONE public
+    façade. Four things a reader must not re-derive wrongly:
+    - **It carries the tree's FIRST remote non-GRDB pin** (SwiftProtobuf),
+      confined to this package exactly as GRDB is confined to `gmDaemon`.
+      Nothing generated crosses its actor boundary, so `gmVibesCore` never
+      imports SwiftProtobuf.
+    - **It is NONISOLATED by default while `gmVibesCore` is MainActor by
+      default**, and that asymmetry is deliberate rather than an oversight in
+      one of them.
+    - Its blocking POSIX socket I/O runs on a `DispatchSerialQueue`-backed actor
+      executor, **never the cooperative pool** — a 30-second blocking `recv` on
+      a pool thread can starve every other async in the app.
+    - **It is GMCC-AGNOSTIC by construction**: it takes a ready-made command
+      string and knows nothing of `GM_FS_ROOT`, `gm_hook`, prompts or bot tiers.
+      That is why the script builder lives in `gmVibesCore`, which already has
+      `Paths`.
   - `gmk/gmVibes/` — the GMVibes macOS app target, and now a **THIN** one: it
     holds `GMVibesApp.swift` (the `@main` entry point), `Assets.xcassets` and a
     README, and nothing else. Release via the `release-dmg` skill.
-  - `gmk/gmVibesCore/` — the seventh shipped package, holding the app's ~99
+  - `gmk/gmVibesCore/` — the shipped package holding the app's ~99
     sources. They
     moved out of the Xcode target so that **sourcekit-lsp can resolve them**: the
     language server reads SwiftPM, `compile_commands.json` or `buildServer.json`
     and is **not** an Xcode client, so a source that lives only in an Xcode
     target gets no build settings and reports `No such module 'GmDaemonSdk'` on
     every import. See the root `Package.swift` note below. Depends on
-    `gmDaemonSdk` and `gmUxComponentLibrary` and on nothing else — **not** on
+    `gmDaemonSdk`, `gmUxComponentLibrary` and `gmITerm2Client`, and on nothing
+    else — **not** on
     `gmDaemon`: the app target links `GmKernelHost` for future writer hosting but
     nothing imports it, so that link stays on the APP target.
+    The `gmITerm2Client` edge is what `PromptRunBar`'s Play button launches
+    through; it adds no wire verb and no daemon involvement, because the app
+    talks to iTerm2 directly.
     Its manifest is **swift-tools-version 6.2** while the rest of the repo is on
     6.0, because `defaultIsolation` does not exist before 6.2. That setting is
     not a preference: `project.pbxproj` compiles the app target with
@@ -298,7 +322,7 @@ nobody had run. Dispatch it manually when the local path is unavailable.
     `DaemonConnectionModel` would drag an entire observable model into the public
     surface to serve a handful of reads. Raise nothing to `public` that
     `GMVibesApp.swift` does not name.
-  - `gmk/Gm_Kernel_test/` — the eighth package, and the only one that **ships
+  - `gmk/Gm_Kernel_test/` — the ninth package, and the only one that **ships
     nothing** (`products: []`). The repository's ENTIRE test suite: one shared
     environment per test process, a real `gm_kernel` booted against a temporary
     root, driven over the wire and read back with read-only SQL. Subfoldered per
@@ -333,6 +357,9 @@ gmDaemonSdk ──┬── gmDaemon ─────────────┐
               ├── gmUxComponentLibrary ─┼── gmVibesCore ── gmVibes  (the app)
               ├── gmMcp ────────────────┤                  (a THIN target:
               ├─────────────────────────┘                   @main + Assets)
+              │                         │
+              │  gmITerm2Client ────────┘   (SwiftProtobuf, confined here)
+              │
               ├── gmAgententicsSdk ──┐
               │                      │  (vendored, zero deps of its own)
               │ gmClaudeForFoundationModels ──┘
@@ -340,6 +367,11 @@ gmDaemonSdk ──┬── gmDaemon ─────────────┐
               └── gmKernel  ← links GmKernelHost + GmMcpServer + GmHookCli
                               (the CLI half: one Mach-O, three personalities)
 ```
+
+`gmITerm2Client` hangs off nothing in this tree — it does not depend on
+`gmDaemonSdk` and it is GMCC-agnostic by construction. It **cannot cycle** for
+the strongest available reason: nothing depends on it except `gmVibesCore`, and
+its only dependency is remote.
 
 `gmVibes` now takes an edge on `gmDaemon` — the LINK is in place and the app is
 where the writer will be hosted. **It does not host it yet**; see "What this pass
@@ -499,6 +531,12 @@ Missing, all of it named in the approved architecture:
   and it will silently displace the first the moment the app becomes the second.
 - `publish_release.sh` still BUILDS the DMG fresh rather than re-signing staged
   bits, so "what you tested is what ships" remains false for the app.
+- **The GM pane is OUTBOUND ONLY.** `PromptRunBar` starts a Claude Code session
+  in an iTerm2 window and learns nothing further about it: no return channel, no
+  feedback, no hooks, no generated MCP config, no native-model routing, and
+  `TX_BATCH` still has no caller. The four amended doc comments in `gmVibesCore`
+  say "no **RETURN** channel" for exactly this reason and **must not be read as
+  promising one** — what stays true in all of them is that nothing comes back.
 
 **What this means for the release:** the binaries are the deliverable. The app
 ships renamed, menu-bar-resident and reading vitals off the wire, but it is still
@@ -519,6 +557,7 @@ swift build --package-path gmk/gmDaemon
 swift build --package-path gmk/gmUxComponentLibrary
 swift build --package-path gmk/gmMcp
 swift build --package-path gmk/gmAgententicsSdk
+swift build --package-path gmk/gmITerm2Client
 swift build --package-path gmk/gmVibesCore
 # gmk/gmClaudeForFoundationModels is VENDORED. It gets NO CI job of its own, and
 # that is a decision, not an oversight: it is already COMPILE-GATED in CI as a

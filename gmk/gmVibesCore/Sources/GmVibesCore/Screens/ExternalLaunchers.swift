@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import GmDaemonSdk
+import GmITerm2Client
 
 // External-app launchers + the bot tier catalog, moved verbatim out of
 // SessionPromptEditorView.swift (they are not editor code).
@@ -8,7 +9,10 @@ import GmDaemonSdk
 // MARK: - Bot fidelity tiers
 
 // The three GMCC bot fidelity tiers. Each maps to a resume command that the
-// editor copies to the clipboard for the user to paste into Claude Code.
+// editor copies to the clipboard for the user to paste into Claude Code — and,
+// since the run bar landed, the same command the launched pane execs directly.
+// The clipboard route still exists and is still the fallback when a launch
+// fails; it is no longer the only route.
 enum BotTier: String, CaseIterable, Identifiable {
     case gmBot     = "/gm_bot"
     case gmBotRPI  = "/gm_bot_rpi"
@@ -55,9 +59,14 @@ enum BotTier: String, CaseIterable, Identifiable {
 /// Feature 1, in full: which slash command the resume-command launcher emits
 /// when invoked without an explicit choice, and which tier the cluster
 /// highlights. App-side `UserDefaults` — deliberately NOT dope, NOT
-/// `daemon_config`, NOT a `run_option_profile`: GMVibes has no runtime
-/// channel into the Claude Code session its buttons launch, so this is a
-/// preference about the clipboard string and nothing more.
+/// `daemon_config`, NOT a `run_option_profile`: GMVibes has no RETURN channel
+/// into the Claude Code session its buttons launch; the launch is
+/// fire-and-forget. So this is a preference about the clipboard string and
+/// nothing more.
+///
+/// THAT LAST CLAUSE IS STILL LITERALLY CORRECT AFTER THE RUN BAR LANDED, and it
+/// is worth leaving standing as evidence that the contract held: `PromptRunBar`
+/// seeds its tier from this preference as `@State` and NEVER writes it back.
 ///
 /// It is set **explicitly**, through `BotLauncherCluster`'s inline picker —
 /// never learned from the last tier clicked. A user copying `/gm_bot` once to
@@ -123,23 +132,77 @@ enum VSCode {
 // Falls back to NSWorkspace open-at-dir, then a Finder reveal — mirroring VSCode.
 enum ITerm {
     // Writes the per-instance Dynamic Profile OFF the main thread, then opens the
-    // window ON the main thread. Both the file write and a cold-iTerm AppleScript
-    // launch are slow enough to hitch the UI if run inline from the button action.
+    // window. The profile write is AWAITED before the launch, which also closes
+    // the cold-start race where iTerm2 read its dynamic profiles before we
+    // finished writing ours.
+    @MainActor
     static func open(dir: URL, instanceUUID: UUID, instanceName: String) {
-        let guid = "gmvibes-\(instanceUUID.uuidString)"
-        let name = "GMVibes — \(instanceName)"
-        Task.detached(priority: .userInitiated) {
-            let wrote = writeProfile(guid: guid, name: name, workingDir: dir.path)
-            await MainActor.run { launch(dir: dir, profileName: name, profileWritten: wrote) }
+        Task {
+            let profileName = await ensureProfile(instanceUUID: instanceUUID,
+                                                  instanceName: instanceName,
+                                                  workingDir: dir.path)
+            await launch(dir: dir, profileName: profileName)
         }
     }
 
-    // Open a window for the per-instance profile, falling back to NSWorkspace
-    // open-at-dir, then a Finder reveal — mirroring VSCode. NSAppleScript must run
-    // on the main thread (TN2097), so this whole step is MainActor-isolated.
+    /// Write (or rewrite) this instance's Dynamic Profile and return its NAME on
+    /// success, nil on failure.
+    ///
+    /// Exposed so `PromptRunBar` REUSES it rather than growing a second copy of
+    /// the profile-writing rules. The actual file work runs off the main actor.
+    static func ensureProfile(instanceUUID: UUID,
+                              instanceName: String,
+                              workingDir: String) async -> String? {
+        let guid = "gmvibes-\(instanceUUID.uuidString)"
+        let name = "GMVibes — \(instanceName)"
+        return await Task.detached(priority: .userInitiated) {
+            writeProfile(guid: guid, name: name, workingDir: workingDir) ? name : nil
+        }.value
+    }
+
+    // A TWO-RUNG LADDER: the iTerm2 API, then NSWorkspace open-at-dir / a Finder
+    // reveal. The AppleScript window-open rung that used to sit in the middle is
+    // GONE — AppleScript survives in this feature only for the API cookie
+    // request, which happens inside the transport package.
+    //
+    // THIS LADDER IS `ITerm.open`'s ALONE, BECAUSE IT CARRIES NO COMMAND. "Show
+    // me this folder" is genuinely answered by a Finder window, so degrading is
+    // honest here.
+    //
+    // PLAY HAS NO SUCH FALLBACK AND MUST NEVER ACQUIRE ONE by someone "making
+    // the two consistent". Play carries a command: a window WITHOUT it LOOKS
+    // LIKE SUCCESS while the prompt never runs, which is worse than no window.
     @MainActor
-    private static func launch(dir: URL, profileName: String, profileWritten: Bool) {
-        if profileWritten, runAppleScript(profileName: profileName) { return }
+    private static func launch(dir: URL, profileName: String?) async {
+        do {
+            _ = try await ITerm2Launcher.openWindow(
+                profileName: profileName,
+                profileProperties: workingDirectoryProperties(dir.path))
+            return
+        } catch {
+            // Fall through to the degraded rung. Nothing to report: the user
+            // asked to see a folder and is about to see it.
+        }
+        revealFallback(dir)
+    }
+
+    /// The two profile keys that put a new session in a directory. Shared with
+    /// `PromptRunBar`, which appends the command keys on top of them, so the two
+    /// launch paths cannot disagree about what "open here" means.
+    ///
+    /// Values are iTerm2's own: `Custom Directory` is the enable switch
+    /// (`"Yes"`), `Working Directory` is the path.
+    static func workingDirectoryProperties(_ path: String) -> [PaneProfileProperty] {
+        [.string("Custom Directory", "Yes"),
+         .string("Working Directory", path)]
+    }
+
+    /// Kept SYNCHRONOUS on purpose: `NSWorkspace.open(_:withApplicationAt:configuration:)`
+    /// has an async overload that wins in an `async` context and then demands
+    /// `try await`. This is the same fire-and-forget call the launcher has
+    /// always made.
+    @MainActor
+    private static func revealFallback(_ dir: URL) {
         let ws = NSWorkspace.shared
         if let term = ws.urlForApplication(withBundleIdentifier: "com.googlecode.iterm2") {
             ws.open([dir], withApplicationAt: term, configuration: NSWorkspace.OpenConfiguration())
@@ -161,6 +224,25 @@ enum ITerm {
     // Idempotent per-instance profile file: gmvibes-<UUID>.json with one profile.
     // JSONSerialization both validates the shape and renders the bytes we write.
     // `nonisolated` so it can run off the main actor (pure FileManager/JSON work).
+    //
+    // EXACTLY FOUR KEYS — Guid, Name, Custom Directory, Working Directory. NO Tab
+    // Color, NO Command, NO Initial Text. Two independent reasons, both of which
+    // outlive whatever convenience a fifth key would buy:
+    //
+    //   1. The profile is per-INSTANCE (guid = "gmvibes-<instanceUUID>"), so any
+    //      PER-LAUNCH value put here is last-writer-wins across concurrent
+    //      launches. The pane's colour and command ride in the launch script
+    //      instead, where they belong to one launch.
+    //   2. This function writes to ~/Library/Application Support/iTerm2/
+    //      DynamicProfiles/ through FileManager directly — OUTSIDE $GM_FS_ROOT,
+    //      OUTSIDE the repo, and NOT through Paths.assertContained. Every key
+    //      added makes an uncontained write carry more state.
+    //
+    // (Initial Text is separately disqualified: iTerm2 evaluates it as a swifty
+    // string, so `\(...)` in any interpolated content is an injection hazard.)
+    //
+    // THE ATOMIC-WRITE DISCIPLINE BELOW IS LOAD-BEARING: one malformed file
+    // disables ALL dynamic profiles, not just this one.
     private nonisolated static func writeProfile(guid: String, name: String, workingDir: String) -> Bool {
         guard let dir = dynamicProfilesDir() else { return false }
         let payload: [String: Any] = ["Profiles": [[
@@ -184,22 +266,13 @@ enum ITerm {
         }
     }
 
-    // Open a window for the named profile (NSWorkspace can't select a profile).
-    // The AppleScript API is deprecated but functional; NSAppleScript drives it.
-    @MainActor
-    private static func runAppleScript(profileName: String) -> Bool {
-        // AppleScript string literals don't support backslash escaping — splice any
-        // embedded double quote in via the `quote` constant instead.
-        let escaped = profileName.replacingOccurrences(of: "\"", with: "\" & quote & \"")
-        let source = """
-        tell application "iTerm2"
-            create window with profile "\(escaped)"
-            activate
-        end tell
-        """
-        guard let script = NSAppleScript(source: source) else { return false }
-        var err: NSDictionary?
-        script.executeAndReturnError(&err)
-        return err == nil
-    }
+    // `runAppleScript(profileName:)` WAS HERE and is deliberately gone. It drove
+    // `tell application "iTerm2" / create window with profile` through
+    // NSAppleScript, and it was the middle rung of the old three-rung ladder.
+    //
+    // It was removed as a decision, not as cleanup: the API route above does the
+    // same job and can also carry a command, which AppleScript could only do by
+    // string-splicing into a language with no backslash escaping. Do not restore
+    // it as a "harmless extra fallback" — a rung that opens a window without the
+    // command is precisely the failure mode this design refuses.
 }

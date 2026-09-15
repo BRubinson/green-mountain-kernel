@@ -28,5 +28,8 @@
       <FileRef
          location = "group:gmVibesCore">
       </FileRef>
+      <FileRef
+         location = "group:gmITerm2Client">
+      </FileRef>
    </Group>
 </Workspace>
