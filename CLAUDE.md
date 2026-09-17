@@ -1344,8 +1344,10 @@ Consequences that must not be re-derived incorrectly:
   `gmk/gmVibes/Info.plist`, and hence the `plutil` assertion in `build-dmg.sh`
   that makes a missing key FATAL.
 - **`GMDevPluginDir` is a THIRD baked key**, beside `GMFSRoot` and
-  `GMEnvironment`, fed by the `GM_DEV_PLUGIN_DIR` build setting on the **Beta**
-  configuration and absent on Release. It names the in-tree `plugins/gmcc` a
+  `GMEnvironment`, fed by the `GM_DEV_PLUGIN_DIR` build setting on the **Beta
+  AND Debug** configurations and absent on Release — so test panes load the
+  generated in-tree plugin exactly as beta panes do, staleness preflight
+  included. It names the in-tree `plugins/gmcc` a
   pane is launched with (`claude --plugin-dir`), and it rides this same
   mechanism for this same reason — **the `INFOPLIST_KEY_*` allow-list trap
   applies to it verbatim**, so it is a real key in `gmk/gmVibes/Info.plist` and

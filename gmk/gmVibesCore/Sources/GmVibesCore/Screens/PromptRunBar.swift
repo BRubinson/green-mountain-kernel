@@ -233,6 +233,19 @@ struct PromptRunBar: View {
                 .disabled(block != nil || isLaunching)
                 .help("Open an iTerm2 window in this repo running \(tierCommand)")
 
+                // The INDEPENDENT open. Deliberately NOT gated on the branch
+                // match, gm_hook, or the plugin preflight — a plain terminal
+                // is precisely the tool for fixing the states those gates
+                // block Play on. Only root+repo are required, because without
+                // them there is nowhere to cd and no environment to export.
+                Button {
+                    Task { await openTerminal() }
+                } label: {
+                    Label("Terminal", systemImage: "terminal")
+                }
+                .disabled(gmFsRoot?.isEmpty != false || repoFolder == nil || isLaunching)
+                .help("Open an iTerm2 window in this repo with GM_FS_ROOT set — no bot run.")
+
                 Spacer(minLength: 0)
             }
             statusLine
@@ -401,23 +414,55 @@ struct PromptRunBar: View {
         }
     }
 
+    /// The environment's badge text — the pane's HEADER. Production carries
+    /// none, mirroring paneBackgroundHex's nil: both channels answer "which
+    /// environment is this pane writing to", and production's answer is
+    /// silence.
+    private var envBadgeText: String? {
+        let kind = EnvironmentKind.current
+        return kind == .production ? nil : kind.displayName.uppercased()
+    }
+
     @MainActor
     private func play() async {
         guard block == nil, let root = gmFsRoot, let repo = repoFolder else { return }
+        let script = paneLaunchScript(root: root,
+                                      repoPath: repo.path,
+                                      tabColorHex: launchColors.assign(promptUuid: stub.uuid).hex,
+                                      tierCommand: tierCommand,
+                                      pluginDir: PluginPreflight.directory,
+                                      badgeText: envBadgeText,
+                                      envBackgroundHex: EnvironmentKind.current.paneBackgroundHex)
+        await launchPane(script: script, root: root, repo: repo)
+    }
+
+    /// The independent open: the same prepared pane, an interactive shell
+    /// instead of a bot run. See the button's comment for why its gating is
+    /// deliberately looser than Play's.
+    @MainActor
+    private func openTerminal() async {
+        guard let root = gmFsRoot, !root.isEmpty, let repo = repoFolder else { return }
+        let script = paneShellScript(root: root,
+                                     repoPath: repo.path,
+                                     tabColorHex: launchColors.assign(promptUuid: stub.uuid).hex,
+                                     badgeText: envBadgeText,
+                                     envBackgroundHex: EnvironmentKind.current.paneBackgroundHex,
+                                     shell: loginShellPath())
+        await launchPane(script: script, root: root, repo: repo)
+    }
+
+    /// The launch dance both buttons share: profile, script on disk, command
+    /// line, iTerm2 window. One implementation so the claude pane and the
+    /// shell pane cannot drift in how they reach iTerm2.
+    @MainActor
+    private func launchPane(script: String, root: String, repo: URL) async {
         phase = .launching(.preparing)
-        let colour = launchColors.assign(promptUuid: stub.uuid)
         var scriptURL: URL?
         do {
             let profileName = await ITerm.ensureProfile(
                 instanceUUID: windowID.instanceUUID,
                 instanceName: instanceName,
                 workingDir: repo.path)
-            let script = paneLaunchScript(root: root,
-                                          repoPath: repo.path,
-                                          tabColorHex: colour.hex,
-                                          tierCommand: tierCommand,
-                                          pluginDir: PluginPreflight.directory,
-                                          envBackgroundHex: EnvironmentKind.current.paneBackgroundHex)
             scriptURL = try PaneScriptWriter.write(script: script, root: root)
             let command = try paneCommandLine(shell: loginShellPath(),
                                               scriptPath: scriptURL!.path)

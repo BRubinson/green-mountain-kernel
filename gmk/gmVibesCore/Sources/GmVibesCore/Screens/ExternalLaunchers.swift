@@ -16,7 +16,40 @@ enum BotTier: String, CaseIterable, Identifiable {
     case gmBotTeam = "/gm_bot_team"
 
     var id: String { rawValue }
-    var command: String { rawValue }
+
+    /// The bare command name, no slash: "gm_bot_rpi". `rawValue` keeps the
+    /// leading slash because it is the UserDefaults key (BotLauncherPreference),
+    /// and stripping it there would reset every saved tier choice.
+    private var commandName: String { String(rawValue.dropFirst()) }
+
+    /// What Claude Code actually accepts. Plugin slash commands are namespaced
+    /// `/<plugin>:<command>`, so the bare `/gm_bot_rpi` is "Unknown command"
+    /// while `/<plugin>:gm_bot_rpi` resolves. The `<plugin>` is whichever plugin
+    /// the pane actually LOADS: a prod pane loads the marketplace `gmcc`; a
+    /// beta/test pane loads the working-tree alias through `--plugin-dir`, whose
+    /// name is `gmbeta`. Sourced from `BotTier.loadedPluginNamespace` so the
+    /// command and the loaded plugin can never disagree.
+    var invocation: String { "/\(Self.loadedPluginNamespace):\(commandName)" }
+
+    /// The name of the plugin a pane loads, read ONCE. When a dev plugin dir is
+    /// baked (beta/test), that directory IS what `--plugin-dir` loads, so its
+    /// own `plugin.json` name is the authoritative namespace — reading it here
+    /// rather than hardcoding "gmbeta" keeps this correct even if the alias is
+    /// renamed. With no dev dir baked (prod) the pane loads the marketplace
+    /// plugin, whose name is `gmcc`.
+    static let loadedPluginNamespace: String = {
+        guard case .present(let dir) = DevPluginDir.current else { return "gmcc" }
+        let manifest = URL(fileURLWithPath: dir, isDirectory: true)
+            .appendingPathComponent(".claude-plugin", isDirectory: true)
+            .appendingPathComponent("plugin.json")
+        guard let data = try? Data(contentsOf: manifest),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let name = object["name"] as? String, !name.isEmpty
+        else { return "gmcc" }
+        return name
+    }()
+
+    var command: String { invocation }
 
     // 1 / 2 / 3-person icons — increasing crew size by fidelity tier.
     var symbol: String {

@@ -49,6 +49,22 @@ echo "[GMB] version: $VERSION (from gmk/VERSION)"
 # every CI job to 27.
 swift run --package-path "$REPO/gmk/gmAgententicsSdk" gm_bridge_writer $CHECK "$PLUGIN"
 
+# THE gmbeta ALIAS TREE. A second emit of the SAME bridge under a different
+# plugin NAME, so a beta/test GMVibes pane can load the working tree through
+# `claude --plugin-dir` WITHOUT colliding with the marketplace `gmcc` (two
+# plugins that share a name and an MCP server key cannot both load). The name
+# override rides GM_BRIDGE_PLUGIN_NAME and flows through every derived
+# qualified tool name and the `/gmbeta:` command namespace with no
+# substitution — see GmBridgeClaudePlugin.pluginNameEnvVar.
+#
+# NO MARKETPLACE ENTRY. marketplace.json lists only `gmcc`; gmbeta exists purely
+# as a --plugin-dir target and is gitignored (plugins/gmbeta/). So this emit
+# deliberately does NOT touch the manifest or the version bump below.
+GMBETA="$REPO/plugins/gmbeta"
+echo "[GMB] gmbeta alias -> $GMBETA"
+GM_BRIDGE_PLUGIN_NAME=gmbeta \
+    swift run --package-path "$REPO/gmk/gmAgententicsSdk" gm_bridge_writer $CHECK "$GMBETA"
+
 if [ -n "$CHECK" ]; then
     CURRENT="$(python3 -c "import json;print(json.load(open('$MARKETPLACE'))['plugins'][0]['version'])")"
     if [ "$CURRENT" = "$VERSION" ]; then

@@ -420,6 +420,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				GM_BUNDLE_SUFFIX = ".test";
+				GM_DEV_PLUGIN_DIR = "$(SRCROOT)/../plugins/gmbeta";
 				GM_ENV = test;
 				GM_FS_ROOT_BAKED = "~/test_gmfs";
 				INFOPLIST_FILE = gmVibes/Info.plist;
@@ -504,7 +505,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				GM_BUNDLE_SUFFIX = ".beta";
-				GM_DEV_PLUGIN_DIR = "$(SRCROOT)/../plugins/gmcc";
+				GM_DEV_PLUGIN_DIR = "$(SRCROOT)/../plugins/gmbeta";
 				GM_ENV = beta;
 				GM_FS_ROOT_BAKED = "~/beta_gmfs";
 				INFOPLIST_FILE = gmVibes/Info.plist;
