@@ -255,6 +255,8 @@ private struct PromptEditorPane: View {
     @Environment(GMVibesEnvironment.self) private var gmcc
     @Environment(DaemonConnectionModel.self) private var daemon
     @Environment(CatalogStore.self) private var catalog
+    @Environment(CheckoutWatcher.self) private var checkout
+    @Environment(LaunchColorRegistry.self) private var launchColors
     let stub: PromptStub
     let scope: SessionScope
     let windowID: SessionWindowID
@@ -630,6 +632,13 @@ private struct PromptEditorPane: View {
                         // a failed BOT_NEXT) still leaves a working
                         // lifecycle control behind.
                         PromptStatusHeader(stub: stub, phases: phases, store: store)
+                        PromptRunBar(stub: stub,
+                                     windowID: windowID,
+                                     repoFolder: paths.repoFolder,
+                                     sessionCode: catalog.sessionsByUuid[store.sessionUuid]?.code,
+                                     gmFsRoot: gmcc[.gmFsRoot],
+                                     instanceName: catalog.instance(
+                                        uuid: windowID.instanceUUID.wireString)?.name ?? "—")
                         WorkflowStrip(phase: phases.workflow)
                         saveIssueBanner
                         if !editable {

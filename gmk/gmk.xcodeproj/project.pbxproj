@@ -6,6 +6,31 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXAggregateTarget section */
+		1B4010F02FDCA09300DAF751 /* PluginBridge */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 1B4010F22FDCA09300DAF751 /* Build configuration list for PBXAggregateTarget "PluginBridge" */;
+			buildPhases = (
+				1B4010F12FDCA09300DAF751 /* Generate plugins/gmcc */,
+			);
+			dependencies = (
+			);
+			name = PluginBridge;
+			productName = PluginBridge;
+		};
+		1B5EED002FDCA09300DAF751 /* TestEnvSeed */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 1B5EED022FDCA09300DAF751 /* Build configuration list for PBXAggregateTarget "TestEnvSeed" */;
+			buildPhases = (
+				1B5EED012FDCA09300DAF751 /* Seed ~/test_gmfs */,
+			);
+			dependencies = (
+			);
+			name = TestEnvSeed;
+			productName = TestEnvSeed;
+		};
+/* End PBXAggregateTarget section */
+
 /* Begin PBXBuildFile section */
 		1B4010B02FDCA09300DAF751 /* GmDaemonSdk in Frameworks */ = {isa = PBXBuildFile; productRef = 1B4010B22FDCA09300DAF751 /* GmDaemonSdk */; };
 		1B4010B12FDCA09300DAF751 /* GmUxComponentLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = 1B4010B32FDCA09300DAF751 /* GmUxComponentLibrary */; };
@@ -106,6 +131,36 @@
 			shellPath = /bin/sh;
 			shellScript = "set -eu\n# Embed the gm_kernel CLI Mach-O at Contents/Helpers.\n#\n# IT IS COPIED, NEVER BUILT HERE. The CLI is a SwiftPM executable, and running\n# `swift build` from inside an xcodebuild phase means two build systems\n# contending for one build directory. build-dmg.sh builds it FIRST and passes\n# the path in as GM_KERNEL_MACHO.\n#\n# `set -eu` IS LOAD-BEARING. Without it a failed cp leaves the phase green and\n# the bundle helperless, and the only symptom is an install that puts no CLI in\n# bin/ — which, because gm_hook exits 0 silently when its binary is missing,\n# records nothing rather than failing.\n#\n# WHEN GM_KERNEL_MACHO IS UNSET THIS IS A DELIBERATE NO-OP, so a plain Xcode\n# Run still works: a debug build talks to ~/test_gmfs and hosts its own writer\n# in-process, so it needs no helper in its bundle. A RELEASE bundle absolutely\n# does, and build-dmg.sh makes a missing helper FATAL rather than relying on\n# anyone reading this note.\nif [ -z \"${GM_KERNEL_MACHO:-}\" ]; then\n  echo \"note: GM_KERNEL_MACHO unset - no CLI embedded (expected for Xcode Run; build-dmg.sh sets it)\"\n  exit 0\nfi\nif [ ! -x \"$GM_KERNEL_MACHO\" ]; then\n  echo \"error: GM_KERNEL_MACHO=$GM_KERNEL_MACHO is not an executable file\" >&2\n  exit 1\nfi\nHELPERS=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nmkdir -p \"$HELPERS\"\n# -p preserves the mode so the `find -perm +111` signing loop in build-dmg.sh\n# still finds it.\ncp -p \"$GM_KERNEL_MACHO\" \"$HELPERS/gm_kernel\"\ntest -x \"$HELPERS/gm_kernel\" || { echo \"error: helper did not land at $HELPERS/gm_kernel\" >&2; exit 1; }\necho \"embedded gm_kernel ($(lipo -archs \"$HELPERS/gm_kernel\")) at $HELPERS\"\n";
 		};
+		1B4010F12FDCA09300DAF751 /* Generate plugins/gmcc */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Generate plugins/gmcc";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -euo pipefail\n# Regenerate plugins/gmcc from the bridge values in gmAgententicsSdk.\n#\n# IT CALLS generate_plugin.sh AND REIMPLEMENTS NOTHING. rebuild_local.sh:331\n# already calls the same script; a second implementation of the generation\n# logic is the next gm_releases.sh-exists-twice, which CLAUDE.md records as\n# having been believed FIXED for two versions before anyone caught it. The\n# script re-derives the repo root itself, so it needs no argument.\n#\n# `set -euo pipefail` IS MANDATORY. The `Embed gm_kernel CLI` phase's own\n# comment records the same fact: without it a failed step leaves the phase\n# GREEN.\n#\n# FAILURE POLICY: A REAL GENERATION FAILURE FAILS THE BUILD. No `|| true`, no\n# fallback. A green build over a stale plugin is exactly the silent-wrong this\n# target exists to prevent. Only the three gates exit 0, and each prints a\n# `note:` saying which one fired.\n#\n# NO PBXTargetDependency EXISTS IN EITHER DIRECTION, and that is deliberate.\n# Parallelism is bought by INDEPENDENCE, not by a setting:\n# BuildIndependentTargetsInParallel = 1 buys nothing unless the two targets are\n# genuinely independent. A dependency edge silently serialises the build.\n\n# GATE 1 - configuration. Inside the script, not only in the scheme: a\n# build-setting gate is bypassed by anyone who builds the target directly or\n# drags it into another scheme. This is what keeps a source-tree write off the\n# Release path that publish_release.sh requires clean.\n[ \"${CONFIGURATION:-}\" = \"Beta\" ] || { echo \"note: plugin generation is Beta-only (CONFIGURATION=${CONFIGURATION:-})\"; exit 0; }\n\n# GATE 2 - CONFLICTED INDEX. NOT hypothetical: the tree has unmerged paths\n# RIGHT NOW. Regenerating into unresolved conflicts writes generated bytes over\n# a half-resolved state, and gm_bridge_writer's stage-and-swap will do it\n# happily: its ONLY target check is that .claude-plugin/plugin.json exists,\n# which a conflicted tree satisfies, and the half-resolved tree it renames into\n# a trash directory is then dropped with `try? removeItem` - no prompt, no\n# backup. plugins/gmcc is itself a COMMITTED, conflictable tree, so that is\n# reachable rather than theoretical.\n#\n# ls-files -u RATHER THAN MERGE_HEAD: MERGE_HEAD exists ONLY during `git\n# merge`. A conflicted rebase, cherry-pick, revert or `stash pop` walks\n# straight through that test. An unmerged INDEX ENTRY is what all five leave\n# behind, so this one test catches every conflicted state.\nif [ -n \"$(git -C \"${SRCROOT}/..\" ls-files -u)\" ]; then\n  echo \"note: tree has unmerged paths - skipping plugin generation\"; exit 0\nfi\n\n# GATE 3 - target sanity. gm_bridge_writer already refuses a target with no\n# manifest; restating it here makes the failure land at the phase with a\n# readable message instead of deep inside Swift. Sandboxing off buys the\n# ability to write anywhere; these three lines say where.\n[ -f \"${SRCROOT}/../plugins/gmcc/.claude-plugin/plugin.json\" ] || { echo \"error: no plugin manifest at plugins/gmcc\"; exit 1; }\n\n# STRIP THE INHERITED BUILD ENVIRONMENT.\n# The macOS 27 objection was killed with dependency-edge reasoning, which says\n# NOTHING about the ENVIRONMENT. xcodebuild exports MACOSX_DEPLOYMENT_TARGET,\n# SDKROOT, TOOLCHAINS and DEVELOPER_DIR into this phase; SwiftPM reads several\n# of them; and gmAgententicsSdk floors at 27 with unsafeFlags. A nested build\n# inheriting a 26.0 deployment target may fail to resolve a package requiring\n# 27 - the same symptom, arriving through a door the refutation did not cover.\n# Cheap to defend, so defended here rather than offered as a remedy after.\nenv -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET -u TOOLCHAINS -u DEVELOPER_DIR \\\n    bash \"${SRCROOT}/scripts/generate_plugin.sh\"\n\n# VALIDATE WHAT WAS EMITTED.\n# CLAUDE.md records that the writer's verify() checks a file RENDERED, never\n# that it is VALID - the gap v54.0.0's `outputStyles` key fell through, taking\n# the ENTIRE plugin down (an unknown key in plugin.json makes Claude Code\n# refuse to load any of it). The current remedy is \"eyeball the emitted\n# plugin.json\". There is a machine check and it is free.\n# PLAIN, not --strict: --strict fails TODAY on one warning (the manifest\n# declares no `author`), and adding that bridge field is a separate decision.\n# Guarded on the binary, so the build does not fail where claude is not on the\n# phase's PATH - and LOUD when it skips, because a silent skip logs identically\n# to a pass.\n#\n# FIND THE BINARY RATHER THAN HOPING. A GUI-launched Xcode inherits launchd's\n# PATH - /usr/bin:/bin:/usr/sbin:/sbin, since `launchctl getenv PATH` is empty -\n# while claude lives at /opt/homebrew/bin, which reaches a shell only through\n# ~/.zprofile. So `xcodebuild` typed in a terminal finds it (how this was\n# tested) and Cmd-R in Xcode.app does not (how it will be used). swift, git and\n# python3 are all under /usr/bin and are unaffected; claude is the only tool\n# here that is not on the launchd default PATH.\n#\n# A FAILING `claude plugin validate` STILL FAILS THE BUILD: inside an `if` BODY\n# a failing command is not exempt from `set -e`, so the shell exits non-zero.\nPATH=\"/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.claude/local:$PATH\"\nif command -v claude >/dev/null 2>&1; then\n  claude plugin validate \"${SRCROOT}/../plugins/gmcc\"\nelse\n  echo \"note: claude not on this phase's PATH - plugin.json was NOT validated\"\nfi\n";
+		};
+		1B5EED012FDCA09300DAF751 /* Seed ~/test_gmfs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Seed ~/test_gmfs";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/bash;
+			shellScript = "set -euo pipefail\n# Seed ~/test_gmfs in parallel with the Debug app build, so a plain Cmd-R\n# lands on a provisioned environment: kernel binaries staged, this checkout\n# cloned into $ROOT/repos, and the clone registered in the environment's db.\n#\n# IT CALLS gm_env.sh seed AND REIMPLEMENTS NOTHING. The environment script\n# owns environments; a second implementation here is the next\n# gm_releases.sh-exists-twice, which CLAUDE.md records as having been\n# believed fixed for two versions before anyone caught it.\n#\n# NO PBXTargetDependency EXISTS IN EITHER DIRECTION, deliberately - the\n# parallelism is bought by INDEPENDENCE, exactly like PluginBridge. Xcode\n# launches the app only after every scheme build entry finishes, so the seed\n# always completes before the app runs: parallel AND ordered, for free.\n#\n# GATE - configuration, in the script rather than only in the scheme: a\n# scheme gate is bypassed by anyone who builds the target directly or drags\n# it into another scheme. Seeding is Debug-only; Beta/Release get a note and\n# a green no-op.\n[ \"${CONFIGURATION:-}\" = \"Debug\" ] || { echo \"note: env seeding is Debug-only (CONFIGURATION=${CONFIGURATION:-})\"; exit 0; }\n\n# Sandboxing is OFF on this target's configurations because the seed writes\n# to $HOME/test_gmfs - outside the build directory. That root (plus\n# gmKernel's own SwiftPM .build) is the ONLY place it writes.\n#\n# The env strip mirrors PluginBridge: xcodebuild exports SDKROOT,\n# MACOSX_DEPLOYMENT_TARGET, TOOLCHAINS and DEVELOPER_DIR into this phase,\n# SwiftPM reads several of them, and the nested kernel build must not\n# inherit the app's.\nenv -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET -u TOOLCHAINS -u DEVELOPER_DIR bash \"${SRCROOT}/scripts/gm_env.sh\" seed test\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXProject section */
@@ -118,10 +173,6 @@
 				TargetAttributes = {
 					1B4010722FDCA09200DAF751 = {
 						CreatedOnToolsVersion = 26.3;
-					};
-					1B40108B2FDCA09300DAF751 = {
-						CreatedOnToolsVersion = 26.3;
-						TestTargetID = 1B4010722FDCA09200DAF751;
 					};
 				};
 			};
@@ -140,6 +191,7 @@
 				1B4010A62FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmUxComponentLibrary" */,
 				1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "Gm_Kernel_test" */,
 				1B4010D32FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmVibesCore" */,
+				1B4010E42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmITerm2Client" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1B4010742FDCA09200DAF751 /* Products */;
@@ -147,6 +199,8 @@
 			projectRoot = "";
 			targets = (
 				1B4010722FDCA09200DAF751 /* GMVibes */,
+				1B4010F02FDCA09300DAF751 /* PluginBridge */,
+				1B5EED002FDCA09300DAF751 /* TestEnvSeed */,
 			);
 		};
 /* End PBXProject section */
@@ -370,6 +424,7 @@
 				GM_FS_ROOT_BAKED = "~/test_gmfs";
 				INFOPLIST_FILE = gmVibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "GMVibes opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -411,6 +466,7 @@
 				GM_FS_ROOT_BAKED = "~/gmfs";
 				INFOPLIST_FILE = gmVibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "GMVibes opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -448,10 +504,12 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				GM_BUNDLE_SUFFIX = ".beta";
+				GM_DEV_PLUGIN_DIR = "$(SRCROOT)/../plugins/gmcc";
 				GM_ENV = beta;
 				GM_FS_ROOT_BAKED = "~/beta_gmfs";
 				INFOPLIST_FILE = gmVibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "GMVibes opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -470,6 +528,60 @@
 				SWIFT_VERSION = 5.0;
 			};
 			name = Beta;
+		};
+		1B4010F32FDCA09300DAF751 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		1B4010F42FDCA09300DAF751 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Beta;
+		};
+		1B4010F52FDCA09300DAF751 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		1B5EED032FDCA09300DAF751 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		1B5EED042FDCA09300DAF751 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Beta;
+		};
+		1B5EED052FDCA09300DAF751 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
@@ -490,6 +602,26 @@
 				1B4010972FDCA09300DAF751 /* Debug */,
 				1B4010BA2FDCA09300DAF751 /* Beta */,
 				1B4010982FDCA09300DAF751 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1B4010F22FDCA09300DAF751 /* Build configuration list for PBXAggregateTarget "PluginBridge" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1B4010F32FDCA09300DAF751 /* Debug */,
+				1B4010F42FDCA09300DAF751 /* Beta */,
+				1B4010F52FDCA09300DAF751 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1B5EED022FDCA09300DAF751 /* Build configuration list for PBXAggregateTarget "TestEnvSeed" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1B5EED032FDCA09300DAF751 /* Debug */,
+				1B5EED042FDCA09300DAF751 /* Beta */,
+				1B5EED052FDCA09300DAF751 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -516,6 +648,10 @@
 		1B4010D32FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmVibesCore" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = gmVibesCore;
+		};
+		1B4010E42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmITerm2Client" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = gmITerm2Client;
 		};
 /* End XCLocalSwiftPackageReference section */
 

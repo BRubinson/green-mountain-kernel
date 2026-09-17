@@ -5,6 +5,7 @@
 #
 #     bash gmk/scripts/gm_env.sh create  beta
 #     bash gmk/scripts/gm_env.sh refresh beta
+#     bash gmk/scripts/gm_env.sh seed    test
 #     bash gmk/scripts/gm_env.sh doctor  beta
 #     bash gmk/scripts/gm_env.sh run     test -- swift test --package-path ...
 #     bash gmk/scripts/gm_env.sh reap    test
@@ -133,14 +134,19 @@ env_seed_repo() {
         echo "[GMB] refreshing clone at $_dest"
         git -C "$_dest" fetch origin --quiet || true
         git -C "$_dest" fetch "$REPO_ROOT" --quiet || true
+        # KEEP THE EXISTING BRANCH. The dated branch is minted ONCE, at clone
+        # time. Session identity is the branch, and `seed` now runs on every
+        # ⌘R — a fresh `checkout -B` per invocation would mint a new session
+        # row per build.
+        echo "[GMB] $_dest stays on $(git -C "$_dest" rev-parse --abbrev-ref HEAD)"
     else
         echo "[GMB] cloning $REPO_ROOT -> $_dest"
         # Clone from the LOCAL working repo rather than from origin: the point
         # is to test what is here, including commits that have not been pushed.
         git clone --quiet --no-hardlinks "$REPO_ROOT" "$_dest"
+        git -C "$_dest" checkout -q -B "$_branch"
+        echo "[GMB] $_dest on branch $_branch"
     fi
-    git -C "$_dest" checkout -q -B "$_branch"
-    echo "[GMB] $_dest on branch $_branch"
 
     # Boot the environment's kernel so it migrates an empty database into a full
     # schema, then register the clone and validate its dope tree. Those rows —
@@ -188,6 +194,71 @@ env_seed_repo() {
 env_refresh() {
     _env="$1"; guard_not_prod "$_env" refresh
     env_create "$_env"
+}
+
+# ── seed — the Xcode Debug phase's door ──────────────────────────────────────
+#
+# A FAST, IDEMPOTENT subset of create, sized to run on EVERY ⌘R in parallel
+# with the app build (the TestEnvSeed aggregate target calls it). It must not
+# be create: create stages through rebuild_local, a full build that ALSO
+# regenerates plugins/gmcc into the source tree — a write PluginBridge
+# deliberately gates to Beta builds behind three gates, and the Debug path
+# must not acquire. So seed builds the kernel package incrementally and
+# stages the Mach-O itself through the gm_releases functions.
+env_seed() {
+    _env="$1"; guard_not_prod "$_env" seed
+    _root="$(env_root "$_env")" || exit 2
+    echo "[GMB] seed $_env -> $_root"
+    mkdir -p "$_root/bin" "$_root/repos" "$_root/backups"
+
+    # Incremental: seconds on an unchanged tree. SwiftPM's .build directory is
+    # its own — never Xcode's DerivedData — so a parallel app build has nothing
+    # to contend with. The env strip mirrors PluginBridge's: xcodebuild exports
+    # SDKROOT / MACOSX_DEPLOYMENT_TARGET / TOOLCHAINS / DEVELOPER_DIR into a
+    # phase, SwiftPM reads several of them, and a hand-run must behave the
+    # same as a phase-run.
+    env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET -u TOOLCHAINS -u DEVELOPER_DIR \
+        swift build --package-path "$REPO_ROOT/gmk/gmKernel" -c debug
+    _built="$REPO_ROOT/gmk/gmKernel/.build/debug/$GM_MACHO"
+    [ -x "$_built" ] || die "no built kernel at $_built"
+
+    GM_ENV="$_env"; GM_FS_ROOT="$_root"; gm_resolve_fs_root
+    _version="$(cat "$REPO_ROOT/gmk/VERSION")-BETA"
+
+    # Stage only when the bits changed. A staged binary is NEVER overwritten in
+    # place — the kernel's codesign cache answers a rewritten inode with
+    # SIGKILL — so a changed build re-stages its whole version directory and
+    # gm_activate's symlink swap is what makes that safe.
+    _new_sha="$(shasum -a 256 "$_built" | awk '{print $1}')"
+    _old_sha=""
+    [ -e "$GM_BIN/$GM_MACHO" ] && _old_sha="$(shasum -a 256 "$GM_BIN/$GM_MACHO" 2>/dev/null | awk '{print $1}')"
+    if [ "$_new_sha" = "$_old_sha" ]; then
+        echo "[GMB] staged kernel already matches the build — skipping stage"
+    else
+        _stage="$(gm_stage_dir local "$_version")"
+        rm -rf "$_stage"
+        _stage="$(gm_stage_dir local "$_version")"
+        cp -p "$_built" "$_stage/$GM_MACHO"
+        _src_sha="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+        gm_write_manifest "$_stage" "$_version" local "$_src_sha" \
+            "$(lipo -archs "$_stage/$GM_MACHO" 2>/dev/null || echo arm64)"
+        gm_activate local "$_version"
+    fi
+
+    env_seed_repo "$_env" "$_root"
+
+    # If registration autostarted a HEADLESS kernel, stop it now: the incoming
+    # app takes a headless holder over by SIGTERM-and-wait, and paying that
+    # wait on every ⌘R is a cost seed exists to avoid. A live APP holder is
+    # left alone — registration went through its socket and it stays up.
+    if [ -f "$_root/daemon.pid" ]; then
+        _holder_bundle="$(sed -n '3p' "$_root/daemon.pid" 2>/dev/null)"
+        if [ -z "$_holder_bundle" ] && _pid="$(env_live_pid "$_root")"; then
+            echo "[GMB] stopping the autostarted headless kernel (pid $_pid)"
+            GM_FS_ROOT="$_root" "$_root/bin/gm_hook" call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
+        fi
+    fi
+    echo "[GMB] seed $_env done"
 }
 
 # ── ephemeral test runs ──────────────────────────────────────────────────────
@@ -276,6 +347,7 @@ CMD="${1:-}"; shift || true
 case "$CMD" in
     create)  env_create  "${1:?environment: beta|test}" ;;
     refresh) env_refresh "${1:?environment: beta|test}" ;;
+    seed)    env_seed    "${1:?environment: beta|test}" ;;
     doctor)  env_doctor  "${1:-prod}" ;;
     destroy) env_destroy "${1:?environment: beta|test}" ;;
     reap)    env_reap ;;

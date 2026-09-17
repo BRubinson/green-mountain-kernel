@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import GmDaemonSdk
+import GmITerm2Client
 
 // External-app launchers + the bot tier catalog, moved verbatim out of
 // SessionPromptEditorView.swift (they are not editor code).
@@ -125,21 +126,45 @@ enum ITerm {
     // Writes the per-instance Dynamic Profile OFF the main thread, then opens the
     // window ON the main thread. Both the file write and a cold-iTerm AppleScript
     // launch are slow enough to hitch the UI if run inline from the button action.
+    @MainActor
     static func open(dir: URL, instanceUUID: UUID, instanceName: String) {
-        let guid = "gmvibes-\(instanceUUID.uuidString)"
-        let name = "GMVibes — \(instanceName)"
-        Task.detached(priority: .userInitiated) {
-            let wrote = writeProfile(guid: guid, name: name, workingDir: dir.path)
-            await MainActor.run { launch(dir: dir, profileName: name, profileWritten: wrote) }
+        Task {
+            let profileName = await ensureProfile(instanceUUID: instanceUUID,
+                                                  instanceName: instanceName,
+                                                  workingDir: dir.path)
+            await launch(dir: dir, profileName: profileName)
         }
     }
 
-    // Open a window for the per-instance profile, falling back to NSWorkspace
-    // open-at-dir, then a Finder reveal — mirroring VSCode. NSAppleScript must run
-    // on the main thread (TN2097), so this whole step is MainActor-isolated.
+    static func ensureProfile(instanceUUID: UUID,
+                              instanceName: String,
+                              workingDir: String) async -> String? {
+        let guid = "gmvibes-\(instanceUUID.uuidString)"
+        let name = "GMVibes — \(instanceName)"
+        return await Task.detached(priority: .userInitiated) {
+            writeProfile(guid: guid, name: name, workingDir: workingDir) ? name : nil
+        }.value
+    }
+
     @MainActor
-    private static func launch(dir: URL, profileName: String, profileWritten: Bool) {
-        if profileWritten, runAppleScript(profileName: profileName) { return }
+    private static func launch(dir: URL, profileName: String?) async {
+        do {
+            _ = try await ITerm2Launcher.openWindow(
+                profileName: profileName,
+                profileProperties: workingDirectoryProperties(dir.path))
+            return
+        } catch {
+        }
+        revealFallback(dir)
+    }
+
+    static func workingDirectoryProperties(_ path: String) -> [PaneProfileProperty] {
+        [.string("Custom Directory", "Yes"),
+         .string("Working Directory", path)]
+    }
+
+    @MainActor
+    private static func revealFallback(_ dir: URL) {
         let ws = NSWorkspace.shared
         if let term = ws.urlForApplication(withBundleIdentifier: "com.googlecode.iterm2") {
             ws.open([dir], withApplicationAt: term, configuration: NSWorkspace.OpenConfiguration())
@@ -184,22 +209,4 @@ enum ITerm {
         }
     }
 
-    // Open a window for the named profile (NSWorkspace can't select a profile).
-    // The AppleScript API is deprecated but functional; NSAppleScript drives it.
-    @MainActor
-    private static func runAppleScript(profileName: String) -> Bool {
-        // AppleScript string literals don't support backslash escaping — splice any
-        // embedded double quote in via the `quote` constant instead.
-        let escaped = profileName.replacingOccurrences(of: "\"", with: "\" & quote & \"")
-        let source = """
-        tell application "iTerm2"
-            create window with profile "\(escaped)"
-            activate
-        end tell
-        """
-        guard let script = NSAppleScript(source: source) else { return false }
-        var err: NSDictionary?
-        script.executeAndReturnError(&err)
-        return err == nil
-    }
 }

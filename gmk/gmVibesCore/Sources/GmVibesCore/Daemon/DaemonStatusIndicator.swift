@@ -21,7 +21,21 @@ struct DaemonStatusPopover: View {
                     .lineLimit(4)
                 startButton
             case .notInstalled:
-                Text("Daemon binary missing at ~/gmfs/bin/gm_daemon.\nRun plugins/gmcc/scripts/install_gm.sh, or bash gmk/scripts/rebuild_local.sh from a checkout.")
+                // RESOLVED, never a literal. This string used to hardcode
+                // `~/gmfs/bin/gm_daemon` — production — while LandingView's
+                // body rendered `Paths.binDaemon.path` correctly, so a Beta or
+                // Test app showed the two side by side disagreeing and sent
+                // the reader to install into the wrong root. With three
+                // environments, a hardcoded root in a diagnostic is a wrong
+                // answer, not a shorter one.
+                // Same root-aware split as LandingView's gate: a declared
+                // test/beta root is staged from a checkout by gm_env.sh;
+                // install_gm.sh would install a published release into ~/gmfs.
+                // "prod" routes to the installer — gm_env.sh refuses create prod.
+                Text(Paths.declaredEnvironmentName.flatMap { env in
+                    env == "prod" ? nil :
+                    "Daemon binary missing at \(Paths.binDaemon.path).\nStage binaries with bash gmk/scripts/gm_env.sh create \(env)."
+                } ?? "Daemon binary missing at \(Paths.binDaemon.path).\nRun plugins/gmcc/scripts/install_gm.sh, or bash gmk/scripts/rebuild_local.sh from a checkout.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             case .incompatible(let daemonVersion):

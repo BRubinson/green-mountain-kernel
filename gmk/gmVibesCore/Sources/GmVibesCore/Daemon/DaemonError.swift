@@ -4,7 +4,8 @@ import GmDaemonSdk
 /// App-facing typed error surface. Views and stores branch on these cases —
 /// never on message text — per the daemon's typed-code contract.
 nonisolated enum DaemonError: Error, Equatable {
-    /// Binary absent at ~/gmfs/bin/gm_daemon (distinct from a stopped daemon).
+    /// Binary absent at `Paths.binDaemon` — the RESOLVED root's `bin/gm_daemon`,
+    /// which is `~/gmfs` only for production. Distinct from a stopped daemon.
     case notInstalled
     /// Socket dead and autostart disabled (or autostart exhausted its retries).
     case unreachable(String)

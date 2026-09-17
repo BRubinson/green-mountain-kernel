@@ -360,7 +360,7 @@ private struct DaemonGateState: View {
 
             switch daemon.health {
             case .notInstalled:
-                CommandCopyRow(command: "cd ~/Dev/green-mountain-kernel && bash plugins/gmcc/scripts/install_gm.sh")
+                CommandCopyRow(command: Self.remediationCommand)
                     .frame(maxWidth: 480)
             case .down:
                 Button {
@@ -406,12 +406,31 @@ private struct DaemonGateState: View {
         case .incompatible(let version):
             return "The running daemon speaks protocol v\(version.map(String.init) ?? "?"), newer than this build of GMVibes. Rebuild the app against the updated daemon package."
         case .notInstalled:
+            if let env = Paths.declaredEnvironmentName, env != "prod" {
+                return "No daemon binary at \(Paths.binDaemon.path). This is the \(env) environment root — stage binaries into it from your checkout:"
+            }
             return "No daemon binary at \(Paths.binDaemon.path). Build and install it from the green-mountain-kernel repo:"
         case .down(let reason, let intentional):
             return intentional ? "The daemon was stopped." : reason
         default:
             return ""
         }
+    }
+
+    /// Root-aware: `install_gm.sh` fetches the newest PUBLISHED release and
+    /// installs into `~/gmfs` — for a declared test/beta root that is the
+    /// wrong root and the wrong bits. Those roots are staged from a checkout
+    /// by `gm_env.sh`. Keyed on the declared environment label rather than
+    /// `Paths.isProductionRoot`, because the inode comparison reads false on
+    /// any root whose `gm.db` does not exist yet — exactly the state this
+    /// screen shows. Production declares `GMEnvironment = prod` (Release bakes
+    /// GM_ENV like every configuration), and `gm_env.sh` refuses `create prod`,
+    /// so the prod label routes to the installer alongside the no-label CLI case.
+    private static var remediationCommand: String {
+        guard let env = Paths.declaredEnvironmentName, env != "prod" else {
+            return "cd ~/Dev/green-mountain-kernel && bash plugins/gmcc/scripts/install_gm.sh"
+        }
+        return "cd ~/Dev/green-mountain-kernel && bash gmk/scripts/gm_env.sh create \(env)"
     }
 }
 
@@ -423,19 +442,39 @@ private struct EmptyDatabaseState: View {
                 .foregroundStyle(.blue)
             Text("GMCC database is empty")
                 .font(.title2.weight(.semibold))
-            Text("The daemon is healthy but holds no projects yet. Start a Claude Code session in a gmcc-enabled repo (the SessionStart hook registers it), or ensure the context manually:")
+            Text(Self.message)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 480)
 
             VStack(spacing: 10) {
-                CommandCopyRow(command: "gm_hook context ensure")
+                CommandCopyRow(command: Self.seedCommand)
             }
             .frame(maxWidth: 480)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// Root-aware, same family as DaemonGateState.remediationCommand: a bare
+    /// `gm_hook context ensure` from a plain shell resolves the PROD binary
+    /// with GM_FS_ROOT unset and seeds PRODUCTION's database — while a test
+    /// or beta app keeps showing this screen. Non-prod roots are seeded from
+    /// a checkout by gm_env.sh; "prod" and an undeclared label keep the
+    /// direct command.
+    private static var seedCommand: String {
+        guard let env = Paths.declaredEnvironmentName, env != "prod" else {
+            return "gm_hook context ensure"
+        }
+        return "cd ~/Dev/green-mountain-kernel && bash gmk/scripts/gm_env.sh seed \(env)"
+    }
+
+    private static var message: String {
+        guard let env = Paths.declaredEnvironmentName, env != "prod" else {
+            return "The daemon is healthy but holds no projects yet. Start a Claude Code session in a gmcc-enabled repo (the SessionStart hook registers it), or ensure the context manually:"
+        }
+        return "The kernel is healthy but this \(env) environment holds no projects yet. Seed it from your checkout (a Debug ⌘R runs this for test automatically):"
     }
 }
 

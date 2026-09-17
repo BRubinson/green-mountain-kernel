@@ -69,6 +69,29 @@ public enum EnvironmentKind: Sendable {
         case .test: return Color(nsColor: .systemRed)
         }
     }
+
+    /// The pane's BACKGROUND tint, as a bare hex string (no leading `#`).
+    /// `nil` on production — and nil means the escape is NOT EMITTED AT ALL,
+    /// so a production pane's script stays byte-identical to today's.
+    ///
+    /// NOT `bannerColor`, and that is a decision rather than a duplication.
+    /// `bannerColor` is `.systemOrange`: correct as a 22pt fill over app chrome,
+    /// unreadable as the ground behind terminal text. These are two different
+    /// QUANTITIES that happen to mean the same thing, not two descriptions of
+    /// one quantity. Deriving one by darkening the other was considered and
+    /// rejected — terminal contrast is not a linear function of a UI fill, and
+    /// a derived value is one nobody can read off the file.
+    ///
+    /// KEEP THE TINTS DARK AND LOW-SATURATION. These values are a starting
+    /// point, not a verified choice — nobody has looked at one in a real pane
+    /// yet. Never `systemOrange`.
+    public var paneBackgroundHex: String? {
+        switch self {
+        case .production: return nil
+        case .beta: return "3a2410"   // dark amber
+        case .test: return "3a1414"   // dark red
+        }
+    }
 }
 
 /// The always-visible bar a non-production window carries.

@@ -21,6 +21,7 @@ public final class GMVibesServices {
     /// App-lifetime, like CatalogStore: the project rail, the session pane
     /// and every prompt row read one store.
     let diagramCatalog: DiagramCatalogStore
+    let launchColors: LaunchColorRegistry
 
     /// THE KERNEL, when this process is the one holding it.
     ///
@@ -68,6 +69,7 @@ public final class GMVibesServices {
         catalog = CatalogStore()
         checkout = CheckoutWatcher()
         diagramCatalog = DiagramCatalogStore()
+        launchColors = LaunchColorRegistry()
         // The one wiring of the route() → checkout-state edge; both are
         // app-lifetime singletons, so no re-registration ever happens.
         daemon.checkoutSink = checkout
@@ -79,6 +81,11 @@ public final class GMVibesServices {
         // from, because SUBSCRIBE is a socket verb and this process no longer
         // dials the socket.
         if let kernel {
+            // The health loop must not gate on the on-disk binary when the
+            // kernel is this very process. Set synchronously, in the same
+            // MainActor scope that created the model, so the autorun loop's
+            // first turn already sees it.
+            daemon.hostsKernelInProcess = true
             Task { await GMCCDaemonService.shared.adopt(inProcess: kernel.verbCaller) }
             kernelEventToken = kernel.store.subscribeToEvents { [weak self] event in
                 // FAN-OUT RUNS ON GRDB'S WRITER THREAD, inside the commit hook.
@@ -217,5 +224,6 @@ extension View {
             .environment(services.catalog)
             .environment(services.checkout)
             .environment(services.diagramCatalog)
+            .environment(services.launchColors)
     }
 }

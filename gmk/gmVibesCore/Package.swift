@@ -65,7 +65,7 @@ let package = Package(
         .library(name: "GmVibesCore", targets: ["GmVibesCore"])
     ],
     dependencies: [
-        // THREE. This was TWO, with a note explaining that nothing imported
+        // FOUR. This was TWO, with a note explaining that nothing imported
         // GmDaemon and that the app target's GmKernelHost link existed only for
         // "future writer hosting". THAT FUTURE IS NOW: `GMVibesServices`
         // arbitrates database ownership and hosts the writer in-process, so it
@@ -78,9 +78,19 @@ let package = Package(
         // where a macOS 27 dependency pinned the whole app at graph resolution.
         // Do not confuse the two: floors propagate UPWARD to consumers, and
         // this consumer is already higher.
+        //
+        // The FOURTH is gmITerm2Client — the iTerm2 transport, and what
+        // `PromptRunBar`'s Play button launches through. It brings the tree's
+        // first remote non-GRDB pin (SwiftProtobuf), confined to that package
+        // exactly as GRDB is confined to gmDaemon: nothing generated crosses
+        // its actor boundary, so gmVibesCore never imports SwiftProtobuf. IT
+        // MOVES NO FLOOR EITHER — gmITerm2Client declares macOS 26 (it was 27,
+        // lowered in the same commit as this line, because 27 was never earned
+        // there), which is exactly this package's floor rather than above it.
         .package(path: "../gmDaemonSdk"),
         .package(path: "../gmUxComponentLibrary"),
         .package(path: "../gmDaemon"),
+        .package(path: "../gmITerm2Client"),
     ],
     targets: [
         .target(
@@ -89,6 +99,7 @@ let package = Package(
                 .product(name: "GmDaemonSdk", package: "gmDaemonSdk"),
                 .product(name: "GmUxComponentLibrary", package: "gmUxComponentLibrary"),
                 .product(name: "GmKernelHost", package: "gmDaemon"),
+                .product(name: "GmITerm2Client", package: "gmITerm2Client"),
             ],
             swiftSettings: appTargetSettings
         ),

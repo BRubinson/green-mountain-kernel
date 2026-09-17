@@ -431,6 +431,7 @@ struct SessionPromptListSidebar: View {
 }
 
 struct PromptNavRow: View {
+    @Environment(LaunchColorRegistry.self) private var launchColors
     let stub: PromptStub
     var body: some View {
         HStack(spacing: 8) {
@@ -441,7 +442,8 @@ struct PromptNavRow: View {
             }
             Spacer()
             PromptDiagramBadge(promptUuid: stub.uuid)
-            PromptStatusBadge(status: PromptStatus(rawValue: stub.status))
+            PromptStatusBadge(status: PromptStatus(rawValue: stub.status),
+                              tint: launchColors.color(for: stub.uuid)?.color)
         }
         .padding(.vertical, 2)
     }

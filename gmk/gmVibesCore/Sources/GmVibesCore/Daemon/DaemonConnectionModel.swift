@@ -40,6 +40,13 @@ final class DaemonConnectionModel {
     /// the sink is an app-lifetime singleton, wired once by GMVibesServices.
     weak var checkoutSink: CheckoutEventSink?
 
+    /// True when THIS process won arbitration and hosts the kernel in-process.
+    /// Set once by GMVibesServices during its init, before the supervising
+    /// loop's first turn can run (both live in one synchronous MainActor
+    /// scope). The on-disk binary check is meaningless in that mode: there is
+    /// no binary to exec, and the store is already open in this address space.
+    var hostsKernelInProcess = false
+
     /// Live session scopes register their prompt uuids so prompt-subject
     /// events route to the owning session only; unknown subjects fan out.
     /// Owner-token guarded: a retired scope's late unregister must not kill
@@ -105,7 +112,7 @@ final class DaemonConnectionModel {
     private var fastFailureBackoff: Duration = .seconds(1)
 
     private func iterate() async {
-        guard GMCCDaemonService.isInstalled else {
+        guard hostsKernelInProcess || GMCCDaemonService.isInstalled else {
             setHealth(.notInstalled)
             try? await Task.sleep(for: .seconds(5))
             return

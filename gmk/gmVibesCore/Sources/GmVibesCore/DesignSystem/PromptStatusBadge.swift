@@ -19,12 +19,14 @@ import GmDaemonSdk
 /// twelve-phase vocabulary designed for properly.
 struct PromptStatusBadge: View {
     let status: PromptStatus?
+    var tint: Color? = nil
     var body: some View {
         Text(label)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 7).padding(.vertical, 2)
             .background(color.opacity(0.18), in: .capsule)
             .foregroundStyle(color)
+            .overlay { Capsule().strokeBorder(tint ?? .clear, lineWidth: 1.5) }
     }
     private var label: String { status?.rawValue.capitalized ?? "—" }
     var color: Color { Self.color(for: status) }
