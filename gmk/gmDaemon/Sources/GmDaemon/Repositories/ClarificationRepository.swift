@@ -33,7 +33,10 @@ struct ClarificationRepository: RepositoryContext {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
         }
         if let existing = try String.fetchOne(
-            db, sql: "SELECT uuid FROM clarification_summary WHERE prompt_uuid = ?",
+            db, sql: """
+                SELECT uuid FROM clarification_summary WHERE prompt_uuid = ?
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """,
             arguments: [promptUuid]
         ) {
             return (existing, false)
@@ -636,7 +639,8 @@ struct ClarificationRepository: RepositoryContext {
         where condition: String, key: String
     ) throws -> ClarificationSummaryRow? {
         try ClarificationSummaryRecord.fetchAll(
-            db, where: condition, arguments: [key]
+            db, where: condition, arguments: [key],
+            orderBy: "created_at DESC, id DESC"
         ).first?.wireRow()
     }
 

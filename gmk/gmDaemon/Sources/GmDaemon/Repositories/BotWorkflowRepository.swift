@@ -364,25 +364,47 @@ struct BotWorkflowRepository: RepositoryContext {
         let briefing = try String.fetchOne(db, sql: """
             SELECT uuid FROM agent_briefing
             WHERE prompt_uuid = ? AND briefing_for_step = 'initial'
+            ORDER BY created_at DESC, id DESC LIMIT 1
             """, arguments: [promptUuid])
         let clarification = try String.fetchOne(
-            db, sql: "SELECT uuid FROM clarification_summary WHERE prompt_uuid = ?",
+            db,
+            sql: """
+                SELECT uuid FROM clarification_summary WHERE prompt_uuid = ?
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """,
             arguments: [promptUuid])
         var package: String?
         if let clarification {
             package = try String.fetchOne(
-                db, sql: "SELECT uuid FROM care_package WHERE clarification_summary_uuid = ?",
+                db, sql: """
+                    SELECT uuid FROM care_package WHERE clarification_summary_uuid = ?
+                    ORDER BY created_at DESC, id DESC LIMIT 1
+                    """,
                 arguments: [clarification])
         }
         let architecture = try String.fetchOne(
-            db, sql: "SELECT uuid FROM architecture_summary WHERE prompt_uuid = ?",
+            db,
+            sql: """
+                SELECT uuid FROM architecture_summary WHERE prompt_uuid = ?
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """,
             arguments: [promptUuid])
         let review = try String.fetchOne(
-            db, sql: "SELECT uuid FROM review_summary WHERE prompt_uuid = ?",
+            db,
+            sql: """
+                SELECT uuid FROM review_summary WHERE prompt_uuid = ?
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """,
             arguments: [promptUuid])
         var exploration: [String: String] = [:]
+        // Ascending so the dictionary's last-write-wins lands on the newest
+        // summary per agent_type.
         for row in try Row.fetchAll(
-            db, sql: "SELECT agent_type, uuid FROM exploration_summary WHERE prompt_uuid = ?",
+            db,
+            sql: """
+                SELECT agent_type, uuid FROM exploration_summary WHERE prompt_uuid = ?
+                ORDER BY created_at ASC, id ASC
+                """,
             arguments: [promptUuid]
         ) {
             exploration[row["agent_type"]] = row["uuid"]
@@ -400,7 +422,11 @@ struct BotWorkflowRepository: RepositoryContext {
 
     private func clarificationStatus(promptUuid: String) throws -> String? {
         try String.fetchOne(
-            db, sql: "SELECT status FROM clarification_summary WHERE prompt_uuid = ?",
+            db,
+            sql: """
+                SELECT status FROM clarification_summary WHERE prompt_uuid = ?
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """,
             arguments: [promptUuid])
     }
 
