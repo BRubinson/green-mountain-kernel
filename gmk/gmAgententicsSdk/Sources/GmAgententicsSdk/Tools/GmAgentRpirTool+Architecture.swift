@@ -6,6 +6,29 @@ import GmDaemonSdk
 
 @available(GmAgentOs 1.0, *)
 @Generable
+public struct GmAgentRpirOpenArchitectureArguments: Sendable {
+    @Guide(description: promptUuidGuide("to open an architecture summary for"))
+    public var promptUuid: String
+
+    public init(promptUuid: String) {
+        self.promptUuid = promptUuid
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+public struct GmAgentRpirOpenArchitectureTool: GmAgentRpirTool {
+    public let name = "rpir_open_architecture"
+    public let description = "Start the plan page."
+
+    public init() {}
+
+    public func call(arguments: GmAgentRpirOpenArchitectureArguments) async throws -> String {
+        throw GmAgentToolError.notWired(tool: name, verb: "ARCH_OPEN")
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+@Generable
 public struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
     @Guide(description: "Which prompt's architecture, by summary uuid.")
     public var summaryUuid: String
@@ -19,11 +42,26 @@ public struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
     @Guide(description: "Your whole proposal, written out.")
     public var body: String
 
-    public init(summaryUuid: String, agentName: String, agentId: String = "", body: String) {
+    @Guide(description: """
+        Option this proposal REPLACES, by uuid. Leave empty for a new \
+        proposal. The old row stays as rejected history, and if it was the \
+        selected plan the new one takes the selection.
+        """)
+    public var supersedesOptionUuid: String
+
+    @Guide(description: "Version of the replaced option. Required with supersedesOptionUuid.")
+    public var expectedVersion: Int
+
+    public init(
+        summaryUuid: String, agentName: String, agentId: String = "", body: String,
+        supersedesOptionUuid: String = "", expectedVersion: Int = 0
+    ) {
         self.summaryUuid = summaryUuid
         self.agentName = agentName
         self.agentId = agentId
         self.body = body
+        self.supersedesOptionUuid = supersedesOptionUuid
+        self.expectedVersion = expectedVersion
     }
 }
 
@@ -210,6 +248,115 @@ public struct GmAgentRpirWriteArchitectureGeneralChangesTool: GmAgentRpirTool {
 
     public func call(arguments: GmAgentRpirWriteGeneralChangesArguments) async throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_GENERAL_ADD (looped)")
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+@Generable
+public struct GmAgentRpirWriteFieldChangesArguments: Sendable {
+    @Guide(description: "The database change row these fields belong to, by uuid.")
+    public var persistenceChangeUuid: String
+
+    @Guide(description: "All the field changes for that row, in one go.")
+    public var fields: [GmAgentPersistenceFieldChange]
+
+    public init(persistenceChangeUuid: String, fields: [GmAgentPersistenceFieldChange]) {
+        self.persistenceChangeUuid = persistenceChangeUuid
+        self.fields = fields
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+public struct GmAgentRpirWriteArchitectureFieldChangesTool: GmAgentRpirTool {
+    public let name = "rpir_write_architecture_field_changes"
+    public let description = "Write down field-level changes under one database change."
+
+    public init() {}
+
+    public func call(arguments: GmAgentRpirWriteFieldChangesArguments) async throws -> String {
+        throw GmAgentToolError.notWired(tool: name, verb: "ARCH_FIELD_ADD (looped)")
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+@Generable
+public struct GmAgentRpirSummarizeArchitectureArguments: Sendable {
+    @Guide(description: summaryUuidGuide(to: "write", "architecture"))
+    public var summaryUuid: String
+
+    @Guide(description: "Version of the summary you read.")
+    public var expectedVersion: Int
+
+    @Guide(description: "The plan narrative, written over the expanded rows.")
+    public var body: String
+
+    public init(summaryUuid: String, expectedVersion: Int, body: String) {
+        self.summaryUuid = summaryUuid
+        self.expectedVersion = expectedVersion
+        self.body = body
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+public struct GmAgentRpirSummarizeArchitectureTool: GmAgentRpirTool {
+    public let name = "rpir_summarize_architecture"
+    public let description = "Write the plan's own summary."
+
+    public init() {}
+
+    public func call(arguments: GmAgentRpirSummarizeArchitectureArguments) async throws -> String {
+        throw GmAgentToolError.notWired(tool: name, verb: "ARCH_SUMMARIZE")
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+@Generable
+public struct GmAgentRpirArchitectureGateArguments: Sendable {
+    @Guide(description: summaryUuidGuide(to: "move", "architecture"))
+    public var summaryUuid: String
+
+    @Guide(description: "Version of the summary you read.")
+    public var expectedVersion: Int
+
+    public init(summaryUuid: String, expectedVersion: Int) {
+        self.summaryUuid = summaryUuid
+        self.expectedVersion = expectedVersion
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+public struct GmAgentRpirProposeArchitectureTool: GmAgentRpirTool {
+    public let name = "rpir_propose_architecture"
+    public let description = "Put the plan on the table."
+
+    public init() {}
+
+    public func call(arguments: GmAgentRpirArchitectureGateArguments) async throws -> String {
+        throw GmAgentToolError.notWired(tool: name, verb: "ARCH_PROPOSE")
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+public struct GmAgentRpirApproveArchitectureTool: GmAgentRpirTool {
+    public let name = "rpir_approve_architecture"
+    public let description = "The human said yes; lock the plan."
+
+    public init() {}
+
+    public func call(arguments: GmAgentRpirArchitectureGateArguments) async throws -> String {
+        throw GmAgentToolError.notWired(tool: name, verb: "ARCH_APPROVE")
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+public struct GmAgentRpirReviseArchitectureTool: GmAgentRpirTool {
+    public let name = "rpir_revise_architecture"
+    public let description = "Reopen the plan for changes."
+
+    public init() {}
+
+    public func call(arguments: GmAgentRpirArchitectureGateArguments) async throws -> String {
+        throw GmAgentToolError.notWired(tool: name, verb: "ARCH_REVISE")
     }
 }
 

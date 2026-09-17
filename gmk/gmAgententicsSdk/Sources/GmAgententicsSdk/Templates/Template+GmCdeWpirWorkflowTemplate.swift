@@ -159,7 +159,7 @@ let GM_CDE_PHASE_IMPLEMENT_TEMPLATE = """
     **Gate:**
         1. Only the files the change description names. A plan improved on the way past is a plan nobody approved.
         2. QUOTED OUTPUT IS THE PROOF. A summary of a build you ran is not the build you ran.
-        3. Changes made through the shell are invisible to the machine. Record those yourself.
+        3. File-change capture is the hook's job, shell included — the PostToolUse hook records every write. Never write capture rows yourself.
     """
 
 let GM_CDE_PHASE_REVIEW_TEMPLATE = """

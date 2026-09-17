@@ -49,11 +49,11 @@ import Foundation
 /// through rpir_next to the agents doing the work, so a block that names the
 /// wrong write path is the wrong write path, everywhere, at once.
 ///
-/// Verbs with no pen tool are written the way every other daemon verb is
-/// reachable: `gm_hook call <MESSAGE_TYPE> --json '{...}'` (or `--json-file`
-/// when the body is larger than an argv can carry). Keys are the wire's
-/// snake_case, sent verbatim. `gm_hook verbs --json` lists every type the
-/// daemon serves.
+/// CDE WORKFLOW WORK IS PEN-ONLY (v31, prompt p1). Every step this spec
+/// instructs has a pen tool, and the prose below names it. A tool an agent
+/// cannot see is a missing GRANT — a fact to report, never a cue to shell to
+/// the wire: the CLI's unbudgeted output is silently truncated by the
+/// harness, which is the failure that forced this rule.
 public enum WorkflowSpec {
 
     /// Phase codes, in canonical order of appearance across variants.
@@ -152,9 +152,8 @@ public enum WorkflowSpec {
             When every expected row is complete, \(clarifierNote) for the merged pass — \
             rank, seal the synthesis row, then author the question and note suite. Sealing \
             synthesis is what moves the machine into clarify_open. Open the clarification \
-            summary yourself with gm_hook call CLARIFY_OPEN --json \
-            '{"prompt_uuid":"<prompt>"}' — it is no longer created for you by a \
-            status move.
+            summary yourself with mcp__plugin_gmcc_cde__rpir_open_clarification \
+            (prompt_uuid) — it is no longer created for you by a status move.
             """
         case .clarifyOpen:
             return """
@@ -173,40 +172,39 @@ public enum WorkflowSpec {
             mcp__plugin_gmcc_cde__rpir_write_clarification_notes (weight 0-999, 0 = critical), written \
             from the ranked record rather than from a re-read of the repo.
             When the pass returns, the primary seals the suite: \
-            gm_hook call CLARIFY_SEAL --json \
-            '{"summary_uuid":"<clarification>","expected_version":V}'.
+            mcp__plugin_gmcc_cde__rpir_seal_clarification (summary_uuid, \
+            expected_version) — building → answering.
             """
         case .clarifyUser:
             var text = """
             Ask the user each open question (AskUserQuestion; options mirror the option \
-            rows), record each answer with gm_hook call CLARIFY_ANSWER --json \
-            '{"question_uuid":"Q","expected_version":V,"answer_text":"...", \
-            "selected_option_uuids":["<option>"],"skip":false}'. At most 2 generative \
+            rows), record each answer with \
+            mcp__plugin_gmcc_cde__rpir_answer_clarification_question (question_uuid, \
+            expected_version, answer_text, selected_option_uuids, skip). At most 2 generative \
             follow-up passes: question-add stays legal while the summary is answering, so \
             add the follow-ups and ask them in the same conversation.
             """
             if variant == .bot {
                 text += """
-                 When every question is answered or skipped: gm_hook call \
-                CLARIFY_FINALIZE --json \
-                '{"summary_uuid":"<clarification>","expected_version":V}' (pure gate), \
-                then open the architecture summary with gm_hook call ARCH_OPEN --json \
-                '{"prompt_uuid":"<prompt>"}'.
+                 When every question is answered or skipped: \
+                mcp__plugin_gmcc_cde__rpir_finalize_clarification (summary_uuid, \
+                expected_version — pure gate), then open the architecture summary with \
+                mcp__plugin_gmcc_cde__rpir_open_architecture (prompt_uuid).
                 """
             }
             return text
         case .carePackage:
             return """
-            Open the package: gm_hook call CARE_PACKAGE_OPEN --json \
-            '{"summary_uuid":"<clarification summary>"}'. Then curate through the pen: \
+            Open the package: mcp__plugin_gmcc_cde__rpir_open_care_package \
+            (summary_uuid = the CLARIFICATION summary). Then curate through the pen: \
             mcp__plugin_gmcc_cde__rpir_write_care_package with kind dope|kbite|exploration \
             (exploration entries are COPIES of ranked findings written with more intent — \
             never re-explore). Finish with mcp__plugin_gmcc_cde__rpir_close_care_package, \
             clarified_intent being backstory+goal+detail as clarified. The intent \
             lives ONLY here — it is never written back to the prompt row. Then \
-            gm_hook call CLARIFY_FINALIZE --json \
-            '{"summary_uuid":"<clarification>","expected_version":V}' (pure gate) and \
-            gm_hook call ARCH_OPEN --json '{"prompt_uuid":"<prompt>"}'.
+            mcp__plugin_gmcc_cde__rpir_finalize_clarification (summary_uuid, \
+            expected_version — pure gate) and \
+            mcp__plugin_gmcc_cde__rpir_open_architecture (prompt_uuid).
             """
         case .archOptions:
             return """
@@ -222,38 +220,46 @@ public enum WorkflowSpec {
                 mcp__plugin_gmcc_cde__rpir_decide_architecture (option_uuid, expected_version, \
                 rationale — it stamps selected, rejects siblings, records why; offer \
                 unused-option features to the user later). Then expand ONLY the selected \
-                option into rows, persistence FIRST: gm_hook call ARCH_PERSIST_ADD \
-                --json '{"summary_uuid":"S","class_name":"...","file_path":"...", \
-                "reason_brief":"...","change_kind":"add|modify|rename|delete", \
-                "dope_ref":"<entity code>"}', then ARCH_FIELD_ADD (change_kind, \
-                renamed_from, dope_property_ref: <property code>), then ARCH_GENERAL_ADD, \
-                then ARCH_SUMMARIZE. Write each general row as the instruction its \
-                implementer will execute, and name the file_path that implementer owns.
+                option into rows, persistence FIRST: \
+                mcp__plugin_gmcc_cde__rpir_write_architecture_persistence_changes \
+                (summary_uuid, class_name, file_path, reason_brief, change_kind, \
+                dope_ref: <entity code>), then \
+                mcp__plugin_gmcc_cde__rpir_write_architecture_field_changes (change_kind, \
+                renamed_from, dope_property_ref: <property code>), then \
+                mcp__plugin_gmcc_cde__rpir_write_architecture_general_changes, then \
+                mcp__plugin_gmcc_cde__rpir_summarize_architecture. Write each general row \
+                as the instruction its implementer will execute, and name the file_path \
+                that implementer owns.
                 """
             }
             return """
             Design in context (bot) or via your single subagent (rpi) from the clarified \
             record — in rpi the subagent PROPOSES and returns its proposal in its final \
             message; the primary is what persists it. Every row is written db-natively, \
-            persistence FIRST: gm_hook call ARCH_PERSIST_ADD --json \
-            '{"summary_uuid":"S","class_name":"...","file_path":"...", \
-            "reason_brief":"...","change_kind":"add|modify|rename|delete", \
-            "dope_ref":"<entity code>"}', then ARCH_FIELD_ADD (dope_property_ref for \
-            renames and deletes), then ARCH_GENERAL_ADD — each row the instruction its \
-            implementer will execute, naming the file_path that implementer owns — then \
-            ARCH_SUMMARIZE. The architecture rows are one author's work: they are written \
+            persistence FIRST: \
+            mcp__plugin_gmcc_cde__rpir_write_architecture_persistence_changes \
+            (summary_uuid, class_name, file_path, reason_brief, change_kind, \
+            dope_ref: <entity code>), then \
+            mcp__plugin_gmcc_cde__rpir_write_architecture_field_changes \
+            (dope_property_ref for renames and deletes), then \
+            mcp__plugin_gmcc_cde__rpir_write_architecture_general_changes — each row the \
+            instruction its implementer will execute, naming the file_path that \
+            implementer owns — then mcp__plugin_gmcc_cde__rpir_summarize_architecture. \
+            The architecture rows are one author's work: they are written \
             once, in order, against a single summary_uuid.
             """
         case .planGate:
             return """
-            gm_hook call ARCH_PROPOSE --json '{"summary_uuid":"S","expected_version":V}', \
-            then present the plan for user sign-off — ALWAYS include the full persistence \
-            delta table (positive AND negative changes, dope refs shown). Approve → \
-            gm_hook call ARCH_APPROVE --json '{"summary_uuid":"S","expected_version":V}'. \
-            The prompt's status does not move here: it was claimed as initiated when its \
-            briefing opened, and the next move it makes is to done. Modify → gm_hook call \
-            ARCH_REVISE --json \
-            '{"summary_uuid":"S","expected_version":V}' and return to architecture.
+            mcp__plugin_gmcc_cde__rpir_propose_architecture (summary_uuid, \
+            expected_version), then present the plan for user sign-off — ALWAYS include \
+            the full persistence delta table (positive AND negative changes, dope refs \
+            shown). Approve → mcp__plugin_gmcc_cde__rpir_approve_architecture \
+            (summary_uuid, expected_version). The prompt's status does not move here: it \
+            was claimed as initiated when its briefing opened, and the next move it makes \
+            is to done. Modify → mcp__plugin_gmcc_cde__rpir_revise_architecture \
+            (summary_uuid, expected_version) and return to architecture — \
+            mcp__plugin_gmcc_cde__rpir_open_architecture_option's supersede form \
+            (supersedes_option_uuid + expected_version) replaces a proposal in place.
             """
         case .implement:
             switch variant {
@@ -297,25 +303,24 @@ public enum WorkflowSpec {
             case .team: spawn = "Run the review workflow — one reviewer per methodology."
             }
             return """
-            Open the summary: gm_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'. \
+            Open the summary: mcp__plugin_gmcc_cde__rpir_open_review (prompt_uuid). \
             \(spawn) Reviewers scope themselves with mcp__plugin_gmcc_cde__rpir_get_architecture and \
             mcp__plugin_gmcc_cde__cde_search_file_changes, read the record so far with \
             mcp__plugin_gmcc_cde__rpir_get_review, and write their findings with \
             mcp__plugin_gmcc_cde__rpir_write_reviews, each rating its own. The primary \
             then runs the one cross-agent calibration pass \
-            (mcp__plugin_gmcc_cde__rpir_rank_reviews) and seals with gm_hook call \
-            REVIEW_COMPLETE, whose payload is summary_uuid, expected_version, overview and \
-            verdict (approved|approved_with_nits|changes_requested). It refuses unranked \
-            findings. Write the payload to a file and pass --json-file: an overview is \
-            routinely larger than an argv can carry.
+            (mcp__plugin_gmcc_cde__rpir_rank_reviews) and seals with \
+            mcp__plugin_gmcc_cde__rpir_complete_review (summary_uuid, expected_version, \
+            overview, verdict: approved|approved_with_nits|changes_requested). It refuses \
+            unranked findings.
             """
         case .reviewFix:
             return """
             Clarify fix intent with the user (fix all / fix critical / proceed), then run \
-            the fix loop: every finding under rating 100 gets gm_hook call \
-            REVIEW_RESOLVE --json '{"finding_uuid":"F","expected_version":V, \
-            "status":"fixed|accepted|wont_fix"}' (legal after complete by design — the fix \
-            loop runs post-seal). The fixes are implementation and carry implementation's \
+            the fix loop: every finding under rating 100 gets \
+            mcp__plugin_gmcc_cde__rpir_resolve_review_finding (finding_uuid, \
+            expected_version, status: fixed|accepted|wont_fix — legal after complete by \
+            design; the fix loop runs post-seal). The fixes are implementation and carry implementation's \
             proof: the documented build loop, run and reported. Team: the fixes themselves \
             may run as a workflow.
             """

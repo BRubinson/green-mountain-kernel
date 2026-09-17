@@ -2855,12 +2855,27 @@ public struct ArchOptionAddRequest: Codable, Hashable, Sendable {
     public let agentName: String
     public let agentId: String?
     public let body: String
+    /// REVISION, as the same verb. Set BOTH of these to supersede an existing
+    /// option row: the new row is inserted, the superseded row is stamped
+    /// `rejected` (kept — the record is append-only history), and a selection
+    /// on the old row carries over to the new one with a line appended to the
+    /// summary's decision rationale. The pair travels together: one without
+    /// the other is refused. Additive OPTIONALS, so nil-nil is the original
+    /// wire shape byte-for-byte and this does NOT bump GmWireProtocol.version.
+    public let supersedesOptionUuid: String?
+    /// The superseded row's version — threaded like every mutation.
+    public let expectedVersion: Int64?
 
-    public init(summaryUuid: String, agentName: String, agentId: String? = nil, body: String) {
+    public init(
+        summaryUuid: String, agentName: String, agentId: String? = nil, body: String,
+        supersedesOptionUuid: String? = nil, expectedVersion: Int64? = nil
+    ) {
         self.summaryUuid = summaryUuid
         self.agentName = agentName
         self.agentId = agentId
         self.body = body
+        self.supersedesOptionUuid = supersedesOptionUuid
+        self.expectedVersion = expectedVersion
     }
 }
 

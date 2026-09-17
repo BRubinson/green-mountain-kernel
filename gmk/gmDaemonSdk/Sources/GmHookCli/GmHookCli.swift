@@ -54,6 +54,8 @@ public enum GmHookCli {
             let dryRun = argv.contains("--dry-run")
             let stdin = HookRunner.readStdin()
             switch event {
+            case "pre-tool-use":
+                if let line = HookRunner.preToolUse(stdin: stdin) { print(line) }
             case "post-tool-use":
                 if let line = HookRunner.postToolUse(stdin: stdin, dryRun: dryRun) { print(line) }
             case "subagent-start":

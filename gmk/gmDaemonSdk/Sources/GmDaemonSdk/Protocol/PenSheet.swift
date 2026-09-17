@@ -63,12 +63,12 @@ public enum PenSheet {
         every agent's findings at once, so it is one reader's job, not yours.
           - Seal only your own summary. That seal is yours; another agent's is not.
 
-        A VERB WITH NO PEN TOOL is reached the same way every daemon verb is: \
-        gm_hook call <MESSAGE_TYPE> --json '{...}' (--json-file for a body \
-        bigger than an argv). Wire keys are snake_case and are sent verbatim; \
-        `gm_hook verbs --json` lists every type. If a pen tool you DO have \
-        covers the write, use the pen tool — it is typed and it threads the \
-        version for you.
+        CDE WORK IS PEN-ONLY. Every workflow step has a pen door; a tool you \
+        cannot see is a missing GRANT, and that is a fact to REPORT, never a \
+        cue to shell to the wire — CLI output is unbudgeted and the harness \
+        silently truncates it mid-JSON. File-change capture belongs to the \
+        PostToolUse hook alone (Bash included): never write capture rows \
+        yourself.
         """
     }
 

@@ -54,6 +54,18 @@ func makePhaseDoorTools() -> [Tool] {
                     skip: args.optBool("skip") ?? false))
             }),
         Tool(
+            name: "rpir_seal_clarification",
+            description: "Seal the question suite building → answering. Answers are writable only after this seal; rpir_finalize_clarification is the LATER move (answering → complete). The primary's call, like every seal.",
+            params: [
+                ("summary_uuid", "string", "The clarification summary uuid", true),
+                ("expected_version", "number", "The summary version this write is based on", true),
+            ],
+            run: { args, client in
+                try client.clarifySeal(ClarifySealRequest(
+                    summaryUuid: try args.string("summary_uuid"),
+                    expectedVersion: try args.int64("expected_version")))
+            }),
+        Tool(
             name: "rpir_finalize_clarification",
             description: "answering → complete. Every question is answered or skipped; the care package carries the decided intent forward.",
             params: [
@@ -156,6 +168,16 @@ func makePhaseDoorTools() -> [Tool] {
 
         // ── Architecture ─────────────────────────────────────────────────
         Tool(
+            name: "rpir_open_architecture",
+            description: "Open the prompt's architecture summary page — fetch-or-open, idempotent. Opened explicitly like every summary; nothing opens it as a side effect.",
+            params: [
+                ("prompt_uuid", "string", "The prompt to open an architecture summary for", true),
+            ],
+            run: { args, client in
+                try client.archOpen(ArchOpenRequest(
+                    promptUuid: try args.string("prompt_uuid")))
+            }),
+        Tool(
             name: "rpir_write_architecture_persistence_changes",
             description: "Record ONE persistence-tier change. Persistence rows come before general rows because a schema or wire delta is what the plan gate is signed off against.",
             params: [
@@ -198,6 +220,88 @@ func makePhaseDoorTools() -> [Tool] {
                     reasonBrief: try args.string("reason_brief"),
                     changeDepth: depth,
                     changeCode: try args.string("change_code")))
+            }),
+        Tool(
+            name: "rpir_write_architecture_field_changes",
+            description: "Record ONE field-level change under a persistence change row (m0025 grain: add|modify|rename|delete per field).",
+            params: [
+                ("persistence_change_uuid", "string", "The parent persistence change row", true),
+                ("field_name", "string", "The field being changed", true),
+                ("data_type", "string", "The field's data type", true),
+                ("change_reason", "string", "Why this field changes", true),
+                ("change_purpose", "string", "What the change is for", true),
+                ("nullable", "boolean", "Whether the field is nullable", true),
+                ("is_foreign_key", "boolean", "Whether the field is a foreign key", false),
+                ("fk_target", "string", "The FK target when is_foreign_key", false),
+                ("is_indexed", "boolean", "Whether the field is indexed", false),
+                ("change_kind", "string", "add|modify|rename|delete (default add)", false),
+                ("renamed_from", "string", "Old field name when change_kind is rename", false),
+                ("dope_property_ref", "string", "domain.entity.property dot-path CODE, ghost-legal", false),
+            ],
+            run: { args, client in
+                try client.archFieldAdd(ArchFieldAddRequest(
+                    persistenceChangeUuid: try args.string("persistence_change_uuid"),
+                    fieldName: try args.string("field_name"),
+                    dataType: try args.string("data_type"),
+                    changeReason: try args.string("change_reason"),
+                    changePurpose: try args.string("change_purpose"),
+                    nullable: args.optBool("nullable") ?? false,
+                    isForeignKey: args.optBool("is_foreign_key") ?? false,
+                    fkTarget: args.optString("fk_target"),
+                    isIndexed: args.optBool("is_indexed") ?? false,
+                    changeKind: args.optString("change_kind"),
+                    renamedFrom: args.optString("renamed_from"),
+                    dopePropertyRef: args.optString("dope_property_ref")))
+            }),
+        Tool(
+            name: "rpir_summarize_architecture",
+            description: "Write the architecture summary's own body — the plan narrative over the expanded rows.",
+            params: [
+                ("summary_uuid", "string", "The architecture summary uuid", true),
+                ("expected_version", "number", "The summary version this write is based on", true),
+                ("body", "string", "The summary narrative (markdown)", true),
+            ],
+            run: { args, client in
+                try client.archSummarize(ArchSummarizeRequest(
+                    summaryUuid: try args.string("summary_uuid"),
+                    expectedVersion: try args.int64("expected_version"),
+                    body: try args.string("body")))
+            }),
+        Tool(
+            name: "rpir_propose_architecture",
+            description: "drafting → proposed: put the expanded plan on the table for the plan gate.",
+            params: [
+                ("summary_uuid", "string", "The architecture summary uuid", true),
+                ("expected_version", "number", "The summary version this write is based on", true),
+            ],
+            run: { args, client in
+                try client.archPropose(ArchProposeRequest(
+                    summaryUuid: try args.string("summary_uuid"),
+                    expectedVersion: try args.int64("expected_version")))
+            }),
+        Tool(
+            name: "rpir_approve_architecture",
+            description: "proposed → approved (terminal; unlocks implementation). The user's sign-off at the plan gate is what authorizes this call.",
+            params: [
+                ("summary_uuid", "string", "The architecture summary uuid", true),
+                ("expected_version", "number", "The summary version this write is based on", true),
+            ],
+            run: { args, client in
+                try client.archApprove(ArchApproveRequest(
+                    summaryUuid: try args.string("summary_uuid"),
+                    expectedVersion: try args.int64("expected_version")))
+            }),
+        Tool(
+            name: "rpir_revise_architecture",
+            description: "proposed → drafting: the revision edge. Reopens the summary so options and rows can change; compose with rpir_open_architecture_option's supersede form to replace a proposal.",
+            params: [
+                ("summary_uuid", "string", "The architecture summary uuid", true),
+                ("expected_version", "number", "The summary version this write is based on", true),
+            ],
+            run: { args, client in
+                try client.archRevise(ArchReviseRequest(
+                    summaryUuid: try args.string("summary_uuid"),
+                    expectedVersion: try args.int64("expected_version")))
             }),
         Tool(
             name: "kbite_open_maw",

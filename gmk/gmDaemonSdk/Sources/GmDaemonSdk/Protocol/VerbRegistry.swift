@@ -313,6 +313,11 @@ public enum VerbRegistry {
         // generated from this registry — can see it, because an agent typing
         // it by hand would be forging capture rows for a tool call that never
         // happened.
+        //
+        // NO `pen:` NAME, DELIBERATELY (Endotherm ruling, prompt p1). File-change
+        // capture happens ONLY as the PostToolUse hook; a pen door here is the
+        // forgery vector the paragraph above warns about, offered as a typed
+        // tool. Do not "complete" this row in a coverage sweep.
         VerbSpec(.fileChangeAdd, gm: "gm file-change add",
                  aliases: ["gm hook post-tool-use"],
                  role: .record(agentPhases: nil)),
@@ -342,7 +347,7 @@ public enum VerbRegistry {
                  role: .record(agentPhases: [.clarifyOpen])),
         VerbSpec(.clarifyNoteAdd, gm: "gm clarify note-add", pen: "rpir_write_clarification_notes",
                  role: .record(agentPhases: [.clarifyOpen])),
-        VerbSpec(.clarifySeal, gm: "gm clarify seal", role: .record(agentPhases: [.clarifyOpen])),
+        VerbSpec(.clarifySeal, gm: "gm clarify seal", pen: "rpir_seal_clarification", role: .record(agentPhases: [.clarifyOpen])),
         VerbSpec(.clarifyAnswer, gm: "gm clarify answer", pen: "rpir_answer_clarification_question", role: .record(agentPhases: [.clarifyUser])),
         VerbSpec(.clarifyReopen, gm: "gm clarify reopen", role: .record(agentPhases: nil)),
         VerbSpec(.clarifyFinalize, gm: "gm clarify finalize", pen: "rpir_finalize_clarification", role: .record(agentPhases: [.clarifyUser])),
@@ -360,10 +365,10 @@ public enum VerbRegistry {
         VerbSpec(.carePackageGet, gm: "gm clarify package-get", role: .read),
 
         // ── Architecture machine ─────────────────────────────────────────
-        VerbSpec(.archOpen, gm: "gm arch open", role: .record(agentPhases: [.architecture])),
-        VerbSpec(.archSummarize, gm: "gm arch summarize", role: .record(agentPhases: [.architecture])),
+        VerbSpec(.archOpen, gm: "gm arch open", pen: "rpir_open_architecture", role: .record(agentPhases: [.architecture])),
+        VerbSpec(.archSummarize, gm: "gm arch summarize", pen: "rpir_summarize_architecture", role: .record(agentPhases: [.architecture])),
         VerbSpec(.archPersistAdd, gm: "gm arch persist-add", pen: "rpir_write_architecture_persistence_changes", role: .record(agentPhases: [.architecture])),
-        VerbSpec(.archFieldAdd, gm: "gm arch field-add", role: .record(agentPhases: [.architecture])),
+        VerbSpec(.archFieldAdd, gm: "gm arch field-add", pen: "rpir_write_architecture_field_changes", role: .record(agentPhases: [.architecture])),
         VerbSpec(.archGeneralAdd, gm: "gm arch general-add", pen: "rpir_write_architecture_general_changes", role: .record(agentPhases: [.architecture])),
         VerbSpec(.archOptionAdd, gm: "gm arch option-add", pen: "rpir_open_architecture_option",
                  role: .record(agentPhases: [.archOptions])),
@@ -371,9 +376,9 @@ public enum VerbRegistry {
         // call, by methodology.
         VerbSpec(.archDecide, gm: "gm arch decide", pen: "rpir_decide_architecture",
                  role: .record(agentPhases: [.archOptions])),
-        VerbSpec(.archPropose, gm: "gm arch propose", role: .record(agentPhases: [.architecture])),
-        VerbSpec(.archApprove, gm: "gm arch approve", role: .record(agentPhases: [.planGate])),
-        VerbSpec(.archRevise, gm: "gm arch revise", role: .record(agentPhases: [.planGate])),
+        VerbSpec(.archPropose, gm: "gm arch propose", pen: "rpir_propose_architecture", role: .record(agentPhases: [.architecture])),
+        VerbSpec(.archApprove, gm: "gm arch approve", pen: "rpir_approve_architecture", role: .record(agentPhases: [.planGate])),
+        VerbSpec(.archRevise, gm: "gm arch revise", pen: "rpir_revise_architecture", role: .record(agentPhases: [.planGate])),
         VerbSpec(.archGet, gm: "gm arch get", pen: "rpir_get_architecture", role: .read),
 
         // ── Exploration machine ──────────────────────────────────────────

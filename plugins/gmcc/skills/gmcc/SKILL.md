@@ -43,4 +43,4 @@ Detail lives beside this file rather than in it — READ THE ONE YOU NEED, not a
 - `ref/gmfs_details.md` — The gmfs filesystem layout, the three environments, and how paths and roots resolve. Read before touching anything under $GM_FS_ROOT.
 - `ref/kbite_awareness.md` — What kbites are, how they are searched, and when to reach for one instead of reading files.
 
-A verb with no pen tool is reached the way every daemon verb is reached: `gm_hook call <MESSAGE_TYPE> --json '{...}'`. Wire keys are snake_case and sent verbatim; `gm_hook verbs --json` lists every type.
+CDE work is pen-only: every workflow step has a pen tool, and a tool you cannot see is a missing GRANT — a fact to report, never a cue to shell to the wire (CLI output is unbudgeted and the harness silently truncates it). File-change capture belongs to the PostToolUse hook alone; never write capture rows yourself.

@@ -166,6 +166,48 @@ public enum HookRunner {
         return additionalContextLine(context)
     }
 
+    /// Warn — never block — when a Bash command hand-invokes the file-change
+    /// capture write (Endotherm ruling, prompt p1: capture belongs to the
+    /// PostToolUse hook alone, and a hand-typed capture row is a forgery of the
+    /// machine's own record; the guard STARTS as a warning, not an error).
+    ///
+    /// The spellings are DERIVED from `VerbRegistry`'s `.fileChangeAdd` row —
+    /// its MessageType, its canonical `gm` invocation and every alias — never
+    /// hand-listed, so a new alias is covered the day it is registered.
+    ///
+    /// - Returns: the PreToolUse hook response line (allow + warning) when the
+    ///   command matches, otherwise nil for silence. Exit is always 0 either
+    ///   way — the hook contract holds.
+    public static func preToolUse(stdin: Data) -> String? {
+        guard let payload = HookPayload.decode(stdin),
+              payload.toolName == "Bash",
+              let command = payload.command, !command.isEmpty,
+              let spec = VerbRegistry.spec(for: .fileChangeAdd)
+        else { return nil }
+        var patterns = [spec.messageType.rawValue]
+        for invocation in spec.gmInvocations {
+            patterns.append(invocation)
+            // The same subcommand reached through the gm_hook binary name.
+            if invocation.hasPrefix("gm ") {
+                patterns.append("gm_hook " + invocation.dropFirst(3))
+            }
+        }
+        guard patterns.contains(where: command.contains) else { return nil }
+        let warning = "[GMB] warning: file-change capture belongs to the PostToolUse hook "
+            + "alone (Bash included) — a hand-invoked capture write forges the machine's "
+            + "record. This command was allowed, but do not write capture rows yourself."
+        let response: [String: Any] = [
+            "hookSpecificOutput": [
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "allow",
+                "permissionDecisionReason": warning,
+            ],
+            "systemMessage": warning,
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: response) else { return nil }
+        return String(data: data, encoding: .utf8)
+    }
+
     // MARK: - Front-end helpers
 
     /// Read the whole raw payload from stdin. Front-ends call this rather than

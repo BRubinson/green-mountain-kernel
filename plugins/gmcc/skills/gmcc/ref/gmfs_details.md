@@ -7,9 +7,10 @@ daemon's SQLite db at `~/gmfs/gm.db`. The gmfs on disk is a **file tree
 only** — prompt-scoped scratch files under `memory/`, plus the kbite
 content store.
 
-Two channels reach the db: the **pen** (`mcp__plugin_gmcc_pen__*`, served by
-`gm_mcp`) for everything that has a pen tool, and
-`gm_hook call <MESSAGE_TYPE> --json '{...}'` for everything else.
+The **pen** (`mcp__plugin_gmcc_cde__*`, served by `gm_mcp`) is the agent's
+channel: every CDE workflow verb has a pen tool. `gm_hook call` remains the
+ops door for non-CDE verbs only; its output is unbudgeted and the harness
+truncates it, so nothing workflow-critical rides it.
 `gm_hook verbs --json` is the catalogue. See
 `skills/gm_daemon/SKILL.md`.
 
@@ -245,18 +246,13 @@ Edit/Write/NotebookEdit with real line ranges from the tool's own patch,
 and a Bash write only when the command NAMES its target — so nothing
 self-reports its own edits.
 
-For a change no tool call made, the verb is reached directly — there is no
-pen door for it, deliberately, because the capture hook is the channel that
-should be recording writes:
+File-change capture is OWNED BY THE PostToolUse HOOK, whose matcher covers
+Edit, Write, NotebookEdit AND Bash — shell-made edits are captured too. There
+is deliberately no pen door for FILE_CHANGE_ADD, and agents never invoke the
+capture write themselves under any spelling: a hand-typed capture row is a
+forgery of the machine's own record.
 
-```
-gm_hook call FILE_CHANGE_ADD --json '{
-  "path": "<repo-relative>", "kind": "edit|create|delete|rename",
-  "prompt_uuid": "<U>"
-}'
-```
-
-Run from inside the repo — git context is auto-detected. Run completion is
+Run completion is
 prompt status `done` plus the clarification/architecture/exploration/review
 rows and registered artifacts; there is no phase-history equivalent.
 `arch_get` derives per-change implementation state from these records.

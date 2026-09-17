@@ -512,19 +512,23 @@ nonisolated(unsafe) let tools: [Tool] = [
         }),
     Tool(
         name: "rpir_open_architecture_option",
-        description: "Write YOUR methodology's architecture Option row (the architect pen; one per agent_name).",
+        description: "Write YOUR methodology's architecture Option row (the architect pen; one per agent_name). To REVISE an existing proposal, pass supersedes_option_uuid + expected_version together: the old row is kept as rejected history and a selected row hands its selection to the revision.",
         params: [
             ("summary_uuid", "string", "The architecture summary uuid", true),
             ("agent_name", "string", "Your methodology persona", true),
             ("agent_id", "string", "Self-reported agent id", false),
             ("body", "string", "Your full proposal (markdown)", true),
+            ("supersedes_option_uuid", "string", "Option row this proposal REPLACES (revision door; requires expected_version)", false),
+            ("expected_version", "number", "The superseded row's version (revision door; requires supersedes_option_uuid)", false),
         ],
         run: { args, client in
             try client.archOptionAdd(ArchOptionAddRequest(
                 summaryUuid: try args.string("summary_uuid"),
                 agentName: try args.string("agent_name"),
                 agentId: args.optString("agent_id"),
-                body: try args.string("body")))
+                body: try args.string("body"),
+                supersedesOptionUuid: args.optString("supersedes_option_uuid"),
+                expectedVersion: args.optInt("expected_version").map(Int64.init)))
         }),
     Tool(
         name: "dope_search_session",

@@ -203,6 +203,35 @@ public struct GmAgentRpirFinalizeClarificationTool: GmAgentRpirTool {
 
 @available(GmAgentOs 1.0, *)
 @Generable
+public struct GmAgentRpirSealClarificationArguments: Sendable {
+    @Guide(description: summaryUuidGuide(to: "seal", "question list"))
+    public var summaryUuid: String
+
+    @Guide(description: "Version of the summary you read.")
+    public var expectedVersion: Int
+
+    public init(summaryUuid: String, expectedVersion: Int) {
+        self.summaryUuid = summaryUuid
+        self.expectedVersion = expectedVersion
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+public struct GmAgentRpirSealClarificationTool: GmAgentRpirTool {
+    public let name = "rpir_seal_clarification"
+    public let description = "Questions written; open them for answers."
+
+    public init() {}
+
+    public func call(
+        arguments: GmAgentRpirSealClarificationArguments
+    ) async throws -> String {
+        throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_SEAL")
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+@Generable
 public struct GmAgentRpirOpenCarePackageArguments: Sendable {
     @Guide(description: "Which question list the box belongs to, by uuid.")
     public var summaryUuid: String

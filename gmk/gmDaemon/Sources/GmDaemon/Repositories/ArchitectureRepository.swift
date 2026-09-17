@@ -191,6 +191,16 @@ struct ArchitectureRepository: RepositoryContext {
     /// The first architect pen verb: one option row per methodology,
     /// UNIQUE(summary, agent_name) — a re-add by the same persona is refused
     /// (the option IS the proposal; revise by decision, not overwrite).
+    ///
+    /// THE SANCTIONED REVISION DOOR rides the SAME verb: pass
+    /// `supersedes_option_uuid` + `expected_version` and the new row replaces
+    /// the named one atomically — the superseded row is stamped `rejected`
+    /// and KEPT (append-only history), the same persona may replace its own
+    /// proposal, and a selection on the old row carries over to the new one
+    /// with a line appended to the summary's decision rationale, so the
+    /// selection never silently vanishes mid-drafting. Before this existed,
+    /// revising a selected plan meant a by-hand dance: a sibling option under
+    /// a fresh agent_name plus a re-decide — three writes for one edit.
     func optionAdd(_ req: ArchOptionAddRequest) throws -> ArchOptionRowResponse {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .drafting, verb: "option-add")
         let agentName = Store.normalizedAgentName(req.agentName)
@@ -205,24 +215,72 @@ struct ArchitectureRepository: RepositoryContext {
             throw StoreError.badRequest(
                 detail: "option body exceeds \(Store.maxNarrativeBytes / (1024 * 1024)) MB")
         }
+        // The supersede pair travels together — one without the other is a
+        // caller mistake, refused before anything is written.
+        if (req.supersedesOptionUuid == nil) != (req.expectedVersion == nil) {
+            throw StoreError.badRequest(
+                detail: "supersedes_option_uuid and expected_version must be passed together")
+        }
+        var superseded: ArchitectureOptionRow?
+        if let supersedesUuid = req.supersedesOptionUuid {
+            guard let old = try fetchOptions(
+                where: "uuid = ?", arguments: [supersedesUuid]
+            ).first else {
+                throw StoreError.notFound(entity: "architecture_option", key: supersedesUuid)
+            }
+            guard old.architectureSummaryUuid == req.summaryUuid else {
+                throw StoreError.badRequest(
+                    detail: "option \(supersedesUuid) belongs to a different summary")
+            }
+            superseded = old
+        }
         if try Row.fetchOne(
-            db, sql: "SELECT 1 FROM architecture_option WHERE architecture_summary_uuid = ? AND agent_name = ?",
-            arguments: [req.summaryUuid, agentName]
+            db, sql: "SELECT 1 FROM architecture_option WHERE architecture_summary_uuid = ? AND agent_name = ? AND uuid != ?",
+            arguments: [req.summaryUuid, agentName, superseded?.uuid ?? ""]
         ) != nil {
+            // A persona may replace ITS OWN proposal (the superseded row is
+            // excluded above); colliding with a live sibling persona is still
+            // refused.
             throw StoreError.badRequest(
                 detail: "agent '\(agentName)' already wrote an option for this summary")
         }
+        // Insert first, then reject: a failure between the two rolls the whole
+        // verb back (one boundary), so no state exists where the old row is
+        // rejected and no successor landed.
+        let wasSelected = superseded?.status == "selected"
         let uuid = try core.insertBase(db, table: "architecture_option", extra: [
             "architecture_summary_uuid": req.summaryUuid,
             "agent_name": agentName,
             "agent_id": req.agentId,
             "body": body,
-            "status": "proposed",
+            "status": wasSelected ? "selected" : "proposed",
         ])
+        if let superseded {
+            try core.updateBase(
+                db, table: "architecture_option", uuid: superseded.uuid,
+                expectedVersion: req.expectedVersion!, set: ["status": "rejected"])
+            if wasSelected {
+                guard let summaryVersion = try Int64.fetchOne(
+                    db, sql: "SELECT version FROM architecture_summary WHERE uuid = ?",
+                    arguments: [req.summaryUuid]
+                ) else {
+                    throw StoreError.notFound(entity: "architecture_summary", key: req.summaryUuid)
+                }
+                let existing = try String.fetchOne(
+                    db, sql: "SELECT decision_rationale FROM architecture_summary WHERE uuid = ?",
+                    arguments: [req.summaryUuid]) ?? ""
+                let stamp = "revised \(StoreCore.isoNow()): option \(superseded.uuid) superseded by \(uuid)"
+                let appended = existing.isEmpty ? stamp : existing + "\n" + stamp
+                try core.updateBase(
+                    db, table: "architecture_summary", uuid: req.summaryUuid,
+                    expectedVersion: summaryVersion, set: ["decision_rationale": appended])
+            }
+        }
         try core.appendEvent(
             db, kind: .architectureChange, subjectUuid: req.summaryUuid,
             payload: Store.jsonPayload([
-                "action": "option_add", "agent_name": agentName,
+                "action": superseded == nil ? "option_add" : "option_supersede",
+                "agent_name": agentName,
                 "prompt_uuid": summary.promptUuid,
             ]))
         try clarification.touchSessionForPrompt(promptUuid: summary.promptUuid)

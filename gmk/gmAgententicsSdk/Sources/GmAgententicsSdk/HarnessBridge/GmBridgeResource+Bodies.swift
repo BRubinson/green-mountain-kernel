@@ -30,18 +30,12 @@ phase's instructions. This file describes the machine, not the prose.
 ## The two write channels
 
 Pen tools are `mcp__plugin_gmcc_cde__<name>`; this file names them bare.
-Where a pen tool exists it is the write path — typed, threading
-`expected_version`. Where none exists, the verb is reached the way every
-daemon verb is reached:
-
-```bash
-gm_hook call <MESSAGE_TYPE> --json '{...}'
-gm_hook call <MESSAGE_TYPE> --json-file <path>   # when the body outgrows an argv
-```
-
-Keys are the wire's snake_case, sent verbatim. `gm_hook verbs --json`
-lists every MessageType the daemon serves and which of them carry a pen
-tool.
+EVERY workflow step below has a pen tool, and the pen is the ONLY channel
+an agent uses for CDE work — typed, threading `expected_version`, and
+budget-guarded (CLI output is not: the harness silently truncates it
+mid-JSON, which is why the shell door was retired from agent usage). A pen
+tool you cannot see is a missing GRANT — report it. `gm_hook call` survives
+for non-CDE ops (dope node surgery, kbite ops) outside the workflow.
 
 ## The machine
 
@@ -108,7 +102,7 @@ CARE PACKAGE.
    sealing THAT row with `explore_complete`. Findings stay UNRANKED here —
    calibration is cross-agent and belongs to one reader. When every expected
    row is complete, open the clarification summary yourself with
-   `gm_hook call CLARIFY_OPEN --json '{"prompt_uuid":"<prompt>"}'` — no status
+   `rpir_open_clarification` (prompt_uuid) — no status
    move here; the prompt has been `initiated` since its briefing opened, and
    the summary is no longer created as a side effect of a status change. Then
    the merged `gmcc:clarifier` pass.
@@ -120,34 +114,24 @@ CARE PACKAGE.
    it is what moves the machine into this phase. The same pass authors the
    suite: `clarify_question_add` (ordered options) and `clarify_note_add`
    (weight 0-999, 0 = critical). The primary seals the suite when the pass
-   returns:
-
-   ```bash
-   gm_hook call CLARIFY_SEAL --json \
-     '{"summary_uuid":"<clarification>","expected_version":V}'
-   ```
+   returns: `rpir_seal_clarification` (summary_uuid, expected_version) —
+   building → answering.
 
    In the bot variant the primary runs the pass itself.
 4. **clarify_user** — the primary asks (AskUserQuestion mirroring the option
-   rows) and records each answer:
-
-   ```bash
-   gm_hook call CLARIFY_ANSWER --json \
-     '{"question_uuid":"Q","expected_version":V,"answer_text":"...",
-       "selected_option_uuids":["<option>"],"skip":false}'
-   ```
-
-   At most 2 generative follow-up passes — `clarify_question_add` stays
+   rows) and records each answer with `rpir_answer_clarification_question`
+   (question_uuid, expected_version, answer_text, selected_option_uuids,
+   skip). At most 2 generative follow-up passes — `clarify_question_add` stays
    legal while the summary is answering, so add the follow-ups and ask them
    in the same conversation.
 5. **care_package** (rpi/team) — open it with
-   `gm_hook call CARE_PACKAGE_OPEN --json '{"summary_uuid":"<clarification>"}'`,
+   `rpir_open_care_package` (summary_uuid = the CLARIFICATION summary),
    curate refs with `care_ref_add` (`kind` dope|kbite|exploration —
    exploration entries are COPIES of ranked findings, never re-explored),
    then `care_package_complete` with `clarified_intent` = backstory + goal +
    detail, clarified. The intent lives ONLY here. Then
-   `gm_hook call CLARIFY_FINALIZE --json '{"summary_uuid":"<clarification>","expected_version":V}'`
-   (a pure gate) and `gm_hook call ARCH_OPEN --json '{"prompt_uuid":"<prompt>"}'`.
+   `rpir_finalize_clarification` (summary_uuid, expected_version — a pure
+   gate) and `rpir_open_architecture` (prompt_uuid).
 6. **arch_options** (team) — one architect per methodology. Each loads the
    clarified intent with `care_package_get` and writes its OWN proposal with
    `arch_option_add` (one row per `agent_name`). Once any option exists,
@@ -156,24 +140,22 @@ CARE PACKAGE.
    among options is cross-agent judgement and belongs to one reader.
 7. **architecture** — ONLY the selected option (or the solo design) expands
    into rows, persistence FIRST:
-
-   ```bash
-   gm_hook call ARCH_PERSIST_ADD --json \
-     '{"summary_uuid":"S","class_name":"...","file_path":"...",
-       "reason_brief":"...","change_kind":"add|modify|rename|delete",
-       "dope_ref":"<entity code>"}'
-   ```
-
-   then `ARCH_FIELD_ADD` (`change_kind`, `renamed_from`,
-   `dope_property_ref` for renames and deletes), then `ARCH_GENERAL_ADD`,
-   then `ARCH_SUMMARIZE`. Write each general row as the instruction its
+   `rpir_write_architecture_persistence_changes` (summary_uuid, class_name,
+   file_path, reason_brief, change_kind: add|modify|rename|delete,
+   dope_ref: <entity code>), then
+   `rpir_write_architecture_field_changes` (`change_kind`, `renamed_from`,
+   `dope_property_ref` for renames and deletes), then
+   `rpir_write_architecture_general_changes`, then
+   `rpir_summarize_architecture`. Write each general row as the instruction its
    implementer will execute, naming the `file_path` that implementer owns.
-8. **plan_gate** — `gm_hook call ARCH_PROPOSE --json
-   '{"summary_uuid":"S","expected_version":V}'`, then user sign-off ALWAYS
+8. **plan_gate** — `rpir_propose_architecture` (summary_uuid,
+   expected_version), then user sign-off ALWAYS
    showing the full persistence delta table (positive AND negative changes,
-   dope refs shown). Approve → `ARCH_APPROVE` + `prompt_set_status status:
-   implementing` (it claims the activation). Modify → `ARCH_REVISE` and back
-   to architecture.
+   dope refs shown). Approve → `rpir_approve_architecture` +
+   `prompt_set_status status: implementing` (it claims the activation).
+   Modify → `rpir_revise_architecture` and back to architecture; a
+   proposal is replaced in place with `rpir_open_architecture_option`'s
+   supersede form (supersedes_option_uuid + expected_version).
 9. **implement** — persistence changes first. Capture is the PostToolUse
    hook and nothing else: Edit/Write/NotebookEdit record exactly, with real
    line ranges from the tool's own patch. A Bash write records only when the
@@ -186,20 +168,18 @@ CARE PACKAGE.
    code is pure orchestration and never writes; the agents inside it hold
    the pen. `arch_get` audits progress (planned rows joined to what has
    actually been touched, plus the unplanned set).
-10. **review** — `gm_hook call REVIEW_OPEN --json '{"prompt_uuid":"<prompt>"}'`.
+10. **review** — `rpir_open_review` (prompt_uuid).
     Reviewers scope themselves with `arch_get` and `file_change_list`, read
     the record with `review_get`, and write findings with
     `review_finding_add`, each rating its own. The primary then runs the one
     cross-agent calibration pass (`review_rank`) and seals with
-    `gm_hook call REVIEW_COMPLETE --json-file <path>` — payload
-    `summary_uuid`, `expected_version`, `overview`, `verdict`
-    (approved|approved_with_nits|changes_requested). It refuses unranked
-    findings, and an overview is routinely larger than an argv can carry,
-    which is why the payload goes through a file.
+    `rpir_complete_review` (summary_uuid, expected_version, overview,
+    verdict: approved|approved_with_nits|changes_requested). It refuses
+    unranked findings.
 11. **review_fix** — clarify fix intent with the user, then every finding
-    under rating 100 gets
-    `gm_hook call REVIEW_RESOLVE --json '{"finding_uuid":"F","expected_version":V,"status":"fixed|accepted|wont_fix"}'`
-    (legal after complete by design — the fix loop runs post-seal).
+    under rating 100 gets `rpir_resolve_review_finding` (finding_uuid,
+    expected_version, status: fixed|accepted|wont_fix — legal after complete
+    by design; the fix loop runs post-seal).
 12. **done** — `prompt_set_status status: done` (releases the activation
     claim, closes the workflow row). Completion is db rows only — no
     phase-history files.
@@ -503,9 +483,10 @@ daemon's SQLite db at `~/gmfs/gm.db`. The gmfs on disk is a **file tree
 only** — prompt-scoped scratch files under `memory/`, plus the kbite
 content store.
 
-Two channels reach the db: the **pen** (`mcp__plugin_gmcc_pen__*`, served by
-`gm_mcp`) for everything that has a pen tool, and
-`gm_hook call <MESSAGE_TYPE> --json '{...}'` for everything else.
+The **pen** (`mcp__plugin_gmcc_cde__*`, served by `gm_mcp`) is the agent's
+channel: every CDE workflow verb has a pen tool. `gm_hook call` remains the
+ops door for non-CDE verbs only; its output is unbudgeted and the harness
+truncates it, so nothing workflow-critical rides it.
 `gm_hook verbs --json` is the catalogue. See
 `skills/gm_daemon/SKILL.md`.
 
@@ -741,18 +722,13 @@ Edit/Write/NotebookEdit with real line ranges from the tool's own patch,
 and a Bash write only when the command NAMES its target — so nothing
 self-reports its own edits.
 
-For a change no tool call made, the verb is reached directly — there is no
-pen door for it, deliberately, because the capture hook is the channel that
-should be recording writes:
+File-change capture is OWNED BY THE PostToolUse HOOK, whose matcher covers
+Edit, Write, NotebookEdit AND Bash — shell-made edits are captured too. There
+is deliberately no pen door for FILE_CHANGE_ADD, and agents never invoke the
+capture write themselves under any spelling: a hand-typed capture row is a
+forgery of the machine's own record.
 
-```
-gm_hook call FILE_CHANGE_ADD --json '{
-  "path": "<repo-relative>", "kind": "edit|create|delete|rename",
-  "prompt_uuid": "<U>"
-}'
-```
-
-Run from inside the repo — git context is auto-detected. Run completion is
+Run completion is
 prompt status `done` plus the clarification/architecture/exploration/review
 rows and registered artifacts; there is no phase-history equivalent.
 `arch_get` derives per-change implementation state from these records.

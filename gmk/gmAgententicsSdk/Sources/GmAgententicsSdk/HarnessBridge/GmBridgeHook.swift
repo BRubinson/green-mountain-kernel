@@ -72,6 +72,21 @@ extension GmBridgeHook {
                     ]
                 )
             ],
+            Tool.preToolUse.code: [
+                MatcherGroup(
+                    matcher: "Bash",
+                    hooks: [
+                        // WARNS, NEVER BLOCKS (Endotherm ruling, prompt p1): a
+                        // Bash command that hand-invokes the file-change capture
+                        // write gets an allow-with-warning response — capture
+                        // belongs to the PostToolUse hook alone, and the guard
+                        // starts as a warning rather than an error. Exit is 0 on
+                        // every path; the hook contract holds. No socket, no
+                        // daemon — the match is pure string work in-process.
+                        Handler(command: hookCommand("pre-tool-use"), timeout: 5)
+                    ]
+                )
+            ],
             Tool.postToolUse.code: [
                 MatcherGroup(
                     matcher: "Edit|Write|NotebookEdit|Bash",

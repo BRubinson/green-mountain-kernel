@@ -82,17 +82,25 @@ public enum GmAgentTools {
         public static let writeClarificationNotes = GmAgentRpirWriteClarificationNotesTool()
         public static let answerClarificationQuestion =
             GmAgentRpirAnswerClarificationQuestionTool()
+        public static let sealClarification = GmAgentRpirSealClarificationTool()
         public static let finalizeClarification = GmAgentRpirFinalizeClarificationTool()
         public static let openCarePackage = GmAgentRpirOpenCarePackageTool()
         public static let writeCarePackage = GmAgentRpirWriteCarePackageTool()
         public static let closeCarePackage = GmAgentRpirCloseCarePackageTool()
         public static let getClarification = GmAgentRpirGetClarificationTool()
 
+        public static let openArchitecture = GmAgentRpirOpenArchitectureTool()
         public static let openArchitectureOption = GmAgentRpirOpenArchitectureOptionTool()
         public static let writeArchitecturePersistenceChanges =
             GmAgentRpirWriteArchitecturePersistenceChangesTool()
+        public static let writeArchitectureFieldChanges =
+            GmAgentRpirWriteArchitectureFieldChangesTool()
         public static let writeArchitectureGeneralChanges =
             GmAgentRpirWriteArchitectureGeneralChangesTool()
+        public static let summarizeArchitecture = GmAgentRpirSummarizeArchitectureTool()
+        public static let proposeArchitecture = GmAgentRpirProposeArchitectureTool()
+        public static let approveArchitecture = GmAgentRpirApproveArchitectureTool()
+        public static let reviseArchitecture = GmAgentRpirReviseArchitectureTool()
         public static let decideArchitecture = GmAgentRpirDecideArchitectureTool()
         public static let getArchitecture = GmAgentRpirGetArchitectureTool()
 
@@ -115,10 +123,12 @@ public enum GmAgentTools {
             openExploration, writeExplorations, rankExplorations, completeExploration,
             getExploration,
             openClarification, writeClarificationQuestions, writeClarificationNotes,
-            answerClarificationQuestion, finalizeClarification,
+            answerClarificationQuestion, sealClarification, finalizeClarification,
             openCarePackage, writeCarePackage, closeCarePackage, getClarification,
-            openArchitectureOption, writeArchitecturePersistenceChanges,
-            writeArchitectureGeneralChanges, decideArchitecture, getArchitecture,
+            openArchitecture, openArchitectureOption, writeArchitecturePersistenceChanges,
+            writeArchitectureFieldChanges, writeArchitectureGeneralChanges,
+            summarizeArchitecture, proposeArchitecture, approveArchitecture,
+            reviseArchitecture, decideArchitecture, getArchitecture,
             openReview, writeReviews, rankReviews, completeReview, resolveReviewFinding,
             getReview,
             searchExploration, searchClarification, searchArchitecture,

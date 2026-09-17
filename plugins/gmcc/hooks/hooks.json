@@ -12,6 +12,18 @@
         "matcher" : "Edit|Write|NotebookEdit|Bash"
       }
     ],
+    "PreToolUse" : [
+      {
+        "hooks" : [
+          {
+            "command" : "[ -x \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" ] || exit 0; exec \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" hook pre-tool-use",
+            "timeout" : 5,
+            "type" : "command"
+          }
+        ],
+        "matcher" : "Bash"
+      }
+    ],
     "SessionStart" : [
       {
         "hooks" : [
