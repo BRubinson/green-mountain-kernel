@@ -65,7 +65,10 @@ struct ExplorationRepository: RepositoryContext {
             }
         }
         if let existing = try String.fetchOne(
-            db, sql: "SELECT uuid FROM exploration_summary WHERE prompt_uuid = ? AND agent_type = ?",
+            db, sql: """
+                SELECT uuid FROM exploration_summary WHERE prompt_uuid = ? AND agent_type = ?
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """,
             arguments: [promptUuid, agentType]
         ) {
             return (existing, false)
@@ -345,7 +348,8 @@ struct ExplorationRepository: RepositoryContext {
 
     func fetchSummary(byPrompt promptUuid: String, agentType: String) throws -> ExplorationSummaryRow? {
         try ExplorationSummaryRecord.fetchAll(
-            db, where: "prompt_uuid = ? AND agent_type = ?", arguments: [promptUuid, agentType]
+            db, where: "prompt_uuid = ? AND agent_type = ?", arguments: [promptUuid, agentType],
+            orderBy: "created_at DESC, id DESC"
         ).first?.wireRow()
     }
 

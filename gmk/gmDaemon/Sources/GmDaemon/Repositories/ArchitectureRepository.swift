@@ -20,7 +20,10 @@ struct ArchitectureRepository: RepositoryContext {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
         }
         if let existing = try String.fetchOne(
-            db, sql: "SELECT uuid FROM architecture_summary WHERE prompt_uuid = ?",
+            db, sql: """
+                SELECT uuid FROM architecture_summary WHERE prompt_uuid = ?
+                ORDER BY created_at DESC, id DESC LIMIT 1
+                """,
             arguments: [promptUuid]
         ) {
             return (existing, false)
@@ -587,7 +590,8 @@ struct ArchitectureRepository: RepositoryContext {
         where condition: String, key: String
     ) throws -> ArchitectureSummaryRow? {
         try ArchitectureSummaryRecord.fetchAll(
-            db, where: condition, arguments: [key]
+            db, where: condition, arguments: [key],
+            orderBy: "created_at DESC, id DESC"
         ).first?.wireRow()
     }
 

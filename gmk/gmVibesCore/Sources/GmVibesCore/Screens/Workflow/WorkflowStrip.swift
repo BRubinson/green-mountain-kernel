@@ -25,15 +25,16 @@ import GmDaemonSdk
 /// There is deliberately no loading spinner, no error banner and no
 /// empty-state copy. A prompt with no workflow row (never started, and
 /// `/gm_task` where the absence is permanent) shows the header alone — the
-/// settled decision.
+/// settled decision. Failed ≠ absent, though: an error is evidence and
+/// renders as one dim caption line; absence stays silent.
 struct WorkflowStrip: View {
     let phase: PromptPhaseStore.Phase<BotNextResponse>
 
-    /// `nil` only for the genuinely absent cases — `.idle` / `.absent` /
-    /// `.failed`, i.e. any non-`.loaded` state. Every `.loaded` response
-    /// renders, including the degraded one-pill model an unrecognised variant
-    /// produces (`variantLabel == nil`), which draws a single unlabelled pill
-    /// rather than nothing.
+    /// `nil` for any non-`.loaded` state — `.idle` / `.absent` render
+    /// nothing and `.failed` renders its own caption line in `body`. Every
+    /// `.loaded` response renders, including the degraded one-pill model an
+    /// unrecognised variant produces (`variantLabel == nil`), which draws a
+    /// single unlabelled pill rather than nothing.
     private var model: WorkflowStripModel? {
         guard case .loaded(let response) = phase else { return nil }
         return WorkflowStripModel.make(response)
@@ -52,6 +53,10 @@ struct WorkflowStrip: View {
                         .foregroundStyle(.secondary)
                 }
             }
+        } else if case .failed(let message) = phase {
+            Label(message, systemImage: "exclamationmark.triangle")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
         }
     }
 
