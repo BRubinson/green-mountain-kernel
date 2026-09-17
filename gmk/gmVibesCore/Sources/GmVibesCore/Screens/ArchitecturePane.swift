@@ -1,11 +1,15 @@
 import SwiftUI
 import GmDaemonSdk
+import GmUxComponentLibrary
 
 /// Read-only architecture section (ARCH_GET): summary body + status,
-/// persistence-first change rows — RENDERED IN WIRE ORDER, never re-sorted
-/// (persistence-before-general is the daemon's positional contract) — each
-/// decorated with derived implementation state, then unplanned changes (scope
-/// drift) and the ordering audit. All arch writes stay bot/CLI-side.
+/// methodology options when a team flow ran (the selected option's body IS
+/// the plan's primary text; empty options = non-team flow, rendered exactly
+/// as before), persistence-first change rows — RENDERED IN WIRE ORDER, never
+/// re-sorted (persistence-before-general is the daemon's positional
+/// contract) — each decorated with derived implementation state, then
+/// unplanned changes (scope drift) and the ordering audit. All arch writes
+/// stay bot/CLI-side.
 struct ArchitecturePane: View {
     let phase: PromptPhaseStore.Phase<ArchGetResponse>
 
@@ -38,9 +42,13 @@ struct ArchitecturePane: View {
                 statusChip(response.summary.architectureStatus)
                 orderingChip(response.orderingRespected)
                 Spacer()
-                Text(progressLabel(response))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                // A freshly-opened architecture has no change rows yet;
+                // "0/0 implemented" reads like a stall, not a state.
+                if let progress = progressLabel(response) {
+                    Text(progress)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             if !response.summary.body.isEmpty {
@@ -50,6 +58,10 @@ struct ArchitecturePane: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
                     .background(.purple.opacity(0.06), in: .rect(cornerRadius: 8))
+            }
+
+            if !response.options.isEmpty {
+                optionsSection(response)
             }
 
             if !response.persistenceChanges.isEmpty {
@@ -91,6 +103,83 @@ struct ArchitecturePane: View {
         Text(title)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
+    }
+
+    /// m0025 team flows: the persisted methodology options. Selection lives
+    /// on `status` ("selected" — the same derivation the daemon uses for the
+    /// option stubs), not a dedicated flag. The selected body is the plan's
+    /// primary text; the losers stay readable as collapsed offers.
+    @ViewBuilder
+    private func optionsSection(_ response: ArchGetResponse) -> some View {
+        let selected = response.options.first(where: { $0.status == "selected" })
+        if let selected {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    sectionHeader("Selected Plan")
+                    optionStatusChip(selected.status)
+                    Text(selected.agentName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                // An empty body would put a "Selected Plan" headline over
+                // zero blocks; the summary body above already carries the
+                // plan text in that case.
+                if !selected.body.isEmpty {
+                    MarkdownBlocksView(MarkdownDocument.parse(selected.body))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+
+        if let rationale = response.summary.decisionRationale, !rationale.isEmpty {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Decision Rationale")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(rationale)
+                    .font(.callout)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(10)
+            .background(.green.opacity(0.06), in: .rect(cornerRadius: 8))
+        }
+
+        let siblings = response.options.filter { $0.status != "selected" }
+        if !siblings.isEmpty {
+            // Mid-run, before the decide, EVERY option is "proposed" — there
+            // is no primary, and "Other Options" would read as "options that
+            // lost" while the choice is still open.
+            sectionHeader(selected == nil ? "Proposed Options" : "Other Options")
+            ForEach(siblings, id: \.uuid) { option in
+                DisclosureGroup {
+                    MarkdownBlocksView(MarkdownDocument.parse(option.body))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                        .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 6))
+                } label: {
+                    HStack(spacing: 8) {
+                        Text(option.agentName)
+                            .font(.callout.weight(.medium))
+                        optionStatusChip(option.status)
+                        Spacer()
+                    }
+                }
+            }
+        }
+    }
+
+    private func optionStatusChip(_ status: String) -> some View {
+        let color: Color = switch status {
+        case "selected": .green
+        case "rejected": .gray
+        default: .blue
+        }
+        return Text(status)
+            .font(.caption2.weight(.medium))
+            .padding(.horizontal, 7).padding(.vertical, 2)
+            .background(color.opacity(0.18), in: .capsule)
+            .foregroundStyle(color)
     }
 
     private func persistenceRow(_ change: ArchPersistenceChangeRow) -> some View {
@@ -196,8 +285,9 @@ struct ArchitecturePane: View {
         }
     }
 
-    private func progressLabel(_ response: ArchGetResponse) -> String {
+    private func progressLabel(_ response: ArchGetResponse) -> String? {
         let planned = response.persistenceChanges.count + response.generalChanges.count
+        guard planned > 0 else { return nil }
         let touched = response.persistenceChanges.filter { $0.implementation.fileChangeCount > 0 }.count
             + response.generalChanges.filter { $0.implementation.fileChangeCount > 0 }.count
         return "\(touched)/\(planned) implemented"

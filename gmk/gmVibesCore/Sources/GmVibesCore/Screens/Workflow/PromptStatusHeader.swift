@@ -12,9 +12,9 @@ import GmDaemonSdk
 /// back o draft too"). **Back to Draft is kept**: the chip carries BOTH
 /// actions, `PromptStatus.allowedNext` and the `Gate` enum survive wholesale
 /// from the deleted lifecycle rail rather than being narrowed to the Done
-/// edge, and the app retains a status-reversal affordance (blocked today — the daemon has
-/// no backward edge — and it ships visible-but-disabled so the intent reads
-/// as "coming", not "missing").
+/// edge. The daemon's lifecycle has a real backward edge — done → draft
+/// re-opens a finished prompt — so Back to Draft is LIVE on a done prompt
+/// and gated by `allowedNext` everywhere else.
 ///
 /// ### Why this type is independent of the strip
 /// The chip and both actions render from `stub.status` +
@@ -88,10 +88,10 @@ struct PromptStatusHeader: View {
     }
 
     private var blockedHint: String? {
-        // `.done` ONLY: Back to Draft is permanently blocked, so consulting
-        // every button would render its message forever and mask the Done
-        // reason — the one explanation the user actually needs. A done
-        // prompt is terminal and needs no hint.
+        // `.done` ONLY: on a not-done prompt the Done gate reason is the one
+        // explanation the user needs, and consulting every button would stack
+        // Back to Draft's message on top of it. On a done prompt Back to
+        // Draft is open, so there is no blocked control left to explain.
         guard let status, status != .done else { return nil }
         if case .blocked(let reason, let fix) = gate(to: .done) {
             return "\(reason) — \(fix)."
@@ -127,8 +127,8 @@ struct PromptStatusHeader: View {
         return "Advance this prompt to \(next.rawValue)"
     }
 
-    /// `PromptStatus.allowedNext` is the authority, consulted for `.done`;
-    /// `.draft` has no daemon-side edge at all. The old rail's forward-edge
+    /// `PromptStatus.allowedNext` is the authority for BOTH edges (`.done`
+    /// from Initiated, `.draft` from Done). The old rail's forward-edge
     /// branches (clarifying→architecting, architecting→implementing) went with
     /// the `precomputed*Gate` helpers: they adjudicated edges the rail never
     /// offered, and that file's own comment called them unreachable.
@@ -136,8 +136,8 @@ struct PromptStatusHeader: View {
         switch next {
         case .done:
             // The EDGE SET rules here, not a phase gate: the daemon couples
-            // no summary requirement to →done, but .done has exactly two
-            // inbound edges (implementing, reviewing) — server-enforced.
+            // no summary requirement to →done; the one inbound edge is
+            // initiated → done — server-enforced.
             guard let status else { return .unknown }
             // A done prompt is terminal. The old rail expressed this by
             // rendering NO buttons at all (`nextStates` returned []); this
@@ -150,18 +150,22 @@ struct PromptStatusHeader: View {
             }
             guard status.allowedNext.contains(.done) else {
                 return .blocked(
-                    reason: "Done is reachable from Implementing or Reviewing (this prompt is \(status.rawValue))",
-                    fix: "advance the prompt with the bot first")
+                    reason: "Done is reachable once the prompt is Initiated (this prompt is \(status.rawValue))",
+                    fix: "start it with the bot first")
             }
             return .open
         case .draft:
-            // No backward edge exists daemon-side — filed as a GM feature
-            // request; the button ships visible-but-disabled so the intent
-            // reads as "coming", not "missing". KEPT per the user's
-            // mid-flight correction.
-            return .blocked(
-                reason: "Back to Draft isn't available yet",
-                fix: "pending a GM feature (the daemon has no backward edge)")
+            guard let status else { return .unknown }
+            guard status != .draft else {
+                return .blocked(reason: "This prompt is already a draft",
+                                fix: "there is nothing to go back to")
+            }
+            guard status.allowedNext.contains(.draft) else {
+                return .blocked(
+                    reason: "Back to Draft re-opens a finished prompt (this prompt is \(status.rawValue))",
+                    fix: "it becomes available once the prompt is Done")
+            }
+            return .open
         default:
             return .open
         }

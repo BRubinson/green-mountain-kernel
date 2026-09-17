@@ -524,7 +524,9 @@ private struct PromptEditorPane: View {
         // `version`.)
         .task(id: stub.uuid) {
             await load()
-            seedPhaseExpansion()
+            // Expansion seeds are draft-branch state; the run document never
+            // reads them.
+            if editable { seedPhaseExpansion() }
             // Memoized store — a re-selection of an already-loaded prompt
             // must not re-issue guaranteed round trips. The event loop below
             // still refreshes on every real mutation. Explore/review always fetch
@@ -576,7 +578,24 @@ private struct PromptEditorPane: View {
         // mentions status at all. Re-seeding from a fresh capture is what keeps
         // that correct.
         .onChange(of: stub.status) { _, _ in
-            seedPhaseExpansion()
+            if editable { seedPhaseExpansion() }
+            // done→draft re-entry (Back to Draft): .id(stub.uuid) recreates
+            // the pane on prompt SWITCH, not status change, and a pane whose
+            // load() ran post-draft skipped saver creation — entering
+            // editable with a nil saver would make flush()'s `guard let
+            // saver` a silent no-op and edits would NEVER save. Re-run
+            // load() to build the save machinery.
+            //
+            // The gate must NOT read `editable`: a stale CONTENT_LOCKED
+            // outcome pins saveIssue = .locked, which pins `editable` false,
+            // and load() is the ONLY writer that clears the lock — gating on
+            // `editable` deadlocks exactly the pane that needs the reload.
+            // Gate on the raw status instead; load() clears saveIssue first
+            // thing, so its own `if editable` machinery gates come up true.
+            if PromptStatus(rawValue: stub.status) == .draft,
+               saver == nil || saveIssue == .locked {
+                Task { await load() }
+            }
             Task { await phases.refresh(lifecyclePhases: phasesApply) }
         }
         // cmd+F opens the inline find bar over the three sections; nil while
@@ -641,6 +660,12 @@ private struct PromptEditorPane: View {
                                         uuid: windowID.instanceUUID.wireString)?.name ?? "—")
                         WorkflowStrip(phase: phases.workflow)
                         saveIssueBanner
+                        // The one status fork: the draft EDITOR keeps its
+                        // per-phase disclosure cards verbatim; past draft the
+                        // run document takes over. Everything above is shared
+                        // chrome (the .locked banner and its Copy All survive
+                        // in both branches).
+                        if editable {
                         if !editable {
                             // The initial prompt is read-only once past draft;
                             // memories (the top-bar slot) are the live surface.
@@ -715,6 +740,21 @@ private struct PromptEditorPane: View {
                                   accessory: { EmptyView() }) {
                             DopePane(scope: scope, promptUuid: stub.uuid, scrollable: false)
                                 .frame(minHeight: 120)
+                        }
+                        } else {
+                            PromptRunDocument(
+                                stub: stub,
+                                phases: phases,
+                                scope: scope,
+                                backstory: backstory,
+                                goal: goal,
+                                detail: detail,
+                                clarifiedIntent: clarifiedIntent,
+                                availableKbites: availableKbites,
+                                selectedKbites: $selectedKbites,
+                                findQuery: findQuery,
+                                activeLocal: { activeLocal($0) }
+                            )
                         }
                     }
                     .padding(20)
@@ -972,6 +1012,11 @@ private struct PromptEditorPane: View {
         kbiteSuppress = true
         selectedKbites = response.kbiteCodes
         kbiteSuppress = false
+        // Post-draft the pane is a READER: no saver, no undo stack, no flush
+        // registration. The buffers above still populate on both paths (the
+        // run document renders them). onDisappear's unregister/flush stays
+        // unconditional — both no-op for a never-registered, saver-less box.
+        if editable {
         // Scope-memoized: panes on the same prompt share one actor for WRITE
         // SERIALIZATION only. The version argument seeds a fresh actor; an
         // existing actor's threading is authoritative and is never rewound
@@ -979,6 +1024,7 @@ private struct PromptEditorPane: View {
         let newSaver = scope.saver(forPrompt: prompt.uuid, version: prompt.version)
         saver = newSaver
         draftBox.saver = newSaver
+        }
         // Pane-local echo watermark: the highest version THIS pane has written
         // or synchronized to. The shared actor's watermark can't distinguish a
         // peer pane's edit from our own echo — this can.
@@ -986,6 +1032,7 @@ private struct PromptEditorPane: View {
         await loadAvailableKbites()
         let s = currentState()
         lastSaved = s
+        if editable {
         // Keyed by the STABLE prompt uuid, not draftBox.promptKey — that key
         // is per-pane-unique (uuid#random) by design for the flush registry,
         // and loading under it would reset the injected shared stack on every
@@ -993,6 +1040,7 @@ private struct PromptEditorPane: View {
         history.load(promptKey: stub.uuid, current: s)
         // Register with the quit-flush registry (bounded drain on termination).
         PromptFlushRegistry.shared.register(draftBox)
+        }
         loaded = true
         await resolvePaths()
     }
