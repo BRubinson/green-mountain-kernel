@@ -152,7 +152,8 @@ The DMG is staged under `$GM_FS_ROOT/apps/downloads/<version>/` and installed
 from there to `/Applications`. That install is the **one** write outside the
 filesystem root on this path: it is confined to `gm_install_app` in the shared
 library, `GM_APP_DEST` redirects it, and `--no-app` turns it off. It refuses
-while GMVibes is running, because replacing a live bundle corrupts it in ways
+while the app is running (the bundle is `gm_kernel.app`; a lingering legacy
+`GMVibes.app` gets the same guard), because replacing a live bundle corrupts it in ways
 that surface later as a crash rather than here as an error.
 
 ### The release store
@@ -424,6 +425,26 @@ swift test  --package-path gmk/Gm_Kernel_test
   - `gmk/gmVibes/` — the GMVibes macOS app target, and now a **THIN** one: it
     holds `GMVibesApp.swift` (the `@main` entry point), `Assets.xcassets` and a
     README, and nothing else. Release via the `release-dmg` skill.
+    **THE PRODUCT IS `gm_kernel.app`; GMVibes is now an internal name only.**
+    `PRODUCT_NAME = gm_kernel` in all three configurations, so Finder, the Dock
+    and the menu bar all say gm_kernel. What deliberately did NOT move: the
+    bundle identifiers stay `rube.GMVibes` / `.beta` / `.test` (the
+    debug→`~/test_gmfs` environment mapping and the NSUserDefaults domains key
+    on them); the Xcode TARGET and SCHEMES stay `GMVibes` / `GMVibesBeta`
+    (`build-dmg.sh` drives `-scheme GMVibes`); this directory and the
+    `gmVibesCore` package keep their names; and the window title stays
+    "GM Vibes" — the one place the old name is meant to show.
+    **`gm_kernel` IS A HOMONYM, accepted at decision time:** it names both the
+    staged CLI Mach-O in `~/gmfs/bin` and the app bundle
+    `/Applications/gm_kernel.app`. They are not merely the same version — the
+    installer extracts the CLI out of the bundle, so they are the same bytes;
+    one name for one piece of code in two containers. `gm_retire_legacy_app`
+    in `gm_releases.sh` removes a lingering `/Applications/GMVibes.app` on
+    install/publish (guarded: refuses while the app runs, checks the bundle id
+    is `rube.GMVibes` before touching it) — the second-copy hazard for the OLD
+    name. The installer still reads EITHER bundle name out of a DMG, because
+    the published back-catalogue contains `GMVibes.app` and cannot be
+    rewritten.
   - `gmk/gmVibesCore/` — the shipped package holding the app's ~99
     sources. They
     moved out of the Xcode target so that **sourcekit-lsp can resolve them**: the

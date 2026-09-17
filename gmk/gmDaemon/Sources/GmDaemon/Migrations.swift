@@ -15,7 +15,7 @@ public enum Migrations {
     /// skips a changed body on an existing db, so any schema change lands as a
     /// new registerMigration and existing databases upgrade in place. Never
     /// instruct anyone to wipe the database file again.
-    public static let currentSchemaVersion = 29
+    public static let currentSchemaVersion = 30
 
     /// The five BaseEntity columns wrapped into every domain table.
     /// `id` is the internal rowid; `uuid` is the external join key — all FKs
