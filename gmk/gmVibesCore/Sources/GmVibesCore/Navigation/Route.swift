@@ -52,7 +52,7 @@ enum Route: Codable, Hashable {
 /// `query` carries the ⌘K palette's text across the hand-off so "show all
 /// results" doesn't drop the user on an empty page.
 struct SearchSeed: Codable, Hashable {
-    var sessionUuid: String? = nil
+    var sessionUuid: String?
     var query: String = ""
 }
 
@@ -77,7 +77,7 @@ public struct WindowSeed: Codable, Hashable, Identifiable {
         self.init(nil)
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from _: Decoder) {
         self.init(nil)
     }
 }

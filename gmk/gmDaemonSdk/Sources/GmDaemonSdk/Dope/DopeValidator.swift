@@ -26,12 +26,8 @@ public enum DopeValidator {
 
         // Scope.
         check { try DopeCode.validateCode(bundle.main.scope.code, field: "scope code") }
-        // scope_type is no longer persisted, so there is nothing to
-        // validate: only a SESSION_INSTANCE tree can be written to a repo
-        // (Store.requireRepoWritableScope), which makes the field a constant
-        // and a stored constant only creates the possibility of a file that
-        // contradicts it. An older file that still carries scope_type simply
-        // decodes with the key ignored.
+        // scope_type is not persisted, so there is nothing to validate: a file
+        // that still carries the key decodes with it ignored.
         if bundle.main.version < 0 {
             errors.append("scope version \(bundle.main.version) is negative")
         }
@@ -48,11 +44,13 @@ public enum DopeValidator {
         let mapCodes = Set(bundle.main.persistence.keys)
         for code in mapCodes.subtracting(fileCodes).sorted() {
             errors.append(
-                "\(DopeDocumentCodec.scopeFileName) names persistence '\(code)' but no domain was provided")
+                "\(DopeDocumentCodec.scopeFileName) names persistence '\(code)' but no domain was provided"
+            )
         }
         for code in Set(fileCodes).subtracting(mapCodes).sorted() {
             errors.append(
-                "persistence domain '\(code)' is not named in \(DopeDocumentCodec.scopeFileName)")
+                "persistence domain '\(code)' is not named in \(DopeDocumentCodec.scopeFileName)"
+            )
         }
         for (code, path) in bundle.main.persistence.sorted(by: { $0.key < $1.key })
         where path != DopeScopeDocument.expectedFile(forPersistenceCode: code) {
@@ -63,8 +61,8 @@ public enum DopeValidator {
 
         // Per-domain walks + the cross-domain ref indexes.
         var enumIndex = Set<String>()  // "domain.enums.enum"
-        var propertyIndex = [String: String]()  // "domain.entity.property" → data_type
-        var entityIndex = [String: String]()  // "domain.entity" → entity_type
+        var propertyIndex: [String: String] = [:]
+        var entityIndex: [String: String] = [:]
 
         for file in bundle.domainFiles {
             let dcode = file.body.code
@@ -141,14 +139,16 @@ public enum DopeValidator {
         // Base-composable refs, now that entityIndex is complete (refs may
         // point forward and across domains). Surviving edges feed the cycle
         // check below.
-        var baseEdge = [String: String]()  // "domain.entity" → target path
+        var baseEdge: [String: String] = [:]
         for file in bundle.domainFiles {
             for entity in file.entities {
                 let path = "\(file.body.code).\(entity.body.code)"
                 guard let raw = entity.body.baseComposableRef else { continue }
                 do {
                     _ = try DopeCode.parseEntityRef(
-                        raw, field: "entity '\(path)' base_composable_ref")
+                        raw,
+                        field: "entity '\(path)' base_composable_ref"
+                    )
                 } catch {
                     errors.append(String(describing: error))
                     continue
@@ -176,7 +176,7 @@ public enum DopeValidator {
         // has at most ONE outgoing edge — the graph is functional — so this
         // is a linear pointer-chase with a three-colour map, never a
         // branching DFS.
-        var colour = [String: Int]()  // 1 = on the current chase, 2 = settled
+        var colour: [String: Int] = [:]
         for start in baseEdge.keys.sorted() where colour[start] == nil {
             var chain: [String] = []
             var node = start
@@ -188,7 +188,8 @@ public enum DopeValidator {
             if colour[node] == 1, let i = chain.firstIndex(of: node) {
                 errors.append(
                     "base_composable cycle: "
-                        + (chain[i...] + [node]).joined(separator: " → "))
+                        + (chain[i...] + [node]).joined(separator: " → ")
+                )
             }
             for n in chain { colour[n] = 2 }
             colour[node] = 2
@@ -209,7 +210,8 @@ public enum DopeValidator {
                     let isRelationship = dataType == .relationship
                     if isEnum != (body.enumRef != nil) {
                         errors.append(
-                            "property '\(path)': enum_ref must be present exactly when data_type is 'enum'")
+                            "property '\(path)': enum_ref must be present exactly when data_type is 'enum'"
+                        )
                     }
                     if isRelationship != (body.relationshipTargetRef != nil) {
                         errors.append(
@@ -227,7 +229,8 @@ public enum DopeValidator {
                             let ref = try DopeCode.parseRef(raw, field: "property '\(path)' enum_ref")
                             guard case .enumType = ref else {
                                 throw DopeCode.ValidationError(
-                                    "property '\(path)' enum_ref '\(raw)' is not a domain.enums.enum_code path")
+                                    "property '\(path)' enum_ref '\(raw)' is not a domain.enums.enum_code path"
+                                )
                             }
                             if !enumIndex.contains(raw) {
                                 errors.append("property '\(path)' enum_ref '\(raw)' does not resolve")
@@ -262,14 +265,17 @@ public enum DopeValidator {
                             let ref = try DopeCode.parseRef(raw, field: "property '\(path)' base_origin_ref")
                             guard case let .property(originDomain, originEntityCode, _) = ref else {
                                 throw DopeCode.ValidationError(
-                                    "property '\(path)' base_origin_ref '\(raw)' is not a domain.entity.property path")
+                                    "property '\(path)' base_origin_ref '\(raw)' is not a domain.entity.property path"
+                                )
                             }
                             guard let originType = propertyIndex[raw] else {
                                 errors.append("property '\(path)' base_origin_ref '\(raw)' does not resolve")
                                 continue
                             }
                             let originEntity = DopeCode.formatEntityRef(
-                                domain: originDomain, entity: originEntityCode)
+                                domain: originDomain,
+                                entity: originEntityCode
+                            )
                             guard entityIndex[originEntity] == DopeEntityType.baseComposable.rawValue else {
                                 errors.append(
                                     "property '\(path)' base_origin_ref '\(raw)' originates from '\(originEntity)', which is not a BASE_COMPOSABLE"

@@ -2,12 +2,8 @@
 description: GM-CDE auditor. Audits the current session's artifact tree against its db rows, the wider gmfs/db environment (kernel health, db-vs-disk drift, archive hygiene, kbite provenance), and the host wiring that lives outside any one repo (binary reachability, env-vs-db root agreement, permission grants) — then interactively resolves each finding.
 argument-hint: "[session | environment | system | all] [--dry-run]"
 disable-model-invocation: true
-allowed-tools: Read, Write, Bash, Glob, AskUserQuestion, Skill
+allowed-tools: Read, Write, Bash, Glob, AskUserQuestion
 ---
-
-**Load the `gmcc` skill before anything else.** It carries the GMB identity and
-the GM-CDE rules every step below assumes. Do not begin the work until it is in
-context.
 
 Audit the GM-CDE install and resolve each finding WITH the Endotherm.
 
@@ -25,4 +21,4 @@ Audit the GM-CDE install and resolve each finding WITH the Endotherm.
 **Contract:**
     1. `--dry-run` reports and changes NOTHING.
     2. The db is append-only. A wrong row is corrected by writing again, never by deletion.
-    3. Take `gm_hook call BACKUP --json '{}'` before anything that touches the database.
+    3. There is no agent-side backup door — the kernel backs itself up before any migration. Anything irreversible is put to the Endotherm before it is taken.

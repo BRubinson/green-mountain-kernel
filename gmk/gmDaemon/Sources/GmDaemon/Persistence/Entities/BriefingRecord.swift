@@ -87,7 +87,8 @@ extension AgentBriefingRecord {
             kbiteRefs: kbiteRefs,
             fileChangeRefs: fileChangeRefs,
             createdAt: createdAt,
-            updatedAt: updatedAt)
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -100,7 +101,11 @@ extension AgentBriefingDopePersistenceRecord {
 extension AgentBriefingDopeKbiteRecord {
     func wireRow() -> AgentBriefingKbiteRefRow {
         AgentBriefingKbiteRefRow(
-            uuid: uuid, kbiteResourceFileUuid: kbiteResourceFileUuid, brief: brief, seq: Int(seq))
+            uuid: uuid,
+            kbiteResourceFileUuid: kbiteResourceFileUuid,
+            brief: brief,
+            seq: Int(seq)
+        )
     }
 }
 

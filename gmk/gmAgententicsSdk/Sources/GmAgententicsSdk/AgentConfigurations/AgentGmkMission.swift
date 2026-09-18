@@ -1,4 +1,5 @@
-// The top-level mission passed into the phases: one per skill, mapping each phase to its staffing, workflow template and base step set.
+// The top-level mission passed into the phases: one per skill, mapping each phase
+// to its staffing, workflow template and base step set.
 
 import Foundation
 import GmDaemonSdk
@@ -128,25 +129,13 @@ extension GmCdeRpirWorkflowPhase {
         }
     }
 
-    /// The phase's instruction text.
+    /// The phase's instruction text, and the source of truth for this layer.
     ///
-    /// THESE CONSTANTS ARE THE NEWER DESCRIPTION, NOT A STALE COPY — read that
-    /// before "consolidating" them into `WorkflowSpec`. They are structured
-    /// (**Calls** / **Gate**), and they already spell the `cde` tool vocabulary,
-    /// which `WorkflowSpec` only acquired by a mechanical rename. The direction
-    /// of travel is `WorkflowSpec` → these, not the other way round.
-    ///
-    /// A v30 change briefly pointed this at `WorkflowSpec.instructions` on the
-    /// theory that the constants were the duplicate. They are not; that reversed
-    /// the arrow and fed the new layer the old text. Recorded because the mistake
-    /// is an easy one to make twice — CLAUDE.md still asserts phase text is "read
-    /// live from WorkflowSpec", which is the claim that invites it.
-    ///
-    /// TWO DESCRIPTIONS DO COEXIST TODAY, and the platform floor is why: this
-    /// package is macOS 27 and `WorkflowSpec` lives in the macOS 14 base, so the
-    /// daemon cannot read these constants at `BOT_NEXT` time. They are reconciled
-    /// where BOTH are reachable — the plugin generator, which is macOS 27 and
-    /// depends on the SDK.
+    /// `WorkflowSpec` carries a second description because it lives in the macOS 14
+    /// base while this package is macOS 27, so the daemon cannot read these
+    /// constants at `BOT_NEXT` time. Reconcile the two only in the plugin
+    /// generator, where both are reachable, and only in the direction
+    /// `WorkflowSpec` → these constants.
     var template: String {
         switch self {
         case .briefing: return GM_CDE_PHASE_BRIEFING_TEMPLATE

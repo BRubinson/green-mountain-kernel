@@ -1,18 +1,14 @@
 import Foundation
 import GmDaemonSdk
 
-/// Pure layout: dope tree → one all-or-nothing batch that lays the whole
-/// domain model out as a canvas — one `dope_scope` container plus one
-/// `dope_entity` card per entity, grouped in per-domain columns. Replaces
-/// scripts/diagram_from_dope.py: card geometry comes from
-/// `DiagramRenderEnvironment.cardHeight` + `DiagramResolver.entityCard` (the
-/// renderer's own row resolution, base-composable chain included), so the
-/// generated layout can NEVER drift from what the screenshot draws.
+/// Pure layout: dope tree → one all-or-nothing batch laying the whole domain model
+/// out as a canvas, one `dope_scope` container plus one `dope_entity` card per
+/// entity in per-domain columns. Card geometry comes from the renderer's own
+/// `DiagramRenderEnvironment.cardHeight` + `DiagramResolver.entityCard`, so the
+/// generated layout cannot drift from what the screenshot draws.
 ///
-/// With `replacing`, the batch is a full regenerate: element_delete
-/// mutations for every current top-level element (subtree CASCADE) precede
-/// the adds, so one batch-apply swaps the canvas atomically under the
-/// diagram-revision CAS. Empty domains are skipped.
+/// With `replacing`, element_delete mutations for every current top-level element
+/// precede the adds, so one batch-apply swaps the canvas atomically under the CAS.
 public enum DopeCanvasLayout {
 
     /// Layout-only knobs the renderer does not own (points, pre-scale).
@@ -37,7 +33,10 @@ public enum DopeCanvasLayout {
                 .elementDelete(
                     DiagramElementDelete(
                         elementUuid: element.identity.uuid,
-                        expectedVersion: element.identity.version)))
+                        expectedVersion: element.identity.version
+                    )
+                )
+            )
         }
 
         mutations.append(
@@ -46,9 +45,13 @@ public enum DopeCanvasLayout {
                     clientRef: "scope",
                     code: "scope_\(tree.body.code)",
                     name: tree.body.name,
-                    centerX: 0, centerY: 0, elementZ: 0,
+                    centerX: 0,
+                    centerY: 0,
+                    elementZ: 0,
                     payload: .dopeScopePersistenceLayer(DopeScopePersistenceLayerPayload(dopeScopeCode: tree.body.code))
-                )))
+                )
+            )
+        )
 
         var xCursor = 0.0
         var sort = 0
@@ -75,7 +78,10 @@ public enum DopeCanvasLayout {
                                 centerX: columnX,
                                 centerY: yCursor + height / 2,
                                 elementZ: Double(sort),
-                                payload: .dopeEntity(DopeEntityPayload(entityCode: entityCode)))))
+                                payload: .dopeEntity(DopeEntityPayload(entityCode: entityCode))
+                            )
+                        )
+                    )
                     yCursor += height + metrics.yGap
                 }
             }

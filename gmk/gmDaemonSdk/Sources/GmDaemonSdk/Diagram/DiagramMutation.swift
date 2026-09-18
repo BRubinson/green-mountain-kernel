@@ -1,14 +1,13 @@
 import Foundation
 
 /// The batch currency. `applyDiagramMutations` is the ONLY mutation body in
-/// the store — the granular DIAGRAM_NODE_* verbs are one-element batches
-/// routed through the same code, so they structurally cannot drift from
-/// batch semantics. Mutations apply strictly in array order inside one
-/// transaction; any failure rolls back everything; the whole batch bumps
-/// diagram.revision exactly once and emits exactly one DIAGRAM_CHANGE event.
-///
-/// Encoding: `{"kind": "<case>", "fields": {...}}` — the DiagramElementPayload
-/// discipline (single-word tag keys, camelCase case-struct keys).
+/// the store; the granular DIAGRAM_NODE_* verbs are one-element batches
+/// through the same code, so they cannot drift from batch semantics.
+/// Mutations apply strictly in array order inside one transaction, any
+/// failure rolls back everything, and the whole batch bumps diagram.revision
+/// exactly once and emits exactly one DIAGRAM_CHANGE event. Encoding is
+/// `{"kind": "<case>", "fields": {...}}` — single-word tag keys, camelCase
+/// case-struct keys.
 public enum DiagramMutation: Codable, Hashable, Sendable {
     case elementAdd(DiagramElementAdd)
     case elementUpdate(DiagramElementUpdate)
@@ -40,7 +39,10 @@ public enum DiagramMutation: Codable, Hashable, Sendable {
             self = .diagramUpdate(try c.decode(DiagramRowUpdate.self, forKey: .fields))
         default:
             throw DecodingError.dataCorruptedError(
-                forKey: .kind, in: c, debugDescription: "unknown diagram mutation kind '\(kind)'")
+                forKey: .kind,
+                in: c,
+                debugDescription: "unknown diagram mutation kind '\(kind)'"
+            )
         }
     }
 
@@ -249,8 +251,12 @@ public struct DiagramMutationResult: Codable, Hashable, Sendable {
     public let cascadedElements: Int?
 
     public init(
-        index: Int, kind: String, clientRef: String? = nil, uuid: String? = nil,
-        version: Int64? = nil, cascadedElements: Int? = nil
+        index: Int,
+        kind: String,
+        clientRef: String? = nil,
+        uuid: String? = nil,
+        version: Int64? = nil,
+        cascadedElements: Int? = nil
     ) {
         self.index = index
         self.kind = kind

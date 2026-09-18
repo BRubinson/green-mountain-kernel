@@ -1,11 +1,25 @@
 {
   "version": 1,
   "indentation": { "spaces": 4 },
+  "tabWidth": 4,
   "lineLength": 120,
   "maximumBlankLines": 1,
   "respectsExistingLineBreaks": true,
+  "indentConditionalCompilationBlocks": false,
+  "lineBreakBeforeEachArgument": true,
+  "lineBreakBeforeEachGenericRequirement": true,
+  "prioritizeKeepingFunctionOutputTogether": true,
+  "lineBreakAroundMultilineExpressionChainComponents": true,
+  "multiElementCollectionTrailingCommas": true,
   "rules": {
     "AlwaysUseLowerCamelCase": false,
-    "TypeNamesShouldBeCapitalized": false
+    "TypeNamesShouldBeCapitalized": true,
+    "UseSynthesizedInitializer": false,
+    "UseLetInEveryBoundCaseVariable": false,
+    "OmitExplicitReturns": true,
+    "AlwaysUseLiteralForEmptyCollectionInit": true,
+    "ValidateDocumentationComments": true,
+    "NeverUseForceTry": true,
+    "NeverUseImplicitlyUnwrappedOptionals": true
   }
 }

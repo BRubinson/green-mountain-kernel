@@ -1,28 +1,13 @@
 import Foundation
 
 /// Any JSON value, as a `Codable` — the type that makes an untyped passthrough
-/// possible without teaching a caller 123 payload shapes.
-///
-/// PROMOTED FROM `GmHookCli` AT v30, AND THE PROMOTION IS THE POINT. This
-/// started life as a `fileprivate`-in-spirit enum inside `Call.swift`, serving
-/// exactly one caller: `gm_hook call <TYPE> --json`. The harness envelope
-/// (`MCP_CALL`, `HOOK_EVENT`) needs the same shape on the PROTOCOL side, and the
-/// alternative to moving it was a byte-identical second copy in `Messages.swift`
-/// — the same duplication-with-no-checker that the vendored `gm_releases.sh`
-/// twin already demonstrates the cost of. One type, two consumers.
-///
-/// `GmHookCli` keeps the spelling `JSONValue` as a typealias onto this, so the
-/// relay code that was written against it reads unchanged.
-///
-/// WHY AN ENUM AND NOT `[String: Any]`: `Any` is not `Codable`, not `Sendable`,
-/// and not `Hashable`. Every payload on this wire is all three, and the envelope
-/// machinery relies on it — `Sendable` because payloads cross the server's
-/// serial queue, `Hashable` because the message structs are.
-///
-/// KEYS ARE NEVER TRANSLATED BY THIS TYPE. The wire is snake_case and a caller
-/// holding a `GmJsonValue` is working at wire level; a silent key rewrite here
-/// would be a second dialect to learn, and it would be invisible at the call
-/// site. Whatever went in comes out.
+/// possible without teaching a caller 123 payload shapes. `GmHookCli` spells it
+/// `JSONValue` through a typealias.
+/// An enum rather than `[String: Any]` because `Any` is none of `Codable`,
+/// `Sendable` or `Hashable`, and the envelope machinery needs all three:
+/// `Sendable` because payloads cross the server's serial queue, `Hashable`
+/// because the message structs are. KEYS ARE NEVER TRANSLATED HERE — the wire
+/// is snake_case and whatever went in comes out.
 public enum GmJsonValue: Codable, Hashable, Sendable {
     case null
     case bool(Bool)

@@ -1,15 +1,10 @@
 import Foundation
 
-/// Per-domain multicast invalidation signals. A view's visibility-scoped
-/// `.task` awaits a domain stream instead of sleeping:
+/// Per-domain multicast invalidation signals. A view's visibility-scoped `.task` awaits a
+/// domain stream instead of sleeping.
 ///
-///     .task(id: key) {
-///         await store.refresh()
-///         for await _ in daemon.hub.stream(for: .topology) { await store.refresh() }
-///     }
-///
-/// Streams coalesce with `.bufferingNewest(1)` — a capped event replay can
-/// deliver thousands of events; subscribers must wake once, not N times.
+/// Streams coalesce with `.bufferingNewest(1)`: a capped event replay can deliver thousands
+/// of events, and subscribers must wake once, not N times.
 @MainActor
 final class InvalidationHub {
     enum Domain: Hashable {

@@ -1,0 +1,222 @@
+swiftlint_version: 0.65.1
+reporter: xcode
+allow_zero_lintable_files: false
+baseline: .swiftlint-baseline.json
+
+included:
+  - gmk
+
+# Single-star paths only: a ** globstar here crashes SwiftLint 0.65.1 on this tree.
+excluded:
+  - gmk/gmClaudeForFoundationModels
+  - gmk/gmITerm2Client/Sources/GmITerm2Client/Generated
+  - gmk/build
+  - gmk/scripts
+  - gmk/*/.build
+  - gmk/*/Package.swift
+
+# Run by hand only: swiftlint analyze --compiler-log-path <log>
+analyzer_rules:
+  - unused_import
+  - unused_declaration
+
+disabled_rules:
+  # swift-format owns layout
+  - trailing_whitespace
+  - leading_whitespace
+  - trailing_newline
+  - vertical_whitespace
+  - vertical_whitespace_opening_braces
+  - vertical_whitespace_closing_braces
+  - opening_brace
+  - closing_brace
+  - colon
+  - comma
+  - return_arrow_whitespace
+  - function_name_whitespace
+  - no_space_in_method_call
+  - statement_position
+  - switch_case_alignment
+  - closure_parameter_position
+  - vertical_parameter_alignment
+  - attribute_name_spacing
+  - closure_end_indentation
+  - literal_expression_end_indentation
+  - indentation_width
+  - collection_alignment
+  - multiline_arguments
+  - multiline_arguments_brackets
+  - multiline_function_chains
+  - multiline_literal_brackets
+  - multiline_parameters
+  - multiline_parameters_brackets
+  - comma_inheritance
+  - let_var_whitespace
+  - period_spacing
+  - operator_usage_whitespace
+  - trailing_semicolon
+  - control_statement
+  - redundant_void_return
+  - void_return
+  - empty_parentheses_with_trailing_closure
+  - trailing_comma
+  - sorted_imports
+  - duplicate_imports
+  - number_separator
+  - syntactic_sugar
+  - implicit_getter
+  - implicit_return
+  - for_where
+  - no_fallthrough_only
+  - line_length
+  # house decisions
+  - todo
+  - inclusive_language
+  - file_length
+  - type_body_length
+  - function_parameter_count
+  - large_tuple
+  - nesting
+  # SwiftUI: these fight label+content closures, init-before-properties, and padding literals
+  - multiple_closures_with_trailing_closure
+  - type_contents_order
+  - file_types_order
+  - no_magic_numbers
+  - redundant_discardable_let
+
+opt_in_rules:
+  - fatal_error_message
+  - implicitly_unwrapped_optional
+  - unhandled_throwing_task
+  - async_without_await
+  - unneeded_escaping
+  - unneeded_throws_rethrows
+  - unused_parameter
+  - overridden_super_call
+  - prohibited_super_call
+  - identical_operands
+  - yoda_condition
+  - discouraged_assert
+  - private_subject
+  - private_swiftui_state
+  - explicit_init
+  - toggle_bool
+  - prefer_key_path
+  - prefer_self_type_over_type_of_self
+  - prefer_zero_over_explicit_init
+  # redundant_nil_coalescing is left out: its autocorrect strips the `?? nil` that flattens a double optional.
+  - redundant_type_annotation
+  - unneeded_parentheses_in_closure_argument
+  - shorthand_optional_binding
+  - joined_default_parameter
+  - legacy_multiple
+  - convenience_type
+  - pattern_matching_keywords
+  - unavailable_function
+  - static_operator
+  - empty_count
+  - empty_string
+  - empty_collection_literal
+  - first_where
+  - last_where
+  - contains_over_first_not_nil
+  - contains_over_filter_count
+  - contains_over_filter_is_empty
+  - contains_over_range_nil_comparison
+  - sorted_first_last
+  - flatmap_over_map_reduce
+  - reduce_into
+  - empty_xctest_method
+  - single_test_class
+  - balanced_xctest_lifecycle
+  # final_test_case is left out: its autocorrect marks a shared test base class final and breaks every subclass.
+  - closure_body_length
+  - custom_rules
+
+identifier_name:
+  min_length: 1
+  max_length:
+    warning: 50
+    error: 70
+  excluded:
+    - "^id$"
+    - "^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"
+
+type_name:
+  min_length: 2
+  max_length:
+    warning: 50
+    error: 80
+
+function_body_length:
+  warning: 60
+  error: 120
+
+closure_body_length:
+  warning: 80
+  error: 160
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+  ignores_case_statements: true
+
+force_cast: warning
+force_try: warning
+
+private_over_fileprivate:
+  validate_extensions: true
+
+unused_import:
+  always_keep_imports:
+    - Foundation
+
+custom_rules:
+  no_print:
+    name: "No bare print"
+    regex: '(?<![\w.])(?:Swift\.)?(?:print|debugPrint|dump)\s*\('
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "Route output through the logger; print/debugPrint/dump are not shipped code."
+    severity: error
+  todo_requires_ticket:
+    name: "TODO needs a ticket"
+    regex: '\b(TODO|FIXME)\b(?!\s*\(\s*[A-Z]+-\d+\s*\))'
+    match_kinds: [comment, doccomment]
+    message: "TODO/FIXME must carry a ticket: TODO(GMK-123)."
+    severity: warning
+  historical_comment:
+    name: "No history in comments"
+    regex: '(?i)\b(used to|previously|formerly|no longer|this was|was replaced|replaced by|has since|until v\d|in the past|originally)\b'
+    match_kinds: [comment, doccomment]
+    message: "Comments describe what IS. Move history to git."
+    severity: error
+  long_comment_run:
+    name: "Comment run over 8 lines"
+    regex: '(?:^[ \t]*//[^\n]*\n){9,}'
+    match_kinds: [comment, doccomment]
+    message: "A comment states intent the code cannot; nine or more consecutive comment lines is a decision record."
+    severity: error
+  block_comment:
+    name: "No block comments"
+    regex: '/\*(?!\*)'
+    match_kinds: [comment]
+    message: "Use // line comments."
+    severity: error
+  comment_line_length:
+    name: "Comment line over 120"
+    regex: '^[^\n]{121,}$'
+    match_kinds: [comment, doccomment]
+    message: "Wrap comment lines at 120 columns."
+    severity: error
+  no_unchecked_sendable:
+    name: "No @unchecked Sendable"
+    regex: '@unchecked Sendable'
+    match_kinds: [attribute.builtin, typeidentifier]
+    message: "Prove Sendable; do not assert it."
+    severity: error
+  no_file_literal:
+    name: "No #file"
+    regex: '#file\b'
+    match_kinds: [keyword]
+    message: "Use #filePath or #fileID."
+    severity: error

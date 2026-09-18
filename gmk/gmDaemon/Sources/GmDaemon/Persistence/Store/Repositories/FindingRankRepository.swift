@@ -5,14 +5,9 @@ import GmDaemonSdk
 /// The 0–999 finding-rating write path, shared by ExplorationRepository and
 /// ReviewRepository.
 ///
-/// These two methods lived on Store only because two repositories needed them.
-/// Under the (db, core) swap that stops being an option: a repository can no
-/// longer name a Store, so shared domain logic needs a repository of its own
-/// rather than a parking spot on the facade. They are the only genuinely
-/// homeless INSTANCE members in the whole extraction — everything else either
-/// already had a repository owner or is a static.
-///
-/// Bodies moved verbatim from Store+Exploration.swift.
+/// It is a repository of its own because a repository cannot name a Store under
+/// the (db, core) swap, so shared domain logic needs an owner rather than a
+/// parking spot on the facade.
 struct FindingRankRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
@@ -39,39 +34,51 @@ struct FindingRankRepository: RepositoryContext {
             }
             guard (0...999).contains(pair.rating) else {
                 throw StoreError.badRequest(
-                    detail: "finding_rating must be 0–999 (got \(pair.rating) for \(pair.findingUuid))")
+                    detail: "finding_rating must be 0–999 (got \(pair.rating) for \(pair.findingUuid))"
+                )
             }
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM \(table) WHERE uuid = ? AND \(parentColumn) = ?",
+                    db,
+                    sql: "SELECT 1 FROM \(table) WHERE uuid = ? AND \(parentColumn) = ?",
                     arguments: [pair.findingUuid, summaryUuid]
                 ) != nil
             else {
                 throw StoreError.badRequest(
-                    detail: "finding \(pair.findingUuid) does not belong to summary \(summaryUuid)")
+                    detail: "finding \(pair.findingUuid) does not belong to summary \(summaryUuid)"
+                )
             }
         }
         for pair in ratings {
             guard
                 let version = try Int64.fetchOne(
-                    db, sql: "SELECT version FROM \(table) WHERE uuid = ?", arguments: [pair.findingUuid]
+                    db,
+                    sql: "SELECT version FROM \(table) WHERE uuid = ?",
+                    arguments: [pair.findingUuid]
                 )
             else {
                 throw StoreError.notFound(entity: table, key: pair.findingUuid)
             }
             try core.updateBase(
-                db, table: table, uuid: pair.findingUuid,
-                expectedVersion: version, set: ["finding_rating": pair.rating])
+                db,
+                table: table,
+                uuid: pair.findingUuid,
+                expectedVersion: version,
+                set: ["finding_rating": pair.rating]
+            )
         }
     }
 
     func unrankedCount(
-        table: String, parentColumn: String, summaryUuid: String
+        table: String,
+        parentColumn: String,
+        summaryUuid: String
     ) throws -> Int {
         try Int.fetchOne(
             db,
             sql: "SELECT COUNT(*) FROM \(table) WHERE \(parentColumn) = ? AND finding_rating IS NULL",
-            arguments: [summaryUuid]) ?? 0
+            arguments: [summaryUuid]
+        ) ?? 0
     }
 
     // MARK: - Prompt-scoped (m0025 per-agent exploration summaries)
@@ -92,7 +99,8 @@ struct FindingRankRepository: RepositoryContext {
             }
             guard (0...999).contains(pair.rating) else {
                 throw StoreError.badRequest(
-                    detail: "finding_rating must be 0–999 (got \(pair.rating) for \(pair.findingUuid))")
+                    detail: "finding_rating must be 0–999 (got \(pair.rating) for \(pair.findingUuid))"
+                )
             }
             guard
                 try Row.fetchOne(
@@ -106,21 +114,27 @@ struct FindingRankRepository: RepositoryContext {
                 ) != nil
             else {
                 throw StoreError.badRequest(
-                    detail: "finding \(pair.findingUuid) does not belong to prompt \(promptUuid)")
+                    detail: "finding \(pair.findingUuid) does not belong to prompt \(promptUuid)"
+                )
             }
         }
         for pair in ratings {
             guard
                 let version = try Int64.fetchOne(
-                    db, sql: "SELECT version FROM exploration_finding WHERE uuid = ?",
+                    db,
+                    sql: "SELECT version FROM exploration_finding WHERE uuid = ?",
                     arguments: [pair.findingUuid]
                 )
             else {
                 throw StoreError.notFound(entity: "exploration_finding", key: pair.findingUuid)
             }
             try core.updateBase(
-                db, table: "exploration_finding", uuid: pair.findingUuid,
-                expectedVersion: version, set: ["finding_rating": pair.rating])
+                db,
+                table: "exploration_finding",
+                uuid: pair.findingUuid,
+                expectedVersion: version,
+                set: ["finding_rating": pair.rating]
+            )
         }
     }
 
@@ -135,6 +149,7 @@ struct FindingRankRepository: RepositoryContext {
                 WHERE s.prompt_uuid = ? AND f.finding_rating IS NULL
                   AND f.kind != 'key_file'
                 """,
-            arguments: [promptUuid]) ?? 0
+            arguments: [promptUuid]
+        ) ?? 0
     }
 }

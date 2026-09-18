@@ -24,7 +24,9 @@ struct CatalogSearchRepository: RepositoryContext {
         if let projectUuid = req.projectUuid {
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM project WHERE uuid = ?", arguments: [projectUuid]
+                    db,
+                    sql: "SELECT 1 FROM project WHERE uuid = ?",
+                    arguments: [projectUuid]
                 ) != nil
             else {
                 throw StoreError.notFound(entity: "project", key: projectUuid)
@@ -58,9 +60,13 @@ struct CatalogSearchRepository: RepositoryContext {
         sessionConditions.append("(\(sessionMatch) OR \(instanceSubtreeMatch))")
         sessionSql += " WHERE " + sessionConditions.joined(separator: " AND ")
         sessionSql += " LIMIT \(limit)"
-        let sessions = try SessionStubRecord.fetchAll(
-            db, sql: sessionSql, arguments: StatementArguments(sessionArguments)
-        ).map { $0.wireStub() }
+        let sessions =
+            try SessionStubRecord.fetchAll(
+                db,
+                sql: sessionSql,
+                arguments: StatementArguments(sessionArguments)
+            )
+            .map { $0.wireStub() }
 
         // Instances: the parent closure of every returned session, plus
         // instances that matched directly (kept even when they contribute no
@@ -89,9 +95,13 @@ struct CatalogSearchRepository: RepositoryContext {
             instanceArguments.append(contentsOf: parentUuids)
         }
         instanceSql += " WHERE " + instanceConditions.joined(separator: " AND ")
-        let instances = try InstanceRecord.fetchAll(
-            db, sql: instanceSql, arguments: StatementArguments(instanceArguments)
-        ).map { $0.wireRow() }
+        let instances =
+            try InstanceRecord.fetchAll(
+                db,
+                sql: instanceSql,
+                arguments: StatementArguments(instanceArguments)
+            )
+            .map { $0.wireRow() }
 
         return CatalogSearchResponse(instances: instances, sessions: sessions)
     }

@@ -20,7 +20,9 @@ struct GitStateRepository: RepositoryContext {
                     SELECT i.absolute_file_system_path
                     FROM session s JOIN instance i ON i.uuid = s.instance_uuid
                     WHERE s.uuid = ?
-                    """, arguments: [req.sessionUuid]) ?? ""
+                    """,
+                arguments: [req.sessionUuid]
+            ) ?? ""
         let (headState, currentCode, currentBranch) = Store.headSummary(repoRoot: instanceRoot)
         return SessionResolveResponse(
             session: session,
@@ -36,7 +38,8 @@ struct GitStateRepository: RepositoryContext {
     ) throws -> InstanceCurrentSessionResponse {
         guard
             let instanceRoot = try String.fetchOne(
-                db, sql: "SELECT absolute_file_system_path FROM instance WHERE uuid = ?",
+                db,
+                sql: "SELECT absolute_file_system_path FROM instance WHERE uuid = ?",
                 arguments: [req.instanceUuid]
             )
         else {
@@ -60,13 +63,17 @@ struct GitStateRepository: RepositoryContext {
                            ) AS last_activity_at
                     FROM session s
                     WHERE s.instance_uuid = ? AND s.code = ?
-                    """, arguments: [req.instanceUuid, code])
-            {
+                    """,
+                arguments: [req.instanceUuid, code]
+            ) {
                 stub = row.wireStub()
             }
         }
         return InstanceCurrentSessionResponse(
-            session: stub, headState: headState, currentSessionCode: currentCode,
-            currentBranch: currentBranch)
+            session: stub,
+            headState: headState,
+            currentSessionCode: currentCode,
+            currentBranch: currentBranch
+        )
     }
 }

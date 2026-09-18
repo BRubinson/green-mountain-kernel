@@ -5,16 +5,11 @@ extension GmBridgeAgent {
 
     /// The eight directive+instruction combos, one harness agent each.
     ///
-    /// Descriptions are capped at ten words because this field is what the
-    /// harness matches on when deciding whether to delegate — it is a routing
-    /// signal, not documentation. "Never auto-delegate" is the load-bearing half
-    /// of every workflow agent's line: these are spawned by the phase machine,
-    /// and each carries only the tools its one phase needs — except the
-    /// primarch, which walks every phase.
-    ///
-    /// THE RULE: every tool an agent's instruction set names is granted here.
-    /// A withheld one yields no visible refusal — the agent falls back to
-    /// guessing a wire verb through BASH, or, holding no BASH, goes idle.
+    /// Descriptions are capped at ten words: the harness matches on this field
+    /// when deciding whether to delegate, so it is a routing signal rather than
+    /// documentation. Every tool an agent's instruction set names must be granted
+    /// here — a withheld one yields no visible refusal, and the agent falls back
+    /// to guessing a wire verb through BASH or goes idle holding none.
     public static let all: [File] = [
         file(
             .primarch,
@@ -22,50 +17,51 @@ extension GmBridgeAgent {
             description: "GMCC primary agent. Drives the prompt lifecycle. Never auto-delegate.",
             native: [.bash, .read, .write, .edit, .grep, .glob, .task, .webFetch, .webSearch],
             tools: [
-                GmAgentTools.cde.initialize,
-                GmAgentTools.cde.loadPrompt,
-                GmAgentTools.cde.setStatus,
-                GmAgentTools.rpir.next,
+                GmAgentTools.Cde.initialize,
+                GmAgentTools.Cde.loadPrompt,
+                GmAgentTools.Cde.setStatus,
+                GmAgentTools.Rpir.next,
 
-                GmAgentTools.rpir.openBriefing,
-                GmAgentTools.rpir.loadExplorationBrief,
+                GmAgentTools.Rpir.openBriefing,
+                GmAgentTools.Rpir.loadExplorationBrief,
 
-                GmAgentTools.rpir.openExploration,
-                GmAgentTools.rpir.getExploration,
-                GmAgentTools.rpir.rankExplorations,
+                GmAgentTools.Rpir.openExploration,
+                GmAgentTools.Rpir.getExploration,
+                GmAgentTools.Rpir.rankExplorations,
 
-                GmAgentTools.rpir.openClarification,
-                GmAgentTools.rpir.getClarification,
-                GmAgentTools.rpir.answerClarificationQuestion,
-                GmAgentTools.rpir.sealClarification,
-                GmAgentTools.rpir.finalizeClarification,
+                GmAgentTools.Rpir.openClarification,
+                GmAgentTools.Rpir.getClarification,
+                GmAgentTools.Rpir.getCarePackage,
+                GmAgentTools.Rpir.answerClarificationQuestion,
+                GmAgentTools.Rpir.sealClarification,
+                GmAgentTools.Rpir.finalizeClarification,
 
-                GmAgentTools.rpir.openCarePackage,
-                GmAgentTools.rpir.writeCarePackage,
-                GmAgentTools.rpir.closeCarePackage,
+                GmAgentTools.Rpir.openCarePackage,
+                GmAgentTools.Rpir.writeCarePackage,
+                GmAgentTools.Rpir.closeCarePackage,
 
-                GmAgentTools.rpir.openArchitecture,
-                GmAgentTools.rpir.openArchitectureOption,
-                GmAgentTools.rpir.getArchitecture,
-                GmAgentTools.rpir.decideArchitecture,
-                GmAgentTools.rpir.writeArchitecturePersistenceChanges,
-                GmAgentTools.rpir.writeArchitectureFieldChanges,
-                GmAgentTools.rpir.writeArchitectureGeneralChanges,
-                GmAgentTools.rpir.summarizeArchitecture,
-                GmAgentTools.rpir.proposeArchitecture,
-                GmAgentTools.rpir.approveArchitecture,
-                GmAgentTools.rpir.reviseArchitecture,
+                GmAgentTools.Rpir.openArchitecture,
+                GmAgentTools.Rpir.openArchitectureOption,
+                GmAgentTools.Rpir.getArchitecture,
+                GmAgentTools.Rpir.decideArchitecture,
+                GmAgentTools.Rpir.writeArchitecturePersistenceChanges,
+                GmAgentTools.Rpir.writeArchitectureFieldChanges,
+                GmAgentTools.Rpir.writeArchitectureGeneralChanges,
+                GmAgentTools.Rpir.summarizeArchitecture,
+                GmAgentTools.Rpir.proposeArchitecture,
+                GmAgentTools.Rpir.approveArchitecture,
+                GmAgentTools.Rpir.reviseArchitecture,
 
-                GmAgentTools.rpir.openReview,
-                GmAgentTools.rpir.getReview,
-                GmAgentTools.rpir.rankReviews,
-                GmAgentTools.rpir.resolveReviewFinding,
-                GmAgentTools.rpir.completeReview,
+                GmAgentTools.Rpir.openReview,
+                GmAgentTools.Rpir.getReview,
+                GmAgentTools.Rpir.rankReviews,
+                GmAgentTools.Rpir.resolveReviewFinding,
+                GmAgentTools.Rpir.completeReview,
 
-                GmAgentTools.cde.searchFileChanges,
-                GmAgentTools.dope.searchSession,
-                GmAgentTools.dope.searchGlobal,
-                GmAgentTools.dope.updateSessionDope,
+                GmAgentTools.Cde.searchFileChanges,
+                GmAgentTools.Dope.searchSession,
+                GmAgentTools.Dope.searchGlobal,
+                GmAgentTools.Dope.updateSessionDope,
             ]
         ),
         file(
@@ -75,15 +71,15 @@ extension GmBridgeAgent {
             model: .haiku,
             native: [.read, .grep, .glob],
             tools: [
-                GmAgentTools.cde.loadPrompt,
-                GmAgentTools.rpir.openBriefing,
-                GmAgentTools.rpir.loadExplorationBrief,
-                GmAgentTools.rpir.writeBrief,
-                GmAgentTools.rpir.closeBrief,
-                GmAgentTools.cde.searchFileChanges,
-                GmAgentTools.dope.searchSession,
-                GmAgentTools.dope.searchGlobal,
-                GmAgentTools.kbite.search,
+                GmAgentTools.Cde.loadPrompt,
+                GmAgentTools.Rpir.openBriefing,
+                GmAgentTools.Rpir.loadExplorationBrief,
+                GmAgentTools.Rpir.writeBrief,
+                GmAgentTools.Rpir.closeBrief,
+                GmAgentTools.Cde.searchFileChanges,
+                GmAgentTools.Dope.searchSession,
+                GmAgentTools.Dope.searchGlobal,
+                GmAgentTools.Kbite.search,
             ]
         ),
         file(
@@ -92,15 +88,15 @@ extension GmBridgeAgent {
             description: "GMCC exploration agent. Writes its own findings. Never auto-delegate.",
             native: [.bash, .read, .grep, .glob, .webFetch, .webSearch],
             tools: [
-                GmAgentTools.rpir.next,
-                GmAgentTools.cde.loadPrompt,
-                GmAgentTools.rpir.loadExplorationBrief,
-                GmAgentTools.rpir.openExploration,
-                GmAgentTools.rpir.writeExplorations,
-                GmAgentTools.rpir.completeExploration,
-                GmAgentTools.dope.searchSession,
-                GmAgentTools.dope.searchGlobal,
-                GmAgentTools.kbite.search,
+                GmAgentTools.Rpir.next,
+                GmAgentTools.Cde.loadPrompt,
+                GmAgentTools.Rpir.loadExplorationBrief,
+                GmAgentTools.Rpir.openExploration,
+                GmAgentTools.Rpir.writeExplorations,
+                GmAgentTools.Rpir.completeExploration,
+                GmAgentTools.Dope.searchSession,
+                GmAgentTools.Dope.searchGlobal,
+                GmAgentTools.Kbite.search,
             ]
         ),
         file(
@@ -109,16 +105,16 @@ extension GmBridgeAgent {
             description: "GMCC clarification agent. Ranks findings, writes questions. Never auto-delegate.",
             native: [.read, .grep, .glob],
             tools: [
-                GmAgentTools.rpir.next,
-                GmAgentTools.cde.loadPrompt,
-                GmAgentTools.rpir.getExploration,
-                GmAgentTools.rpir.rankExplorations,
-                GmAgentTools.rpir.completeExploration,
-                GmAgentTools.rpir.openExploration,
-                GmAgentTools.rpir.openClarification,
-                GmAgentTools.rpir.writeClarificationQuestions,
-                GmAgentTools.rpir.writeClarificationNotes,
-                GmAgentTools.dope.searchSession,
+                GmAgentTools.Rpir.next,
+                GmAgentTools.Cde.loadPrompt,
+                GmAgentTools.Rpir.getExploration,
+                GmAgentTools.Rpir.rankExplorations,
+                GmAgentTools.Rpir.completeExploration,
+                GmAgentTools.Rpir.openExploration,
+                GmAgentTools.Rpir.openClarification,
+                GmAgentTools.Rpir.writeClarificationQuestions,
+                GmAgentTools.Rpir.writeClarificationNotes,
+                GmAgentTools.Dope.searchSession,
             ]
         ),
         file(
@@ -127,18 +123,19 @@ extension GmBridgeAgent {
             description: "GMCC architecture agent. Writes one architecture option. Never auto-delegate.",
             native: [.bash, .read, .grep, .glob, .webFetch, .webSearch],
             tools: [
-                GmAgentTools.rpir.next,
-                GmAgentTools.cde.loadPrompt,
-                GmAgentTools.rpir.loadExplorationBrief,
-                GmAgentTools.rpir.getClarification,
-                GmAgentTools.rpir.getExploration,
-                GmAgentTools.rpir.openArchitectureOption,
-                GmAgentTools.rpir.writeArchitecturePersistenceChanges,
-                GmAgentTools.rpir.writeArchitectureFieldChanges,
-                GmAgentTools.rpir.writeArchitectureGeneralChanges,
-                GmAgentTools.rpir.getArchitecture,
-                GmAgentTools.dope.searchSession,
-                GmAgentTools.kbite.search,
+                GmAgentTools.Rpir.next,
+                GmAgentTools.Cde.loadPrompt,
+                GmAgentTools.Rpir.loadExplorationBrief,
+                GmAgentTools.Rpir.getClarification,
+                GmAgentTools.Rpir.getCarePackage,
+                GmAgentTools.Rpir.getExploration,
+                GmAgentTools.Rpir.openArchitectureOption,
+                GmAgentTools.Rpir.writeArchitecturePersistenceChanges,
+                GmAgentTools.Rpir.writeArchitectureFieldChanges,
+                GmAgentTools.Rpir.writeArchitectureGeneralChanges,
+                GmAgentTools.Rpir.getArchitecture,
+                GmAgentTools.Dope.searchSession,
+                GmAgentTools.Kbite.search,
             ]
         ),
         file(
@@ -147,13 +144,13 @@ extension GmBridgeAgent {
             description: "GMCC implementation agent. Expands approved architecture into changes. Never auto-delegate.",
             native: [.bash, .read, .write, .edit, .grep, .glob],
             tools: [
-                GmAgentTools.rpir.next,
-                GmAgentTools.cde.loadPrompt,
-                GmAgentTools.rpir.loadExplorationBrief,
-                GmAgentTools.rpir.getArchitecture,
-                GmAgentTools.cde.searchFileChanges,
-                GmAgentTools.dope.searchSession,
-                GmAgentTools.kbite.search,
+                GmAgentTools.Rpir.next,
+                GmAgentTools.Cde.loadPrompt,
+                GmAgentTools.Rpir.loadExplorationBrief,
+                GmAgentTools.Rpir.getArchitecture,
+                GmAgentTools.Cde.searchFileChanges,
+                GmAgentTools.Dope.searchSession,
+                GmAgentTools.Kbite.search,
             ]
         ),
         file(
@@ -162,16 +159,17 @@ extension GmBridgeAgent {
             description: "GMCC review agent. Writes review finding rows. Never auto-delegate.",
             native: [.bash, .read, .grep, .glob],
             tools: [
-                GmAgentTools.cde.loadPrompt,
-                GmAgentTools.rpir.loadExplorationBrief,
-                GmAgentTools.rpir.getClarification,
-                GmAgentTools.rpir.getArchitecture,
-                GmAgentTools.cde.searchFileChanges,
-                GmAgentTools.rpir.openReview,
-                GmAgentTools.rpir.writeReviews,
-                GmAgentTools.rpir.getReview,
-                GmAgentTools.dope.searchSession,
-                GmAgentTools.kbite.search,
+                GmAgentTools.Cde.loadPrompt,
+                GmAgentTools.Rpir.loadExplorationBrief,
+                GmAgentTools.Rpir.getClarification,
+                GmAgentTools.Rpir.getCarePackage,
+                GmAgentTools.Rpir.getArchitecture,
+                GmAgentTools.Cde.searchFileChanges,
+                GmAgentTools.Rpir.openReview,
+                GmAgentTools.Rpir.writeReviews,
+                GmAgentTools.Rpir.getReview,
+                GmAgentTools.Dope.searchSession,
+                GmAgentTools.Kbite.search,
             ]
         ),
         file(
@@ -180,9 +178,9 @@ extension GmBridgeAgent {
             description: "GMCC kbite agent. Chews maw resources. Never auto-delegate.",
             native: [.bash, .read, .write, .grep, .glob],
             tools: [
-                GmAgentTools.kbite.openMaw,
-                GmAgentTools.kbite.digest,
-                GmAgentTools.kbite.search,
+                GmAgentTools.Kbite.openMaw,
+                GmAgentTools.Kbite.digest,
+                GmAgentTools.Kbite.search,
             ]
         ),
     ]

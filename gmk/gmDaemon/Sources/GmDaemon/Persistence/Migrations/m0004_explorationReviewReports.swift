@@ -3,18 +3,13 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0004 — db-native exploration + review reports (the last two
-    // file-based bot reports move into the db). Pure ADD: five new
-    // BaseEntity tables + five external-content FTS5 mirrors; no rebuild,
-    // no data motion, no domain row touched. One summary per prompt
-    // (UNIQUE), children FK the summary with CASCADE. finding_rating is
-    // deliberately nullable: NULL marks work-in-progress (unranked);
-    // the complete transition refuses while any NULL remains, and GETs
-    // always return NULL-rated rows in the full partition. The FtsSpec
-    // loop is a private copy of m0003's — frozen migrations stay
-    // self-contained; never share helpers across migration bodies. The
-    // `_ad` triggers ride the global recursive_triggers pragma so FK
-    // cascade deletes stay FTS-synced. No PRAGMA in this body.
+    // m0004 — db-native exploration + review reports. Pure ADD: five BaseEntity
+    // tables plus five external-content FTS5 mirrors, no data motion.
+    // finding_rating is deliberately nullable: NULL marks unranked, and the
+    // complete transition refuses while any NULL remains. The FtsSpec loop is a
+    // private copy of m0003's — never share helpers across migration bodies.
+    // The `_ad` triggers ride the global recursive_triggers pragma so FK cascade
+    // deletes stay FTS-synced. No PRAGMA in this body.
     static func m0004_explorationReviewReports(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0004_explorationReviewReports") { db in
             try db.execute(
@@ -95,7 +90,8 @@ extension Migrations {
                         ON review_summary(prompt_uuid);
                     CREATE INDEX idx_review_finding_summary_fk
                         ON review_finding(review_summary_uuid);
-                    """)
+                    """
+            )
 
             struct FtsSpec {
                 let source: String
@@ -104,19 +100,24 @@ extension Migrations {
             let specs = [
                 FtsSpec(
                     source: "exploration_summary",
-                    columns: ["overview"]),
+                    columns: ["overview"]
+                ),
                 FtsSpec(
                     source: "exploration_key_file",
-                    columns: ["file_path"]),
+                    columns: ["file_path"]
+                ),
                 FtsSpec(
                     source: "exploration_finding",
-                    columns: ["title", "body"]),
+                    columns: ["title", "body"]
+                ),
                 FtsSpec(
                     source: "review_summary",
-                    columns: ["overview"]),
+                    columns: ["overview"]
+                ),
                 FtsSpec(
                     source: "review_finding",
-                    columns: ["title", "body", "file_path"]),
+                    columns: ["title", "body", "file_path"]
+                ),
             ]
             for spec in specs {
                 let fts = "\(spec.source)_fts"
@@ -149,7 +150,8 @@ extension Migrations {
                         END;
 
                         INSERT INTO \(fts)(\(fts)) VALUES('rebuild');
-                        """)
+                        """
+                )
             }
 
             try db.execute(

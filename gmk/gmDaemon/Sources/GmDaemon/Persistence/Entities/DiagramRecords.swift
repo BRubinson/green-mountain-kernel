@@ -125,27 +125,29 @@ struct DiagramStrokeVertexRecord: BaseRecordFields {
 extension DiagramRecord {
     /// db → wire, with the derived instance injected.
     ///
-    /// `instanceUuid` is NOT a diagram column — m0021 dropped it when INSTANCE
-    /// stopped being an ownership tier — so DiagramRepository.diagramSelect
-    /// derives it through a LEFT JOIN onto session. That makes diagramSelect a
-    /// PROJECTION join rather than a filter-only one: this record decodes the
-    /// `d.*` half and the joined column arrives here as a labelled, undefaulted
-    /// parameter.
-    ///
-    /// `visibility` is passed explicitly rather than relying on DiagramRow's
-    /// "PRIVATE" init default. It also retires a hasColumn("visibility")
-    /// fallback at the call site, which has been dead since m0024 made the
-    /// column NOT NULL DEFAULT 'PRIVATE' and every reader started selecting d.*
-    /// — the guard could only ever take its true branch.
+    /// `instanceUuid` is not a diagram column: DiagramRepository.diagramSelect
+    /// derives it through a LEFT JOIN onto session, so this record decodes the
+    /// `d.*` half and the joined column arrives as a labelled, undefaulted
+    /// parameter. `visibility` is passed explicitly rather than leaning on
+    /// DiagramRow's "PRIVATE" init default.
     func wireRow(instanceUuid: String?) -> DiagramRow {
         DiagramRow(
-            uuid: uuid, version: version, tier: tier,
-            projectUuid: projectUuid, instanceUuid: instanceUuid,
-            sessionUuid: sessionUuid, promptUuid: promptUuid,
-            code: code, name: name, description: description,
+            uuid: uuid,
+            version: version,
+            tier: tier,
+            projectUuid: projectUuid,
+            instanceUuid: instanceUuid,
+            sessionUuid: sessionUuid,
+            promptUuid: promptUuid,
+            code: code,
+            name: name,
+            description: description,
             gmccDiagramPath: gmccDiagramPath,
-            dopeScopeCode: dopeScopeCode, revision: revision,
+            dopeScopeCode: dopeScopeCode,
+            revision: revision,
             visibility: visibility,
-            createdAt: createdAt, updatedAt: updatedAt)
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }

@@ -2,12 +2,8 @@
 description: Initialize the GM-CDE system at the user level. Creates the filesystem root, installs the kernel binaries, and brings the daemon up. Run once per machine; per-project, per-instance and per-session state is auto-ensured by the SessionStart hook on first encounter.
 argument-hint: "[--force]"
 disable-model-invocation: true
-allowed-tools: Bash, Read, Write, Glob, AskUserQuestion, Skill
+allowed-tools: Bash, Read, Write, Glob, AskUserQuestion
 ---
-
-**Load the `gmcc` skill before anything else.** It carries the GMB identity and
-the GM-CDE rules every step below assumes. Do not begin the work until it is in
-context.
 
 Initialize GM-CDE at the USER level. Once per machine.
 

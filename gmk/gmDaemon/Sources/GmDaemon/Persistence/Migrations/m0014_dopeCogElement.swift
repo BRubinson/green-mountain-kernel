@@ -3,31 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0014 — COGS (Coordination Of General Systems). Pure ADD.
-    //
-    // Shape mirrors m0010's diagram_element: a generic element row plus a
-    // per-type SUBTYPE table carrying that type's typed fields. A second
-    // element type is then one new subtype table plus one registry entry
-    // — never a migration against this table.
-    //
-    // DELIBERATE DIVERGENCE FROM m0010, and the whole point of the
-    // registry: element_type carries NO CHECK constraint. m0010's
-    // diagram_element.element_type has one, which is exactly why adding a
-    // type there means rebuilding the table — the pain m0008 already paid
-    // once for dope_domain_entity. Validity is enforced in Swift by
-    // DopeCogElementSpec.spec(for:) throwing on an unknown value at READ,
-    // the same pattern Store+Diagram.fetchElementInfo already uses, plus
-    // the structural guarantee that exactly one subtype row exists.
-    //
-    // dope_scope_code is a ghost-tolerant CODE resolved at read time, not
-    // a uuid FK: ingest re-mints every child uuid, and a uuid FK would
-    // need an ON DELETE answer dope_scope cannot give (scope delete is not
-    // offered). Same precedent as diagram_dope_scope — a dangling code is
-    // a legal, renderable state, never an error.
-    //
-    // deleted_on/mask_kind ride here for the same reason they ride on the
-    // persistence tables, and under the same rule: they are masking state,
-    // meaningful only on the overlay tiers, and never serialized.
+    // m0014 — COGS. Pure ADD, shaped like m0010's diagram_element: a generic
+    // element row plus a per-type subtype table, so a new element type is one
+    // subtype table plus one registry entry rather than a migration.
+    // element_type carries NO CHECK, unlike diagram_element — that CHECK is
+    // exactly why adding a type there means rebuilding the table. Validity is
+    // enforced at READ by DopeCogElementSpec.spec(for:). dope_scope_code is a
+    // ghost-tolerant CODE, not a uuid FK: ingest re-mints every child uuid, and
+    // a dangling code is a legal renderable state.
     static func m0014_dopeCogElement(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0014_dopeCogElement") { db in
             try db.execute(
@@ -84,7 +67,8 @@ extension Migrations {
                         ON dope_cog_element(parent_element_uuid);
                     CREATE INDEX idx_dope_cog_primary_system_element_fk
                         ON dope_cog_primary_system(element_uuid);
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",

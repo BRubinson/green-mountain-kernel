@@ -13,8 +13,10 @@ EVERY workflow step below has a pen tool, and the pen is the ONLY channel
 an agent uses for CDE work — typed, threading `expected_version`, and
 budget-guarded (CLI output is not: the harness silently truncates it
 mid-JSON, which is why the shell door was retired from agent usage). A pen
-tool you cannot see is a missing GRANT — report it. `gm_hook call` survives
-for non-CDE ops (dope node surgery, kbite ops) outside the workflow.
+tool you cannot see is a missing GRANT — report it. There is no shell door
+for anything else either: the kernel's CLI is the harness's client, and the
+PreToolUse hook denies it from Bash. A verb with no pen tool is a missing
+door to report, not a reason to reach around the pen.
 
 ## The machine
 
@@ -112,7 +114,8 @@ CARE PACKAGE.
    `rpir_finalize_clarification` (summary_uuid, expected_version — a pure
    gate) and `rpir_open_architecture` (prompt_uuid).
 6. **arch_options** (team) — one architect per methodology. Each loads the
-   clarified intent with `care_package_get` and writes its OWN proposal with
+   clarified intent with `rpir_get_clarification` (the care package rides on
+   it; there is no separate package read) and writes its OWN proposal with
    `arch_option_add` (one row per `agent_name`). Once any option exists,
    change rows wait until `arch_decide` selects one — rejecting the
    siblings and recording the rationale in the same atomic write. Choosing
@@ -215,7 +218,8 @@ polarity as `weight`.
 ## Error recovery
 
 Daemon unreachable: `bash $GM_PLUGIN_ROOT/scripts/install_gm.sh`, then
-`gm_hook context ensure`, then retry. `$GM_BOOTED` unset: restart
+restart the session — SessionStart re-ensures the context; an agent does
+not. `$GM_BOOTED` unset: restart
 Claude Code. Anything stranded mid-phase: `prompt_init` with the prompt's
 selector, then `bot_next` — resume is the first-run code path by
 construction.

@@ -1,32 +1,14 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// The prompt's `bot_workflow` phase graph, rendered from BOT_NEXT's derived
-/// view: one pill per phase of the variant's graph, the served phase
-/// highlighted, entry blockers listed underneath.
+/// The prompt's `bot_workflow` phase graph from BOT_NEXT's derived view: one pill per phase,
+/// the served phase highlighted, entry blockers underneath.
 ///
-/// **Read-only.** The app never advances the machine; BOT_NEXT is addressed
-/// by prompt uuid and never carries a client key, so a live terminal's claim
-/// is never stolen.
-///
-/// **A leaf, by construction.** This view returns `EmptyView()` for every
-/// non-`.loaded` phase state. It is a SIBLING of `PromptStatusHeader`, never
-/// its parent — it has no say in whether the lifecycle controls render. That
-/// is the structural mitigation for deleting the lifecycle rail: the strip
-/// can vanish entirely and the surviving header is still a correct,
-/// actionable control.
-///
-/// A variant this build does not recognise is NOT one of those vanishing
-/// cases: `WorkflowStripModel.make` degrades it to a one-pill model carrying
-/// the served phase with no variant label, and the strip renders that pill.
-/// Daemon/app version skew has to stay visible on screen rather than looking
-/// identical to "no workflow row".
-///
-/// There is deliberately no loading spinner, no error banner and no
-/// empty-state copy. A prompt with no workflow row (never started, and
-/// `/gm_task` where the absence is permanent) shows the header alone — the
-/// settled decision. Failed ≠ absent, though: an error is evidence and
-/// renders as one dim caption line; absence stays silent.
+/// READ-ONLY. BOT_NEXT is addressed by prompt uuid and never carries a client key, so a live
+/// terminal's claim is never stolen. A LEAF: this view returns `EmptyView()` for every
+/// non-`.loaded` state and is a SIBLING of `PromptStatusHeader`, so it has no say in whether
+/// the lifecycle controls render. An unrecognised variant degrades to a one-pill model rather
+/// than vanishing, because version skew must not look identical to "no workflow row".
 struct WorkflowStrip: View {
     let phase: PromptPhaseStore.Phase<BotNextResponse>
 

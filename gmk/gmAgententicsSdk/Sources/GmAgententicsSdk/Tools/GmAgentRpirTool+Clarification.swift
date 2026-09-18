@@ -22,7 +22,7 @@ public struct GmAgentRpirOpenClarificationTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirOpenClarificationArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirOpenClarificationArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_OPEN")
     }
 }
@@ -37,7 +37,8 @@ public struct GmAgentClarificationQuestion: Sendable {
         description: """
             The answers to offer, in order. Write real alternatives with their \
             trade-offs, not yes/no.
-            """)
+            """
+    )
     public var options: [String]
 
     public init(question: String, options: [String] = []) {
@@ -59,7 +60,9 @@ public struct GmAgentRpirWriteClarificationQuestionsArguments: Sendable {
     public var questions: [GmAgentClarificationQuestion]
 
     public init(
-        summaryUuid: String, agentName: String, questions: [GmAgentClarificationQuestion]
+        summaryUuid: String,
+        agentName: String,
+        questions: [GmAgentClarificationQuestion]
     ) {
         self.summaryUuid = summaryUuid
         self.agentName = agentName
@@ -75,8 +78,8 @@ public struct GmAgentRpirWriteClarificationQuestionsTool: GmAgentRpirTool {
     public init() {}
 
     public func call(
-        arguments: GmAgentRpirWriteClarificationQuestionsArguments
-    ) async throws -> String {
+        arguments _: GmAgentRpirWriteClarificationQuestionsArguments
+    ) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_QUESTION_ADD (looped)")
     }
 }
@@ -123,8 +126,8 @@ public struct GmAgentRpirWriteClarificationNotesTool: GmAgentRpirTool {
     public init() {}
 
     public func call(
-        arguments: GmAgentRpirWriteClarificationNotesArguments
-    ) async throws -> String {
+        arguments _: GmAgentRpirWriteClarificationNotesArguments
+    ) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_NOTE_ADD (looped)")
     }
 }
@@ -148,8 +151,11 @@ public struct GmAgentRpirAnswerClarificationQuestionArguments: Sendable {
     public var skip: Bool
 
     public init(
-        questionUuid: String, expectedVersion: Int, answerText: String,
-        selectedOptionUuids: [String] = [], skip: Bool = false
+        questionUuid: String,
+        expectedVersion: Int,
+        answerText: String,
+        selectedOptionUuids: [String] = [],
+        skip: Bool = false
     ) {
         self.questionUuid = questionUuid
         self.expectedVersion = expectedVersion
@@ -167,8 +173,8 @@ public struct GmAgentRpirAnswerClarificationQuestionTool: GmAgentRpirTool {
     public init() {}
 
     public func call(
-        arguments: GmAgentRpirAnswerClarificationQuestionArguments
-    ) async throws -> String {
+        arguments _: GmAgentRpirAnswerClarificationQuestionArguments
+    ) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_ANSWER")
     }
 }
@@ -196,8 +202,8 @@ public struct GmAgentRpirFinalizeClarificationTool: GmAgentRpirTool {
     public init() {}
 
     public func call(
-        arguments: GmAgentRpirFinalizeClarificationArguments
-    ) async throws -> String {
+        arguments _: GmAgentRpirFinalizeClarificationArguments
+    ) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_FINALIZE")
     }
 }
@@ -225,8 +231,8 @@ public struct GmAgentRpirSealClarificationTool: GmAgentRpirTool {
     public init() {}
 
     public func call(
-        arguments: GmAgentRpirSealClarificationArguments
-    ) async throws -> String {
+        arguments _: GmAgentRpirSealClarificationArguments
+    ) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_SEAL")
     }
 }
@@ -249,7 +255,7 @@ public struct GmAgentRpirOpenCarePackageTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirOpenCarePackageArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirOpenCarePackageArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CARE_PACKAGE_OPEN")
     }
 }
@@ -273,12 +279,16 @@ public struct GmAgentCareRef: Sendable {
         description: """
             For an exploration ref: the finding written out again with more intent. \
             Copy and sharpen what was already found — do not go exploring again.
-            """)
+            """
+    )
     public var body: String
 
     public init(
-        kind: String, dopeCode: String = "", kbiteFileUuid: String = "",
-        title: String = "", body: String = ""
+        kind: String,
+        dopeCode: String = "",
+        kbiteFileUuid: String = "",
+        title: String = "",
+        body: String = ""
     ) {
         self.kind = kind
         self.dopeCode = dopeCode
@@ -310,7 +320,7 @@ public struct GmAgentRpirWriteCarePackageTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirWriteCarePackageArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirWriteCarePackageArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CARE_PACKAGE_REF_ADD (looped)")
     }
 }
@@ -328,7 +338,8 @@ public struct GmAgentRpirCloseCarePackageArguments: Sendable {
         description: """
             What was decided, in full: what was chosen, and what was ruled out and \
             why. This is the only place it is written down.
-            """)
+            """
+    )
     public var clarifiedIntent: String
 
     public init(packageUuid: String, expectedVersion: Int, clarifiedIntent: String) {
@@ -345,7 +356,7 @@ public struct GmAgentRpirCloseCarePackageTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirCloseCarePackageArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirCloseCarePackageArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CARE_PACKAGE_COMPLETE")
     }
 }
@@ -360,7 +371,9 @@ public struct GmAgentRpirGetClarificationArguments: Sendable {
         description: """
             Only return notes this important or better, 0 to 999. Use a small \
             number to keep the answer short.
-            """, .range(0...999))
+            """,
+        .range(0...999)
+    )
     public var noteWeightMax: Int
 
     public init(promptUuid: String, noteWeightMax: Int = 100) {
@@ -376,7 +389,53 @@ public struct GmAgentRpirGetClarificationTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirGetClarificationArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirGetClarificationArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "CLARIFY_GET")
+    }
+}
+
+@available(GmAgentOs 1.0, *)
+@Generable
+public struct GmAgentRpirGetCarePackageArguments: Sendable {
+    @Guide(description: promptUuidGuide("'s care package to read"))
+    public var promptUuid: String
+
+    @Guide(
+        description: """
+            Carry every curated exploration body inline. Say false to get the \
+            intent plus a stub roster (title, path, excerpt, size) — the bodies \
+            are what grow, and the roster is what fits.
+            """
+    )
+    public var includeRefBodies: Bool
+
+    @Guide(
+        description: """
+            One exploration ref's uuid, from the stub roster, to read that \
+            curated body in full while the rest stay stubs. Empty means none.
+            """
+    )
+    public var refUuid: String
+
+    public init(promptUuid: String, includeRefBodies: Bool = true, refUuid: String = "") {
+        self.promptUuid = promptUuid
+        self.includeRefBodies = includeRefBodies
+        self.refUuid = refUuid
+    }
+}
+
+/// The care package on its own — the clarified intent, its refs, and the
+/// curated exploration copies — narrowable to a stub roster and one body at a
+/// time. The same shape `rpir_get_architecture` uses for options and change
+/// rows, and the door `rpir_get_clarification`'s overflow retry points at.
+@available(GmAgentOs 1.0, *)
+public struct GmAgentRpirGetCarePackageTool: GmAgentRpirTool {
+    public let name = "rpir_get_care_package"
+    public let description = "Show me the box on its own, one item at a time if it is big."
+
+    public init() {}
+
+    public func call(arguments _: GmAgentRpirGetCarePackageArguments) throws -> String {
+        throw GmAgentToolError.notWired(tool: name, verb: "CARE_PACKAGE_GET")
     }
 }

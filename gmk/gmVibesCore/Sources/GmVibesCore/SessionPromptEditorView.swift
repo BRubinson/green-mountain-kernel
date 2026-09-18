@@ -24,11 +24,9 @@ struct SessionPromptScreen: View {
     @State private var showSessionDope = false
     // One list filter over both fields: name + content (all sections).
     @State private var promptQuery = ""
-    // Per-prompt undo/redo controllers, surviving the detail pane's teardown
-    // (prompt reselection — the pane's .id() recreation used to discard the
-    // stack). A plain reference box, not @Observable, so create-or-get from
-    // body mutates nothing SwiftUI tracks. Dies with the screen on route
-    // change, same as the old pane-local state.
+    // Per-prompt undo/redo controllers, surviving the detail pane's teardown on prompt
+    // reselection. A plain reference box, not @Observable, so create-or-get from body mutates
+    // nothing SwiftUI tracks. Dies with the screen on route change.
     @State private var editHistories = EditHistoryBox()
 
     private var store: SessionStore { scope.store }
@@ -83,18 +81,13 @@ struct SessionPromptScreen: View {
     }
 
     var body: some View {
-        // ScreenScaffold's sidebar shape (NavigationSplitView), deliberately:
-        // its columns OWN their toolbar / navigationTitle / .task lifecycles,
-        // which the pane's per-prompt recreation (.id(stub.uuid)) depends on.
-        // The earlier HSplitView attempt broke exactly that — toolbar items
-        // declared inside HSplitView children leak on teardown and the child
-        // re-hosting reset pane @State, restarting load() forever. The global
-        // group comes from GMVibesWindow with `.navigation` placement.
+        // ScreenScaffold's sidebar shape (NavigationSplitView): its columns OWN their toolbar,
+        // navigationTitle and .task lifecycles, which the pane's per-prompt `.id(stub.uuid)`
+        // recreation depends on. An HSplitView leaks toolbar items on teardown and re-hosts
+        // children, resetting pane @State and restarting load() forever.
         //
-        // title: nil — PromptEditorPane declares its OWN navigationTitle
-        // (prompt name) + subtitle (status); a scaffold title here sits
-        // OUTSIDE the content and would win the preference race, wiping
-        // both. The empty-state branches title themselves instead.
+        // `title: nil` because PromptEditorPane declares its own navigationTitle and subtitle;
+        // a scaffold title sits OUTSIDE the content and wins the preference race, wiping both.
         ScreenScaffold {
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
@@ -156,8 +149,10 @@ struct SessionPromptScreen: View {
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
             // The sidebar filter's writer (name + prefetched content match).
             .searchable(
-                text: $promptQuery, placement: .sidebar,
-                prompt: "Filter prompts")
+                text: $promptQuery,
+                placement: .sidebar,
+                prompt: "Filter prompts"
+            )
         } content: {
             detailContent
         }
@@ -206,16 +201,11 @@ struct SessionPromptScreen: View {
                 await catalog.refresh()
             }
         }
-        // No screen-local scope lease: the WINDOW holds it (GMVibesWindow,
-        // keyed on Route.sessionScopeUuid), and the `.sessionPrompt` route
-        // arm is this screen's only construction site — the InstanceScreen
-        // embed that once justified a local lease was deleted by the
-        // instance-page inversion.
+        // No screen-local scope lease: the WINDOW holds it, keyed on `Route.sessionScopeUuid`,
+        // and the `.sessionPrompt` route arm is this screen's only construction site.
         //
-        // Route-equal repeat deep link: `go` short-circuits (no re-init), so
-        // the retarget arrives on the one-shot channel. Consuming clears it
-        // (the nil re-fire is guarded), keeping it armed for the next
-        // identical hit.
+        // On a route-equal repeat deep link `go` short-circuits, so the retarget arrives on
+        // the one-shot channel. Consuming clears it, keeping it armed for the next hit.
         .onChange(of: nav.pendingPromptTarget) { _, target in
             guard let target else { return }
             selectedUuid = target.wireString
@@ -334,7 +324,9 @@ private struct PromptEditorPane: View {
     @Environment(WindowNav.self) private var nav
 
     init(
-        stub: PromptStub, scope: SessionScope, windowID: SessionWindowID,
+        stub: PromptStub,
+        scope: SessionScope,
+        windowID: SessionWindowID,
         history: PromptEditHistory
     ) {
         self.stub = stub
@@ -350,7 +342,9 @@ private struct PromptEditorPane: View {
         // happens in load(), so SwiftUI re-running init is harmless.
         _draftBox = State(
             initialValue: PromptDraftBox(
-                promptKey: "\(stub.uuid)#\(UUID().uuidString)"))
+                promptKey: "\(stub.uuid)#\(UUID().uuidString)"
+            )
+        )
     }
 
     // The three fields are editable only while the prompt is a draft; a
@@ -522,7 +516,9 @@ private struct PromptEditorPane: View {
                                     expanded: Array(memoriesModel.expanded),
                                     promptUuid: stub.uuid,
                                     isDaemonWatched: paths.memoryIsDaemonWatched
-                                )))
+                                )
+                            )
+                        )
                     } else {
                         showMemories.toggle()
                     }
@@ -581,36 +577,25 @@ private struct PromptEditorPane: View {
                 let isDraft = PromptStatus(rawValue: fresh.status) == .draft
                 await phases.refresh(
                     lifecyclePhases: !isDraft,
-                    reports: !isDraft || reportsEvidence(fresh))
+                    reports: !isDraft || reportsEvidence(fresh)
+                )
             }
         }
-        // Status transitions (draft → initiated → done) flip `editable` via
-        // the stub. Store refresh + reconciliation ride the .prompt event arm
-        // (PROMPT_STATUS_CHANGE routes there) — this handler only re-seeds
-        // emphasis and fetches phases with a FRESH capture: the event loop's
-        // captured self can hold a stale pre-transition status, so its
-        // `phasesApply` misses the draft → initiated boundary.
-        //
-        // m0028 made that boundary FIRE MORE OFTEN THAN IT LOOKS. draft →
-        // initiated is now stamped daemon-side by BRIEFING_OPEN rather than by
-        // an explicit set-status, so this handler runs on a call that never
-        // mentions status at all. Re-seeding from a fresh capture is what keeps
-        // that correct.
+        // Status transitions flip `editable` via the stub. Store refresh and reconciliation
+        // ride the `.prompt` event arm; this handler only re-seeds emphasis and fetches phases
+        // with a FRESH capture, because the event loop's captured self can hold a stale
+        // pre-transition status and miss the draft → initiated boundary. That boundary is
+        // stamped daemon-side by BRIEFING_OPEN, so this runs on calls that never mention
+        // status at all.
         .onChange(of: stub.status) { _, _ in
             if editable { seedPhaseExpansion() }
-            // done→draft re-entry (Back to Draft): .id(stub.uuid) recreates
-            // the pane on prompt SWITCH, not status change, and a pane whose
-            // load() ran post-draft skipped saver creation — entering
-            // editable with a nil saver would make flush()'s `guard let
-            // saver` a silent no-op and edits would NEVER save. Re-run
-            // load() to build the save machinery.
+            // done→draft re-entry: `.id(stub.uuid)` recreates the pane on prompt SWITCH, not
+            // on status change, and a pane whose load() ran post-draft has no saver, which
+            // makes flush()'s `guard let saver` a silent no-op. Re-run load().
             //
-            // The gate must NOT read `editable`: a stale CONTENT_LOCKED
-            // outcome pins saveIssue = .locked, which pins `editable` false,
-            // and load() is the ONLY writer that clears the lock — gating on
-            // `editable` deadlocks exactly the pane that needs the reload.
-            // Gate on the raw status instead; load() clears saveIssue first
-            // thing, so its own `if editable` machinery gates come up true.
+            // The gate must NOT read `editable`: a stale CONTENT_LOCKED outcome pins
+            // `saveIssue = .locked`, which pins `editable` false, and load() is the only
+            // writer that clears the lock. Gate on the raw status instead.
             if PromptStatus(rawValue: stub.status) == .draft,
                 saver == nil || saveIssue == .locked
             {
@@ -666,8 +651,10 @@ private struct PromptEditorPane: View {
             VStack(spacing: 0) {
                 if find.isPresented && supportsFind {
                     FindBar(
-                        find: find, total: findMatches.total,
-                        onStep: { stepFind($0, proxy: proxy) })
+                        find: find,
+                        total: findMatches.total,
+                        onStep: { stepFind($0, proxy: proxy) }
+                    )
                 }
                 ScrollView {
                     VStack(spacing: 16) {
@@ -684,7 +671,10 @@ private struct PromptEditorPane: View {
                             sessionCode: catalog.sessionsByUuid[store.sessionUuid]?.code,
                             gmFsRoot: gmcc[.gmFsRoot],
                             instanceName: catalog.instance(
-                                uuid: windowID.instanceUUID.wireString)?.name ?? "—")
+                                uuid: windowID.instanceUUID.wireString
+                            )?
+                            .name ?? "—"
+                        )
                         WorkflowStrip(phase: phases.workflow)
                         saveIssueBanner
                         // The one status fork: the draft EDITOR keeps its
@@ -703,30 +693,44 @@ private struct PromptEditorPane: View {
                             }
                             KBitePillBox(available: availableKbites, selected: $selectedKbites)
                             sectionEditor(
-                                "Backstory", field: .backstory, text: $backstory,
-                                minHeight: 90, hint: "Narrative context (inherited from the session).")
+                                "Backstory",
+                                field: .backstory,
+                                text: $backstory,
+                                minHeight: 90,
+                                hint: "Narrative context (inherited from the session)."
+                            )
                             if let intent = clarifiedIntent {
                                 refinedSection("Clarified Intent", refined: intent, original: goal)
                             }
                             sectionEditor(
-                                "Goal", field: .goal, text: $goal,
-                                minHeight: 120, hint: "The outcome / acceptance criteria.")
+                                "Goal",
+                                field: .goal,
+                                text: $goal,
+                                minHeight: 120,
+                                hint: "The outcome / acceptance criteria."
+                            )
                             sectionEditor(
-                                "Detail", field: .detail, text: $detail,
-                                minHeight: 220, hint: "The approach, constraints, specifics.")
+                                "Detail",
+                                field: .detail,
+                                text: $detail,
+                                minHeight: 220,
+                                hint: "The approach, constraints, specifics."
+                            )
                             // Briefings lead the stack chronologically: the
                             // briefer's initial briefing precedes clarification.
                             // UNGATED like Exploration/Review — BRIEFING_OPEN is
                             // explicit-only and legally exists at draft.
                             phaseCard(
-                                "Briefing", systemImage: "shippingbox",
+                                "Briefing",
+                                systemImage: "shippingbox",
                                 expanded: $briefingExpanded,
                                 accessory: { EmptyView() }
                             ) {
                                 BriefingPane(phase: phases.briefings)
                             }
                             phaseCard(
-                                "Clarification", systemImage: "questionmark.bubble",
+                                "Clarification",
+                                systemImage: "questionmark.bubble",
                                 expanded: $clarifyExpanded,
                                 accessory: { EmptyView() }
                             ) {
@@ -740,7 +744,8 @@ private struct PromptEditorPane: View {
                                 }
                             }
                             phaseCard(
-                                "Architecture", systemImage: "square.stack.3d.up",
+                                "Architecture",
+                                systemImage: "square.stack.3d.up",
                                 expanded: $archExpanded,
                                 accessory: { EmptyView() }
                             ) {
@@ -753,7 +758,8 @@ private struct PromptEditorPane: View {
                             // Exploration/review are UNGATED: their summaries are
                             // explicit-only opens that legally exist at draft.
                             phaseCard(
-                                "Exploration", systemImage: "binoculars",
+                                "Exploration",
+                                systemImage: "binoculars",
                                 expanded: $exploreExpanded,
                                 accessory: { ReportBadgeCluster(items: explorationBadges) }
                             ) {
@@ -762,7 +768,8 @@ private struct PromptEditorPane: View {
                                 }
                             }
                             phaseCard(
-                                "Review", systemImage: "checkmark.seal",
+                                "Review",
+                                systemImage: "checkmark.seal",
                                 expanded: $reviewExpanded,
                                 accessory: { ReportBadgeCluster(items: reviewBadges) }
                             ) {
@@ -776,7 +783,8 @@ private struct PromptEditorPane: View {
                             // scope preferred, SESSION_BASE fallback; the pane's
                             // resolvedVia chip shows which answered.
                             phaseCard(
-                                "Dope", systemImage: "cube.transparent",
+                                "Dope",
+                                systemImage: "cube.transparent",
                                 expanded: $dopeExpanded,
                                 accessory: { EmptyView() }
                             ) {
@@ -815,7 +823,8 @@ private struct PromptEditorPane: View {
     private var saveIssueBanner: some View {
         if externalChange != nil || saveIssue == .conflict {
             banner(
-                color: .orange, icon: "exclamationmark.triangle.fill",
+                color: .orange,
+                icon: "exclamationmark.triangle.fill",
                 text: "This prompt changed elsewhere."
             ) {
                 Button("Reload") { acceptExternal() }
@@ -826,7 +835,8 @@ private struct PromptEditorPane: View {
             // and a locked prompt can't be written anyway. The buffers are
             // still on screen — offer a copy instead.
             banner(
-                color: .blue, icon: "lock.fill",
+                color: .blue,
+                icon: "lock.fill",
                 text: "This prompt left Draft — content is now read-only. Your unsaved text is still shown below."
             ) {
                 Button("Copy All") {
@@ -836,7 +846,8 @@ private struct PromptEditorPane: View {
             }
         } else if case .failed(let message) = saveIssue {
             banner(
-                color: .red, icon: "xmark.octagon.fill",
+                color: .red,
+                icon: "xmark.octagon.fill",
                 text: "Save failed: \(message)"
             ) {
                 Button("Retry") {
@@ -849,7 +860,9 @@ private struct PromptEditorPane: View {
     }
 
     private func banner(
-        color: Color, icon: String, text: String,
+        color: Color,
+        icon: String,
+        text: String,
         @ViewBuilder action: () -> some View
     ) -> some View {
         HStack(spacing: 10) {
@@ -874,7 +887,8 @@ private struct PromptEditorPane: View {
     /// Persistent section card: sections NEVER disappear with status — status
     /// only drives which one is expanded by default (seedPhaseExpansion).
     private func phaseCard(
-        _ title: String, systemImage: String,
+        _ title: String,
+        systemImage: String,
         expanded: Binding<Bool>,
         @ViewBuilder accessory: () -> some View,
         @ViewBuilder content: () -> some View
@@ -902,20 +916,14 @@ private struct PromptEditorPane: View {
             .foregroundStyle(.secondary)
     }
 
-    /// Default emphasis by phase: the section the current status makes
-    /// relevant opens and the other closes; the user's later toggles are
-    /// never overridden except on a status change (which re-seeds
-    /// deliberately — emphasis follows the phase, not accumulation).
+    /// Default emphasis by phase: the relevant section opens and the others close. A user's
+    /// later toggles survive until the next status change, so emphasis follows the phase
+    /// rather than accumulating.
     private func seedPhaseExpansion() {
-        // FOLLOWS THE EVIDENCE, NOT THE STATUS. This used to switch over six
-        // lifecycle states, one section each. m0028 left three, and `initiated`
-        // covers everything between start and finish — so status can no longer
-        // say which section to emphasise.
-        //
-        // The reports stub already carries the answer and always did: the
-        // furthest-along report that EXISTS is the one the prompt is actually
-        // working on, which is the same thing the old status was a proxy for.
-        // Checked in reverse phase order so the latest wins.
+        // FOLLOWS THE EVIDENCE, NOT THE STATUS. `initiated` covers everything between start
+        // and finish, so status cannot say which section to emphasise. The reports stub
+        // carries the answer: the furthest-along report that EXISTS is what the prompt is
+        // working on. Checked in reverse phase order so the latest wins.
         exploreExpanded = false
         clarifyExpanded = false
         archExpanded = false
@@ -994,8 +1002,11 @@ private struct PromptEditorPane: View {
 
     @ViewBuilder
     private func sectionEditor(
-        _ title: String, field: Field, text: Binding<String>,
-        minHeight: CGFloat, hint: String
+        _ title: String,
+        field: Field,
+        text: Binding<String>,
+        minHeight: CGFloat,
+        hint: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
@@ -1021,7 +1032,8 @@ private struct PromptEditorPane: View {
                 // AppKit-backed editor with live markdown header highlighting + a
                 // line-number gutter. cmd+F routes to the inline find-in-page bar.
                 MarkdownSourceEditor(
-                    text: text, minHeight: minHeight,
+                    text: text,
+                    minHeight: minHeight,
                     query: findQuery,
                     activeOccurrence: activeLocal(segmentID(field))
                 )
@@ -1114,34 +1126,47 @@ private struct PromptEditorPane: View {
         let project = instance.flatMap { inst in catalog.projects.first { $0.uuid == inst.projectUuid } }
         let artifacts = store.promptDetails[stub.uuid]?.artifacts ?? []
         let storagePath = stub.gmfsRelativeStoragePath
-        let resolved: ResolvedPaths = await Task.detached(priority: .userInitiated) {
-            var p = ResolvedPaths()
-            if let path = instance?.absoluteFileSystemPath, !path.isEmpty {
-                p.repoFolder = URL(fileURLWithPath: path, isDirectory: true)
+        let resolved: ResolvedPaths =
+            await Task.detached(priority: .userInitiated) {
+                var p = ResolvedPaths()
+                if let path = instance?.absoluteFileSystemPath, !path.isEmpty {
+                    p.repoFolder = URL(fileURLWithPath: path, isDirectory: true)
+                }
+                // No $GM_FS_ROOT → every gmfs-derived location is nil (buttons
+                // disable; Memories explains) instead of resolving against cwd.
+                guard let root, !root.isEmpty else { return p }
+                if let sessionStub {
+                    p.sessionFolder = GmFsPathResolver.resolve(
+                        relative: sessionStub.gmfsRelativeStoragePath,
+                        gmFsRoot: root
+                    )
+                }
+                p.promptFolder = GmFsPathResolver.promptFolder(
+                    gmFsRoot: root,
+                    storagePath: storagePath
+                )
+                let memory = GmFsPathResolver.memoryRoot(
+                    gmFsRoot: root,
+                    storagePath: storagePath,
+                    artifacts: artifacts
+                )
+                p.memoryRoot = memory.root
+                p.memoryIsDaemonWatched = memory.isDaemonWatched
+                if let instance {
+                    p.instanceFolder = GmFsPathResolver.resolve(
+                        relative: instance.gmfsRelativeStoragePath,
+                        gmFsRoot: root
+                    )
+                }
+                if let project {
+                    p.projectFolder = GmFsPathResolver.resolve(
+                        relative: project.gmfsRelativeStoragePath,
+                        gmFsRoot: root
+                    )
+                }
+                return p
             }
-            // No $GM_FS_ROOT → every gmfs-derived location is nil (buttons
-            // disable; Memories explains) instead of resolving against cwd.
-            guard let root, !root.isEmpty else { return p }
-            if let sessionStub {
-                p.sessionFolder = GmFsPathResolver.resolve(
-                    relative: sessionStub.gmfsRelativeStoragePath, gmFsRoot: root)
-            }
-            p.promptFolder = GmFsPathResolver.promptFolder(
-                gmFsRoot: root, storagePath: storagePath)
-            let memory = GmFsPathResolver.memoryRoot(
-                gmFsRoot: root, storagePath: storagePath, artifacts: artifacts)
-            p.memoryRoot = memory.root
-            p.memoryIsDaemonWatched = memory.isDaemonWatched
-            if let instance {
-                p.instanceFolder = GmFsPathResolver.resolve(
-                    relative: instance.gmfsRelativeStoragePath, gmFsRoot: root)
-            }
-            if let project {
-                p.projectFolder = GmFsPathResolver.resolve(
-                    relative: project.gmfsRelativeStoragePath, gmFsRoot: root)
-            }
-            return p
-        }.value
+            .value
         if paths != resolved { paths = resolved }
     }
 
@@ -1153,8 +1178,10 @@ private struct PromptEditorPane: View {
     private func openInITerm(_ url: URL?) {
         guard let url else { return }
         ITerm.open(
-            dir: url, instanceUUID: windowID.instanceUUID,
-            instanceName: catalog.instance(uuid: windowID.instanceUUID.wireString)?.name ?? "—")
+            dir: url,
+            instanceUUID: windowID.instanceUUID,
+            instanceName: catalog.instance(uuid: windowID.instanceUUID.wireString)?.name ?? "—"
+        )
     }
 
     private func currentState() -> PromptEditHistory.EditState {
@@ -1256,7 +1283,10 @@ private struct PromptEditorPane: View {
     private func loadAvailableKbites() async {
         let refs =
             (try? await GMCCDaemonService.shared.listKbites(
-                scope: .prompt, ownerUuid: stub.uuid, all: true)) ?? []
+                scope: .prompt,
+                ownerUuid: stub.uuid,
+                all: true
+            )) ?? []
         availableKbites = Set(refs.map(\.code)).union(selectedKbites).sorted()
     }
 

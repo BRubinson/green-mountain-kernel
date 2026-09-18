@@ -1,31 +1,17 @@
 import Foundation
 import PackagePlugin
 
-/// Generates `BuildInfo.swift` — the build identity `gm_hook ping` reports
-/// back — INSIDE the build graph.
-///
-/// WHAT THIS REPLACED, and why it matters more than it sounds: the stamp used
-/// to be a shell script (`stamp_build_info.sh`) that two different callers had
-/// to remember to run — a developer's build script and the release workflow.
-/// It wrote into a GITIGNORED `Generated/` directory, which produced a
-/// fresh-clone defect: on a clean checkout `BuildInfo.swift` did not exist, so
-/// the daemon target failed with an undefined-symbol error that gave no hint a
-/// shell script was the missing step. Opening the project in Xcode and pressing
-/// Build simply did not work, and nothing said why.
-///
-/// As a prebuild plugin the stamp happens because the target is being built.
-/// Xcode gets it, every CI job gets it, a clean clone gets it, and the explicit
-/// stamp step leaves both workflows entirely. There is no longer a way to build
-/// this target WITHOUT a current stamp, which is the property that was missing.
-///
-/// The generated file lands in the plugin work directory, never in the source
-/// tree — so there is nothing to gitignore and nothing to accidentally commit.
+/// Generates `BuildInfo.swift`, the build identity `gm_hook ping` reports, inside the
+/// build graph. A prebuild plugin stamps because the target is being built, so Xcode,
+/// a clean clone and every script get a current stamp with no prior shell step.
+/// The file lands in the plugin work directory, never in the source tree.
 @main
 struct StampBuildInfo: BuildToolPlugin {
 
     func createBuildCommands(
-        context: PluginContext, target: Target
-    ) async throws -> [Command] {
+        context: PluginContext,
+        target: Target
+    ) -> [Command] {
         let outputDir = context.pluginWorkDirectoryURL
         let output = outputDir.appending(path: "BuildInfo.swift")
 
@@ -37,47 +23,14 @@ struct StampBuildInfo: BuildToolPlugin {
             (try? String(contentsOf: versionFile, encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
 
-        // Written as a shell one-liner rather than resolved here because the
-        // PLUGIN runs once at graph-construction time while the COMMAND runs at
-        // build time. Resolving the sha up here would stamp whatever commit was
-        // checked out when the graph was built, which in a long-lived Xcode
-        // session is not the commit being compiled.
+        // The sha and date resolve inside the COMMAND, at build time: the plugin body runs
+        // once at graph construction, which in a long Xcode session is not the commit
+        // being compiled. git may fail (tarball, sandbox); `unknown` is the honest stamp.
         //
-        // git is allowed to FAIL. A tarball, an exported tree or a sandboxed
-        // build has no reachable .git, and `unknown` is the honest answer there
-        // — the same fallback the retired shell script used. A build that
-        // refused to proceed without a sha would make the stamp a liability
-        // rather than a diagnostic.
-        // TWO PROPERTIES ARE BEING HELD HERE AT ONCE, and they are easy to
-        // confuse. See StampVersion for the full measurement; the short version
-        // is that an unconditional prebuild write invalidates whole-module
-        // release builds for every downstream package. This plugin poisons
-        // gmDaemon and gmKernel the same way.
-        //
-        // BUT THE CONDITIONAL WRITE ALONE CANNOT FIX THIS FILE. `date` used to be
-        // `date -u +%Y-%m-%dT%H:%M:%SZ` — a live wall clock, producing DIFFERENT
-        // CONTENT EVERY SECOND. Content that always differs defeats a content
-        // comparison exactly as thoroughly as it defeats an mtime check, so the
-        // timestamp had to stop being volatile BEFORE the `cmp` was worth adding.
-        // Anyone who applies only half of this pair will measure no improvement
-        // and wrongly conclude the diagnosis was wrong.
-        //
-        // The date is now the COMMIT date (`git show -s --format=%cI HEAD`). That
-        // keeps a real, meaningful build-identity date — it still answers "what
-        // is in these bits" for `gm_hook ping` — while being stable for a given
-        // commit, which is what makes the comparison below meaningful.
-        //
-        // git is STILL ALLOWED TO FAIL, for both values. A tarball, an exported
-        // tree or a sandboxed build has no reachable .git, and `unknown` is the
-        // honest answer there. A build that refused to proceed without a sha
-        // would make the stamp a liability rather than a diagnostic.
-        //
-        // The sha is resolved HERE, at build time, rather than up in the plugin
-        // body, because the PLUGIN runs once at graph-construction time while the
-        // COMMAND runs per build. Resolving it above would stamp whatever commit
-        // was checked out when the graph was built, which in a long-lived Xcode
-        // session is not the commit being compiled. That reasoning is unchanged
-        // and applies to the commit date for the same reason.
+        // Two properties hold together and must stay together: the date is the COMMIT
+        // date, so the content is stable for a given commit, and the file is written only
+        // when the content changes. A prebuild command runs before every build, and an
+        // unconditional write moves the mtime and recompiles every whole-module dependent.
         let script = """
             set -e
             sha="$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo unknown)"

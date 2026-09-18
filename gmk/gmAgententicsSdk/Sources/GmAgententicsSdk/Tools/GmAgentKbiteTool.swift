@@ -14,7 +14,8 @@ public struct GmAgentKbiteSearchArguments: Sendable {
         description: """
             Only look inside these kbites, by uuid. Leave empty to search every \
             digested kbite.
-            """)
+            """
+    )
     public var kbiteUuids: [String]
 
     @Guide(description: GM_TOOL_GUIDE_SEARCH_LIMIT, .range(1...500))
@@ -34,7 +35,7 @@ public struct GmAgentKbiteSearchTool: GmAgentKbiteTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentKbiteSearchArguments) async throws -> String {
+    public func call(arguments _: GmAgentKbiteSearchArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "KBITE_SEARCH")
     }
 }
@@ -61,7 +62,7 @@ public struct GmAgentKbiteOpenMawTool: GmAgentKbiteTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentKbiteOpenMawArguments) async throws -> String {
+    public func call(arguments _: GmAgentKbiteOpenMawArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "KBITE_MAW_OPEN")
     }
 }
@@ -88,7 +89,7 @@ public struct GmAgentKbiteDigestTool: GmAgentKbiteTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentKbiteDigestArguments) async throws -> String {
+    public func call(arguments _: GmAgentKbiteDigestArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "KBITE_DIGEST")
     }
 }

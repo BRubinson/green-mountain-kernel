@@ -3,15 +3,11 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0019 — COGS vocabulary: primary_system becomes HULL, and
-    // PersistenceOwner joins it as a second element type.
-    //
-    // dope_cog_element.element_type deliberately carries NO db CHECK
-    // (the Swift registry governs it), which is exactly why this is a
-    // table RENAME plus a plain CREATE rather than the rebuild m0018
-    // needed. The cog tables are empty db-wide, so there is nothing to
-    // backfill — the UPDATE below is written anyway so the migration is
-    // correct on any database, not just this one.
+    // m0019 — COGS vocabulary: primary_system becomes HULL, and PersistenceOwner
+    // joins it as a second element type. dope_cog_element.element_type carries NO
+    // db CHECK (the Swift registry governs it), which is why this is a table
+    // RENAME plus a plain CREATE rather than m0018's rebuild. The UPDATE below is
+    // written so the migration is correct on any database, not just an empty one.
     static func m0019_cogHullsAndPersistenceOwner(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0019_cogHullsAndPersistenceOwner") { db in
             try db.execute(
@@ -37,7 +33,8 @@ extension Migrations {
                         ON dope_cog_persistence_owner(element_uuid);
                     CREATE INDEX idx_dope_cog_persistence_owner_code
                         ON dope_cog_persistence_owner(dope_persistence_code);
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",

@@ -144,36 +144,14 @@ public enum ChangeKind: String, Codable, Hashable, CaseIterable, Sendable {
     case rename
 }
 
-/// Prompt lifecycle v3 (m0028). THREE states, and a cycle rather than a ladder:
+/// The prompt lifecycle: THREE states, a cycle rather than a ladder.
+///     draft ⇄ initiated → done   (done → draft is the edit edge)
 ///
-///     draft ⇄ initiated → done
-///       ↖──────────────────┘
-///
-/// WHY THE MIDDLE STATES WENT AWAY. The old ladder was
-/// draft → clarifying → architecting → implementing → reviewing → done, and it
-/// mostly duplicated information the machine derived anyway: phase comes from db
-/// evidence at every BOT_NEXT with no stored cursor, so `clarifying` was not
-/// what made the clarify phase current — the clarification summary's existence
-/// was. What the four middle arms actually did was gate: each transition
-/// demanded its predecessor's backing summary be complete. That is the part
-/// being retired, so the states that existed to carry it went with it.
-///
-/// It was not quite true that NOTHING read the status: the `implement` entry
-/// gate required `implementing` as a second, weaker proxy for "the plan was
-/// approved". m0028 dropped that condition rather than rewriting it, since with
-/// three states it would hold whenever the phase was reachable. Architecture
-/// approval is the gate that survived, and it is the one that was doing the
-/// work.
-///
-/// `done` IS NOT TERMINAL any more. done → draft is the edit edge: a finished
-/// prompt is re-opened by sending it back to draft, which is why the summary
-/// tables lost their per-prompt UNIQUE constraints in the same migration — a
-/// second run needs a second summary.
-///
-/// Legacy notes: the old terminal `clarified` was mapped to `done` by m0002;
-/// m0028 maps all four retired arms to `initiated`. Naming them here is legal
-/// under the retired-name contract for the same reason the wire-version note
-/// is — a record of a retirement has to be able to say what was retired.
+/// Status carries no gating: phase comes from db evidence at every BOT_NEXT
+/// with no stored cursor, and architecture approval is the real gate on
+/// implementation. `done` IS NOT TERMINAL — done → draft re-opens a finished
+/// prompt, which is why the summary tables carry no per-prompt UNIQUE
+/// constraint: a second run needs a second summary.
 public enum PromptStatus: String, Codable, Hashable, CaseIterable, Sendable {
     /// Not started, or sent back for editing.
     case draft
@@ -397,18 +375,12 @@ public struct HelloAck: Codable, Hashable, Sendable {
 
 /// N inner request lines, executed in order inside ONE transaction.
 ///
-/// The inner lines stay RAW NDJSON on purpose. A typed union over the ~230
-/// dispatchable requests would be a second hand-maintained vocabulary whose
-/// arms could drift from `MessageType`, and it would have to grow every time a
-/// verb is added. Keeping them opaque means the batch verb needs no knowledge
-/// of what it carries: the dispatcher re-enters itself, which it already does
-/// once per connection, and the handlers' existing JSON welding — normally the
-/// obstacle to in-process composition — is what makes this cheap.
-///
-/// Atomicity is the whole point. Today every verb is its own implicit
-/// transaction because each arrives as a separate wire message, so an agent
-/// writing twelve findings writes twelve commits and a failure at the seventh
-/// leaves six behind. Inside one batch those twelve either all land or none do.
+/// The inner lines stay RAW NDJSON: a typed union over the ~230 dispatchable
+/// requests would be a second vocabulary that could drift from `MessageType`,
+/// and keeping them opaque means this verb needs no knowledge of what it
+/// carries. Atomicity is the point — each verb is otherwise its own implicit
+/// transaction, so twelve findings are twelve commits and a failure at the
+/// seventh leaves six behind.
 public struct TxBatchRequest: Codable, Hashable, Sendable {
     /// Raw NDJSON request lines, executed in order.
     public let requests: [String]
@@ -422,12 +394,8 @@ public struct TxBatchRequest: Codable, Hashable, Sendable {
 ///
 /// Results are BUFFERED and emitted only after the commit, so a partial batch
 /// is not expressible to an observer any more than it is to the database.
-///
-/// THERE IS NO `failedIndex` FIELD, and its absence is deliberate. An earlier
-/// version carried one, which could never be populated: a failure THROWS (an
-/// `ok: false` envelope with no `error` is read as success by the client), and a
-/// throw carries no payload. The failing index is named in the error MESSAGE
-/// instead, which is where a caller actually reads it.
+/// THERE IS NO `failedIndex` FIELD: a failure THROWS and a throw carries no
+/// payload, so the failing index is named in the error MESSAGE instead.
 public struct TxBatchResponse: Codable, Hashable, Sendable {
     /// Raw NDJSON result lines, one per request, in request order. Present only
     /// on success, because a rolled-back batch throws.
@@ -471,19 +439,11 @@ public struct PingResponse: Codable, Hashable, Sendable {
     /// Bundle path of the instance actually holding the db lock, so a
     /// client-mode kernel can name BOTH bundles rather than only its own.
     public let writerBundlePath: String?
-    /// The filesystem root this kernel actually resolved.
-    ///
-    /// Reported for the same reason as `writerRole`: with more than one
-    /// environment on a machine, "which database am I looking at" stops being
-    /// rhetorical, and a client that cannot ask has to GUESS from its own
-    /// environment — which is exactly the guess that is wrong for a
-    /// LaunchServices-launched app, since it inherits no environment at all.
-    ///
-    /// ADDITIVE OPTIONAL: it decodes safely in both directions and nil means
-    /// what the absent field meant — the peer does not report its root. It
-    /// contributed NOTHING to the v29 bump; the six new test-lock message types
-    /// did. Recorded because the rule only means something if the distinction
-    /// is held.
+    /// The filesystem root this kernel actually resolved. With several
+    /// environments on a machine a client that cannot ask has to GUESS from its
+    /// own environment, which is the guess that is wrong for a
+    /// LaunchServices-launched app: it inherits no environment at all. An
+    /// additive optional, so nil means the peer does not report its root.
     public let gmfsRoot: String?
 
     public init(
@@ -756,15 +716,12 @@ public struct ContextEnsureRequest: Codable, Hashable, Sendable {
     public let session: SessionContext
     /// Claude Code's conversation uuid, from the SessionStart payload. When
     /// present the daemon pins it to the ensured session in
-    /// claude_session_binding — the binding every hook write resolves
-    /// through.
+    /// claude_session_binding, the binding every hook write resolves through.
     ///
-    /// IT RIDES THIS MESSAGE ON PURPOSE, rather than getting a verb of its
-    /// own: SessionStart already calls `gm context ensure`, so the binding
-    /// costs no second process and cannot be forgotten independently of the
-    /// call that creates the session it points at. The insert is
-    /// INSERT OR IGNORE against a UNIQUE index, so re-running is a no-op and
-    /// pin-once is a schema fact rather than a branch a caller can skip.
+    /// IT RIDES THIS MESSAGE rather than taking a verb of its own, so the
+    /// binding cannot be forgotten independently of the call that creates the
+    /// session it points at. The insert is INSERT OR IGNORE against a UNIQUE
+    /// index, so pin-once is a schema fact rather than a caller's branch.
     public let claudeSessionId: String?
 
     public init(
@@ -788,18 +745,13 @@ public struct ContextEnsureResponse: Codable, Hashable, Sendable {
     public let createdInstance: Bool
     public let createdSession: Bool
     /// How many `claude_session_binding` rows exist for this session.
-    ///
-    /// CAPTURE HEALTH, AND THE ONLY WAY THE MCP CAN SEE IT. Zero means no Claude
-    /// conversation is bound to this gmcc session, so the PostToolUse hook has
-    /// nothing to attribute against and file-change capture is silently OFF. A
-    /// stdio MCP server is handed only CLAUDE_PROJECT_DIR — it cannot read
-    /// `claude_session_id` for itself — so without this count it cannot tell a
-    /// healthy session from a dead one, and the failure stays invisible exactly
-    /// the way it did before.
-    ///
-    /// OPTIONAL BY CONSTRUCTION: an additive optional field on an existing
-    /// message does not bump `GmWireProtocol.version`, so an older client
-    /// decodes this response unchanged and GMVibes' pinned kit keeps working.
+    /// CAPTURE HEALTH, AND THE ONLY WAY THE MCP CAN SEE IT. Zero means no
+    /// Claude conversation is bound to this gmcc session, so the PostToolUse
+    /// hook has nothing to attribute against and file-change capture is
+    /// silently OFF. A stdio MCP server is handed only CLAUDE_PROJECT_DIR and
+    /// cannot read `claude_session_id` itself, so without this count it cannot
+    /// tell a healthy session from a dead one. Optional, so an older client
+    /// decodes this response unchanged.
     public let claudeSessionBindingCount: Int?
 
     public init(
@@ -1186,10 +1138,16 @@ public struct PromptQualifiedDiagramRow: Codable, Hashable, Sendable {
     public let updatedAt: String
 
     public init(
-        uuid: String, promptUuid: String, diagramUuid: String,
-        renderedPath: String, renderedRevision: Int64,
-        renderFingerprint: String, qualification: String,
-        version: Int64, createdAt: String, updatedAt: String
+        uuid: String,
+        promptUuid: String,
+        diagramUuid: String,
+        renderedPath: String,
+        renderedRevision: Int64,
+        renderFingerprint: String,
+        qualification: String,
+        version: Int64,
+        createdAt: String,
+        updatedAt: String
     ) {
         self.uuid = uuid
         self.promptUuid = promptUuid
@@ -1216,8 +1174,11 @@ public struct PromptDiagramQualifyRequest: Codable, Hashable, Sendable {
     public let qualification: String
 
     public init(
-        promptUuid: String, diagramUuid: String, renderedPath: String,
-        renderedRevision: Int64, renderFingerprint: String,
+        promptUuid: String,
+        diagramUuid: String,
+        renderedPath: String,
+        renderedRevision: Int64,
+        renderFingerprint: String,
         qualification: String
     ) {
         self.promptUuid = promptUuid
@@ -1273,22 +1234,17 @@ public struct ChangeRange: Codable, Hashable, Sendable {
 }
 
 /// The primary high-frequency message. Carries full context blocks so the
-/// ensure chain can run lazily — deliberately NOT slimmed to uuid addressing
-/// this prompt (no call-order coupling for gm; revisit when the yamls and
-/// their context source go away in prompt 2).
-/// The `file_change.origin` vocabulary — ONE declaration, four consumers:
-/// the server-side guard in FileChangeRepository.add, the gm writers that
-/// stamp it, this message's documentation, and the
+/// ensure chain can run lazily, rather than uuid addressing, which would
+/// couple callers to call order.
+
+/// The `file_change.origin` vocabulary — ONE declaration, read by the guard in
+/// FileChangeRepository.add, by the writers that stamp it, and by the
 /// `agentics.enums.file_change_origin` dope entity that mirrors it.
 ///
-/// The column is `TEXT NOT NULL DEFAULT 'hook'` with NO CHECK constraint, so
-/// THIS LIST IS THE CONSTRAINT: extending the dope enum without extending
-/// this list makes every write of the new value throw, and a caller that
-/// swallows errors records nothing at all. Extend both together.
-///
-/// The column having no CHECK is also what lets the list SHRINK: rows written
-/// under a wider vocabulary keep their stored value and still read back, while
-/// a value absent here can no longer be written.
+/// The column has NO CHECK constraint, so THIS LIST IS THE CONSTRAINT: extend
+/// it and the dope enum together, or every write of the new value throws. The
+/// absent CHECK is also what lets the list shrink — rows written under a wider
+/// vocabulary still read back, while a value absent here cannot be written.
 public enum FileChangeOrigin {
     /// PostToolUse Edit|Write|NotebookEdit — exact paths and exact
     /// structuredPatch ranges, straight off the payload.
@@ -1318,38 +1274,30 @@ public struct FileChangeAdd: Codable, Hashable, Sendable {
     public let changeKind: ChangeKind
     public let ranges: [ChangeRange]
     /// When autoAttribute is true and promptUuid is nil, the daemon resolves
-    /// the prompt itself. OPT-IN so the long-standing "omitted prompt means
-    /// deliberately session-scoped" semantic stays intact for every other
-    /// caller; the PostToolUse bookkeeping hook is the intended caller.
-    ///
+    /// the prompt itself. OPT-IN, so "omitted prompt means deliberately
+    /// session-scoped" stays intact for every other caller.
     /// THERE IS NO clientKey ON THIS MESSAGE, and its absence is the design.
     /// A hook-origin write must resolve through the claude_session_binding,
-    /// never through the ClientKey activation ladder — process ancestry
-    /// cannot tell one sibling subagent from another, which is what made hook
-    /// attribution wrong. Removing the field rather than agreeing not to send
-    /// it makes that split STRUCTURAL: no field remains through which a hook
-    /// write could reach the ladder.
+    /// never through the ClientKey activation ladder, because process ancestry
+    /// cannot tell one sibling subagent from another. With no field, no hook
+    /// write can reach the ladder.
     public let autoAttribute: Bool?
-    /// Agent identity is SELF-REPORTED (nothing on the transport can
-    /// distinguish sibling subagents); origin is one of `FileChangeOrigin.all`
-    /// (nil → hook, the db default); workflow_phase is NEVER taken from the
-    /// caller — the daemon stamps it from the attributed prompt's active
-    /// bot_workflow.
+    /// Agent identity is SELF-REPORTED, because nothing on the transport
+    /// distinguishes sibling subagents. origin is one of
+    /// `FileChangeOrigin.all`, nil meaning the db default. workflow_phase is
+    /// NEVER taken from the caller: the daemon stamps it from the attributed
+    /// prompt's active bot_workflow.
     public let agentId: String?
     public let agentName: String?
     public let origin: String?
     /// The PostToolUse payload, one field per column rather than a blob so
-    /// every axis stays queryable. All OPTIONAL: the manual path carries none
-    /// of them, and a row with no tool call behind it has no tool_use_id.
+    /// every axis stays queryable. All OPTIONAL: the manual path carries none.
     ///
-    /// claudeTurnId is THE naming trap here. The payload field is called
-    /// `prompt_id`, but it is Claude Code's TURN id and has nothing to do
-    /// with a gmcc prompt uuid — hence the name it carries on this message.
-    ///
-    /// toolUseId is the idempotency key, paired server-side with the resolved
-    /// session_file: one `sed -i a b c` is one tool_use_id and three rows, so
-    /// the unit is (tool call, file). A replay returns the EXISTING row with
-    /// `deduplicated` set rather than writing a second one.
+    /// claudeTurnId is THE naming trap. The payload spells it `prompt_id`, but
+    /// it is Claude Code's TURN id and has nothing to do with a gmcc prompt
+    /// uuid. toolUseId is the idempotency key, paired server-side with the
+    /// resolved session_file, so the unit is (tool call, file) and a replay
+    /// returns the EXISTING row with `deduplicated` set.
     public let claudeSessionId: String?
     public let claudeTurnId: String?
     public let toolUseId: String?
@@ -1713,21 +1661,36 @@ public struct CatalogSearchRequest: Codable, Hashable, Sendable {
     public let query: String
     public let projectUuid: String?
     public let limit: Int?
+    /// ADDITIVE OPTIONAL: byte mode (see `CdePager`); sessions are the paged
+    /// region and instances are recomputed as the parents of the page.
+    public let pageBytes: Int?
+    public let pageCursor: String?
 
-    public init(query: String, projectUuid: String? = nil, limit: Int? = nil) {
+    public init(
+        query: String,
+        projectUuid: String? = nil,
+        limit: Int? = nil,
+        pageBytes: Int? = nil,
+        pageCursor: String? = nil
+    ) {
         self.query = query
         self.projectUuid = projectUuid
         self.limit = limit
+        self.pageBytes = pageBytes
+        self.pageCursor = pageCursor
     }
 }
 
 public struct CatalogSearchResponse: Codable, Hashable, Sendable {
     public let instances: [InstanceRow]
     public let sessions: [SessionStub]
+    /// ADDITIVE OPTIONAL, byte mode only.
+    public let page: CdePage?
 
-    public init(instances: [InstanceRow], sessions: [SessionStub]) {
+    public init(instances: [InstanceRow], sessions: [SessionStub], page: CdePage? = nil) {
         self.instances = instances
         self.sessions = sessions
+        self.page = page
     }
 }
 
@@ -2142,9 +2105,9 @@ public struct ClarifyGetRequest: Codable, Hashable, Sendable {
     public var isNarrowed: Bool { includeCarePackage != nil || noteWeightMax != nil }
 }
 
-/// A note with its body replaced by a leading excerpt and its true length.
-/// A note has no title, so a body-less stub would be unreadable — the excerpt
-/// is what makes "is this one worth widening for" answerable.
+/// A note carrying a leading excerpt of its body plus the body's true length.
+/// A note has no title, so a body-less stub would be unreadable: the excerpt is
+/// what makes "is this one worth widening for" answerable.
 public struct ClarificationNoteStub: Codable, Hashable, Sendable {
     public let uuid: String
     public let weight: Int?
@@ -2221,7 +2184,8 @@ public struct CarePackageStub: Codable, Hashable, Sendable {
             kbiteRefCount: package.kbiteRefs.count,
             explorationRefCount: package.explorationRefs.count,
             dopeScopeUuid: package.dopeScopeUuid,
-            dopeScopeRevision: package.dopeScopeRevision)
+            dopeScopeRevision: package.dopeScopeRevision
+        )
     }
 }
 
@@ -2331,7 +2295,7 @@ public struct CarePackageResponse: Codable, Hashable, Sendable {
     }
 }
 
-/// A curated exploration COPY with its body replaced by a leading excerpt.
+/// A curated exploration COPY carrying a leading excerpt of its body.
 public struct CarePackageExplorationRefStub: Codable, Hashable, Sendable {
     public let uuid: String
     public let curatedTitle: String
@@ -2637,30 +2601,14 @@ public struct ArchReviseRequest: Codable, Hashable, Sendable {
     }
 }
 
-/// Structurally-partitioned read — the ARCH analogue of the rating windows
-/// on EXPLORE_GET / REVIEW_GET. Architecture rows carry no rating, so the
-/// window is STRUCTURAL rather than numeric: option bodies, change_code, and
-/// a page over the general change rows.
-///
-/// THE WIRE DEFAULT IS UNCHANGED BY CONSTRUCTION. Every field below is an
-/// additive OPTIONAL whose nil means "what ARCH_GET has always returned":
-/// full option bodies, verbatim change_code, every row, and none of the new
-/// response keys emitted at all. A caller that ships no new field — GMVibes'
-/// local package build, any older peer — gets a byte-identical response,
-/// which is exactly why this does NOT bump GmWireProtocol.version.
-///
-/// THE NARROWING IS APPLIED BY THE PEN, NOT THE DAEMON. gm_mcp's `arch_get`
-/// passes includeOptions=false / full=false / limit by DEFAULT and exposes
-/// include_options / option_uuid / full / change_uuid / limit / cursor in its
-/// tool schema so an agent can widen. The agent harness — not the daemon — is
-/// where an 80 KB result gets refused, so the client that feeds the harness
-/// is the client that narrows.
-///
-/// persistenceChanges are NEVER narrowed and NEVER paged. They are the
-/// persistence-first contract, and they were the silent casualty of the
-/// unwindowed response: sorted-key JSON puts "options" before
-/// "persistence_changes", so a clip mid-array ate the whole persistence set
-/// without saying so.
+/// Structurally-partitioned read — the ARCH analogue of the rating windows on
+/// EXPLORE_GET / REVIEW_GET. Architecture rows carry no rating, so the window
+/// is STRUCTURAL: option bodies, change_code, and a page over the general
+/// change rows. Every field here is an additive OPTIONAL whose nil means full
+/// bodies and every row, so an older peer gets a byte-identical response. THE
+/// NARROWING IS APPLIED BY THE PEN, NOT THE DAEMON. persistenceChanges are
+/// NEVER narrowed and NEVER paged, because sorted-key JSON puts "options" ahead
+/// of them and a clip mid-array eats the persistence set silently.
 public struct ArchGetRequest: Codable, Hashable, Sendable {
     public let promptUuid: String
     /// nil/true = option BODIES inline (the historical response). false drops
@@ -2712,11 +2660,10 @@ public struct ArchGetRequest: Codable, Hashable, Sendable {
     }
 }
 
-/// An option with its BODY replaced by a length. Carries everything needed to
-/// decide whether to fetch the body (`ArchGetRequest.optionUuid`) — including
-/// which one won. The decision RATIONALE is not duplicated here: it lives on
-/// `ArchitectureSummaryRow.decisionRationale`, which every form of the
-/// response carries in full.
+/// An option carrying its body LENGTH in place of the body, plus everything
+/// needed to decide whether to fetch it, including which one won. The decision
+/// RATIONALE is not duplicated here: it lives on
+/// `ArchitectureSummaryRow.decisionRationale`, which every response carries.
 public struct ArchitectureOptionStub: Codable, Hashable, Sendable {
     public let uuid: String
     public let agentName: String
@@ -2742,10 +2689,9 @@ public struct ArchitectureOptionStub: Codable, Hashable, Sendable {
     }
 }
 
-/// A general change row with change_code replaced by a leading excerpt and
-/// its true length. Every OTHER field — path, reason, depth, and the derived
-/// implementation state — stays verbatim, because those are what an
-/// implementation audit actually reads.
+/// A general change row carrying a leading excerpt of change_code and its true
+/// length. Every other field — path, reason, depth, derived implementation
+/// state — stays verbatim, because those are what an audit reads.
 public struct ArchGeneralChangeStub: Codable, Hashable, Sendable {
     public let uuid: String
     public let seq: Int64
@@ -2871,8 +2817,12 @@ public struct ArchOptionAddRequest: Codable, Hashable, Sendable {
     public let expectedVersion: Int64?
 
     public init(
-        summaryUuid: String, agentName: String, agentId: String? = nil, body: String,
-        supersedesOptionUuid: String? = nil, expectedVersion: Int64? = nil
+        summaryUuid: String,
+        agentName: String,
+        agentId: String? = nil,
+        body: String,
+        supersedesOptionUuid: String? = nil,
+        expectedVersion: Int64? = nil
     ) {
         self.summaryUuid = summaryUuid
         self.agentName = agentName
@@ -3060,27 +3010,13 @@ public struct BotGetRequest: Codable, Hashable, Sendable {
 
 // MARK: - AGENT_REGISTER
 
-/// Who agent X is — one row per agent_id, written by two parties that never
-/// coordinate.
-///
-/// TWO WRITERS, ONE ROW, keyed on agent_id alone:
-///
-/// - `gm hook subagent-start` writes the IDENTITY half (agent_type and the
-///   Claude ids) because that half is universal — every spawn shape fires
-///   SubagentStart carrying agent_id, and the hook beats the agent to any
-///   write. The gmcc session and prompt are NOT on this message: the daemon
-///   resolves them from `claudeSessionId` through the binding, which is the
-///   same single resolution path a file_change takes.
-/// - `gm agent register` writes the AUTHORITY half (role, methodology,
-///   phase), because no spawn shape delivers a role or a methodology and four
-///   identical personas differ by agent_id alone — for a bare workflow agent
-///   the role exists nowhere but the spawning script.
-///
-/// Fields are MERGED, never overwritten: an omitted field leaves whatever the
-/// row already holds, so neither writer can erase the other's half. ORDERING
-/// IS NOT A CONSTRAINT — the join happens at READ time, so a spawner that
-/// only learns agent ids when a dynamic workflow reports back may register
-/// long after the agent's rows are written and still explain them.
+/// Who agent X is — TWO WRITERS, ONE ROW, keyed on agent_id alone. The
+/// SubagentStart hook writes the IDENTITY half, which every spawn shape
+/// delivers, and the daemon resolves session and prompt from `claudeSessionId`
+/// through the binding. AGENT_REGISTER writes the AUTHORITY half, since no
+/// spawn shape carries a role. Fields are MERGED, never overwritten, so neither
+/// writer can erase the other's half, and ORDERING IS NOT A CONSTRAINT: the
+/// join happens at READ time.
 public struct AgentRegisterRequest: Codable, Hashable, Sendable {
     /// Opaque and NEVER parsed. Its shape varies by spawn kind, and reading
     /// structure into it would make the registry wrong for whichever shape
@@ -3095,12 +3031,10 @@ public struct AgentRegisterRequest: Codable, Hashable, Sendable {
     /// The identity half, off the SubagentStart payload.
     ///
     /// `agentType` is a LABEL and never authoritative: it carries the
-    /// subagent_type for a plain subagent, the literal `workflow-subagent`
-    /// for a bare workflow agent, and the NAME for a named teammate. The role
-    /// that means something arrives on the authority half instead.
-    ///
-    /// `claudeTurnId` is the naming trap — the payload calls it `prompt_id`
-    /// and it is Claude Code's TURN id, not a gmcc prompt uuid.
+    /// subagent_type, the literal `workflow-subagent`, or a teammate's NAME
+    /// depending on spawn shape. The role that means something arrives on the
+    /// authority half. `claudeTurnId` is the naming trap — the payload calls
+    /// it `prompt_id` and it is Claude Code's TURN id, not a prompt uuid.
     public let agentType: String?
     public let claudeSessionId: String?
     public let claudeTurnId: String?
@@ -3541,7 +3475,11 @@ public struct SessionResolveResponse: Codable, Hashable, Sendable {
     public let currentBranch: String?
 
     public init(
-        session: SessionRow, checkedOut: Bool, headState: String, currentSessionCode: String?, currentBranch: String?
+        session: SessionRow,
+        checkedOut: Bool,
+        headState: String,
+        currentSessionCode: String?,
+        currentBranch: String?
     ) {
         self.session = session
         self.checkedOut = checkedOut
@@ -3582,17 +3520,10 @@ public struct PathsGetRequest: Codable, Hashable, Sendable {
     public init() {}
 }
 
-/// Typed roots (never a map — dictionary keys and coder key strategies don't
-/// mix). The fs root plus db/socket/backups come from Paths; the kbite roots
-/// from daemon_config (fallback defaults, settable via CONFIG_SET). Retires
-/// client-side ~/.zshrc scraping.
-///
-/// The retired second root is GONE rather than renamed. It used to name a
-/// separate content tree, and with one top-level filesystem there is nothing
-/// left for it to name — two fields that always held the same value would be an
-/// invitation to let them drift. `projectsRoot` takes its place in the response
-/// because it is what clients actually wanted from it: the absolute half of
-/// every `gmfs_relative_storage_path`.
+/// Typed roots — never a map, because dictionary keys and coder key strategies
+/// do not mix. The fs root plus db/socket/backups come from Paths; the kbite
+/// roots from daemon_config, settable via CONFIG_SET. `projectsRoot` is the
+/// absolute half of every `gmfs_relative_storage_path`.
 public struct PathsGetResponse: Codable, Hashable, Sendable {
     public let gmFsRoot: String
     public let dbPath: String
@@ -3940,8 +3871,11 @@ public struct DopeGetRequest: Codable, Hashable, Sendable {
     public let resolved: Bool?
 
     public init(
-        sessionUuid: String, promptUuid: String? = nil, code: String? = nil,
-        resolved: Bool? = nil, projectUuid: String? = nil
+        sessionUuid: String,
+        promptUuid: String? = nil,
+        code: String? = nil,
+        resolved: Bool? = nil,
+        projectUuid: String? = nil
     ) {
         self.sessionUuid = sessionUuid
         self.promptUuid = promptUuid
@@ -3991,9 +3925,11 @@ public struct DopeGetResponse: Codable, Hashable, Sendable {
     public let areaVersions: [String: Int64]?
 
     public init(
-        tree: DopeScopeTree, resolvedVia: String,
+        tree: DopeScopeTree,
+        resolvedVia: String,
         resolutions: [DopeOverlay.Resolution]? = nil,
-        hidden: [String]? = nil, warnings: [String]? = nil,
+        hidden: [String]? = nil,
+        warnings: [String]? = nil,
         areaVersions: [String: Int64]? = nil
     ) {
         self.tree = tree
@@ -4039,9 +3975,13 @@ public struct DopeSearchRequest: Codable, Hashable, Sendable {
     public let limit: Int?
 
     public init(
-        query: String, scope: DopeSearchScope, sessionUuid: String? = nil,
-        promptUuid: String? = nil, projectUuid: String? = nil,
-        onlyMasks: Bool? = nil, sources: [DopeSearchSource]? = nil,
+        query: String,
+        scope: DopeSearchScope,
+        sessionUuid: String? = nil,
+        promptUuid: String? = nil,
+        projectUuid: String? = nil,
+        onlyMasks: Bool? = nil,
+        sources: [DopeSearchSource]? = nil,
         limit: Int? = nil
     ) {
         self.query = query; self.scope = scope; self.sessionUuid = sessionUuid
@@ -4065,9 +4005,16 @@ public struct DopeSearchHit: Codable, Hashable, Sendable {
     public let origin: String?
 
     public init(
-        kind: String, subjectUuid: String, scopeUuid: String, scopeCode: String,
-        scopeType: String, path: String, title: String, excerpt: String,
-        score: Double, origin: String?
+        kind: String,
+        subjectUuid: String,
+        scopeUuid: String,
+        scopeCode: String,
+        scopeType: String,
+        path: String,
+        title: String,
+        excerpt: String,
+        score: Double,
+        origin: String?
     ) {
         self.kind = kind; self.subjectUuid = subjectUuid; self.scopeUuid = scopeUuid
         self.scopeCode = scopeCode; self.scopeType = scopeType; self.path = path
@@ -4104,10 +4051,18 @@ public struct DopeCogElementNode: Codable, Hashable, Sendable {
     public let deletedOn: String?
 
     public init(
-        uuid: String, version: Int64, elementType: String, code: String, name: String,
-        description: String, sortOrder: Int, parentElementUuid: String?,
-        dopeScopeCode: String?, primaryPath: String?,
-        dopePersistenceCode: String? = nil, deletedOn: String?
+        uuid: String,
+        version: Int64,
+        elementType: String,
+        code: String,
+        name: String,
+        description: String,
+        sortOrder: Int,
+        parentElementUuid: String?,
+        dopeScopeCode: String?,
+        primaryPath: String?,
+        dopePersistenceCode: String? = nil,
+        deletedOn: String?
     ) {
         self.uuid = uuid
         self.version = version
@@ -4135,8 +4090,14 @@ public struct DopeCogNode: Codable, Hashable, Sendable {
     public let elements: [DopeCogElementNode]
 
     public init(
-        uuid: String, version: Int64, code: String, name: String, description: String,
-        sortOrder: Int, deletedOn: String?, elements: [DopeCogElementNode]
+        uuid: String,
+        version: Int64,
+        code: String,
+        name: String,
+        description: String,
+        sortOrder: Int,
+        deletedOn: String?,
+        elements: [DopeCogElementNode]
     ) {
         self.uuid = uuid
         self.version = version
@@ -4156,8 +4117,11 @@ public struct DopeCogAddRequest: Codable, Hashable, Sendable {
     public let description: String?
     public let sortOrder: Int?
     public init(
-        scopeUuid: String, code: String, name: String,
-        description: String? = nil, sortOrder: Int? = nil
+        scopeUuid: String,
+        code: String,
+        name: String,
+        description: String? = nil,
+        sortOrder: Int? = nil
     ) {
         self.scopeUuid = scopeUuid; self.code = code; self.name = name
         self.description = description; self.sortOrder = sortOrder
@@ -4172,8 +4136,12 @@ public struct DopeCogUpdateRequest: Codable, Hashable, Sendable {
     public let description: String?
     public let sortOrder: Int?
     public init(
-        uuid: String, expectedVersion: Int64, code: String? = nil, name: String? = nil,
-        description: String? = nil, sortOrder: Int? = nil
+        uuid: String,
+        expectedVersion: Int64,
+        code: String? = nil,
+        name: String? = nil,
+        description: String? = nil,
+        sortOrder: Int? = nil
     ) {
         self.uuid = uuid; self.expectedVersion = expectedVersion; self.code = code
         self.name = name; self.description = description; self.sortOrder = sortOrder
@@ -4203,10 +4171,16 @@ public struct DopeCogElementAddRequest: Codable, Hashable, Sendable {
     /// decodes safely in both directions per the wire convention.
     public let dopePersistenceCode: String?
     public init(
-        cogUuid: String, elementType: String, code: String, name: String,
-        description: String? = nil, sortOrder: Int? = nil,
-        parentElementUuid: String? = nil, dopeScopeCode: String? = nil,
-        primaryPath: String? = nil, dopePersistenceCode: String? = nil
+        cogUuid: String,
+        elementType: String,
+        code: String,
+        name: String,
+        description: String? = nil,
+        sortOrder: Int? = nil,
+        parentElementUuid: String? = nil,
+        dopeScopeCode: String? = nil,
+        primaryPath: String? = nil,
+        dopePersistenceCode: String? = nil
     ) {
         self.cogUuid = cogUuid; self.elementType = elementType; self.code = code
         self.name = name; self.description = description; self.sortOrder = sortOrder
@@ -4226,9 +4200,15 @@ public struct DopeCogElementUpdateRequest: Codable, Hashable, Sendable {
     public let clearDopeScopeCode: Bool?
     public let primaryPath: String?
     public init(
-        uuid: String, expectedVersion: Int64, code: String? = nil, name: String? = nil,
-        description: String? = nil, sortOrder: Int? = nil, dopeScopeCode: String? = nil,
-        clearDopeScopeCode: Bool? = nil, primaryPath: String? = nil
+        uuid: String,
+        expectedVersion: Int64,
+        code: String? = nil,
+        name: String? = nil,
+        description: String? = nil,
+        sortOrder: Int? = nil,
+        dopeScopeCode: String? = nil,
+        clearDopeScopeCode: Bool? = nil,
+        primaryPath: String? = nil
     ) {
         self.uuid = uuid; self.expectedVersion = expectedVersion; self.code = code
         self.name = name; self.description = description; self.sortOrder = sortOrder
@@ -4313,8 +4293,11 @@ public struct DopePromotedScope: Codable, Hashable, Sendable {
     public let counts: DopeTreeCounts
 
     public init(
-        code: String, baseScopeUuid: String, fromRevision: Int64,
-        toRevision: Int64, counts: DopeTreeCounts
+        code: String,
+        baseScopeUuid: String,
+        fromRevision: Int64,
+        toRevision: Int64,
+        counts: DopeTreeCounts
     ) {
         self.code = code
         self.baseScopeUuid = baseScopeUuid
@@ -4455,7 +4438,10 @@ public struct DopeNodeDeleteRequest: Codable, Hashable, Sendable {
     public let soft: Bool?
 
     public init(
-        level: DopeLevel, nodeUuid: String, expectedVersion: Int64, soft: Bool? = nil
+        level: DopeLevel,
+        nodeUuid: String,
+        expectedVersion: Int64,
+        soft: Bool? = nil
     ) {
         self.level = level
         self.nodeUuid = nodeUuid
@@ -4587,8 +4573,10 @@ public struct DopeIngestResponse: Codable, Hashable, Sendable {
     public let gapCrossed: Int64?
 
     public init(
-        scope: DopeScopeRow, counts: DopeTreeCounts,
-        previousRevision: Int64? = nil, gapCrossed: Int64? = nil
+        scope: DopeScopeRow,
+        counts: DopeTreeCounts,
+        previousRevision: Int64? = nil,
+        gapCrossed: Int64? = nil
     ) {
         self.scope = scope
         self.counts = counts
@@ -4726,16 +4714,15 @@ public struct DiagramGetResponse: Codable, Hashable, Sendable {
     /// The OWNER's `gmfs_relative_storage_path` — the root a rendered
     /// screenshot lands under, whichever tier owns the diagram.
     ///
-    /// ADDITIVE OPTIONAL on an existing message, so it does not bump the
-    /// wire version (CLAUDE.md's rule) and an older peer simply ignores it.
-    /// It lives here rather than being fetched separately because the
-    /// alternative is three extra round trips — PROJECT_LIST / SESSION_GET /
-    /// PROMPT_GET — to learn something the daemon already had in hand while
-    /// resolving the owner.
+    /// An additive optional, so an older peer ignores it. It rides this
+    /// response rather than being fetched separately because the alternative is
+    /// three round trips for something the daemon already held while resolving
+    /// the owner.
     public let ownerStoragePath: String?
 
     public init(
-        tree: DiagramTree, bindings: [DiagramBindingResolution],
+        tree: DiagramTree,
+        bindings: [DiagramBindingResolution],
         ownerStoragePath: String? = nil
     ) {
         self.tree = tree
@@ -4850,9 +4837,8 @@ public struct DiagramBatchApplyResponse: Codable, Hashable, Sendable {
 // MARK: - Diagram Studio (v23)
 
 /// DIAGRAM_SEARCH — the cross-tier browse AND search surface backing the
-/// GMVibes galleries. Deliberately a SEPARATE message from DIAGRAM_LIST,
-/// whose single-owner no-union picker contract stays untouched.
-///
+/// GMVibes galleries. A SEPARATE message from DIAGRAM_LIST, whose single-owner
+/// no-union picker contract it must not disturb.
 /// Two modes in one message: a nil/empty `query` is a plain filtered SELECT
 /// of the project's diagrams across tiers ordered by updated_at DESC (the
 /// gallery grid); a non-empty query is a bm25-ranked FTS5 MATCH over
@@ -4866,8 +4852,10 @@ public struct DiagramSearchRequest: Codable, Hashable, Sendable {
     public let limit: Int?
 
     public init(
-        projectUuid: String, sessionUuid: String? = nil,
-        query: String? = nil, visibility: String? = nil,
+        projectUuid: String,
+        sessionUuid: String? = nil,
+        query: String? = nil,
+        visibility: String? = nil,
         limit: Int? = nil
     ) {
         self.projectUuid = projectUuid
@@ -4917,8 +4905,11 @@ public struct DiagramDeleteResponse: Codable, Hashable, Sendable {
     public let gmccDiagramPath: String?
 
     public init(
-        deletedUuid: String, code: String, cascadedElements: Int,
-        ownerStoragePath: String? = nil, gmccDiagramPath: String? = nil
+        deletedUuid: String,
+        code: String,
+        cascadedElements: Int,
+        ownerStoragePath: String? = nil,
+        gmccDiagramPath: String? = nil
     ) {
         self.deletedUuid = deletedUuid
         self.code = code
@@ -4983,7 +4974,9 @@ public struct DiagramIngestResponse: Codable, Hashable, Sendable {
     public let root: String
 
     public init(
-        ingested: [String], skipped: [String], warnings: [String] = [],
+        ingested: [String],
+        skipped: [String],
+        warnings: [String] = [],
         root: String
     ) {
         self.ingested = ingested
@@ -5048,7 +5041,7 @@ public struct DopeResolveResponse: Codable, Hashable, Sendable {
 
 /// Excerpting policy shared by every stub in this file. One constant, so a
 /// stub is the same size wherever it comes from.
-public enum PenExcerpt {
+public enum CdeExcerpt {
     /// Long enough to recognize what a body is about; short enough that a
     /// hundred stubs still fit inside the result budget below.
     public static let chars = 400
@@ -5056,7 +5049,10 @@ public enum PenExcerpt {
     /// (excerpt, true length, whether anything was dropped). Character-based,
     /// never byte-based: an excerpt is shown to a reader, and clipping a
     /// grapheme in half would put mojibake in the record.
-    public static func take(_ body: String, chars limit: Int = PenExcerpt.chars)
+    public static func take(
+        _ body: String,
+        chars limit: Int = CdeExcerpt.chars
+    )
         -> (excerpt: String, chars: Int, truncated: Bool)
     {
         let total = body.count
@@ -5068,7 +5064,7 @@ public enum PenExcerpt {
 /// What a pen read tool can be told to make itself smaller. Data, not prose,
 /// so the guard below can quote it back to the caller in a form the caller
 /// can act on without reading English.
-public struct PenNarrowing: Codable, Hashable, Sendable {
+public struct CdeNarrowing: Codable, Hashable, Sendable {
     /// The tool's own argument names, in the order worth trying.
     public let parameters: [String]
     /// The exact next call to make.
@@ -5084,7 +5080,7 @@ public struct PenNarrowing: Codable, Hashable, Sendable {
 /// prose apology and NEVER a clipped JSON body: the failure mode being fixed
 /// is a caller hand-parsing truncated JSON, so an over-budget read returns a
 /// well-formed envelope that names the parameter which narrows THIS tool.
-public struct PenOversizeNote: Codable, Hashable, Sendable {
+public struct CdeOversizeNote: Codable, Hashable, Sendable {
     public let tool: String
     /// "degraded" = a narrowed payload rides along under `result`.
     /// "withheld" = even the narrowed form did not fit; there is no payload.
@@ -5120,22 +5116,19 @@ public struct PenOversizeNote: Codable, Hashable, Sendable {
 }
 
 /// THE GENERIC RESPONSE-SIZE GUARD. Every pen read passes through here before
-/// it is handed to the harness, because arch_get is merely the one that got
-/// caught: a 79,598-character ARCH_GET was REFUSED for exceeding max tokens,
-/// spilled to a file, and had to be hand-parsed from a body that had been cut
-/// mid-array — so `persistence_changes` (which sorts after `options`) vanished
-/// silently.
+/// the harness sees it: an over-budget result is refused whole, and what the
+/// reader gets back is a body cut mid-array with no note saying so.
 ///
-/// THRESHOLD. `maxBytes` is 45,000. The refusal ceiling is measured, not
-/// guessed: 79,598 characters was refused, so the real per-result cap sits
-/// below that. Taking the harness's 25,000-token result cap and a pessimistic
-/// 2.5 bytes/token for pretty-printed JSON carrying escaped source code
-/// (`\"`, `\n`, and identifiers that tokenize badly), 45,000 bytes is ~18,000
-/// tokens — comfortably inside the cap with headroom for the MCP envelope,
-/// and a little over half the size that actually got refused. Typical JSON
-/// runs nearer 3.5 bytes/token, so the common case is ~13,000 tokens.
-public enum PenResultBudget {
+/// `maxBytes` is 45,000, measured rather than guessed. A 79,598-character
+/// result is refused, so the real cap sits below that; against the harness's
+/// 25,000-token ceiling and a pessimistic 2.5 bytes/token for JSON carrying
+/// escaped source, 45,000 bytes is ~18,000 tokens with envelope headroom.
+public enum CdeResultBudget {
     public static let maxBytes = 45_000
+    /// The page budget the cde server hands `CdePager` by default. 15 KB
+    /// under `maxBytes` is the room for the envelope, the fixed parts of a
+    /// page and pretty-print inflation, all measured on the same encoder.
+    public static let pageBytes = 30_000
 
     public static func encoder() -> JSONEncoder {
         let encoder = JSONEncoder()
@@ -5145,18 +5138,16 @@ public enum PenResultBudget {
 
     /// Render a tool result under the budget.
     ///
-    /// 1. Fits → the payload verbatim, exactly as before.
-    /// 2. Over → re-run `degrade` (the tool's own narrowed call) and return
-    ///    `{"gmcc_oversize": <note>, "result": <narrowed payload>}`.
-    /// 3. Still over, or nothing to degrade to → the note ALONE. A caller
-    ///    that gets no `result` key knows it got no data, which is a fact it
-    ///    can act on; a truncated body is a fact it cannot.
+    /// 1. Fits → the payload verbatim.
+    /// 2. Over → the `withheld` note ALONE. A caller that gets no `result`
+    ///    key knows it got no data, which is a fact it can act on; a truncated
+    ///    body is a fact it cannot. Every read is paged by `CdePager` before
+    ///    it reaches here, so this branch is a last resort, not a plan.
     public static func render(
         tool: String,
-        narrowing: PenNarrowing?,
+        narrowing: CdeNarrowing?,
         value: any Encodable,
-        isWrite: Bool = false,
-        degrade: (() throws -> any Encodable)? = nil
+        isWrite: Bool = false
     ) throws -> String {
         let encoder = encoder()
         let data = try encoder.encode(AnyEncodable(value))
@@ -5185,25 +5176,15 @@ public enum PenResultBudget {
         }
         func stamp(_ base: String) -> String { isWrite ? "completed_\(base)" : base }
 
-        if let degrade {
-            let narrowed = try encoder.encode(AnyEncodable(try degrade()))
-            if narrowed.count <= maxBytes {
-                let note = PenOversizeNote(
-                    tool: tool, outcome: stamp("degraded"), bytes: data.count,
-                    degradedBytes: narrowed.count, budgetBytes: maxBytes,
-                    parameters: parameters, retryWith: retryWith)
-                return try envelope(note: note, payload: narrowed, encoder: encoder)
-            }
-            let note = PenOversizeNote(
-                tool: tool, outcome: stamp("withheld"), bytes: data.count,
-                degradedBytes: narrowed.count, budgetBytes: maxBytes,
-                parameters: parameters, retryWith: retryWith)
-            return try envelope(note: note, payload: nil, encoder: encoder)
-        }
-        let note = PenOversizeNote(
-            tool: tool, outcome: stamp("withheld"), bytes: data.count,
-            degradedBytes: nil, budgetBytes: maxBytes,
-            parameters: parameters, retryWith: retryWith)
+        let note = CdeOversizeNote(
+            tool: tool,
+            outcome: stamp("withheld"),
+            bytes: data.count,
+            degradedBytes: nil,
+            budgetBytes: maxBytes,
+            parameters: parameters,
+            retryWith: retryWith
+        )
         return try envelope(note: note, payload: nil, encoder: encoder)
     }
 
@@ -5212,7 +5193,9 @@ public enum PenResultBudget {
     /// through JSONSerialization, so nothing in it can be reshaped on the way
     /// out.
     static func envelope(
-        note: PenOversizeNote, payload: Data?, encoder: JSONEncoder
+        note: CdeOversizeNote,
+        payload: Data?,
+        encoder: JSONEncoder
     ) throws -> String {
         let noteText = String(data: try encoder.encode(note), encoding: .utf8) ?? "{}"
         guard let payload, let payloadText = String(data: payload, encoding: .utf8) else {
@@ -5577,28 +5560,17 @@ public struct TestRunResponse: Codable, Hashable, Sendable {
 // MARK: - The harness envelope (v30)
 
 /// The identity a harness-side caller must supply, because the kernel cannot
-/// derive it.
-///
-/// THIS STRUCT IS THE REASON THE HARNESS CHILD PROCESS SURVIVES. It was tempting
-/// to read `MCP_CALL` as "the kernel serves MCP, so the child goes away", and
-/// three separate things forbid it:
-///
-/// 1. `ClientKey.resolve()` starts at `getpid()` and walks `e_ppid` up to 64
-///    hops looking for a `claude`-prefixed `p_comm`, returning
-///    `claude:<pid>:<starttime>`. THAT STRING IS THE ACTIVATION-CLAIM KEY. A
-///    kernel process is not a descendant of any Claude instance, so it resolves
-///    nil — or worse, its own unrelated ancestry — and the activation registry
-///    degrades to last-writer-wins across concurrent prompts. That is a
-///    data-integrity failure, and a silent one.
-/// 2. `main()` chdirs to `$CLAUDE_PROJECT_DIR` so `GitContext.detect()` resolves
-///    the right repo. One long-lived process cannot hold N cwds.
-/// 3. MCP stdio transport is per-server-process; a long-lived kernel has no
-///    per-session stdin.
-///
-/// So the child stays and gets THIN, resolving the triple once at startup and
-/// forwarding it. `clientKey` is resolved BEFORE any chdir and cached — process
-/// ancestry cannot change for a live process, and the walk is up to 64 sysctl
-/// hops. `cwd` is read AFTER the chdir.
+/// derive it. THIS STRUCT IS WHY THE HARNESS CHILD PROCESS EXISTS:
+/// 1. `ClientKey.resolve()` walks process ancestry for a `claude` parent, and
+///    that string IS the activation-claim key. A kernel is no such descendant,
+///    so it resolves nil and the registry degrades to last-writer-wins.
+/// 2. `main()` chdirs to `$CLAUDE_PROJECT_DIR` so `GitContext.detect()` finds
+///    the right repo, and one long-lived process cannot hold N cwds.
+/// 3. MCP stdio transport is per-server-process.
+
+/// The child is therefore THIN: it resolves the triple once at startup and
+/// forwards it. `clientKey` is resolved BEFORE any chdir and cached, since
+/// ancestry cannot change for a live process. `cwd` is read AFTER the chdir.
 public struct GmHarnessIdentity: Codable, Hashable, Sendable {
     /// `claude:<pid>:<starttime>`, resolved by the child from ITS ancestry.
     ///
@@ -5642,7 +5614,7 @@ public struct McpCallRequest: Codable, Hashable, Sendable {
 /// Result of an `MCP_CALL`.
 ///
 /// RENDERED TEXT, NOT A STRUCTURED RESULT, and that is deliberate. Rendering
-/// lives kernel-side with the tool bodies so `PenResultBudget`'s per-tool
+/// lives kernel-side with the tool bodies so `CdeResultBudget`'s per-tool
 /// narrowing and degrade paths apply to the bytes that actually go back. If the
 /// child rendered, the budget and the renderer would be in two processes and
 /// free to drift — and the failure mode of that drift is a result that blows the
@@ -5650,14 +5622,12 @@ public struct McpCallRequest: Codable, Hashable, Sendable {
 public struct McpCallResponse: Codable, Hashable, Sendable {
     /// The rendered tool result, already budget-checked.
     ///
-    /// THERE IS NO SEPARATE `budget` FIELD, and its absence is deliberate — an
-    /// earlier draft carried one. `PenResultBudget.render` does not return a
-    /// payload plus a report; on an over-budget result it returns the
-    /// `gmcc_oversize` ENVELOPE, which already contains both the note and the
-    /// narrowed payload under `result`. A sibling field would either duplicate
-    /// what is inside this string or sit permanently nil, and a field nothing
-    /// ever populates is a claim the wire does not honour. The same reasoning
-    /// removed `TxBatchResponse.failedIndex`.
+    /// THERE IS NO SEPARATE `budget` FIELD, and its absence is deliberate.
+    /// `CdeResultBudget.render` returns the `gmcc_oversize` ENVELOPE on an
+    /// over-budget result, which already carries both the note and the narrowed
+    /// payload under `result`. A sibling field would duplicate this string or
+    /// sit permanently nil, and a field nothing populates is a claim the wire
+    /// does not honour.
     public let text: String
     /// A tool-level failure. Rides the RESULT envelope rather than the protocol
     /// error, matching what the MCP server already does: a tool that fails is
@@ -5671,20 +5641,14 @@ public struct McpCallResponse: Codable, Hashable, Sendable {
     }
 }
 
-/// `HOOK_EVENT` — one Claude Code lifecycle hook, relayed to the kernel.
+/// `HOOK_EVENT` — one Claude Code lifecycle hook, relayed to the kernel. The
+/// logic it reaches compiles into the kernel and takes its cwd from the payload
+/// rather than the process, so this verb moves the CALL SITE, not the logic.
 ///
-/// The logic this reaches (`HookLogic` / `HookRunner`) ALREADY compiles into the
-/// kernel and `postToolUse` already takes its cwd from the payload rather than
-/// the process, so this verb moves the CALL SITE rather than the ~957 lines.
-///
-/// THE LAUNCHER STAYS A SHELL-FORM `command` HOOK, and that is not a
-/// half-measure. `SessionStart` accepts only `command` and `mcp_tool`, never
-/// `http`; an `mcp_tool` handler there is documented to expect a "not connected"
-/// error on first run; and `SessionStart` is precisely where the claude-session
-/// binding every later write depends on is created. Shell form is also the only
-/// handler type that resolves `${GM_FS_ROOT:-$HOME/gmfs}` at hook time and the
-/// only one that can honour the silent exit-0 no-op contract. `async` is
-/// command-only too, which keeps `PostToolUse` off the tool-call critical path.
+/// THE LAUNCHER STAYS A SHELL-FORM `command` HOOK: `SessionStart` accepts only
+/// `command` and `mcp_tool`, an `mcp_tool` handler there expects a "not
+/// connected" error on first run, and shell form alone resolves
+/// `${GM_FS_ROOT:-$HOME/gmfs}` at hook time and honours the exit-0 no-op.
 public struct HookEventRequest: Codable, Hashable, Sendable {
     /// The lifecycle event name as the harness spells it (`PostToolUse`,
     /// `SessionStart`, `SubagentStart`, …). A raw string rather than an enum:
@@ -5696,12 +5660,10 @@ public struct HookEventRequest: Codable, Hashable, Sendable {
     /// When true the daemon returns `ok` for a BUSINESS failure and reports the
     /// problem in `note` instead of throwing.
     ///
-    /// A WIRE FIELD, NOT A CLIENT CONVENTION. A hook may never exit non-zero —
-    /// a non-zero PostToolUse is a blocked tool call — and `gm_hook call`
-    /// currently does exit non-zero on error. Putting the contract in the
-    /// message means a caller cannot forget it, and the daemon cannot answer the
-    /// wrong way by accident. Transport-level failures still fail: a malformed
-    /// envelope is not a business failure.
+    /// A WIRE FIELD, NOT A CLIENT CONVENTION. A hook may never exit non-zero,
+    /// since a non-zero PostToolUse is a blocked tool call. Putting the contract
+    /// in the message means a caller cannot forget it. Transport-level failures
+    /// still fail: a malformed envelope is not a business failure.
     public let hookSafe: Bool
 
     public init(event: String, payload: GmJsonValue? = nil, identity: GmHarnessIdentity, hookSafe: Bool = true) {

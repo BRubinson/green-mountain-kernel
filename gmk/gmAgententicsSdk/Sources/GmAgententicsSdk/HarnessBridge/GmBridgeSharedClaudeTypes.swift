@@ -52,7 +52,7 @@ public enum GmBridgeClaudeTypeTool: Equatable, Hashable, Sendable {
     /// A bridged MCP tool, carried as the definition rather than its spelling.
     case mcp(GmBridgeMcpTool)
 
-    /// A raw permission rule, e.g. `Bash(gm_hook:*)`. The escape hatch for
+    /// A raw permission rule, e.g. `Bash(git:*)`. The escape hatch for
     /// anything the two typed cases above cannot name.
     case rule(String)
 

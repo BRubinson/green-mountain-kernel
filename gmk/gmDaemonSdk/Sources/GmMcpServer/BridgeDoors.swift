@@ -5,19 +5,14 @@ import GmDaemonSdk
 /// doors, and the tools that exist in order to REFUSE.
 ///
 /// THE BRIDGE IS THE ONLY SOURCE OF THIS VOCABULARY. Every name here is
-/// declared by a `GmAgentTool` in `gmAgententicsSdk`; nothing in this file
-/// coins one. That rule is not stylistic — the plugin's `allowed-tools`
-/// frontmatter is generated from the bridge, so a name the server invents is a
-/// name the plugin will never grant, and a name the bridge declares that the
-/// server does not serve is a grant that resolves to nothing. Both directions
-/// are build failures via `GmPenTools.rosterProblems()`.
-///
-/// WHY REFUSALS ARE PUBLISHED RATHER THAN OMITTED. `notSupported` and
-/// `notImplemented` are the bridge's way of saying "asked and answered: no".
-/// An omitted tool is indistinguishable from a capability nobody thought of,
-/// and an agent that cannot see a refusal invents a workaround — shelling out,
-/// or reaching for a file it should not touch. A published refusal that names
-/// the reason is a smaller context cost than the workaround it prevents.
+/// declared by a `GmAgentTool` in `gmAgententicsSdk`: the plugin's
+/// `allowed-tools` frontmatter is generated from the bridge, so a name the
+/// server invents is never granted and a name the bridge declares but the
+/// server does not serve is a grant resolving to nothing.
+
+/// REFUSALS ARE PUBLISHED RATHER THAN OMITTED. An omitted tool is
+/// indistinguishable from a capability nobody thought of, and an agent that
+/// cannot see a refusal invents a workaround.
 func makeBridgeDoorTools() -> [Tool] {
     [
         // THE SEARCH AND `projects_*` DOORS LIVE IN `RecallDoors.swift`, not
@@ -31,7 +26,8 @@ func makeBridgeDoorTools() -> [Tool] {
         refusal(
             "diagram_not_supported",
             "The diagram family is not served on this surface.",
-            "Diagrams are authored in GMVibes and read through the DIAGRAM verbs; no agent-facing door is offered."),
+            "Diagrams are authored in GMVibes and read through the DIAGRAM verbs; no agent-facing door is offered."
+        ),
         refusal(
             "fs_not_supported",
             "The filesystem family is not served on this surface.",
@@ -58,5 +54,6 @@ private func refusal(_ name: String, _ description: String, _ reason: String) ->
         refuses: true,
         run: { _, _ in
             throw ToolError(message: "\(name) is deliberately not supported. \(reason)")
-        })
+        }
+    )
 }

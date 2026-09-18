@@ -14,28 +14,16 @@ search-first through the pen (`dope_search`, then targeted `dope_get` by
 ## The supported path
 
 The db is the editing surface. The files are a **publication** of it.
-Granular edits are one verb per level, reached through the passthrough:
+The one pen door from db to files is `dope_update_session` (scope_uuid;
+`force` writes even when the repo has diverged).
 
-```bash
-gm_hook call DOPE_NODE_ADD --json \
-  '{"level":"persistence|entity|property|enum|option",
-    "parent_uuid":"P","fields":{...}}'
-
-gm_hook call DOPE_NODE_UPDATE --json \
-  '{"level":"entity","node_uuid":"N","expected_version":V,"fields":{...}}'
-
-gm_hook call DOPE_WRITE_REPO --json '{"scope_uuid":"U"}'      # db -> files
-```
-
-Hand-editing is the exception, not the workflow. When it happens:
-
-```bash
-# parse + validate, never writes — one of scope_uuid or dir_path
-gm_hook call DOPE_READ_REPO  --json '{"scope_uuid":"U"}'
-gm_hook call DOPE_MERGE_PLAN --json '{"scope_uuid":"U"}'      # db vs files, read-only
-gm_hook call DOPE_RESOLVE    --json \
-  '{"scope_uuid":"U","take_ours":true,"dot_path":"<dot.path>"}'
-```
+Granular node edits — add or update one node at one level (persistence,
+entity, property, enum, option) — and hand-edit reconciliation (parse and
+validate the tree, plan a db-vs-files merge, resolve one dot-path either
+way) are kernel verbs with NO pen tool. They are operator acts, reached
+from GMVibes, not from an agent. A missing door is a fact to report to the
+Endotherm; the shell is not a way around it, and the PreToolUse hook denies
+it.
 
 Only a `SESSION_INSTANCE` scope is repo-writable.
 

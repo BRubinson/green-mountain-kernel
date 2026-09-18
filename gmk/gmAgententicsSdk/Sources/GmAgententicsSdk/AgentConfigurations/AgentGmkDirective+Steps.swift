@@ -18,13 +18,7 @@ extension AgentGmkDirective {
     }
 }
 
-// THE ASSEMBLY MOVED, and this note is kept rather than the code because the
-// deletion is the point. `session(personality:)`, `solo(personality:)`,
-// `primary` and `assemble(...)` lived here and composed a body from core +
-// personality + directives + steps. `AgentGmkSessionProfile.compile()` now does
-// that, once per process, for all twelve profiles.
-//
-// Two assemblies is the exact drift this refactor exists to remove: the markdown
-// an agent is spawned with and the instructions a native session runs on have to
-// be the same text, and they can only be guaranteed the same if one function
-// produces both. Do not reintroduce a second one here.
+// Assembly belongs to `AgentGmkSessionProfile.compile()` alone. The markdown an
+// agent is spawned with and the instructions a native session runs on must be the
+// same text, which only holds while one function produces both — so do not add a
+// second assembly here.

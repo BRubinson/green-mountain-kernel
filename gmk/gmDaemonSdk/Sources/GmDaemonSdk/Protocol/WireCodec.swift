@@ -1,18 +1,13 @@
 import Foundation
 
 /// The single source of JSON coders for the wire and every human-facing JSON
-/// printer. snake_case is applied by strategy, not by hand-written CodingKeys —
-/// wire types declare NO CodingKeys except the two intentional renames
-/// (RawEnvelopeHead.typeRaw → "type", ErrorPayload.codeRaw → "code"), and a
-/// type retaining an explicit CodingKeys enum must list every OTHER key as a
-/// bare case: under .convertFromSnakeCase an explicit snake_case raw value
-/// stops matching and an Optional field silently decodes to nil.
-///
-/// All five coder sites route through here: NDJSON.encodeLine, NDJSON.decode,
-/// gm's printJSON, gm's event-stream printer, and (via NDJSON) DaemonClient.
-/// A bare JSONEncoder() anywhere else silently emits camelCase — the golden
-/// contract in Tests/GmDaemonSdkTests/Fixtures/wire_keys.golden is the
-/// tripwire (regenerate + diff with scripts/wire_keys.py).
+/// printer. snake_case is applied by STRATEGY, not by hand-written CodingKeys:
+/// wire types declare none except the two intentional renames, and a type that
+/// keeps an explicit CodingKeys enum must list every other key as a bare case,
+/// because under `.convertFromSnakeCase` an explicit snake_case raw value stops
+/// matching and an Optional field silently decodes to nil. Every coder site
+/// routes through here; a bare `JSONEncoder()` elsewhere silently emits
+/// camelCase.
 public enum WireCodec {
     public static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()

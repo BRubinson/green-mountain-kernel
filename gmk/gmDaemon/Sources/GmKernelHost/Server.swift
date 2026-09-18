@@ -64,16 +64,13 @@ final class Server: @unchecked Sendable {
         params.requiredLocalEndpoint = NWEndpoint.unix(path: Paths.socket.path)
         self.listener = try NWListener(using: params)
         // Post-commit fan-out: EVERY daemon_event kind streams to subscribers.
-        // NOTE ON QUEUES: GRDB fires afterNextTransaction(onCommit:) on the
-        // DATABASE's serialized queue, not this one — mutual exclusion holds
-        // only because the server-queue turn that issued the write is blocked
-        // inside dbQueue.write for the duration. Do NOT add a
-        // dispatchPrecondition(.onQueue(queue)) here; it would trap.
+        // GRDB fires afterNextTransaction(onCommit:) on the DATABASE's queue,
+        // not this one — mutual exclusion holds only because the server-queue
+        // turn that issued the write is blocked inside dbQueue.write. Do NOT add
+        // a dispatchPrecondition(.onQueue(queue)) here; it would trap.
         //
-        // SUBSCRIBE, never assign. This used to be `store.eventSink = { ... }`,
-        // which a second consumer would have overwritten silently — and the app
-        // hosting the writer in-process IS that second consumer. Both rows now
-        // coexist; see StoreCore.subscribe.
+        // SUBSCRIBE, never assign: a settable sink lets a second consumer
+        // displace the first silently, and the in-process app host is one.
         self.eventToken = store.subscribeToEvents { [weak self] event in
             self?.broadcast(event.notification)
             self?.watchedStateMayHaveChanged(event.kind)
@@ -150,7 +147,9 @@ final class Server: @unchecked Sendable {
                     kind: DaemonEventKind.checkoutChange.rawValue,
                     subjectUuid: instanceUuid,
                     payload: Store.jsonPayload(payload),
-                    createdAt: Store.isoNow()))
+                    createdAt: Store.isoNow()
+                )
+            )
         }
     }
 
@@ -179,7 +178,9 @@ final class Server: @unchecked Sendable {
                     kind: DaemonEventKind.promptMemoryChange.rawValue,
                     subjectUuid: promptUuid,
                     payload: "{\"gmfs_relative_storage_path\":\(Self.jsonString(storagePath))}",
-                    createdAt: Store.isoNow()))
+                    createdAt: Store.isoNow()
+                )
+            )
         }
     }
 
@@ -195,7 +196,11 @@ final class Server: @unchecked Sendable {
     /// Push an EVENT line to every subscriber.
     func broadcast(_ notification: EventNotification) {
         let envelope = ResponseEnvelope<EventNotification>(
-            type: .event, requestId: "", ok: true, payload: notification)
+            type: .event,
+            requestId: "",
+            ok: true,
+            payload: notification
+        )
         guard let line = try? NDJSON.encodeLine(envelope) else { return }
         let group = goodbyeGroup
         for key in subscribers {
@@ -213,25 +218,17 @@ final class Server: @unchecked Sendable {
     /// handlers (main queue) and connection callbacks take the same clean
     /// path, and the DAEMON_STOP goodbye event broadcasts to subscribers
     /// before EOF. "Drain" is structural: this runs as one serial-queue turn,
-    /// so every previously received line has already completed.
+    /// so every line received ahead of it has already completed.
     func shutdown() {
         queue.async { self.performShutdown() }
     }
 
     /// The HOSTED shutdown: everything `performShutdown` does except `exit(0)`,
-    /// plus one caller-supplied step in the one place it can be correct.
-    ///
-    /// `beforeClose` runs after the listener is cancelled and after DAEMON_STOP
-    /// has gone out, but BEFORE the database closes. That ordering is the whole
-    /// reason this exists. The app's dirty prompt-edit flush used to go through
-    /// the SOCKET, which cannot work once both ends are one process — and even
-    /// in-process it must not run while the listener is still accepting, or a
-    /// write can arrive after the flush has decided what was dirty.
-    ///
-    /// Runs SYNCHRONOUSLY on the caller's thread rather than hopping to the
-    /// server queue: this is called from a terminating app, and an async hop
-    /// would let the process die before the flush landed. The listener is
-    /// already cancelled by then, so there is no concurrent turn to race.
+    /// plus one caller-supplied step. `beforeClose` runs after the listener is
+    /// cancelled and after DAEMON_STOP has gone out, but BEFORE the database
+    /// closes, or a write can arrive after the flush decided what was dirty.
+    /// It runs SYNCHRONOUSLY on the caller's thread, because a terminating app
+    /// can die across an async hop before the flush lands.
     func shutdownForHost(beforeClose: () -> Void) {
         listener.cancel()
         if let token = eventToken {
@@ -279,23 +276,14 @@ final class Server: @unchecked Sendable {
 
     // MARK: - Dispatch
 
-    /// Route one decoded NDJSON line. Handshake enforcement happens before
-    /// payload decoding and is DIRECTIONAL: a newer client means THIS daemon
-    /// is the stale binary — reply, then self-exit so the client's retry
-    /// autostarts the fresh build. An older client (a pinned-Kit GMVibes) is
-    /// rejected but the daemon stays up — it must never be kill-loopable.
-    /// `client` is OPTIONAL, and nil means an IN-PROCESS caller — the app host
-    /// reaching the same 96 handlers with no socket between them. Only two
-    /// things in this function actually use it: SUBSCRIBE, which registers a
-    /// connection to stream events to, and the re-entrant TX_BATCH / harness
-    /// paths, which thread it so an inner verb resolves the same caller
-    /// identity. Everything else already ignored it.
+    /// Route one decoded NDJSON line. Handshake enforcement precedes payload
+    /// decoding and is DIRECTIONAL: a newer client means THIS daemon is stale,
+    /// so reply and self-exit for the client's retry to autostart fresh bits;
+    /// an older client is rejected and the daemon stays up, never kill-loopable.
     ///
-    /// SUBSCRIBE WITH NO CLIENT IS REFUSED rather than made to work. An
-    /// in-process consumer has a better door — `Store.subscribeToEvents` — and
-    /// faking a connection to reach the socket path would put an in-process
-    /// caller into `connections`, which is server-queue-confined state this
-    /// path never otherwise touches.
+    /// A nil `client` means an IN-PROCESS caller. Only SUBSCRIBE and the
+    /// re-entrant TX_BATCH / harness paths use it, and SUBSCRIBE without one is
+    /// REFUSED: an in-process consumer has `Store.subscribeToEvents`.
     func dispatch(line: Data, from client: ClientConnection?) -> HandlerResult {
         // Version-FIRST: the pre-head keeps `type` raw so a newer client
         // invoking a message name this build doesn't know still reaches the
@@ -306,8 +294,10 @@ final class Server: @unchecked Sendable {
             rawHead = try NDJSON.decode(RawEnvelopeHead.self, from: line)
         } catch {
             return errorResult(
-                type: .error, requestId: "",
-                payload: ErrorPayload(code: .badRequest, message: "undecodable envelope: \(error)"))
+                type: .error,
+                requestId: "",
+                payload: ErrorPayload(code: .badRequest, message: "undecodable envelope: \(error)")
+            )
         }
 
         guard rawHead.protocolVersion == GmWireProtocol.version else {
@@ -317,24 +307,32 @@ final class Server: @unchecked Sendable {
                 ? "daemon speaks v\(GmWireProtocol.version), client spoke newer v\(rawHead.protocolVersion) — daemon exiting for restart"
                 : "daemon speaks v\(GmWireProtocol.version), client spoke older v\(rawHead.protocolVersion) — rejected, daemon stays up"
             let result = errorResult(
-                type: rawHead.type ?? .error, requestId: rawHead.requestId ?? "",
+                type: rawHead.type ?? .error,
+                requestId: rawHead.requestId ?? "",
                 payload: ErrorPayload(
-                    code: .protocolMismatch, message: message,
-                    daemonProtocolVersion: GmWireProtocol.version))
+                    code: .protocolMismatch,
+                    message: message,
+                    daemonProtocolVersion: GmWireProtocol.version
+                )
+            )
             return HandlerResult(line: result.line, postAction: clientNewer ? .shutdown : .none)
         }
 
         guard let resolvedType = rawHead.type else {
             return errorResult(
-                type: .error, requestId: rawHead.requestId ?? "",
+                type: .error,
+                requestId: rawHead.requestId ?? "",
                 payload: ErrorPayload(
                     code: .unknownType,
-                    message: "unknown message type \(rawHead.typeRaw) at matching protocol v\(GmWireProtocol.version)"))
+                    message: "unknown message type \(rawHead.typeRaw) at matching protocol v\(GmWireProtocol.version)"
+                )
+            )
         }
         let head = EnvelopeHead(
             protocolVersion: rawHead.protocolVersion,
             type: resolvedType,
-            requestId: rawHead.requestId ?? "")
+            requestId: rawHead.requestId ?? ""
+        )
 
         do {
             switch head.type {
@@ -345,14 +343,22 @@ final class Server: @unchecked Sendable {
                 }
                 let ack = HelloAck(daemonPid: getpid(), protocolVersion: GmWireProtocol.version)
                 let envelope = ResponseEnvelope<HelloAck>(
-                    type: .hello, requestId: head.requestId, ok: true, payload: ack)
+                    type: .hello,
+                    requestId: head.requestId,
+                    ok: true,
+                    payload: ack
+                )
                 return HandlerResult(line: try NDJSON.encodeLine(envelope))
 
             case .ping:
                 return try PingHandler.handle(head: head, startedAt: startedAt, startedDate: startedDate)
             case .status:
                 return try StatusHandler.handle(
-                    head: head, store: store, startedAt: startedAt, startedDate: startedDate)
+                    head: head,
+                    store: store,
+                    startedAt: startedAt,
+                    startedDate: startedDate
+                )
             case .shutdown:
                 return try ShutdownHandler.handle(head: head)
             case .backup:
@@ -364,11 +370,14 @@ final class Server: @unchecked Sendable {
                 // door it should be using instead.
                 guard let client else {
                     return errorResult(
-                        type: .error, requestId: head.requestId,
+                        type: .error,
+                        requestId: head.requestId,
                         payload: ErrorPayload(
                             code: .badRequest,
                             message: "SUBSCRIBE requires a socket connection — an in-process "
-                                + "caller subscribes through the store directly"))
+                                + "caller subscribes through the store directly"
+                        )
+                    )
                 }
                 return try handleSubscribe(line: line, head: head, client: client)
 
@@ -380,44 +389,57 @@ final class Server: @unchecked Sendable {
                 // its own. `client` is threaded through so an inner verb still
                 // resolves the same caller identity it would have on its own.
                 return try TxBatchHandler.handle(
-                    line: line, head: head, store: store,
+                    line: line,
+                    head: head,
+                    store: store,
                     dispatch: { [weak client] inner in
                         guard let client else {
                             return self.errorResult(
-                                type: .error, requestId: head.requestId,
+                                type: .error,
+                                requestId: head.requestId,
                                 payload: ErrorPayload(
                                     code: .badRequest,
-                                    message: "TX_BATCH lost its client connection mid-batch"))
+                                    message: "TX_BATCH lost its client connection mid-batch"
+                                )
+                            )
                         }
                         return self.dispatch(line: inner, from: client)
-                    })
+                    }
+                )
 
             case .mcpCall, .hookEvent:
-                // The harness envelope (v30). Both re-enter this dispatcher for
-                // the verb they actually carry, exactly as TX_BATCH does — the
-                // caller below is `KernelVerbCaller`, which encodes an envelope
-                // and hands it back here, so all 96 handlers are reached with no
-                // socket hop and no second client to keep in step.
-                //
-                // Threading `client` through matters for the same reason it does
-                // in TX_BATCH: an inner verb must resolve the same caller
-                // identity it would have resolved on its own.
+                // The harness envelope. Both re-enter this dispatcher for the
+                // verb they actually carry, exactly as TX_BATCH does, through a
+                // `KernelVerbCaller`. Threading `client` through matters for the
+                // same reason it does there: an inner verb must resolve the same
+                // caller identity it would have resolved on its own.
                 let caller = KernelVerbCaller(dispatch: { [weak client] inner in
                     guard let client else {
                         return self.errorResult(
-                            type: .error, requestId: head.requestId,
+                            type: .error,
+                            requestId: head.requestId,
                             payload: ErrorPayload(
                                 code: .badRequest,
-                                message: "\(head.type.rawValue) lost its client connection mid-call"))
+                                message: "\(head.type.rawValue) lost its client connection mid-call"
+                            )
+                        )
                     }
                     return self.dispatch(line: inner, from: client)
                 })
                 if head.type == .mcpCall {
                     return try McpCallHandler.handle(
-                        line: line, head: head, store: store, caller: caller)
+                        line: line,
+                        head: head,
+                        store: store,
+                        caller: caller
+                    )
                 }
                 return try HookEventHandler.handle(
-                    line: line, head: head, store: store, caller: caller)
+                    line: line,
+                    head: head,
+                    store: store,
+                    caller: caller
+                )
 
             case .contextEnsure:
                 return try ContextEnsureHandler.handle(line: line, head: head, store: store)
@@ -688,20 +710,28 @@ final class Server: @unchecked Sendable {
 
             case .event, .error:
                 return errorResult(
-                    type: head.type, requestId: head.requestId,
+                    type: head.type,
+                    requestId: head.requestId,
                     payload: ErrorPayload(
-                        code: .unknownType, message: "\(head.type.rawValue) is daemon → client only"))
+                        code: .unknownType,
+                        message: "\(head.type.rawValue) is daemon → client only"
+                    )
+                )
             }
         } catch let error as StoreError {
             return errorResult(type: head.type, requestId: head.requestId, payload: error.errorPayload)
         } catch let error as DecodingError {
             return errorResult(
-                type: head.type, requestId: head.requestId,
-                payload: ErrorPayload(code: .badRequest, message: "undecodable payload: \(error)"))
+                type: head.type,
+                requestId: head.requestId,
+                payload: ErrorPayload(code: .badRequest, message: "undecodable payload: \(error)")
+            )
         } catch {
             return errorResult(
-                type: head.type, requestId: head.requestId,
-                payload: ErrorPayload(code: .dbError, message: "\(error)"))
+                type: head.type,
+                requestId: head.requestId,
+                payload: ErrorPayload(code: .dbError, message: "\(error)")
+            )
         }
     }
 
@@ -725,11 +755,19 @@ final class Server: @unchecked Sendable {
         }
         let ack = SubscribeAck(lastEventId: try store.lastEventId(), replayCount: replayed.count)
         let ackEnvelope = ResponseEnvelope<SubscribeAck>(
-            type: .subscribe, requestId: head.requestId, ok: true, payload: ack)
+            type: .subscribe,
+            requestId: head.requestId,
+            ok: true,
+            payload: ack
+        )
         client.send(try NDJSON.encodeLine(ackEnvelope))
         for event in replayed {
             let envelope = ResponseEnvelope<EventNotification>(
-                type: .event, requestId: "", ok: true, payload: event)
+                type: .event,
+                requestId: "",
+                ok: true,
+                payload: event
+            )
             if let eventLine = try? NDJSON.encodeLine(envelope) {
                 client.send(eventLine)
             }
@@ -747,14 +785,19 @@ final class Server: @unchecked Sendable {
 
     func errorResult(type: MessageType, requestId: String, payload: ErrorPayload) -> HandlerResult {
         let envelope = ResponseEnvelope<EmptyPayload>(
-            type: type, requestId: requestId, ok: false, error: payload)
+            type: type,
+            requestId: requestId,
+            ok: false,
+            error: payload
+        )
         // Encoding a payload-less envelope of concrete types cannot realistically
         // fail; the fallback is still a decodable error line rather than a
         // bare newline the client would report as a contextless wire error.
         let fallback =
             Data(
                 #"{"protocol_version":\#(GmWireProtocol.version),"type":"ERROR","request_id":"","ok":false,"error":{"code":"INTERNAL_ERROR","message":"error-envelope encoding failed"}}"#
-                    .utf8) + Data([0x0A])
+                    .utf8
+            ) + Data([0x0A])
         let line = (try? NDJSON.encodeLine(envelope)) ?? fallback
         return HandlerResult(line: line)
     }
@@ -828,7 +871,8 @@ final class ClientConnection: @unchecked Sendable {
                     content: result.line,
                     completion: .contentProcessed { _ in
                         server.shutdown()
-                    })
+                    }
+                )
             }
         }
     }

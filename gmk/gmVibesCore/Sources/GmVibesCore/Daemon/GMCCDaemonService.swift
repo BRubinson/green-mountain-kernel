@@ -3,37 +3,12 @@ import GmDaemonSdk
 
 /// The single off-main boundary for all daemon verb traffic.
 ///
-/// ## Two transports, one surface
-///
-/// Every wrapper below calls a method on `GmVerbCaller`, and BOTH transports
-/// conform to it: `DaemonClient` over the unix socket, and the kernel's
-/// in-process caller which re-enters the dispatcher directly. `DaemonClient`'s
-/// conformance is literally empty — all ~110 verb methods live in
-/// `extension GmVerbCaller` — so swapping the transport changes nothing here
-/// and nothing in the ~99 UI sources behind it.
-///
-/// When this app hosts the writer, `adopt(inProcess:)` swaps the socket out and
-/// the socket hop disappears. When another kernel owns the store, the socket
-/// client stays and everything works as it always did.
-///
-/// ## THE QUEUE IS LOAD-BEARING ON BOTH TRANSPORTS
-///
-/// It was introduced because `DaemonClient` is blocking POSIX I/O. It matters
-/// at least as much in-process, for a different reason: the verb layer is
-/// SYNCHRONOUS, so a call runs the handler, the store boundary and the SQLite
-/// write on the calling thread's turn. On MainActor that is a UI stall against
-/// a multi-hundred-megabyte FTS database. This trampoline is what guarantees
-/// that never happens.
-///
-/// It is also half the answer to the transaction-boundary question. `Store`'s
-/// ambient handle is thread-local and correct only while no thread hop occurs
-/// INSIDE a boundary; `inTransaction` takes a non-`async` closure, so `await`
-/// within one does not compile. Hopping to get ONTO the verb layer, as here, is
-/// outside any boundary and is exactly what should happen.
-///
-/// The probe client has autostart OFF so health checks report true daemon state
-/// instead of resurrecting a daemon the user killed; `startDaemon()` is the only
-/// autostart path in the app.
+/// Both transports conform to `GmVerbCaller`, so `adopt(inProcess:)` swaps the socket for the
+/// in-process caller without touching a wrapper here or any UI source behind it.
+/// The queue is load-bearing on BOTH: `DaemonClient` is blocking POSIX I/O, and in-process the
+/// verb layer is SYNCHRONOUS, so handler, store boundary and SQLite write would run on the
+/// caller's turn and stall MainActor. The probe client has autostart OFF so health checks
+/// report true daemon state; `startDaemon()` is the app's only autostart path.
 actor GMCCDaemonService {
     static let shared = GMCCDaemonService()
 
@@ -105,16 +80,12 @@ actor GMCCDaemonService {
     func ping() async throws -> PingResponse { try await perform { try $0.ping() } }
     func status() async throws -> StatusResponse { try await perform { try $0.status() } }
 
-    /// The ONLY call site permitted to spawn the daemon: a throwaway
-    /// autostart-enabled client, reached exclusively from the explicit
-    /// "Start daemon" affordance.
+    /// The only call site permitted to spawn the daemon: a throwaway autostart-enabled
+    /// client, reached from the explicit "Start daemon" affordance.
     ///
-    /// IN WRITER MODE THIS SPAWNS NOTHING. The kernel is already up, in this
-    /// very process — spawning `$GM_FS_ROOT/bin/gm_daemon` would produce a
-    /// second process that loses the flock and exits 0, which is harmless but
-    /// pointless, and the affordance would appear to do nothing. Answer with
-    /// the local ping instead, which is the truthful response to "is the kernel
-    /// running?" when the asker IS the kernel.
+    /// In writer mode this spawns nothing. The kernel is already up in this process, so a
+    /// spawned one would lose the flock and exit; the local ping is the truthful answer to
+    /// "is the kernel running?" when the asker IS the kernel.
     func startDaemon() async throws -> PingResponse {
         guard socketClient != nil else {
             return try await ping()
@@ -150,7 +121,11 @@ actor GMCCDaemonService {
 
     // MARK: - Catalog search
 
-    func searchCatalog(query: String, projectUuid: String? = nil, limit: Int? = nil) async throws
+    func searchCatalog(
+        query: String,
+        projectUuid: String? = nil,
+        limit: Int? = nil
+    ) async throws
         -> CatalogSearchResponse
     {
         let uuid = Self.normalized(projectUuid)
@@ -219,7 +194,8 @@ actor GMCCDaemonService {
                     sessionUuid: uuid,
                     withReports: withReports ? true : nil
                 )
-            ).prompts
+            )
+            .prompts
         }
     }
 
@@ -302,16 +278,12 @@ actor GMCCDaemonService {
 
     // MARK: - Bot workflow (m0025, read-only)
 
-    /// BOT_NEXT — the app's read onto the workflow machine. Treated honestly
-    /// as a write (it stamps `last_served_phase` and emits WORKFLOW_CHANGE),
-    /// but it is the ONLY bot verb wrapped here: botStart / botResume /
-    /// botSetBaseline stay unwrapped because the app must not drive the
-    /// machine. No `botGet` wrapper either — BOT_NEXT always.
+    /// BOT_NEXT — the app's read onto the workflow machine, and the only bot verb wrapped
+    /// here: the app must not drive the machine. It stamps `last_served_phase` and emits
+    /// WORKFLOW_CHANGE, so it is treated as a write.
     ///
-    /// NEVER passes `clientKey`. `BotWorkflowRepository.resolve()` treats a
-    /// clientKey as a CLAIM on the workflow, and the app must not steal a live
-    /// terminal session's claim. `promptUuid` is `resolve()`'s FIRST branch, so
-    /// clientKey is never even consulted on this path.
+    /// NEVER passes `clientKey`. `BotWorkflowRepository.resolve()` treats one as a CLAIM on
+    /// the workflow, and the app must not steal a live terminal session's claim.
     func botNext(promptUuid: String) async throws -> BotNextResponse {
         let uuid = Self.normalized(promptUuid)
         return try await perform { try $0.botNext(BotNextRequest(promptUuid: uuid)) }
@@ -437,7 +409,8 @@ actor GMCCDaemonService {
     }
 
     func dopeGet(
-        sessionUuid: String, promptUuid: String? = nil,
+        sessionUuid: String,
+        promptUuid: String? = nil,
         code: String? = nil
     ) async throws -> DopeGetResponse {
         let req = DopeGetRequest(
@@ -466,7 +439,9 @@ actor GMCCDaemonService {
     /// ONLY door to the tree behind a project-tier diagram.
     func dopeGet(projectUuid: String, code: String? = nil) async throws -> DopeGetResponse {
         let req = DopeGetRequest(
-            projectUuid: Self.normalized(projectUuid), code: code)
+            projectUuid: Self.normalized(projectUuid),
+            code: code
+        )
         return try await perform { try $0.dopeGet(req) }
     }
 
@@ -515,13 +490,17 @@ actor GMCCDaemonService {
     /// = the project's diagrams across tiers by recency; non-empty = FTS.
     /// Deliberately separate from diagramList's one-owner contract.
     func diagramSearch(
-        projectUuid: String, sessionUuid: String? = nil,
-        query: String? = nil, limit: Int? = nil
+        projectUuid: String,
+        sessionUuid: String? = nil,
+        query: String? = nil,
+        limit: Int? = nil
     ) async throws -> [DiagramRow] {
         let req = DiagramSearchRequest(
             projectUuid: Self.normalized(projectUuid),
             sessionUuid: Self.normalized(sessionUuid),
-            query: query, limit: limit)
+            query: query,
+            limit: limit
+        )
         return try await perform { try $0.diagramSearch(req).diagrams }
     }
 
@@ -535,7 +514,10 @@ actor GMCCDaemonService {
         return try await perform {
             try $0.diagramDelete(
                 DiagramDeleteRequest(
-                    diagramUuid: uuid, expectedRevision: expectedRevision))
+                    diagramUuid: uuid,
+                    expectedRevision: expectedRevision
+                )
+            )
         }
     }
 
@@ -544,13 +526,15 @@ actor GMCCDaemonService {
     /// granular DIAGRAM_NODE_* verbs are deliberately not wrapped, since a
     /// one-mutation batch is the same call.
     func diagramBatchApply(
-        diagramUuid: String, expectedRevision: Int64?,
+        diagramUuid: String,
+        expectedRevision: Int64?,
         mutations: [DiagramMutation]
     ) async throws -> DiagramBatchApplyResponse {
         let req = DiagramBatchApplyRequest(
             diagramUuid: Self.normalized(diagramUuid),
             expectedRevision: expectedRevision,
-            mutations: mutations)
+            mutations: mutations
+        )
         return try await perform { try $0.diagramBatchApply(req) }
     }
 

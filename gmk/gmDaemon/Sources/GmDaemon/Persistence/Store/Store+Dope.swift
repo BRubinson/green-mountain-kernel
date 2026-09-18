@@ -46,7 +46,10 @@ extension Store {
 
     @discardableResult
     func bumpScopeRevision(
-        _ db: Database, scopeUuid: String, area: DopeArea? = nil, ownerUuid: String? = nil
+        _ db: Database,
+        scopeUuid: String,
+        area: DopeArea? = nil,
+        ownerUuid: String? = nil
     ) throws -> Int64 {
         try DopeRepository(db: db, core: core)
             .bumpScopeRevision(scopeUuid: scopeUuid, area: area, ownerUuid: ownerUuid)
@@ -62,32 +65,57 @@ extension Store {
     }
 
     func recordDopeChange(
-        _ db: Database, scope: DopeScopeRow, action: String, level: DopeLevel?,
-        nodeUuid: String?, revision: Int64
+        _ db: Database,
+        scope: DopeScopeRow,
+        action: String,
+        level: DopeLevel?,
+        nodeUuid: String?,
+        revision: Int64
     ) throws {
-        try DopeRepository(db: db, core: core).recordDopeChange(
-            scope: scope, action: action, level: level, nodeUuid: nodeUuid, revision: revision)
+        try DopeRepository(db: db, core: core)
+            .recordDopeChange(
+                scope: scope,
+                action: action,
+                level: level,
+                nodeUuid: nodeUuid,
+                revision: revision
+            )
     }
 
     func dopeScopeCandidates(
-        _ db: Database, sessionUuid: String, scopeType: DopeScopeType,
-        promptUuid: String? = nil, code: String? = nil
+        _ db: Database,
+        sessionUuid: String,
+        scopeType: DopeScopeType,
+        promptUuid: String? = nil,
+        code: String? = nil
     ) throws -> [DopeScopeRow] {
-        try DopeRepository(db: db, core: core).dopeScopeCandidates(
-            sessionUuid: sessionUuid, scopeType: scopeType,
-            promptUuid: promptUuid, code: code)
+        try DopeRepository(db: db, core: core)
+            .dopeScopeCandidates(
+                sessionUuid: sessionUuid,
+                scopeType: scopeType,
+                promptUuid: promptUuid,
+                code: code
+            )
     }
 
     func dopeProjectScopeCandidates(
-        _ db: Database, projectUuid: String, scopeType: DopeScopeType,
+        _ db: Database,
+        projectUuid: String,
+        scopeType: DopeScopeType,
         code: String? = nil
     ) throws -> [DopeScopeRow] {
-        try DopeRepository(db: db, core: core).dopeProjectScopeCandidates(
-            projectUuid: projectUuid, scopeType: scopeType, code: code)
+        try DopeRepository(db: db, core: core)
+            .dopeProjectScopeCandidates(
+                projectUuid: projectUuid,
+                scopeType: scopeType,
+                code: code
+            )
     }
 
     func owningPersistenceUuid(
-        _ db: Database, level: DopeLevel, nodeUuid: String
+        _ db: Database,
+        level: DopeLevel,
+        nodeUuid: String
     ) throws -> String? {
         try DopeRepository(db: db, core: core)
             .owningPersistenceUuid(level: level, nodeUuid: nodeUuid)
@@ -98,7 +126,9 @@ extension Store {
     }
 
     func fetchDopeTree(
-        _ db: Database, scope: DopeScopeRow, forProjection: Bool = false
+        _ db: Database,
+        scope: DopeScopeRow,
+        forProjection: Bool = false
     ) throws -> DopeScopeTree {
         try DopeRepository(db: db, core: core)
             .fetchDopeTree(scope: scope, forProjection: forProjection)
@@ -106,7 +136,9 @@ extension Store {
 
     @discardableResult
     func copyDopeTree(
-        _ db: Database, from source: DopeScopeRow, into targetScopeUuid: String
+        _ db: Database,
+        from source: DopeScopeRow,
+        into targetScopeUuid: String
     ) throws -> DopeTreeCounts {
         try DopeRepository(db: db, core: core)
             .copyDopeTree(from: source, into: targetScopeUuid)
@@ -114,7 +146,9 @@ extension Store {
 
     @discardableResult
     func insertDopeTree(
-        _ db: Database, scopeUuid: String, domainFiles: [DopePersistenceFileDocument]
+        _ db: Database,
+        scopeUuid: String,
+        domainFiles: [DopePersistenceFileDocument]
     ) throws -> DopeTreeCounts {
         try DopeRepository(db: db, core: core)
             .insertDopeTree(scopeUuid: scopeUuid, domainFiles: domainFiles)
@@ -125,7 +159,9 @@ extension Store {
     }
 
     func insertDopeCogs(
-        _ db: Database, scopeUuid: String, cogFiles: [DopeCogDocument]
+        _ db: Database,
+        scopeUuid: String,
+        cogFiles: [DopeCogDocument]
     ) throws {
         try DopeRepository(db: db, core: core)
             .insertDopeCogs(scopeUuid: scopeUuid, cogFiles: cogFiles)

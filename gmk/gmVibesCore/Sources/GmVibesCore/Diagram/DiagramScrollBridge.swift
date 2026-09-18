@@ -1,26 +1,14 @@
 import SwiftUI
 import AppKit
 
-/// Why AppKit: SwiftUI has no scroll-wheel gesture on any platform — the
-/// gesture catalog is taps, long-presses, drags, magnify, rotate and spatial
-/// events — and trackpad two-finger pan is table stakes for an infinite canvas. (SALVAGE-COPY of CanvasScrollBridge — survives the Drawing tear-out.)
-/// This is the second deliberate AppKit exception (MarkdownSourceEditor is the
-/// first).
+/// AppKit because SwiftUI has no scroll-wheel gesture, and two-finger pan is table stakes.
 ///
-/// Mechanism: a LOCAL NSEvent monitor, not a `scrollWheel(with:)` override.
-/// The override was tried first and never fired — SwiftUI's hosting view
-/// claims scroll routing before a background representable's NSView sees the
-/// event. The monitor observes events pre-dispatch, so hosting-view routing
-/// cannot starve it. The monitor's app-global reach is scoped back down by the
-/// two checks a view-based design would have gotten free:
-///   * `event.window === view.window` — a second session window's canvas
-///     never sees this window's scrolls;
-///   * the event location converted into the view's own bounds — scrolls over
-///     the sidebar List or the prompt editor pass through untouched
-///     (returning the event unconsumed preserves normal dispatch).
-/// Lifetime is owned by the NSView: installed on window attach, removed on
-/// window detach AND deinit, so momentum deltas can't fire into a dead closure
-/// after the pane is torn down.
+/// A LOCAL NSEvent monitor, not a `scrollWheel(with:)` override: SwiftUI's hosting view claims
+/// scroll routing before a background representable's NSView sees the event. The monitor's
+/// app-global reach is scoped by two checks — the event's window must be this view's window,
+/// and its location must fall inside this view's bounds, with an unconsumed event preserving
+/// normal dispatch. The NSView removes the monitor on window detach AND deinit, so momentum
+/// deltas cannot fire into a dead closure.
 struct DiagramScrollBridge: NSViewRepresentable {
     /// Reference-typed sink: closures are swapped in place, so `updateNSView`
     /// never rebuilds the view and can never feed an observation loop.
@@ -32,8 +20,8 @@ struct DiagramScrollBridge: NSViewRepresentable {
     }
     let sink: Sink
 
-    func makeNSView(context: Context) -> ScrollCatcher { ScrollCatcher(sink: sink) }
-    func updateNSView(_ nsView: ScrollCatcher, context: Context) { nsView.sink = sink }
+    func makeNSView(context _: Context) -> ScrollCatcher { ScrollCatcher(sink: sink) }
+    func updateNSView(_ nsView: ScrollCatcher, context _: Context) { nsView.sink = sink }
 
     final class ScrollCatcher: NSView {
         var sink: Sink
@@ -45,7 +33,7 @@ struct DiagramScrollBridge: NSViewRepresentable {
         }
 
         @available(*, unavailable)
-        required init?(coder: NSCoder) { fatalError("unused") }
+        required init?(coder _: NSCoder) { fatalError("unused") }
 
         /// v0 ships no keyboard handling — a focusable view here would join the
         /// key-view loop and steal arrow keys from the sidebar List. Flipping

@@ -2,53 +2,14 @@ import Foundation
 import GRDB
 import GmDaemonSdk
 
-/// TEST_* data access — the agent-scoped test mutex (m0029). Runs INSIDE a
-/// Store-owned transaction.
-///
-/// ## What this actually protects, and what it does not
-///
-/// This is a mutex for AGENTS, and it sits ABOVE the kernel's own single-writer
-/// `flock` rather than replacing or duplicating it. The two protect different
-/// things and conflating them is the mistake worth naming up front:
-///
-///   - `KernelOwnership`'s flock on `$ROOT/daemon.pid` stops two KERNELS
-///     writing one database. It is per-root and it is absolute.
-///   - This lock stops two AGENTS building and testing one REPOSITORY.
-///
-/// Once a test run owns its own ephemeral root there is no database contention
-/// left here to protect — every run has its own db, its own socket and its own
-/// pidfile, and each is legitimately its own single writer. What stays
-/// contended is the BUILD and the CHECKOUT: two agents running `swift build`
-/// over one working tree fight over `.build/`, over the index, and over the
-/// tree's cleanliness. That is the thing this serialises.
-///
-/// ## Liveness is DERIVED, never asserted
-///
-/// A lock whose only liveness signal is a TTL deadlocks the first time a holder
-/// is SIGKILLed — and it deadlocks for however long the TTL says, which is
-/// exactly when someone is already frustrated. Worse, a TTL fails toward
-/// HOLDING: if the clock is skewed or the lease is long, the safe-looking
-/// reading is "still held", and for a mutex that is the worst direction.
-///
-/// So the primary liveness test is a `flock(LOCK_NB)` probe on the holder's own
-/// `run.lock` file. If we can take that lock, the holder's process is gone —
-/// not "probably gone", gone, because the kernel released it at exit. That is
-/// the same shape as `KernelOwnership`: authority DERIVED from a won lock
-/// rather than asserted by a field somebody has to keep true.
-///
-/// `expires_at` survives only for `holder_kind == .lease`, the degraded path
-/// for a holder that cannot keep a descriptor open. It must never be promoted
-/// to the primary check.
-///
-/// ## Reaping is LAZY, never a timer
-///
-/// A stale lock is reclaimed inside the next `acquire`, in that call's own
-/// transaction. There is deliberately no background sweep, and the reason is
-/// structural rather than aesthetic: the ambient `StoreBoundary` handle is
-/// thread-local and correct only while the verb layer performs no thread hops
-/// inside a boundary — an invariant pinned at zero occurrences of
-/// `DispatchQueue` / `Task {` / `async` / `await` under this directory. A
-/// reaper timer would be the first violation.
+/// TEST_* data access — the agent-scoped test mutex, run INSIDE a Store-owned
+/// transaction. It is a mutex for AGENTS above the kernel's own single-writer
+/// `flock`, and what it serialises is the BUILD and the CHECKOUT.
+/// Liveness is DERIVED, never asserted: the primary test is `flock(LOCK_NB)` on
+/// the holder's own `run.lock`, so a SIGKILLed holder is provably gone.
+/// `expires_at` serves `holder_kind == .lease` only and must never become the
+/// primary check, since a TTL fails toward HOLDING. Reaping is LAZY, inside the
+/// next `acquire`: a reaper timer would hop threads inside a StoreBoundary.
 struct TestRunRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
@@ -56,18 +17,13 @@ struct TestRunRepository: RepositoryContext {
     // MARK: - Verbs
 
     /// The runnable suites, read from a file in the CHECKOUT rather than from a
-    /// table.
-    ///
-    /// That asymmetry is the whole point: the ask was that repo tests be
-    /// configured in the repo. A manifest stored in the db would be a second
-    /// copy of something the checkout already states, and the two would
-    /// disagree the moment the repo is cloned into another environment — which
-    /// is precisely what the beta and test channels do on every refresh. A file
+    /// table. A manifest in the db would be a second copy of what the checkout
+    /// already states, and the two would disagree the moment the repo is cloned
+    /// into another environment, which every beta and test refresh does. A file
     /// travels with the clone; a row does not.
-    ///
-    /// An absent manifest is NOT an error. A project that declares no suites is
-    /// a normal project, and `manifestPath` comes back so a caller staring at
-    /// an empty list can tell "none declared" from "looked in the wrong tree".
+    /// An absent manifest is NOT an error, and `manifestPath` comes back so a
+    /// caller staring at an empty list can tell "none declared" from "looked in
+    /// the wrong tree".
     func suiteList(_ req: TestSuiteListRequest) throws -> TestSuiteListResponse {
         guard
             let instance = try InstanceRecord.fetchOne(
@@ -75,7 +31,9 @@ struct TestRunRepository: RepositoryContext {
                 sql: """
                     SELECT * FROM instance WHERE project_uuid = ?
                      ORDER BY created_at ASC LIMIT 1
-                    """, arguments: [req.projectUuid])
+                    """,
+                arguments: [req.projectUuid]
+            )
         else {
             throw StoreError.notFound(entity: "instance", key: "project \(req.projectUuid)")
         }
@@ -96,26 +54,21 @@ struct TestRunRepository: RepositoryContext {
 
     /// Report the lock. WRITES NOTHING — not the claim cell, not a reclaim.
     ///
-    /// Two ways this could have mutated, both rejected:
-    ///
-    /// 1. It does NOT fetch-or-OPEN the cell. A project nobody has ever locked
-    ///    has no row, and the honest answer is `open` — synthesised, not
-    ///    persisted. Creating a row on read would mean a read-only verb needed a
-    ///    write transaction, which is how `TEST_LOCK_STATUS` first failed: the
-    ///    INSERT hit the read-only boundary and the whole call errored.
-    /// 2. It REPORTS a dead holder as `open` but does not reclaim it. A read
-    ///    that silently broke somebody else's lock would make inspection
-    ///    destructive — the same rule that stopped `BOT_NEXT` advancing a
-    ///    prompt.
-    ///
-    /// Reclaiming is `acquire`'s job, because that is the caller who has
-    /// actually decided to take the lock.
+    /// It does NOT fetch-or-OPEN the cell: a project nobody has locked has no
+    /// row, and `open` is synthesised rather than persisted, because creating a
+    /// row on read would need a write transaction inside a read-only verb.
+    /// It REPORTS a dead holder as `open` without reclaiming it, since a read
+    /// that silently broke somebody else's lock would make inspection
+    /// destructive. Reclaiming is `acquire`'s job.
     func lockStatus(_ req: TestLockStatusRequest) throws -> TestLockResponse {
         try requireProject(req.projectUuid)
         guard let cell = try cell(projectUuid: req.projectUuid) else {
             // Never locked. Nothing to write, nothing to report but `open`.
             return TestLockResponse(
-                projectUuid: req.projectUuid, state: .open, version: 0)
+                projectUuid: req.projectUuid,
+                state: .open,
+                version: 0
+            )
         }
         let stale = try isHolderGone(cell)
         if cell.state == TestLockState.held.rawValue, stale {
@@ -133,7 +86,8 @@ struct TestRunRepository: RepositoryContext {
                 throw StoreError.badRequest(
                     detail: "test lock for project \(req.projectUuid) is held by run "
                         + "\(cell.heldByRunUuid ?? "?") (pid \(cell.holderPid.map(String.init) ?? "?")). "
-                        + "TEST_LOCK_STATUS reports how to tell when it is done.")
+                        + "TEST_LOCK_STATUS reports how to tell when it is done."
+                )
             }
             // LAZY RECLAIM. The holder's process is gone — proven, not guessed,
             // because we took its flock. Mark its run abandoned rather than
@@ -147,7 +101,9 @@ struct TestRunRepository: RepositoryContext {
 
         let now = StoreCore.isoNow()
         let runUuid = try core.insertBase(
-            db, table: "test_run", now: now,
+            db,
+            table: "test_run",
+            now: now,
             extra: [
                 "project_uuid": req.projectUuid,
                 "instance_uuid": req.targetInstanceUuid,
@@ -161,7 +117,8 @@ struct TestRunRepository: RepositoryContext {
                 "done_kind": req.doneKind.rawValue,
                 "done_condition": req.doneCondition,
                 "done_hint": req.doneHint,
-            ])
+            ]
+        )
 
         // holder_kind is derived from what the caller actually supplied rather
         // than from what it claimed: a lockPath means a real flock is available,
@@ -173,7 +130,9 @@ struct TestRunRepository: RepositoryContext {
             : nil
 
         try core.updateBase(
-            db, table: "project_test_lock", uuid: cell.uuid,
+            db,
+            table: "project_test_lock",
+            uuid: cell.uuid,
             expectedVersion: cell.version,
             set: [
                 "state": TestLockState.held.rawValue,
@@ -184,16 +143,20 @@ struct TestRunRepository: RepositoryContext {
                 "holder_pid": req.holderPid.map { Int($0) },
                 "claimed_at": now,
                 "expires_at": expiresAt,
-            ])
+            ]
+        )
 
         try core.appendEvent(
-            db, kind: .testLockChange, subjectUuid: cell.uuid,
+            db,
+            kind: .testLockChange,
+            subjectUuid: cell.uuid,
             payload: Store.jsonPayload([
                 "action": reclaimed ? "reclaim" : "acquire",
                 "project_uuid": req.projectUuid,
                 "run_uuid": runUuid,
                 "suite_id": req.suiteId,
-            ]))
+            ])
+        )
 
         let fresh = try requireCell(uuid: cell.uuid)
         return response(cell: fresh, run: try run(uuid: runUuid), reclaimed: reclaimed)
@@ -210,15 +173,21 @@ struct TestRunRepository: RepositoryContext {
             throw StoreError.badRequest(
                 detail: "run \(req.runUuid) does not hold the test lock for project "
                     + "\(req.projectUuid) (held by \(cell.heldByRunUuid ?? "nobody")). "
-                    + "Pass force to break it deliberately.")
+                    + "Pass force to break it deliberately."
+            )
         }
 
         try finish(
-            runUuid: req.runUuid, state: req.finalState,
-            exitCode: req.exitCode, summary: req.summary)
+            runUuid: req.runUuid,
+            state: req.finalState,
+            exitCode: req.exitCode,
+            summary: req.summary
+        )
 
         try core.updateBase(
-            db, table: "project_test_lock", uuid: cell.uuid,
+            db,
+            table: "project_test_lock",
+            uuid: cell.uuid,
             expectedVersion: cell.version,
             set: [
                 "state": TestLockState.open.rawValue,
@@ -228,16 +197,20 @@ struct TestRunRepository: RepositoryContext {
                 "holder_pid": nil,
                 "claimed_at": nil,
                 "expires_at": nil,
-            ])
+            ]
+        )
 
         try core.appendEvent(
-            db, kind: .testLockChange, subjectUuid: cell.uuid,
+            db,
+            kind: .testLockChange,
+            subjectUuid: cell.uuid,
             payload: Store.jsonPayload([
                 "action": req.force ? "force_release" : "release",
                 "project_uuid": req.projectUuid,
                 "run_uuid": req.runUuid,
                 "final_state": req.finalState.rawValue,
-            ]))
+            ])
+        )
 
         let fresh = try requireCell(uuid: cell.uuid)
         return response(cell: fresh, run: try run(uuid: req.runUuid))
@@ -245,12 +218,15 @@ struct TestRunRepository: RepositoryContext {
 
     func runStart(_ req: TestRunStartRequest) throws -> TestRunResponse {
         try core.updateBase(
-            db, table: "test_run", uuid: req.runUuid,
+            db,
+            table: "test_run",
+            uuid: req.runUuid,
             expectedVersion: req.expectedVersion,
             set: [
                 "state": TestRunState.running.rawValue,
                 "started_at": StoreCore.isoNow(),
-            ])
+            ]
+        )
         guard let row = try run(uuid: req.runUuid) else {
             throw StoreError.notFound(entity: "test_run", key: req.runUuid)
         }
@@ -272,26 +248,23 @@ struct TestRunRepository: RepositoryContext {
             sql: """
                 SELECT * FROM test_run WHERE project_uuid = ?
                  ORDER BY created_at DESC LIMIT ?
-                """, arguments: [project, min(max(req.limit ?? 20, 1), 200)])
+                """,
+            arguments: [project, min(max(req.limit ?? 20, 1), 200)]
+        )
         return TestRunResponse(runs: rows.map(summary(from:)))
     }
 
     // MARK: - Liveness
 
     /// THE DEADLOCK ANSWER. Returns true when the current holder is provably
-    /// gone.
-    ///
-    /// For `.process` holders this takes the holder's own `run.lock` with
-    /// `LOCK_NB`. Success means the kernel already released it, which happens
-    /// exactly when the holding process died — including `kill -9`, which no
-    /// cooperative scheme can catch. We immediately unlock and close, so the
-    /// probe leaves no trace and does not itself become a holder.
-    ///
-    /// A MISSING lock file counts as gone: the run root is wiped on teardown,
-    /// so an absent file means the run cleaned up (or was cleaned up) and there
-    /// is nothing left to wait for. Failing the other way would strand the lock
-    /// forever on exactly the tidy path.
-    private func isHolderGone(_ cell: ProjectTestLockRecord) throws -> Bool {
+    /// gone. For `.process` holders this takes the holder's own `run.lock` with
+    /// `LOCK_NB`: success means the kernel already released it, which happens
+    /// exactly when the holding process died, `kill -9` included. The probe
+    /// unlocks and closes immediately so it never becomes a holder itself.
+    /// A MISSING lock file counts as gone, because the run root is wiped on
+    /// teardown; failing the other way would strand the lock forever on exactly
+    /// the tidy path.
+    private func isHolderGone(_ cell: ProjectTestLockRecord) -> Bool {
         guard cell.state == TestLockState.held.rawValue else { return true }
         guard cell.holderKind == TestHolderKind.process.rawValue,
             let path = cell.lockPath
@@ -326,7 +299,9 @@ struct TestRunRepository: RepositoryContext {
     private func requireProject(_ projectUuid: String) throws {
         guard
             try Row.fetchOne(
-                db, sql: "SELECT 1 FROM project WHERE uuid = ?", arguments: [projectUuid]
+                db,
+                sql: "SELECT 1 FROM project WHERE uuid = ?",
+                arguments: [projectUuid]
             ) != nil
         else {
             throw StoreError.notFound(entity: "project", key: projectUuid)
@@ -339,25 +314,31 @@ struct TestRunRepository: RepositoryContext {
         try requireProject(projectUuid)
         if let existing = try cell(projectUuid: projectUuid) { return existing }
         let uuid = try core.insertBase(
-            db, table: "project_test_lock",
+            db,
+            table: "project_test_lock",
             extra: [
                 "project_uuid": projectUuid,
                 "state": TestLockState.open.rawValue,
                 "holder_kind": TestHolderKind.process.rawValue,
-            ])
+            ]
+        )
         return try requireCell(uuid: uuid)
     }
 
     private func cell(projectUuid: String) throws -> ProjectTestLockRecord? {
         try ProjectTestLockRecord.fetchOne(
-            db, sql: "SELECT * FROM project_test_lock WHERE project_uuid = ?",
-            arguments: [projectUuid])
+            db,
+            sql: "SELECT * FROM project_test_lock WHERE project_uuid = ?",
+            arguments: [projectUuid]
+        )
     }
 
     private func requireCell(uuid: String) throws -> ProjectTestLockRecord {
         guard
             let row = try ProjectTestLockRecord.fetchOne(
-                db, sql: "SELECT * FROM project_test_lock WHERE uuid = ?", arguments: [uuid]
+                db,
+                sql: "SELECT * FROM project_test_lock WHERE uuid = ?",
+                arguments: [uuid]
             )
         else {
             throw StoreError.notFound(entity: "project_test_lock", key: uuid)
@@ -369,7 +350,9 @@ struct TestRunRepository: RepositoryContext {
         guard let uuid else { return nil }
         guard
             let row = try Row.fetchOne(
-                db, sql: "SELECT * FROM test_run WHERE uuid = ?", arguments: [uuid]
+                db,
+                sql: "SELECT * FROM test_run WHERE uuid = ?",
+                arguments: [uuid]
             )
         else { return nil }
         return summary(from: row)
@@ -377,8 +360,11 @@ struct TestRunRepository: RepositoryContext {
 
     private func abandon(runUuid: String) throws {
         try finish(
-            runUuid: runUuid, state: .abandoned, exitCode: nil,
-            summary: "holder process exited without releasing the lock")
+            runUuid: runUuid,
+            state: .abandoned,
+            exitCode: nil,
+            summary: "holder process exited without releasing the lock"
+        )
     }
 
     /// Stamp a terminal state. Reads the current version rather than taking one
@@ -386,24 +372,32 @@ struct TestRunRepository: RepositoryContext {
     /// demanding a second version the caller has no reason to be holding would
     /// turn a legitimate release into a VERSION_CONFLICT it cannot fix.
     private func finish(
-        runUuid: String, state: TestRunState, exitCode: Int32?, summary: String?
+        runUuid: String,
+        state: TestRunState,
+        exitCode: Int32?,
+        summary: String?
     ) throws {
         guard
             let current = try Int64.fetchOne(
-                db, sql: "SELECT version FROM test_run WHERE uuid = ?", arguments: [runUuid]
+                db,
+                sql: "SELECT version FROM test_run WHERE uuid = ?",
+                arguments: [runUuid]
             )
         else {
             throw StoreError.notFound(entity: "test_run", key: runUuid)
         }
         try core.updateBase(
-            db, table: "test_run", uuid: runUuid,
+            db,
+            table: "test_run",
+            uuid: runUuid,
             expectedVersion: current,
             set: [
                 "state": state.rawValue,
                 "finished_at": StoreCore.isoNow(),
                 "exit_code": exitCode.map { Int($0) },
                 "summary": summary,
-            ])
+            ]
+        )
     }
 
     // MARK: - Mapping
@@ -430,7 +424,8 @@ struct TestRunRepository: RepositoryContext {
             expiresAt: cell.expiresAt,
             version: cell.version,
             run: run,
-            reclaimed: reclaimed)
+            reclaimed: reclaimed
+        )
     }
 
     private func summary(from row: Row) -> TestRunSummary {
@@ -457,7 +452,8 @@ struct TestRunRepository: RepositoryContext {
             summary: row["summary"],
             createdAt: row["created_at"],
             updatedAt: row["updated_at"],
-            version: row["version"])
+            version: row["version"]
+        )
     }
 }
 

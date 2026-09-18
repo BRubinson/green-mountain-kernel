@@ -95,9 +95,15 @@ extension ArchitectureSummaryRecord {
     /// db → wire. Replicates the retired hand mapper exactly.
     func wireRow() -> ArchitectureSummaryRow {
         ArchitectureSummaryRow(
-            uuid: uuid, version: version, promptUuid: promptUuid,
-            body: body, status: status, decisionRationale: decisionRationale,
-            createdAt: createdAt, updatedAt: updatedAt)
+            uuid: uuid,
+            version: version,
+            promptUuid: promptUuid,
+            body: body,
+            status: status,
+            decisionRationale: decisionRationale,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -109,11 +115,20 @@ extension ArchitecturePersistenceFieldChangeRecord {
     /// the decoder instead of once per field here.
     func wireRow() -> ArchPersistenceFieldChangeRow {
         ArchPersistenceFieldChangeRow(
-            uuid: uuid, seq: seq, fieldName: fieldName,
-            changeReason: changeReason, changePurpose: changePurpose,
-            dataType: dataType, nullable: nullable, isForeignKey: isForeignKey,
-            fkTarget: fkTarget, isIndexed: isIndexed, changeKind: changeKind,
-            renamedFrom: renamedFrom, dopePropertyRef: dopePropertyRef)
+            uuid: uuid,
+            seq: seq,
+            fieldName: fieldName,
+            changeReason: changeReason,
+            changePurpose: changePurpose,
+            dataType: dataType,
+            nullable: nullable,
+            isForeignKey: isForeignKey,
+            fkTarget: fkTarget,
+            isIndexed: isIndexed,
+            changeKind: changeKind,
+            renamedFrom: renamedFrom,
+            dopePropertyRef: dopePropertyRef
+        )
     }
 }
 
@@ -129,9 +144,16 @@ extension ArchitecturePersistenceChangeRecord {
         implementation: ChangeImplementationState
     ) -> ArchPersistenceChangeRow {
         ArchPersistenceChangeRow(
-            uuid: uuid, seq: seq, className: className, filePath: filePath,
-            reasonBrief: reasonBrief, changeKind: changeKind, dopeRef: dopeRef,
-            fields: fields, implementation: implementation)
+            uuid: uuid,
+            seq: seq,
+            className: className,
+            filePath: filePath,
+            reasonBrief: reasonBrief,
+            changeKind: changeKind,
+            dopeRef: dopeRef,
+            fields: fields,
+            implementation: implementation
+        )
     }
 }
 
@@ -140,9 +162,15 @@ extension ArchitectureGeneralChangeRecord {
     /// for why `implementation` is a labelled, un-defaulted parameter.
     func wireRow(implementation: ChangeImplementationState) -> ArchGeneralChangeRow {
         ArchGeneralChangeRow(
-            uuid: uuid, seq: seq, filePath: filePath, className: className,
-            reasonBrief: reasonBrief, changeDepth: changeDepth,
-            changeCode: changeCode, implementation: implementation)
+            uuid: uuid,
+            seq: seq,
+            filePath: filePath,
+            className: className,
+            reasonBrief: reasonBrief,
+            changeDepth: changeDepth,
+            changeCode: changeCode,
+            implementation: implementation
+        )
     }
 }
 
@@ -150,9 +178,15 @@ extension ArchitectureOptionRecord {
     /// db → wire.
     func wireRow() -> ArchitectureOptionRow {
         ArchitectureOptionRow(
-            uuid: uuid, version: version,
+            uuid: uuid,
+            version: version,
             architectureSummaryUuid: architectureSummaryUuid,
-            agentName: agentName, agentId: agentId, body: body, status: status,
-            createdAt: createdAt, updatedAt: updatedAt)
+            agentName: agentName,
+            agentId: agentId,
+            body: body,
+            status: status,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }

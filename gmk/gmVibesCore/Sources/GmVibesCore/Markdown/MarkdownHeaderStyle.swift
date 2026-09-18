@@ -63,13 +63,13 @@ enum MarkdownHeaderStyle {
     }
 
     /// Approximate rendered line height for a line at the given (optional) level.
-    /// Used to size gutter rows to match the editor's per-line heights.
+    /// Sizes gutter rows to match the editor's per-line heights.
     static func lineHeight(forLevel level: Int?) -> CGFloat {
         size(forLevel: level) * lineHeightFactor
     }
 
     /// Approximate monospaced advance width per character at the given level.
-    /// Used to estimate the no-wrap content width for horizontal scrolling.
+    /// Estimates the no-wrap content width for horizontal scrolling.
     static func charWidth(forLevel level: Int?) -> CGFloat {
         size(forLevel: level) * 0.62
     }
@@ -103,6 +103,7 @@ enum MarkdownHeaderStyle {
     static func nsFont(forLevel level: Int?) -> NSFont {
         NSFont.monospacedSystemFont(
             ofSize: size(forLevel: level),
-            weight: level != nil ? .bold : .regular)
+            weight: level != nil ? .bold : .regular
+        )
     }
 }

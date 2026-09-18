@@ -32,8 +32,10 @@ struct ProjectScreen: View {
             HStack(spacing: 0) {
                 content
                     .searchable(
-                        text: $query, placement: .toolbar,
-                        prompt: "Search instances & sessions")
+                        text: $query,
+                        placement: .toolbar,
+                        prompt: "Search instances & sessions"
+                    )
                 Divider()
                 ProjectDiagramRail(projectUuid: projectUuid) { diagramID in
                     nav.go(.diagram(diagramID))
@@ -69,7 +71,8 @@ struct ProjectScreen: View {
                 description: Text(
                     query.isEmpty
                         ? "This project has no instances in the GMCC database."
-                        : "Nothing matches “\(query)”.")
+                        : "Nothing matches “\(query)”."
+                )
             )
         } else {
             ScrollView {
@@ -114,12 +117,13 @@ struct ProjectScreen: View {
             sessionsPerInstance: 5,
             activeSessionByInstance: active,
             hoistActive: true
-        ).apply(to: catalog)
+        )
+        .apply(to: catalog)
         if activeByInstance != active { activeByInstance = active }
         if filtered != next { filtered = next }
     }
 
-    private func openSession(_ stub: SessionStub, _ instance: InstanceRow) {
+    private func openSession(_ stub: SessionStub, _: InstanceRow) {
         // CatalogStore's factory: nil on a malformed uuid ⇒ inert row, never
         // a fabricated identity.
         guard let windowID = catalog.sessionWindowID(forSessionUuid: stub.uuid) else { return }

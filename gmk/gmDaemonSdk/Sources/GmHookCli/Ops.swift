@@ -63,7 +63,8 @@ func runOps(_ argv: [String]) -> Int32 {
                 daemon \(action) is not served here. Lifecycle is scripts/install_gm.sh \
                 (fetch + install), scripts/rebuild_local.sh (compile from source) and the \
                 launchd job; this binary never installs or builds.
-                """)
+                """
+            )
         }
 
     case "paths":
@@ -92,7 +93,7 @@ func runOps(_ argv: [String]) -> Int32 {
     case "pen-sheet":
         // The generated agent sheet, for inspection. Same text SubagentStart
         // hands a spawning agent.
-        print(PenSheet.text)
+        FileHandle.standardOutput.write(Data((CdeSheet.text + "\n").utf8))
         return 0
 
     default:

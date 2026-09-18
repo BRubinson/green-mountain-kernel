@@ -3,55 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0012 — the Dope*Domain* -> Dope*Persistence* rename, carried all
-    // the way down to the SQL table and column names, FUSED with the
-    // deleted_on soft delete, the mask_kind overlay marker, and the
-    // per-subtree content_revision.
-    //
-    // Fusing them is not an optimization, it is the same operation:
-    // UNIQUE(parent, code) is an INLINE TABLE CONSTRAINT that SQLite
-    // cannot drop, so converting it to a partial index
-    // (WHERE deleted_on IS NULL, which is what makes delete-then-re-add
-    // of the same code work) requires exactly the five-table rebuild the
-    // rename already requires. Rebuilding five heavily-FK'd tables twice
-    // in one release, against an append-only db that is never wiped, is
-    // how you lose a database.
-    //
-    // Because the target names are NEW, this needs no ALTER..RENAME at
-    // all: create with final REFERENCES text, copy, drop the old five.
-    // That sidesteps m0008's documented hazard entirely (under
-    // foreign_keys=OFF a RENAME does not rewrite REFERENCES clauses).
-    //
-    // Registered with GRDB's default .deferred foreignKeyChecks and NO
-    // PRAGMA in this body — m0008's rule, and it matters more here: five
-    // tables CASCADE-reference each other, so with enforcement live the
-    // DROPs would cascade the data away.
-    //
-    // Copy order is parent-first; DROP order is child-first. `id` is
-    // copied EXPLICITLY so rowids and therefore every insertion order
-    // survive.
-    //
-    // The three new columns are all nullable-or-defaulted and join no
-    // CHECK that existing data could violate, so this migration is
-    // BEHAVIORALLY INERT: with every deleted_on NULL the partial unique
-    // indexes are semantically identical to the constraints they replace.
-    //
-    // deleted_on  — the prompt's soft delete. Doubles as the resolver's
-    //               WHITEOUT: an overlay node carrying it masks the base
-    //               node at that dot-path. Reads deliberately do NOT
-    //               filter it (that is the point: communicate the
-    //               intended delete).
-    // mask_kind   — 'PASSTHROUGH' marks an ancestor shell that exists in
-    //               a sparse overlay only to carry identity and children.
-    //               Without it, masking one property would drag in
-    //               domain/entity shells whose empty description
-    //               ('' NOT NULL DEFAULT) would OVERRIDE the base's real
-    //               description. Silent data corruption; this column is
-    //               the fix.
-    // content_revision — per-subtree counter for sub-loadable dope, on
-    //               dope_persistence only. dope_scope.revision REMAINS
-    //               the single whole-tree counter and the sole CAS gate;
-    //               this sits BESIDE it and never replaces it.
+    // m0012 — the Dope*Domain* -> Dope*Persistence* table/column rename, fused
+    // with deleted_on, mask_kind and per-subtree content_revision. Fusing is the
+    // same operation: UNIQUE(parent, code) is an inline constraint SQLite cannot
+    // drop, so making it a partial index (WHERE deleted_on IS NULL, which is what
+    // lets a code be re-added after delete) needs the five-table rebuild the
+    // rename needs. deleted_on is a whiteout marker reads do NOT filter out.
+    // Target names are NEW, so no ALTER..RENAME: create with final REFERENCES
+    // text, copy parent-first, drop child-first, `id` explicit, .deferred.
     static func m0012_dopePersistenceRenameAndSoftDelete(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0012_dopePersistenceRenameAndSoftDelete") { db in
             // Row counts BEFORE, so the copy is proven and not merely hoped
@@ -60,7 +19,8 @@ extension Migrations {
             let before = try [
                 "dope_domain", "dope_domain_entity", "dope_domain_enum",
                 "dope_domain_enum_option", "dope_domain_entity_property",
-            ].map { table in
+            ]
+            .map { table in
                 try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(table)") ?? -1
             }
 
@@ -248,19 +208,22 @@ extension Migrations {
                         ON dope_persistence_entity_property(related_property_uuid);
                     CREATE INDEX idx_dope_persistence_property_base_origin_fk
                         ON dope_persistence_entity_property(base_origin_property_uuid);
-                    """)
+                    """
+            )
 
             // Proven, not hoped for.
             let after = try [
                 "dope_persistence", "dope_persistence_entity", "dope_persistence_enum",
                 "dope_persistence_enum_option", "dope_persistence_entity_property",
-            ].map { table in
+            ]
+            .map { table in
                 try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(table)") ?? -1
             }
             guard before == after else {
                 throw StoreError.corruptState(
                     entity: "dope_persistence",
-                    detail: "m0012 row-count mismatch: before \(before) after \(after)")
+                    detail: "m0012 row-count mismatch: before \(before) after \(after)"
+                )
             }
 
             try db.execute(

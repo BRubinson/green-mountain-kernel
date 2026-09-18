@@ -2,36 +2,28 @@ import Foundation
 import GmDaemonSdk
 
 // gm_mcp — the GMCC MCP stdio server: the agent PEN surface as typed MCP
-// tools. A thin client of the daemon socket beside gm and GMVibes — reuses
-// DaemonClient/WireCodec verbatim and NEVER touches the db (single-writer
-// invariant).
-//
-// Hand-rolled JSON-RPC 2.0 over newline-delimited stdio: exactly the three
-// methods that matter (initialize, tools/list, tools/call) plus ping;
-// notifications are ignored. Three methods do not justify a dependency —
-// the daemon already hand-rolls its own wire envelope.
-//
-// THE SURFACE IS THE PEN, AND VerbRegistry DECLARES IT. Every tool below is
-// a VerbSpec row carrying `pen:`, and the roster is checked against the
-// registry at startup so the two cannot drift. Nothing here authorizes
-// anything: which tools an agent holds is set by its own definition, and the
-// workflow's methodology — the primary calibrates, decides and seals — is
-// GUIDANCE in that definition and in the pen sheet, not a refusal.
-//
-// READS MATTER AS MUCH AS WRITES: an agent that cannot read its own
-// exploration/review/architecture rows through the pen will shell out to get
-// them another way, and then it is already outside the pen when it writes.
-// Every read here therefore declares a `narrowing` — the parameter that makes
-// ITS result smaller — and PenResultBudget degrades to that narrowed form
-// rather than handing back a body the harness refuses. An unnarrowable read
-// is an incentive to leave.
-//
-// Registered by the plugin as server `pen`, so tools surface as
-// mcp__plugin_gmcc_cde__<tool> (the plugin-scoped naming rule — a bare
-// mcp__gmcc__ matcher never fires). Harness tool search defers tool schemas
-// by default; this server declares `alwaysLoad` on its .mcp.json entry, so
-// the pen is in every session's surface without a search and without holding
-// up startup.
+// tools. A thin client of the daemon socket that reuses DaemonClient/WireCodec
+// and NEVER touches the db, keeping the single-writer invariant. JSON-RPC 2.0
+// is hand-rolled over newline-delimited stdio for exactly initialize,
+// tools/list, tools/call and ping.
+
+// THE SURFACE IS THE PEN, AND VerbRegistry DECLARES IT. Every tool below is a
+// VerbSpec row carrying `pen:`, checked against the registry at startup so the
+// two cannot drift. Nothing here authorizes anything: which tools an agent
+// holds is set by its own definition, and the workflow's methodology is
+// GUIDANCE in that definition and the pen sheet, never a refusal.
+
+// READS MATTER AS MUCH AS WRITES: an agent that cannot read its own rows
+// through the cde server shells out, and is then already outside it when it
+// writes. Every read is PAGED here, in this layer, by `CdePager` over the
+// daemon's whole typed response (see CdePagedResults.swift): the daemon and
+// GMVibes keep whole records, and only this door cuts them to the harness's
+// result cap. `narrowing` names the cursor the guard quotes back if a page
+// still overflows.
+
+// Tools surface as mcp__plugin_gmcc_cde__<tool>; a bare mcp__gmcc__ matcher
+// never fires. The .mcp.json entry declares `alwaysLoad`, so the pen is in
+// every session's surface without a ToolSearch.
 
 // MARK: - Minimal JSON value
 
@@ -162,7 +154,7 @@ struct Args {
         let full = optBool("full") ?? false
         let maxRating = optInt("max_rating")
         let range = optString("rating_range")
-        let picked = [full, maxRating != nil, range != nil].filter { $0 }.count
+        let picked = [full, maxRating != nil, range != nil].filter(\.self).count
         guard picked <= 1 else {
             throw ToolError(message: "full, max_rating, and rating_range are mutually exclusive")
         }
@@ -193,25 +185,19 @@ struct Tool {
     /// {property name: (type, description, required)}
     let params: [(String, String, String, Bool)]
     /// What makes THIS tool's result smaller, in the tool's own argument
-    /// names. nil is a positive statement: this result cannot outgrow the
+    /// names. nil is a positive statement: the result cannot outgrow the
     /// budget, or nothing about it is divisible. The guard quotes it back
-    /// verbatim on an oversize result, so a caller is never told to "narrow
-    /// the query" without being told with what.
-    /// True when this tool exists in order to REFUSE — the bridge's
-    /// `notSupported` / `notImplemented` cases.
-    ///
-    /// It carries no wire verb, so it legitimately has no `VerbSpec`, and the
-    /// roster check must not read that absence as an undeclared tool. Flagged
-    /// rather than name-matched on a `_not_supported` suffix: two of the four
-    /// refusals (`dope_update_session`) do not carry the suffix, and a check
-    /// keyed on spelling would pass them silently.
+    /// verbatim, so a caller is never told to narrow without being told with
+    /// what.
+
+    /// True when this tool exists in order to REFUSE. It carries no wire verb,
+    /// so it legitimately has no `VerbSpec` and the roster check must not read
+    /// that absence as an undeclared tool. FLAGGED rather than matched on a
+    /// `_not_supported` suffix, because some refusals do not carry it and a
+    /// check keyed on spelling would pass them silently.
     var refuses: Bool = false
 
-    var narrowing: PenNarrowing? = nil
-    /// The narrowed re-run the guard performs on an oversize result, so the
-    /// caller gets DATA plus instructions instead of a refusal plus a
-    /// truncated body. nil = there is nothing smaller to fall back to.
-    var degrade: ((Args, any GmVerbCaller) throws -> any Encodable)? = nil
+    var narrowing: CdeNarrowing?
     let run: (Args, any GmVerbCaller) throws -> any Encodable
 
     var inputSchema: [String: Any] {
@@ -252,10 +238,15 @@ private func botSelector(_ args: Args, _ client: any GmVerbCaller) -> (String?, 
 private func resolvePromptUuid(_ args: Args, _ client: any GmVerbCaller) throws -> String {
     if let explicit = args.optString("prompt_uuid") { return explicit }
     let (prompt, key, session) = botSelector(args, client)
-    return try client.botGet(
-        BotGetRequest(
-            promptUuid: prompt, clientKey: key, sessionUuid: session)
-    ).workflow.promptUuid
+    return
+        try client.botGet(
+            BotGetRequest(
+                promptUuid: prompt,
+                clientKey: key,
+                sessionUuid: session
+            )
+        )
+        .workflow.promptUuid
 }
 
 /// Shared schema rows for the two rating-windowed reads.
@@ -268,19 +259,43 @@ private let ratingWindowParams: [(String, String, String, Bool)] = [
 private let promptSelectorParam: (String, String, String, Bool) =
     ("prompt_uuid", "string", "Explicit prompt uuid (omit to resolve YOUR workflow's prompt)", false)
 
-// `nonisolated(unsafe)` IS A CONSEQUENCE OF THE LIBRARY MOVE, not a new risk.
-//
-// This was a top-level `let` in an executable's `main.swift`, where Swift
-// implicitly isolates globals to the main actor. In a library target that
-// implicit isolation is gone, and `[Tool]` cannot be `Sendable` because a `Tool`
-// carries `run`/`degrade` closures over `Args` and `DaemonClient`.
-//
-// What makes it safe is unchanged by the move: the array is built ONCE at
-// initialization, never mutated, and read only from the single stdio read loop
-// in `GmMcpServer.main()` — one thread, one connection, no concurrency anywhere
-// in this process. Annotating it says that out loud rather than making the
-// closures `@Sendable`, which would mean touching the 40-odd tool bodies in the
-// same pass that moves the writer.
+/// The two rows every paged read carries. Paging is the cde layer's own
+/// contract — see CdePagedResults.swift — so these never reach the daemon.
+let pageParams: [(String, String, String, Bool)] = [
+    ("cursor", "string", "page.next_cursor from the previous call (opaque) — omit for the first page", false),
+    (
+        "page_bytes", "number",
+        "Page budget in bytes (default 30000, max 45000); every array and every long text is paged inside it",
+        false
+    ),
+]
+
+/// One pager per call, from the shared page arguments.
+func makePager(_ args: Args) throws -> CdePager {
+    let bytes = min(args.optInt("page_bytes") ?? CdeResultBudget.pageBytes, CdeResultBudget.maxBytes)
+    do {
+        return try CdePager(pageBytes: bytes, cursor: args.optString("cursor"))
+    } catch let error as CdePagerError {
+        throw ToolError(message: error.description)
+    }
+}
+
+/// The narrowing every paged read declares: the cursor first, then whatever
+/// selector reads one body.
+func pagedNarrowing(_ tool: String, selectors: [String] = []) -> CdeNarrowing {
+    let extra = selectors.isEmpty ? "" : "; \(selectors.joined(separator: " / ")) for one body"
+    return CdeNarrowing(
+        parameters: ["cursor", "page_bytes"] + selectors,
+        retryWith: "\(tool) with cursor = page.next_cursor\(extra)"
+    )
+}
+
+// `nonisolated(unsafe)` because a library target gives globals no implicit
+// main-actor isolation and `[Tool]` cannot be `Sendable`: a `Tool` carries
+// `run`/`degrade` closures over `Args` and `DaemonClient`. What makes it safe
+// is that the array is built ONCE, never mutated, and read only from the single
+// stdio read loop in `GmMcpServer.main()` — one thread, one connection, no
+// concurrency in this process.
 nonisolated(unsafe) let tools: [Tool] =
     [
         Tool(
@@ -292,20 +307,35 @@ nonisolated(unsafe) let tools: [Tool] =
                 let (prompt, key, session) = botSelector(args, client)
                 return try client.botNext(
                     BotNextRequest(
-                        promptUuid: prompt, clientKey: key, sessionUuid: session))
-            }),
+                        promptUuid: prompt,
+                        clientKey: key,
+                        sessionUuid: session
+                    )
+                )
+            }
+        ),
         Tool(
             name: "cde_load_prompt",
-            description: "The workflow's prompt row — read the prompt without being told a uuid.",
-            params: [("prompt_uuid", "string", "Explicit prompt uuid (escape hatch)", false)],
+            description:
+                "The workflow's prompt row — read the prompt without being told a uuid. The prompt's detail / backstory / goal arrive as text windows; loop on cursor until page.next_cursor is null.",
+            params: [("prompt_uuid", "string", "Explicit prompt uuid (escape hatch)", false)] + pageParams,
+            narrowing: pagedNarrowing("cde_load_prompt"),
             run: { args, client in
                 let (prompt, key, session) = botSelector(args, client)
-                let workflow = try client.botGet(
-                    BotGetRequest(
-                        promptUuid: prompt, clientKey: key, sessionUuid: session)
-                ).workflow
-                return try client.getPrompt(PromptGetRequest(promptUuid: workflow.promptUuid))
-            }),
+                let workflow =
+                    try client.botGet(
+                        BotGetRequest(
+                            promptUuid: prompt,
+                            clientKey: key,
+                            sessionUuid: session
+                        )
+                    )
+                    .workflow
+                let response = try client.getPrompt(PromptGetRequest(promptUuid: workflow.promptUuid))
+                var pager = try makePager(args)
+                return try CdePromptPage.build(response, pager: &pager)
+            }
+        ),
         Tool(
             name: "rpir_open_exploration",
             description:
@@ -322,16 +352,24 @@ nonisolated(unsafe) let tools: [Tool] =
                 // clarifier opens it (it never explored, so nothing else can have
                 // opened one for it) and completes it in the same pass.
                 let (prompt, key, session) = botSelector(args, client)
-                let workflow = try client.botGet(
-                    BotGetRequest(
-                        promptUuid: prompt, clientKey: key, sessionUuid: session)
-                ).workflow
+                let workflow =
+                    try client.botGet(
+                        BotGetRequest(
+                            promptUuid: prompt,
+                            clientKey: key,
+                            sessionUuid: session
+                        )
+                    )
+                    .workflow
                 return try client.exploreOpen(
                     ExploreOpenRequest(
                         promptUuid: workflow.promptUuid,
                         agentType: agentType,
-                        agentId: args.optString("agent_id")))
-            }),
+                        agentId: args.optString("agent_id")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_load_exploration_brief",
             description: "Fetch a briefing + staleness. Zero-uuid form: pass only step and YOUR briefing resolves.",
@@ -339,20 +377,26 @@ nonisolated(unsafe) let tools: [Tool] =
                 ("briefing_uuid", "string", "Explicit briefing uuid", false),
                 ("prompt_uuid", "string", "Owner prompt uuid", false),
                 ("step", "string", "Briefing step (initial)", false),
-            ],
+            ] + pageParams,
+            narrowing: pagedNarrowing("rpir_load_exploration_brief"),
             run: { args, client in
                 var session: String?
                 if args.optString("briefing_uuid") == nil, args.optString("prompt_uuid") == nil {
                     session = try? ContextBuilder.resolveSessionUuid(client)
                 }
-                return try client.briefingGet(
+                let response = try client.briefingGet(
                     BriefingGetRequest(
                         briefingUuid: args.optString("briefing_uuid"),
                         promptUuid: args.optString("prompt_uuid"),
                         sessionUuid: session,
                         step: args.optString("step") ?? "initial",
-                        clientKey: ClientKey.resolve()))
-            }),
+                        clientKey: ClientKey.resolve()
+                    )
+                )
+                var pager = try makePager(args)
+                return try CdeBriefingPage.build(response, pager: &pager)
+            }
+        ),
         Tool(
             name: "rpir_write_brief",
             description: """
@@ -389,8 +433,11 @@ nonisolated(unsafe) let tools: [Tool] =
                         dopeRefs: args.optStrings("dope_refs"),
                         kbiteRefs: args.optStrings("kbite_refs"),
                         fileChangeRefs: args.optStrings("file_change_refs"),
-                        agentId: args.optString("agent_id")))
-            }),
+                        agentId: args.optString("agent_id")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_write_explorations",
             description:
@@ -422,8 +469,11 @@ nonisolated(unsafe) let tools: [Tool] =
                         filePath: args.optString("file_path"),
                         agentName: try args.string("agent_name"),
                         agentId: args.optString("agent_id"),
-                        rating: args.optInt("rating")))
-            }),
+                        rating: args.optInt("rating")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_complete_exploration",
             description:
@@ -438,8 +488,11 @@ nonisolated(unsafe) let tools: [Tool] =
                     ExploreCompleteRequest(
                         summaryUuid: try args.string("summary_uuid"),
                         expectedVersion: try args.int64("expected_version"),
-                        overview: try args.string("overview")))
-            }),
+                        overview: try args.string("overview")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_write_reviews",
             description: "Insert a review finding (self-rate 0=critical…999=ignore).",
@@ -473,8 +526,11 @@ nonisolated(unsafe) let tools: [Tool] =
                         lineEnd: args.optInt("line_end"),
                         agentName: try args.string("agent_name"),
                         agentId: args.optString("agent_id"),
-                        rating: args.optInt("rating")))
-            }),
+                        rating: args.optInt("rating")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_write_clarification_questions",
             description:
@@ -493,8 +549,11 @@ nonisolated(unsafe) let tools: [Tool] =
                         question: try args.string("question"),
                         options: args.optStrings("options"),
                         agentName: args.optString("agent_name"),
-                        agentId: args.optString("agent_id")))
-            }),
+                        agentId: args.optString("agent_id")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_write_clarification_notes",
             description: "Insert an internal clarification note (weight 0=critical…999; any summary state).",
@@ -518,8 +577,11 @@ nonisolated(unsafe) let tools: [Tool] =
                         weight: args.optInt("weight"),
                         questionUuid: args.optString("question_uuid"),
                         agentName: args.optString("agent_name"),
-                        agentId: args.optString("agent_id")))
-            }),
+                        agentId: args.optString("agent_id")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_write_care_package",
             description:
@@ -549,8 +611,11 @@ nonisolated(unsafe) let tools: [Tool] =
                         curatedTitle: args.optString("title"),
                         curatedBody: args.optString("body"),
                         filePath: args.optString("file_path"),
-                        sourceFindingUuid: args.optString("source_finding_uuid")))
-            }),
+                        sourceFindingUuid: args.optString("source_finding_uuid")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_open_architecture_option",
             description:
@@ -577,8 +642,11 @@ nonisolated(unsafe) let tools: [Tool] =
                         agentId: args.optString("agent_id"),
                         body: try args.string("body"),
                         supersedesOptionUuid: args.optString("supersedes_option_uuid"),
-                        expectedVersion: args.optInt("expected_version").map(Int64.init)))
-            }),
+                        expectedVersion: args.optInt("expected_version").map(Int64.init)
+                    )
+                )
+            }
+        ),
         Tool(
             name: "dope_search_session",
             description: "FTS over the session's dope tree (hits carry dot-paths).",
@@ -588,10 +656,8 @@ nonisolated(unsafe) let tools: [Tool] =
                 ("session_uuid", "string", "Explicit session uuid", false),
                 ("prompt_uuid", "string", "Prompt scope selector", false),
                 ("limit", "number", "Max hits", false),
-            ],
-            narrowing: PenNarrowing(
-                parameters: ["limit", "scope"],
-                retryWith: "dope_search_session with a smaller limit, or scope narrowed to prompt"),
+            ] + pageParams,
+            narrowing: pagedNarrowing("dope_search_session"),
             run: { args, client in
                 let scopeRaw = args.optString("scope") ?? "session"
                 guard let scope = DopeSearchScope(rawValue: scopeRaw) else {
@@ -601,30 +667,38 @@ nonisolated(unsafe) let tools: [Tool] =
                 if session == nil, scope != .project {
                     session = try? ContextBuilder.resolveSessionUuid(client)
                 }
-                return try client.dopeSearch(
+                let response = try client.dopeSearch(
                     DopeSearchRequest(
                         query: try args.string("query"),
                         scope: scope,
                         sessionUuid: session,
                         promptUuid: args.optString("prompt_uuid"),
-                        limit: args.optInt("limit")))
-            }),
+                        limit: args.optInt("limit")
+                    )
+                )
+                var pager = try makePager(args)
+                return try CdeHitsPage.build(response.hits, pager: &pager)
+            }
+        ),
         Tool(
             name: "kbite_search",
             description: "bm25-ranked kbite file stubs with briefs — read briefs, then kbite_file_get.",
             params: [
                 ("query", "string", "The search query", true),
                 ("limit", "number", "Max hits", false),
-            ],
-            narrowing: PenNarrowing(
-                parameters: ["limit"],
-                retryWith: "kbite_search with a smaller limit, then kbite_file_get for the one file worth opening"),
+            ] + pageParams,
+            narrowing: pagedNarrowing("kbite_search"),
             run: { args, client in
-                try client.searchKbites(
+                let response = try client.searchKbites(
                     KbiteSearchRequest(
                         query: try args.string("query"),
-                        limit: args.optInt("limit")))
-            }),
+                        limit: args.optInt("limit")
+                    )
+                )
+                var pager = try makePager(args)
+                return try CdeHitsPage.build(response.hits, pager: &pager)
+            }
+        ),
 
         // ── Reading the record ───────────────────────────────────────────────
         //
@@ -641,31 +715,27 @@ nonisolated(unsafe) let tools: [Tool] =
             params: [
                 promptSelectorParam,
                 ("agent_type", "string", "Filter to one agent's summary (omit for all)", false),
-            ] + ratingWindowParams,
-            // Already windowed — no new parameter is owed here, only the
-            // declaration that lets the guard name the one that exists.
-            narrowing: PenNarrowing(
-                parameters: ["max_rating", "rating_range", "agent_type"],
-                retryWith:
-                    "rpir_get_exploration with max_rating=0 for the critical findings, or agent_type to read one methodology's summary"
-            ),
-            degrade: { args, client in
-                try client.exploreGet(
-                    ExploreGetRequest(
-                        promptUuid: try resolvePromptUuid(args, client),
-                        agentType: args.optString("agent_type"),
-                        ratingMax: 0))
-            },
+                ("finding_uuid", "string", "Return exactly this finding in full and nothing else", false),
+            ] + ratingWindowParams + pageParams,
+            narrowing: pagedNarrowing("rpir_get_exploration", selectors: ["finding_uuid"]),
             run: { args, client in
                 let window = try args.ratingWindow()
-                return try client.exploreGet(
+                let findingUuid = args.optString("finding_uuid")
+                // A pinned finding needs its body whatever its rating, so the
+                // window is widened to everything for that one read.
+                let response = try client.exploreGet(
                     ExploreGetRequest(
                         promptUuid: try resolvePromptUuid(args, client),
                         agentType: args.optString("agent_type"),
-                        full: window.full,
-                        ratingMin: window.min,
-                        ratingMax: window.max))
-            }),
+                        full: findingUuid != nil ? true : window.full,
+                        ratingMin: findingUuid != nil ? nil : window.min,
+                        ratingMax: findingUuid != nil ? nil : window.max
+                    )
+                )
+                var pager = try makePager(args)
+                return try CdeExplorationPage.build(response, pager: &pager, findingUuid: findingUuid)
+            }
+        ),
         Tool(
             name: "rpir_rank_explorations",
             description:
@@ -688,30 +758,36 @@ nonisolated(unsafe) let tools: [Tool] =
                 }
                 return try client.exploreRank(
                     ExploreRankRequest(
-                        promptUuid: try resolvePromptUuid(args, client), ratings: pairs))
-            }),
+                        promptUuid: try resolvePromptUuid(args, client),
+                        ratings: pairs
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_get_review",
             description:
                 "The prompt's review record: summary, findings inside the rating window, stubs outside it. Same window semantics as rpir_get_exploration.",
-            params: [promptSelectorParam] + ratingWindowParams,
-            narrowing: PenNarrowing(
-                parameters: ["max_rating", "rating_range"],
-                retryWith: "rpir_get_review with max_rating=0 for the critical findings only"),
-            degrade: { args, client in
-                try client.reviewGet(
-                    ReviewGetRequest(
-                        promptUuid: try resolvePromptUuid(args, client), ratingMax: 0))
-            },
+            params: [
+                promptSelectorParam,
+                ("finding_uuid", "string", "Return exactly this finding in full and nothing else", false),
+            ] + ratingWindowParams + pageParams,
+            narrowing: pagedNarrowing("rpir_get_review", selectors: ["finding_uuid"]),
             run: { args, client in
                 let window = try args.ratingWindow()
-                return try client.reviewGet(
+                let findingUuid = args.optString("finding_uuid")
+                let response = try client.reviewGet(
                     ReviewGetRequest(
                         promptUuid: try resolvePromptUuid(args, client),
-                        full: window.full,
-                        ratingMin: window.min,
-                        ratingMax: window.max))
-            }),
+                        full: findingUuid != nil ? true : window.full,
+                        ratingMin: findingUuid != nil ? nil : window.min,
+                        ratingMax: findingUuid != nil ? nil : window.max
+                    )
+                )
+                var pager = try makePager(args)
+                return try CdeReviewPage.build(response, pager: &pager, findingUuid: findingUuid)
+            }
+        ),
         Tool(
             name: "rpir_get_clarification",
             description:
@@ -719,93 +795,83 @@ nonisolated(unsafe) let tools: [Tool] =
             params: [
                 promptSelectorParam,
                 (
-                    "include_care_package", "boolean",
-                    "Embed the full care package (default true; false leaves a counts-only care_package_stub — the package reads whole through care_package_get)",
-                    false
-                ),
-                (
                     "note_weight_max", "number",
                     "Weight window over the notes: at or below stays a full row, above drops to note_stubs (unweighted notes are always full)",
                     false
                 ),
-            ],
-            // Two things here grow without bound — the embedded care package and
-            // the note bodies — and each has its own switch. Questions are NOT
-            // windowed: a question plus its pre-authored options is bounded by
-            // what a human can answer.
-            narrowing: PenNarrowing(
-                parameters: ["include_care_package", "note_weight_max"],
-                retryWith:
-                    "rpir_get_clarification with include_care_package=false (then care_package_get for the package itself), and note_weight_max=0 for the critical notes only"
-            ),
-            degrade: { args, client in
-                try client.clarifyGet(
+                ("note_uuid", "string", "Return exactly this note in full and nothing else", false),
+            ] + pageParams,
+            // The care package is ALWAYS a counts-only stub here — it has its
+            // own door. Questions are never windowed: a question plus its
+            // pre-authored options is bounded by what a human can answer.
+            narrowing: pagedNarrowing("rpir_get_clarification", selectors: ["note_uuid"]),
+            run: { args, client in
+                let noteUuid = args.optString("note_uuid")
+                let response = try client.clarifyGet(
                     ClarifyGetRequest(
                         promptUuid: try resolvePromptUuid(args, client),
                         includeCarePackage: false,
-                        noteWeightMax: 0))
-            },
-            run: { args, client in
-                try client.clarifyGet(
-                    ClarifyGetRequest(
-                        promptUuid: try resolvePromptUuid(args, client),
-                        includeCarePackage: args.optBool("include_care_package"),
-                        noteWeightMax: args.optInt("note_weight_max")))
-            }),
+                        noteWeightMax: noteUuid != nil ? nil : args.optInt("note_weight_max")
+                    )
+                )
+                var pager = try makePager(args)
+                return try CdeClarificationPage.build(response, pager: &pager, noteUuid: noteUuid)
+            }
+        ),
         Tool(
-            name: "rpir_get_architecture",
+            name: "rpir_get_care_package",
             description:
-                "The approved architecture with its implementation state: persistence changes before general changes, each joined to its recorded file changes, plus the touched-but-unplanned set. This is the implementation spec. Option bodies and change_code are STUBBED by default — pass option_uuid / change_uuid / full to read one in full.",
+                "The prompt's sealed care package on its own: the clarified intent (as text windows), the dope and kbite refs, and the curated exploration copies as a stub roster (title, path, excerpt, size). Pass ref_uuid to read one curated body in full; loop on cursor until page.next_cursor is null.",
             params: [
                 promptSelectorParam,
                 (
-                    "include_options", "boolean",
-                    "Return every architect option's full BODY inline (default false — stubs carry uuid, agent, status, selected, body_chars)",
+                    "ref_uuid", "string",
+                    "Return exactly this exploration ref's curated body in full, the rest as stubs",
                     false
                 ),
-                ("option_uuid", "string", "Return exactly this option's body in full", false),
-                (
-                    "full", "boolean",
-                    "Return every general change's change_code verbatim (default false — stubs carry a leading excerpt + change_code_chars)",
-                    false
-                ),
-                ("change_uuid", "string", "Return exactly this general change's change_code in full", false),
-                (
-                    "limit", "number", "Page size over the general change rows (persistence changes are never paged)",
-                    false
-                ),
-                ("cursor", "string", "Continuation from a previous result's change_page.next_cursor", false),
-            ],
-            // THE PEN IS WHAT NARROWS, NOT THE DAEMON. ArchGetRequest's wire
-            // default is still "everything full" so every existing caller —
-            // GMVibes building against this package included — is unchanged by
-            // construction. It is this client, the one feeding an agent harness
-            // with a hard result cap, that opts into the stub form; the schema
-            // above is how an agent opts back out.
-            narrowing: PenNarrowing(
-                parameters: ["limit", "cursor", "option_uuid", "change_uuid"],
-                retryWith:
-                    "rpir_get_architecture with limit (e.g. 10) and a cursor to page the general changes; then option_uuid / change_uuid to read one body at a time"
-            ),
-            degrade: { args, client in
-                try client.archGet(
-                    ArchGetRequest(
-                        promptUuid: try resolvePromptUuid(args, client),
-                        includeOptions: false,
-                        full: false,
-                        limit: 10))
-            },
+            ] + pageParams,
+            narrowing: pagedNarrowing("rpir_get_care_package", selectors: ["ref_uuid"]),
             run: { args, client in
-                try client.archGet(
-                    ArchGetRequest(
-                        promptUuid: try resolvePromptUuid(args, client),
-                        includeOptions: args.optBool("include_options") ?? false,
-                        optionUuid: args.optString("option_uuid"),
-                        full: args.optBool("full") ?? false,
-                        changeUuid: args.optString("change_uuid"),
-                        limit: args.optInt("limit"),
-                        cursor: args.optString("cursor")))
-            }),
+                let response = try client.carePackageGet(
+                    CarePackageGetRequest(promptUuid: try resolvePromptUuid(args, client))
+                )
+                var pager = try makePager(args)
+                return try CdeCarePackagePage.build(
+                    response.package,
+                    pager: &pager,
+                    refUuid: args.optString("ref_uuid")
+                )
+            }
+        ),
+        Tool(
+            name: "rpir_get_architecture",
+            description:
+                "The approved architecture with its implementation state: persistence changes (whole) before general changes (stubs with a leading excerpt), each joined to its recorded file changes, plus the touched-but-unplanned set. This is the implementation spec. The summary body, the decision rationale, one option body (option_uuid) or one change_code (change_uuid) arrive as text windows; loop on cursor until page.next_cursor is null.",
+            params: [
+                promptSelectorParam,
+                ("option_uuid", "string", "Return exactly this option's body in full", false),
+                ("change_uuid", "string", "Return exactly this general change's change_code in full", false),
+                ("limit", "number", "Cap the general change stub roster to its first N rows", false),
+            ] + pageParams,
+            // THE CDE LAYER IS WHAT CUTS, NOT THE DAEMON. The daemon is read
+            // unnarrowed — every body in hand — and CdeArchitecturePage decides
+            // what becomes a stub or a window, so GMVibes and this door read
+            // one verb with one meaning.
+            narrowing: pagedNarrowing("rpir_get_architecture", selectors: ["option_uuid", "change_uuid"]),
+            run: { args, client in
+                let response = try client.archGet(
+                    ArchGetRequest(promptUuid: try resolvePromptUuid(args, client))
+                )
+                var pager = try makePager(args)
+                return try CdeArchitecturePage.build(
+                    response,
+                    pager: &pager,
+                    optionUuid: args.optString("option_uuid"),
+                    changeUuid: args.optString("change_uuid"),
+                    limit: args.optInt("limit")
+                )
+            }
+        ),
         Tool(
             name: "cde_search_file_changes",
             description:
@@ -814,103 +880,73 @@ nonisolated(unsafe) let tools: [Tool] =
                 promptSelectorParam,
                 ("session_uuid", "string", "List a whole session instead of one prompt", false),
                 ("path", "string", "Filter to one repo-relative path", false),
-                ("limit", "number", "Max rows", false),
-            ],
-            narrowing: PenNarrowing(
-                parameters: ["limit", "path"],
-                retryWith: "cde_search_file_changes with limit 25 or fewer, or path to scope to one file"),
-            // THE DEGRADE MUST FIT THE BUDGET BY ARITHMETIC, not by hope. A change
-            // row with its line ranges runs ~1,200 bytes, so the old limit of 100
-            // asked for ~120,000 against a 45,000 budget and could NEVER fit: the
-            // call returned zero rows and advised retrying with the same 100.
-            // Measured on a 202-change prompt: 100 -> 109,994 bytes, 60 -> 66,023,
-            // 30 -> fits. 25 keeps headroom for rows carrying many ranges.
-            degrade: { args, client in
-                let session = args.optString("session_uuid")
-                let prompt = session == nil ? try resolvePromptUuid(args, client) : args.optString("prompt_uuid")
-                return try client.listFileChanges(
-                    FileChangeListRequest(
-                        sessionUuid: session,
-                        promptUuid: prompt,
-                        relativePath: args.optString("path"),
-                        limit: 25))
-            },
+                ("limit", "number", "Max rows to consider, newest first (default 2000)", false),
+            ] + pageParams,
+            narrowing: pagedNarrowing("cde_search_file_changes"),
             run: { args, client in
                 let session = args.optString("session_uuid")
                 // An explicit session read is session-scoped; otherwise the
                 // prompt is resolved the same way every other record read is.
                 let prompt = session == nil ? try resolvePromptUuid(args, client) : args.optString("prompt_uuid")
-                return try client.listFileChanges(
+                // The whole list is fetched and paged HERE, so the default
+                // limit is the record, not the page: a row is ~1.2 KB and a
+                // 2,000-row prompt is a ~2.4 MB local read per page.
+                let response = try client.listFileChanges(
                     FileChangeListRequest(
                         sessionUuid: session,
                         promptUuid: prompt,
                         relativePath: args.optString("path"),
-                        limit: args.optInt("limit")))
-            }),
+                        limit: args.optInt("limit") ?? 2_000
+                    )
+                )
+                var pager = try makePager(args)
+                return try CdeFileChangePage.build(response, pager: &pager)
+            }
+        ),
     ] + makeFastPathTools() + makePrimaryDoorTools() + makePhaseDoorTools() + makeBridgeDoorTools() + makeRecallDoors()
 // MARK: - Upfront loading
 
 // EVERY PEN TOOL LOADS UPFRONT, declared once as `"alwaysLoad": true` on this
-// server's `.mcp.json` entry rather than per-tool here.
+// server's `.mcp.json` entry rather than per-tool here. Session startup then
+// waits on a socket connect, capped at the 5-second connect timeout.
 //
-// The per-tool `_meta` flag this replaced existed for one reason: server-level
-// alwaysLoad makes session startup WAIT for the server's tools (capped at the
-// 5-second connect timeout), and the launcher used to run a release build
-// before exec — so a session following a source edit would spend the whole
-// budget in bash. The launcher no longer builds, so the wait is a socket
-// connect and the reason is gone.
-//
-// WHAT THE OLD ARRANGEMENT COST: with six tools upfront and the rest deferred,
-// an agent holding a correct frontmatter tool list still found every other pen
-// call failing until it thought to run a ToolSearch by exact name — and nothing
-// in any agent definition told it that step existed. From inside the agent that
-// is indistinguishable from the server not being registered at all, which is
-// exactly how it was reported. Loading the whole surface costs context; it buys
-// the disappearance of a failure mode that reads as a lie.
+// Deferring most of the surface costs more than the context it saves: an agent
+// holding a correct frontmatter tool list finds every deferred pen call failing
+// until it thinks to run a ToolSearch by exact name, which from inside the
+// agent is indistinguishable from the server not being registered at all.
 
 // MARK: - The initialize instructions, generated from the registry
 
-/// The `instructions` field of `initialize` — the one piece of prose the
-/// harness loads at session start, ahead of any tool schema. It is GENERATED
-/// from VerbRegistry so it cannot drift from the roster, ordered critical
-/// first, and deliberately small (the budget below is ~2KB: this text is paid
-/// for by every session the pen is loaded into).
-// The pen sheet generator lives in GmDaemonSdk as `PenSheet`. The
-// SubagentStart hook hands spawned agents the same generated text, and two
-// generators over one registry drift apart — which is how the retired CLI
-// cheatsheet came to contradict the agent definitions it shipped beside.
+/// The `instructions` field of `initialize` is generated from VerbRegistry by
+/// `CdeSheet` in GmDaemonSdk, so it cannot drift from the roster. The
+/// SubagentStart hook hands spawned agents the same generated text: two
+/// generators over one registry drift apart.
 
-/// Startup diagnostics on stderr (stdout belongs to the protocol): the roster
-/// and the registry must be the same set. The build-time guard is
-/// WorkflowSpecTests' parity assertion — this is the runtime echo of it, so a
-/// mismatched binary says so in the MCP log instead of silently serving a
-/// surface nobody declared.
+/// Startup diagnostics on stderr, since stdout belongs to the protocol. The
+/// roster and the registry must be the same set, so a mismatched binary says so
+/// in the MCP log instead of silently serving a surface nobody declared.
 @MainActor func validateRosterAgainstRegistry() {
-    let lines = GmPenTools.rosterProblems()
+    let lines = GmCdeTools.rosterProblems()
     guard !lines.isEmpty else { return }
     FileHandle.standardError.write(Data((lines.joined(separator: "\n") + "\n").utf8))
 }
 
-extension GmPenTools {
-    /// The roster check, as DATA rather than as a side effect on stderr.
+extension GmCdeTools {
+    /// The roster check, as DATA rather than as a side effect on stderr, so a
+    /// test can assert it is empty. A mismatch printed only at `gm_mcp` startup
+    /// is found by whoever reads an MCP log, which is nobody.
     ///
-    /// SPLIT OUT SO A TEST CAN ASSERT IT IS EMPTY (v30). The check itself was
-    /// already bidirectional; what it lacked was a caller that could FAIL.
-    /// Printing at `gm_mcp` startup means a mismatch is found by whoever reads
-    /// an MCP log, which is nobody — and the contract tests that used to assert
-    /// parity at build time are all deleted.
-    ///
-    /// BOTH DIRECTIONS MATTER. An ORPHAN (served, undeclared) is a tool with no
-    /// role decision behind it. A MISSING (declared, unserved) is a capability
-    /// the pen advertises and cannot deliver — and a one-directional gate passes
-    /// that cleanly.
+    /// BOTH DIRECTIONS MATTER. An ORPHAN — served, undeclared — is a tool with
+    /// no role decision behind it. A MISSING — declared, unserved — is a
+    /// capability the pen advertises and cannot deliver, and a one-directional
+    /// gate passes that cleanly.
     @MainActor public static func rosterProblems() -> [String] {
         // Refusals are excluded from the ORPHAN direction only. They have no
         // verb by construction, so "served with no VerbSpec" is their normal
         // state — but they must still be DECLARED by the bridge, which the
         // missing direction below and the generator's own check both enforce.
         let served = Set(tools.filter { !$0.refuses }.map(\.name))
-        let declared = VerbRegistry.penToolNames
+        let declared = VerbRegistry.cdeToolNames
         var lines: [String] = []
         for orphan in served.subtracting(declared).sorted() {
             lines.append("serves '\(orphan)' with no VerbSpec — the door has made no role decision about it")
@@ -918,7 +954,7 @@ extension GmPenTools {
         for missing in declared.subtracting(served).sorted() {
             lines.append("VerbRegistry declares pen tool '\(missing)' but this binary does not serve it")
         }
-        let instructionBytes = PenSheet.instructions.utf8.count
+        let instructionBytes = CdeSheet.instructions.utf8.count
         if instructionBytes > 2_048 {
             lines.append("initialize instructions are \(instructionBytes) bytes (budget 2048)")
         }
@@ -928,29 +964,19 @@ extension GmPenTools {
 
 // MARK: - Rendering (byte-budgeted)
 
-/// Tool results are the wire response as sorted-key JSON — the same shape the
-/// daemon's `--json` prints, which is the form agents parse.
-///
-/// THIS NO LONGER CLIPS. The previous implementation cut the JSON at 80,000
-/// bytes and appended "narrow the query (rating windows, limit) and retry" —
-/// advice `rpir_get_architecture` could not take, since ArchGetRequest had nothing to
-/// narrow. Worse, sorted keys meant the cut landed inside `options` and ate
-/// `persistence_changes` whole, silently. A caller hand-parsing a truncated
-/// body is the failure being fixed, so the guard degrades to the narrowed
-/// form (or to a note alone) and never emits invalid JSON.
-///
-/// The threshold and the envelope shape live in `PenResultBudget` in
-/// GmDaemonSdk — the pen binary cannot be linked into the test target, and
-/// a size guard nothing can test is a size guard nobody trusts.
-func renderResult(
-    tool: Tool, args: Args, client: any GmVerbCaller, value: any Encodable
-) throws -> String {
-    try PenResultBudget.render(
+/// Tool results are the wire response as sorted-key JSON, the form agents
+/// parse. THIS NEVER CLIPS: cutting the JSON at a byte count lands the cut
+/// inside whichever key sorts there and eats the rest silently. Every read is
+/// paged by `CdePager` before it gets here, so the guard's withhold note is a
+/// last resort. The threshold and the envelope shape live in
+/// `CdeResultBudget` in GmDaemonSdk so the test package can exercise them.
+func renderResult(tool: Tool, value: any Encodable) throws -> String {
+    try CdeResultBudget.render(
         tool: tool.name,
         narrowing: tool.narrowing,
         value: value,
-        isWrite: VerbRegistry.writePenTools.contains(tool.name),
-        degrade: tool.degrade.map { degrade in { try degrade(args, client) } })
+        isWrite: VerbRegistry.writeCdeTools.contains(tool.name)
+    )
 }
 
 // MARK: - JSON-RPC loop
@@ -969,37 +995,21 @@ func respondError(id: Any, code: Int, message: String) {
     writeMessage(["jsonrpc": "2.0", "id": id, "error": ["code": code, "message": message]])
 }
 
-// WAS `main.swift`. The sources moved into a LIBRARY target so the one
-// multi-call `gm_kernel` Mach-O can carry the MCP personality; `gm_mcp` is now a
-// shim over `GmMcpServer.main()`. NOTHING ELSE CHANGED — the declarations above
-// are byte-identical, and the only edit is that the former top-level statements
-// are now a function body, because top-level code is legal solely in an
-// executable target's `main.swift`.
-//
-// Deliberately NOT refactored while it moved. This is the one component that
-// owns per-session identity (the ClientKey ancestry walk, the per-session cwd),
-// and moving it in the same pass that moves the writer is already two changes;
-// rewriting its hand-rolled JSON-RPC at the same time would be a third.
+// A LIBRARY target, so the multi-call `gm_kernel` Mach-O can carry the MCP
+// personality and `gm_mcp` is a shim over `GmMcpServer.main()`. Top-level code
+// is legal solely in an executable target's `main.swift`, which is why these
+// statements are a function body.
 
 public enum GmMcpServer {
 
     /// The `gm_mcp` personality: a JSON-RPC 2.0 server on newline-delimited
     /// stdio, relaying every `tools/call` to the daemon over the unix socket.
-    ///
-    /// It stays a CHILD OF THE HARNESS in every shape, which is the whole reason
-    /// it survives the collapse unchanged. Three things depend on that and
-    /// cannot be supplied by a server living inside the kernel process: the
-    /// harness owns this stdin; `ClientKey.resolve()` walks the process ancestry
-    /// to derive `claude:<pid>:<starttime>`, which IS the activation-claim key;
-    /// and the chdir below gives one cwd per session, where one process cannot
-    /// hold N.
-    ///
-    /// `@MainActor` PRESERVES THE OLD SEMANTICS RATHER THAN ADDING NEW ONES.
-    /// These statements lived in an executable's `main.swift`, where top-level
-    /// code is main-actor-isolated implicitly — which is why
-    /// `validateRosterAgainstRegistry()` could be declared `@MainActor` and
-    /// called plainly. Dropping the annotation here would not make the server
-    /// more concurrent; it would just make that existing call illegal.
+    /// It stays a CHILD OF THE HARNESS. Three things depend on that and cannot
+    /// be supplied from inside the kernel process: the harness owns this stdin;
+    /// `ClientKey.resolve()` walks process ancestry for the activation-claim
+    /// key; and the chdir below gives one cwd per session. `@MainActor` matches
+    /// the implicit isolation of top-level code, which is what lets
+    /// `validateRosterAgainstRegistry()` be called plainly.
     @MainActor
     public static func main() {
         // Servers spawn with the project dir as cwd; CLAUDE_PROJECT_DIR is the
@@ -1041,8 +1051,9 @@ public enum GmMcpServer {
                         ],
                         // Loaded at session start, ahead of any tool schema — the only
                         // place the pen gets to state its own contract.
-                        "instructions": PenSheet.instructions,
-                    ])
+                        "instructions": CdeSheet.instructions,
+                    ]
+                )
             case "ping":
                 respond(id: id, result: [:])
             case "tools/list":
@@ -1057,7 +1068,8 @@ public enum GmMcpServer {
                             ]
                             return entry
                         }
-                    ])
+                    ]
+                )
             case "tools/call":
                 let name = message["params"]?["name"]?.stringValue ?? ""
                 let arguments = Args(json: message["params"]?["arguments"] ?? .object([:]))
@@ -1073,12 +1085,12 @@ public enum GmMcpServer {
                             "content": [
                                 [
                                     "type": "text",
-                                    "text": try renderResult(
-                                        tool: tool, args: arguments, client: client, value: result),
+                                    "text": try renderResult(tool: tool, value: result),
                                 ]
                             ],
                             "isError": false,
-                        ])
+                        ]
+                    )
                 } catch {
                     let text: String
                     switch error {
@@ -1096,7 +1108,8 @@ public enum GmMcpServer {
                         result: [
                             "content": [["type": "text", "text": "ERROR: \(text)"]],
                             "isError": true,
-                        ])
+                        ]
+                    )
                 }
             default:
                 respondError(id: id, code: -32601, message: "method '\(method)' not supported")

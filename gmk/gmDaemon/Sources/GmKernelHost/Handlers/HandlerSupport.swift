@@ -13,6 +13,6 @@ func okResult<P: Codable & Sendable>(
 }
 
 /// Decode the typed request payload for a handler.
-func decodePayload<P: Codable & Sendable>(_ type: P.Type, from line: Data) throws -> P {
+func decodePayload<P: Codable & Sendable>(_: P.Type, from line: Data) throws -> P {
     try NDJSON.decode(RequestEnvelope<P>.self, from: line).payload
 }

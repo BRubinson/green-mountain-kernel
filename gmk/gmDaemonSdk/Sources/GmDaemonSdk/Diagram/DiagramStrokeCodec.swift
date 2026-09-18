@@ -2,26 +2,12 @@ import Foundation
 
 /// Freehand stroke geometry: decimation, and the packed on-disk form.
 ///
-/// Kit-resident, not app-resident, for the same reason `DiagramTreeReducer`
-/// is: GMVibes decimates a stroke locally the moment the pen lifts, and the
-/// daemon stores it. If the two used different arithmetic the same gesture
-/// would round-trip to something else, and the parity oracle would be the
-/// thing that noticed — loudly, and much later.
-///
-/// ## What is stored
-///
-/// The INPUT CENTERLINE, never the rendered outline: `[x, y, pressure?]` per
-/// vertex, element-local. The fat, tapered stroke is derived at render time.
-/// Storing the outline would bake today's brush into the data and make a
-/// width change a migration.
-///
-/// ## Why packed
-///
-/// A vertex row is a full BaseEntity — uuid, version, two timestamps, a seq,
-/// an FK — roughly 250 bytes of scaffolding around 24 bytes of coordinate. A
-/// single trackpad stroke can be hundreds of points. Shapes, which have four
-/// vertices and benefit from being queryable, keep their rows; strokes pack.
-/// `DiagramElementTypeSpec.vertexStorage` is what decides, per type.
+/// Kit-resident so the app and the daemon decimate with identical arithmetic;
+/// different arithmetic would round-trip the same gesture to something else.
+/// What is stored is the INPUT CENTERLINE, never the rendered outline, so a
+/// brush-width change is not a migration. Strokes pack because a vertex row
+/// is a full BaseEntity — ~250 bytes of scaffolding around 24 bytes of
+/// coordinate. `DiagramElementTypeSpec.vertexStorage` decides, per type.
 public enum DiagramStrokeCodec {
 
     /// RDP tolerance in element-local units. ~0.75px keeps a 100-vertex
@@ -40,24 +26,19 @@ public enum DiagramStrokeCodec {
 
     // MARK: - Quantization
 
-    /// Round-trip a vertex through the STORAGE precision without touching
-    /// the database.
+    /// Round-trip a vertex through the STORAGE precision without touching the
+    /// database.
     ///
-    /// This exists because of the parity oracle. `DiagramTreeReducer` keeps
-    /// vertices as exact `Double`s in memory; the daemon writes them as
-    /// f32/u8 and reads them back changed in the last bits. The oracle
-    /// compares payloads by `String(describing:)` — exact equality — so
-    /// without this the two implementations would "disagree" about a stroke
-    /// neither of them got wrong.
-    ///
-    /// Both write paths normalize through here, so the in-memory tree and
-    /// the persisted tree hold the same numbers by construction rather than
-    /// by tolerance.
+    /// In-memory vertices are exact `Double`s; the daemon writes f32/u8 and
+    /// reads them back changed in the last bits. Both write paths normalize
+    /// through here, so the in-memory tree and the persisted tree hold the
+    /// same numbers by construction rather than by tolerance.
     public static func normalizedForStorage(_ vertex: DiagramVertex) -> DiagramVertex {
         DiagramVertex(
             x: Double(Float(vertex.x)),
             y: Double(Float(vertex.y)),
-            pressure: vertex.pressure.map { quantizedPressure($0) })
+            pressure: vertex.pressure.map { quantizedPressure($0) }
+        )
     }
 
     public static func normalizedForStorage(_ vertices: [DiagramVertex]) -> [DiagramVertex] {
@@ -77,9 +58,12 @@ public enum DiagramStrokeCodec {
         guard case .drawingStroke(let stroke) = payload else { return payload }
         return .drawingStroke(
             DrawingStrokePayload(
-                tool: stroke.tool, strokeColor: stroke.strokeColor,
+                tool: stroke.tool,
+                strokeColor: stroke.strokeColor,
                 strokeWidth: stroke.strokeWidth,
-                vertices: normalizedForStorage(stroke.vertices)))
+                vertices: normalizedForStorage(stroke.vertices)
+            )
+        )
     }
 
     static func quantizedPressure(_ p: Double) -> Double {
@@ -114,14 +98,16 @@ public enum DiagramStrokeCodec {
         guard count >= 0 else {
             throw StoreError.corruptState(
                 entity: "diagram_drawing_stroke",
-                detail: "negative packed vertex_count \(count)")
+                detail: "negative packed vertex_count \(count)"
+            )
         }
         let expected = count * bytesPerVertex
         guard data.count == expected else {
             throw StoreError.corruptState(
                 entity: "diagram_drawing_stroke",
                 detail: "packed stroke is \(data.count) bytes, expected \(expected) "
-                    + "for \(count) vertices")
+                    + "for \(count) vertices"
+            )
         }
         let bytes = [UInt8](data)
         var vertices: [DiagramVertex] = []
@@ -143,7 +129,9 @@ public enum DiagramStrokeCodec {
                 DiagramVertex(
                     x: Double(Float(bitPattern: xBits)),
                     y: Double(Float(bitPattern: yBits)),
-                    pressure: raw == nilPressure ? nil : Double(raw) / pressureScale))
+                    pressure: raw == nilPressure ? nil : Double(raw) / pressureScale
+                )
+            )
         }
         return vertices
     }
@@ -157,7 +145,8 @@ public enum DiagramStrokeCodec {
     /// Endpoints are always preserved, so a decimated stroke still starts
     /// and ends exactly where the hand did.
     public static func decimate(
-        _ vertices: [DiagramVertex], epsilon: Double = defaultEpsilon
+        _ vertices: [DiagramVertex],
+        epsilon: Double = defaultEpsilon
     ) -> [DiagramVertex] {
         guard vertices.count > 2, epsilon > 0 else { return vertices }
         var keep = [Bool](repeating: false, count: vertices.count)
@@ -168,8 +157,11 @@ public enum DiagramStrokeCodec {
     }
 
     private static func simplify(
-        _ v: [DiagramVertex], _ first: Int, _ last: Int,
-        _ epsilon: Double, _ keep: inout [Bool]
+        _ v: [DiagramVertex],
+        _ first: Int,
+        _ last: Int,
+        _ epsilon: Double,
+        _ keep: inout [Bool]
     ) {
         guard last > first + 1 else { return }
         var maxDistance = 0.0
@@ -188,7 +180,9 @@ public enum DiagramStrokeCodec {
     }
 
     private static func perpendicularDistance(
-        _ p: DiagramVertex, _ a: DiagramVertex, _ b: DiagramVertex
+        _ p: DiagramVertex,
+        _ a: DiagramVertex,
+        _ b: DiagramVertex
     ) -> Double {
         let dx = b.x - a.x
         let dy = b.y - a.y

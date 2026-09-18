@@ -1,25 +1,20 @@
 import Foundation
 import GmDaemonSdk
 
-/// Filesystem derivations off daemon rows, isolated in one place. Rows carry
-/// gmfs-RELATIVE storage paths; everything here resolves against
-/// $GM_FS_ROOT. Historical archiving moved PROMPT folders (not session
-/// dirs) into _archive/cold_storage/<same relative path>, so the archive
-/// mirror is probed at the prompt-folder level, where archiving actually
-/// happened.
+/// Filesystem derivations off daemon rows, isolated in one place. Rows carry gmfs-RELATIVE
+/// storage paths; everything here resolves against $GM_FS_ROOT. The archive mirror lives at
+/// `_archive/cold_storage/<same relative path>` and is probed at the PROMPT-folder level,
+/// because that is the granularity archiving works at.
 ///
-/// All functions perform synchronous FileManager probes — callers resolve
-/// off the main actor and cache the results (never call from a View body).
+/// Every function performs synchronous FileManager probes: resolve off the main actor and
+/// cache the result, never call from a View body.
 nonisolated enum GmFsPathResolver {
-    /// Slug rule shared with prompt codes (mirrors the historical folder
-    /// segment rule; also used by CreatePromptView's code preview).
+    /// The folder-segment slug rule, shared with prompt codes.
     ///
-    /// WARNING: this is NOT the session-code rule. `session.code` is derived
-    /// from the branch with ONLY `/` → `__` (no case/punctuation folding),
-    /// and branch comparison is daemon-side now — INSTANCE_CURRENT_SESSION
-    /// returns the authoritatively slugged code. Never compare a branch
-    /// against THIS slug: it folds aggressively, so `Feature/Login` would
-    /// silently never match its session.
+    /// This is NOT the session-code rule: `session.code` folds only `/` → `__`, with no case
+    /// or punctuation folding, and INSTANCE_CURRENT_SESSION returns the authoritative code.
+    /// Never compare a branch against this slug — it folds aggressively, so `Feature/Login`
+    /// would silently never match its session.
     static func slug(_ name: String) -> String {
         let lower = name.lowercased()
         var out = ""
@@ -110,7 +105,8 @@ nonisolated enum GmFsPathResolver {
             ResolvedMemory(
                 root: root,
                 isDaemonWatched: root != nil && watched != nil
-                    && root!.standardizedFileURL.path == watched!.standardizedFileURL.path)
+                    && root!.standardizedFileURL.path == watched!.standardizedFileURL.path
+            )
         }
         let parents = artifacts.compactMap { artifact -> URL? in
             let path = artifact.filePath

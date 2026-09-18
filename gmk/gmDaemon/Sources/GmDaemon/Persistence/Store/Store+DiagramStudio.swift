@@ -15,7 +15,8 @@ extension Store {
         if let visibility = req.visibility, DiagramVisibility(rawValue: visibility) == nil {
             throw StoreError.badRequest(
                 detail:
-                    "unknown visibility '\(visibility)' (PRIVATE|PUBLIC)")
+                    "unknown visibility '\(visibility)' (PRIVATE|PUBLIC)"
+            )
         }
         let trimmed = (req.query ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         // Browse mode tolerates an empty query by design; a NON-empty query

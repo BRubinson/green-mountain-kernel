@@ -4,16 +4,12 @@ import GmDaemonSdk
 
 /// Reads and writes `dope_element_provenance` — the merge base.
 ///
-/// Two writers, and they are deliberately the only two:
-///   * `stampProvenanceFromFiles` runs after a files -> db sync and records
-///     what each element looked like when it arrived, clearing the dirty
-///     flag. This IS the base.
-///   * `markLocallyModified` runs on a granular dope mutation and sets the
-///     dirty flag for the affected dot-path.
-///
-/// Everything is addressed by dot-path, never uuid: ingest re-mints every
-/// child uuid, so uuid-keyed provenance would be erased by the operation it
-/// exists to inform.
+/// Two writers, deliberately the only two: `stampProvenanceFromFiles` runs after
+/// a files -> db sync and records what each element looked like when it arrived,
+/// clearing the dirty flag, which IS the base; `markLocallyModified` runs on a
+/// granular dope mutation and sets the dirty flag for that dot-path.
+/// Everything is addressed by dot-path, never uuid: ingest re-mints every child
+/// uuid, so uuid-keyed provenance would be erased by what it exists to inform.
 extension Store {
 
     // MARK: - Cross-domain helper forwards (bodies in DopeProvenanceRepository)
@@ -23,14 +19,19 @@ extension Store {
     }
 
     func stampProvenanceFromFiles(
-        _ db: Database, scopeUuid: String, bundle: DopeDocumentBundle
+        _ db: Database,
+        scopeUuid: String,
+        bundle: DopeDocumentBundle
     ) throws {
         try DopeProvenanceRepository(db: db, core: core)
             .stampFromFiles(scopeUuid: scopeUuid, bundle: bundle)
     }
 
     func markLocallyModified(
-        _ db: Database, scopeUuid: String, dotPath: String, kind: String
+        _ db: Database,
+        scopeUuid: String,
+        dotPath: String,
+        kind: String
     ) throws {
         try DopeProvenanceRepository(db: db, core: core)
             .markLocallyModified(scopeUuid: scopeUuid, dotPath: dotPath, kind: kind)
@@ -84,23 +85,19 @@ extension Store {
         }
     }
 
-    /// Resolve one conflicting dot-path — or every one of them.
+    /// Resolve one conflicting dot-path, or every one of them.
     ///
     /// Resolution is expressed IN the base rather than by rewriting a tree,
-    /// which is what makes it a single small write instead of a second merge
-    /// engine:
-    ///
-    ///   take theirs → clear the dirty flag, so the next sync takes the file
-    ///                 exactly as an untouched element would;
-    ///   take ours   → re-base onto the file's CURRENT hash while staying
-    ///                 dirty, so the local edit is kept and the file is no
-    ///                 longer considered to have moved.
-    ///
-    /// Either way the conflict is gone on the next plan, in the direction
-    /// that was chosen.
+    /// which makes it one small write instead of a second merge engine. Take
+    /// theirs clears the dirty flag, so the next sync takes the file exactly as
+    /// an untouched element would. Take ours re-bases onto the file's CURRENT
+    /// hash while staying dirty, so the local edit is kept and the file is not
+    /// treated as having moved. Either way the conflict is gone on the next plan.
     @discardableResult
     public func dopeResolve(
-        scopeUuid: String, dotPath: String?, takeOurs: Bool
+        scopeUuid: String,
+        dotPath: String?,
+        takeOurs: Bool
     ) throws -> [String] {
         let plan = try dopeMergePlan(scopeUuid: scopeUuid)
         let conflicts = DopeMerge.conflicts(in: plan)
@@ -112,7 +109,8 @@ extension Store {
                     detail: conflicts.isEmpty
                         ? "no unresolved dope conflicts in scope \(scopeUuid)"
                         : "'\(dotPath)' is not a conflicting path; conflicts: "
-                            + conflicts.map(\.dotPath).joined(separator: ", "))
+                            + conflicts.map(\.dotPath).joined(separator: ", ")
+                )
             }
             targets = [match]
         } else {
@@ -127,7 +125,7 @@ extension Store {
             }
             let root = try self.instanceRoot(db, sessionUuid: try scope.requireSessionUuid())
             let sandbox = try DopeRepoSandbox.resolve(instanceRoot: root)
-            var out = [String: String]()
+            var out: [String: String] = [:]
             for element in DopeMerge.elements(of: try sandbox.readBundle().bundle) {
                 out[element.dotPath] = element.contentHash
             }
@@ -147,14 +145,17 @@ extension Store {
                         arguments: [
                             theirHashes[target.dotPath], now,
                             scopeUuid, target.dotPath,
-                        ])
+                        ]
+                    )
                 } else {
                     try db.execute(
                         sql: """
                             UPDATE dope_element_provenance
                                SET locally_modified = 0, updated_at = ?
                              WHERE dope_scope_uuid = ? AND dot_path = ?
-                            """, arguments: [now, scopeUuid, target.dotPath])
+                            """,
+                        arguments: [now, scopeUuid, target.dotPath]
+                    )
                 }
             }
         }

@@ -57,7 +57,8 @@ extension Store {
                                     name: entry.name,
                                     type: entry.type,
                                     description: entry.description,
-                                    fullPath: sourceDir.appendingPathComponent(entry.name).path)
+                                    fullPath: sourceDir.appendingPathComponent(entry.name).path
+                                )
                         },
                         keywords: artifact.keywords
                     )
@@ -81,9 +82,15 @@ extension Store {
             var rc = resourceCount
             var fc = fileCount
             var kw = attachedKeywords
-            let uuid = try KbiteResourceRepository(db: db, core: core).digestApply(
-                code: req.code, found: found, inlinedContents: inlinedContents,
-                resourceCount: &rc, fileCount: &fc, attachedKeywords: &kw)
+            let uuid = try KbiteResourceRepository(db: db, core: core)
+                .digestApply(
+                    code: req.code,
+                    found: found,
+                    inlinedContents: inlinedContents,
+                    resourceCount: &rc,
+                    fileCount: &fc,
+                    attachedKeywords: &kw
+                )
             resourceCount = rc
             fileCount = fc
             attachedKeywords = kw
@@ -154,9 +161,18 @@ extension Store {
 
     @discardableResult
     func attachKeyword(
-        _ db: Database, table: String, ownerColumn: String, ownerUuid: String, keywordUuid: String
+        _ db: Database,
+        table: String,
+        ownerColumn: String,
+        ownerUuid: String,
+        keywordUuid: String
     ) throws -> Bool {
-        try KbiteResourceRepository(db: db, core: core).attachKeyword(
-            table: table, ownerColumn: ownerColumn, ownerUuid: ownerUuid, keywordUuid: keywordUuid)
+        try KbiteResourceRepository(db: db, core: core)
+            .attachKeyword(
+                table: table,
+                ownerColumn: ownerColumn,
+                ownerUuid: ownerUuid,
+                keywordUuid: keywordUuid
+            )
     }
 }

@@ -27,7 +27,12 @@ A kbite is a persistent body of analyzed reference material — docs, API refere
 - Relate — cross-reference two kbites
 - Export — portable zip carrying db rows and sources
 - Import — never auto-registers
-- `gm_hook call KBITE_DELETE --json '{"code":"<code>"}'` — deletes and cascades; back up first
+- Delete — cascades, and has NO pen door. It is an operator act; report the request rather than performing it.
 
 ### Registry
-Active kbites are listed on the prompt or session. Add one explicitly only when asked; never auto-add. Path roots come from `gm_hook paths --json` — never hardcode them.
+Active kbites are listed on the prompt or session (`kbite_codes` on `cde_load_prompt`). Adding one to a registry has no pen door either: on an explicit request, report it; never auto-add. Path roots resolve under `$GM_FS_ROOT` — never hardcode them.
+
+### Reference
+Detail lives beside this file rather than in it — read it only when it names your situation:
+
+- `ref/kbite_awareness.md` — What kbites are, how they are searched, and when to reach for one instead of reading files.

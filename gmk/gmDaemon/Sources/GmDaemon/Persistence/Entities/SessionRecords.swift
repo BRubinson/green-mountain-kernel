@@ -47,26 +47,27 @@ extension SessionRecord {
     /// unclaimed.
     func wireRow(activations: [PromptActivationRow]) -> SessionRow {
         SessionRow(
-            uuid: uuid, version: version, code: code, name: name,
-            backstory: backstory, goal: goal,
-            createdAt: createdAt, updatedAt: updatedAt,
-            activations: activations)
+            uuid: uuid,
+            version: version,
+            code: code,
+            name: name,
+            backstory: backstory,
+            goal: goal,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            activations: activations
+        )
     }
 }
 
-/// PROJECTION record: a typed decoder for a result-set shape rather than a
-/// table mirror, so it is deliberately NOT enrolled in RecordSchemaTests
-/// (which maps live TABLES, and stays at exactly 57 entries).
+/// PROJECTION record: a typed decoder for a result-set shape, not a table
+/// mirror, so it is deliberately NOT enrolled in RecordSchemaTests.
 ///
 /// `lastActivityAt` is a correlated MAX() across session.updated_at,
-/// prompt.updated_at and file_change.created_at — not a column anywhere.
-/// That is exactly why SessionRecord.wireRow() cannot synthesize it, and why
-/// this shape was previously the one hand mapper with no repository owner
-/// (it served both ListingRepository.listSessions and
-/// GitStateRepository.instanceCurrentSession from a static on Store).
-///
-/// The MAX is lexicographic, which is only correct because isoNow() emits
-/// seconds-precision ISO-8601 Z for every writer.
+/// prompt.updated_at and file_change.created_at, and is a column nowhere, which
+/// is why SessionRecord.wireRow() cannot synthesize it. The MAX is
+/// lexicographic, correct only because isoNow() emits seconds-precision
+/// ISO-8601 Z for every writer.
 struct SessionStubRecord: SnakeCaseDecoded {
     var uuid: String
     var version: Int64
@@ -91,6 +92,7 @@ extension SessionStubRecord {
             gmfsRelativeStoragePath: gmfsRelativeStoragePath,
             createdAt: createdAt,
             updatedAt: updatedAt,
-            lastActivityAt: lastActivityAt)
+            lastActivityAt: lastActivityAt
+        )
     }
 }

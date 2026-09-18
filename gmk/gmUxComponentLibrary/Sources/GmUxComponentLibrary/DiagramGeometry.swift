@@ -26,6 +26,8 @@ public enum DiagramDrag {
                 elementUuid: node.identity.uuid,
                 expectedVersion: node.identity.version,
                 centerX: node.base.centerX + diagramDelta.width / divisor,
-                centerY: node.base.centerY + diagramDelta.height / divisor))
+                centerY: node.base.centerY + diagramDelta.height / divisor
+            )
+        )
     }
 }

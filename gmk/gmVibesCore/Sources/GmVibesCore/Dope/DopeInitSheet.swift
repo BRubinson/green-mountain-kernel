@@ -129,7 +129,11 @@ struct DopeInitSheet: View {
         Task {
             do {
                 try await store.initScope(
-                    key: key, code: code, name: name, description: descriptionText)
+                    key: key,
+                    code: code,
+                    name: name,
+                    description: descriptionText
+                )
                 dismiss()
             } catch let error as DaemonError {
                 submitError = error.userMessage

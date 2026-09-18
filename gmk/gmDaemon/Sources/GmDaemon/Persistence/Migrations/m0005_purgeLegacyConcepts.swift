@@ -3,29 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0005 — purge the legacy concepts. Three rebuilds plus a backfill.
-    //
-    // The plugin no longer has a legacy tier: YEETS is gone, the yaml era
-    // is gone, and every bot report is db-native. What kept the legacy
-    // FORK alive was data — 66 clarification rows categorised yeet_type,
-    // 84 review verdicts of legacy_unstated, and 105 pre-m0002 prompts
-    // carrying no clarification/architecture summary at all, whose only
-    // record was an on-disk qualified.md/architecture.md reached through
-    // SUMMARY_ABSENT + prompt_is_legacy. This migration removes that data
-    // reason so the fork can leave the code. Uniformity was chosen over
-    // fidelity by explicit decision: the placeholder summaries assert a
-    // completeness the underlying history does not have, and point at the
-    // file for anyone who wants the real content.
-    //
+    // m0005 — purge the legacy concepts: three rebuilds plus a backfill, so no
+    // row carries yeet_type, legacy_unstated, or a missing summary.
     // SQLite cannot alter a CHECK, so clarification, review_summary and
-    // prompt_artifact rebuild. Registered with NO foreignKeyChecks:
-    // argument for the same reason m0002 is — GRDB's default .deferred IS
-    // the official SQLite 12-step, and with FK enforcement live the
-    // review_summary drop would CASCADE every review_finding away. NO
-    // PRAGMA may appear in this body. Each rebuild copies `id` explicitly:
-    // the external-content FTS5 mirrors join on content_rowid='id', and a
-    // DROP TABLE takes the source table's triggers with it, so every
-    // rebuilt table recreates its triggers and re-runs the fts rebuild.
+    // prompt_artifact rebuild. Registered with NO foreignKeyChecks: argument —
+    // GRDB's default .deferred IS the SQLite 12-step, and with FK enforcement
+    // live the review_summary drop would CASCADE every review_finding away. NO
+    // PRAGMA in this body. Each rebuild copies `id` explicitly (the FTS5 mirrors
+    // join on content_rowid) and recreates the triggers DROP TABLE removes.
     static func m0005_purgeLegacyConcepts(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0005_purgeLegacyConcepts") { db in
             // Step 1 — data motion FIRST, so the narrowed CHECKs hold when the
@@ -37,7 +22,8 @@ extension Migrations {
 
                     UPDATE review_summary SET verdict = 'approved'
                      WHERE verdict = 'legacy_unstated';
-                    """)
+                    """
+            )
 
             // Step 2 — clarification: drop yeet_type from the category CHECK.
             try db.execute(
@@ -73,7 +59,8 @@ extension Migrations {
 
                     CREATE INDEX idx_clarification_summary_uuid_fk
                         ON clarification(clarification_summary_uuid);
-                    """)
+                    """
+            )
 
             // Step 3 — review_summary: drop legacy_unstated from the verdict
             // CHECK. review_finding CASCADE-references this table by uuid;
@@ -106,7 +93,8 @@ extension Migrations {
 
                     CREATE INDEX idx_review_summary_prompt_uuid
                         ON review_summary(prompt_uuid);
-                    """)
+                    """
+            )
 
             // Step 4 — prompt_artifact: drop the kind column. Every legal
             // value described a pre-migration report file except 'other',
@@ -135,7 +123,8 @@ extension Migrations {
 
                     CREATE INDEX idx_prompt_artifact_prompt_uuid
                         ON prompt_artifact(prompt_uuid);
-                    """)
+                    """
+            )
 
             // Step 5 — recreate the FTS triggers the drops took with them, and
             // rebuild both indexes. A private copy of the m0003 loop: frozen
@@ -173,7 +162,8 @@ extension Migrations {
                         END;
 
                         INSERT INTO \(fts)(\(fts)) VALUES('rebuild');
-                        """)
+                        """
+                )
             }
 
             // Step 6 — the backfill. Every prompt gets a clarification and an
@@ -193,7 +183,8 @@ extension Migrations {
                      WHERE NOT EXISTS (
                          SELECT 1 FROM clarification_summary c WHERE c.prompt_uuid = p.uuid
                      )
-                    """)
+                    """
+            )
             for row in missingClarification {
                 let promptUuid: String = row["prompt_uuid"]
                 let storagePath: String = row["storage_path"]
@@ -213,7 +204,8 @@ extension Migrations {
                         UUID().uuidString.lowercased(), now, now, promptUuid,
                         "Backfilled by m0005; not authored by a bot run.",
                         pointer, pointer,
-                    ])
+                    ]
+                )
             }
 
             let missingArchitecture = try Row.fetchAll(
@@ -224,7 +216,8 @@ extension Migrations {
                      WHERE NOT EXISTS (
                          SELECT 1 FROM architecture_summary a WHERE a.prompt_uuid = p.uuid
                      )
-                    """)
+                    """
+            )
             for row in missingArchitecture {
                 let promptUuid: String = row["prompt_uuid"]
                 let storagePath: String = row["storage_path"]
@@ -242,7 +235,8 @@ extension Migrations {
                         """,
                     arguments: [
                         UUID().uuidString.lowercased(), now, now, promptUuid, pointer,
-                    ])
+                    ]
+                )
             }
 
             try db.execute(

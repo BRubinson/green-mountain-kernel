@@ -2,17 +2,13 @@ import Foundation
 import GmDaemon
 import GmDaemonSdk
 
-// TEST_* — the agent-scoped test mutex (m0029, wire v29).
+// TEST_* — the agent-scoped test mutex, sitting above the kernel's own
+// single-writer flock: flock stops two KERNELS writing one database, these stop
+// two AGENTS building and testing one repository.
 //
-// A mutex for AGENTS, sitting above the kernel's own single-writer flock:
-// flock stops two KERNELS writing one database, these stop two AGENTS building
-// and testing one repository.
-//
-// Note what is absent: there is no "run the tests" verb. Execution needs
-// process supervision, output streaming and cancellation, none of which is this
-// change. TEST_RUN_START records that a run began and what will signal its
-// completion, which is exactly what another agent needs in order to decide
-// whether to wait — and it keeps the surface small enough to be correct.
+// There is deliberately no "run the tests" verb. TEST_RUN_START records only
+// that a run began and what will signal its completion, which is what another
+// agent needs in order to decide whether to wait.
 
 /// TEST_SUITE_LIST — the suites a project declares, read from the CHECKOUT.
 enum TestSuiteListHandler {

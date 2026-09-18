@@ -1,23 +1,13 @@
 import Foundation
 
-/// COGS — Coordination Of General Systems.
+/// COGS — Coordination Of General Systems: the mass-relationship layer naming
+/// a project's primary systems and how they fit together, where the
+/// persistence tree models what the project STORES.
 ///
-/// Where the persistence tree models what the project STORES, a cog tree
-/// models how its larger systems fit together: the mass-relationship layer
-/// that names a project's primary systems and, later, the wiring between
-/// them.
-///
-/// The registry below is the whole extensibility story, and it exists
-/// because of a specific piece of debt. m0010's `diagram_element.element_type`
-/// carries a `CHECK (element_type IN (...))`, so adding a type there means
-/// rebuilding the table — the same pain m0008 already paid once for
-/// dope_domain_entity. `dope_cog_element.element_type` therefore carries NO
-/// CHECK. Validity lives here in Swift, enforced at read the way
-/// Store+Diagram.fetchElementInfo already does, plus the structural
-/// guarantee that exactly one subtype row exists per element.
-///
-/// Adding a second element type is: one case, one registry entry, one
-/// subtype table. Never a migration against dope_cog_element.
+/// `dope_cog_element.element_type` carries NO CHECK constraint; validity lives
+/// in the registry below and is enforced at read, alongside the structural
+/// guarantee that exactly one subtype row exists per element. Adding a type is
+/// one case, one registry entry, one subtype table — never a migration.
 public enum DopeCogElementType: String, Codable, Hashable, CaseIterable, Sendable {
     /// A fundamental organizational boundary of the project — the things a
     /// repo actually splits along (daemon / app / bot, or backend /
@@ -75,14 +65,16 @@ public struct DopeCogElementSpec: Sendable {
             subtypeTable: "dope_cog_hull",
             ownedFields: [.primaryPath, .dopeScopeCode],
             requiredFields: [.primaryPath],
-            allowedParentTypes: nil),
+            allowedParentTypes: nil
+        ),
         .persistenceOwner: DopeCogElementSpec(
             type: .persistenceOwner,
             subtypeTable: "dope_cog_persistence_owner",
             ownedFields: [.dopePersistenceCode],
             requiredFields: [.dopePersistenceCode],
             // Links live on a Hull and nowhere else.
-            allowedParentTypes: [.hull]),
+            allowedParentTypes: [.hull]
+        ),
     ]
 
     /// Throws on an unknown value rather than letting a bad row render as
@@ -91,7 +83,8 @@ public struct DopeCogElementSpec: Sendable {
         guard let type = DopeCogElementType(rawValue: raw), let spec = all[type] else {
             throw StoreError.badRequest(
                 detail: "unknown cog element_type '\(raw)' (known: "
-                    + DopeCogElementType.allCases.map(\.rawValue).joined(separator: ", ") + ")")
+                    + DopeCogElementType.allCases.map(\.rawValue).joined(separator: ", ") + ")"
+            )
         }
         return spec
     }

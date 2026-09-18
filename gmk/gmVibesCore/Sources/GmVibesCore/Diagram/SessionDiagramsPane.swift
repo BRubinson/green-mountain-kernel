@@ -1,15 +1,12 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// The session view's DIAGRAMS tab — a real list of the session's SAVED
-/// diagrams (DIAGRAM_LIST at SESSION tier), not the dope scopes it used to
-/// show. A diagram is a document now; the scope it is drawn over is one of
-/// its properties, not its identity.
+/// The session view's DIAGRAMS tab: the session's SAVED diagrams over DIAGRAM_LIST at SESSION
+/// tier. A diagram is a document, and the dope scope it is drawn over is a property of it.
 ///
-/// Creating one binds it to a dope scope (read through the session's existing
-/// DopeStore, so the tab shares one cache with the dope tab) and the CREATE
-/// is what seeds the canvas — see DiagramCatalogStore.create. Importing pulls
-/// a PROJECT-tier diagram down into this session as a copy.
+/// Creating one binds it to a dope scope, read through the session's existing DopeStore so
+/// the tab shares one cache with the dope tab, and the CREATE seeds the canvas. Importing
+/// pulls a PROJECT-tier diagram down into this session as a copy.
 struct SessionDiagramsPane: View {
     @Environment(DaemonConnectionModel.self) private var daemon
     @Environment(DiagramCatalogStore.self) private var diagrams
@@ -48,7 +45,9 @@ struct SessionDiagramsPane: View {
         .alert(
             "Diagram action failed",
             isPresented: Binding(
-                get: { actionError != nil }, set: { if !$0 { actionError = nil } })
+                get: { actionError != nil },
+                set: { if !$0 { actionError = nil } }
+            )
         ) {
             Button("OK", role: .cancel) { actionError = nil }
         } message: {
@@ -74,7 +73,8 @@ struct SessionDiagramsPane: View {
             .disabled(busy)
             .help(
                 "Create a session diagram over one dope scope — the canvas is "
-                    + "scaffolded from that scope once, at creation")
+                    + "scaffolded from that scope once, at creation"
+            )
 
             Menu {
                 if projectRows.isEmpty {
@@ -125,7 +125,8 @@ struct SessionDiagramsPane: View {
             Button("Make Public") { setVisibility(row, .public) }
                 .help(
                     "PUBLIC session diagrams can serialize into the repo's "
-                        + "committed .gmcc tree via DIAGRAM_WRITE_REPO")
+                        + "committed .gmcc tree via DIAGRAM_WRITE_REPO"
+                )
         }
         Divider()
         Button("Delete Diagram", role: .destructive) { delete(row) }
@@ -137,11 +138,16 @@ struct SessionDiagramsPane: View {
         run {
             let code = Self.uniqueCode(
                 base: "\(scopeRow.code)_canvas",
-                taken: Set(rows.map(\.code)))
+                taken: Set(rows.map(\.code))
+            )
             _ = try await diagrams.create(
-                owner: owner, code: code, name: scopeRow.name,
-                dopeScopeCode: scopeRow.code, projectUuid: projectUuid,
-                sessionUuid: scope.sessionUuid)
+                owner: owner,
+                code: code,
+                name: scopeRow.name,
+                dopeScopeCode: scopeRow.code,
+                projectUuid: projectUuid,
+                sessionUuid: scope.sessionUuid
+            )
         }
     }
 
@@ -149,16 +155,23 @@ struct SessionDiagramsPane: View {
         run {
             let code = Self.uniqueCode(base: row.code, taken: Set(rows.map(\.code)))
             _ = try await diagrams.copy(
-                row, to: owner, code: code, name: row.name,
-                projectUuid: projectUuid)
+                row,
+                to: owner,
+                code: code,
+                name: row.name,
+                projectUuid: projectUuid
+            )
         }
     }
 
     private func promote(_ row: DiagramRow) {
         run {
             try await diagrams.promote(
-                row, to: .project, ownerUuid: projectUuid,
-                from: owner)
+                row,
+                to: .project,
+                ownerUuid: projectUuid,
+                from: owner
+            )
             await diagrams.refreshGallery(galleryScope)
         }
     }

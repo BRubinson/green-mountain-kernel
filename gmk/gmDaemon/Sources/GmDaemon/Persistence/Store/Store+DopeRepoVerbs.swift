@@ -6,41 +6,31 @@ import GmDaemonSdk
 // NOT the repository pattern — data access lives in DopeRepository. Filesystem work never
 // enters a db transaction (the four-phase contract below).
 
-/// The three whole-tree repo verbs, each a four-phase orchestration:
-///
-///   1. db read     — resolve scope, instance root, tree, revision;
-///   2. pure        — projection + validation, no db, no fs;
-///   3. filesystem  — contained read or atomic write, NO db lock held
-///                    (Server's serial dispatch queue means no other
-///                    client's commit can interleave with phase 3);
-///   4. db write    — ingest's tree replace, or the audit event alone.
-///
+/// The three whole-tree repo verbs, each a four-phase orchestration: db read to
+/// resolve scope, instance root, tree and revision; a pure projection and
+/// validation step; contained filesystem work with NO db lock held, safe because
+/// Server's serial dispatch queue keeps another client's commit from
+/// interleaving; then the db write.
 /// Phase 3 is why these verbs REFUSE to run inside a caller-opened transaction
 /// (`StoreError.notComposable`): composing one would hold the single writer
-/// across filesystem I/O, blocking every other writer in the machine on
-/// someone else's disk.
-///
-/// Filesystem work never enters a db transaction — the Store+Backup /
-/// digestKbite rule, load-bearing here because these verbs write into a
-/// user's repo.
+/// across filesystem I/O, blocking every other writer on someone else's disk.
 extension Store {
 
     /// The repo verbs are SESSION-BASE ONLY.
     ///
-    /// `requireSessionUuid()` is not the gate it looks like: it succeeds for
-    /// BOTH `.sessionInstance` and `.sessionInstanceItem`, because
-    /// `isSessionOwned` covers the overlay tier too. Without this guard,
-    /// a DOPE_WRITE_REPO aimed at a PROMPT scope resolves the same
-    /// instance root a session-base write resolves and overwrites the shared
-    /// {instance_root}/.gmcc tree — and an overlay carries soft-delete
+    /// `requireSessionUuid()` is not the gate it looks like: it succeeds for BOTH
+    /// `.sessionInstance` and `.sessionInstanceItem`, because `isSessionOwned`
+    /// covers the overlay tier. Without this guard a DOPE_WRITE_REPO aimed at a
+    /// PROMPT scope resolves the same instance root a session-base write does and
+    /// overwrites the shared {instance_root}/.gmcc tree — and an overlay carries
     /// tombstones, which must never reach a committed .doped.json.
-    ///
-    /// Stated once here rather than three times inline, so the three verbs
-    /// cannot drift apart.
     static func requireRepoWritableScope(_ scope: DopeScopeRow, verb: String) throws {
         guard scope.tier == .sessionInstance else {
             throw StoreError.dopeScopeNotRepoWritable(
-                scopeUuid: scope.uuid, scopeType: scope.scopeType, verb: verb)
+                scopeUuid: scope.uuid,
+                scopeType: scope.scopeType,
+                verb: verb
+            )
         }
     }
 
@@ -76,7 +66,8 @@ extension Store {
             root = dirPath
         default:
             throw StoreError.badRequest(
-                detail: "read-repo needs exactly one of --scope-uuid or --dir-path")
+                detail: "read-repo needs exactly one of --scope-uuid or --dir-path"
+            )
         }
 
         // Phase 3 — read (no phase-2 work on the way in; validation follows
@@ -105,7 +96,8 @@ extension Store {
             onDiskRevision: onDisk,
             dbRevision: dbRevision,
             drift: dbRevision.map { $0 != onDisk },
-            warnings: repo.warnings)
+            warnings: repo.warnings
+        )
     }
 
     // MARK: - write-repo
@@ -145,7 +137,10 @@ extension Store {
             sandbox = try DopeRepoSandbox.resolve(instanceRoot: root)
             if let onDisk = sandbox.peekRevision(), onDisk > scope.revision, req.force != true {
                 throw StoreError.revisionConflict(
-                    scopeUuid: scope.uuid, expected: onDisk, actual: scope.revision)
+                    scopeUuid: scope.uuid,
+                    expected: onDisk,
+                    actual: scope.revision
+                )
             }
             result = try sandbox.writeAtomically(bundle)
         } catch let error as DopeRepoSandbox.SandboxError {
@@ -165,15 +160,19 @@ extension Store {
             if req.force == true { payload["forced"] = true }
             if !result.pruned.isEmpty { payload["files_pruned"] = result.pruned }
             try self.appendEvent(
-                db, kind: .dopeChange, subjectUuid: scope.uuid,
-                payload: Store.jsonPayload(payload))
+                db,
+                kind: .dopeChange,
+                subjectUuid: scope.uuid,
+                payload: Store.jsonPayload(payload)
+            )
             try self.touchSession(db, uuid: try scope.requireSessionUuid())
         }
         return DopeWriteRepoResponse(
             dopeRoot: sandbox.dopeRoot.path,
             filesWritten: result.written,
             filesPruned: result.pruned,
-            revision: scope.revision)
+            revision: scope.revision
+        )
     }
 
     // MARK: - ingest
@@ -213,18 +212,14 @@ extension Store {
             throw StoreError.badRequest(detail: error.description)
         }
 
-        // Phase 4 — one transaction: gate revision == file.version - 1
-        // exactly (single guarded UPDATE, changesCount-discriminated per the
-        // updateBase idiom), ordered wipe, dependency-ordered re-insert.
-        // Every child uuid changes — the locked no-smart-diff consequence.
-        //
-        // The file is the whole truth, so scope.doped.json's scope
-        // name/description are APPLIED to the row (a hand-edit must never be
-        // silently reverted by the next write-repo). The row's optimistic
-        // lock `version` bumps ONLY when those fields actually change — SET
-        // right-hand sides read the OLD row in SQLite — so a pure tree
-        // ingest leaves it alone, per bumpScopeRevision's split-counter
-        // invariant. The scope CODE is identity, never ingested.
+        // Phase 4 — one transaction: gate revision == file.version - 1 exactly,
+        // ordered wipe, dependency-ordered re-insert. Every child uuid changes,
+        // which is the no-smart-diff consequence.
+        // The file is the whole truth, so scope.doped.json's name and description
+        // are APPLIED to the row, and a hand-edit must never be silently reverted
+        // by the next write-repo. The row's optimistic lock `version` bumps ONLY
+        // when those fields change, so a pure tree ingest leaves it alone. The
+        // scope CODE is identity and is never ingested.
         guard bundle.main.scope.code == scopeBefore.code else {
             throw StoreError.badRequest(
                 detail:
@@ -266,46 +261,69 @@ extension Store {
                     bundle.main.scope.name, bundle.main.scope.description,
                     bundle.main.scope.name, bundle.main.scope.description,
                     Store.isoNow(), req.scopeUuid, expectedRevision,
-                ])
+                ]
+            )
             if db.changesCount == 0 {
                 guard
                     let actual = try Int64.fetchOne(
-                        db, sql: "SELECT revision FROM dope_scope WHERE uuid = ?",
+                        db,
+                        sql: "SELECT revision FROM dope_scope WHERE uuid = ?",
                         arguments: [req.scopeUuid]
                     )
                 else {
                     throw StoreError.notFound(entity: "dope_scope", key: req.scopeUuid)
                 }
                 throw StoreError.revisionConflict(
-                    scopeUuid: req.scopeUuid, expected: expectedRevision, actual: actual)
+                    scopeUuid: req.scopeUuid,
+                    expected: expectedRevision,
+                    actual: actual
+                )
             }
 
             try self.wipeDopeTree(db, scopeUuid: req.scopeUuid)
             let counts = try self.insertDopeTree(
-                db, scopeUuid: req.scopeUuid, domainFiles: bundle.domainFiles)
+                db,
+                scopeUuid: req.scopeUuid,
+                domainFiles: bundle.domainFiles
+            )
             try self.insertDopeCogs(
-                db, scopeUuid: req.scopeUuid, cogFiles: bundle.cogFiles)
+                db,
+                scopeUuid: req.scopeUuid,
+                cogFiles: bundle.cogFiles
+            )
             // This tree just came FROM the files, so it IS the new merge
             // base: record every element's hash and clear the dirty flags.
             try self.stampProvenanceFromFiles(
-                db, scopeUuid: req.scopeUuid, bundle: bundle)
+                db,
+                scopeUuid: req.scopeUuid,
+                bundle: bundle
+            )
 
             guard let scope = try self.fetchDopeScope(db, uuid: req.scopeUuid) else {
                 throw StoreError.corruptState(entity: "dope_scope", detail: "vanished during ingest")
             }
             let gap = adopt ? (incoming - scopeBefore.revision - 1) : 0
             try self.recordDopeIngestEvent(
-                db, scope: scope, before: scopeBefore.revision,
-                counts: counts, adopted: adopt)
+                db,
+                scope: scope,
+                before: scopeBefore.revision,
+                counts: counts,
+                adopted: adopt
+            )
             return DopeIngestResponse(
-                scope: scope, counts: counts,
+                scope: scope,
+                counts: counts,
                 previousRevision: scopeBefore.revision,
-                gapCrossed: gap > 0 ? gap : nil)
+                gapCrossed: gap > 0 ? gap : nil
+            )
         }
     }
 
     private func recordDopeIngestEvent(
-        _ db: Database, scope: DopeScopeRow, before: Int64, counts: DopeTreeCounts,
+        _ db: Database,
+        scope: DopeScopeRow,
+        before: Int64,
+        counts: DopeTreeCounts,
         adopted: Bool
     ) throws {
         var payload: [String: Any] = [
@@ -322,8 +340,11 @@ extension Store {
         ]
         if adopted { payload["adopted"] = true }
         try appendEvent(
-            db, kind: .dopeChange, subjectUuid: scope.uuid,
-            payload: Store.jsonPayload(payload))
+            db,
+            kind: .dopeChange,
+            subjectUuid: scope.uuid,
+            payload: Store.jsonPayload(payload)
+        )
         try touchSession(db, uuid: scope.requireSessionUuid())
     }
 }

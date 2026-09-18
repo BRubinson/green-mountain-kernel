@@ -15,7 +15,9 @@ struct SessionRepository: RepositoryContext {
         }
         let prompts = try fetchPromptStubs(sessionUuid: req.sessionUuid)
         let changeSummary = try changeSummary(
-            where: "session_uuid = ?", arguments: [req.sessionUuid])
+            where: "session_uuid = ?",
+            arguments: [req.sessionUuid]
+        )
         let promptChanges = try promptChangeSummaries(sessionUuid: req.sessionUuid)
         return SessionGetResponse(
             session: session,
@@ -38,15 +40,18 @@ struct SessionRepository: RepositoryContext {
         if let activePromptUuid = req.activePromptUuid {
             guard req.clearActivePrompt != true else {
                 throw StoreError.badRequest(
-                    detail: "activePromptUuid and clearActivePrompt are mutually exclusive")
+                    detail: "activePromptUuid and clearActivePrompt are mutually exclusive"
+                )
             }
             guard let clientKey = req.clientKey else {
                 throw StoreError.badRequest(
-                    detail: "activation claims need a client key — run via gm, which resolves it")
+                    detail: "activation claims need a client key — run via gm, which resolves it"
+                )
             }
             guard
                 let owner = try String.fetchOne(
-                    db, sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
+                    db,
+                    sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
                     arguments: [activePromptUuid]
                 )
             else {
@@ -54,20 +59,25 @@ struct SessionRepository: RepositoryContext {
             }
             guard owner == req.sessionUuid else {
                 throw StoreError.badRequest(
-                    detail: "prompt \(activePromptUuid) belongs to session \(owner), not \(req.sessionUuid)")
+                    detail: "prompt \(activePromptUuid) belongs to session \(owner), not \(req.sessionUuid)"
+                )
             }
             try claimActivation(
                 sessionUuid: req.sessionUuid,
-                promptUuid: activePromptUuid, clientKey: clientKey)
+                promptUuid: activePromptUuid,
+                clientKey: clientKey
+            )
             activationTouched = true
         } else if req.clearActivePrompt == true {
             guard let clientKey = req.clientKey else {
                 throw StoreError.badRequest(
-                    detail: "activation claims need a client key — run via gm, which resolves it")
+                    detail: "activation claims need a client key — run via gm, which resolves it"
+                )
             }
             try db.execute(
                 sql: "DELETE FROM prompt_activation WHERE client_key = ?",
-                arguments: [clientKey])
+                arguments: [clientKey]
+            )
             activationTouched = true
         }
         guard !set.isEmpty || activationTouched else {
@@ -75,12 +85,19 @@ struct SessionRepository: RepositoryContext {
         }
         if !set.isEmpty {
             try core.updateBase(
-                db, table: "session", uuid: req.sessionUuid,
-                expectedVersion: req.expectedVersion, set: set)
+                db,
+                table: "session",
+                uuid: req.sessionUuid,
+                expectedVersion: req.expectedVersion,
+                set: set
+            )
         }
         try core.appendEvent(
-            db, kind: .updateSession, subjectUuid: req.sessionUuid,
-            payload: Store.jsonPayload(["fields": set.keys.sorted()]))
+            db,
+            kind: .updateSession,
+            subjectUuid: req.sessionUuid,
+            payload: Store.jsonPayload(["fields": set.keys.sorted()])
+        )
         guard let row = try fetchRow(uuid: req.sessionUuid) else {
             throw StoreError.notFound(entity: "session", key: req.sessionUuid)
         }
@@ -100,19 +117,24 @@ struct SessionRepository: RepositoryContext {
     /// re-claiming replaces both sides' old rows so the two partial-unique
     /// indexes can never collide on a legitimate re-claim.
     func claimActivation(
-        sessionUuid: String, promptUuid: String, clientKey: String
+        sessionUuid: String,
+        promptUuid: String,
+        clientKey: String
     ) throws {
         try evictDeadActivations(sessionUuid: sessionUuid)
         try db.execute(
             sql: "DELETE FROM prompt_activation WHERE client_key = ? OR prompt_uuid = ?",
-            arguments: [clientKey, promptUuid])
+            arguments: [clientKey, promptUuid]
+        )
         _ = try core.insertBase(
-            db, table: "prompt_activation",
+            db,
+            table: "prompt_activation",
             extra: [
                 "session_uuid": sessionUuid,
                 "prompt_uuid": promptUuid,
                 "client_key": clientKey,
-            ])
+            ]
+        )
     }
 
     /// Opportunistic liveness eviction (review finding 033dad8f): only
@@ -124,19 +146,24 @@ struct SessionRepository: RepositoryContext {
         let rows = try Row.fetchAll(
             db,
             sql: "SELECT uuid, client_key FROM prompt_activation WHERE session_uuid = ?",
-            arguments: [sessionUuid])
+            arguments: [sessionUuid]
+        )
         for row in rows where !Store.clientKeyLooksAlive(row["client_key"]) {
             try db.execute(
                 sql: "DELETE FROM prompt_activation WHERE uuid = ?",
-                arguments: [row["uuid"] as String])
+                arguments: [row["uuid"] as String]
+            )
         }
     }
 
     func fetchActivations(sessionUuid: String) throws -> [PromptActivationRow] {
         try PromptActivationRecord.fetchAll(
-            db, where: "session_uuid = ?", arguments: [sessionUuid],
+            db,
+            where: "session_uuid = ?",
+            arguments: [sessionUuid],
             orderBy: "created_at"
-        ).map { $0.wireRow() }
+        )
+        .map { $0.wireRow() }
     }
 
     /// The attribution ladder shared by file-change auto-attribution and the
@@ -144,7 +171,8 @@ struct SessionRepository: RepositoryContext {
     /// session's single claim when unambiguous, else nil (never a guess
     /// between two concurrent prompts).
     func resolveActivePrompt(
-        sessionUuid: String, clientKey: String?
+        sessionUuid: String,
+        clientKey: String?
     ) throws -> String? {
         // Dead claims are FILTERED here rather than deleted: this runs inside
         // read transactions (briefing get/stub). Deletion happens on the
@@ -166,7 +194,8 @@ struct SessionRepository: RepositoryContext {
     /// per-prompt fetch here would be the N+1 the enrichment exists to
     /// delete).
     func fetchPromptStubs(
-        sessionUuid: String?, withReports: Bool = false
+        sessionUuid: String?,
+        withReports: Bool = false
     ) throws -> [PromptStub] {
         let sql: String
         let arguments: StatementArguments
@@ -213,8 +242,9 @@ struct SessionRepository: RepositoryContext {
                         ON q.clarification_summary_uuid = cs.uuid
                     \(scope)
                     GROUP BY cs.uuid
-                    """, arguments: scopeArgs)
-            {
+                    """,
+                arguments: scopeArgs
+            ) {
                 clar[row["prompt_uuid"]] = ClarificationReportStub(
                     summaryUuid: row["uuid"],
                     version: row["version"],
@@ -235,8 +265,9 @@ struct SessionRepository: RepositoryContext {
                             WHERE gc.architecture_summary_uuid = cs.uuid) AS g_count
                     FROM architecture_summary cs
                     \(scope)
-                    """, arguments: scopeArgs)
-            {
+                    """,
+                arguments: scopeArgs
+            ) {
                 arch[row["prompt_uuid"]] = ArchitectureReportStub(
                     summaryUuid: row["uuid"],
                     version: row["version"],
@@ -282,8 +313,9 @@ struct SessionRepository: RepositoryContext {
                     FROM exploration_summary cs
                     \(scope)
                     GROUP BY cs.prompt_uuid
-                    """, arguments: scopeArgs)
-            {
+                    """,
+                arguments: scopeArgs
+            ) {
                 explore[row["prompt_uuid"]] = ExplorationReportStub(
                     summaryUuid: row["rep_uuid"],
                     version: row["rep_version"],
@@ -306,8 +338,9 @@ struct SessionRepository: RepositoryContext {
                     LEFT JOIN review_finding f ON f.review_summary_uuid = cs.uuid
                     \(scope)
                     GROUP BY cs.uuid
-                    """, arguments: scopeArgs)
-            {
+                    """,
+                arguments: scopeArgs
+            ) {
                 review[row["prompt_uuid"]] = ReviewReportStub(
                     summaryUuid: row["uuid"],
                     version: row["version"],
@@ -320,26 +353,30 @@ struct SessionRepository: RepositoryContext {
                 )
             }
         }
-        return try Row.fetchAll(db, sql: sql, arguments: arguments).map { row in
-            let uuid: String = row["uuid"]
-            return PromptStub(
-                uuid: uuid,
-                sessionUuid: row["session_uuid"],
-                seq: row["seq"],
-                code: row["code"],
-                name: row["name"],
-                status: row["status"],
-                version: row["version"],
-                gmfsRelativeStoragePath: row["gmfs_relative_storage_path"],
-                reports: withReports
-                    ? PromptReportsStub(
-                        clarification: clar[uuid], architecture: arch[uuid],
-                        exploration: explore[uuid], review: review[uuid])
-                    : nil,
-                createdAt: row["created_at"],
-                updatedAt: row["updated_at"]
-            )
-        }
+        return try Row.fetchAll(db, sql: sql, arguments: arguments)
+            .map { row in
+                let uuid: String = row["uuid"]
+                return PromptStub(
+                    uuid: uuid,
+                    sessionUuid: row["session_uuid"],
+                    seq: row["seq"],
+                    code: row["code"],
+                    name: row["name"],
+                    status: row["status"],
+                    version: row["version"],
+                    gmfsRelativeStoragePath: row["gmfs_relative_storage_path"],
+                    reports: withReports
+                        ? PromptReportsStub(
+                            clarification: clar[uuid],
+                            architecture: arch[uuid],
+                            exploration: explore[uuid],
+                            review: review[uuid]
+                        )
+                        : nil,
+                    createdAt: row["created_at"],
+                    updatedAt: row["updated_at"]
+                )
+            }
     }
 
     /// One grouped aggregation: file_change row count, distinct files touched,
@@ -384,7 +421,8 @@ struct SessionRepository: RepositoryContext {
                 ORDER BY fc.prompt_uuid
                 """,
             arguments: [sessionUuid]
-        ).map { row in
+        )
+        .map { row in
             PromptChangeSummary(
                 promptUuid: row["prompt_uuid"],
                 summary: ChangeSummary(

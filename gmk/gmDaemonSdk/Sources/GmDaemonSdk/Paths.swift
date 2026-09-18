@@ -2,15 +2,10 @@ import Foundation
 
 /// Single source of truth for `~/gmfs/`, the ONE top-level filesystem.
 ///
-/// `~/gmfs/` replaces what used to be TWO sibling roots — one for binaries and
-/// daemon runtime state, a second for per-repo content. The collapse is
-/// not tidying: it is what makes the write-containment rule below expressible
-/// as a single prefix test. Two roots beside each other cannot be stated as
-/// "never write outside gmfs or the working repo" without immediately needing
-/// an exception, and a rule with an exception erodes.
-///
-/// Nothing here is committed to git, and — importantly — **nothing here is
-/// CREATED by this type**. See `ensureRuntimeDirs`.
+/// One root is what makes the write-containment rule below a single prefix
+/// test; two roots side by side cannot be stated without an exception, and a
+/// rule with an exception erodes. Nothing here is committed to git, and
+/// **nothing here is CREATED by this type** — see `ensureRuntimeDirs`.
 public enum Paths {
 
     // MARK: - The root
@@ -29,56 +24,32 @@ public enum Paths {
     public static let environmentInfoKey = "GMEnvironment"
 
     /// The resolved filesystem root. **A property of the BITS, not of the
-    /// environment.**
-    ///
-    /// Order — and the first arm coming FIRST is the whole point:
+    /// environment.** Order, first arm winning:
     ///   1. `Bundle.main`'s `GMFSRoot`, baked in at build time
     ///   2. `$GM_FS_ROOT`
     ///   3. `~/gmfs`
-    ///
-    /// ## Why the bundle key has to win
-    ///
-    /// A LaunchServices-launched `.app` inherits **no shell environment at
-    /// all**, so arm 2 is unreachable from a GUI launch and the app would
-    /// always land on `~/gmfs` no matter what the session that "selected" an
-    /// environment said. That is exactly the silent-data hazard that got the
-    /// previous snapshot dev loop deleted, and the recorded verdict was that
-    /// "every available mitigation was a detection mechanism". A T overlay and
-    /// a red bar are detection mechanisms: they make a wrong state visible,
-    /// they do not make it impossible.
-    ///
-    /// Baking the root into the bundle DISSOLVES the hazard instead. Each
-    /// bundle carries its own root — production included, set EXPLICITLY rather
-    /// than left to the fallback — so no launch context (Finder, Dock,
-    /// `open -n`, Xcode Run, a LaunchServices crash-relaunch) can change any
-    /// app's database.
-    ///
-    /// The tempting alternative — an `<EnvironmentVariables>` block in the
-    /// scheme — is STRICTLY WORSE than what was deleted: the same bits would
-    /// mean two different databases depending on whether you hit Run or
-    /// double-clicked.
-    ///
-    /// This also closes a live bug. Before this ordering, any shell that
-    /// exported `GM_FS_ROOT` and then ran `open -a` handed the PRODUCTION app a
-    /// different database.
-    ///
-    /// The CLI keeps env resolution, and the asymmetry is correct rather than
-    /// inconsistent: it mirrors the asymmetry in reality, where one shape
-    /// inherits an environment and the other does not.
-    ///
+
+    /// The bundle key must win: a LaunchServices-launched `.app` inherits no
+    /// shell environment, so arm 2 is unreachable from a GUI launch and every
+    /// app would land on `~/gmfs` whatever environment the session selected.
+    /// Each bundle carries its own root, production included and set
+    /// EXPLICITLY, so no launch context can change any app's database. An
+    /// `<EnvironmentVariables>` block in the scheme is strictly worse: the
+    /// same bits would mean two databases depending on how they were started.
+    /// The CLI keeps env resolution, because a CLI does inherit one.
+
     /// Resolved once per process: the daemon env is a `posix_spawn` snapshot,
-    /// so a per-request read would be stale by design — and ONE ROOT PER
-    /// PROCESS is a property callers depend on, not an accident.
-    /// HOME overrides cannot work here (`homeDirectoryForCurrentUser` resolves
-    /// via `getpwuid`, not `$HOME`), so `$HOME` and `GM_FS_ROOT` are different
-    /// levers and setting one does not move the other.
+    /// so a per-request read would be stale by design, and ONE ROOT PER
+    /// PROCESS is a property callers depend on. `$HOME` is a different lever —
+    /// `homeDirectoryForCurrentUser` resolves via `getpwuid`, not `$HOME`.
     public static let root: URL = {
         if let baked = Bundle.main.object(forInfoDictionaryKey: bakedRootInfoKey) as? String,
             !baked.isEmpty
         {
             return URL(
                 fileURLWithPath: (baked as NSString).expandingTildeInPath,
-                isDirectory: true)
+                isDirectory: true
+            )
         }
         if let override = ProcessInfo.processInfo.environment["GM_FS_ROOT"],
             !override.isEmpty
@@ -103,18 +74,12 @@ public enum Paths {
 
     /// Whether this process is looking at the production root.
     ///
-    /// **Compares INODES, not paths**, and that is load-bearing rather than
-    /// fastidious. `standardizedFileURL` does not resolve symlinks, so a
-    /// `~/prod_gmfs` symlink, an APFS firmlink, or `/Users` vs
-    /// `/System/Volumes/Data/Users` would all make one root look like two. A
-    /// false answer here paints the non-production chrome — the red bar — over
-    /// LIVE PRODUCTION DATA, which is the badge lying at the exact moment it
-    /// matters most, and precisely the failure the baked-root design exists to
-    /// prevent.
-    ///
-    /// Keyed on `gm.db` rather than the directory because the database is the
-    /// thing whose identity actually matters; two roots sharing a `gm.db` inode
-    /// ARE the same environment whatever their paths say.
+    /// **Compares INODES, not paths.** `standardizedFileURL` does not resolve
+    /// symlinks, so a symlink, an APFS firmlink, or `/Users` vs
+    /// `/System/Volumes/Data/Users` would make one root look like two, and a
+    /// false answer here paints the non-production red bar over LIVE
+    /// PRODUCTION DATA. Keyed on `gm.db` rather than the directory: two roots
+    /// sharing a `gm.db` inode ARE the same environment, whatever their paths.
     public static var isProductionRoot: Bool {
         isSameRoot(root, defaultProductionRoot)
     }
@@ -256,24 +221,14 @@ public enum Paths {
     /// The write-containment invariant, ENFORCED rather than documented:
     /// *never write files outside either gmfs or the working repo.*
     ///
-    /// The reason this is a throwing choke point and not a comment: a rule that
-    /// lives only in prose is obeyed exactly as long as everyone who adds a
-    /// write has read the prose, which is a guarantee that decays with every
-    /// contributor. This one fails the write.
-    ///
-    /// `repoRoot` is the working repo when there is one — a caller that has
-    /// already resolved it (from a git toplevel, or a hook payload's cwd) hands
-    /// it in. A caller with no repo context passes nil and gets the strict
-    /// gmfs-only rule, which is the correct default: code that does not know
-    /// where the repo is has no business writing into one.
-    ///
+    /// `repoRoot` is the working repo when a caller has resolved one; a caller
+    /// with no repo context passes nil and gets the strict gmfs-only rule.
     /// Paths are compared after `standardizedFileURL` resolution so `..`
-    /// traversal cannot smuggle a write out of the root, and the prefix test is
-    /// on a path-component boundary so `~/gmfs-evil` is not read as being
-    /// inside `~/gmfs`.
+    /// cannot smuggle a write out, and the prefix test is on a path-component
+    /// boundary so `~/gmfs-evil` is not inside `~/gmfs`.
     public static func assertContained(_ url: URL, repoRoot: URL? = nil) throws {
         let permitted = ([root] + (repoRoot.map { [$0] } ?? []))
-            .map { $0.standardizedFileURL.path }
+            .map(\.standardizedFileURL.path)
         let target = url.standardizedFileURL.path
         for allowed in permitted where target == allowed || target.hasPrefix(allowed + "/") {
             return
@@ -287,11 +242,10 @@ public enum Paths {
     /// Idempotent.
     ///
     /// DELIBERATELY NOT CALLED FROM ANY BUILD OR TEST PATH. This type DEFINES
-    /// the layout; populating `~/gmfs` belongs to the migration/cutover step
-    /// and to nothing else. A stray call here would have the build itself
-    /// create a runtime root as a side effect — on a machine where the old
-    /// runtime is still the live one, and where the test suite is supposed to
-    /// be provably unable to touch anything outside a temp dir.
+    /// the layout; populating `~/gmfs` belongs to the cutover step alone. A
+    /// stray call would have a build create a runtime root as a side effect,
+    /// on a machine whose test suite must be unable to touch anything outside
+    /// a temp dir.
     public static func ensureRuntimeDirs() throws {
         let fm = FileManager.default
         try fm.createDirectory(at: root, withIntermediateDirectories: true)

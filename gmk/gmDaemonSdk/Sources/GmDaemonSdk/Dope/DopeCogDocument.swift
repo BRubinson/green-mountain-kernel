@@ -2,24 +2,12 @@ import Foundation
 
 /// The on-disk form of one cog: `cogs/{code}/{code}.index.cog.doped.json`.
 ///
-/// Hulls ship FLAT — there is no nested cog directory level yet, because no
-/// nestable element type exists. A hull's PersistenceOwner children do NOT
-/// get files or directories of their own: they collapse into the hull's
-/// `links` block on write and expand back into sibling element rows on read.
-///
-///     { "code": "gm_daemon", "name": "GM Daemon",
-///       "elements": [
-///         { "code": "gm_daemon", "element_type": "Hull",
-///           "primary_path": "gmk/gmDaemon",
-///           "links": { "persistence_owners": ["doped", "agentics"] } } ] }
-///
-/// The collapse is deliberately lossy-but-canonical: a PersistenceOwner's
-/// own name and description are dropped, because the descriptive material
-/// belongs to the persistence domain it names, not to the link. Expansion
-/// therefore mints them from the code, and `expand(collapse(x)) == x` only
-/// holds when owners are created that way — which is why seeding goes
-/// through the same synthesis the reader uses, and why there is a
-/// fixed-point test.
+/// Hulls ship FLAT. A hull's PersistenceOwner children get no files of their
+/// own: they collapse into the hull's `links` block on write and expand back
+/// into sibling element rows on read. The collapse drops an owner's own name
+/// and description, so `expand(collapse(x)) == x` holds only where owners are
+/// synthesized from the code — seeding must go through the same synthesis the
+/// reader uses.
 public struct DopeCogDocument: Codable, Hashable, Sendable {
     public let body: DopeCogBody
     public let elements: [DopeCogElementDocument]
@@ -71,9 +59,14 @@ public struct DopeCogElementDocument: Codable, Hashable, Sendable {
     public let links: DopeCogLinks?
 
     public init(
-        code: String, name: String, description: String, sortOrder: Int,
-        elementType: String, primaryPath: String? = nil,
-        dopeScopeCode: String? = nil, links: DopeCogLinks? = nil
+        code: String,
+        name: String,
+        description: String,
+        sortOrder: Int,
+        elementType: String,
+        primaryPath: String? = nil,
+        dopeScopeCode: String? = nil,
+        links: DopeCogLinks? = nil
     ) {
         self.code = code
         self.name = name

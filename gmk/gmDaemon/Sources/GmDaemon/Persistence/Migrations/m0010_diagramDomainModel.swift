@@ -3,38 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0010 — DIAGRAM domain modeling (db-persisted canvases over dope).
-    // Pure ADD, m0007's grammar throughout: baseColumns identity, an index
-    // per FK, CHECK-coupled discriminators, and PARTIAL unique indexes
-    // wherever a nullable FK joins a uniqueness rule (the m0007
-    // NULLs-are-distinct lesson, stamped four times for the tier ladder).
-    //
-    // diagram.revision is the whole-tree content counter (the
-    // bumpScopeRevision split applies verbatim: element edits bump it
-    // WITHOUT touching the diagram row's optimistic-lock version).
-    //
-    // Ownership is a chain-non-null tier ladder: each tier fills its own
-    // FK and every ancestor's, so list/get by any ancestor is a plain
-    // indexed WHERE and promotion is an UPDATE that moves tier and NULLs
-    // the FKs below it. project_uuid is ALWAYS NOT NULL.
-    //
-    // dope bindings are TEXT codes, deliberately NOT SQL FKs into the
-    // dope tables: DOPE_INGEST wipes and re-mints every child uuid, so
-    // a uuid FK would dangle after one round-trip edit. Dangling codes
-    // are a LEGAL renderable state (ghost cards) — diagram tables never
-    // join requireNoExternalReferrers, so a picture can never block
-    // domain evolution.
-    //
-    // The family has ZERO RESTRICT FKs: element subtree deletes are plain
-    // CASCADEs (element → subtype row → vertex rows), and dope's whole
-    // ordered-delete discipline does not transfer.
-    //
-    // Vertex rows are full BaseEntity rows (explicit user decision) whose
-    // FKs target the SUBTYPE table's UNIQUE element_uuid — the schema
-    // itself proves a vertex can only hang off a stroke/shape. They are
-    // written as whole-set replacements inside batch transactions;
-    // coordinates are element-local, so dragging a stroke is one
-    // diagram_element UPDATE, never a vertex rewrite.
+    // m0010 — DIAGRAM domain modeling in m0007's grammar: baseColumns identity,
+    // an index per FK, CHECK-coupled discriminators, and PARTIAL unique indexes
+    // wherever a nullable FK joins a uniqueness rule. Ownership is a chain-non-
+    // null tier ladder: each tier fills its own FK and every ancestor's, and
+    // project_uuid is ALWAYS NOT NULL. dope bindings are TEXT codes, not SQL
+    // FKs: DOPE_INGEST re-mints every child uuid, so a uuid FK would dangle, and
+    // a dangling code is a legal renderable state. Vertex FKs target the subtype
+    // table's UNIQUE element_uuid, so a vertex can only hang off a stroke.
     static func m0010_diagramDomainModel(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0010_diagramDomainModel") { db in
             try db.execute(
@@ -181,7 +157,8 @@ extension Migrations {
                         ON diagram_stroke_vertex(stroke_element_uuid);
                     CREATE INDEX idx_diagram_shape_vertex_shape_fk
                         ON diagram_shape_vertex(shape_element_uuid);
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",

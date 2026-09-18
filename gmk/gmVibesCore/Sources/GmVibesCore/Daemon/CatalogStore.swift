@@ -62,7 +62,9 @@ final class CatalogStore {
                 }
             let newSessionsByUuid = Dictionary(sessions.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
             let newInstancesByUuid = Dictionary(
-                instances.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
+                instances.map { ($0.uuid, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
 
             // Change-gated publication (the app's anti-thrash idiom).
             if self.projects != newProjects { self.projects = newProjects }
@@ -114,14 +116,17 @@ final class CatalogStore {
     /// anyway (the call is coalesced) so the sheet's own row is current the
     /// instant it dismisses, rather than a socket round trip later.
     func setPrimaryBranch(
-        projectUuid: String, expectedVersion: Int64,
+        projectUuid: String,
+        expectedVersion: Int64,
         branch: String
     ) async throws {
         _ = try await service.updateProject(
             ProjectUpdateRequest(
                 projectUuid: projectUuid,
                 expectedVersion: expectedVersion,
-                primaryProjectBranch: branch))
+                primaryProjectBranch: branch
+            )
+        )
         await refresh()
     }
 

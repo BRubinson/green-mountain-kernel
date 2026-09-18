@@ -48,6 +48,7 @@ extension AgentRegistrationRecord {
             methodology: methodology,
             workflowPhase: workflowPhase,
             createdAt: createdAt,
-            updatedAt: updatedAt)
+            updatedAt: updatedAt
+        )
     }
 }

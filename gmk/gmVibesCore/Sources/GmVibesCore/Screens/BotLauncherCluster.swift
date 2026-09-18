@@ -1,24 +1,13 @@
 import SwiftUI
 
-/// The prompt editor's resume-command launcher: three copy buttons (one per
-/// bot fidelity tier) plus the inline picker that sets which tier is the
-/// persisted default.
+/// The prompt editor's resume-command launcher: one copy button per bot fidelity tier, plus
+/// the inline picker that sets the persisted default.
 ///
-/// **All three copy buttons stay.** An explicit copy is always exactly one
-/// click, whatever the default is — the picker changes which tier is
-/// highlighted and which one a choice-less `copyResume()` emits, never which
-/// tiers are reachable.
-///
-/// **The default is set explicitly, never learned.** Clicking a copy button
-/// copies and nothing else; it does not re-point the preference. Trying
-/// `/gm_bot` once must not silently become your default. That is the whole
-/// behavioural contract of Feature 1, and it is why the highlight is bound to
-/// `BotLauncherPreference` rather than to a `@State` selection.
-///
-/// GMVibes has no channel into the session it launches, so there is
-/// deliberately nothing here about reconcile behavior or per-role
-/// model/effort — no stub, no disabled control, no "coming soon". A disabled
-/// control is a promise this architecture cannot keep.
+/// Every tier stays reachable in one click. The picker changes which tier is highlighted and
+/// which one a choice-less `copyResume()` emits, and THE DEFAULT IS SET EXPLICITLY: clicking a
+/// copy button copies and nothing else, so trying a tier once never re-points the preference.
+/// That is why the highlight binds to `BotLauncherPreference` rather than a `@State` selection.
+/// The app has no channel into the session it launches, so nothing here promises one.
 struct BotLauncherCluster: View {
     /// The prompt's daemon-allocated per-session seq — bot commands resolve
     /// prompts by seq, not uuid.

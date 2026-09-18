@@ -3,30 +3,21 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0002 — db-native clarification + architecture entities, prompt
-    // lifecycle v2 (six states), daemon_config. The first no-wipe
-    // migration: existing data is preserved and the prompt table is
-    // rebuilt in place.
-    //
-    // Registered with NO foreignKeyChecks: argument — GRDB's default
-    // .deferred IS the official SQLite 12-step (PRAGMA foreign_keys=OFF
-    // outside the transaction → body → whole-db foreign_key_check →
-    // commit). NO PRAGMA may appear in this body: pragmas are silently
-    // ignored inside a transaction, and with FK enforcement live the
-    // prompt rebuild either aborts (via file_change's NO ACTION
-    // reference) or silently CASCADE-deletes every prompt_artifact row
-    // and commits — both verified empirically.
+    // m0002 — db-native clarification + architecture entities, prompt lifecycle
+    // v2, daemon_config; the prompt table is rebuilt in place.
+    // Registered with NO foreignKeyChecks: argument — GRDB's default .deferred
+    // IS the official SQLite 12-step. NO PRAGMA may appear in this body:
+    // pragmas are silently ignored inside a transaction, and with FK
+    // enforcement live the prompt rebuild either aborts on file_change's NO
+    // ACTION reference or CASCADE-deletes every prompt_artifact row and commits.
     static func m0002_clarificationArchitectureLifecycleV2(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0002_clarificationArchitectureLifecycleV2") { db in
             // Step 1 — the prompt rebuild, FIRST, while the table has only its
-            // three m0001-era referrers. Ordering is create-new → copy →
-            // drop-old → rename-new: the only ALTER renames a table with zero
-            // referrers, which is correct under every GRDB FK mode (renaming
-            // the OLD table out of the way instead rewrites child FK clauses
-            // to REFERENCES "prompt_old" whenever foreign_keys is ON). The
-            // copy carries `id` explicitly so every uuid keeps its rowid and
-            // sqlite_sequence stays monotonic. Old terminal `clarified` maps
-            // to the new terminal `done`; draft/clarifying copy through.
+            // three m0001-era referrers. create-new → copy → drop-old →
+            // rename-new, so the only ALTER renames a table with zero referrers;
+            // renaming the OLD table out of the way instead rewrites child FK
+            // clauses to REFERENCES "prompt_old" whenever foreign_keys is ON.
+            // The copy carries `id` explicitly so every uuid keeps its rowid.
             try db.execute(
                 sql: """
                     CREATE TABLE prompt_new (
@@ -61,7 +52,8 @@ extension Migrations {
                     DROP TABLE prompt;
                     ALTER TABLE prompt_new RENAME TO prompt;
                     CREATE INDEX idx_prompt_session_uuid ON prompt(session_uuid);
-                    """)
+                    """
+            )
 
             // Step 2 — the new entity tables, created AFTER the rebuild so
             // their CASCADE references point at the new prompt table and never
@@ -165,7 +157,8 @@ extension Migrations {
                         ON architecture_persistence_field_change(persistence_change_uuid);
                     CREATE INDEX idx_arch_general_change_summary_fk
                         ON architecture_general_change(architecture_summary_uuid);
-                    """)
+                    """
+            )
 
             // Step 3 — seed daemon_config with the layout defaults ($HOME
             // conventions, matching gm_session_startup.sh). CONFIG_SET is the write

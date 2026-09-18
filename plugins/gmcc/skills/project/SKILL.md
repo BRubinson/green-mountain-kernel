@@ -17,4 +17,4 @@ allowed-tools: mcp__plugin_gmcc_cde__projects_search, mcp__plugin_gmcc_cde__proj
 Re-derivable from working directory and branch. Starting in the same repo on the same branch always lands on the same project/instance/session row — existing uuids reused, new rows created only when evidence requires.
 
 ### Session State Ensured at Boot
-`gm_hook context ensure` upserts project, instance, and session rows, creates the session's artifact home (`prompts/`), idempotently — never clobbers existing state.
+The SessionStart hook upserts project, instance, and session rows and creates the session's artifact home (`prompts/`), idempotently — never clobbering existing state. The harness runs it; an agent never does. If a session boots without its rows, restart the session rather than reaching for the binary.

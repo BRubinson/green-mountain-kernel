@@ -3,14 +3,10 @@ import Foundation
 import GmDaemonSdk
 
 /// The pure pre-pass that turns (DiagramTree + hydrated dope trees) into a
-/// ready-to-draw `ResolvedDiagram`. Transforms, sibling z-order, dope
-/// injection, `.absent` ghosts, FK edges, and deterministic colors are all
-/// computed exactly ONCE here — views are dumb exhaustive switches, and the
-/// binding/ghost/geometry tests target this type in plain XCTest with zero
-/// SwiftUI.
-///
-/// Imports Foundation + CoreGraphics only. This file is deliberately outside
-/// the `#if canImport(SwiftUI)` guard the view files carry.
+/// ready-to-draw `ResolvedDiagram`. Transforms, sibling z-order, dope injection,
+/// `.absent` ghosts, FK edges and deterministic colors are computed exactly ONCE
+/// here, leaving views as dumb exhaustive switches. Foundation + CoreGraphics
+/// only, deliberately outside the `#if canImport(SwiftUI)` guard the views carry.
 
 /// Caller-assembled dope context: one hydrated tree per RESOLVED dope_scope
 /// binding code (from DIAGRAM_GET's bindings + one DOPE_GET each). Codes the
@@ -46,8 +42,10 @@ public struct ResolvedDiagram: Sendable {
     public let environment: DiagramRenderEnvironment
 
     public init(
-        contentBounds: CGRect, topLevel: [ResolvedElement],
-        edges: [ResolvedEdge], environment: DiagramRenderEnvironment
+        contentBounds: CGRect,
+        topLevel: [ResolvedElement],
+        edges: [ResolvedEdge],
+        environment: DiagramRenderEnvironment
     ) {
         self.contentBounds = contentBounds
         self.topLevel = topLevel
@@ -76,9 +74,15 @@ public struct ResolvedElement: Sendable {
     public let accumulatedScale: Double
 
     public init(
-        uuid: String, code: String, name: String, frame: CGRect,
-        elementZ: Double, kind: ResolvedElementKind, children: [ResolvedElement],
-        accumulatedCenter: CGPoint = .zero, accumulatedScale: Double = 1
+        uuid: String,
+        code: String,
+        name: String,
+        frame: CGRect,
+        elementZ: Double,
+        kind: ResolvedElementKind,
+        children: [ResolvedElement],
+        accumulatedCenter: CGPoint = .zero,
+        accumulatedScale: Double = 1
     ) {
         self.uuid = uuid
         self.code = code
@@ -95,21 +99,34 @@ public struct ResolvedElement: Sendable {
     /// patch geometry into a tree phase 1 already built.
     func replacingChildren(_ children: [ResolvedElement]) -> ResolvedElement {
         ResolvedElement(
-            uuid: uuid, code: code, name: name, frame: frame,
-            elementZ: elementZ, kind: kind, children: children,
+            uuid: uuid,
+            code: code,
+            name: name,
+            frame: frame,
+            elementZ: elementZ,
+            kind: kind,
+            children: children,
             accumulatedCenter: accumulatedCenter,
-            accumulatedScale: accumulatedScale)
+            accumulatedScale: accumulatedScale
+        )
     }
 
     func replacing(
-        kind: ResolvedElementKind, frame: CGRect,
+        kind: ResolvedElementKind,
+        frame: CGRect,
         children: [ResolvedElement]
     ) -> ResolvedElement {
         ResolvedElement(
-            uuid: uuid, code: code, name: name, frame: frame,
-            elementZ: elementZ, kind: kind, children: children,
+            uuid: uuid,
+            code: code,
+            name: name,
+            frame: frame,
+            elementZ: elementZ,
+            kind: kind,
+            children: children,
             accumulatedCenter: accumulatedCenter,
-            accumulatedScale: accumulatedScale)
+            accumulatedScale: accumulatedScale
+        )
     }
 }
 
@@ -120,8 +137,11 @@ extension ResolvedElement {
     /// is own-properties-first, composed-base union appended.
     public func rowCenterY(_ rowIndex: Int, environment: DiagramRenderEnvironment) -> CGFloat {
         DiagramResolver.rowCenterY(
-            frameMinY: frame.minY, scale: accumulatedScale,
-            rowIndex: rowIndex, environment: environment)
+            frameMinY: frame.minY,
+            scale: accumulatedScale,
+            rowIndex: rowIndex,
+            environment: environment
+        )
     }
 }
 
@@ -133,13 +153,19 @@ extension ResolvedDiagram {
     public func reskinned(_ scheme: DiagramRenderEnvironment.ColorScheme) -> ResolvedDiagram {
         guard scheme != environment.colorScheme else { return self }
         let env = DiagramRenderEnvironment(
-            colorScheme: scheme, displayScale: environment.displayScale,
-            padding: environment.padding, cardWidth: environment.cardWidth,
+            colorScheme: scheme,
+            displayScale: environment.displayScale,
+            padding: environment.padding,
+            cardWidth: environment.cardWidth,
             cardHeaderHeight: environment.cardHeaderHeight,
-            cardRowHeight: environment.cardRowHeight)
+            cardRowHeight: environment.cardRowHeight
+        )
         return ResolvedDiagram(
-            contentBounds: contentBounds, topLevel: topLevel,
-            edges: edges, environment: env)
+            contentBounds: contentBounds,
+            topLevel: topLevel,
+            edges: edges,
+            environment: env
+        )
     }
 }
 
@@ -172,8 +198,10 @@ public struct ResolvedText: Hashable, Sendable {
     public let backgroundColor: String?
 
     public init(
-        markdown: String, fontSize: Double,
-        textColor: String, backgroundColor: String?
+        markdown: String,
+        fontSize: Double,
+        textColor: String,
+        backgroundColor: String?
     ) {
         self.markdown = markdown
         self.fontSize = fontSize
@@ -204,7 +232,9 @@ public struct ResolvedConnector: Hashable, Sendable {
     public let label: String
 
     public init(
-        target: Target, strokeColor: String, lineWidth: Double,
+        target: Target,
+        strokeColor: String,
+        lineWidth: Double,
         lineStyle: DiagramConnectorLineStyle,
         headKind: DiagramConnectorHead,
         routingKind: DiagramConnectorRouting = .orthogonalStep,
@@ -235,8 +265,12 @@ public struct ResolvedUmlNode: Hashable, Sendable {
     public let fillColor: String?
 
     public init(
-        nodeKind: DiagramNodeKind, markdown: String, fontSize: Double,
-        textColor: String?, strokeColor: String?, lineWidth: Double,
+        nodeKind: DiagramNodeKind,
+        markdown: String,
+        fontSize: Double,
+        textColor: String?,
+        strokeColor: String?,
+        lineWidth: Double,
         fillColor: String?
     ) {
         self.nodeKind = nodeKind
@@ -274,8 +308,11 @@ public struct ResolvedStroke: Sendable {
     public let outline: [CGPoint]
 
     public init(
-        points: [CGPoint], color: String, lineWidth: Double,
-        tool: DiagramStrokeTool, outline: [CGPoint] = []
+        points: [CGPoint],
+        color: String,
+        lineWidth: Double,
+        tool: DiagramStrokeTool,
+        outline: [CGPoint] = []
     ) {
         self.points = points
         self.color = color
@@ -294,8 +331,12 @@ public struct ResolvedShape: Sendable {
     public let cornerRadius: Double?
 
     public init(
-        kind: DiagramShapeKind, points: [CGPoint], strokeColor: String,
-        lineWidth: Double, fillColor: String?, cornerRadius: Double?
+        kind: DiagramShapeKind,
+        points: [CGPoint],
+        strokeColor: String,
+        lineWidth: Double,
+        fillColor: String?,
+        cornerRadius: Double?
     ) {
         self.kind = kind
         self.points = points
@@ -353,8 +394,11 @@ public struct EntityCardModel: Sendable {
     public let rows: [PropertyRow]
 
     public init(
-        entityCode: String, entityName: String, domainCode: String,
-        headerHue: Double, rows: [PropertyRow]
+        entityCode: String,
+        entityName: String,
+        domainCode: String,
+        headerHue: Double,
+        rows: [PropertyRow]
     ) {
         self.entityCode = entityCode
         self.entityName = entityName
@@ -395,9 +439,13 @@ public struct ResolvedEdge: Sendable {
     public let origin: ResolvedEdgeOrigin
 
     public init(
-        from: CGPoint, to: CGPoint, fromElementUuid: String,
-        toElementUuid: String, propertyRef: String,
-        points: [CGPoint]? = nil, routed: Bool = false,
+        from: CGPoint,
+        to: CGPoint,
+        fromElementUuid: String,
+        toElementUuid: String,
+        propertyRef: String,
+        points: [CGPoint]? = nil,
+        routed: Bool = false,
         origin: ResolvedEdgeOrigin = .dopeForeignKey
     ) {
         self.from = from
@@ -414,16 +462,12 @@ public struct ResolvedEdge: Sendable {
 public enum DiagramResolver {
 
     /// The one entry point. Semantics frozen here:
-    ///  - `center_x/y` are PARENT-space; vertices are element-local; `scale`
-    ///    composes multiplicatively; stroke width scales with the
-    ///    accumulated transform.
-    ///  - `element_z` orders SIBLINGS only, tie-broken by code; global paint
-    ///    order is depth-first (a child never interleaves between another
-    ///    parent's children — deliberate).
-    ///  - Ghost injection happens here, once: an unresolved scope code makes
-    ///    the scope card `.absentScope` and its entity children
-    ///    `.absentEntity`; a resolved scope with a code-matches-nothing
-    ///    entity makes just that card `.absentEntity`.
+    ///  - `center_x/y` are PARENT-space, vertices are element-local, `scale`
+    ///    composes multiplicatively, stroke width scales with the transform.
+    ///  - `element_z` orders SIBLINGS only, tie-broken by code; global paint order
+    ///    is depth-first, so a child never interleaves with another parent's.
+    ///  - Ghost injection happens here once: an unresolved scope code makes the
+    ///    card `.absentScope` and its entity children `.absentEntity`.
     public static func resolve(
         _ tree: DiagramTree,
         dope: DiagramDopeContext,
@@ -442,45 +486,58 @@ public enum DiagramResolver {
         let sortedTop = tree.elements.sorted(by: siblingOrder)
         let placed = sortedTop.map { node in
             resolveElement(
-                node, parentCenter: .zero, parentScale: 1,
+                node,
+                parentCenter: .zero,
+                parentScale: 1,
                 scope: scopeEntry(for: node, dope: dope),
-                environment: environment, entityFrames: &entityFrames,
-                obstacles: &obstacles, pass: &pass)
+                environment: environment,
+                entityFrames: &entityFrames,
+                obstacles: &obstacles,
+                pass: &pass
+            )
         }
 
-        // PHASE 2 — the deferred pass. Every immediate element now has a
-        // frame, so a connector can finally be told where its endpoints are.
-        //
-        // Both producers emit into ONE router call in a FIXED order (FK
-        // first, then connectors, each internally sorted), because
-        // DiagramEdgeRouter routes against a shared obstacle graph and index
-        // i in is index i out. Two separate calls would route each set
-        // blind to the other's corridors, and screenshot determinism would
-        // depend on dictionary iteration order.
+        // PHASE 2 — the deferred pass. Every immediate element now has a frame, so
+        // a connector can be told where its endpoints are. Both producers emit into
+        // ONE router call in a FIXED order (FK first, then connectors, each sorted)
+        // because DiagramEdgeRouter routes against a shared obstacle graph and
+        // index i in is index i out. Two calls would route each set blind to the
+        // other's corridors, making determinism depend on dictionary order.
         let fkSeeds = foreignKeyEdgeSeeds(
-            dope: dope, entityFrames: entityFrames,
-            environment: environment)
+            dope: dope,
+            entityFrames: entityFrames,
+            environment: environment
+        )
         let connectorSeeds = connectorEdgeSeeds(pass: pass)
         let seeds = fkSeeds + connectorSeeds
         let routes = DiagramEdgeRouter.route(
             edges: seeds.map(\.request),
             obstacles: obstacles,
-            padding: edgeRoutingPadding)
-        let edges = zip(seeds, routes).map { seed, route in
-            if route.routed, route.points.count >= 2 {
+            padding: edgeRoutingPadding
+        )
+        let edges = zip(seeds, routes)
+            .map { seed, route in
+                if route.routed, route.points.count >= 2 {
+                    return ResolvedEdge(
+                        from: route.points[0],
+                        to: route.points[route.points.count - 1],
+                        fromElementUuid: seed.fromElementUuid,
+                        toElementUuid: seed.toElementUuid,
+                        propertyRef: seed.propertyRef,
+                        points: route.points,
+                        routed: true,
+                        origin: seed.origin
+                    )
+                }
                 return ResolvedEdge(
-                    from: route.points[0], to: route.points[route.points.count - 1],
+                    from: seed.fallbackFrom,
+                    to: seed.fallbackTo,
                     fromElementUuid: seed.fromElementUuid,
                     toElementUuid: seed.toElementUuid,
                     propertyRef: seed.propertyRef,
-                    points: route.points, routed: true, origin: seed.origin)
+                    origin: seed.origin
+                )
             }
-            return ResolvedEdge(
-                from: seed.fallbackFrom, to: seed.fallbackTo,
-                fromElementUuid: seed.fromElementUuid,
-                toElementUuid: seed.toElementUuid,
-                propertyRef: seed.propertyRef, origin: seed.origin)
-        }
 
         // Patch the placeholder connectors with their resolved targets, so
         // hit-testing and bounds see real geometry rather than the phase-1
@@ -503,8 +560,11 @@ public enum DiagramResolver {
         if bounds.isNull { bounds = CGRect(x: 0, y: 0, width: 320, height: 200) }
 
         return ResolvedDiagram(
-            contentBounds: bounds, topLevel: topLevel,
-            edges: edges, environment: environment)
+            contentBounds: bounds,
+            topLevel: topLevel,
+            edges: edges,
+            environment: environment
+        )
     }
 
     // MARK: - Internals
@@ -515,7 +575,8 @@ public enum DiagramResolver {
     }
 
     private static func scopeEntry(
-        for node: DiagramElementNode, dope: DiagramDopeContext
+        for node: DiagramElementNode,
+        dope: DiagramDopeContext
     ) -> DiagramDopeContext.Entry? {
         if case .dopeScopePersistenceLayer(let payload) = node.payload {
             return dope.entries[payload.dopeScopeCode]
@@ -524,9 +585,12 @@ public enum DiagramResolver {
     }
 
     private static func resolveElement(
-        _ node: DiagramElementNode, parentCenter: CGPoint, parentScale: Double,
+        _ node: DiagramElementNode,
+        parentCenter: CGPoint,
+        parentScale: Double,
         parentUuid: String? = nil,
-        scope: DiagramDopeContext.Entry?, environment: DiagramRenderEnvironment,
+        scope: DiagramDopeContext.Entry?,
+        environment: DiagramRenderEnvironment,
         entityFrames:
             inout [String: (
                 frame: CGRect, entityCode: String,
@@ -538,7 +602,8 @@ public enum DiagramResolver {
         let scale = parentScale * node.base.scale
         let center = CGPoint(
             x: parentCenter.x + node.base.centerX * parentScale,
-            y: parentCenter.y + node.base.centerY * parentScale)
+            y: parentCenter.y + node.base.centerY * parentScale
+        )
 
         // Children first — container frames derive from child extents.
         let sortedChildren = node.children.sorted(by: siblingOrder)
@@ -551,21 +616,32 @@ public enum DiagramResolver {
         case .drawingLayer(let payload):
             children = sortedChildren.map {
                 resolveElement(
-                    $0, parentCenter: center, parentScale: scale,
+                    $0,
+                    parentCenter: center,
+                    parentScale: scale,
                     parentUuid: node.identity.uuid,
-                    scope: nil, environment: environment,
-                    entityFrames: &entityFrames, obstacles: &obstacles,
-                    pass: &pass)
+                    scope: nil,
+                    environment: environment,
+                    entityFrames: &entityFrames,
+                    obstacles: &obstacles,
+                    pass: &pass
+                )
             }
             kind = .layer(
                 LayerStyle(
-                    opacity: payload.opacity, visible: payload.visible,
-                    locked: payload.locked))
+                    opacity: payload.opacity,
+                    visible: payload.visible,
+                    locked: payload.locked
+                )
+            )
             frame = children.reduce(CGRect.null) { $0.union($1.frame) }
             if frame.isNull {
                 frame = CGRect(
-                    x: center.x - 100 * scale, y: center.y - 60 * scale,
-                    width: 200 * scale, height: 120 * scale)
+                    x: center.x - 100 * scale,
+                    y: center.y - 60 * scale,
+                    width: 200 * scale,
+                    height: 120 * scale
+                )
             }
 
         case .drawingStroke(let payload):
@@ -581,18 +657,25 @@ public enum DiagramResolver {
                 : StrokeOutliner.outline(
                     points: points,
                     pressures: payload.vertices.map(\.pressure),
-                    options: StrokeOutliner.Options(size: payload.strokeWidth * scale * 2))
+                    options: StrokeOutliner.Options(size: payload.strokeWidth * scale * 2)
+                )
             kind = .stroke(
                 ResolvedStroke(
-                    points: points, color: payload.strokeColor,
+                    points: points,
+                    color: payload.strokeColor,
                     lineWidth: payload.strokeWidth * scale,
-                    tool: payload.tool, outline: outline))
+                    tool: payload.tool,
+                    outline: outline
+                )
+            )
             frame =
                 points.isEmpty
                 ? CGRect(origin: center, size: .zero)
-                : points.dropFirst().reduce(CGRect(origin: points[0], size: .zero)) {
-                    $0.union(CGRect(origin: $1, size: .zero))
-                }.insetBy(dx: -payload.strokeWidth * scale, dy: -payload.strokeWidth * scale)
+                : points.dropFirst()
+                    .reduce(CGRect(origin: points[0], size: .zero)) {
+                        $0.union(CGRect(origin: $1, size: .zero))
+                    }
+                    .insetBy(dx: -payload.strokeWidth * scale, dy: -payload.strokeWidth * scale)
 
         case .drawingShape(let payload):
             let points = payload.vertices.map {
@@ -600,32 +683,45 @@ public enum DiagramResolver {
             }
             kind = .shape(
                 ResolvedShape(
-                    kind: payload.shapeKind, points: points,
+                    kind: payload.shapeKind,
+                    points: points,
                     strokeColor: payload.strokeColor,
                     lineWidth: payload.strokeWidth * scale,
                     fillColor: payload.fillColor,
-                    cornerRadius: payload.cornerRadius.map { $0 * scale }))
+                    cornerRadius: payload.cornerRadius.map { $0 * scale }
+                )
+            )
             frame =
                 points.isEmpty
                 ? CGRect(
-                    x: center.x - 40 * scale, y: center.y - 40 * scale,
-                    width: 80 * scale, height: 80 * scale)
-                : points.dropFirst().reduce(CGRect(origin: points[0], size: .zero)) {
-                    $0.union(CGRect(origin: $1, size: .zero))
-                }.insetBy(dx: -payload.strokeWidth * scale, dy: -payload.strokeWidth * scale)
+                    x: center.x - 40 * scale,
+                    y: center.y - 40 * scale,
+                    width: 80 * scale,
+                    height: 80 * scale
+                )
+                : points.dropFirst()
+                    .reduce(CGRect(origin: points[0], size: .zero)) {
+                        $0.union(CGRect(origin: $1, size: .zero))
+                    }
+                    .insetBy(dx: -payload.strokeWidth * scale, dy: -payload.strokeWidth * scale)
 
         case .drawingText(let payload):
             let width = payload.width * scale
             let height = payload.height * scale
             frame = CGRect(
-                x: center.x - width / 2, y: center.y - height / 2,
-                width: width, height: height)
+                x: center.x - width / 2,
+                y: center.y - height / 2,
+                width: width,
+                height: height
+            )
             kind = .text(
                 ResolvedText(
                     markdown: payload.markdown,
                     fontSize: payload.fontSize * scale,
                     textColor: payload.textColor,
-                    backgroundColor: payload.backgroundColor))
+                    backgroundColor: payload.backgroundColor
+                )
+            )
 
         case .connector(let payload):
             // DEFERRED. A connector's geometry is a function of its target's
@@ -637,16 +733,26 @@ public enum DiagramResolver {
             // a ghost draws nothing.
             pass.deferred.append(
                 ResolvePass.Deferred(
-                    uuid: node.identity.uuid, code: node.base.code,
-                    parentUuid: parentUuid, payload: payload, scale: scale))
+                    uuid: node.identity.uuid,
+                    code: node.base.code,
+                    parentUuid: parentUuid,
+                    payload: payload,
+                    scale: scale
+                )
+            )
             frame = CGRect(origin: center, size: .zero)
             kind = .connector(
                 ResolvedConnector(
-                    target: .absent, strokeColor: payload.strokeColor,
+                    target: .absent,
+                    strokeColor: payload.strokeColor,
                     lineWidth: payload.strokeWidth * scale,
-                    lineStyle: payload.lineStyle, headKind: payload.headKind,
-                    routingKind: payload.routingKind, tailKind: payload.tailKind,
-                    label: payload.label))
+                    lineStyle: payload.lineStyle,
+                    headKind: payload.headKind,
+                    routingKind: payload.routingKind,
+                    tailKind: payload.tailKind,
+                    label: payload.label
+                )
+            )
 
         case .umlNode(let payload):
             // Connectors are children of the element they connect FROM, so
@@ -655,41 +761,59 @@ public enum DiagramResolver {
             // extent (a connector must not inflate the node it hangs off).
             children = sortedChildren.map {
                 resolveElement(
-                    $0, parentCenter: center, parentScale: scale,
+                    $0,
+                    parentCenter: center,
+                    parentScale: scale,
                     parentUuid: node.identity.uuid,
-                    scope: scope, environment: environment,
-                    entityFrames: &entityFrames, obstacles: &obstacles,
-                    pass: &pass)
+                    scope: scope,
+                    environment: environment,
+                    entityFrames: &entityFrames,
+                    obstacles: &obstacles,
+                    pass: &pass
+                )
             }
             let width = payload.width * scale
             let height = payload.height * scale
             frame = CGRect(
-                x: center.x - width / 2, y: center.y - height / 2,
-                width: width, height: height)
+                x: center.x - width / 2,
+                y: center.y - height / 2,
+                width: width,
+                height: height
+            )
             kind = .umlNode(
                 ResolvedUmlNode(
-                    nodeKind: payload.nodeKind, markdown: payload.markdown,
+                    nodeKind: payload.nodeKind,
+                    markdown: payload.markdown,
                     fontSize: (payload.fontSize ?? 13) * scale,
                     textColor: payload.textColor,
                     strokeColor: payload.strokeColor,
                     lineWidth: (payload.strokeWidth ?? 2) * scale,
-                    fillColor: payload.fillColor))
+                    fillColor: payload.fillColor
+                )
+            )
 
         case .dopeScopePersistenceLayer(let payload):
             children = sortedChildren.map {
                 resolveElement(
-                    $0, parentCenter: center, parentScale: scale,
+                    $0,
+                    parentCenter: center,
+                    parentScale: scale,
                     parentUuid: node.identity.uuid,
-                    scope: scope, environment: environment,
-                    entityFrames: &entityFrames, obstacles: &obstacles,
-                    pass: &pass)
+                    scope: scope,
+                    environment: environment,
+                    entityFrames: &entityFrames,
+                    obstacles: &obstacles,
+                    pass: &pass
+                )
             }
             if let scope {
                 kind = .scopeCard(
                     ResolvedScopeCard(
                         dopeScopeCode: payload.dopeScopeCode,
                         scopeName: scope.tree.body.name,
-                        resolvedVia: scope.resolvedVia))
+                        resolvedVia: scope.resolvedVia
+                    )
+                )
             } else {
                 kind = .absentScope(code: payload.dopeScopeCode)
             }
@@ -697,8 +821,11 @@ public enum DiagramResolver {
             frame =
                 frame.isNull
                 ? CGRect(
-                    x: center.x - 140 * scale, y: center.y - 90 * scale,
-                    width: 280 * scale, height: 180 * scale)
+                    x: center.x - 140 * scale,
+                    y: center.y - 90 * scale,
+                    width: 280 * scale,
+                    height: 180 * scale
+                )
                 : frame.insetBy(dx: -24 * scale, dy: -32 * scale)
 
         case .dopeEntity(let payload):
@@ -709,18 +836,26 @@ public enum DiagramResolver {
             // not inflate the card it hangs off.
             children = sortedChildren.map {
                 resolveElement(
-                    $0, parentCenter: center, parentScale: scale,
+                    $0,
+                    parentCenter: center,
+                    parentScale: scale,
                     parentUuid: node.identity.uuid,
-                    scope: scope, environment: environment,
-                    entityFrames: &entityFrames, obstacles: &obstacles,
-                    pass: &pass)
+                    scope: scope,
+                    environment: environment,
+                    entityFrames: &entityFrames,
+                    obstacles: &obstacles,
+                    pass: &pass
+                )
             }
             if let scope, let model = entityCard(payload.entityCode, in: scope.tree) {
                 let width = environment.cardWidth * scale
                 let height = environment.cardHeight(rowCount: model.rows.count) * scale
                 frame = CGRect(
-                    x: center.x - width / 2, y: center.y - height / 2,
-                    width: width, height: height)
+                    x: center.x - width / 2,
+                    y: center.y - height / 2,
+                    width: width,
+                    height: height
+                )
                 kind = .entityCard(model)
                 entityFrames[node.identity.uuid] =
                     (frame, payload.entityCode, scope.tree.body.code, scale)
@@ -729,8 +864,11 @@ public enum DiagramResolver {
                 let width = environment.cardWidth * scale
                 let height = environment.cardHeight(rowCount: 1) * scale
                 frame = CGRect(
-                    x: center.x - width / 2, y: center.y - height / 2,
-                    width: width, height: height)
+                    x: center.x - width / 2,
+                    y: center.y - height / 2,
+                    width: width,
+                    height: height
+                )
                 kind = .absentEntity(code: payload.entityCode)
                 // Ghost cards are obstacles too — edges route around them,
                 // they just never produce edges themselves.
@@ -744,8 +882,12 @@ public enum DiagramResolver {
         var nodeKind: DiagramNodeKind?
         if case .umlNode(let payload) = node.payload { nodeKind = payload.nodeKind }
         pass.frames[node.identity.uuid] = ResolvePass.Frame(
-            frame: frame, type: type, parentUuid: parentUuid, scale: scale,
-            nodeKind: nodeKind)
+            frame: frame,
+            type: type,
+            parentUuid: parentUuid,
+            scale: scale,
+            nodeKind: nodeKind
+        )
 
         // Obstacle participation is now DATA on the registry rather than a
         // hardcoded branch: structural content (entity cards, shapes, text
@@ -759,11 +901,16 @@ public enum DiagramResolver {
         }
 
         return ResolvedElement(
-            uuid: node.identity.uuid, code: node.base.code,
-            name: node.base.name, frame: frame,
-            elementZ: node.base.elementZ, kind: kind,
+            uuid: node.identity.uuid,
+            code: node.base.code,
+            name: node.base.name,
+            frame: frame,
+            elementZ: node.base.elementZ,
+            kind: kind,
             children: children,
-            accumulatedCenter: center, accumulatedScale: scale)
+            accumulatedCenter: center,
+            accumulatedScale: scale
+        )
     }
 
     /// Card contents from the hydrated dope tree: the entity's own
@@ -805,7 +952,10 @@ public enum DiagramResolver {
                 // `name` is the property's OWN code — the snake_case column
                 // name exactly as modeled, never the dot-path.
                 return EntityCardModel.PropertyRow(
-                    name: property.body.code, typeLabel: typeLabel, badges: badges)
+                    name: property.body.code,
+                    typeLabel: typeLabel,
+                    badges: badges
+                )
             }
         }
 
@@ -820,23 +970,21 @@ public enum DiagramResolver {
         }
 
         return EntityCardModel(
-            entityCode: entityCode, entityName: entity.body.name,
+            entityCode: entityCode,
+            entityName: entity.body.name,
             domainCode: domainCode,
             headerHue: DiagramPalette.domainHue(domainCode),
-            rows: allRows)
+            rows: allRows
+        )
     }
 
     // MARK: - The two-phase resolve
 
-    /// Phase-1 state: what phase 2 needs and phase 1 is the only thing that
-    /// can know.
+    /// Phase-1 state: what phase 2 needs and only phase 1 can know.
     ///
-    /// `frames` holds EVERY element, keyed by uuid. The older `entityFrames`
-    /// dictionary is kept alongside it rather than replaced: it carries dope
-    /// metadata (entityCode, scopeCode) that only entity cards have, and the
-    /// FK producer is written against exactly that. Widening it would have
-    /// meant making those fields optional on every element in the diagram to
-    /// serve one producer.
+    /// `frames` holds EVERY element keyed by uuid, while `entityFrames` stays
+    /// alongside it because it carries dope metadata (entityCode, scopeCode) that
+    /// only entity cards have and the FK producer is written against.
     struct ResolvePass {
         struct Frame {
             let frame: CGRect
@@ -892,12 +1040,16 @@ public enum DiagramResolver {
             seeds.append(
                 EdgeSeed(
                     request: DiagramEdgeRouter.EdgeRequest(
-                        fromFrame: source.anchorFrame, toFrame: target.anchorFrame,
+                        fromFrame: source.anchorFrame,
+                        toFrame: target.anchorFrame,
                         sourceRowY: source.anchorFrame.midY,
                         propertyRef: deferred.code,
-                        fromElementUuid: parentUuid),
-                    fallbackFrom: from, fallbackTo: to,
-                    fromElementUuid: parentUuid, toElementUuid: targetUuid,
+                        fromElementUuid: parentUuid
+                    ),
+                    fallbackFrom: from,
+                    fallbackTo: to,
+                    fromElementUuid: parentUuid,
+                    toElementUuid: targetUuid,
                     propertyRef: deferred.code,
                     origin: .connector(
                         elementUuid: deferred.uuid,
@@ -909,7 +1061,11 @@ public enum DiagramResolver {
                             headKind: deferred.payload.headKind,
                             routingKind: deferred.payload.routingKind,
                             tailKind: deferred.payload.tailKind,
-                            label: deferred.payload.label))))
+                            label: deferred.payload.label
+                        )
+                    )
+                )
+            )
         }
         return seeds
     }
@@ -920,7 +1076,8 @@ public enum DiagramResolver {
     /// diagram's content bounds include it and a screenshot cannot clip a
     /// connector that runs outside every card.
     private static func patchDeferred(
-        _ element: ResolvedElement, pass: ResolvePass
+        _ element: ResolvedElement,
+        pass: ResolvePass
     ) -> ResolvedElement {
         let children = element.children.map { patchDeferred($0, pass: pass) }
         guard case .connector(let placeholder) = element.kind else {
@@ -945,9 +1102,12 @@ public enum DiagramResolver {
                     headKind: placeholder.headKind,
                     routingKind: placeholder.routingKind,
                     tailKind: placeholder.tailKind,
-                    label: placeholder.label)),
+                    label: placeholder.label
+                )
+            ),
             frame: source.frame.union(target.frame),
-            children: children)
+            children: children
+        )
     }
 
     /// One edge to route, from either producer.
@@ -961,20 +1121,17 @@ public enum DiagramResolver {
         let origin: ResolvedEdgeOrigin
     }
 
-    /// The FK edge pass: for every relationship property of every rendered
-    /// entity card, if the target property's owning entity also has a card
-    /// under the SAME scope element family, draw an edge between the two
-    /// card borders.
-    /// Base routing padding in points, scaled per-obstacle by accumulated
-    /// scale. Coupled to the frozen layout generator's corridors
-    /// (diagram_from_dope.py: 50pt gutters, 48pt row gaps) — must stay < 24
-    /// or the vertical row-gap corridors close entirely. Deliberately NOT a
-    /// DiagramRenderEnvironment knob: it is routing policy, not a render
-    /// setting. Internal (not private) so the corridor-arithmetic fixture
-    /// pins THIS value against the generator constants — changing it without
-    /// updating the fixture breaks loudly.
+    /// Base routing padding in points, scaled per-obstacle by accumulated scale.
+    /// Coupled to the frozen layout generator's corridors (50pt gutters, 48pt row
+    /// gaps), so it must stay under 24 or the vertical row-gap corridors close
+    /// entirely. Routing policy rather than a render setting, hence not a
+    /// `DiagramRenderEnvironment` knob; internal so the corridor-arithmetic
+    /// fixture can pin it against the generator constants.
     static let edgeRoutingPadding: Double = 12
 
+    /// The FK edge pass: for every relationship property of every rendered entity
+    /// card, draw an edge between the two card borders when the target property's
+    /// owning entity also has a card under the SAME scope element family.
     private static func foreignKeyEdgeSeeds(
         dope: DiagramDopeContext,
         entityFrames: [String: (
@@ -1017,20 +1174,29 @@ public enum DiagramResolver {
                 // 1:1 to drawn rows: own properties render first, the
                 // composed-base union only appends after them.
                 let rowY = rowCenterY(
-                    frameMinY: info.frame.minY, scale: info.scale,
-                    rowIndex: rowIndex, environment: environment)
+                    frameMinY: info.frame.minY,
+                    scale: info.scale,
+                    rowIndex: rowIndex,
+                    environment: environment
+                )
                 let (from, to) = anchorPoints(info.frame, target.frame)
                 seeds.append(
                     EdgeSeed(
                         request: DiagramEdgeRouter.EdgeRequest(
-                            fromFrame: info.frame, toFrame: target.frame,
+                            fromFrame: info.frame,
+                            toFrame: target.frame,
                             sourceRowY: rowY,
                             propertyRef: "\(info.entityCode).\(property.body.code)",
-                            fromElementUuid: uuid),
-                        fallbackFrom: from, fallbackTo: to,
-                        fromElementUuid: uuid, toElementUuid: target.uuid,
+                            fromElementUuid: uuid
+                        ),
+                        fallbackFrom: from,
+                        fallbackTo: to,
+                        fromElementUuid: uuid,
+                        toElementUuid: target.uuid,
                         propertyRef: "\(info.entityCode).\(property.body.code)",
-                        origin: .dopeForeignKey))
+                        origin: .dopeForeignKey
+                    )
+                )
             }
         }
         // Routing is the CALLER's — one shared-graph call for every producer,
@@ -1042,7 +1208,9 @@ public enum DiagramResolver {
     /// `ResolvedElement.rowCenterY` (the host's search field-jump) both call
     /// this, so the two can never disagree.
     static func rowCenterY(
-        frameMinY: CGFloat, scale: Double, rowIndex: Int,
+        frameMinY: CGFloat,
+        scale: Double,
+        rowIndex: Int,
         environment: DiagramRenderEnvironment
     ) -> CGFloat {
         frameMinY

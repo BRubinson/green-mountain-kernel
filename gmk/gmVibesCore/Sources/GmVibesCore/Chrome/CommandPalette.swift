@@ -86,7 +86,8 @@ struct CommandPalette: View {
     private func open(_ hit: SearchHit) {
         guard
             let windowID = catalog.sessionWindowID(
-                forSessionUuid: hit.sessionUuid, targetPromptUuid: hit.promptUuid
+                forSessionUuid: hit.sessionUuid,
+                targetPromptUuid: hit.promptUuid
             )
         else { return }
         // Dismiss FIRST — nav.go flips the window's route .id, and mutating

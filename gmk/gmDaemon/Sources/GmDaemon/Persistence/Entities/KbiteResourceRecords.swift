@@ -47,18 +47,14 @@ struct ResourceFileKeywordJunctionRecord: BaseRecordFields {
     var keywordUuid: String
 }
 
-/// PROJECTION record: a typed decoder for a result-set shape rather than a
-/// table mirror. Not enrolled in RecordSchemaTests, which maps live TABLES.
+/// PROJECTION record: a typed decoder for a result-set shape, not a table
+/// mirror, so it is not enrolled in RecordSchemaTests.
 ///
-/// This exists specifically so the kbite stub read stays narrow. Its query
-/// projects `resource_file_content IS NOT NULL AS has_content` — a computed
-/// column — precisely to avoid touching resource_file_content, which is
-/// ~115 MB across ~12k rows and by far the largest thing in the schema.
-/// KbiteResourceFileRecord declares that column as String?, so a naive
-/// SELECT * conversion would DECODE FINE and regress silently into a
-/// multi-megabyte read holding the single-writer queue. Modelling the
-/// projection instead makes that mistake unexpressible rather than merely
-/// documented.
+/// It keeps the kbite stub read narrow. The query projects
+/// `resource_file_content IS NOT NULL AS has_content` to avoid touching
+/// resource_file_content, which is ~115 MB and the largest thing in the schema.
+/// A `SELECT *` would decode fine and silently hold the single-writer queue
+/// across a multi-megabyte read; the projection makes that unexpressible.
 struct KbiteResourceFileStubRecord: SnakeCaseDecoded {
     var uuid: String
     var resourceFileName: String
@@ -67,13 +63,14 @@ struct KbiteResourceFileStubRecord: SnakeCaseDecoded {
 }
 
 extension KbiteResourceFileStubRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
+    /// db → wire.
     func wireStub() -> KbiteResourceFileStub {
         KbiteResourceFileStub(
             uuid: uuid,
             resourceFileName: resourceFileName,
             resourceFileSummary: resourceFileSummary,
-            hasContent: hasContent)
+            hasContent: hasContent
+        )
     }
 }
 
@@ -88,12 +85,13 @@ extension KbiteResourceRecord {
             resourceSummary: resourceSummary,
             resourceType: resourceType,
             resourceTrust: Int(resourceTrust),
-            files: files)
+            files: files
+        )
     }
 }
 
 extension KbiteResourceFileRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
+    /// db → wire.
     ///
     /// This is the FULL-CONTENT read (KBITE_FILE_GET, one file by uuid) and is
     /// the only place resource_file_content is meant to be loaded. The stub
@@ -105,6 +103,7 @@ extension KbiteResourceFileRecord {
             resourceFileName: resourceFileName,
             resourceFileSummary: resourceFileSummary,
             resourceFileContent: resourceFileContent,
-            createdAt: createdAt)
+            createdAt: createdAt
+        )
     }
 }

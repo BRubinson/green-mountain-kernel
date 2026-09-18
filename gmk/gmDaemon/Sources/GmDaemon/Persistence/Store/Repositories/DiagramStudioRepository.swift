@@ -12,7 +12,8 @@ struct DiagramStudioRepository: RepositoryContext {
     func diagramSearch(_ req: DiagramSearchRequest, pattern: FTS5Pattern?) throws -> DiagramSearchResponse {
         guard
             try Row.fetchOne(
-                db, sql: "SELECT 1 FROM project WHERE uuid = ?",
+                db,
+                sql: "SELECT 1 FROM project WHERE uuid = ?",
                 arguments: [req.projectUuid]
             ) != nil
         else {
@@ -21,7 +22,9 @@ struct DiagramStudioRepository: RepositoryContext {
         if let sessionUuid = req.sessionUuid {
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM session WHERE uuid = ?", arguments: [sessionUuid]
+                    db,
+                    sql: "SELECT 1 FROM session WHERE uuid = ?",
+                    arguments: [sessionUuid]
                 ) != nil
             else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
@@ -54,7 +57,9 @@ struct DiagramStudioRepository: RepositoryContext {
                        AND \(conditions.joined(separator: " AND "))
                      ORDER BY bm25(diagram_fts, 6.0, 4.0, 1.0)
                      LIMIT \(limit)
-                    """, arguments: StatementArguments([pattern] + args))
+                    """,
+                arguments: StatementArguments([pattern] + args)
+            )
         } else {
             rows = try Row.fetchAll(
                 db,
@@ -63,7 +68,9 @@ struct DiagramStudioRepository: RepositoryContext {
                      WHERE \(conditions.joined(separator: " AND "))
                      ORDER BY d.updated_at DESC, d.code
                      LIMIT \(limit)
-                    """, arguments: StatementArguments(args))
+                    """,
+                arguments: StatementArguments(args)
+            )
         }
         return DiagramSearchResponse(diagrams: try rows.map(DiagramRepository.diagramRow))
     }
@@ -74,27 +81,40 @@ struct DiagramStudioRepository: RepositoryContext {
         }
         if let expected = req.expectedRevision, expected != diagram.revision {
             throw StoreError.revisionConflict(
-                scopeUuid: diagram.uuid, expected: expected, actual: diagram.revision)
+                scopeUuid: diagram.uuid,
+                expected: expected,
+                actual: diagram.revision
+            )
         }
         let elements =
             try Int.fetchOne(
-                db, sql: "SELECT COUNT(*) FROM diagram_element WHERE diagram_uuid = ?",
-                arguments: [diagram.uuid]) ?? 0
+                db,
+                sql: "SELECT COUNT(*) FROM diagram_element WHERE diagram_uuid = ?",
+                arguments: [diagram.uuid]
+            ) ?? 0
         let storagePath = try self.diagram.diagramOwnerStoragePath(diagram: diagram)
         // The durable goodbye rides BEFORE the row drop, carrying the
         // final revision — live galleries/editors drop the card on it.
         try self.diagram.recordDiagramChange(
-            diagram: diagram, action: "deleted", elementUuid: nil,
-            mutationCount: nil, revision: diagram.revision)
+            diagram: diagram,
+            action: "deleted",
+            elementUuid: nil,
+            mutationCount: nil,
+            revision: diagram.revision
+        )
         // One statement: elements + subtypes + vertices cascade via FKs,
         // the FTS row via its delete trigger, and m0022's qualified
         // readings via their own CASCADE.
         try db.execute(
             sql: "DELETE FROM diagram WHERE uuid = ?",
-            arguments: [diagram.uuid])
+            arguments: [diagram.uuid]
+        )
         return DiagramDeleteResponse(
-            deletedUuid: diagram.uuid, code: diagram.code,
-            cascadedElements: elements, ownerStoragePath: storagePath,
-            gmccDiagramPath: diagram.gmccDiagramPath)
+            deletedUuid: diagram.uuid,
+            code: diagram.code,
+            cascadedElements: elements,
+            ownerStoragePath: storagePath,
+            gmccDiagramPath: diagram.gmccDiagramPath
+        )
     }
 }

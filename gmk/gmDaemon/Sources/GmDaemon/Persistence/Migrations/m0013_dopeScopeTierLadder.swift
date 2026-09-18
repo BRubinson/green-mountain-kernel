@@ -3,48 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0013 — dope_scope widened from two tiers to four:
-    // BASE_PROJECT / PROJECT_ITEM / SESSION_INSTANCE / SESSION_INSTANCE_ITEM.
-    //
-    // SQLite cannot ALTER a CHECK or a column's NOT NULL-ness, so this is
-    // a full rebuild in the m0002/m0008 grammar. Registered .deferred
-    // with NO PRAGMA in the body: the five dope_persistence* tables
-    // CASCADE-reference this one.
-    //
-    // Ownership is m0010's chain-non-null tier ladder, ported verbatim:
-    // each tier fills its own FK and every ancestor's, one CHECK per
-    // tier, one PARTIAL unique index per tier (four, replacing the two
-    // session_uuid-keyed indexes, which do not generalize past two
-    // tiers). project_uuid is ALWAYS NOT NULL.
-    //
-    // The two existing scope types are pure VALUE renames:
-    //   SESSION_BASE -> SESSION_INSTANCE
-    //   PROMPT       -> SESSION_INSTANCE_ITEM
-    // which is what makes this drop-in rather than a rewrite —
-    // dopeScopeCandidates, dopeGet, dopeList, DopeBootSync and the
-    // diagram binding ladder all keep working on a renamed constant.
-    //
-    // The prompt_uuid CHECK stays a BICONDITIONAL, exactly as m0007's
-    // was. A nullable slot there would re-stamp m0007's NULLs-are-
-    // distinct trap: UNIQUE(session_uuid, prompt_uuid, code) silently
-    // constrains NOTHING for a prompt-free row. A session-level personal
-    // overlay, if ever wanted, is a FIFTH tier — never a nullable slot.
-    //
-    // promoted_from_* is the BASE_PROJECT promotion high-water mark
-    // (CHECK-restricted to that tier). It is deliberately separate from
-    // the row's own `revision`: keying promotion on "did THIS scope
-    // promote before" lets two instances on one branch overwrite each
-    // other at every alternating boot, and without a recorded high-water
-    // the same session re-promotes identical content at every
-    // SessionStart. Keeping them separate also lets BASE_PROJECT.revision
-    // stay its own forward-only counter that a lower-revision winner can
-    // never drag backward.
-    //
-    // The copy uses LEFT JOINs plus a pre-flight refusal, NOT inner
-    // joins: an inner join would silently DROP any scope whose
-    // session/instance lineage is broken — project_uuid NOT NULL would
-    // never fire, because the row simply would not be selected. On an
-    // append-only db a migration fails loudly; it never deletes a row.
+    // m0013 — dope_scope widened from two tiers to four: BASE_PROJECT /
+    // PROJECT_ITEM / SESSION_INSTANCE / SESSION_INSTANCE_ITEM. Full rebuild,
+    // .deferred with NO PRAGMA: five dope_persistence* tables CASCADE-reference
+    // this one. Ownership is m0010's chain-non-null ladder — one CHECK and one
+    // PARTIAL unique index per tier, project_uuid ALWAYS NOT NULL, prompt_uuid
+    // CHECKed as a BICONDITIONAL so the index cannot silently constrain nothing.
+    // promoted_from_* is the BASE_PROJECT high-water mark, kept separate from
+    // `revision` so two instances on one branch cannot overwrite each other.
     static func m0013_dopeScopeTierLadder(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0013_dopeScopeTierLadder") { db in
             let orphans =
@@ -55,12 +21,14 @@ extension Migrations {
                         LEFT JOIN session  s ON s.uuid = ds.session_uuid
                         LEFT JOIN instance i ON i.uuid = s.instance_uuid
                         WHERE i.project_uuid IS NULL
-                        """) ?? -1
+                        """
+                ) ?? -1
             guard orphans == 0 else {
                 throw StoreError.corruptState(
                     entity: "dope_scope",
                     detail: "m0013: \(orphans) scope(s) have no resolvable project "
-                        + "through session->instance; refusing to drop them")
+                        + "through session->instance; refusing to drop them"
+                )
             }
             let before = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM dope_scope") ?? -1
 
@@ -129,13 +97,15 @@ extension Migrations {
                     CREATE INDEX idx_dope_scope_instance_fk ON dope_scope(instance_uuid);
                     CREATE INDEX idx_dope_scope_session_fk  ON dope_scope(session_uuid);
                     CREATE INDEX idx_dope_scope_prompt_fk   ON dope_scope(prompt_uuid);
-                    """)
+                    """
+            )
 
             let after = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM dope_scope") ?? -1
             guard before == after else {
                 throw StoreError.corruptState(
                     entity: "dope_scope",
-                    detail: "m0013 row-count mismatch: before \(before) after \(after)")
+                    detail: "m0013 row-count mismatch: before \(before) after \(after)"
+                )
             }
 
             try db.execute(

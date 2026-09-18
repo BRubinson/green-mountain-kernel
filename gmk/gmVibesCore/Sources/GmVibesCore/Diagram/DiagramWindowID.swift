@@ -3,12 +3,9 @@ import GmDaemonSdk
 
 /// Route payload for `Route.diagram`.
 ///
-/// The route used to be `(SessionWindowID, scopeCode)` — the identity of a
-/// non-persisted canvas over one session's dope scope. Db-backed diagrams
-/// break that in two places: a PROJECT-tier diagram has NO session, and one
-/// dope scope can carry many saved diagrams. So the route now carries the
-/// diagram's own identity, and the session rides along as an optional
-/// (still load-bearing: see `Route.sessionScopeUuid`).
+/// It carries the diagram's own identity with the session as an optional, because a
+/// PROJECT-tier diagram has no session and one dope scope can carry many saved diagrams.
+/// The optional session is still load-bearing; see `Route.sessionScopeUuid`.
 struct DiagramWindowID: Codable, Hashable, Identifiable {
     /// What the canvas is. A saved row is named by uuid; a preview has no row
     /// to name, so its dope scope code IS its identity — two states that
@@ -62,7 +59,10 @@ struct DiagramWindowID: Codable, Hashable, Identifiable {
     /// a rail on the project page has none to give, and that is legal.
     static func saved(_ row: DiagramRow, session: SessionWindowID?) -> DiagramWindowID {
         DiagramWindowID(
-            source: .saved(diagramUuid: row.uuid), name: row.name,
-            session: session, projectUuid: row.projectUuid)
+            source: .saved(diagramUuid: row.uuid),
+            name: row.name,
+            session: session,
+            projectUuid: row.projectUuid
+        )
     }
 }

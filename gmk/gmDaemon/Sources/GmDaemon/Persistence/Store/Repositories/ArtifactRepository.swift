@@ -11,7 +11,9 @@ struct ArtifactRepository: RepositoryContext {
     func add(_ req: ArtifactAddRequest) throws -> ArtifactRow {
         guard
             try Row.fetchOne(
-                db, sql: "SELECT 1 FROM prompt WHERE uuid = ?", arguments: [req.promptUuid]
+                db,
+                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
+                arguments: [req.promptUuid]
             ) != nil
         else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -29,25 +31,34 @@ struct ArtifactRepository: RepositoryContext {
                     SET note = ?, version = version + 1, updated_at = ?
                     WHERE uuid = ?
                     """,
-                arguments: [req.note, Store.isoNow(), existing])
+                arguments: [req.note, Store.isoNow(), existing]
+            )
             try core.appendEvent(
-                db, kind: .addArtifact, subjectUuid: existing,
-                payload: Store.jsonPayload(["file_path": req.filePath]))
+                db,
+                kind: .addArtifact,
+                subjectUuid: existing,
+                payload: Store.jsonPayload(["file_path": req.filePath])
+            )
             guard let row = try fetchRow(uuid: existing) else {
                 throw StoreError.notFound(entity: "prompt_artifact", key: existing)
             }
             return row
         }
         let uuid = try core.insertBase(
-            db, table: "prompt_artifact",
+            db,
+            table: "prompt_artifact",
             extra: [
                 "prompt_uuid": req.promptUuid,
                 "file_path": req.filePath,
                 "note": req.note,
-            ])
+            ]
+        )
         try core.appendEvent(
-            db, kind: .addArtifact, subjectUuid: uuid,
-            payload: Store.jsonPayload(["file_path": req.filePath]))
+            db,
+            kind: .addArtifact,
+            subjectUuid: uuid,
+            payload: Store.jsonPayload(["file_path": req.filePath])
+        )
         guard let row = try fetchRow(uuid: uuid) else {
             throw StoreError.notFound(entity: "prompt_artifact", key: uuid)
         }
@@ -59,12 +70,14 @@ struct ArtifactRepository: RepositoryContext {
     }
 
     func fetchRows(promptUuid: String) throws -> [ArtifactRow] {
-        // ORDER BY ... , id is unchanged: `id` is still a column, it is just
-        // no longer a Record property.
+        // `id` orders the tie-break: it is a column even though no Record
+        // exposes it as a property.
         try PromptArtifactRecord.fetchAll(
             db,
-            where: "prompt_uuid = ?", arguments: [promptUuid],
+            where: "prompt_uuid = ?",
+            arguments: [promptUuid],
             orderBy: "created_at, id"
-        ).map { $0.wireRow() }
+        )
+        .map { $0.wireRow() }
     }
 }

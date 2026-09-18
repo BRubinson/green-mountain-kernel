@@ -26,7 +26,7 @@ public struct GmAgentRpirOpenBriefingTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirOpenBriefingArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirOpenBriefingArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "BRIEFING_OPEN")
     }
 }
@@ -50,8 +50,11 @@ public struct GmAgentRpirWriteBriefArguments: Sendable {
     public var fileChangeRefs: [String]
 
     public init(
-        briefingUuid: String, expectedVersion: Int,
-        dopeRefs: [String], kbiteRefs: [String], fileChangeRefs: [String]
+        briefingUuid: String,
+        expectedVersion: Int,
+        dopeRefs: [String],
+        kbiteRefs: [String],
+        fileChangeRefs: [String]
     ) {
         self.briefingUuid = briefingUuid
         self.expectedVersion = expectedVersion
@@ -68,7 +71,7 @@ public struct GmAgentRpirWriteBriefTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirWriteBriefArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirWriteBriefArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "BRIEFING_COMPLETE")
     }
 }
@@ -95,7 +98,7 @@ public struct GmAgentRpirCloseBriefTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirCloseBriefArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirCloseBriefArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "BRIEFING_COMPLETE")
     }
 }
@@ -118,7 +121,7 @@ public struct GmAgentRpirLoadBriefTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirLoadBriefArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirLoadBriefArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "BRIEFING_GET")
     }
 }

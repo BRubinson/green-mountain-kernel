@@ -208,20 +208,32 @@ extension ReportBadgeItem {
         if unranked > 0 {  // stalled-run signal
             items.append(
                 .init(
-                    id: "explore-unranked", text: "\(unranked) unranked",
-                    systemImage: "exclamationmark.circle", tint: .orange))
+                    id: "explore-unranked",
+                    text: "\(unranked) unranked",
+                    systemImage: "exclamationmark.circle",
+                    tint: .orange
+                )
+            )
         }
         if findings > 0 {
             items.append(
                 .init(
-                    id: "explore-findings", text: "\(findings) findings",
-                    systemImage: "sparkle.magnifyingglass", tint: .secondary))
+                    id: "explore-findings",
+                    text: "\(findings) findings",
+                    systemImage: "sparkle.magnifyingglass",
+                    tint: .secondary
+                )
+            )
         }
         if keyFiles > 0 {
             items.append(
                 .init(
-                    id: "explore-keyfiles", text: "\(keyFiles) key files",
-                    systemImage: "doc.text.magnifyingglass", tint: .secondary))
+                    id: "explore-keyfiles",
+                    text: "\(keyFiles) key files",
+                    systemImage: "doc.text.magnifyingglass",
+                    tint: .secondary
+                )
+            )
         }
         return items
     }
@@ -232,20 +244,32 @@ extension ReportBadgeItem {
             let display = verdict.display
             items.append(
                 .init(
-                    id: "review-verdict", text: display.label,
-                    systemImage: "checkmark.seal", tint: display.tint))
+                    id: "review-verdict",
+                    text: display.label,
+                    systemImage: "checkmark.seal",
+                    tint: display.tint
+                )
+            )
         }
         if open > 0 {  // fix-loop progress signal
             items.append(
                 .init(
-                    id: "review-open", text: "\(open) open",
-                    systemImage: "circle", tint: .orange))
+                    id: "review-open",
+                    text: "\(open) open",
+                    systemImage: "circle",
+                    tint: .orange
+                )
+            )
         }
         if unranked > 0 {
             items.append(
                 .init(
-                    id: "review-unranked", text: "\(unranked) unranked",
-                    systemImage: "exclamationmark.circle", tint: .orange))
+                    id: "review-unranked",
+                    text: "\(unranked) unranked",
+                    systemImage: "exclamationmark.circle",
+                    tint: .orange
+                )
+            )
         }
         return items
     }

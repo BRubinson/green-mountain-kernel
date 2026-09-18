@@ -815,6 +815,33 @@ bash gmk/scripts/rebuild_local.sh                   # universal build → staged
 See **The release loop** above for how `rebuild_local.sh`, `publish_release.sh`
 and the plugin's `install_gm.sh` divide the work.
 
+### Lint and format
+
+One gate, two tools, all of it repo-side and none of it in the generated plugin:
+
+```bash
+bash gmk/scripts/swift_lint_format.sh          # lint; exit 1 on a swift-format finding or a SwiftLint error
+bash gmk/scripts/swift_lint_format.sh --fix    # swift-format in place, then lint; SwiftLint never rewrites
+bash gmk/scripts/install_swiftlint.sh          # pinned SwiftLint into $GM_FS_ROOT/tools, symlinked at bin/swiftlint
+```
+
+- **swift-format owns layout.** Root `.swift-format`; `gmk/Gm_Kernel_test/.swift-format`
+  is a full copy that allows force-try and IUOs (nested configs replace, they do not
+  merge, and the script passes no `--configuration` so discovery reaches it).
+  `.swift-format-ignore` declares vendored, generated and build output.
+- **SwiftLint owns semantics and comments.** Root `.swiftlint.yml`. Errors fail the gate,
+  warnings do not. The comment rules (`historical_comment`, `long_comment_run`,
+  `block_comment`, `comment_line_length`) are errors and enforce the no-history-in-comments
+  axiom; they are never baselined. `.swiftlint-baseline.json` exempts pre-existing warnings.
+  `excluded` uses single-star paths only: a `**` globstar crashes SwiftLint 0.65.1 here.
+  Not installed → the stage warns and is skipped.
+- **Where it fires:** `rebuild_local.sh` before every build (and it sets `core.hooksPath`
+  to `gmk/scripts/githooks` when unset); the committed pre-commit hook on staged `.swift`
+  files; and `.claude/settings.json` registers `gmk/scripts/swift_lint_hook.sh` as a
+  PostToolUse hook that lints the one file an agent just edited and returns the findings
+  as context. The hook never formats: a rewrite between an agent's read and its next Edit
+  breaks the edit. Format at a checkpoint with `--fix`.
+
 ### ONE test package — and what was given up to get it
 
 `gmk/Gm_Kernel_test` is the repository's only test package. It boots ONE real
@@ -1148,7 +1175,7 @@ Consequences a reader must not re-derive incorrectly:
 ## The pen vocabulary is `cde`, and the bridge owns it
 
 The MCP server key is **`cde`**, tools are `mcp__plugin_gmcc_cde__<name>`, and
-the roster is **exactly the 50 tools `GmAgentTools` declares in the bridge** — no
+the roster is **exactly the 51 tools `GmAgentTools` declares in the bridge** — no
 more, and no fewer.
 
 - **THE BRIDGE IS THE ONLY SOURCE OF TOOL NAMES.** A name the server invents is a
@@ -1172,7 +1199,7 @@ more, and no fewer.
   skill, command and agent that takes the family — the `gmcc` skill was
   advertising `diagram_not_supported`, and the `.diagram` family contributes
   nothing else at all. Serving them keeps the answer discoverable; granting them
-  buys nothing. Today: 50 served, 47 granted, and the difference is exactly
+  buys nothing. Today: 51 served, 48 granted, and the difference is exactly
   those three.
 - **A skill's reference documents are INDEXED, not orphaned.** `skills/gmcc/`
   ships four `ref/*.md` totalling ~38KB beside a ~2KB `SKILL.md`, and until v30
@@ -1183,8 +1210,24 @@ more, and no fewer.
   session that boots gmcc, the refs load only when a reader follows the index.
   That split is the whole point — progressive disclosure, with the index as the
   cheap thing that names the door.
-- **`PenSheet.instructions` has a 2048-byte budget and the roster check enforces
+- **`CdeSheet.instructions` has a 2048-byte budget and the roster check enforces
   it.** It sits at ~1.8KB. If it crosses, trim PROSE, never names.
+- **PAGING LIVES IN THE CDE LAYER, NEVER IN THE DAEMON.** Every cde read is
+  cut to the harness's 45,000-byte result cap by `CdePager`
+  (`gmDaemonSdk/Protocol/CdePaging.swift`) over the daemon's WHOLE typed
+  response, in `GmMcpServer/CdePagedResults.swift`: arrays page by row, long
+  text (plan body, overviews, intent, prompt detail, one option body or
+  change_code) pages as character windows, and every result carries
+  `page {pageBytes, nextCursor, regions[{name, returned, total}]}`. A caller
+  loops on `cursor` until `page.nextCursor` is null. The daemon's verbs and
+  the wire are untouched by this — GMVibes reads whole records in-process
+  through the same verb layer and is not budget-bound — so a page re-reads the
+  whole record from the daemon (bounded: ≤ ~400 KB in production). Do not add
+  `page_bytes`/`cursor` to a wire request; the divergence between the app and
+  the MCP is presentational and belongs here. `CdeResultBudget.render`'s
+  withhold envelope is the last resort, no longer a plan, and its `degrade`
+  round trip is gone. The `Pen*` identifier family was renamed `Cde*` in the
+  same change; "pen" survives only in prose.
 - **AN UNKNOWN KEY IN `plugin.json` DISABLES THE ENTIRE PLUGIN.** Claude Code
   validates the manifest strictly and answers an unrecognised field with
   `<field>: Invalid input`, refusing to load *any* of it — commands, agents,

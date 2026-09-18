@@ -2,41 +2,12 @@ import Foundation
 import Observation
 import GmDaemonSdk
 
-/// Feature 2's write path: per-question answer drafts over CLARIFY_ANSWER —
-/// the ONLY report-subsystem write the app performs, and the only place in
-/// this prompt where a bug destroys user data.
+/// Per-question answer drafts over CLARIFY_ANSWER, the app's only clarification write.
 ///
-/// ## The wholesale-replace trap
-///
-/// `ClarificationRepository.answer()` DELETEs every `user_clarification_answer`
-/// row for the question and rewrites `answer_text` WHOLESALE on every non-skip
-/// call. Sending only the axis the user just touched therefore *destroys the
-/// other one*: toggling a checkbox with `answerText: nil` wipes typed text, and
-/// saving text with `selectedOptionUuids: nil` wipes every selection. So
-/// `save()` ALWAYS sends BOTH axes in full — including an EMPTY selection array,
-/// which is a real value ("nothing selected"), never an omission. `skip()` sends
-/// `skip: true`, which is the daemon's symmetric clear of both axes.
-///
-/// ## Versioning
-///
-/// `expectedVersion` targets the QUESTION row, never the summary — so version
-/// cells are tracked per question uuid and a conflict banners on that one
-/// question while every other draft survives untouched. On success the returned
-/// row's version is adopted IMMEDIATELY rather than waiting for the
-/// CLARIFICATION_CHANGE round trip, so two quick saves in a row both succeed.
-///
-/// This is a DELIBERATE divergence from `PromptSaveActor`, whose
-/// one-version-per-prompt shape cannot express per-question concurrency. Its
-/// vocabulary (saved / conflict / locked / failed) is borrowed; the component
-/// is not reused.
-///
-/// ## Deliberately NOT an actor
-///
-/// There is no debounce and no autosave — an explicit per-question Save is the
-/// settled rhythm — and the daemon already serializes writes on one queue, so
-/// actor isolation would buy nothing while costing a hop off the main actor for
-/// state SwiftUI must read SYNCHRONOUSLY during `body`. Turning this into an
-/// actor would deadlock the bindings; leave it `@MainActor @Observable`.
+/// `ClarificationRepository.answer()` rewrites both axes wholesale, so `save()` always sends
+/// text AND selection in full; an empty selection array is a real value, never an omission.
+/// `expectedVersion` targets the QUESTION row, so a conflict banners on that one question.
+/// Stays `@MainActor @Observable`: SwiftUI reads this state synchronously during `body`.
 @MainActor
 @Observable
 final class ClarificationAnswerModel {
@@ -66,11 +37,8 @@ final class ClarificationAnswerModel {
     /// re-sending the same stale expected version.
     var onNeedsRefresh: (@MainActor () async -> Void)?
 
-    /// The ONE daemon call this model makes, behind a replaceable closure so
-    /// `ClarificationAnswerModelTests` can assert the request SHAPE — both axes,
-    /// always, in full — without a live socket. Production never reassigns it;
-    /// this is a test seam, not a dependency-injection point, and nothing else
-    /// about the model's shape changed to accommodate it.
+    /// The one daemon call this model makes, behind a closure so a test can assert the
+    /// request shape without a live socket. Production never reassigns it.
     @ObservationIgnored
     var send: (ClarifyAnswerRequest) async throws -> ClarificationQuestionRow = {
         try await GMCCDaemonService.shared.clarifyAnswer($0)
@@ -80,16 +48,11 @@ final class ClarificationAnswerModel {
 
     func draft(for questionUuid: String) -> Draft? { drafts[questionUuid] }
 
-    /// Mirrors the daemon's `badRequest` guard exactly (it trims the text and
-    /// treats empty as absent), so the user never eats a server error for
-    /// pressing Save on an empty answer.
+    /// Mirrors the daemon's `badRequest` guard (trims the text, treats empty as absent).
     ///
-    /// `dirty` is part of the gate, not a nicety. `StoreCore.updateBase` bumps
-    /// `version = version + 1` on EVERY successful update, so a Save with no
-    /// pending edit is not a harmless no-op: it burns a version on the question
-    /// row and widens the VERSION_CONFLICT window that the whole per-question
-    /// version design exists to narrow. `applyServerRow` clears `dirty` the
-    /// moment a write lands, so the gate reopens on the next real edit.
+    /// `dirty` is part of the gate: `StoreCore.updateBase` bumps the version on every
+    /// successful update, so a Save with no pending edit burns a question-row version
+    /// and widens the VERSION_CONFLICT window.
     func canSave(_ questionUuid: String) -> Bool {
         guard let draft = drafts[questionUuid], !draft.inFlight, draft.dirty else { return false }
         return !trimmed(draft.text).isEmpty || !draft.selected.isEmpty
@@ -97,18 +60,12 @@ final class ClarificationAnswerModel {
 
     // MARK: - Reconciliation
 
-    /// Reconcile against every CLARIFY_GET and every event-triggered refetch.
+    /// Reconcile against every CLARIFY_GET and event-triggered refetch.
     ///
-    /// The server version ALWAYS wins — that is what makes the next Save legal
-    /// after someone else (a bot run, the CLI, another window) touched the row.
-    /// A dirty draft keeps the user's text and selection while adopting the new
-    /// version cell; a clean draft simply mirrors the server. A conflict banner
-    /// survives the refresh it triggered (otherwise it would flash and vanish
-    /// before the user could read it) but is dropped once the draft is clean,
-    /// where it no longer describes anything.
-    ///
-    /// Drafts for questions that are no longer served are dropped: a question
-    /// that does not exist cannot be answered.
+    /// The server version always wins, which is what makes the next Save legal after another
+    /// writer touched the row. A dirty draft keeps the user's text and selection while adopting
+    /// the new version cell. A conflict banner survives the refresh it triggered so the user can
+    /// read it, and drafts for questions the server stopped serving are dropped.
     func adopt(_ questions: [ClarificationQuestionRow]) {
         var next: [String: Draft] = [:]
         for question in questions {
@@ -116,8 +73,13 @@ final class ClarificationAnswerModel {
             let serverSelection = Set(question.selectedOptionUuids)
             guard var draft = drafts[question.uuid] else {
                 next[question.uuid] = Draft(
-                    text: serverText, selected: serverSelection, version: question.version,
-                    dirty: false, inFlight: false, conflict: nil)
+                    text: serverText,
+                    selected: serverSelection,
+                    version: question.version,
+                    dirty: false,
+                    inFlight: false,
+                    conflict: nil
+                )
                 continue
             }
             draft.version = question.version
@@ -172,7 +134,9 @@ final class ClarificationAnswerModel {
                 // "no options selected", and omitting it would leave the daemon's
                 // wholesale rewrite to decide — which it does by clearing anyway.
                 selectedOptionUuids: Array(draft.selected),
-                skip: false))
+                skip: false
+            )
+        )
     }
 
     /// `skip: true` clears BOTH axes daemon-side; adopting the returned row
@@ -186,7 +150,9 @@ final class ClarificationAnswerModel {
                 expectedVersion: draft.version,
                 answerText: nil,
                 selectedOptionUuids: nil,
-                skip: true))
+                skip: true
+            )
+        )
     }
 
     private func perform(questionUuid: String, request: ClarifyAnswerRequest) async {
@@ -202,7 +168,8 @@ final class ClarificationAnswerModel {
                 questionUuid,
                 conflict:
                     "Answered elsewhere while you were editing. Your text was kept and the "
-                    + "question refreshed — review it, then save again.")
+                    + "question refreshed — review it, then save again."
+            )
             // Without this the user would keep re-sending the same stale
             // expected version and conflict forever.
             await onNeedsRefresh?()
@@ -212,7 +179,8 @@ final class ClarificationAnswerModel {
             finish(
                 questionUuid,
                 conflict: reason
-                    ?? "Clarification is no longer accepting answers.")
+                    ?? "Clarification is no longer accepting answers."
+            )
             await onNeedsRefresh?()
         } catch let error as DaemonError {
             finish(questionUuid, conflict: error.userMessage)
@@ -227,8 +195,13 @@ final class ClarificationAnswerModel {
         var draft =
             drafts[row.uuid]
             ?? Draft(
-                text: "", selected: [], version: row.version,
-                dirty: false, inFlight: false, conflict: nil)
+                text: "",
+                selected: [],
+                version: row.version,
+                dirty: false,
+                inFlight: false,
+                conflict: nil
+            )
         draft.version = row.version
         draft.text = row.answerText ?? ""
         draft.selected = Set(row.selectedOptionUuids)

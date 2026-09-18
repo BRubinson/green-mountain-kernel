@@ -20,8 +20,10 @@ final class KernelLifecycleTests: KernelBackedTestCase {
         let db = try env.readOnlyDatabase()
         let head = try db.read { try Int.fetchOne($0, sql: "SELECT MAX(version) FROM schema_migrations") }
         XCTAssertEqual(
-            head, Migrations.currentSchemaVersion,
-            "a booted kernel must leave its db at the schema its binary knows")
+            head,
+            Migrations.currentSchemaVersion,
+            "a booted kernel must leave its db at the schema its binary knows"
+        )
     }
 
     /// The kernel answers PING with its own identity, and the protocol version
@@ -35,11 +37,9 @@ final class KernelLifecycleTests: KernelBackedTestCase {
     /// The kernel that answered is the WRITER, and it reports the root it
     /// actually resolved.
     ///
-    /// The root assertion is the load-bearing half. It proves the spawned child
-    /// landed on the harness's temporary root rather than on `~/gmfs` — which is
-    /// exactly the failure `DaemonClient.spawnDaemon` used to have, where an app
-    /// resolving its root from a bundle spawned a writer that inherited nothing
-    /// and silently opened production.
+    /// The root assertion is the load-bearing half: it proves the spawned child
+    /// landed on the harness's temporary root rather than on `~/gmfs`, where a
+    /// writer inheriting no environment silently opens production.
     func testTheKernelIsTheWriterAndNamesItsOwnRoot() throws {
         let pong = try env.send(.ping, PingRequest(), PingResponse.self)
         XCTAssertEqual(pong.writerRole, "writer")
@@ -47,7 +47,8 @@ final class KernelLifecycleTests: KernelBackedTestCase {
         XCTAssertEqual(
             URL(fileURLWithPath: reported).standardizedFileURL.path,
             env.root.standardizedFileURL.path,
-            "the spawned kernel must be on the harness root, NOT the installed runtime")
+            "the spawned kernel must be on the harness root, NOT the installed runtime"
+        )
     }
 
     /// The kernel's own boot write is visible in SQL.
@@ -62,22 +63,23 @@ final class KernelLifecycleTests: KernelBackedTestCase {
             try Int.fetchOne(
                 $0,
                 sql: "SELECT COUNT(*) FROM daemon_event WHERE kind = ?",
-                arguments: [DaemonEventKind.daemonStart.rawValue])
+                arguments: [DaemonEventKind.daemonStart.rawValue]
+            )
         }
         XCTAssertGreaterThan(starts ?? 0, 0, "a booted kernel must record its own start")
     }
 
     /// Every message type the build knows has a registry row.
     ///
-    /// This used to be `VerbRegistryTests`, which was deleted with the rest of
-    /// the old suite. It is cheap enough to keep here and it guards a real
-    /// hazard: a verb with no row is a WRITE the permission layer cannot see.
+    /// Guards a real hazard: a verb with no row is a WRITE the permission layer
+    /// cannot see.
     func testEveryMessageTypeHasARegistryRow() {
         let transportOnly: Set<MessageType> = [.hello, .subscribe, .event, .error]
         for type in MessageType.allCases where !transportOnly.contains(type) {
             XCTAssertNotNil(
                 VerbRegistry.spec(for: type),
-                "\(type.rawValue) has no VerbRegistry row — the guard cannot see it")
+                "\(type.rawValue) has no VerbRegistry row — the guard cannot see it"
+            )
         }
     }
 }

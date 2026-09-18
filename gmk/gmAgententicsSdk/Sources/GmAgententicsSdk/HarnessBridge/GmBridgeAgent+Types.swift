@@ -88,7 +88,7 @@ public enum GmBridgeAgent {
             nativeTools.map(\.rawValue) + mcpTools.map(\.qualifiedName)
         }
 
-        public func contents() throws -> String? {
+        public func contents() -> String? {
             var lines = ["---"]
             lines.append("name: \(GmBridgeYaml.scalar(name))")
             lines.append("description: \(GmBridgeYaml.scalar(description))")
@@ -106,7 +106,8 @@ public enum GmBridgeAgent {
             }
             if !disallowedTools.isEmpty {
                 lines.append(
-                    "disallowedTools: \(GmBridgeYaml.list(disallowedTools.map(\.rawValue)))")
+                    "disallowedTools: \(GmBridgeYaml.list(disallowedTools.map(\.rawValue)))"
+                )
             }
             if !skills.isEmpty {
                 lines.append("skills: \(GmBridgeYaml.list(skills))")

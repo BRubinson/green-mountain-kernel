@@ -10,7 +10,11 @@ enum ShutdownHandler {
     static func handle(head: EnvelopeHead) throws -> HandlerResult {
         let response = ShutdownResponse(message: "daemon pid \(getpid()) stopping")
         let envelope = ResponseEnvelope<ShutdownResponse>(
-            type: .shutdown, requestId: head.requestId, ok: true, payload: response)
+            type: .shutdown,
+            requestId: head.requestId,
+            ok: true,
+            payload: response
+        )
         return HandlerResult(line: try NDJSON.encodeLine(envelope), postAction: .shutdown)
     }
 }

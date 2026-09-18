@@ -15,18 +15,13 @@ public enum DaemonClientError: Error, Sendable {
 }
 
 /// NDJSON unix-socket REQUEST/RESPONSE client used by gm_hook, gm_mcp AND
-/// GMVibes.
+/// GMVibes, over blocking POSIX socket I/O and short-lived exchanges.
 ///
-/// Blocking POSIX socket I/O — connections are short-lived request/response
-/// exchanges; GMVibes wraps calls in a Task off the main actor, and an
-/// internal lock serializes concurrent request() callers so the shared fd
-/// and read buffer can never interleave frames. Connect-or-autostart: when
-/// the socket is dead the client spawns ~/gmfs/bin/gm_daemon (idempotent —
-/// the daemon's pidfile flock makes a duplicate spawn exit 0) and retries
-/// with capped backoff.
-///
-/// Event streaming lives in DaemonEventSubscription, which owns its own
-/// connection — a streaming connection cannot issue requests by construction.
+/// An internal lock serializes concurrent request() callers so the shared fd
+/// and read buffer can never interleave frames. Connect-or-autostart: a dead
+/// socket spawns the headless kernel, which the pidfile flock makes
+/// idempotent. Event streaming lives in DaemonEventSubscription, which owns
+/// its own connection, so a streaming connection cannot issue requests.
 public final class DaemonClient: @unchecked Sendable {
     private let socketPath: String
     private let daemonBinaryPath: String
@@ -103,7 +98,7 @@ public final class DaemonClient: @unchecked Sendable {
     public func request<Req: Codable & Sendable, Resp: Codable & Sendable>(
         type: MessageType,
         payload: Req,
-        responseType: Resp.Type
+        responseType _: Resp.Type
     ) throws -> Resp {
         lock.lock()
         defer { lock.unlock() }
@@ -127,7 +122,9 @@ public final class DaemonClient: @unchecked Sendable {
         if let error = response.error {
             if error.code == .protocolMismatch {
                 throw DaemonClientError.protocolMismatch(
-                    message: error.message, daemonVersion: error.daemonProtocolVersion)
+                    message: error.message,
+                    daemonVersion: error.daemonProtocolVersion
+                )
             }
             throw DaemonClientError.server(error)
         }
@@ -148,7 +145,9 @@ public final class DaemonClient: @unchecked Sendable {
         if let error = response.error {
             if error.code == .protocolMismatch {
                 throw DaemonClientError.protocolMismatch(
-                    message: error.message, daemonVersion: error.daemonProtocolVersion)
+                    message: error.message,
+                    daemonVersion: error.daemonProtocolVersion
+                )
             }
             throw DaemonClientError.server(error)
         }
@@ -177,13 +176,15 @@ public final class DaemonClient: @unchecked Sendable {
     private func autostart() throws {
         guard FileManager.default.isExecutableFile(atPath: daemonBinaryPath) else {
             throw DaemonClientError.unreachable(
-                "daemon binary missing at \(daemonBinaryPath) — run install_gm.sh")
+                "daemon binary missing at \(daemonBinaryPath) — run install_gm.sh"
+            )
         }
         var delay: UInt32 = 100_000  // µs
         for _ in 0..<10 {
             guard spawnDaemon() else {
                 throw DaemonClientError.unreachable(
-                    "posix_spawn(\(daemonBinaryPath)) failed: \(String(cString: strerror(errno)))")
+                    "posix_spawn(\(daemonBinaryPath)) failed: \(String(cString: strerror(errno)))"
+                )
             }
             usleep(delay)
             if let connected = try? dial() {
@@ -195,26 +196,14 @@ public final class DaemonClient: @unchecked Sendable {
         throw DaemonClientError.unreachable("daemon did not come up at \(socketPath) after autostart")
     }
 
-    /// Spawn the HEADLESS writer.
+    /// Spawn the HEADLESS writer, naming the `daemon` personality explicitly
+    /// rather than relying on which name the path resolved under.
     ///
-    /// ## Why this must never launch the app, and why it says `daemon` out loud
-    ///
-    /// `daemonBinaryPath` points at `~/gmfs/bin/gm_daemon`, which is now a
-    /// SYMLINK at the one multi-call `gm_kernel` Mach-O. Dispatch keys on
-    /// `basename(argv[0])`, so spawning through that name already selects the
-    /// headless personality — and the explicit `daemon` argument below makes it
-    /// true regardless of which name the path resolves under.
-    ///
-    /// The hazard being guarded is specific and severe: `posix_spawn` on a GUI
-    /// binary produces an AppKit process that LaunchServices knows nothing about,
-    /// bypassing one-instance-per-bundle entirely. Since this runs from Claude
-    /// Code hooks, that would be a SECOND WRITER created on every tool call. Two
-    /// independent things now prevent it — a bare `gm_kernel` invocation exits 2
-    /// and opens nothing, and this call names the personality it wants — and the
-    /// ownership lock would refuse a second writer even if both failed.
-    ///
-    /// The extra argument is safe for a standalone `gm_daemon` binary too: that
-    /// shim ignores argv entirely.
+    /// `posix_spawn` on a GUI binary produces an AppKit process LaunchServices
+    /// knows nothing about, bypassing one-instance-per-bundle. This runs from
+    /// Claude Code hooks, so that would be a SECOND WRITER on every tool call.
+    /// The argument is harmless to a standalone `gm_daemon` shim, which
+    /// ignores argv entirely.
     private func spawnDaemon() -> Bool {
         var attr: posix_spawnattr_t?
         posix_spawnattr_init(&attr)
@@ -228,20 +217,12 @@ public final class DaemonClient: @unchecked Sendable {
 
         // THE CHILD'S ROOT IS SET EXPLICITLY, ALWAYS — production included.
         //
-        // This used to pass `environ` straight through, which is correct for a
-        // CLI caller (a harness that `setenv`s the root gets propagation for
-        // free) and SILENTLY WRONG for the app. An app resolves its root from
-        // its BUNDLE, and a LaunchServices-launched process carries no
-        // GM_FS_ROOT in its environment at all — so the spawned kernel
-        // inherited nothing, fell back to `~/gmfs`, and you got the right
-        // binary pointed at the WRONG ROOT: the app reading one database while
-        // the writer it just started wrote another.
-        //
-        // Injecting the RESOLVED root covers both callers, because
-        // `Paths.root` is already whatever this process actually resolved —
-        // bundle key, env, or default. Production is included deliberately
-        // rather than left implicit: an explicit value cannot be silently
-        // redirected by a stray export in whatever shell happened to launch us.
+        // An app resolves its root from its BUNDLE and a LaunchServices-launched
+        // process carries no GM_FS_ROOT at all, so passing `environ` through
+        // would point the spawned writer at a different database from the one
+        // its parent reads. `Paths.root` is whatever this process actually
+        // resolved — bundle key, env, or default — and an explicit value cannot
+        // be redirected by a stray export in the launching shell.
         var env = ProcessInfo.processInfo.environment
         env["GM_FS_ROOT"] = Paths.root.path
         let envp: [UnsafeMutablePointer<CChar>?] =

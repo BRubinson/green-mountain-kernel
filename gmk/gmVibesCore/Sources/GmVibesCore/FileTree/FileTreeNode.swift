@@ -44,9 +44,11 @@ struct FileTreeNode: Identifiable, Hashable {
                     return walk(child, maxDepth: maxDepth - 1)
                 }
                 return FileTreeNode(
-                    url: child, isDirectory: false,
+                    url: child,
+                    isDirectory: false,
                     modifiedAt: v?.contentModificationDate ?? .distantPast,
-                    children: nil)
+                    children: nil
+                )
             }
             .sorted { lhs, rhs in
                 if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory }

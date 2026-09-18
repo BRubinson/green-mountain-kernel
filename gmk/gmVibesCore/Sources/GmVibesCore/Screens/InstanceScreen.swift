@@ -74,7 +74,8 @@ struct InstanceScreen: View {
             sessionsPerInstance: nil,
             activeSessionByInstance: active,
             hoistActive: true
-        ).apply(to: catalog)
+        )
+        .apply(to: catalog)
         if filtered != next { filtered = next }
     }
 

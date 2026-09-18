@@ -43,7 +43,8 @@ actor PromptSaveActor {
                     backstory: backstory,
                     goal: goal,
                     detail: detail
-                ))
+                )
+            )
             version = row.version
             lastWrittenVersion = row.version
             return .saved(row.version)
@@ -90,7 +91,10 @@ final class PromptDraftBox {
     func flush() async {
         guard let saver, let draft = pendingDraft else { return }
         let outcome = await saver.save(
-            backstory: draft.backstory, goal: draft.goal, detail: draft.detail)
+            backstory: draft.backstory,
+            goal: draft.goal,
+            detail: draft.detail
+        )
         if case .saved = outcome, pendingDraft == draft {
             pendingDraft = nil
         }
@@ -115,7 +119,7 @@ final class PromptFlushRegistry {
     }
 
     var hasDirtyDrafts: Bool {
-        boxes.values.contains { $0.isDirty }
+        boxes.values.contains(where: \.isDirty)
     }
 
     func flushAll() async {
@@ -141,24 +145,14 @@ public final class GMVibesAppDelegate: NSObject, NSApplicationDelegate {
     /// away.
     public var services: GMVibesServices?
 
-    /// TERMINATION IS ORDERED, and the order is the point.
+    /// Termination is ordered: flush dirty prompt drafts on a bounded deadline, THEN stop the
+    /// kernel (listener down, DAEMON_STOP, WAL checkpointed, database closed, socket and
+    /// pidfile unlinked). The flush is a write and the stop closes the database.
     ///
-    ///   1. flush dirty prompt drafts, on a bounded deadline
-    ///   2. stop the kernel — listener down, DAEMON_STOP sent, WAL checkpointed,
-    ///      database closed, socket and pidfile unlinked
-    ///
-    /// Step 1 before step 2 because the flush is a WRITE and step 2 closes the
-    /// database. This is the ordering inversion the old code had: the flush went
-    /// through the socket, so it could not have run after the listener was
-    /// cancelled — and once the app hosts the writer, the socket is its own.
-    /// The transport is in-process now, so the flush is an ordinary write and
-    /// only has to beat the close.
-    ///
-    /// The deadline is unchanged and still does not gate on the flush: the save
-    /// path can bottom out in blocking I/O, so a quit must never be hostage to
-    /// it. What DID change is that the kernel shutdown now runs on both
-    /// completion paths — a flush that timed out must not also skip closing the
-    /// database, or the WAL is left for the next boot to recover.
+    /// The deadline does not gate on the flush, because the save path can bottom out in
+    /// blocking I/O and a quit must never be hostage to it. Kernel shutdown runs on BOTH
+    /// completion paths: a flush that timed out must still close the database, or the WAL is
+    /// left for the next boot to recover.
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let registry = PromptFlushRegistry.shared
         guard registry.hasDirtyDrafts else {

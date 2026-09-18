@@ -1,22 +1,13 @@
 import Foundation
 
-/// The DOPED tree types. Each level's content fields are declared exactly
-/// once as a `*Body` struct; the wire node types (here) and the `.doped.json`
-/// document types (DopeDocument.swift) both FLATTEN the same body into their
-/// own JSON object via hand-written Codable, so a field cannot land on one
-/// side only — wire↔file parity is structural, not maintained.
-///
-/// CONSTRAINT: every child-collection CodingKey in this file and in
-/// DopeDocument.swift is a single word with no underscore (`domains`,
-/// `entities`, `enums`, `options`, `properties`). Under the snake_case
-/// strategies an explicit snake_case raw value stops matching and the field
-/// silently decodes to nil (see Envelope.swift) — single-word keys are fixed
-/// points of both strategies.
-///
-/// References inside bodies are dot-path CODES (`domain.entity.property`,
-/// `domain.enums.enum_code`), never uuids: uuids exist only in
-/// `DopeNodeIdentity`, which the document types simply do not include — the
-/// JSON uuid ban is an absent field, not a validation rule.
+/// The DOPED tree types. Each level's content fields are declared once as a
+/// `*Body` struct; the wire node types here and the `.doped.json` document
+/// types both FLATTEN the same body via hand-written Codable, so wire↔file
+/// parity is structural. References inside bodies are dot-path CODES, never
+/// uuids — the JSON uuid ban is an absent field, not a validation rule.
+/// Every child-collection CodingKey here and in DopeDocument.swift is a single
+/// word with no underscore: under the snake_case strategies an explicit
+/// snake_case raw value stops matching and the field silently decodes to nil.
 
 // MARK: - Bodies (one declaration per level)
 
@@ -39,7 +30,10 @@ public struct DopePersistenceBody: Codable, Hashable, Sendable {
     public let sortOrder: Int
 
     public init(
-        code: String, name: String, description: String, sortOrder: Int
+        code: String,
+        name: String,
+        description: String,
+        sortOrder: Int
     ) {
         self.code = code
         self.name = name
@@ -62,8 +56,13 @@ public struct DopeEntityBody: Codable, Hashable, Sendable {
     public let baseComposableRef: String?
 
     public init(
-        code: String, name: String, entityType: String, description: String,
-        sortOrder: Int, repoRepresentativeFile: String?, baseComposableRef: String?
+        code: String,
+        name: String,
+        entityType: String,
+        description: String,
+        sortOrder: Int,
+        repoRepresentativeFile: String?,
+        baseComposableRef: String?
     ) {
         self.code = code
         self.name = name
@@ -95,10 +94,18 @@ public struct DopePropertyBody: Codable, Hashable, Sendable {
     public let baseOriginRef: String?
 
     public init(
-        code: String, name: String, description: String, sortOrder: Int,
-        dataType: String, nullable: Bool, isUnique: Bool,
-        autoIncrement: Bool?, textCharLimit: Int?,
-        enumRef: String?, relationshipTargetRef: String?, baseOriginRef: String?
+        code: String,
+        name: String,
+        description: String,
+        sortOrder: Int,
+        dataType: String,
+        nullable: Bool,
+        isUnique: Bool,
+        autoIncrement: Bool?,
+        textCharLimit: Int?,
+        enumRef: String?,
+        relationshipTargetRef: String?,
+        baseOriginRef: String?
     ) {
         self.code = code
         self.name = name
@@ -123,7 +130,10 @@ public struct DopeEnumBody: Codable, Hashable, Sendable {
     public let repoRepresentativeFile: String?
 
     public init(
-        code: String, name: String, description: String, sortOrder: Int,
+        code: String,
+        name: String,
+        description: String,
+        sortOrder: Int,
         repoRepresentativeFile: String?
     ) {
         self.code = code
@@ -141,7 +151,10 @@ public struct DopeOptionBody: Codable, Hashable, Sendable {
     public let sortOrder: Int
 
     public init(
-        code: String, name: String, description: String, sortOrder: Int
+        code: String,
+        name: String,
+        description: String,
+        sortOrder: Int
     ) {
         self.code = code
         self.name = name
@@ -168,7 +181,10 @@ public struct DopeNodeIdentity: Codable, Hashable, Sendable {
     public let deletedOn: String?
 
     public init(
-        uuid: String, version: Int64, createdAt: String, updatedAt: String,
+        uuid: String,
+        version: Int64,
+        createdAt: String,
+        updatedAt: String,
         deletedOn: String? = nil
     ) {
         self.uuid = uuid
@@ -194,9 +210,14 @@ public extension DopeScopeTree {
     /// the tree structurally and must not invent scope identity.
     func replacingDomains(_ domains: [DopePersistenceNode]) -> DopeScopeTree {
         DopeScopeTree(
-            identity: identity, body: body, sessionUuid: sessionUuid,
-            promptUuid: promptUuid, scopeType: scopeType,
-            revision: revision, domains: domains)
+            identity: identity,
+            body: body,
+            sessionUuid: sessionUuid,
+            promptUuid: promptUuid,
+            scopeType: scopeType,
+            revision: revision,
+            domains: domains
+        )
     }
 
     /// A structurally valid empty tree, for the both-layers-absent case.
@@ -204,8 +225,12 @@ public extension DopeScopeTree {
         DopeScopeTree(
             identity: DopeNodeIdentity(uuid: "", version: 0, createdAt: "", updatedAt: ""),
             body: DopeScopeBody(code: "", name: "", description: ""),
-            sessionUuid: nil, promptUuid: nil,
-            scopeType: DopeScopeType.sessionInstance.rawValue, revision: 0, domains: [])
+            sessionUuid: nil,
+            promptUuid: nil,
+            scopeType: DopeScopeType.sessionInstance.rawValue,
+            revision: 0,
+            domains: []
+        )
     }
 }
 
@@ -316,8 +341,10 @@ public struct DopePersistenceNode: Codable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey { case entities, enums }
 
     public init(
-        identity: DopeNodeIdentity, body: DopePersistenceBody,
-        entities: [DopeEntityNode], enums: [DopeEnumNode]
+        identity: DopeNodeIdentity,
+        body: DopePersistenceBody,
+        entities: [DopeEntityNode],
+        enums: [DopeEnumNode]
     ) {
         self.identity = identity
         self.body = body
@@ -359,8 +386,12 @@ public struct DopeScopeTree: Codable, Hashable, Sendable {
     }
 
     public init(
-        identity: DopeNodeIdentity, body: DopeScopeBody, sessionUuid: String?,
-        promptUuid: String?, scopeType: String, revision: Int64,
+        identity: DopeNodeIdentity,
+        body: DopeScopeBody,
+        sessionUuid: String?,
+        promptUuid: String?,
+        scopeType: String,
+        revision: Int64,
         domains: [DopePersistenceNode]
     ) {
         self.identity = identity

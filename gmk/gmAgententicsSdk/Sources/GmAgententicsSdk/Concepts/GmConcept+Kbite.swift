@@ -1,6 +1,10 @@
 import Foundation
 
-let GM_CONCEPT_KBITE = """
+/// COMPUTED, NOT A CONSTANT: the reference index at the bottom is built from
+/// `GmBridgeResource.all`, so a document declared under this skill is cited
+/// here automatically and one removed stops being cited. See `GM_CONCEPT_GMCC`.
+var GM_CONCEPT_KBITE: String {
+    """
     ## KBite — Pre-Indexed External Knowledge
 
     A kbite is a persistent body of analyzed reference material — docs, API references, whole example sources — digested into the db and reached by ranked search. Kbites are DB-CANONICAL; the filesystem holds only identity, the raw-source archive, and in-progress maws.
@@ -23,8 +27,14 @@ let GM_CONCEPT_KBITE = """
     - Relate — cross-reference two kbites
     - Export — portable zip carrying db rows and sources
     - Import — never auto-registers
-    - `gm_hook call KBITE_DELETE --json '{"code":"<code>"}'` — deletes and cascades; back up first
+    - Delete — cascades, and has NO pen door. It is an operator act; report the request rather than performing it.
 
     ### Registry
-    Active kbites are listed on the prompt or session. Add one explicitly only when asked; never auto-add. Path roots come from `gm_hook paths --json` — never hardcode them.
+    Active kbites are listed on the prompt or session (`kbite_codes` on `cde_load_prompt`). Adding one to a registry has no pen door either: on an explicit request, report it; never auto-add. Path roots resolve under `$GM_FS_ROOT` — never hardcode them.
+
+    ### Reference
+    Detail lives beside this file rather than in it — read it only when it names your situation:
+
+    \(GmBridgeResource.index(for: "kbite"))
     """
+}

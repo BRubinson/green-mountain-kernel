@@ -2,24 +2,17 @@
 
 import Foundation
 
-/// Prepended to EVERY command body.
-///
-/// Commands are the one surface where the GMB identity is not already loaded:
-/// an agent gets it baked into its profile instruction, but a command runs in
-/// whatever context the session already has. Loading the skill first is what
-/// makes the rest of the body mean what it says.
-let GM_COMMAND_SKILL_PRELUDE = """
-    **Load the `gmcc` skill before anything else.** It carries the GMB identity and
-    the GM-CDE rules every step below assumes. Do not begin the work until it is in
-    context.
-    """
+// No prelude is prepended to a command body. The GMB identity and the GM-CDE
+// rules reach every session through the output style (`force-for-plugin`) and
+// the SessionStart pen sheet, so a command runs in a context that already
+// carries them — a per-command skill load was paying for text already present.
 
 let GM_COMMAND_ASK_BODY = """
     Survey what the kernel can do for this request, and report it WITHOUT choosing.
 
     **Steps:**
         1. Read the ask. Name what is actually being requested, in one line, before looking at anything.
-        2. Survey the surface that could serve it — the tool families (`cde_*`, `rpir_*`, `dope_*`, `kbite_*`), the shell, the wire verbs behind `gm_hook call`, and the scoped commands that already exist.
+        2. Survey the surface that could serve it — the tool families (`cde_*`, `rpir_*`, `dope_*`, `kbite_*`), the shell, and the scoped commands that already exist. A kernel verb with no pen tool is a finding (a missing door), not an option to reach through the shell.
         3. Lay out every option you found. For each: what it does, what it costs, and what it would need from the Endotherm.
         4. State what you could NOT determine, and what would settle it.
         5. Stop there.
@@ -66,7 +59,7 @@ let GM_COMMAND_CLEANUP_BODY = """
     **Contract:**
         1. `--dry-run` reports and changes NOTHING.
         2. The db is append-only. A wrong row is corrected by writing again, never by deletion.
-        3. Take `gm_hook call BACKUP --json '{}'` before anything that touches the database.
+        3. There is no agent-side backup door — the kernel backs itself up before any migration. Anything irreversible is put to the Endotherm before it is taken.
     """
 
 let GM_COMMAND_CRUNCH_OPEN_MAW_BODY = """
@@ -114,7 +107,7 @@ let GM_COMMAND_CRUNCH_DIGEST_BODY = """
 
     **Contract:**
         1. Digest is the one step that writes the record. Verify before deleting the maw — step 5 is not reversible from here.
-        2. Take `gm_hook call BACKUP --json '{}'` first.
+        2. There is no agent-side backup door. Put the digest to the Endotherm before step 3 when the kbite already exists.
     """
 
 let GM_COMMAND_KBITE_EXPORT_BODY = """
@@ -143,7 +136,7 @@ let GM_COMMAND_KBITE_IMPORT_BODY = """
 
     **Contract:**
         1. A kbite that already exists is a decision, not an error — put the overwrite to the Endotherm before taking it.
-        2. Take `gm_hook call BACKUP --json '{}'` before loading rows.
+        2. There is no agent-side backup door. The confirmation in 1 is the safeguard; do not load rows without it.
     """
 
 let GM_COMMAND_KBITE_RELATE_BODY = """

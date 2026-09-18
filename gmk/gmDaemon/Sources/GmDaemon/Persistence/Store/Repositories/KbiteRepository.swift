@@ -25,7 +25,9 @@ struct KbiteRepository: RepositoryContext {
                     SELECT k.uuid, k.code FROM kbite k
                     JOIN \(level)_active_kbite j ON j.kbite_uuid = k.uuid
                     WHERE j.\(level)_uuid = ?
-                    """, arguments: [uuid])
+                    """,
+                arguments: [uuid]
+            )
             for row in rows {
                 let kbiteUuid: String = row["uuid"]
                 if seen.insert(kbiteUuid).inserted {
@@ -48,17 +50,24 @@ struct KbiteRepository: RepositoryContext {
                 db,
                 sql: """
                     SELECT 1 FROM \(level)_active_kbite WHERE \(level)_uuid = ? AND kbite_uuid = ?
-                    """, arguments: [req.ownerUuid, kbiteUuid]) != nil
+                    """,
+                arguments: [req.ownerUuid, kbiteUuid]
+            ) != nil
         if !exists {
             try core.insertBase(
-                db, table: "\(level)_active_kbite",
+                db,
+                table: "\(level)_active_kbite",
                 extra: [
                     "\(level)_uuid": req.ownerUuid,
                     "kbite_uuid": kbiteUuid,
-                ])
+                ]
+            )
             try core.appendEvent(
-                db, kind: .addKbite, subjectUuid: req.ownerUuid,
-                payload: Store.jsonPayload(["scope": level, "code": req.code]))
+                db,
+                kind: .addKbite,
+                subjectUuid: req.ownerUuid,
+                payload: Store.jsonPayload(["scope": level, "code": req.code])
+            )
         }
         return KbiteAddResponse(kbiteUuid: kbiteUuid, code: req.code, added: !exists)
     }
@@ -69,7 +78,9 @@ struct KbiteRepository: RepositoryContext {
         try requireScopeOwner(scope: req.scope, ownerUuid: req.ownerUuid)
         guard
             let kbiteUuid = try String.fetchOne(
-                db, sql: "SELECT uuid FROM kbite WHERE code = ?", arguments: [req.code]
+                db,
+                sql: "SELECT uuid FROM kbite WHERE code = ?",
+                arguments: [req.code]
             )
         else {
             return KbiteRemoveResponse(removed: false)
@@ -78,12 +89,17 @@ struct KbiteRepository: RepositoryContext {
         try db.execute(
             sql: """
                 DELETE FROM \(level)_active_kbite WHERE \(level)_uuid = ? AND kbite_uuid = ?
-                """, arguments: [req.ownerUuid, kbiteUuid])
+                """,
+            arguments: [req.ownerUuid, kbiteUuid]
+        )
         let removed = db.changesCount > 0
         if removed {
             try core.appendEvent(
-                db, kind: .removeKbite, subjectUuid: req.ownerUuid,
-                payload: Store.jsonPayload(["scope": level, "code": req.code]))
+                db,
+                kind: .removeKbite,
+                subjectUuid: req.ownerUuid,
+                payload: Store.jsonPayload(["scope": level, "code": req.code])
+            )
         }
         return KbiteRemoveResponse(removed: removed)
     }
@@ -93,7 +109,8 @@ struct KbiteRepository: RepositoryContext {
     /// The owner's own scope plus every ancestor scope+uuid, walked up the
     /// prompt → session → instance → project FK columns.
     func resolveAncestorScopes(
-        scope: KbiteScope, ownerUuid: String
+        scope: KbiteScope,
+        ownerUuid: String
     ) throws -> [(level: String, uuid: String)] {
         var scopes: [(level: String, uuid: String)] = [(scope.rawValue, ownerUuid)]
         var current = (scope: scope, uuid: ownerUuid)
@@ -126,7 +143,9 @@ struct KbiteRepository: RepositoryContext {
     private func requireScopeOwner(scope: KbiteScope, ownerUuid: String) throws {
         guard
             try Row.fetchOne(
-                db, sql: "SELECT 1 FROM \(scope.rawValue) WHERE uuid = ?", arguments: [ownerUuid]
+                db,
+                sql: "SELECT 1 FROM \(scope.rawValue) WHERE uuid = ?",
+                arguments: [ownerUuid]
             ) != nil
         else {
             throw StoreError.notFound(entity: scope.rawValue, key: ownerUuid)

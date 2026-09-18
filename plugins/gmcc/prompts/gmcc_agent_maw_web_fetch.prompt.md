@@ -194,4 +194,4 @@ Task tool:
 ```
 
 (When composing the prompt, substitute `{kbite_open_root}` with the real
-absolute root — the `kbite_open_root` key of `gm_hook paths --json`.)
+absolute root: `$GM_FS_ROOT/kbites/open`.)

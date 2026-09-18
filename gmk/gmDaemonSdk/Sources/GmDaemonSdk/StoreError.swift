@@ -3,17 +3,10 @@ import Foundation
 /// Typed domain failures. Handlers never hand-build error payloads — this is
 /// the ONE mapping point from Store outcomes to wire error codes.
 ///
-/// LIVES IN THE BASE LAYER, not beside the Store that throws most of it. This
-/// was the ONLY upward dependency in the whole kit and the one thing that had
-/// to move for the package split to compile at all: it sat in `Database/` (now
-/// gmDaemon, the middle layer) while base-layer code threw it —
-/// `Protocol/Rows.swift`, `Diagram/DiagramStorage.swift`,
-/// `Diagram/DiagramStrokeCodec.swift`, `Dope/DopeCogElement.swift`. That is
-/// base-depending-on-middle, which is a cycle the moment the modules separate.
-///
-/// It is Foundation-only, so the move costs nothing. The rule it is the
-/// archetype of: a symbol a test or a lower layer cannot reach gets MOVED to
-/// where it belongs, never made `public` to paper over a misfiling.
+/// LIVES IN THE BASE LAYER, not beside the Store that throws most of it:
+/// base-layer code throws this, and base-depending-on-middle is a cycle once
+/// the modules separate. It is Foundation-only, so the placement costs
+/// nothing.
 public enum StoreError: Error, Sendable {
     case notFound(entity: String, key: String)
     case versionConflict(entity: String, uuid: String, expected: Int64, actual: Int64)
@@ -68,33 +61,20 @@ public enum StoreError: Error, Sendable {
     /// still decodes it.
     case dopeScopeNotRepoWritable(scopeUuid: String, scopeType: String, verb: String)
     /// A write naming a Claude conversation arrived with no
-    /// claude_session_binding row to resolve it, so NOTHING was written. This
-    /// is the server-side no-op contract: a hook cannot record into a repo
-    /// whose SessionStart never pinned the conversation, which is strictly
-    /// stronger than any env variable surviving a subprocess.
-    ///
-    /// `booted` says whether the daemon knows the repo. It does NOT change
-    /// the refusal — only whether a HOOK_UNBOUND event marks it, which
-    /// `Store.addFileChange` appends in its own transaction. Mapped onto the
-    /// badRequest wire code (no new ErrorCode), so a pinned-Kit GMVibes still
-    /// decodes it.
+    /// claude_session_binding row to resolve it, so NOTHING was written: a
+    /// hook cannot record into a repo whose SessionStart never pinned the
+    /// conversation. `booted` says whether the daemon knows the repo and does
+    /// NOT change the refusal — only whether a HOOK_UNBOUND event marks it,
+    /// which `Store.addFileChange` appends in its own transaction. Mapped onto
+    /// the badRequest wire code, so a pinned-Kit GMVibes still decodes it.
     case hookUnbound(claudeSessionId: String, booted: Bool)
     /// A verb that CANNOT run inside a caller-opened transaction was called
-    /// inside one. Two families qualify, both for reasons SQLite enforces
-    /// rather than reasons we chose:
-    ///
-    /// - The four-phase repo verbs (dope / diagram write-repo and ingest) run
-    ///   db read → pure projection → filesystem work → db write, and the
-    ///   filesystem phase deliberately holds NO lock. Composing one would pin
-    ///   the single writer across file I/O, so every other writer in the
-    ///   machine — including every hook — would block on someone else's disk.
-    /// - `checkpointTruncate`, because a WAL checkpoint inside a transaction is
-    ///   illegal.
-    ///
-    /// A loud refusal in two files beats an enrolment table listing which of
-    /// ~230 verbs are composable, which nobody would keep accurate. Mapped onto
-    /// the badRequest wire code, so no new ErrorCode and no stale-client
-    /// decode problem.
+    /// inside one. Two families qualify: the four-phase repo verbs, whose
+    /// filesystem phase holds NO lock, so composing one would pin the single
+    /// writer across file I/O and block every hook on someone else's disk; and
+    /// `checkpointTruncate`, because a WAL checkpoint inside a transaction is
+    /// illegal in SQLite. Mapped onto the badRequest wire code, so there is no
+    /// new ErrorCode and no stale-client decode problem.
     case notComposable(verb: String)
 
     public var errorPayload: ErrorPayload {
@@ -104,12 +84,14 @@ public enum StoreError: Error, Sendable {
         case .versionConflict(let entity, let uuid, let expected, let actual):
             return ErrorPayload(
                 code: .versionConflict,
-                message: "\(entity) \(uuid): expected version \(expected), actual \(actual)")
+                message: "\(entity) \(uuid): expected version \(expected), actual \(actual)"
+            )
         case .invalidTransition(let from, let to, let reason):
             let suffix = reason.map { " (\($0))" } ?? ""
             return ErrorPayload(
                 code: .invalidTransition,
-                message: "illegal prompt transition \(from.rawValue) → \(to.rawValue)\(suffix)")
+                message: "illegal prompt transition \(from.rawValue) → \(to.rawValue)\(suffix)"
+            )
         case .summaryAbsent(let entity, let uuid):
             // The open hint is entity-derived, and names the pen tool wherever
             // one covers the open; the rest go through the raw verb.
@@ -127,30 +109,36 @@ public enum StoreError: Error, Sendable {
             }
             return ErrorPayload(
                 code: .summaryAbsent,
-                message: "prompt \(uuid) has no \(entity) yet — open one (\(hint))")
+                message: "prompt \(uuid) has no \(entity) yet — open one (\(hint))"
+            )
         case .contentLocked(let status):
             return ErrorPayload(
                 code: .contentLocked,
-                message: "prompt content is editable only in draft (status: \(status.rawValue))")
+                message: "prompt content is editable only in draft (status: \(status.rawValue))"
+            )
         case .emptyUpdate(let entity):
             return ErrorPayload(
                 code: .badRequest,
-                message: "\(entity) update carried no fields — nothing to change")
+                message: "\(entity) update carried no fields — nothing to change"
+            )
         case .corruptState(let entity, let detail):
             return ErrorPayload(
                 code: .internalError,
-                message: "\(entity) holds an impossible value: \(detail)")
+                message: "\(entity) holds an impossible value: \(detail)"
+            )
         case .badRequest(let detail):
             return ErrorPayload(code: .badRequest, message: detail)
         case .invalidEntityTransition(let entity, let from, let to, let reason):
             let suffix = reason.map { " (\($0))" } ?? ""
             return ErrorPayload(
                 code: .invalidTransition,
-                message: "illegal \(entity) transition \(from) → \(to)\(suffix)")
+                message: "illegal \(entity) transition \(from) → \(to)\(suffix)"
+            )
         case .revisionConflict(let scopeUuid, let expected, let actual):
             return ErrorPayload(
                 code: .versionConflict,
-                message: "dope_scope \(scopeUuid): expected revision \(expected), actual \(actual)")
+                message: "dope_scope \(scopeUuid): expected revision \(expected), actual \(actual)"
+            )
         case .dopeScopeAbsent(let sessionUuid, let promptUuid, let code):
             var target = "session \(sessionUuid)"
             if let promptUuid { target += " / prompt \(promptUuid)" }
@@ -161,7 +149,8 @@ public enum StoreError: Error, Sendable {
                 + ",\"code\":\"\(code ?? "<code>")\",\"name\":\"<name>\"}'"
             return ErrorPayload(
                 code: .summaryAbsent,
-                message: "\(target) has no dope scope yet — initialize one (\(initHint))")
+                message: "\(target) has no dope scope yet — initialize one (\(initHint))"
+            )
         case .dopeProjectScopeAbsent(let projectUuid, let code):
             var target = "project \(projectUuid)"
             if let code { target += " code '\(code)'" }
@@ -170,7 +159,8 @@ public enum StoreError: Error, Sendable {
                 message: "\(target) has no project-tier dope scope yet — a project scope "
                     + "arrives by promotion from a primary-branch session "
                     + "(gm_hook call DOPE_PROMOTE --json '{\"session_uuid\":\"<U>\"}'), "
-                    + "not by DOPE_INIT")
+                    + "not by DOPE_INIT"
+            )
         case .diagramAbsent(let ownerKind, let ownerUuid, let code):
             var target = "\(ownerKind) \(ownerUuid)"
             if let code { target += " code '\(code)'" }
@@ -180,13 +170,15 @@ public enum StoreError: Error, Sendable {
                 + "\"name\":\"<name>\"}'"
             return ErrorPayload(
                 code: .summaryAbsent,
-                message: "\(target) has no diagram yet — initialize one (\(initHint))")
+                message: "\(target) has no diagram yet — initialize one (\(initHint))"
+            )
         case .dopeScopeNotRepoWritable(let scopeUuid, let scopeType, let verb):
             return ErrorPayload(
                 code: .badRequest,
                 message: "dope \(verb) is session-base only: scope \(scopeUuid) is "
                     + "\(scopeType). Only a SESSION_INSTANCE tree is read from or "
-                    + "written to {instance_root}/.gmcc")
+                    + "written to {instance_root}/.gmcc"
+            )
         case .hookUnbound(let claudeSessionId, let booted):
             let repo =
                 booted
@@ -195,13 +187,15 @@ public enum StoreError: Error, Sendable {
             return ErrorPayload(
                 code: .badRequest,
                 message: "claude session \(claudeSessionId) is not bound to a gmcc "
-                    + "session — nothing was recorded (\(repo))")
+                    + "session — nothing was recorded (\(repo))"
+            )
         case .notComposable(let verb):
             return ErrorPayload(
                 code: .badRequest,
                 message: "\(verb) cannot run inside a caller-opened transaction — "
                     + "it performs work that must not hold the single writer lock. "
-                    + "Call it outside inTransaction / TX_BATCH.")
+                    + "Call it outside inTransaction / TX_BATCH."
+            )
         }
     }
 }

@@ -2,26 +2,14 @@ import Foundation
 
 extension GmBridgeScript {
 
-    // THE THREE SCRIPTS THAT SURVIVE AS FILES, embedded verbatim.
+    // The three scripts that ship as files, embedded verbatim: the installer pair,
+    // which runs BEFORE any binary exists and so cannot become kernel subcommands,
+    // plus the SessionStart provisioner.
     //
-    // The other three are GONE as files, by decision: `gm_hook.sh` is inlined as
-    // a shell-form command string in hooks.json, `run_mcp.sh` is replaced by the
-    // .mcp.json launcher, and `check_gm_stale.sh` folds into an inline `[ -x ]`
-    // test in that same hook string. What is left is the installer pair — which
-    // must run BEFORE any binary exists, so neither can become a kernel
-    // subcommand — plus the SessionStart provisioner.
-    //
-    // EMBEDDED IN EXTENDED DELIMITERS (`#"""` … `"""#`) so the bash needs no
-    // escaping: backslashes and `\(` sequences are literal inside them. That is
-    // what makes this a copy rather than a thousand hand-edits waiting to go
-    // wrong. The delimiter grows a `#` if a body ever contains the terminator.
-    //
-    // `gm_releases.sh` IS TAKEN FROM `gmk/scripts/`, THE AUTHORED COPY. The
-    // plugin has always carried a byte-identical vendored twin that nothing has
-    // checked for drift since ReleaseStoreContractTests was deleted. Generating
-    // it from this one constant does not merely detect that drift — it makes it
-    // unrepresentable, which is the whole reason to embed rather than to copy at
-    // generate time.
+    // Extended delimiters (`#"""` … `"""#`) keep the bash unescaped — backslashes
+    // and `\(` are literal inside them, and the delimiter grows a `#` if a body
+    // ever contains the terminator. `gm_releases.sh` is the authored `gmk/scripts/`
+    // copy; emitting the plugin's from this constant makes drift unrepresentable.
 
     public static let sessionStartupBody = #"""
         #!/bin/bash

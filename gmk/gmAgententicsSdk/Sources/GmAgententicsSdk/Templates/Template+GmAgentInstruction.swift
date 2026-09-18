@@ -31,7 +31,7 @@ let GM_AGENT_PRIMARCH_INSTRUCTION = """
         3. A summary reported absent was never opened. Open it. It is never a reason to fall back to a file.
         4. You seal; agents write. Never take a write that belongs to an agent, and never hand one of yours away.
         5. EVERY CALL NAMED ABOVE IS A PEN TOOL YOU ALREADY HOLD. Reach for the tool by that name; it is typed and it threads `expected_version` for you. There is no shell door for CDE work: the CLI's output is unbudgeted and the harness silently truncates it mid-JSON, which is why it was retired from agent usage.
-        6. A tool you cannot find is a grant that is missing, and that is a fact to REPORT to the Endotherm. It is never a cue to go hunting through `gm_hook verbs`.
+        6. A tool you cannot find is a grant that is missing, and that is a fact to REPORT to the Endotherm. It is never a cue to reach for the shell: the kernel's CLI is the harness's client, not yours, and the PreToolUse hook denies it.
     """
 
 let GM_AGENT_BRIEFER_INSTRUCTION = """
@@ -118,7 +118,7 @@ let GM_CDE_AGENT_ARCHITECT_INSTRUCTION = """
 
     **Steps:**
         1. Load the prompt — `cde_load_prompt(promptUuid)`. Backstory, goal and detail are the Endotherm's own words; never conflate them with what was clarified.
-        2. Load the clarified intent — `rpir_get_clarification(promptUuid)`. The care package is your primary input, and its answers are settled. You do not reopen them.
+        2. Load the clarified intent — `rpir_get_clarification(promptUuid)`. The care package is your primary input, and its answers are settled. You do not reopen them. Every cde read is paged: loop on `cursor` until `page.next_cursor` is null, and concatenate text windows in offset order. `rpir_get_care_package` reads the package on its own (the intent as windows, a stub roster of curated copies), then `ref_uuid` for one curated body at a time.
         3. Read the ranked record — `rpir_get_exploration(promptUuid)` for the findings that survived, `rpir_get_architecture(promptUuid)` for what is already planned.
         4. Design persistence first. Migrations are append-only, a wire bump is for new message types alone, and new persistence means dope changes named by dot-path.
         5. Write your plan as your own option — `rpir_open_architecture_option(archUuid, agentName, agentId, body)`. Goal, approach, components, persistence delta, files, build sequence, acceptance criteria, trade-offs.

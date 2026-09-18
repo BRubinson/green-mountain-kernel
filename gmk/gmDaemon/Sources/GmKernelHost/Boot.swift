@@ -2,36 +2,14 @@ import Foundation
 import GmDaemon
 import GmDaemonSdk
 
-/// The headless kernel host — what `gm_kernel daemon` (and the `gm_daemon`
-/// symlink) runs.
+/// The headless, AppKit-free kernel host — what `gm_kernel daemon` (and the
+/// `gm_daemon` symlink) runs. `DaemonClient.autostart()` `posix_spawn`s a binary
+/// from hooks, SSH and CI, where LaunchServices cannot launch an app and
+/// spawning a GUI binary directly mints an untracked second writer.
 ///
-/// ## Why a headless personality still exists
-///
-/// The kernel is meant to be the app: a menu-bar-resident process that owns the
-/// database and opens vibe windows. It would have been tidier to make the app
-/// bundle the ONLY shape that can open the db, and that shape was seriously
-/// considered — it reduces "two writers" from two possible causes to one.
-///
-/// It does not survive contact with how clients actually start the writer.
-/// `DaemonClient.autostart()` `posix_spawn`s a binary when no socket answers, and
-/// that call happens inside Claude Code hooks, over SSH, and in CI. None of those
-/// contexts can launch an application: LaunchServices is unavailable, and
-/// spawning a GUI binary directly produces an AppKit process that LaunchServices
-/// does not know about — which is to say a SECOND WRITER, created on every hook
-/// call, by the very mechanism meant to make the writer available.
-///
-/// So this host stays, AppKit-free, and the app takes over from it when a person
-/// launches the app. See `KernelOwnership` for the handover.
-///
-/// ## Boot order, and which parts are load-bearing
-///
-///   1. take the ownership lock — BEFORE anything can open the database
-///   2. redirect stdout/stderr into `~/gmfs/daemon.log`
-///   3. open + (back up, if pending) + migrate + record DAEMON_START
-///   4. bind the socket, serve, `dispatchMain()`
-///
-/// Step 1 first is the invariant. Steps 2 and 3 are in that order so a db failure
-/// is written to the log rather than to a stderr nobody is reading.
+/// Boot order is load-bearing: the ownership lock comes first, so nothing can
+/// open the database before it, and log redirection precedes the db work so a
+/// failure lands in the log rather than an unread stderr.
 public enum KernelHost {
 
     /// Run as the headless writer. Never returns.
@@ -47,15 +25,9 @@ public enum KernelHost {
         let token: KernelOwnership.Token
         switch consume outcome {
         case .heldBy:
-            // A redundant autostart, and NOT an error — deliberately exit 0.
-            //
-            // Client autostart races are normal: two hooks firing at once both
-            // see no socket and both spawn. The loser exiting 0 silently is what
-            // makes that harmless, and `DaemonClient.autostart()` depends on this
-            // exit code to distinguish "someone else got there first" from "the
-            // binary is broken". An app host behaves differently on this branch —
-            // it degrades to client mode rather than exiting — because quitting a
-            // window the user just opened is not a silent no-op.
+            // A redundant autostart, not an error: two hooks racing both spawn,
+            // and `DaemonClient.autostart()` reads exit 0 as "someone else got
+            // there first" rather than "the binary is broken".
             exit(0)
         case .acquired(let acquired):
             token = acquired
@@ -74,34 +46,28 @@ public enum KernelHost {
         }
 
         // --- the writer + the server --------------------------------------
-        // ONE sequence, shared with the app host. `KernelServices.bootWriter`
-        // opens the database, refuses one written by newer bits, takes the
-        // pre-migration backup when the ledger is behind, migrates, records the
-        // start and binds the socket. It THROWS rather than exiting, because an
-        // app has to be able to show the refusal; here, exiting is right.
-        //
-        // Watchers (memory + checkout) are owned by the Server's
-        // WatcherSupervisor, built inside server.start() and rebuilt on
-        // CONFIG_SET / CREATE_INSTANCE through the post-commit fan-out. The
-        // supervisor's first rebuild logs the watched state.
+        // ONE sequence, shared with the app host: open, refuse a db written by
+        // newer bits, back up when the ledger is behind, migrate, record the
+        // start, bind. It THROWS rather than exiting so an app can show the
+        // refusal. Watchers are owned by the Server's WatcherSupervisor and
+        // rebuilt on CONFIG_SET / CREATE_INSTANCE via the post-commit fan-out.
         let services: KernelServices
         do {
             services = try KernelServices.bootWriter(
-                consume token, personality: "headless", log: log)
+                consume token,
+                personality: "headless",
+                log: log
+            )
         } catch {
             log("db bootstrap failed: \(error)")
             exit(1)
         }
 
         // --- signals ------------------------------------------------------
-        // THE HEADLESS SHUTDOWN STILL EXITS. `Server.shutdown()` ends in
-        // exit(0) after the goodbye lands, which is what a signalled daemon
-        // should do and what `KernelHostRole.takeOver` relies on: an app taking
-        // over sends SIGTERM and then polls for the lock, so this process must
-        // actually go away rather than merely stop serving.
-        //
-        // The app host takes the OTHER door — `KernelServices.shutdown` — which
-        // performs the same ordered teardown and does not exit.
+        // The headless shutdown ENDS IN exit(0): `KernelHostRole.takeOver`
+        // sends SIGTERM and then polls for the lock, so this process must go
+        // away rather than merely stop serving. The app host uses
+        // `KernelServices.shutdown`, the same ordered teardown without the exit.
         signal(SIGTERM, SIG_IGN)
         signal(SIGINT, SIG_IGN)
         let sigtermSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)

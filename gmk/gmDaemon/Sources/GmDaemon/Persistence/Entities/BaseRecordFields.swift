@@ -1,25 +1,11 @@
 // Shared read-only surface for records carrying the BaseEntity columns.
 // Read sugar only — no write path exists on records by design.
 //
-// wireRow() CONVENTION (fixed here so each domain does not invent its own):
-//
-//   A. Nullary, total: `func wireRow() -> XRow`. The default — 13 of the ~20
-//      conversions. Copy ProjectRecord's literally, doc sentence included.
-//   B. Parameterized, for the SIX composed wire rows whose extra data comes
-//      from another query: SessionRecord.wireRow(activations:),
-//      FileChangeRecord.wireRow(ranges:), KbiteResourceRecord.wireRow(files:),
-//      ArchitecturePersistenceChangeRecord.wireRow(fields:implementation:),
-//      ArchitectureGeneralChangeRecord.wireRow(implementation:),
-//      DiagramRecord.wireRow(instanceUuid:). Every injected child is a
-//      LABELLED argument with NO default — a default would re-open the
-//      silent-omission hole the wire Row init defaults were removed to close.
-//   C. Decoder-only: a Record with no 1:1 wire twin (DopeRepository's tree
-//      hydration). It earns its keep as the decode step; do NOT invent a
-//      wireRow() for it.
-//
-// `db` never enters Entities/ and enrichment never happens inside a Record:
-// records stay flat so RecordSchemaTests can decode them from a synthesized
-// PRAGMA row.
+// wireRow() is nullary and total by default, and parameterized only for the six
+// composed wire rows whose extra data comes from another query. Every injected
+// child is a LABELLED argument with NO default, because a default re-opens the
+// silent-omission hole. A record with no 1:1 wire twin stays decoder-only.
+// `db` never enters Entities/, so records stay flat and decodable from a row.
 
 import Foundation
 import GRDB
@@ -74,7 +60,8 @@ extension BaseRecordFields {
         try fetchOne(
             db,
             sql: "SELECT * FROM \(databaseTableName) WHERE \(condition)",
-            arguments: arguments)
+            arguments: arguments
+        )
     }
 
     /// `SELECT * FROM <table> [WHERE …] [ORDER BY …]`, so a converted fetch
@@ -98,35 +85,9 @@ extension BaseRecordFields {
 
 // MARK: - Records not on the decode path
 //
-// Final accounting for the Records-as-decode-path conversion. Every record in
-// Entities/ is either consumed by a repository read or named here with the
-// reason it is not. RecordSchemaTests still proves ALL of them against the live
-// schema, so an unconsumed record is dead weight but never silently wrong.
-//
-//   DaemonConfigRecord
-//     daemon_config is read as a two-column key/value projection folded into a
-//     [String: String]. There is no wire row and no field mapping, so a typed
-//     decoder would add a SELECT * and buy nothing.
-//
-//   FileChangeRecord, FileChangeRangeRecord, SessionFileRecord
-//     FileChangeRepository.list is a PROJECTION join: it folds file_change,
-//     session_file and file_change_range into one heterogeneous output, taking
-//     sf.relative_path alongside fc.*. session_file is otherwise only probed
-//     for a uuid. Not expressible as a single-table record.
-//
-//   DopeCogHullRecord, DopeCogPersistenceOwnerRecord
-//     The cog subtype tables. hydrateElement picks BOTH the table and the
-//     column at runtime from a DopeCogElementSpec, which is the one genuine
-//     floor of this conversion and the last hasColumn() in the layer.
-//
-//   KeywordRecord
-//     keyword is read as `String.fetchAll` of a single column through a
-//     junction; the wire shape is [String].
-//
-//   InstanceActiveKbiteRecord, ProjectActiveKbiteRecord,
-//   SessionActiveKbiteRecord, PromptActiveKbiteRecord,
-//   KbiteKeywordJunctionRecord, ResourceFileKeywordJunctionRecord
-//     Junction tables. They are written through insertBase and read only as
-//     EXISTS probes (`SELECT 1 …`) or as joins that project the PARENT table's
-//     columns. No read ever materializes a junction row, so these records
-//     exist for schema-drift coverage via RecordSchemaTests, not for decoding.
+// Each record here is read through a projection or a probe rather than decoded
+// whole: daemon_config as a key/value fold; file_change and its neighbours as
+// one heterogeneous projection join; the cog subtype tables through a runtime
+// DopeCogElementSpec pick; keyword as a single-column fetch; and the junction
+// tables only as EXISTS probes or as joins projecting the PARENT's columns.
+// They exist for schema-drift coverage, not for decoding.

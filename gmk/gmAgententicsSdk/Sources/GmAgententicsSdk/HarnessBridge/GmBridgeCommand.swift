@@ -138,8 +138,6 @@ extension GmBridgeCommand {
         ),
     ]
 
-    static let gmHook = Tool.rule("Bash(gm_hook:*)")
-
     /// The kbite surface, typed — what the crunch and kbite commands reach for.
     static var kbiteTools: [Tool] {
         GmBridgeMcpTool.tools(in: .kbite).map(Tool.mcp)
@@ -153,9 +151,11 @@ extension GmBridgeCommand {
     }
 
     /// The tools a workflow command needs to drive the RPIR phase machine.
+    ///
+    /// Pen tools only: the PreToolUse hook denies `gm_hook` from Bash, so a shell
+    /// grant here would be a permission for something the harness refuses.
     static var rpirWorkflow: [Tool] {
-        [Tool.rule("Bash(gm_hook:*)")]
-            + GmBridgeMcpTool.tools(in: .cde).map(Tool.mcp)
+        GmBridgeMcpTool.tools(in: .cde).map(Tool.mcp)
             + GmBridgeMcpTool.tools(in: .rpir).map(Tool.mcp)
     }
 
@@ -189,7 +189,7 @@ extension GmBridgeCommand {
             arguments: arguments,
             disableModelInvocation: disableModelInvocation,
             userInvocable: userInvocable,
-            allowedTools: allowed.contains(.skill) ? allowed : allowed + [.skill],
+            allowedTools: allowed,
             disallowedTools: disallowed,
             model: model,
             effort: effort,
@@ -201,7 +201,7 @@ extension GmBridgeCommand {
             metadata: metadata,
             license: license,
             compatibility: compatibility,
-            body: body.isEmpty ? "" : "\(GM_COMMAND_SKILL_PRELUDE)\n\n\(body)"
+            body: body
         )
     }
 }

@@ -134,7 +134,8 @@ public enum GmBridgeCommand {
             }
             if let disableModelInvocation {
                 lines.append(
-                    "disable-model-invocation: \(GmBridgeYaml.bool(disableModelInvocation))")
+                    "disable-model-invocation: \(GmBridgeYaml.bool(disableModelInvocation))"
+                )
             }
             if let userInvocable {
                 lines.append("user-invocable: \(GmBridgeYaml.bool(userInvocable))")

@@ -48,10 +48,16 @@ extension ExplorationSummaryRecord {
     /// db → wire.
     func wireRow() -> ExplorationSummaryRow {
         ExplorationSummaryRow(
-            uuid: uuid, version: version, promptUuid: promptUuid,
-            agentType: agentType, agentId: agentId,
-            status: status, overview: overview,
-            createdAt: createdAt, updatedAt: updatedAt)
+            uuid: uuid,
+            version: version,
+            promptUuid: promptUuid,
+            agentType: agentType,
+            agentId: agentId,
+            status: status,
+            overview: overview,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -63,10 +69,16 @@ extension ExplorationFindingRecord {
     /// target type; this makes the conversion explicit and non-truncating.
     func wireRow() -> ExplorationFindingRow {
         ExplorationFindingRow(
-            uuid: uuid, version: version,
+            uuid: uuid,
+            version: version,
             explorationSummaryUuid: explorationSummaryUuid,
-            kind: kind, title: title, body: body, filePath: filePath,
-            agentName: agentName, agentId: agentId,
-            findingRating: findingRating.map(Int.init))
+            kind: kind,
+            title: title,
+            body: body,
+            filePath: filePath,
+            agentName: agentName,
+            agentId: agentId,
+            findingRating: findingRating.map(Int.init)
+        )
     }
 }

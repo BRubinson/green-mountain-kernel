@@ -3,31 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0007 — DOPED domain modeling (Domain Optimized Project Essence
-    // Driver — see DopeVocabulary). Pure ADD: six new BaseEntity tables, no rebuild, no data
-    // motion, no existing row touched. No FTS5 mirrors this pass — dope
-    // has no search entry point yet; mirrors attach later as a pure-ADD
-    // migration exactly as m0003 did for m0002's tables.
-    //
-    // dope_scope.revision is the single whole-tree content counter and IS
-    // the `version` field of scope.doped.json; the row's `version` column
-    // keeps its standard optimistic-lock meaning (see bumpScopeRevision's
-    // touchSession-style split in Store+Dope.swift).
-    //
-    // Scope uniqueness is TWO PARTIAL UNIQUE INDEXES, not a column-list
-    // UNIQUE: SQLite treats NULLs as distinct in unique indexes, so a
-    // UNIQUE(session_uuid, scope_type, prompt_uuid, code) would silently
-    // constrain nothing for SESSION_BASE rows (prompt_uuid IS NULL).
-    //
-    // The two property ref FKs are ON DELETE RESTRICT — deleting a
-    // still-referenced enum or target property must be a loud refusal,
-    // never a silent un-typing. Consequence: scope deletion and ingest's
-    // whole-tree wipe delete properties FIRST (explicit ordered deletes
-    // in one transaction), because a cross-domain relationship would
-    // RESTRICT a naive scope->domain CASCADE. Latent hazard, accepted and
-    // documented: deleting a session/prompt row would CASCADE into
-    // dope_scope and hit the same RESTRICT wall — nothing deletes those
-    // rows today (the db is append-only).
+    // m0007 — DOPE persistence modeling. Pure ADD: six BaseEntity tables, no
+    // FTS5 mirrors. dope_scope.revision is the whole-tree content counter and IS
+    // scope.doped.json's `version`; the row's `version` column keeps its
+    // optimistic-lock meaning. Scope uniqueness is TWO PARTIAL UNIQUE INDEXES
+    // because SQLite treats NULLs as distinct, so a column-list UNIQUE would
+    // constrain nothing for a NULL prompt_uuid. The two property ref FKs are ON
+    // DELETE RESTRICT, so scope deletion and ingest's whole-tree wipe delete
+    // properties FIRST or a cross-domain relationship RESTRICTs mid-statement.
     static func m0007_dopeDomainModel(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0007_dopeDomainModel") { db in
             try db.execute(
@@ -148,7 +131,8 @@ extension Migrations {
                         ON dope_domain_entity_property(dope_domain_enum_uuid);
                     CREATE INDEX idx_dope_property_related_fk
                         ON dope_domain_entity_property(related_property_uuid);
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",

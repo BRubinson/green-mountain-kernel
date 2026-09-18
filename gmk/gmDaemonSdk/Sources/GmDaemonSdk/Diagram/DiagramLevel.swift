@@ -33,12 +33,10 @@ public enum DiagramVisibility: String, Codable, Hashable, CaseIterable, Sendable
 /// diagram_element.element_type values. Raw values are the db discriminators
 /// AND the wire payload tags — one string, three layers.
 ///
-/// Since m0021 the db carries NO CHECK on this column: validity is this
-/// enum plus DiagramElementTypeSpec, enforced on both write paths and thrown
-/// on at read (`fetchElementInfo`). Adding a type is one case here, one
-/// registry entry below, and one subtype table — never a migration. That is
-/// the standard DopeCogElement.swift:11-19 set for cogs, applied to the
-/// family it was written about.
+/// The db carries NO CHECK on this column: validity is this enum plus
+/// DiagramElementTypeSpec, enforced on both write paths and thrown on at read.
+/// Adding a type is one case here, one registry entry below, and one subtype
+/// table — never a migration.
 public enum DiagramElementType: String, Codable, Hashable, CaseIterable, Sendable {
     case drawingLayer = "drawing_layer"
     case drawingStroke = "drawing_stroke"
@@ -94,8 +92,10 @@ public enum DiagramVertexStorage: Sendable, Hashable {
     /// Packed little-endian (f32 x, f32 y, u8 pressure) triples in a blob
     /// column, with the vertex rows as the fallback read when it is NULL.
     case packedBlob(
-        column: String, countColumn: String,
-        fallback: (table: String, parentColumn: String))
+        column: String,
+        countColumn: String,
+        fallback: (table: String, parentColumn: String)
+    )
 
     /// The vertex table this storage reads from, if any — the fallback for
     /// `.packedBlob`, the table itself for `.rows`.
@@ -193,15 +193,11 @@ public struct DiagramElementRefSpec: Sendable, Hashable {
     public let rule: ContainmentRule
 
     public enum ContainmentRule: Sendable, Hashable {
-        /// The target must be a PEER OF THE REFERRER'S OWN PARENT — it
-        /// shares the referrer's grandparent — and may be neither the
-        /// referrer's parent nor the referrer itself.
-        ///
-        /// A connector is rendered as a child of the element it connects
-        /// FROM, so "connects to a sibling" means a sibling of that parent,
-        /// not a sibling of the connector. The other reading would let a
-        /// connector under entity A target only other children of A, which
-        /// is never what anyone draws.
+        /// The target must be a PEER OF THE REFERRER'S OWN PARENT — it shares
+        /// the referrer's grandparent — and may be neither the referrer's
+        /// parent nor the referrer itself. A connector is rendered as a child
+        /// of the element it connects FROM, so "connects to a sibling" means a
+        /// sibling of that parent, not of the connector.
         case peerOfOwnParent
     }
 
@@ -248,52 +244,76 @@ public struct DiagramElementTypeSpec: Sendable {
     public static let all: [DiagramElementType: DiagramElementTypeSpec] = {
         let specs: [DiagramElementTypeSpec] = [
             DiagramElementTypeSpec(
-                type: .drawingLayer, subtypeTable: "diagram_drawing_layer",
+                type: .drawingLayer,
+                subtypeTable: "diagram_drawing_layer",
                 vertexStorage: .none,
-                allowedParentTypes: nil, isDopeBinding: false,
-                elementRefs: [], resolution: .immediate,
-                participatesInRouting: false),
+                allowedParentTypes: nil,
+                isDopeBinding: false,
+                elementRefs: [],
+                resolution: .immediate,
+                participatesInRouting: false
+            ),
             DiagramElementTypeSpec(
-                type: .drawingStroke, subtypeTable: "diagram_drawing_stroke",
+                type: .drawingStroke,
+                subtypeTable: "diagram_drawing_stroke",
                 vertexStorage: .packedBlob(
-                    column: "packed_vertices", countColumn: "vertex_count",
+                    column: "packed_vertices",
+                    countColumn: "vertex_count",
                     fallback: (
                         table: "diagram_stroke_vertex",
                         parentColumn: "stroke_element_uuid"
-                    )),
-                allowedParentTypes: [.drawingLayer], isDopeBinding: false,
-                elementRefs: [], resolution: .immediate,
+                    )
+                ),
+                allowedParentTypes: [.drawingLayer],
+                isDopeBinding: false,
+                elementRefs: [],
+                resolution: .immediate,
                 // Ink is not an obstacle: you draw over and around a canvas
                 // freely, and a dense stroke corpus would swamp the router.
-                participatesInRouting: false),
+                participatesInRouting: false
+            ),
             DiagramElementTypeSpec(
-                type: .drawingShape, subtypeTable: "diagram_drawing_shape",
+                type: .drawingShape,
+                subtypeTable: "diagram_drawing_shape",
                 vertexStorage: .rows(
                     table: "diagram_shape_vertex",
-                    parentColumn: "shape_element_uuid"),
-                allowedParentTypes: [.drawingLayer], isDopeBinding: false,
-                elementRefs: [], resolution: .immediate,
-                participatesInRouting: true),
+                    parentColumn: "shape_element_uuid"
+                ),
+                allowedParentTypes: [.drawingLayer],
+                isDopeBinding: false,
+                elementRefs: [],
+                resolution: .immediate,
+                participatesInRouting: true
+            ),
             DiagramElementTypeSpec(
-                type: .drawingText, subtypeTable: "diagram_drawing_text",
+                type: .drawingText,
+                subtypeTable: "diagram_drawing_text",
                 // Explicit width/height on the subtype row, NOT a vertex
                 // extent: markdown wrapping needs a known layout width.
                 vertexStorage: .none,
-                allowedParentTypes: [.drawingLayer], isDopeBinding: false,
-                elementRefs: [], resolution: .immediate,
-                participatesInRouting: true),
+                allowedParentTypes: [.drawingLayer],
+                isDopeBinding: false,
+                elementRefs: [],
+                resolution: .immediate,
+                participatesInRouting: true
+            ),
             DiagramElementTypeSpec(
-                type: .umlNode, subtypeTable: "diagram_uml_node",
+                type: .umlNode,
+                subtypeTable: "diagram_uml_node",
                 // Explicit width/height on the subtype row, like drawing_text:
                 // markdown wrapping needs a known layout width, and the kit
                 // never measures text (hosts may auto-fit and write back).
                 vertexStorage: .none,
-                allowedParentTypes: [.drawingLayer], isDopeBinding: false,
-                elementRefs: [], resolution: .immediate,
+                allowedParentTypes: [.drawingLayer],
+                isDopeBinding: false,
+                elementRefs: [],
+                resolution: .immediate,
                 // Structural content: edges route around nodes.
-                participatesInRouting: true),
+                participatesInRouting: true
+            ),
             DiagramElementTypeSpec(
-                type: .connector, subtypeTable: "diagram_connector",
+                type: .connector,
+                subtypeTable: "diagram_connector",
                 vertexStorage: .none,
                 // Rendered as a child of the element it connects FROM.
                 // umlNode joined in m0024 — without it nodes could not
@@ -305,26 +325,37 @@ public struct DiagramElementTypeSpec: Sendable {
                 isDopeBinding: false,
                 elementRefs: [
                     DiagramElementRefSpec(
-                        role: "target", column: "target_element_uuid",
-                        rule: .peerOfOwnParent)
+                        role: "target",
+                        column: "target_element_uuid",
+                        rule: .peerOfOwnParent
+                    )
                 ],
                 // Defined in terms of another element's frame, so it cannot
                 // be placed until every immediate element has one.
                 resolution: .deferred,
                 // A connector is a route, not an obstacle to other routes.
-                participatesInRouting: false),
+                participatesInRouting: false
+            ),
             DiagramElementTypeSpec(
-                type: .dopeScopePersistenceLayer, subtypeTable: "diagram_dope_scope_persistence_layer",
+                type: .dopeScopePersistenceLayer,
+                subtypeTable: "diagram_dope_scope_persistence_layer",
                 vertexStorage: .none,
-                allowedParentTypes: nil, isDopeBinding: true,
-                elementRefs: [], resolution: .immediate,
-                participatesInRouting: false),
+                allowedParentTypes: nil,
+                isDopeBinding: true,
+                elementRefs: [],
+                resolution: .immediate,
+                participatesInRouting: false
+            ),
             DiagramElementTypeSpec(
-                type: .dopeEntity, subtypeTable: "diagram_dope_entity",
+                type: .dopeEntity,
+                subtypeTable: "diagram_dope_entity",
                 vertexStorage: .none,
-                allowedParentTypes: [.dopeScopePersistenceLayer], isDopeBinding: true,
-                elementRefs: [], resolution: .immediate,
-                participatesInRouting: true),
+                allowedParentTypes: [.dopeScopePersistenceLayer],
+                isDopeBinding: true,
+                elementRefs: [],
+                resolution: .immediate,
+                participatesInRouting: true
+            ),
         ]
         return Dictionary(uniqueKeysWithValues: specs.map { ($0.type, $0) })
     }()

@@ -1,19 +1,14 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// Project settings — today a single field, deliberately shaped to grow.
+/// Project settings: one field today, shaped to grow.
 ///
-/// PROJECT_UPDATE is the only project-level mutation the daemon offers, and
-/// `primary_project_branch` (BASE_DOPED_BRANCH) is its only settable field.
-/// `ProjectUpdateRequest` keeps that field Optional so the request can gain
-/// more without a wire bump, which is why this sheet sends ONLY what changed
-/// rather than echoing the whole row back.
+/// `ProjectUpdateRequest` keeps its fields Optional so the request can gain more without a
+/// wire bump, so this sheet sends ONLY what changed rather than echoing the whole row back.
 ///
-/// The sheet takes a `projectUuid`, not a `ProjectRow`. The tree refreshes on
-/// every topology event, so a row captured at presentation time can go stale
-/// while the user is still typing — and the optimistic lock would then reject
-/// a save the user had no way to understand. Re-reading from the catalog on
-/// submit means we always lock against the version the UI is showing.
+/// It takes a `projectUuid`, not a `ProjectRow`: the tree refreshes on every topology event,
+/// so a row captured at presentation time goes stale while the user types and the optimistic
+/// lock rejects a save nobody could explain. Re-reading on submit locks against what is shown.
 struct ProjectSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(CatalogStore.self) private var catalog
@@ -164,7 +159,8 @@ struct ProjectSettingsSheet: View {
                 try await catalog.setPrimaryBranch(
                     projectUuid: current.uuid,
                     expectedVersion: current.version,
-                    branch: trimmedBranch)
+                    branch: trimmedBranch
+                )
                 dismiss()
             } catch let error as DaemonError {
                 submitError = error.userMessage

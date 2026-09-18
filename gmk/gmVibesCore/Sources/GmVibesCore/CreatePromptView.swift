@@ -62,7 +62,8 @@ struct CreatePromptView: View {
                                     set: { on in
                                         if on { selectedKbites.insert(kbite) } else { selectedKbites.remove(kbite) }
                                     }
-                                ))
+                                )
+                            )
                         }
                     }
                 }
@@ -97,10 +98,17 @@ struct CreatePromptView: View {
         // Session-scope registry seeds the preselection (kbite inheritance).
         let sessionCodes =
             (try? await GMCCDaemonService.shared.listKbites(
-                scope: .session, ownerUuid: store.sessionUuid))?.map(\.code) ?? []
+                scope: .session,
+                ownerUuid: store.sessionUuid
+            ))?
+            .map(\.code) ?? []
         let names =
             (try? await GMCCDaemonService.shared.listKbites(
-                scope: .session, ownerUuid: store.sessionUuid, all: true))?.map(\.code) ?? []
+                scope: .session,
+                ownerUuid: store.sessionUuid,
+                all: true
+            ))?
+            .map(\.code) ?? []
         // Always surface inherited kbites even if the registry list misses them.
         let preselected = Set(sessionCodes)
         let merged = Set(names).union(preselected)
@@ -129,19 +137,15 @@ struct CreatePromptView: View {
                     backstory: backstory,
                     goal: goal,
                     detail: detail
-                ))
+                )
+            )
             for code in kbites {
                 _ = try? await service.addKbite(scope: .prompt, ownerUuid: row.uuid, code: code)
             }
-            // Give the prompt its filesystem presence (memory/ for bot
-            // artifacts) — the daemon owns the row, the app owns the folder.
-            // Created at the daemon-returned storage path VERBATIM: the
-            // daemon's MemoryWatcher matches that string exactly, so a slugged
-            // folder of our own would never receive PROMPT_MEMORY_CHANGED
-            // (spaces/capitals in the dirname are the accepted cost). An
-            // empty storage path creates NOTHING: the resolver has no
-            // guessing legs, so a conventionally-named folder could never be
-            // found again.
+            // The prompt's filesystem presence: the daemon owns the row, the app owns the
+            // folder. Created at the daemon-returned storage path VERBATIM, because
+            // MemoryWatcher matches that string exactly. An empty storage path creates
+            // nothing — the resolver cannot guess a folder name.
             if let root = gmcc[.gmFsRoot], !root.isEmpty,
                 !row.gmfsRelativeStoragePath.isEmpty
             {
@@ -149,7 +153,9 @@ struct CreatePromptView: View {
                     .appendingPathComponent(row.gmfsRelativeStoragePath, isDirectory: true)
                     .appendingPathComponent("memory", isDirectory: true)
                 try? FileManager.default.createDirectory(
-                    at: memory, withIntermediateDirectories: true)
+                    at: memory,
+                    withIntermediateDirectories: true
+                )
             }
             await store.refresh()
             isSaving = false

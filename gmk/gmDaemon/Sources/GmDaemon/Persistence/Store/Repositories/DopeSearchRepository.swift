@@ -31,7 +31,7 @@ struct DopeSearchRepository: RepositoryContext {
             requested.isEmpty || requested.contains($0)
         }
 
-        var arms = [String]()
+        var arms: [String] = []
         var args: [any DatabaseValueConvertible] = []
         for source in selected {
             arms.append(Self.searchArm(source, scopePlaceholders: placeholders))
@@ -45,11 +45,17 @@ struct DopeSearchRepository: RepositoryContext {
         var hits = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(args))
             .map { row in
                 DopeSearchHit(
-                    kind: row["kind"], subjectUuid: row["subject_uuid"],
-                    scopeUuid: row["scope_uuid"], scopeCode: row["scope_code"],
-                    scopeType: row["scope_type"], path: row["path"],
-                    title: row["title"], excerpt: row["excerpt"], score: row["score"],
-                    origin: nil)
+                    kind: row["kind"],
+                    subjectUuid: row["subject_uuid"],
+                    scopeUuid: row["scope_uuid"],
+                    scopeCode: row["scope_code"],
+                    scopeType: row["scope_type"],
+                    path: row["path"],
+                    title: row["title"],
+                    excerpt: row["excerpt"],
+                    score: row["score"],
+                    origin: nil
+                )
             }
 
         guard req.onlyMasks == true else { return DopeSearchResponse(hits: hits) }
@@ -57,23 +63,28 @@ struct DopeSearchRepository: RepositoryContext {
         // 2. Resolve each overlay scope ONCE and keep only hits whose
         // dot-path is overlay-origin. One resolve per scope, never one
         // per hit.
-        var provenance = [String: [String: DopeOverlay.Origin]]()
+        var provenance: [String: [String: DopeOverlay.Origin]] = [:]
         for scope in scopes where scope.tier?.isOverlay == true {
             guard let baseTier = scope.tier?.masks else { continue }
             let overlayTree = try dope.fetchDopeTree(scope: scope)
             let baseRows: [DopeScopeRow]
             if baseTier.isSessionOwned, let sessionUuid = scope.sessionUuid {
                 baseRows = try dope.dopeScopeCandidates(
-                    sessionUuid: sessionUuid, scopeType: baseTier, code: scope.code)
-            } else {
-                baseRows = try DopeScopeRecord.fetchAll(
-                    db,
-                    sql: """
-                        SELECT * FROM dope_scope
-                         WHERE project_uuid = ? AND scope_type = ? AND code = ?
-                        """, arguments: [scope.projectUuid, baseTier.rawValue, scope.code]
+                    sessionUuid: sessionUuid,
+                    scopeType: baseTier,
+                    code: scope.code
                 )
-                .map { $0.wireRow() }
+            } else {
+                baseRows =
+                    try DopeScopeRecord.fetchAll(
+                        db,
+                        sql: """
+                            SELECT * FROM dope_scope
+                             WHERE project_uuid = ? AND scope_type = ? AND code = ?
+                            """,
+                        arguments: [scope.projectUuid, baseTier.rawValue, scope.code]
+                    )
+                    .map { $0.wireRow() }
             }
             let baseTree = try baseRows.first.map { try dope.fetchDopeTree(scope: $0) }
             let merged = DopeOverlay.resolve(base: baseTree, overlay: overlayTree)
@@ -87,10 +98,17 @@ struct DopeSearchRepository: RepositoryContext {
             switch origin {
             case .overridden, .added, .tombstoned, .orphanedMask:
                 return DopeSearchHit(
-                    kind: hit.kind, subjectUuid: hit.subjectUuid, scopeUuid: hit.scopeUuid,
-                    scopeCode: hit.scopeCode, scopeType: hit.scopeType, path: hit.path,
-                    title: hit.title, excerpt: hit.excerpt, score: hit.score,
-                    origin: origin.rawValue)
+                    kind: hit.kind,
+                    subjectUuid: hit.subjectUuid,
+                    scopeUuid: hit.scopeUuid,
+                    scopeCode: hit.scopeCode,
+                    scopeType: hit.scopeType,
+                    path: hit.path,
+                    title: hit.title,
+                    excerpt: hit.excerpt,
+                    score: hit.score,
+                    origin: origin.rawValue
+                )
             case .base:
                 return nil
             }
@@ -111,65 +129,79 @@ struct DopeSearchRepository: RepositoryContext {
             }
             guard
                 let sessionUuid = try String.fetchOne(
-                    db, sql: "SELECT session_uuid FROM prompt WHERE uuid = ?", arguments: [promptUuid]
+                    db,
+                    sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
+                    arguments: [promptUuid]
                 )
             else {
                 throw StoreError.notFound(entity: "prompt", key: promptUuid)
             }
-            return try DopeScopeRecord.fetchAll(
-                db,
-                sql: """
-                    SELECT * FROM dope_scope
-                     WHERE (session_uuid = ? AND scope_type = 'SESSION_INSTANCE')
-                        OR (prompt_uuid = ? AND scope_type = 'SESSION_INSTANCE_ITEM')
-                     ORDER BY code
-                    """, arguments: [sessionUuid, promptUuid]
-            ).map { $0.wireRow() }
+            return
+                try DopeScopeRecord.fetchAll(
+                    db,
+                    sql: """
+                        SELECT * FROM dope_scope
+                         WHERE (session_uuid = ? AND scope_type = 'SESSION_INSTANCE')
+                            OR (prompt_uuid = ? AND scope_type = 'SESSION_INSTANCE_ITEM')
+                         ORDER BY code
+                        """,
+                    arguments: [sessionUuid, promptUuid]
+                )
+                .map { $0.wireRow() }
         case .session:
             guard let sessionUuid = req.sessionUuid else {
                 throw StoreError.badRequest(detail: "--scope session requires --session-uuid")
             }
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM session WHERE uuid = ?",
-                    arguments: [sessionUuid]) != nil
+                    db,
+                    sql: "SELECT 1 FROM session WHERE uuid = ?",
+                    arguments: [sessionUuid]
+                ) != nil
             else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
             }
-            return try DopeScopeRecord.fetchAll(
-                db,
-                sql: """
-                    SELECT * FROM dope_scope WHERE session_uuid = ? ORDER BY code
-                    """, arguments: [sessionUuid]
-            ).map { $0.wireRow() }
-        case .project:
-            // A nil project_uuid means EVERY project. Safe to define this way
-            // rather than a behaviour change to worry about: nil previously
-            // threw unconditionally, so no caller can be relying on the old
-            // answer — and one caller, `dope_search_global`, was DEAD for its
-            // whole life because of it. The precedent is on the same message:
-            // `DopeSearchRequest.sources` already reads nil as "every arm".
-            guard let projectUuid = req.projectUuid else {
-                return try DopeScopeRecord.fetchAll(
+            return
+                try DopeScopeRecord.fetchAll(
                     db,
                     sql: """
-                        SELECT * FROM dope_scope ORDER BY project_uuid, code
-                        """
-                ).map { $0.wireRow() }
+                        SELECT * FROM dope_scope WHERE session_uuid = ? ORDER BY code
+                        """,
+                    arguments: [sessionUuid]
+                )
+                .map { $0.wireRow() }
+        case .project:
+            // A nil project_uuid means EVERY project, matching the precedent on
+            // the same message: `DopeSearchRequest.sources` already reads nil as
+            // "every arm".
+            guard let projectUuid = req.projectUuid else {
+                return
+                    try DopeScopeRecord.fetchAll(
+                        db,
+                        sql: """
+                            SELECT * FROM dope_scope ORDER BY project_uuid, code
+                            """
+                    )
+                    .map { $0.wireRow() }
             }
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM project WHERE uuid = ?",
-                    arguments: [projectUuid]) != nil
+                    db,
+                    sql: "SELECT 1 FROM project WHERE uuid = ?",
+                    arguments: [projectUuid]
+                ) != nil
             else {
                 throw StoreError.notFound(entity: "project", key: projectUuid)
             }
-            return try DopeScopeRecord.fetchAll(
-                db,
-                sql: """
-                    SELECT * FROM dope_scope WHERE project_uuid = ? ORDER BY code
-                    """, arguments: [projectUuid]
-            ).map { $0.wireRow() }
+            return
+                try DopeScopeRecord.fetchAll(
+                    db,
+                    sql: """
+                        SELECT * FROM dope_scope WHERE project_uuid = ? ORDER BY code
+                        """,
+                    arguments: [projectUuid]
+                )
+                .map { $0.wireRow() }
         }
     }
 
@@ -177,7 +209,8 @@ struct DopeSearchRepository: RepositoryContext {
     /// list, including the dot-path so --only-masks can match resolver
     /// provenance without a second query.
     private static func searchArm(
-        _ source: DopeSearchSource, scopePlaceholders: String
+        _ source: DopeSearchSource,
+        scopePlaceholders: String
     ) -> String {
         let common = "sc.uuid AS scope_uuid, sc.code AS scope_code, sc.scope_type AS scope_type"
         let bm = "bm25(%@, 10.0, 6.0, 2.0)"

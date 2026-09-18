@@ -6,52 +6,14 @@ nonisolated func shellSingleQuoted(_ s: String) -> String {
     "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
 }
 
-/// The script a pane runs.
+/// The shared preamble both pane scripts start with: self-delete, cd, root export, the OSC
+/// 1337 helpers, and the three visual signals. One preamble, two tails, so the claude form
+/// and the shell form cannot drift.
 ///
-/// ## Two colour channels, two questions — they cannot fight
-///
-/// `tabColorHex` is the PROMPT's hue. `envBackgroundHex` is the ENVIRONMENT's.
-/// The environment signal rides `bg` rather than `tab` because this repo's own
-/// swatch help text admits the tab colour tints window chrome only under the
-/// Minimal or Compact window styles and colours the tab alone under Regular —
-/// so an environment signal on `tab` CAN FAIL TO RENDER ENTIRELY, and a beta
-/// indicator that may be invisible is a detection mechanism that does not
-/// detect. `bg` always shows.
-///
-/// OSC 1337 `SetColors=` accepts `fg bg bold link selbg selfg curbg curfg
-/// underline tab` plus `key=preset`. No client change, no protobuf, no iTerm2
-/// API method needed.
-///
-/// NAMED RETREAT: nobody has run the `bg` form from this script (the `tab` form
-/// proves the transport). If it no-ops, fall back to the profile's
-/// `Background Color` key through the Dynamic Profile writer in
-/// `ExternalLaunchers.swift` — NOT to tinting `tab`, which reintroduces the
-/// invisibility problem.
-///
-/// ## `--plugin-dir` CANNOT ride through `tierCommand`
-///
-/// `shellSingleQuoted` wraps its ENTIRE input in ONE pair of quotes, so
-/// appending the flag to `tierCommand` yields ONE argv — a prompt string
-/// starting with a hyphen — not a flag plus a command. The directory gets its
-/// own `shellSingleQuoted` call and its own argv token.
-///
-/// ## A nil value emits NOTHING
-///
-/// Not `--plugin-dir ''` (an empty path claude will try to load and fail on),
-/// and not an empty `envbg` assignment. With both nil the emission is
-/// byte-identical to the pre-`setcolor` script apart from that refactor.
-/// The shared preamble both pane scripts start with: self-delete, cd, root
-/// export, the OSC 1337 helpers, and the three visual signals (tab hue,
-/// environment background, environment badge). Extracted so the claude form
-/// and the shell form cannot drift — one preamble, two tails.
-///
-/// The BADGE is the environment's HEADER: iTerm2 renders SetBadgeFormat as a
-/// large text overlay in the pane, which is what makes a TEST pane say TEST
-/// where a background tint alone can be mistaken for a theme. The payload is
-/// base64 per the OSC 1337 contract, computed in-shell so this string stays
-/// printable. A nil badge emits no CALL, like the other nil channels — the
-/// setbadge helper itself is always defined, so a production script carries
-/// the (inert) definition; only the call is conditional.
+/// The environment signal rides `bg`, never `tab`: the tab colour tints window chrome only
+/// under the Minimal or Compact window styles, so a `tab` signal can fail to render at all.
+/// `--plugin-dir` gets its own `shellSingleQuoted` call, because that helper wraps its entire
+/// input in ONE pair of quotes. A nil value emits nothing at all rather than an empty flag.
 private nonisolated func paneScriptPreamble(
     root: String,
     repoPath: String,
@@ -106,7 +68,8 @@ nonisolated func paneLaunchScript(
         repoPath: repoPath,
         tabColorHex: tabColorHex,
         badgeText: badgeText,
-        envBackgroundHex: envBackgroundHex)
+        envBackgroundHex: envBackgroundHex
+    )
         + "exec claude \(pluginFlag)\(shellSingleQuoted(tierCommand))\n"
 }
 
@@ -128,7 +91,8 @@ nonisolated func paneShellScript(
         repoPath: repoPath,
         tabColorHex: tabColorHex,
         badgeText: badgeText,
-        envBackgroundHex: envBackgroundHex)
+        envBackgroundHex: envBackgroundHex
+    )
         + "export PATH=\"$GM_FS_ROOT/bin:$PATH\"\n"
         + "exec \(shellSingleQuoted(shell)) -i\n"
 }
@@ -169,11 +133,13 @@ enum PaneScriptWriter {
             try Data(script.utf8).write(to: url, options: .atomic)
             try FileManager.default.setAttributes(
                 [.posixPermissions: 0o700],
-                ofItemAtPath: url.path)
+                ofItemAtPath: url.path
+            )
         } catch {
             throw ITerm2Error.transportFailed(
                 reason: "Could not write the launch script: \(error.localizedDescription)",
-                errno: nil)
+                errno: nil
+            )
         }
         return url
     }

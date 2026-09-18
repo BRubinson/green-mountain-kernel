@@ -43,17 +43,27 @@ extension Store {
 
     public func clarifySeal(_ req: ClarifySealRequest) throws -> ClarifySummaryResponse {
         try boundary { db in
-            try ClarificationRepository(db: db, core: core).transition(
-                summaryUuid: req.summaryUuid, expectedVersion: req.expectedVersion,
-                to: .answering, action: "seal", requireFrom: .building)
+            try ClarificationRepository(db: db, core: core)
+                .transition(
+                    summaryUuid: req.summaryUuid,
+                    expectedVersion: req.expectedVersion,
+                    to: .answering,
+                    action: "seal",
+                    requireFrom: .building
+                )
         }
     }
 
     public func clarifyReopen(_ req: ClarifyReopenRequest) throws -> ClarifySummaryResponse {
         try boundary { db in
-            try ClarificationRepository(db: db, core: core).transition(
-                summaryUuid: req.summaryUuid, expectedVersion: req.expectedVersion,
-                to: .answering, action: "reopen", requireFrom: .complete)
+            try ClarificationRepository(db: db, core: core)
+                .transition(
+                    summaryUuid: req.summaryUuid,
+                    expectedVersion: req.expectedVersion,
+                    to: .answering,
+                    action: "reopen",
+                    requireFrom: .complete
+                )
         }
     }
 

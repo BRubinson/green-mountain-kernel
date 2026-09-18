@@ -2,33 +2,16 @@ import Foundation
 
 /// The `.doped.json` document types — the SAME `*Body` structs as the wire
 /// tree, minus `DopeNodeIdentity`. Uuid-freedom is by construction: these
-/// types have nowhere to put one.
-///
-/// Layout on disk, directly under `{instance_root}/.gmcc/` (there is no
-/// `dope/` level):
-///
-///     scope.doped.json                                     DopeScopeDocument
-///     persistence/{code}/{code}.index.persistence.doped.json
-///                                                DopePersistenceIndexDocument
-///     persistence/{code}/{code}.entity.{entity}.persistence.doped.json
-///                                                   DopeEntityFileDocument
-///     persistence/{code}/{code}.enum.{enum}.persistence.doped.json
-///                                                     DopeEnumFileDocument
-///     cogs/{code}/{code}.index.cog.doped.json          (hulls; step 5)
-///
-/// One domain is a DIRECTORY of files, not one file. The assembled in-memory
-/// form stays `DopePersistenceFileDocument`, so validation, ingest and the
-/// overlay resolver never learn that the split happened — the fan-out lives
-/// entirely in DopeRepoSandbox.
-///
-/// `version` appears in the scope file AND in every file beneath it and must
-/// match everywhere — a mismatch means a hand-edit and read-repo reports it.
-/// It IS `dope_scope.revision`.
-///
-/// scope_type is deliberately NOT persisted: only a SESSION_INSTANCE tree is
-/// ever written to a repo (`Store.requireRepoWritableScope`), so storing it
-/// would record a constant and invite a hand-edit to contradict the one tier
-/// that is structurally possible.
+/// types have nowhere to put one. They live directly under
+/// `{instance_root}/.gmcc/`, with one domain as a DIRECTORY of files; the
+/// assembled in-memory form stays `DopePersistenceFileDocument`, so the
+/// fan-out lives entirely in DopeRepoSandbox. `version` IS
+/// `dope_scope.revision` and must match in the scope file and every file
+/// beneath it; a mismatch means a hand-edit and read-repo reports it.
+
+/// scope_type is deliberately NOT persisted: only a SESSION_INSTANCE tree can
+/// be written to a repo, so storing it would record a constant and invite a
+/// file that contradicts it.
 
 public struct DopeScopeDocument: Codable, Hashable, Sendable {
     public let version: Int64
@@ -44,8 +27,10 @@ public struct DopeScopeDocument: Codable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey { case version, scope, persistence, cogs }
 
     public init(
-        version: Int64, scope: DopeScopeBody,
-        persistence: [String: String], cogs: [String: String] = [:]
+        version: Int64,
+        scope: DopeScopeBody,
+        persistence: [String: String],
+        cogs: [String: String] = [:]
     ) {
         self.version = version
         self.scope = scope
@@ -96,8 +81,10 @@ public struct DopePersistenceIndexDocument: Codable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey { case version, entities, enums }
 
     public init(
-        version: Int64, body: DopePersistenceBody,
-        entities: [String: String], enums: [String: String]
+        version: Int64,
+        body: DopePersistenceBody,
+        entities: [String: String],
+        enums: [String: String]
     ) {
         self.version = version
         self.body = body
@@ -271,8 +258,10 @@ public struct DopePersistenceFileDocument: Codable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey { case version, entities, enums }
 
     public init(
-        version: Int64, body: DopePersistenceBody,
-        entities: [DopeEntityDocument], enums: [DopeEnumDocument]
+        version: Int64,
+        body: DopePersistenceBody,
+        entities: [DopeEntityDocument],
+        enums: [DopeEnumDocument]
     ) {
         self.version = version
         self.body = body

@@ -37,14 +37,17 @@ public enum StructuredPatchExpander {
     public static let maxHunkBodyCharacters = FileChangeLimits.maxChangedContentCharacters
 
     public static func expand(_ hunks: [StructuredPatchHunk]) -> [ChangeRange] {
-        hunks.prefix(maxHunks).map { hunk in
-            ChangeRange(
-                lineStart: hunk.newStart,
-                lineEnd: hunk.newStart + max(hunk.newLines, 1) - 1,
-                changedContent: String(
-                    hunk.lines.joined(separator: "\n")
-                        .prefix(maxHunkBodyCharacters)))
-        }
+        hunks.prefix(maxHunks)
+            .map { hunk in
+                ChangeRange(
+                    lineStart: hunk.newStart,
+                    lineEnd: hunk.newStart + max(hunk.newLines, 1) - 1,
+                    changedContent: String(
+                        hunk.lines.joined(separator: "\n")
+                            .prefix(maxHunkBodyCharacters)
+                    )
+                )
+            }
     }
 }
 

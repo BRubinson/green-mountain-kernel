@@ -2,18 +2,13 @@ import Foundation
 import GRDB
 import GmDaemonSdk
 
-/// DOPED domain modeling data access — scope lifecycle, tree hydration, and
-/// the generic per-level node mutations. Whole-tree repo verbs live in
-/// Store+DopeRepo. Runs INSIDE a Store-owned transaction; holds no dbQueue
-/// and never self-transacts. Internal helpers keep their explicit `db`
-/// parameter — verbatim moves from the Store extension.
-///
-/// Two counters, deliberately split (the touchSession precedent): every row's
-/// `version` stays THE optimistic lock, while `dope_scope.revision` is the
-/// whole-tree content counter (= the .doped.json version field), advanced by
-/// `bumpScopeRevision` WITHOUT touching the scope row's version — a property
-/// edit deep in the tree must never invalidate a dope_scope version a
-/// GMVibes scope editor is holding.
+/// DOPE domain modeling data access — scope lifecycle, tree hydration, and the
+/// generic per-level node mutations. Whole-tree repo verbs live in
+/// Store+DopeRepo. Runs INSIDE a Store-owned transaction; holds no dbQueue.
+/// Two counters, deliberately split: every row's `version` is THE optimistic
+/// lock, while `dope_scope.revision` is the whole-tree content counter advanced
+/// by `bumpScopeRevision` without touching the scope row's version, so a deep
+/// property edit cannot invalidate a version a scope editor is holding.
 struct DopeRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
@@ -37,30 +32,33 @@ struct DopeRepository: RepositoryContext {
     /// version — see the extension doc comment and StoreCore.touchSession.
     /// `area` additionally advances that subtree's own content counter, which
     /// is what makes dope sub-LOADABLE: a client compares one area's number
-    /// instead of refetching the whole tree.
-    ///
-    /// dope_scope.revision REMAINS the single whole-tree counter and the sole
-    /// CAS gate for read-repo / write-repo / ingest. The area counters sit
-    /// BESIDE it and never replace it — splitting the scalar, as the goal
-    /// originally read, would invalidate all three gates and the version field
-    /// in every committed .doped.json at once, for a signal this already gives.
+    /// instead of refetching the whole tree. dope_scope.revision REMAINS the
+    /// single whole-tree counter and the sole CAS gate for read-repo, write-repo
+    /// and ingest; area counters sit BESIDE it and never replace it.
     @discardableResult
     func bumpScopeRevision(
-        scopeUuid: String, area: DopeArea? = nil, ownerUuid: String? = nil
+        scopeUuid: String,
+        area: DopeArea? = nil,
+        ownerUuid: String? = nil
     ) throws -> Int64 {
         if let area, let ownerUuid {
             try db.execute(
                 sql: """
                     UPDATE \(area.table) SET content_revision = content_revision + 1, updated_at = ?
                      WHERE uuid = ?
-                    """, arguments: [Store.isoNow(), ownerUuid])
+                    """,
+                arguments: [Store.isoNow(), ownerUuid]
+            )
         }
         try db.execute(
             sql: "UPDATE dope_scope SET revision = revision + 1, updated_at = ? WHERE uuid = ?",
-            arguments: [Store.isoNow(), scopeUuid])
+            arguments: [Store.isoNow(), scopeUuid]
+        )
         guard
             let revision = try Int64.fetchOne(
-                db, sql: "SELECT revision FROM dope_scope WHERE uuid = ?", arguments: [scopeUuid]
+                db,
+                sql: "SELECT revision FROM dope_scope WHERE uuid = ?",
+                arguments: [scopeUuid]
             )
         else {
             throw StoreError.notFound(entity: "dope_scope", key: scopeUuid)
@@ -78,7 +76,9 @@ struct DopeRepository: RepositoryContext {
                 FROM session s
                 JOIN instance i ON i.uuid = s.instance_uuid
                 WHERE s.uuid = ?
-                """, arguments: [sessionUuid]) ?? ""
+                """,
+            arguments: [sessionUuid]
+        ) ?? ""
     }
 
     /// Resolve the scope that owns a node at `level`. The join chains are the
@@ -122,15 +122,20 @@ struct DopeRepository: RepositoryContext {
         }
         guard let row = try DopeScopeRecord.fetchOne(db, sql: sql, arguments: [nodeUuid]) else {
             throw StoreError.notFound(
-                entity: DopeLevelSpec.spec(for: level).table, key: nodeUuid)
+                entity: DopeLevelSpec.spec(for: level).table,
+                key: nodeUuid
+            )
         }
         return row.wireRow()
     }
 
     // internal: the promotion machine emits DOPE_CHANGE too.
     func recordDopeChange(
-        scope: DopeScopeRow, action: String, level: DopeLevel?,
-        nodeUuid: String?, revision: Int64
+        scope: DopeScopeRow,
+        action: String,
+        level: DopeLevel?,
+        nodeUuid: String?,
+        revision: Int64
     ) throws {
         // Every granular mutation funnels through here, which makes it the
         // one place the merge base learns that this session touched an
@@ -139,7 +144,9 @@ struct DopeRepository: RepositoryContext {
             if let dotPath = try dopeProvenance.dotPath(nodeUuid: nodeUuid, level: level) {
                 try dopeProvenance.markLocallyModified(
                     scopeUuid: scope.uuid,
-                    dotPath: dotPath, kind: level.rawValue)
+                    dotPath: dotPath,
+                    kind: level.rawValue
+                )
             }
         }
         // A project-tier scope (BASE_PROJECT / PROJECT_ITEM) has no session,
@@ -159,8 +166,11 @@ struct DopeRepository: RepositoryContext {
         if let nodeUuid { payload["node_uuid"] = nodeUuid }
         if let promptUuid = scope.promptUuid { payload["prompt_uuid"] = promptUuid }
         try core.appendEvent(
-            db, kind: .dopeChange, subjectUuid: scope.uuid,
-            payload: Store.jsonPayload(payload))
+            db,
+            kind: .dopeChange,
+            subjectUuid: scope.uuid,
+            payload: Store.jsonPayload(payload)
+        )
         if let sessionUuid = scope.sessionUuid {
             try core.touchSession(db, uuid: sessionUuid)
         }
@@ -172,18 +182,22 @@ struct DopeRepository: RepositoryContext {
     /// Compare a stamped scope revision against the live one, re-resolve every
     /// dot-path. Warn, never block. Computed, never stored.
     ///
-    /// `drifted` deliberately keeps the guard-both-sides semantics this moved
-    /// out of BriefingRepository: a MISSING number on either side is not
-    /// evidence of drift (an unstamped ref set, or a scope row that no longer
-    /// exists, both report `false`). Loosening that to a bare `!=` would flip
-    /// the badge on for every never-stamped briefing.
+    /// `drifted` guards BOTH sides: a MISSING number on either side is not
+    /// evidence of drift, so an unstamped ref set and an absent scope row both
+    /// report `false`. A bare `!=` would flip the badge on for every
+    /// never-stamped briefing.
     func scopeStaleness(
-        scopeUuid: String?, stampedRevision: Int64?, dotPaths: [String]
+        scopeUuid: String?,
+        stampedRevision: Int64?,
+        dotPaths: [String]
     ) throws -> (stamped: Int64?, current: Int64?, drifted: Bool, ghosts: [String]) {
         // No scope -> no drift, no ghosts.
         guard let scopeUuid else { return (stampedRevision, nil, false, []) }
         let current = try Int64.fetchOne(
-            db, sql: "SELECT revision FROM dope_scope WHERE uuid = ?", arguments: [scopeUuid])
+            db,
+            sql: "SELECT revision FROM dope_scope WHERE uuid = ?",
+            arguments: [scopeUuid]
+        )
         let drifted: Bool = {
             guard let stamped = stampedRevision, let current else { return false }
             return stamped != current
@@ -258,7 +272,9 @@ struct DopeRepository: RepositoryContext {
         }
         guard
             try Row.fetchOne(
-                db, sql: "SELECT uuid FROM session WHERE uuid = ?", arguments: [req.sessionUuid]
+                db,
+                sql: "SELECT uuid FROM session WHERE uuid = ?",
+                arguments: [req.sessionUuid]
             ) != nil
         else {
             throw StoreError.notFound(entity: "session", key: req.sessionUuid)
@@ -266,7 +282,8 @@ struct DopeRepository: RepositoryContext {
         if let promptUuid = req.promptUuid {
             guard
                 let owner = try String.fetchOne(
-                    db, sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
+                    db,
+                    sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
                     arguments: [promptUuid]
                 )
             else {
@@ -274,7 +291,8 @@ struct DopeRepository: RepositoryContext {
             }
             guard owner == req.sessionUuid else {
                 throw StoreError.badRequest(
-                    detail: "prompt \(promptUuid) does not belong to session \(req.sessionUuid)")
+                    detail: "prompt \(promptUuid) does not belong to session \(req.sessionUuid)"
+                )
             }
         }
 
@@ -304,10 +322,12 @@ struct DopeRepository: RepositoryContext {
         else {
             throw StoreError.corruptState(
                 entity: "session",
-                detail: "session \(req.sessionUuid) has no instance->project lineage")
+                detail: "session \(req.sessionUuid) has no instance->project lineage"
+            )
         }
         let uuid = try core.insertBase(
-            db, table: "dope_scope",
+            db,
+            table: "dope_scope",
             extra: [
                 "project_uuid": lineage["p"] as String,
                 "instance_uuid": lineage["i"] as String,
@@ -318,12 +338,14 @@ struct DopeRepository: RepositoryContext {
                 "name": req.name,
                 "description": description,
                 "revision": 0,
-            ])
+            ]
+        )
 
         if req.cloneFromSessionBase == true {
             guard req.promptUuid != nil else {
                 throw StoreError.badRequest(
-                    detail: "--clone-from-session-base is only meaningful for a PROMPT scope")
+                    detail: "--clone-from-session-base is only meaningful for a PROMPT scope"
+                )
             }
             guard
                 let baseRow = try DopeScopeRecord.fetchOne(
@@ -331,10 +353,13 @@ struct DopeRepository: RepositoryContext {
                     sql: """
                         SELECT * FROM dope_scope
                         WHERE session_uuid = ? AND scope_type = 'SESSION_INSTANCE' AND code = ?
-                        """, arguments: [req.sessionUuid, req.code])
+                        """,
+                    arguments: [req.sessionUuid, req.code]
+                )
             else {
                 throw StoreError.badRequest(
-                    detail: "no SESSION_INSTANCE scope with code '\(req.code)' to clone from")
+                    detail: "no SESSION_INSTANCE scope with code '\(req.code)' to clone from"
+                )
             }
             _ = try copyDopeTree(from: baseRow.wireRow(), into: uuid)
         }
@@ -343,8 +368,12 @@ struct DopeRepository: RepositoryContext {
             throw StoreError.corruptState(entity: "dope_scope", detail: "vanished after insert")
         }
         try recordDopeChange(
-            scope: scope, action: "init", level: .scope,
-            nodeUuid: uuid, revision: scope.revision)
+            scope: scope,
+            action: "init",
+            level: .scope,
+            nodeUuid: uuid,
+            revision: scope.revision
+        )
         return DopeScopeResponse(scope: scope, created: true)
     }
 
@@ -355,11 +384,14 @@ struct DopeRepository: RepositoryContext {
     /// unknown uuid (NOT_FOUND) from a real-but-uninitialized target
     /// (SUMMARY_ABSENT) — the clarify/arch/explore/review get pattern.
     private func requireDopeTarget(
-        sessionUuid: String, promptUuid: String?
+        sessionUuid: String,
+        promptUuid: String?
     ) throws {
         guard
             try Row.fetchOne(
-                db, sql: "SELECT uuid FROM session WHERE uuid = ?", arguments: [sessionUuid]
+                db,
+                sql: "SELECT uuid FROM session WHERE uuid = ?",
+                arguments: [sessionUuid]
             ) != nil
         else {
             throw StoreError.notFound(entity: "session", key: sessionUuid)
@@ -367,7 +399,9 @@ struct DopeRepository: RepositoryContext {
         if let promptUuid {
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT uuid FROM prompt WHERE uuid = ?", arguments: [promptUuid]
+                    db,
+                    sql: "SELECT uuid FROM prompt WHERE uuid = ?",
+                    arguments: [promptUuid]
                 ) != nil
             else {
                 throw StoreError.notFound(entity: "prompt", key: promptUuid)
@@ -381,8 +415,10 @@ struct DopeRepository: RepositoryContext {
     // internal, not private: Store+Diagram's binding resolution reuses this
     // exact ladder query (the v12 candidates() promotion precedent).
     func dopeScopeCandidates(
-        sessionUuid: String, scopeType: DopeScopeType,
-        promptUuid: String? = nil, code: String? = nil
+        sessionUuid: String,
+        scopeType: DopeScopeType,
+        promptUuid: String? = nil,
+        code: String? = nil
     ) throws -> [DopeScopeRow] {
         var sql = "SELECT * FROM dope_scope WHERE session_uuid = ? AND scope_type = ?"
         var args: [(any DatabaseValueConvertible)?] = [sessionUuid, scopeType.rawValue]
@@ -399,19 +435,16 @@ struct DopeRepository: RepositoryContext {
             .map { $0.wireRow() }
     }
 
-    /// Project-tier scope candidates — the rung the ladder never had.
+    /// Project-tier scope candidates.
     ///
-    /// `dopeScopeCandidates` is `WHERE session_uuid = ?`, so BASE_PROJECT
-    /// scopes were unaddressable: DOPE_PROMOTE has been populating them
-    /// all along and nothing could read one back. That was invisible while
-    /// every diagram was session-owned, and becomes a wall the moment a
-    /// PROJECT-tier diagram tries to bind a scope — it resolves nothing and
-    /// renders as a canvas of ghosts, which looks like a UI bug and is not.
-    ///
-    /// PROJECT_ITEM is the masking tier over BASE_PROJECT, mirroring
-    /// SESSION_INSTANCE_ITEM over SESSION_INSTANCE.
+    /// `dopeScopeCandidates` is `WHERE session_uuid = ?`, which cannot address a
+    /// BASE_PROJECT scope, so a PROJECT-tier diagram binding one would resolve
+    /// nothing and render as a canvas of ghosts. PROJECT_ITEM is the masking
+    /// tier over BASE_PROJECT, mirroring SESSION_INSTANCE_ITEM over
+    /// SESSION_INSTANCE.
     func dopeProjectScopeCandidates(
-        projectUuid: String, scopeType: DopeScopeType,
+        projectUuid: String,
+        scopeType: DopeScopeType,
         code: String? = nil
     ) throws -> [DopeScopeRow] {
         var sql = """
@@ -432,15 +465,21 @@ struct DopeRepository: RepositoryContext {
 
     func dopeList(_ req: DopeListRequest) throws -> DopeListResponse {
         try requireDopeTarget(
-            sessionUuid: req.sessionUuid, promptUuid: req.promptUuid)
+            sessionUuid: req.sessionUuid,
+            promptUuid: req.promptUuid
+        )
         let scopes: [DopeScopeRow]
         if let promptUuid = req.promptUuid {
             scopes = try dopeScopeCandidates(
-                sessionUuid: req.sessionUuid, scopeType: .sessionInstanceItem,
-                promptUuid: promptUuid)
+                sessionUuid: req.sessionUuid,
+                scopeType: .sessionInstanceItem,
+                promptUuid: promptUuid
+            )
         } else {
             scopes = try dopeScopeCandidates(
-                sessionUuid: req.sessionUuid, scopeType: .sessionInstance)
+                sessionUuid: req.sessionUuid,
+                scopeType: .sessionInstance
+            )
         }
         return DopeListResponse(scopes: scopes)
     }
@@ -453,7 +492,8 @@ struct DopeRepository: RepositoryContext {
                 throw StoreError.badRequest(
                     detail:
                         "several dope scopes match — pass --code (candidates: "
-                        + rows.map(\.code).joined(separator: ", ") + ")")
+                        + rows.map(\.code).joined(separator: ", ") + ")"
+                )
             }
             return rows.first
         }
@@ -464,58 +504,83 @@ struct DopeRepository: RepositoryContext {
         if let projectUuid = req.projectUuid {
             guard req.sessionUuid.isEmpty else {
                 throw StoreError.badRequest(
-                    detail: "pass --project-uuid OR --session-uuid, not both")
+                    detail: "pass --project-uuid OR --session-uuid, not both"
+                )
             }
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT uuid FROM project WHERE uuid = ?",
-                    arguments: [projectUuid]) != nil
+                    db,
+                    sql: "SELECT uuid FROM project WHERE uuid = ?",
+                    arguments: [projectUuid]
+                ) != nil
             else {
                 throw StoreError.notFound(entity: "project", key: projectUuid)
             }
             var projectVia = "base_project"
             var found = try pick(
                 try dopeProjectScopeCandidates(
-                    projectUuid: projectUuid, scopeType: .projectItem, code: req.code))
+                    projectUuid: projectUuid,
+                    scopeType: .projectItem,
+                    code: req.code
+                )
+            )
             if found != nil { projectVia = "project_item" }
             if found == nil {
                 found = try pick(
                     try dopeProjectScopeCandidates(
-                        projectUuid: projectUuid, scopeType: .baseProject,
-                        code: req.code))
+                        projectUuid: projectUuid,
+                        scopeType: .baseProject,
+                        code: req.code
+                    )
+                )
             }
             guard let scope = found else {
                 throw StoreError.dopeProjectScopeAbsent(
-                    projectUuid: projectUuid, code: req.code)
+                    projectUuid: projectUuid,
+                    code: req.code
+                )
             }
             return DopeGetResponse(
                 tree: try fetchDopeTree(scope: scope),
-                resolvedVia: projectVia)
+                resolvedVia: projectVia
+            )
         }
 
         try requireDopeTarget(
-            sessionUuid: req.sessionUuid, promptUuid: req.promptUuid)
+            sessionUuid: req.sessionUuid,
+            promptUuid: req.promptUuid
+        )
 
         var resolvedVia = "session_base"
         var scope: DopeScopeRow?
         if let promptUuid = req.promptUuid {
             scope = try pick(
                 try dopeScopeCandidates(
-                    sessionUuid: req.sessionUuid, scopeType: .sessionInstanceItem,
-                    promptUuid: promptUuid, code: req.code))
+                    sessionUuid: req.sessionUuid,
+                    scopeType: .sessionInstanceItem,
+                    promptUuid: promptUuid,
+                    code: req.code
+                )
+            )
             if scope != nil { resolvedVia = "prompt" }
         }
         if scope == nil {
             scope = try pick(
                 try dopeScopeCandidates(
-                    sessionUuid: req.sessionUuid, scopeType: .sessionInstance,
-                    code: req.code))
+                    sessionUuid: req.sessionUuid,
+                    scopeType: .sessionInstance,
+                    code: req.code
+                )
+            )
         }
         guard let scope else {
             // The target exists (guard above) — this absence means
             // "initialize a scope", not "the uuid is unknown".
             throw StoreError.dopeScopeAbsent(
-                sessionUuid: req.sessionUuid, promptUuid: req.promptUuid, code: req.code)
+                sessionUuid: req.sessionUuid,
+                promptUuid: req.promptUuid,
+                code: req.code
+            )
         }
         let tree = try fetchDopeTree(scope: scope)
 
@@ -527,8 +592,10 @@ struct DopeRepository: RepositoryContext {
             let baseTier = tier.masks
         else {
             return DopeGetResponse(
-                tree: tree, resolvedVia: resolvedVia,
-                areaVersions: areas)
+                tree: tree,
+                resolvedVia: resolvedVia,
+                areaVersions: areas
+            )
         }
 
         // Base pairing is by CODE plus lineage, needing no stored pointer:
@@ -541,18 +608,22 @@ struct DopeRepository: RepositoryContext {
         let baseRows: [DopeScopeRow]
         if baseTier.isSessionOwned {
             baseRows = try dopeScopeCandidates(
-                sessionUuid: try scope.requireSessionUuid(), scopeType: baseTier,
-                code: scope.code)
-        } else {
-            baseRows = try DopeScopeRecord.fetchAll(
-                db,
-                sql: """
-                    SELECT * FROM dope_scope
-                     WHERE project_uuid = ? AND scope_type = ? AND code = ?
-                     ORDER BY code
-                    """, arguments: [scope.projectUuid, baseTier.rawValue, scope.code]
+                sessionUuid: try scope.requireSessionUuid(),
+                scopeType: baseTier,
+                code: scope.code
             )
-            .map { $0.wireRow() }
+        } else {
+            baseRows =
+                try DopeScopeRecord.fetchAll(
+                    db,
+                    sql: """
+                        SELECT * FROM dope_scope
+                         WHERE project_uuid = ? AND scope_type = ? AND code = ?
+                         ORDER BY code
+                        """,
+                    arguments: [scope.projectUuid, baseTier.rawValue, scope.code]
+                )
+                .map { $0.wireRow() }
         }
         let baseTree = try baseRows.first.map { try fetchDopeTree(scope: $0) }
         let merged = DopeOverlay.resolve(base: baseTree, overlay: tree)
@@ -562,14 +633,16 @@ struct DopeRepository: RepositoryContext {
             resolutions: merged.resolutions.values.sorted { $0.path < $1.path },
             hidden: merged.hidden.sorted(),
             warnings: merged.warnings,
-            areaVersions: areas)
+            areaVersions: areas
+        )
     }
 
     /// The dope_persistence row a node lives under — the persistence area's
     /// counter owner. Mirrors dopeOwningScope's join chain, stopping one level
     /// short.
     func owningPersistenceUuid(
-        level: DopeLevel, nodeUuid: String
+        level: DopeLevel,
+        nodeUuid: String
     ) throws -> String? {
         let sql: String
         switch level {
@@ -601,7 +674,7 @@ struct DopeRepository: RepositoryContext {
     /// keep consistent, and the answer a client actually wants ("has anything
     /// in this area moved?") is exactly a max.
     func areaVersions(scopeUuid: String) throws -> [String: Int64] {
-        var out = [String: Int64]()
+        var out: [String: Int64] = [:]
         for area in DopeArea.allCases {
             out[area.rawValue] =
                 try Int64.fetchOne(
@@ -609,7 +682,9 @@ struct DopeRepository: RepositoryContext {
                     sql: """
                         SELECT COALESCE(MAX(content_revision), 0) FROM \(area.table)
                          WHERE dope_scope_uuid = ?
-                        """, arguments: [scopeUuid]) ?? 0
+                        """,
+                    arguments: [scopeUuid]
+                ) ?? 0
         }
         return out
     }
@@ -617,28 +692,17 @@ struct DopeRepository: RepositoryContext {
     // MARK: - Hydration (five flat queries, grouped in Swift — never per-node
     // recursion; ORDER BY sort_order, code keeps write-repo deterministic)
 
-    /// - Parameter forProjection: when true, every level filters
-    ///   `deleted_on IS NULL`.
-    ///
-    ///   Reads deliberately return tombstoned rows — the masking resolver
-    ///   NEEDS them, since a whiteout is only meaningful if you can see it.
-    ///   The db → files projection must not: a tombstone is personal,
-    ///   overlay-tier state, and a saved .doped.json is shared, committed
-    ///   fact.
-    ///
-    ///   DEFENCE IN DEPTH, deliberately. Two independent gates already make
-    ///   a tombstone unreachable from here: `dopeNodeDelete` refuses `--soft`
-    ///   outside an overlay tier, and `requireRepoWritableScope` refuses any
-    ///   repo verb outside SESSION_INSTANCE — disjoint sets, so no scope is
-    ///   both soft-deletable and writable. This filter is what keeps that
-    ///   true if either gate is ever relaxed: the invariant then holds
-    ///   because the projection enforces it directly, not because two
-    ///   unrelated guards happen to intersect at zero.
-    ///
-    ///   Defaults to false so every existing read keeps its behaviour; only
-    ///   the write path opts in.
+    /// `forProjection` makes every level filter `deleted_on IS NULL`. Reads
+    /// deliberately return tombstoned rows, because the masking resolver needs
+    /// them: a whiteout is only meaningful if it is visible. The db → files
+    /// projection must not, since a tombstone is personal overlay-tier state
+    /// while a saved .doped.json is shared, committed fact. That filter is
+    /// DEFENCE IN DEPTH over `dopeNodeDelete`'s soft-delete tier check and
+    /// `requireRepoWritableScope`, so the invariant survives either being
+    /// relaxed. Defaults to false; only writes opt in.
     func fetchDopeTree(
-        scope: DopeScopeRow, forProjection: Bool = false
+        scope: DopeScopeRow,
+        forProjection: Bool = false
     ) throws -> DopeScopeTree {
         // Interpolated, not bound: this is a constant SQL fragment chosen by a
         // Bool, never user input.
@@ -652,7 +716,9 @@ struct DopeRepository: RepositoryContext {
                 SELECT * FROM dope_persistence WHERE dope_scope_uuid = ?
                 \(forProjection ? "AND deleted_on IS NULL" : "")
                 ORDER BY sort_order, code
-                """, arguments: [scope.uuid])
+                """,
+            arguments: [scope.uuid]
+        )
         let entityRows = try DopePersistenceEntityRecord.fetchAll(
             db,
             sql: """
@@ -660,7 +726,9 @@ struct DopeRepository: RepositoryContext {
                 JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                 WHERE d.dope_scope_uuid = ? \(alive("e")) \(alive("d"))
                 ORDER BY e.sort_order, e.code
-                """, arguments: [scope.uuid])
+                """,
+            arguments: [scope.uuid]
+        )
         let enumRows = try DopePersistenceEnumRecord.fetchAll(
             db,
             sql: """
@@ -668,7 +736,9 @@ struct DopeRepository: RepositoryContext {
                 JOIN dope_persistence d ON d.uuid = n.dope_persistence_uuid
                 WHERE d.dope_scope_uuid = ? \(alive("n")) \(alive("d"))
                 ORDER BY n.sort_order, n.code
-                """, arguments: [scope.uuid])
+                """,
+            arguments: [scope.uuid]
+        )
         let optionRows = try DopePersistenceEnumOptionRecord.fetchAll(
             db,
             sql: """
@@ -677,7 +747,9 @@ struct DopeRepository: RepositoryContext {
                 JOIN dope_persistence d ON d.uuid = n.dope_persistence_uuid
                 WHERE d.dope_scope_uuid = ? \(alive("o")) \(alive("n")) \(alive("d"))
                 ORDER BY o.sort_order, o.code
-                """, arguments: [scope.uuid])
+                """,
+            arguments: [scope.uuid]
+        )
         let propertyRows = try DopePersistenceEntityPropertyRecord.fetchAll(
             db,
             sql: """
@@ -686,47 +758,60 @@ struct DopeRepository: RepositoryContext {
                 JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                 WHERE d.dope_scope_uuid = ? \(alive("p")) \(alive("e")) \(alive("d"))
                 ORDER BY p.sort_order, p.code
-                """, arguments: [scope.uuid])
+                """,
+            arguments: [scope.uuid]
+        )
 
         // Ref projection maps: uuid → dot-path code.
-        var domainCode = [String: String]()
+        var domainCode: [String: String] = [:]
         for row in domainRows { domainCode[row.uuid] = row.code }
-        var entityInfo = [String: (domain: String, code: String)]()
-        var entityRef = [String: String]()
+        var entityInfo: [String: (domain: String, code: String)] = [:]
+        var entityRef: [String: String] = [:]
         for row in entityRows {
             let domain = domainCode[row.dopePersistenceUuid] ?? "?"
             entityInfo[row.uuid] = (domain, row.code)
             entityRef[row.uuid] = DopeCode.formatEntityRef(
-                domain: domain, entity: row.code)
+                domain: domain,
+                entity: row.code
+            )
         }
-        var enumRef = [String: String]()
+        var enumRef: [String: String] = [:]
         for row in enumRows {
             let domain = domainCode[row.dopePersistenceUuid] ?? "?"
             enumRef[row.uuid] = DopeCode.formatEnumRef(domain: domain, enumCode: row.code)
         }
-        var propertyRef = [String: String]()
+        var propertyRef: [String: String] = [:]
         for row in propertyRows {
             let info = entityInfo[row.dopePersistenceEntityUuid] ?? (domain: "?", code: "?")
             propertyRef[row.uuid] = DopeCode.formatPropertyRef(
-                domain: info.domain, entity: info.code, property: row.code)
+                domain: info.domain,
+                entity: info.code,
+                property: row.code
+            )
         }
 
         // One identity shape over five record types: every dope node table
         // carries the same BaseEntity columns plus deleted_on.
         func identity<R: DopeNodeRecord>(_ row: R) -> DopeNodeIdentity {
             DopeNodeIdentity(
-                uuid: row.uuid, version: row.version,
-                createdAt: row.createdAt, updatedAt: row.updatedAt,
-                deletedOn: row.deletedOn)
+                uuid: row.uuid,
+                version: row.version,
+                createdAt: row.createdAt,
+                updatedAt: row.updatedAt,
+                deletedOn: row.deletedOn
+            )
         }
 
-        var propertiesByEntity = [String: [DopePropertyNode]]()
+        var propertiesByEntity: [String: [DopePropertyNode]] = [:]
         for row in propertyRows {
             let node = DopePropertyNode(
                 identity: identity(row),
                 body: DopePropertyBody(
-                    code: row.code, name: row.name, description: row.description,
-                    sortOrder: Int(row.sortOrder), dataType: row.dataType,
+                    code: row.code,
+                    name: row.name,
+                    description: row.description,
+                    sortOrder: Int(row.sortOrder),
+                    dataType: row.dataType,
                     nullable: row.nullable,
                     isUnique: row.isUnique,
                     autoIncrement: row.autoIncrement,
@@ -735,64 +820,94 @@ struct DopeRepository: RepositoryContext {
                     relationshipTargetRef: row.relationshipTargetUuid
                         .flatMap { propertyRef[$0] },
                     baseOriginRef: row.baseOriginPropertyUuid
-                        .flatMap { propertyRef[$0] }))
+                        .flatMap { propertyRef[$0] }
+                )
+            )
             propertiesByEntity[row.dopePersistenceEntityUuid, default: []].append(node)
         }
-        var optionsByEnum = [String: [DopeOptionNode]]()
+        var optionsByEnum: [String: [DopeOptionNode]] = [:]
         for row in optionRows {
-            optionsByEnum[row.dopePersistenceEnumUuid, default: []].append(
-                DopeOptionNode(
-                    identity: identity(row),
-                    body: DopeOptionBody(
-                        code: row.code, name: row.name,
-                        description: row.description,
-                        sortOrder: Int(row.sortOrder))))
+            optionsByEnum[row.dopePersistenceEnumUuid, default: []]
+                .append(
+                    DopeOptionNode(
+                        identity: identity(row),
+                        body: DopeOptionBody(
+                            code: row.code,
+                            name: row.name,
+                            description: row.description,
+                            sortOrder: Int(row.sortOrder)
+                        )
+                    )
+                )
         }
-        var entitiesByDomain = [String: [DopeEntityNode]]()
+        var entitiesByDomain: [String: [DopeEntityNode]] = [:]
         for row in entityRows {
-            entitiesByDomain[row.dopePersistenceUuid, default: []].append(
-                DopeEntityNode(
-                    identity: identity(row),
-                    body: DopeEntityBody(
-                        code: row.code, name: row.name,
-                        entityType: row.entityType,
-                        description: row.description,
-                        sortOrder: Int(row.sortOrder),
-                        repoRepresentativeFile: row.repoRepresentativeFile,
-                        baseComposableRef: row.baseComposableUuid
-                            .flatMap { entityRef[$0] }),
-                    properties: propertiesByEntity[row.uuid] ?? []))
+            entitiesByDomain[row.dopePersistenceUuid, default: []]
+                .append(
+                    DopeEntityNode(
+                        identity: identity(row),
+                        body: DopeEntityBody(
+                            code: row.code,
+                            name: row.name,
+                            entityType: row.entityType,
+                            description: row.description,
+                            sortOrder: Int(row.sortOrder),
+                            repoRepresentativeFile: row.repoRepresentativeFile,
+                            baseComposableRef: row.baseComposableUuid
+                                .flatMap { entityRef[$0] }
+                        ),
+                        properties: propertiesByEntity[row.uuid] ?? []
+                    )
+                )
         }
-        var enumsByDomain = [String: [DopeEnumNode]]()
+        var enumsByDomain: [String: [DopeEnumNode]] = [:]
         for row in enumRows {
-            enumsByDomain[row.dopePersistenceUuid, default: []].append(
-                DopeEnumNode(
-                    identity: identity(row),
-                    body: DopeEnumBody(
-                        code: row.code, name: row.name,
-                        description: row.description, sortOrder: Int(row.sortOrder),
-                        repoRepresentativeFile: row.repoRepresentativeFile),
-                    options: optionsByEnum[row.uuid] ?? []))
+            enumsByDomain[row.dopePersistenceUuid, default: []]
+                .append(
+                    DopeEnumNode(
+                        identity: identity(row),
+                        body: DopeEnumBody(
+                            code: row.code,
+                            name: row.name,
+                            description: row.description,
+                            sortOrder: Int(row.sortOrder),
+                            repoRepresentativeFile: row.repoRepresentativeFile
+                        ),
+                        options: optionsByEnum[row.uuid] ?? []
+                    )
+                )
         }
         let domains = domainRows.map { row in
             DopePersistenceNode(
                 identity: identity(row),
                 body: DopePersistenceBody(
-                    code: row.code, name: row.name,
+                    code: row.code,
+                    name: row.name,
                     description: row.description,
-                    sortOrder: Int(row.sortOrder)),
+                    sortOrder: Int(row.sortOrder)
+                ),
                 entities: entitiesByDomain[row.uuid] ?? [],
-                enums: enumsByDomain[row.uuid] ?? [])
+                enums: enumsByDomain[row.uuid] ?? []
+            )
         }
         return DopeScopeTree(
             identity: DopeNodeIdentity(
-                uuid: scope.uuid, version: scope.version,
-                createdAt: scope.createdAt, updatedAt: scope.updatedAt),
+                uuid: scope.uuid,
+                version: scope.version,
+                createdAt: scope.createdAt,
+                updatedAt: scope.updatedAt
+            ),
             body: DopeScopeBody(
-                code: scope.code, name: scope.name,
-                description: scope.description),
-            sessionUuid: scope.sessionUuid, promptUuid: scope.promptUuid,
-            scopeType: scope.scopeType, revision: scope.revision, domains: domains)
+                code: scope.code,
+                name: scope.name,
+                description: scope.description
+            ),
+            sessionUuid: scope.sessionUuid,
+            promptUuid: scope.promptUuid,
+            scopeType: scope.scopeType,
+            revision: scope.revision,
+            domains: domains
+        )
     }
 
     /// Whole-tree copy between scopes: hydrate, project to identity-free
@@ -804,13 +919,15 @@ struct DopeRepository: RepositoryContext {
     /// cross-layer references are dot-path codes and never uuids.
     @discardableResult
     func copyDopeTree(
-        from source: DopeScopeRow, into targetScopeUuid: String
+        from source: DopeScopeRow,
+        into targetScopeUuid: String
     ) throws -> DopeTreeCounts {
         let tree = try fetchDopeTree(scope: source)
         let bundle = DopeProjection.documents(from: tree)
         return try insertDopeTree(
             scopeUuid: targetScopeUuid,
-            domainFiles: bundle.domainFiles)
+            domainFiles: bundle.domainFiles
+        )
     }
 
     // MARK: - Whole-tree insert (clone + ingest share it). Documents in,
@@ -820,14 +937,15 @@ struct DopeRepository: RepositoryContext {
 
     @discardableResult
     func insertDopeTree(
-        scopeUuid: String, domainFiles: [DopePersistenceFileDocument]
+        scopeUuid: String,
+        domainFiles: [DopePersistenceFileDocument]
     ) throws -> DopeTreeCounts {
         var counts = (domains: 0, entities: 0, properties: 0, enums: 0, options: 0)
-        var domainUuidByCode = [String: String]()
-        var enumUuidByRef = [String: String]()
-        var propertyUuidByRef = [String: String]()
-        var entityUuidByRef = [String: String]()
-        var entityRefByUuid = [String: String]()
+        var domainUuidByCode: [String: String] = [:]
+        var enumUuidByRef: [String: String] = [:]
+        var propertyUuidByRef: [String: String] = [:]
+        var entityUuidByRef: [String: String] = [:]
+        var entityRefByUuid: [String: String] = [:]
         var pendingRelationship: [(entityUuid: String, body: DopePropertyBody)] = []
         var pendingBase: [(entityUuid: String, ref: String)] = []
         var pendingBaseOrigin: [(propertyUuid: String, ref: String)] = []
@@ -839,12 +957,14 @@ struct DopeRepository: RepositoryContext {
         // write NULL into a CHECK-coupled column.
         for file in domainFiles {
             let domainUuid = try core.insertBase(
-                db, table: "dope_persistence",
+                db,
+                table: "dope_persistence",
                 extra: [
                     "dope_scope_uuid": scopeUuid,
                     "code": file.body.code, "name": file.body.name,
                     "description": file.body.description, "sort_order": file.body.sortOrder,
-                ])
+                ]
+            )
             counts.domains += 1
             domainUuidByCode[file.body.code] = domainUuid
         }
@@ -852,26 +972,33 @@ struct DopeRepository: RepositoryContext {
             let domainUuid = domainUuidByCode[file.body.code]!
             for en in file.enums {
                 let enumUuid = try core.insertBase(
-                    db, table: "dope_persistence_enum",
+                    db,
+                    table: "dope_persistence_enum",
                     extra: [
                         "dope_persistence_uuid": domainUuid,
                         "code": en.body.code, "name": en.body.name,
                         "description": en.body.description, "sort_order": en.body.sortOrder,
                         "repo_representative_file": en.body.repoRepresentativeFile,
-                    ])
+                    ]
+                )
                 counts.enums += 1
                 enumUuidByRef[
                     DopeCode.formatEnumRef(
-                        domain: file.body.code, enumCode: en.body.code)] = enumUuid
+                        domain: file.body.code,
+                        enumCode: en.body.code
+                    )
+                ] = enumUuid
                 for option in en.options {
                     _ = try core.insertBase(
-                        db, table: "dope_persistence_enum_option",
+                        db,
+                        table: "dope_persistence_enum_option",
                         extra: [
                             "dope_persistence_enum_uuid": enumUuid,
                             "code": option.body.code, "name": option.body.name,
                             "description": option.body.description,
                             "sort_order": option.body.sortOrder,
-                        ])
+                        ]
+                    )
                     counts.options += 1
                 }
             }
@@ -883,7 +1010,8 @@ struct DopeRepository: RepositoryContext {
             let domainUuid = domainUuidByCode[file.body.code]!
             for entity in file.entities {
                 let entityUuid = try core.insertBase(
-                    db, table: "dope_persistence_entity",
+                    db,
+                    table: "dope_persistence_entity",
                     extra: [
                         "dope_persistence_uuid": domainUuid,
                         "code": entity.body.code, "name": entity.body.name,
@@ -891,10 +1019,13 @@ struct DopeRepository: RepositoryContext {
                         "description": entity.body.description,
                         "sort_order": entity.body.sortOrder,
                         "repo_representative_file": entity.body.repoRepresentativeFile,
-                    ])
+                    ]
+                )
                 counts.entities += 1
                 let entityRef = DopeCode.formatEntityRef(
-                    domain: file.body.code, entity: entity.body.code)
+                    domain: file.body.code,
+                    entity: entity.body.code
+                )
                 entityUuidByRef[entityRef] = entityUuid
                 entityRefByUuid[entityUuid] = entityRef
                 if let ref = entity.body.baseComposableRef {
@@ -910,12 +1041,14 @@ struct DopeRepository: RepositoryContext {
                     if let enumRef = body.enumRef {
                         guard let resolved = enumUuidByRef[enumRef] else {
                             throw StoreError.badRequest(
-                                detail: "enum property '\(body.code)' ref '\(enumRef)' did not resolve during insert")
+                                detail: "enum property '\(body.code)' ref '\(enumRef)' did not resolve during insert"
+                            )
                         }
                         enumUuid = resolved
                     }
                     let uuid = try core.insertBase(
-                        db, table: "dope_persistence_entity_property",
+                        db,
+                        table: "dope_persistence_entity_property",
                         extra: [
                             "dope_persistence_entity_uuid": entityUuid,
                             "code": body.code, "name": body.name,
@@ -927,12 +1060,16 @@ struct DopeRepository: RepositoryContext {
                             "text_char_limit": body.textCharLimit,
                             "dope_persistence_enum_uuid": enumUuid,
                             "relationship_target_uuid": nil,
-                        ])
+                        ]
+                    )
                     counts.properties += 1
                     propertyUuidByRef[
                         DopeCode.formatPropertyRef(
-                            domain: file.body.code, entity: entity.body.code,
-                            property: body.code)] = uuid
+                            domain: file.body.code,
+                            entity: entity.body.code,
+                            property: body.code
+                        )
+                    ] = uuid
                     if let originRef = body.baseOriginRef {
                         pendingBaseOrigin.append((uuid, originRef))
                     }
@@ -947,11 +1084,13 @@ struct DopeRepository: RepositoryContext {
         for pending in pendingBase {
             guard let target = entityUuidByRef[pending.ref] else {
                 throw StoreError.badRequest(
-                    detail: "entity base_composable_ref '\(pending.ref)' did not resolve during insert")
+                    detail: "entity base_composable_ref '\(pending.ref)' did not resolve during insert"
+                )
             }
             try db.execute(
                 sql: "UPDATE dope_persistence_entity SET base_composable_uuid = ? WHERE uuid = ?",
-                arguments: [target, pending.entityUuid])
+                arguments: [target, pending.entityUuid]
+            )
         }
         // Relationship properties last: the validator bans chain refs, so
         // every target is a non-relationship property inserted above.
@@ -966,7 +1105,8 @@ struct DopeRepository: RepositoryContext {
                 )
             }
             let uuid = try core.insertBase(
-                db, table: "dope_persistence_entity_property",
+                db,
+                table: "dope_persistence_entity_property",
                 extra: [
                     "dope_persistence_entity_uuid": pending.entityUuid,
                     "code": body.code, "name": body.name,
@@ -978,7 +1118,8 @@ struct DopeRepository: RepositoryContext {
                     "text_char_limit": nil,
                     "dope_persistence_enum_uuid": nil,
                     "relationship_target_uuid": target,
-                ])
+                ]
+            )
             counts.properties += 1
             if let entityRef = entityRefByUuid[pending.entityUuid] {
                 propertyUuidByRef["\(entityRef).\(body.code)"] = uuid
@@ -994,17 +1135,23 @@ struct DopeRepository: RepositoryContext {
         for pending in pendingBaseOrigin {
             guard let target = propertyUuidByRef[pending.ref] else {
                 throw StoreError.badRequest(
-                    detail: "property base_origin_ref '\(pending.ref)' did not resolve during insert")
+                    detail: "property base_origin_ref '\(pending.ref)' did not resolve during insert"
+                )
             }
             try db.execute(
                 sql: """
                     UPDATE dope_persistence_entity_property SET base_origin_property_uuid = ? WHERE uuid = ?
-                    """, arguments: [target, pending.propertyUuid])
+                    """,
+                arguments: [target, pending.propertyUuid]
+            )
         }
         return DopeTreeCounts(
-            domains: counts.domains, entities: counts.entities,
-            properties: counts.properties, enums: counts.enums,
-            options: counts.options)
+            domains: counts.domains,
+            entities: counts.entities,
+            properties: counts.properties,
+            enums: counts.enums,
+            options: counts.options
+        )
     }
 
     /// The ordered whole-tree wipe: relationship properties, then all
@@ -1022,7 +1169,9 @@ struct DopeRepository: RepositoryContext {
                  WHERE base_composable_uuid IS NOT NULL
                    AND dope_persistence_uuid IN (
                     SELECT uuid FROM dope_persistence WHERE dope_scope_uuid = ?)
-                """, arguments: [scopeUuid])
+                """,
+            arguments: [scopeUuid]
+        )
         // base_origin is data_type-INDEPENDENT, so the relationship-first
         // DELETE split below cannot separate origin referrers from their
         // targets — NULL every tag before either property DELETE runs.
@@ -1034,7 +1183,9 @@ struct DopeRepository: RepositoryContext {
                     SELECT e.uuid FROM dope_persistence_entity e
                       JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                      WHERE d.dope_scope_uuid = ?)
-                """, arguments: [scopeUuid])
+                """,
+            arguments: [scopeUuid]
+        )
         try db.execute(
             sql: """
                 DELETE FROM dope_persistence_entity_property
@@ -1043,7 +1194,9 @@ struct DopeRepository: RepositoryContext {
                     SELECT e.uuid FROM dope_persistence_entity e
                       JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                      WHERE d.dope_scope_uuid = ?)
-                """, arguments: [scopeUuid])
+                """,
+            arguments: [scopeUuid]
+        )
         try db.execute(
             sql: """
                 DELETE FROM dope_persistence_entity_property
@@ -1051,38 +1204,46 @@ struct DopeRepository: RepositoryContext {
                     SELECT e.uuid FROM dope_persistence_entity e
                       JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                      WHERE d.dope_scope_uuid = ?)
-                """, arguments: [scopeUuid])
+                """,
+            arguments: [scopeUuid]
+        )
         try db.execute(
             sql: "DELETE FROM dope_persistence WHERE dope_scope_uuid = ?",
-            arguments: [scopeUuid])
+            arguments: [scopeUuid]
+        )
         // Cogs go in the SAME wipe: an ingest that replaced persistence but
         // left cogs behind would leave the two areas describing different
         // revisions of the tree.
         try db.execute(
             sql: "DELETE FROM dope_cog WHERE dope_scope_uuid = ?",
-            arguments: [scopeUuid])
+            arguments: [scopeUuid]
+        )
     }
 
     /// Insert the cogs area of an ingested bundle, expanding each hull's
     /// collapsed `links.persistence_owners` back into sibling
     /// PersistenceOwner element rows.
     func insertDopeCogs(
-        scopeUuid: String, cogFiles: [DopeCogDocument]
+        scopeUuid: String,
+        cogFiles: [DopeCogDocument]
     ) throws {
         for (cogIndex, cog) in cogFiles.enumerated() {
             let cogUuid = try core.insertBase(
-                db, table: "dope_cog",
+                db,
+                table: "dope_cog",
                 extra: [
                     "dope_scope_uuid": scopeUuid,
                     "code": cog.body.code, "name": cog.body.name,
                     "description": cog.body.description,
                     "sort_order": cog.body.sortOrder == 0 ? cogIndex : cog.body.sortOrder,
                     "content_revision": 0,
-                ])
+                ]
+            )
             for element in cog.elements {
                 let spec = try DopeCogElementSpec.spec(for: element.elementType)
                 let elementUuid = try core.insertBase(
-                    db, table: "dope_cog_element",
+                    db,
+                    table: "dope_cog_element",
                     extra: [
                         "dope_cog_uuid": cogUuid,
                         "parent_element_uuid": nil,
@@ -1091,7 +1252,8 @@ struct DopeRepository: RepositoryContext {
                         "description": element.description,
                         "sort_order": element.sortOrder,
                         "dope_scope_code": element.dopeScopeCode,
-                    ])
+                    ]
+                )
                 var subtype: [String: (any DatabaseValueConvertible)?] = ["element_uuid": elementUuid]
                 if spec.ownedFields.contains(.primaryPath) {
                     subtype["primary_path"] = element.primaryPath ?? ""
@@ -1102,9 +1264,13 @@ struct DopeRepository: RepositoryContext {
                 // synthesis both the reader and the seeder share.
                 for (i, owned) in (element.links?.persistenceOwners ?? []).enumerated() {
                     let child = DopeCogProjection.ownerElement(
-                        parentCode: element.code, persistenceCode: owned, sortOrder: i)
+                        parentCode: element.code,
+                        persistenceCode: owned,
+                        sortOrder: i
+                    )
                     let childUuid = try core.insertBase(
-                        db, table: "dope_cog_element",
+                        db,
+                        table: "dope_cog_element",
                         extra: [
                             "dope_cog_uuid": cogUuid,
                             "parent_element_uuid": elementUuid,
@@ -1113,13 +1279,16 @@ struct DopeRepository: RepositoryContext {
                             "description": child.description,
                             "sort_order": child.sortOrder,
                             "dope_scope_code": nil,
-                        ])
+                        ]
+                    )
                     _ = try core.insertBase(
-                        db, table: "dope_cog_persistence_owner",
+                        db,
+                        table: "dope_cog_persistence_owner",
                         extra: [
                             "element_uuid": childUuid,
                             "dope_persistence_code": owned,
-                        ])
+                        ]
+                    )
                 }
             }
         }
@@ -1159,7 +1328,8 @@ struct DopeRepository: RepositoryContext {
         }
         for field in carried where !spec.ownedFields.contains(field) {
             throw StoreError.badRequest(
-                detail: "level '\(level.rawValue)' has no field '\(field.rawValue)'")
+                detail: "level '\(level.rawValue)' has no field '\(field.rawValue)'"
+            )
         }
     }
 
@@ -1168,7 +1338,8 @@ struct DopeRepository: RepositoryContext {
         let limit = Self.dopeDescriptionLimits[level] ?? 128
         guard text.count <= limit else {
             throw StoreError.badRequest(
-                detail: "\(level.rawValue) description exceeds \(limit) characters")
+                detail: "\(level.rawValue) description exceeds \(limit) characters"
+            )
         }
     }
 
@@ -1176,17 +1347,23 @@ struct DopeRepository: RepositoryContext {
     /// state. The schema CHECKs are the backstop; this produces the friendly
     /// message and enforces what SQL cannot see (same scope, no chain refs).
     private func validatePropertyShape(
-        scope: DopeScopeRow, propertyUuid: String?, entityUuid: String,
-        dataType: String, enumUuid: String?, relationshipTargetUuid: String?,
+        scope: DopeScopeRow,
+        propertyUuid: String?,
+        entityUuid: String,
+        dataType: String,
+        enumUuid: String?,
+        relationshipTargetUuid: String?,
         baseOriginPropertyUuid: String?,
-        autoIncrement: Bool?, textCharLimit: Int?
+        autoIncrement: Bool?,
+        textCharLimit: Int?
     ) throws {
         guard let type = DopePropertyDataType(rawValue: dataType) else {
             throw StoreError.badRequest(detail: "unknown data_type '\(dataType)'")
         }
         if (type == .enumeration) != (enumUuid != nil) {
             throw StoreError.badRequest(
-                detail: "enum properties require --enum-uuid, and only enum properties may carry one")
+                detail: "enum properties require --enum-uuid, and only enum properties may carry one"
+            )
         }
         if (type == .relationship) != (relationshipTargetUuid != nil) {
             throw StoreError.badRequest(
@@ -1204,18 +1381,22 @@ struct DopeRepository: RepositoryContext {
             let owner = try dopeOwningScope(level: .enumeration, nodeUuid: enumUuid)
             guard owner.uuid == scope.uuid else {
                 throw StoreError.badRequest(
-                    detail: "enum \(enumUuid) belongs to a different dope scope")
+                    detail: "enum \(enumUuid) belongs to a different dope scope"
+                )
             }
         }
         if let relationshipTargetUuid {
             let owner = try dopeOwningScope(level: .property, nodeUuid: relationshipTargetUuid)
             guard owner.uuid == scope.uuid else {
                 throw StoreError.badRequest(
-                    detail: "target property \(relationshipTargetUuid) belongs to a different dope scope")
+                    detail: "target property \(relationshipTargetUuid) belongs to a different dope scope"
+                )
             }
             let targetType = try String.fetchOne(
-                db, sql: "SELECT data_type FROM dope_persistence_entity_property WHERE uuid = ?",
-                arguments: [relationshipTargetUuid])
+                db,
+                sql: "SELECT data_type FROM dope_persistence_entity_property WHERE uuid = ?",
+                arguments: [relationshipTargetUuid]
+            )
             if targetType == DopePropertyDataType.relationship.rawValue {
                 throw StoreError.badRequest(
                     detail:
@@ -1230,7 +1411,8 @@ struct DopeRepository: RepositoryContext {
             let owner = try dopeOwningScope(level: .property, nodeUuid: origin)
             guard owner.uuid == scope.uuid else {
                 throw StoreError.badRequest(
-                    detail: "base origin property \(origin) belongs to a different dope scope")
+                    detail: "base origin property \(origin) belongs to a different dope scope"
+                )
             }
             // dopeOwningScope proves existence + scope; the origin's
             // data_type, owning entity, and that entity's kind ride in on
@@ -1245,11 +1427,14 @@ struct DopeRepository: RepositoryContext {
                           FROM dope_persistence_entity_property p
                           JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
                          WHERE p.uuid = ?
-                        """, arguments: [origin])
+                        """,
+                    arguments: [origin]
+                )
             else {
                 throw StoreError.corruptState(
                     entity: "dope_persistence_entity_property",
-                    detail: "base origin \(origin) vanished")
+                    detail: "base origin \(origin) vanished"
+                )
             }
             let originEntity: String = row["entity_uuid"]
             // Defense-in-depth only: every base_composable target is
@@ -1258,7 +1443,8 @@ struct DopeRepository: RepositoryContext {
             guard (row["entity_type"] as String?) == DopeEntityType.baseComposable.rawValue else {
                 throw StoreError.badRequest(
                     detail:
-                        "base origin property \(origin) lives on \(originEntity), which is not a BASE_COMPOSABLE")
+                        "base origin property \(origin) lives on \(originEntity), which is not a BASE_COMPOSABLE"
+                )
             }
             try requireBaseChainReaches(entityUuid: entityUuid, targetUuid: originEntity)
             let originType: String = row["data_type"]
@@ -1276,20 +1462,25 @@ struct DopeRepository: RepositoryContext {
     /// is requireAcyclicBase's pointer-chase walked forwards; the visited set
     /// keeps a pre-existing cycle from hanging the walk.
     private func requireBaseChainReaches(
-        entityUuid: String, targetUuid: String
+        entityUuid: String,
+        targetUuid: String
     ) throws {
         var seen: Set<String> = []
         var node: String? =
             try String.fetchOne(
-                db, sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
-                arguments: [entityUuid]) ?? nil
+                db,
+                sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
+                arguments: [entityUuid]
+            )
         while let current = node {
             if current == targetUuid { return }
             guard seen.insert(current).inserted else { break }
             node =
                 try String.fetchOne(
-                    db, sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
-                    arguments: [current]) ?? nil
+                    db,
+                    sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
+                    arguments: [current]
+                )
         }
         throw StoreError.badRequest(
             detail:
@@ -1300,8 +1491,10 @@ struct DopeRepository: RepositoryContext {
     /// Same-scope + shape checks for an entity's final (post-mutation) state.
     /// `entityUuid` is nil on add (a row nothing can reference yet).
     private func validateEntityShape(
-        scope: DopeScopeRow, entityUuid: String?,
-        entityType: DopeEntityType, baseComposableUuid: String?
+        scope: DopeScopeRow,
+        entityUuid: String?,
+        entityType: DopeEntityType,
+        baseComposableUuid: String?
     ) throws {
         if let target = baseComposableUuid {
             if target == entityUuid {
@@ -1310,17 +1503,21 @@ struct DopeRepository: RepositoryContext {
             let owner = try dopeOwningScope(level: .entity, nodeUuid: target)
             guard owner.uuid == scope.uuid else {
                 throw StoreError.badRequest(
-                    detail: "base entity \(target) belongs to a different dope scope")
+                    detail: "base entity \(target) belongs to a different dope scope"
+                )
             }
             // dopeOwningScope proves existence + scope; the TYPE needs its
             // own read.
             let targetType = try String.fetchOne(
-                db, sql: "SELECT entity_type FROM dope_persistence_entity WHERE uuid = ?",
-                arguments: [target])
+                db,
+                sql: "SELECT entity_type FROM dope_persistence_entity WHERE uuid = ?",
+                arguments: [target]
+            )
             guard targetType == DopeEntityType.baseComposable.rawValue else {
                 throw StoreError.badRequest(
                     detail:
-                        "base entity \(target) is \(targetType ?? "unknown") — only a BASE_COMPOSABLE may be composed")
+                        "base entity \(target) is \(targetType ?? "unknown") — only a BASE_COMPOSABLE may be composed"
+                )
             }
             if let entityUuid {
                 try requireAcyclicBase(entityUuid: entityUuid, targetUuid: target)
@@ -1335,7 +1532,8 @@ struct DopeRepository: RepositoryContext {
                 throw StoreError.badRequest(
                     detail:
                         "cannot set entity_type \(entityType.rawValue): still composed by "
-                        + referrers.joined(separator: ", "))
+                        + referrers.joined(separator: ", ")
+                )
             }
         }
         // Strand guard: this entity's materialized properties tag origins on
@@ -1354,15 +1552,19 @@ struct DopeRepository: RepositoryContext {
                       JOIN dope_persistence_entity oe ON oe.uuid = op.dope_persistence_entity_uuid
                      WHERE p.dope_persistence_entity_uuid = ?
                        AND p.base_origin_property_uuid IS NOT NULL
-                    """, arguments: [entityUuid])
+                    """,
+                arguments: [entityUuid]
+            )
             if !tagged.isEmpty {
                 var reachable = Set<String>()
                 var node = baseComposableUuid
                 while let current = node, reachable.insert(current).inserted {
                     node =
                         try String.fetchOne(
-                            db, sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
-                            arguments: [current]) ?? nil
+                            db,
+                            sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
+                            arguments: [current]
+                        )
                 }
                 let stranded = tagged.filter { !reachable.contains($0["origin_entity"] as String) }
                     .map { $0["code"] as String }
@@ -1371,7 +1573,8 @@ struct DopeRepository: RepositoryContext {
                         detail:
                             "cannot change base_composable: property "
                             + stranded.joined(separator: ", ")
-                            + " still originates from a base this entity would no longer compose")
+                            + " still originates from a base this entity would no longer compose"
+                    )
                 }
             }
         }
@@ -1383,7 +1586,8 @@ struct DopeRepository: RepositoryContext {
     /// defensive only — a pre-existing cycle cannot be reached through these
     /// guards.
     private func requireAcyclicBase(
-        entityUuid: String, targetUuid: String
+        entityUuid: String,
+        targetUuid: String
     ) throws {
         var seen: Set<String> = [entityUuid]
         var node: String? = targetUuid
@@ -1392,14 +1596,17 @@ struct DopeRepository: RepositoryContext {
                 if current == entityUuid {
                     throw StoreError.badRequest(
                         detail:
-                            "base_composable cycle: \(entityUuid) already sits on \(targetUuid)'s base chain")
+                            "base_composable cycle: \(entityUuid) already sits on \(targetUuid)'s base chain"
+                    )
                 }
                 return  // corruption below us; not this mutation's cycle
             }
             node =
                 try String.fetchOne(
-                    db, sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
-                    arguments: [current]) ?? nil
+                    db,
+                    sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
+                    arguments: [current]
+                )
         }
     }
 
@@ -1415,7 +1622,9 @@ struct DopeRepository: RepositoryContext {
                 FROM dope_persistence_entity e
                 JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                 WHERE e.base_composable_uuid = ? LIMIT 5
-                """, arguments: [entityUuid])
+                """,
+            arguments: [entityUuid]
+        )
     }
 
     func dopeNodeAdd(_ req: DopeNodeAddRequest) throws -> DopeNodeResponse {
@@ -1430,7 +1639,8 @@ struct DopeRepository: RepositoryContext {
         try DopeCode.validateCode(code, field: "\(req.level.rawValue) code")
         if req.level == .entity, code == DopeCode.reservedEnumSegment {
             throw StoreError.badRequest(
-                detail: "'enums' is a reserved entity code (it disambiguates enum refs)")
+                detail: "'enums' is a reserved entity code (it disambiguates enum refs)"
+            )
         }
         try validateDopeDescription(req.fields.description, level: req.level)
 
@@ -1455,7 +1665,9 @@ struct DopeRepository: RepositoryContext {
                     sql: """
                         SELECT COALESCE(MAX(sort_order), -1) + 1 FROM \(spec.table)
                         WHERE \(parentColumn) = ?
-                        """, arguments: [req.parentUuid]) ?? 0
+                        """,
+                    arguments: [req.parentUuid]
+                ) ?? 0
         }
         extra["sort_order"] = sortOrder
 
@@ -1463,8 +1675,11 @@ struct DopeRepository: RepositoryContext {
         case .entity:
             let entityType = req.fields.entityType ?? .model
             try validateEntityShape(
-                scope: scope, entityUuid: nil, entityType: entityType,
-                baseComposableUuid: req.fields.baseComposableUuid)
+                scope: scope,
+                entityUuid: nil,
+                entityType: entityType,
+                baseComposableUuid: req.fields.baseComposableUuid
+            )
             extra["entity_type"] = entityType.rawValue
             extra["repo_representative_file"] = req.fields.repoRepresentativeFile
             extra["base_composable_uuid"] = req.fields.baseComposableUuid
@@ -1475,13 +1690,16 @@ struct DopeRepository: RepositoryContext {
                 throw StoreError.badRequest(detail: "property-add requires --data-type")
             }
             try validatePropertyShape(
-                scope: scope, propertyUuid: nil, entityUuid: req.parentUuid,
+                scope: scope,
+                propertyUuid: nil,
+                entityUuid: req.parentUuid,
                 dataType: dataType.rawValue,
                 enumUuid: req.fields.enumUuid,
                 relationshipTargetUuid: req.fields.relationshipTargetUuid,
                 baseOriginPropertyUuid: req.fields.baseOriginPropertyUuid,
                 autoIncrement: req.fields.autoIncrement,
-                textCharLimit: req.fields.textCharLimit)
+                textCharLimit: req.fields.textCharLimit
+            )
             extra["data_type"] = dataType.rawValue
             extra["nullable"] = (req.fields.nullable ?? true) ? 1 : 0
             extra["is_unique"] = (req.fields.isUnique ?? false) ? 1 : 0
@@ -1496,14 +1714,24 @@ struct DopeRepository: RepositoryContext {
 
         let uuid = try core.insertBase(db, table: spec.table, extra: extra)
         let revision = try bumpScopeRevision(
-            scopeUuid: scope.uuid, area: .persistence,
-            ownerUuid: try owningPersistenceUuid(level: req.level, nodeUuid: uuid))
+            scopeUuid: scope.uuid,
+            area: .persistence,
+            ownerUuid: try owningPersistenceUuid(level: req.level, nodeUuid: uuid)
+        )
         try recordDopeChange(
-            scope: scope, action: "node_add", level: req.level,
-            nodeUuid: uuid, revision: revision)
+            scope: scope,
+            action: "node_add",
+            level: req.level,
+            nodeUuid: uuid,
+            revision: revision
+        )
         return DopeNodeResponse(
-            level: req.level, uuid: uuid, version: 0,
-            scopeUuid: scope.uuid, revision: revision)
+            level: req.level,
+            uuid: uuid,
+            version: 0,
+            scopeUuid: scope.uuid,
+            revision: revision
+        )
     }
 
     func dopeNodeUpdate(_ req: DopeNodeUpdateRequest) throws -> DopeNodeResponse {
@@ -1513,7 +1741,8 @@ struct DopeRepository: RepositoryContext {
             try DopeCode.validateCode(code, field: "\(req.level.rawValue) code")
             if req.level == .entity, code == DopeCode.reservedEnumSegment {
                 throw StoreError.badRequest(
-                    detail: "'enums' is a reserved entity code (it disambiguates enum refs)")
+                    detail: "'enums' is a reserved entity code (it disambiguates enum refs)"
+                )
             }
         }
         try validateDopeDescription(req.fields.description, level: req.level)
@@ -1541,7 +1770,8 @@ struct DopeRepository: RepositoryContext {
         if req.level == .entity {
             guard
                 let current = try Row.fetchOne(
-                    db, sql: "SELECT * FROM dope_persistence_entity WHERE uuid = ?",
+                    db,
+                    sql: "SELECT * FROM dope_persistence_entity WHERE uuid = ?",
                     arguments: [req.nodeUuid]
                 )
             else {
@@ -1558,8 +1788,11 @@ struct DopeRepository: RepositoryContext {
             if req.fields.clearBaseComposable == true { finalBase = nil }
 
             try validateEntityShape(
-                scope: scope, entityUuid: req.nodeUuid,
-                entityType: finalType, baseComposableUuid: finalBase)
+                scope: scope,
+                entityUuid: req.nodeUuid,
+                entityType: finalType,
+                baseComposableUuid: finalBase
+            )
 
             if req.fields.baseComposableUuid != nil || req.fields.clearBaseComposable == true {
                 // updateValue, not subscript: assigning a typed nil to a
@@ -1572,7 +1805,8 @@ struct DopeRepository: RepositoryContext {
         if req.level == .property {
             guard
                 let current = try Row.fetchOne(
-                    db, sql: "SELECT * FROM dope_persistence_entity_property WHERE uuid = ?",
+                    db,
+                    sql: "SELECT * FROM dope_persistence_entity_property WHERE uuid = ?",
                     arguments: [req.nodeUuid]
                 )
             else {
@@ -1598,12 +1832,16 @@ struct DopeRepository: RepositoryContext {
             if req.fields.clearBaseOrigin == true { finalBaseOrigin = nil }
 
             try validatePropertyShape(
-                scope: scope, propertyUuid: req.nodeUuid,
+                scope: scope,
+                propertyUuid: req.nodeUuid,
                 entityUuid: current["dope_persistence_entity_uuid"],
                 dataType: finalDataType,
-                enumUuid: finalEnum, relationshipTargetUuid: finalRelated,
+                enumUuid: finalEnum,
+                relationshipTargetUuid: finalRelated,
                 baseOriginPropertyUuid: finalBaseOrigin,
-                autoIncrement: finalAutoIncrement, textCharLimit: finalCharLimit)
+                autoIncrement: finalAutoIncrement,
+                textCharLimit: finalCharLimit
+            )
 
             if let dataType = req.fields.dataType { set["data_type"] = dataType.rawValue }
             if let nullable = req.fields.nullable { set["nullable"] = nullable ? 1 : 0 }
@@ -1615,7 +1853,8 @@ struct DopeRepository: RepositoryContext {
             if req.fields.autoIncrement != nil || req.fields.clearAutoIncrement == true {
                 set.updateValue(
                     finalAutoIncrement.map { $0 ? 1 : 0 },
-                    forKey: "auto_increment")
+                    forKey: "auto_increment"
+                )
             }
             if req.fields.textCharLimit != nil || req.fields.clearTextCharLimit == true {
                 set.updateValue(finalCharLimit, forKey: "text_char_limit")
@@ -1637,32 +1876,50 @@ struct DopeRepository: RepositoryContext {
             throw StoreError.emptyUpdate(entity: spec.table)
         }
         try core.updateBase(
-            db, table: spec.table, uuid: req.nodeUuid,
-            expectedVersion: req.expectedVersion, set: set)
+            db,
+            table: spec.table,
+            uuid: req.nodeUuid,
+            expectedVersion: req.expectedVersion,
+            set: set
+        )
         let revision = try bumpScopeRevision(
-            scopeUuid: scope.uuid, area: .persistence,
+            scopeUuid: scope.uuid,
+            area: .persistence,
             ownerUuid: try owningPersistenceUuid(
-                level: req.level, nodeUuid: req.nodeUuid))
+                level: req.level,
+                nodeUuid: req.nodeUuid
+            )
+        )
         try recordDopeChange(
-            scope: scope, action: "node_update", level: req.level,
-            nodeUuid: req.nodeUuid, revision: revision)
+            scope: scope,
+            action: "node_update",
+            level: req.level,
+            nodeUuid: req.nodeUuid,
+            revision: revision
+        )
         guard
             let version = try Int64.fetchOne(
-                db, sql: "SELECT version FROM \(spec.table) WHERE uuid = ?",
+                db,
+                sql: "SELECT version FROM \(spec.table) WHERE uuid = ?",
                 arguments: [req.nodeUuid]
             )
         else {
             throw StoreError.corruptState(entity: spec.table, detail: "vanished after update")
         }
         return DopeNodeResponse(
-            level: req.level, uuid: req.nodeUuid, version: version,
-            scopeUuid: scope.uuid, revision: revision)
+            level: req.level,
+            uuid: req.nodeUuid,
+            version: version,
+            scopeUuid: scope.uuid,
+            revision: revision
+        )
     }
 
     func dopeNodeDelete(_ req: DopeNodeDeleteRequest) throws -> DopeNodeDeleteResponse {
         guard req.level != .scope else {
             throw StoreError.badRequest(
-                detail: "scope deletion is deferred to a later pass (it destroys the whole tree)")
+                detail: "scope deletion is deferred to a later pass (it destroys the whole tree)"
+            )
         }
         let spec = DopeLevelSpec.spec(for: req.level)
         let scope = try dopeOwningScope(level: req.level, nodeUuid: req.nodeUuid)
@@ -1685,34 +1942,54 @@ struct DopeRepository: RepositoryContext {
                     detail: "--soft is only valid inside a masking scope "
                         + "(PROJECT_ITEM / SESSION_INSTANCE_ITEM); scope "
                         + "\(scope.uuid) is \(scope.scopeType). A base scope "
-                        + "records real state only -- use a hard delete.")
+                        + "records real state only -- use a hard delete."
+                )
             }
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT deleted_on FROM \(spec.table) WHERE uuid = ?",
+                    db,
+                    sql: "SELECT deleted_on FROM \(spec.table) WHERE uuid = ?",
                     arguments: [req.nodeUuid]
                 )?["deleted_on"] as String? == nil
             else {
                 throw StoreError.badRequest(
-                    detail: "node \(req.nodeUuid) is already soft-deleted")
+                    detail: "node \(req.nodeUuid) is already soft-deleted"
+                )
             }
             try core.updateBase(
-                db, table: spec.table, uuid: req.nodeUuid,
+                db,
+                table: spec.table,
+                uuid: req.nodeUuid,
                 expectedVersion: req.expectedVersion,
-                set: ["deleted_on": Store.isoNow()])
+                set: ["deleted_on": Store.isoNow()]
+            )
             let revision = try bumpScopeRevision(
-                scopeUuid: scope.uuid, area: .persistence,
+                scopeUuid: scope.uuid,
+                area: .persistence,
                 ownerUuid: try owningPersistenceUuid(
-                    level: req.level, nodeUuid: req.nodeUuid))
+                    level: req.level,
+                    nodeUuid: req.nodeUuid
+                )
+            )
             try recordDopeChange(
-                scope: scope, action: "node_soft_delete", level: req.level,
-                nodeUuid: req.nodeUuid, revision: revision)
+                scope: scope,
+                action: "node_soft_delete",
+                level: req.level,
+                nodeUuid: req.nodeUuid,
+                revision: revision
+            )
             return DopeNodeDeleteResponse(
                 deletedUuid: req.nodeUuid,
                 cascaded: DopeTreeCounts(
-                    domains: 0, entities: 0, properties: 0,
-                    enums: 0, options: 0),
-                scopeUuid: scope.uuid, revision: revision)
+                    domains: 0,
+                    entities: 0,
+                    properties: 0,
+                    enums: 0,
+                    options: 0
+                ),
+                scopeUuid: scope.uuid,
+                revision: revision
+            )
         }
 
         try requireNoExternalReferrers(level: req.level, nodeUuid: req.nodeUuid)
@@ -1730,7 +2007,9 @@ struct DopeRepository: RepositoryContext {
                 sql: """
                     UPDATE dope_persistence_entity SET base_composable_uuid = NULL
                      WHERE dope_persistence_uuid = ? AND base_composable_uuid IS NOT NULL
-                    """, arguments: [req.nodeUuid])
+                    """,
+                arguments: [req.nodeUuid]
+            )
             // Origin tags are data_type-independent — NULL them before
             // BOTH property DELETEs, or a tagged origin that is itself a
             // relationship property trips the RESTRICT mid-statement.
@@ -1740,20 +2019,26 @@ struct DopeRepository: RepositoryContext {
                      WHERE base_origin_property_uuid IS NOT NULL
                        AND dope_persistence_entity_uuid IN (
                         SELECT uuid FROM dope_persistence_entity WHERE dope_persistence_uuid = ?)
-                    """, arguments: [req.nodeUuid])
+                    """,
+                arguments: [req.nodeUuid]
+            )
             try db.execute(
                 sql: """
                     DELETE FROM dope_persistence_entity_property
                      WHERE data_type = 'relationship'
                        AND dope_persistence_entity_uuid IN (
                         SELECT uuid FROM dope_persistence_entity WHERE dope_persistence_uuid = ?)
-                    """, arguments: [req.nodeUuid])
+                    """,
+                arguments: [req.nodeUuid]
+            )
             try db.execute(
                 sql: """
                     DELETE FROM dope_persistence_entity_property
                      WHERE dope_persistence_entity_uuid IN (
                         SELECT uuid FROM dope_persistence_entity WHERE dope_persistence_uuid = ?)
-                    """, arguments: [req.nodeUuid])
+                    """,
+                arguments: [req.nodeUuid]
+            )
         case .entity:
             // Same relationship-first split as the domain case: a bulk
             // delete can scan a same-entity relationship TARGET before
@@ -1763,38 +2048,55 @@ struct DopeRepository: RepositoryContext {
                     UPDATE dope_persistence_entity_property SET base_origin_property_uuid = NULL
                      WHERE base_origin_property_uuid IS NOT NULL
                        AND dope_persistence_entity_uuid = ?
-                    """, arguments: [req.nodeUuid])
+                    """,
+                arguments: [req.nodeUuid]
+            )
             try db.execute(
                 sql: """
                     DELETE FROM dope_persistence_entity_property
                      WHERE data_type = 'relationship'
                        AND dope_persistence_entity_uuid = ?
-                    """, arguments: [req.nodeUuid])
+                    """,
+                arguments: [req.nodeUuid]
+            )
             try db.execute(
                 sql: """
                     DELETE FROM dope_persistence_entity_property
                      WHERE dope_persistence_entity_uuid = ?
-                    """, arguments: [req.nodeUuid])
+                    """,
+                arguments: [req.nodeUuid]
+            )
         default:
             break
         }
         try core.deleteBase(
-            db, table: spec.table, uuid: req.nodeUuid,
-            expectedVersion: req.expectedVersion)
+            db,
+            table: spec.table,
+            uuid: req.nodeUuid,
+            expectedVersion: req.expectedVersion
+        )
         let revision = try bumpScopeRevision(scopeUuid: scope.uuid)
         try recordDopeChange(
-            scope: scope, action: "node_delete", level: req.level,
-            nodeUuid: req.nodeUuid, revision: revision)
+            scope: scope,
+            action: "node_delete",
+            level: req.level,
+            nodeUuid: req.nodeUuid,
+            revision: revision
+        )
         return DopeNodeDeleteResponse(
-            deletedUuid: req.nodeUuid, cascaded: cascaded,
-            scopeUuid: scope.uuid, revision: revision)
+            deletedUuid: req.nodeUuid,
+            cascaded: cascaded,
+            scopeUuid: scope.uuid,
+            revision: revision
+        )
     }
 
     /// RESTRICT-friendly pre-checks: name the referring dot-paths instead of
     /// surfacing an opaque FK error. "External" means outside the subtree
     /// being deleted — internal referrers are handled by the ordered deletes.
     private func requireNoExternalReferrers(
-        level: DopeLevel, nodeUuid: String
+        level: DopeLevel,
+        nodeUuid: String
     ) throws {
         // A list, not one statement: the base-composable referrer queries
         // select FROM dope_persistence_entity while the property-ref queries
@@ -1812,7 +2114,8 @@ struct DopeRepository: RepositoryContext {
                     JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                     WHERE p.dope_persistence_enum_uuid = ? LIMIT 5
                     """, [nodeUuid]
-                ))
+                )
+            )
         case .property:
             queries.append(
                 (
@@ -1823,7 +2126,8 @@ struct DopeRepository: RepositoryContext {
                     JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                     WHERE p.relationship_target_uuid = ? LIMIT 5
                     """, [nodeUuid]
-                ))
+                )
+            )
             queries.append(
                 (
                     """
@@ -1833,7 +2137,8 @@ struct DopeRepository: RepositoryContext {
                     JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                     WHERE p.base_origin_property_uuid = ? LIMIT 5
                     """, [nodeUuid]
-                ))
+                )
+            )
         case .entity:
             queries.append(
                 (
@@ -1846,7 +2151,8 @@ struct DopeRepository: RepositoryContext {
                     WHERE tp.dope_persistence_entity_uuid = ?
                       AND p.dope_persistence_entity_uuid != ? LIMIT 5
                     """, [nodeUuid, nodeUuid]
-                ))
+                )
+            )
             queries.append(
                 (
                     """
@@ -1855,7 +2161,8 @@ struct DopeRepository: RepositoryContext {
                     JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                     WHERE e.base_composable_uuid = ? LIMIT 5
                     """, [nodeUuid]
-                ))
+                )
+            )
             queries.append(
                 (
                     """
@@ -1867,7 +2174,8 @@ struct DopeRepository: RepositoryContext {
                     WHERE op.dope_persistence_entity_uuid = ?
                       AND p.dope_persistence_entity_uuid != ? LIMIT 5
                     """, [nodeUuid, nodeUuid]
-                ))
+                )
+            )
         case .persistence:
             queries.append(
                 (
@@ -1885,7 +2193,8 @@ struct DopeRepository: RepositoryContext {
                              WHERE ee.dope_persistence_uuid = ?))
                     LIMIT 5
                     """, [nodeUuid, nodeUuid, nodeUuid]
-                ))
+                )
+            )
             queries.append(
                 (
                     """
@@ -1897,7 +2206,8 @@ struct DopeRepository: RepositoryContext {
                           (SELECT uuid FROM dope_persistence_entity WHERE dope_persistence_uuid = ?)
                     LIMIT 5
                     """, [nodeUuid, nodeUuid]
-                ))
+                )
+            )
             queries.append(
                 (
                     """
@@ -1912,7 +2222,8 @@ struct DopeRepository: RepositoryContext {
                            WHERE ee.dope_persistence_uuid = ?)
                     LIMIT 5
                     """, [nodeUuid, nodeUuid]
-                ))
+                )
+            )
         case .scope, .option:
             return
         }
@@ -1922,12 +2233,14 @@ struct DopeRepository: RepositoryContext {
         guard referrers.isEmpty else {
             throw StoreError.badRequest(
                 detail:
-                    "cannot delete: still referenced by " + referrers.joined(separator: ", "))
+                    "cannot delete: still referenced by " + referrers.joined(separator: ", ")
+            )
         }
     }
 
     private func dopeCascadeCounts(
-        level: DopeLevel, nodeUuid: String
+        level: DopeLevel,
+        nodeUuid: String
     ) throws -> DopeTreeCounts {
         func count(_ sql: String, _ args: StatementArguments = StatementArguments()) throws -> Int {
             try Int.fetchOne(db, sql: sql, arguments: args) ?? 0
@@ -1935,36 +2248,58 @@ struct DopeRepository: RepositoryContext {
         switch level {
         case .persistence:
             let entities = try count(
-                "SELECT COUNT(*) FROM dope_persistence_entity WHERE dope_persistence_uuid = ?", [nodeUuid])
+                "SELECT COUNT(*) FROM dope_persistence_entity WHERE dope_persistence_uuid = ?",
+                [nodeUuid]
+            )
             let enums = try count(
-                "SELECT COUNT(*) FROM dope_persistence_enum WHERE dope_persistence_uuid = ?", [nodeUuid])
+                "SELECT COUNT(*) FROM dope_persistence_enum WHERE dope_persistence_uuid = ?",
+                [nodeUuid]
+            )
             let options = try count(
                 """
                 SELECT COUNT(*) FROM dope_persistence_enum_option WHERE dope_persistence_enum_uuid IN
                     (SELECT uuid FROM dope_persistence_enum WHERE dope_persistence_uuid = ?)
-                """, [nodeUuid])
+                """,
+                [nodeUuid]
+            )
             let properties = try count(
                 """
                 SELECT COUNT(*) FROM dope_persistence_entity_property WHERE dope_persistence_entity_uuid IN
                     (SELECT uuid FROM dope_persistence_entity WHERE dope_persistence_uuid = ?)
-                """, [nodeUuid])
+                """,
+                [nodeUuid]
+            )
             return DopeTreeCounts(
-                domains: 1, entities: entities, properties: properties,
-                enums: enums, options: options)
+                domains: 1,
+                entities: entities,
+                properties: properties,
+                enums: enums,
+                options: options
+            )
         case .entity:
             let properties = try count(
                 "SELECT COUNT(*) FROM dope_persistence_entity_property WHERE dope_persistence_entity_uuid = ?",
-                [nodeUuid])
+                [nodeUuid]
+            )
             return DopeTreeCounts(
-                domains: 0, entities: 1, properties: properties,
-                enums: 0, options: 0)
+                domains: 0,
+                entities: 1,
+                properties: properties,
+                enums: 0,
+                options: 0
+            )
         case .enumeration:
             let options = try count(
                 "SELECT COUNT(*) FROM dope_persistence_enum_option WHERE dope_persistence_enum_uuid = ?",
-                [nodeUuid])
+                [nodeUuid]
+            )
             return DopeTreeCounts(
-                domains: 0, entities: 0, properties: 0,
-                enums: 1, options: options)
+                domains: 0,
+                entities: 0,
+                properties: 0,
+                enums: 1,
+                options: options
+            )
         case .property:
             return DopeTreeCounts(domains: 0, entities: 0, properties: 1, enums: 0, options: 0)
         case .option:

@@ -27,7 +27,9 @@ struct DopeBaseCatalog: Equatable {
         for domain in tree.domains {
             for entity in domain.entities {
                 let ref = DopeCode.formatEntityRef(
-                    domain: domain.body.code, entity: entity.body.code)
+                    domain: domain.body.code,
+                    entity: entity.body.code
+                )
                 entitiesByRef[ref] = entity
             }
         }
@@ -60,7 +62,10 @@ struct DopeBaseCatalog: Equatable {
         {
             for property in base.properties {
                 let fullPath = DopeCode.formatPropertyRef(
-                    domain: domain, entity: entityCode, property: property.body.code)
+                    domain: domain,
+                    entity: entityCode,
+                    property: property.body.code
+                )
                 guard !materializedOrigins.contains(fullPath),
                     seenCodes.insert(property.body.code).inserted
                 else { continue }

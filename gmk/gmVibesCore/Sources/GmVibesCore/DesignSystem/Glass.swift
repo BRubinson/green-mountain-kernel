@@ -53,7 +53,7 @@ struct CapsuleSearchField: View {
     @Binding var text: String
     /// Optional external focus — the ⌘K palette must own first responder on
     /// open. Defaulted so existing call sites compile unchanged.
-    var focus: FocusState<Bool>.Binding? = nil
+    var focus: FocusState<Bool>.Binding?
 
     var body: some View {
         HStack {

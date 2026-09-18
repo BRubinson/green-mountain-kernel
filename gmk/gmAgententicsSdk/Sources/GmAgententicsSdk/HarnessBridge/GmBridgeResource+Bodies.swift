@@ -1,21 +1,15 @@
 import Foundation
 
-// The reference documents and prompt bodies, transcribed VERBATIM.
+// The reference documents and prompt bodies, transcribed verbatim.
 //
-// These were the two STRUCTURAL gaps: `skills/gmcc/ref/*.md` could not be
-// expressed because `GmBridgeSkill.relativePath` is hard-coded to `SKILL.md`,
-// and `prompts/` had no bridge type at all. Both types now exist
-// (`GmBridgeResource`, `GmBridgePrompt`), and this is their content.
-//
-// EMBEDDED IN EXTENDED DELIMITERS so the markdown needs no escaping. Several
-// bodies carry backslashes and fenced code blocks; every one would need
-// hand-editing in a plain literal, and a missed edit is a silently corrupted
-// document rather than a compile error.
+// Embedded in extended delimiters so the markdown needs no escaping. Several
+// bodies carry backslashes and fenced code blocks, and a missed escape in a plain
+// literal is a silently corrupted document rather than a compile error.
 
 extension GmBridgeResource {
 
     public static let botWorkflows = GmBridgeResource(
-        skill: "gmcc",
+        skill: "cde",
         path: "ref/bot_workflows.md",
         summary:
             "The workflow machine: phases, gates, who writes what, and the two write channels. Read before driving or debugging a bot/rpi/team run.",
@@ -35,8 +29,10 @@ extension GmBridgeResource {
             an agent uses for CDE work — typed, threading `expected_version`, and
             budget-guarded (CLI output is not: the harness silently truncates it
             mid-JSON, which is why the shell door was retired from agent usage). A pen
-            tool you cannot see is a missing GRANT — report it. `gm_hook call` survives
-            for non-CDE ops (dope node surgery, kbite ops) outside the workflow.
+            tool you cannot see is a missing GRANT — report it. There is no shell door
+            for anything else either: the kernel's CLI is the harness's client, and the
+            PreToolUse hook denies it from Bash. A verb with no pen tool is a missing
+            door to report, not a reason to reach around the pen.
 
             ## The machine
 
@@ -134,7 +130,8 @@ extension GmBridgeResource {
                `rpir_finalize_clarification` (summary_uuid, expected_version — a pure
                gate) and `rpir_open_architecture` (prompt_uuid).
             6. **arch_options** (team) — one architect per methodology. Each loads the
-               clarified intent with `care_package_get` and writes its OWN proposal with
+               clarified intent with `rpir_get_clarification` (the care package rides on
+               it; there is no separate package read) and writes its OWN proposal with
                `arch_option_add` (one row per `agent_name`). Once any option exists,
                change rows wait until `arch_decide` selects one — rejecting the
                siblings and recording the rationale in the same atomic write. Choosing
@@ -237,14 +234,16 @@ extension GmBridgeResource {
             ## Error recovery
 
             Daemon unreachable: `bash $GM_PLUGIN_ROOT/scripts/install_gm.sh`, then
-            `gm_hook context ensure`, then retry. `$GM_BOOTED` unset: restart
+            restart the session — SessionStart re-ensures the context; an agent does
+            not. `$GM_BOOTED` unset: restart
             Claude Code. Anything stranded mid-phase: `prompt_init` with the prompt's
             selector, then `bot_next` — resume is the first-run code path by
             construction.
-            """#)
+            """#
+    )
 
     public static let dopedFiles = GmBridgeResource(
-        skill: "gmcc",
+        skill: "dope",
         path: "ref/doped_files.md",
         summary:
             "How the .gmcc/ dope tree maps to disk, and what a dot-path code resolves to. Read before writing dope or chasing a stale scope.",
@@ -265,28 +264,16 @@ extension GmBridgeResource {
             ## The supported path
 
             The db is the editing surface. The files are a **publication** of it.
-            Granular edits are one verb per level, reached through the passthrough:
+            The one pen door from db to files is `dope_update_session` (scope_uuid;
+            `force` writes even when the repo has diverged).
 
-            ```bash
-            gm_hook call DOPE_NODE_ADD --json \
-              '{"level":"persistence|entity|property|enum|option",
-                "parent_uuid":"P","fields":{...}}'
-
-            gm_hook call DOPE_NODE_UPDATE --json \
-              '{"level":"entity","node_uuid":"N","expected_version":V,"fields":{...}}'
-
-            gm_hook call DOPE_WRITE_REPO --json '{"scope_uuid":"U"}'      # db -> files
-            ```
-
-            Hand-editing is the exception, not the workflow. When it happens:
-
-            ```bash
-            # parse + validate, never writes — one of scope_uuid or dir_path
-            gm_hook call DOPE_READ_REPO  --json '{"scope_uuid":"U"}'
-            gm_hook call DOPE_MERGE_PLAN --json '{"scope_uuid":"U"}'      # db vs files, read-only
-            gm_hook call DOPE_RESOLVE    --json \
-              '{"scope_uuid":"U","take_ours":true,"dot_path":"<dot.path>"}'
-            ```
+            Granular node edits — add or update one node at one level (persistence,
+            entity, property, enum, option) — and hand-edit reconciliation (parse and
+            validate the tree, plan a db-vs-files merge, resolve one dot-path either
+            way) are kernel verbs with NO pen tool. They are operator acts, reached
+            from GMVibes, not from an agent. A missing door is a fact to report to the
+            Endotherm; the shell is not a way around it, and the PreToolUse hook denies
+            it.
 
             Only a `SESSION_INSTANCE` scope is repo-writable.
 
@@ -469,10 +456,11 @@ extension GmBridgeResource {
             smart diff, minting fresh child uuids, and it requires the on-disk `version`
             to be **exactly** db revision + 1. If you hand-edited, bump the version by
             one everywhere and let `DOPE_READ_REPO` validate before you go near it.
-            """#)
+            """#
+    )
 
     public static let gmfsDetails = GmBridgeResource(
-        skill: "gmcc",
+        skill: "kernel",
         path: "ref/gmfs_details.md",
         summary:
             "The gmfs filesystem layout, the three environments, and how paths and roots resolve. Read before touching anything under $GM_FS_ROOT.",
@@ -487,11 +475,9 @@ extension GmBridgeResource {
             content store.
 
             The **pen** (`mcp__plugin_gmcc_cde__*`, served by `gm_mcp`) is the agent's
-            channel: every CDE workflow verb has a pen tool. `gm_hook call` remains the
-            ops door for non-CDE verbs only; its output is unbudgeted and the harness
-            truncates it, so nothing workflow-critical rides it.
-            `gm_hook verbs --json` is the catalogue. See
-            `skills/gm_daemon/SKILL.md`.
+            ONLY channel. The kernel's CLI is the harness's client — the hooks call it,
+            an agent never does, and the PreToolUse hook denies it from Bash. A verb
+            with no pen tool is a missing door to report. See the `kernel` skill.
 
             ## Static Plugin Files (Installed to ~/.claude/plugins/gmcc/)
             ```
@@ -546,21 +532,22 @@ extension GmBridgeResource {
             │                           └── {id}_{name}/                  # one folder per prompt
             │                               └── memory/                  # usually empty — every report
             │                                                             # is a db row
-            └── kbites/                                                   # kbite_root (gm_hook paths --json)
+            └── kbites/                                                   # kbite_root
                 ├── {kbite_name}/KBITE_PURPOSE.md                         # identity-level
                 ├── digested/{kbite_name}/...                             # kbite_digested_root — raw-source archive (text is db-canonical)
                 └── open/{kbite_name}/...                                 # kbite_open_root — in-progress maws
             ```
 
-            Each row carries its own `gmfs_relative_storage_path`; the roots come from
-            `gm_hook paths --json`. The db stores **pointers + captions** to the
+            Each row carries its own `gmfs_relative_storage_path`; every root above
+            resolves under `$GM_FS_ROOT`. The db stores **pointers + captions** to the
             `memory/*.md` files (`prompt_artifact` rows) — never their bodies. The
             daemon never writes files; bot workflows create the folders and write the
-            markdown, then register each file with `ARTIFACT_ADD`.
+            markdown. Registering a file as an artifact has no pen tool — see "Prompt
+            Folder Layout" below.
 
             ## Identity Resolution (How a path becomes a session)
 
-            Identity is derived daemon-side by `gm_hook context ensure`
+            Identity is derived daemon-side by the SessionStart hook
             (`GitContext`/`ContextBuilder` in Swift). Given a git repository:
 
             | Concept | Source | Derived value |
@@ -587,30 +574,30 @@ extension GmBridgeResource {
 
             ## Lazy Creation on SessionStart
 
-            On every SessionStart, `gm_session_startup.sh`:
+            On every SessionStart, the harness runs `gm_session_startup.sh`, which
+            hands the work to the kernel's own client. THE HARNESS CALLS IT; AN AGENT
+            NEVER DOES. What it does:
 
-            1. Confirms the git repo, locates the plugin root, and locates the `gm_hook`
-               binary under the one runtime root. It computes nothing the daemon computes.
-            2. Calls `gm_hook context ensure --hook-payload` (best-effort):
-               idempotently upserts the project → instance → session rows in the db
-               (reusing existing uuids, seeding kbite inheritance at create time), pins
-               the claude session binding every later hook write resolves through,
-               creates the session's artifact home
-               (`{gmfs_relative_storage_path}/prompts/` under `$GM_FS_ROOT` — the
-               physical home for prompt `memory/` folders), and runs the dope boot
-               sync. If the daemon/binary is unavailable it warns and continues.
-            3. Prints the pen sheet (`gm_hook pen-sheet`) into the session's context.
-            4. Emits the session env via `gm_hook context env` into
-               `$CLAUDE_ENV_FILE`: `GM_BOOTED`, `GM_PLUGIN_ROOT`, `GM_FS_ROOT`,
-               `PATH` (the active runtime's `bin/` first, so bare `gm_hook` resolves
-               to the correct prod/sandbox binary), plus `GM_FS_ROOT` when sandboxed.
-               Per-level path vars do not exist — roots come from `gm_hook paths` and
-               per-row locations from `gmfs_relative_storage_path`.
+            1. Confirms the git repo and locates the plugin root and the kernel under
+               the one runtime root. It computes nothing the daemon computes.
+            2. Ensures context (best-effort): idempotently upserts the project →
+               instance → session rows in the db (reusing existing uuids, seeding
+               kbite inheritance at create time), pins the claude session binding
+               every later hook write resolves through, creates the session's
+               artifact home (`{gmfs_relative_storage_path}/prompts/` under
+               `$GM_FS_ROOT` — the physical home for prompt `memory/` folders), and
+               runs the dope boot sync. If the daemon is unavailable it warns and
+               continues.
+            3. Prints the pen sheet into the session's context.
+            4. Emits the session env into `$CLAUDE_ENV_FILE`: `GM_BOOTED`,
+               `GM_PLUGIN_ROOT`, `GM_FS_ROOT`, `PATH`. Per-level path vars do not
+               exist — roots resolve under `$GM_FS_ROOT` and per-row locations from
+               `gmfs_relative_storage_path`.
 
             This means **commands can always assume the env + session dir exist**;
-            db rows exist whenever the daemon was reachable at SessionStart (and
-            `gm_hook context ensure` may be re-run by any command at any time — it is
-            idempotent).
+            db rows exist whenever the daemon was reachable at SessionStart. If they
+            do not, restart the session: the hook is idempotent and re-running it is
+            the harness's move, not an agent's.
 
             ## Db-Backed Data Model
 
@@ -621,26 +608,24 @@ extension GmBridgeResource {
             `file_change_range` (edit tracking), `kbite` + `*_active_kbite`
             junctions (registry), `daemon_event` (append-only audit log).
 
-            Key reads — the pen first, the passthrough for what it does not cover:
+            Key reads, all pen tools:
 
             ```
-            prompt_get         full content + artifacts + kbite codes + change summary
-            bot_current_prompt the workflow's prompt row, without being told a uuid
-            file_change_list   recorded edits for a prompt (or a session, or one path)
+            cde_load_prompt          full content + artifacts + kbite codes + change summary
+            rpir_next                the workflow's phase, uuid bundle and blockers, no uuid needed
+            cde_search_file_changes  recorded edits for a prompt (or a session, or one path)
+            projects_search          projects, instances and sessions by name or id
+            rpir_search_*            full text over past explorations, clarifications, plans, reviews
             ```
 
-            ```bash
-            gm_hook context ensure                                   # uuid triple for $PWD + branch
-            gm_hook call SESSION_GET  --json '{"session_uuid":"U"}'  # session row + prompt stubs + change summaries
-            gm_hook call PROMPT_LIST  --json '{"session_uuid":"U","with_reports":true}'
-            gm_hook call ARTIFACT_LIST --json '{"prompt_uuid":"U"}'
-            gm_hook call SEARCH       --json '{"query":"<topic>"}'   # across reports
-            ```
+            A session-wide prompt listing, an artifact listing and a cross-report
+            search have no pen tool. That is a missing door to report, not a cue to
+            shell to the kernel — the PreToolUse hook denies it.
 
             ### Optimistic concurrency (`expected_version`)
 
-            Every mutation (`SESSION_UPDATE`, `PROMPT_UPDATE_CONTENT`,
-            `prompt_set_status`, every pen write) carries `expected_version` — the row
+            Every mutation (`projects_update_session`, `cde_set_status`, every pen
+            write) carries `expected_version` — the row
             version the edit was based on. Capture `version` from the previous
             create/get/mutation (a fresh create returns `version: 0`; each mutation
             returns the incremented version). A stale version yields
@@ -663,15 +648,11 @@ extension GmBridgeResource {
 
             `{id}` is the db prompt row's `seq`; `{name}` its `name`. All identity,
             content (`backstory`/`goal`/`detail`), status, and command live on the
-            prompt row. Any file you write under `memory/` is registered with:
-
-            ```bash
-            gm_hook call ARTIFACT_ADD --json \
-              '{"prompt_uuid":"U","file_path":"<abs path>","note":"<one-sentence caption>"}'
-            ```
-
-            (Upserts on `(prompt_uuid, file_path)` — last-run-wins overwrite of the
-            file is fine; re-register to refresh the note.)
+            prompt row. Registering a file written under `memory/` as an artifact has
+            no pen tool: name the file and its one-sentence caption in your report so
+            the Endotherm can register it. (Registration upserts on
+            `(prompt_uuid, file_path)`, so a last-run-wins overwrite of the file is
+            fine.)
 
             ## Prompt Lifecycle
 
@@ -741,21 +722,19 @@ extension GmBridgeResource {
             Kbites are inherited at create time down the chain
             (project → instance → session → prompt) into the `*_active_kbite`
             junction tables; after seeding, each level is independent. The db is the
-            sole registry. Read the active list as `kbite_codes` on `prompt_get` or
-            `SESSION_GET`, or list a scope:
+            sole registry. Read the active list as `kbite_codes` on `cde_load_prompt`.
+            Listing a scope's registry and adding a kbite to one have no pen tool;
+            both are operator acts.
 
-            ```bash
-            gm_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"U"}'   # "all": true for every kbite row
-            gm_hook call KBITE_ADD  --json '{"scope":"session","owner_uuid":"U","code":"C"}'
-            ```
-
-            Kbites are added only on explicit user request — see
+            Kbites are added only on explicit user request, and then by reporting the
+            request rather than performing it — see
             `ref/kbite_awareness.md`. Digested kbite text is db-canonical: load it via
             `kbite_search` / `kbite_file_get`, not from the filesystem.
-            """#)
+            """#
+    )
 
     public static let kbiteAwareness = GmBridgeResource(
-        skill: "gmcc",
+        skill: "kbite",
         path: "ref/kbite_awareness.md",
         summary: "What kbites are, how they are searched, and when to reach for one instead of reading files.",
         body: #"""
@@ -770,8 +749,8 @@ extension GmBridgeResource {
             keywords, and search live in the daemon db (read with the `kbite_search` /
             `kbite_file_get` pen tools); the filesystem keeps each kbite's identity
             (`{kbite_root}/{name}/KBITE_PURPOSE.md`) and raw-source archive
-            (`{kbite_digested_root}/{name}/`) — both roots from
-            `gm_hook paths --json`.
+            (`{kbite_digested_root}/{name}/`) — both roots under `$GM_FS_ROOT`
+            (`kbites/` and `kbites/digested/`).
 
             KBites are **inherited, not trigger-matched**. The kbites relevant to the
             current work are seeded down the hierarchy — project → instance → session →
@@ -781,29 +760,17 @@ extension GmBridgeResource {
             To use kbite knowledge:
 
             1. **Read the registry**: the active kbites are the `kbite_codes` on
-               `prompt_get` (and on `SESSION_GET` for the session as a whole). For a
-               scoped listing:
-
-               ```bash
-               gm_hook call KBITE_LIST --json \
-                 '{"scope":"project|instance|session|prompt","owner_uuid":"U"}'
-               # add "all": true for every kbite row in the db
-               ```
+               `cde_load_prompt`. A per-scope listing (project, instance, session)
+               has no pen tool.
             2. **Load on demand**: for a registered kbite, read
                `{kbite_root}/{name}/KBITE_PURPOSE.md`, then query the db:
                `kbite_search` returns ranked file stubs with their briefs across kbites
                — read the briefs, then pull the ones that matter with `kbite_file_get`
-               (full file content — the targeted load). For a kbite's whole roster of
-               resources, file stubs and keywords:
-               `gm_hook call KBITE_GET --json '{"code":"{name}"}'`.
-            3. **Explicit add only**: add a kbite to a registry only when the user
-               explicitly asks for it:
-
-               ```bash
-               gm_hook call KBITE_ADD --json '{"scope":"session","owner_uuid":"U","code":"C"}'
-               ```
-
-               Never add one on your own initiative.
+               (full file content — the targeted load). A kbite's whole roster in one
+               read has no pen tool; search for what you need instead.
+            3. **Explicit add only**: a kbite joins a registry only when the user
+               explicitly asks, and the add has no pen tool — report the request
+               rather than performing it. Never add one on your own initiative.
             4. **Cite sources**: when using kbite knowledge, cite the source:
                - "Per the swift_code_edit kbite..."
                - "According to kbite knowledge..."
@@ -821,7 +788,8 @@ extension GmBridgeResource {
             ## KBite System Reference
 
             Full kbite system documentation is in `$GM_PLUGIN_ROOT/skills/gmcc_kbite/SKILL.md`
-            """#)
+            """#
+    )
 
     /// Every reference document, in a stable order.
     public static let all: [GmBridgeResource] = [
@@ -1119,7 +1087,7 @@ extension GmBridgePrompt {
             ```
 
             (When composing the prompt, substitute `{kbite_open_root}` with the real
-            absolute root — the `kbite_open_root` key of `gm_hook paths --json`.)
+            absolute root: `$GM_FS_ROOT/kbites/open`.)
 
             The agent will:
             1. Read all files in the maw path
@@ -1139,7 +1107,8 @@ extension GmBridgePrompt {
             4. Command updates MAW_INDEX status to "chewed"
 
             The chewed files are then used by `/gm_crunch_digest` to populate the persisted kbite.
-            """#)
+            """#
+    )
 
     public static let gmccAgentMawWebFetch = GmBridgePrompt(
         name: "gmcc_agent_maw_web_fetch",
@@ -1340,8 +1309,9 @@ extension GmBridgePrompt {
             ```
 
             (When composing the prompt, substitute `{kbite_open_root}` with the real
-            absolute root — the `kbite_open_root` key of `gm_hook paths --json`.)
-            """#)
+            absolute root: `$GM_FS_ROOT/kbites/open`.)
+            """#
+    )
 
     public static let all: [GmBridgePrompt] = [
         gmccAgentKbiteCrunchChew, gmccAgentMawWebFetch,

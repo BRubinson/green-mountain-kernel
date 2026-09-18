@@ -18,8 +18,10 @@ struct SearchResultsList: View {
     var body: some View {
         if let errorText {
             ContentUnavailableView(
-                "Search Unavailable", systemImage: "bolt.slash",
-                description: Text(errorText))
+                "Search Unavailable",
+                systemImage: "bolt.slash",
+                description: Text(errorText)
+            )
         } else if hits.isEmpty {
             ContentUnavailableView(
                 searched ? "No Matches" : "Search",
@@ -27,7 +29,8 @@ struct SearchResultsList: View {
                 description: Text(
                     searched
                         ? "Nothing in prompts, clarifications, architecture, exploration, or review matched."
-                        : idleDescription)
+                        : idleDescription
+                )
             )
         } else {
             List(hits, id: \.rowID, selection: $selection) { hit in

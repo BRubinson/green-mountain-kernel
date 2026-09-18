@@ -44,7 +44,10 @@ final class DaemonSearchModel {
             guard !Task.isCancelled else { return }
             do {
                 let result = try await GMCCDaemonService.shared.search(
-                    query: trimmed, sessionUuid: sessionUuid, kinds: kindList, limit: limit
+                    query: trimmed,
+                    sessionUuid: sessionUuid,
+                    kinds: kindList,
+                    limit: limit
                 )
                 guard !Task.isCancelled else { return }
                 if hits != result { hits = result }  // change-gated publication

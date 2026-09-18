@@ -47,7 +47,7 @@ public enum GmBridgeOutputStyle {
             body.isEmpty
         }
 
-        public func contents() throws -> String? {
+        public func contents() -> String? {
             guard !isEmpty else { return nil }
 
             var lines = ["---"]
@@ -59,11 +59,13 @@ public enum GmBridgeOutputStyle {
             }
             if let keepCodingInstructions {
                 lines.append(
-                    "keep-coding-instructions: \(GmBridgeYaml.bool(keepCodingInstructions))")
+                    "keep-coding-instructions: \(GmBridgeYaml.bool(keepCodingInstructions))"
+                )
             }
             if let forceForPlugin {
                 lines.append(
-                    "force-for-plugin: \(GmBridgeYaml.bool(forceForPlugin))")
+                    "force-for-plugin: \(GmBridgeYaml.bool(forceForPlugin))"
+                )
             }
             lines.append("---")
 

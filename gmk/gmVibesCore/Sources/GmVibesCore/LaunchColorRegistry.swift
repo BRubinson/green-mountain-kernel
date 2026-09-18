@@ -36,7 +36,9 @@ final class LaunchColorRegistry {
                 red: Double(r) / 255.0,
                 green: Double(g) / 255.0,
                 blue: Double(b) / 255.0,
-                opacity: 1))
+                opacity: 1
+            )
+        )
         assignments[promptUuid] = assigned
         return assigned
     }

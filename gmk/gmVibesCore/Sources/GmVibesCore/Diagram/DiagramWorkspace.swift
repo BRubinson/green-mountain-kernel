@@ -28,21 +28,14 @@ final class DiagramWorkspaceStore {
     }
 }
 
-/// The MODEL half of the diagram screen (the view-state half is
-/// `DiagramViewState`). The split is the freeze-during-drag guarantee made
-/// structural: `resolved` is a STORED property whose only writers are
-/// `adopt` / `reproject` / `reskin` — a drag sample writes only view state,
-/// so per-property observation makes a per-sample re-resolve (and the A*
-/// pass inside it) impossible rather than merely forbidden.
+/// The MODEL half of the diagram screen; `DiagramViewState` is the view-state half. The split
+/// makes the freeze-during-drag guarantee structural: `resolved` is written only by `adopt` /
+/// `reproject` / `reskin`, so a drag sample writes view state alone and per-property
+/// observation makes a per-sample re-resolve impossible rather than merely forbidden.
 ///
-/// TWO sources, one behavior (`DiagramWindowID.Source`):
-///  - `.saved` — a db diagram. DIAGRAM_GET loads it, every write is a
-///    DIAGRAM_BATCH_APPLY through `DaemonDiagramCommitter`, and the dope
-///    scaffold is NOT re-run on load: the tree is the document, seeded once
-///    at create time by `DiagramCatalogStore`.
-///  - `.dopePreview` — the computed, non-persisted canvas over one dope
-///    scope. Scaffolded in memory through `DopeCanvasLayout` and committed
-///    to `LocalDiagramCommitter`; nothing reaches the db.
+/// A `.saved` source is a db diagram: DIAGRAM_GET loads it, writes go through
+/// DIAGRAM_BATCH_APPLY, and the dope scaffold is NOT re-run on load because the tree IS the
+/// document. A `.dopePreview` is scaffolded in memory and committed locally, reaching no db.
 @Observable @MainActor
 final class DiagramWorkspace {
     let id: DiagramWindowID
@@ -56,9 +49,9 @@ final class DiagramWorkspace {
     private(set) var loaded = false
     private(set) var loadError: String?
 
-    /// The single write funnel (kit type, verbatim): stage/restage during a
-    /// gesture, one flush at gesture end.
-    private(set) var editSession: DiagramEditSession!
+    /// The single write funnel: stage/restage during a gesture, one flush at gesture end.
+    /// Assigned by `init` for both sources, so it is non-nil for the workspace's whole life.
+    private(set) var editSession: DiagramEditSession?
 
     /// The dope tree the cards are drawn from (search and the domain pills
     /// run over this). The FIRST bound scope when a canvas binds several.
@@ -94,7 +87,8 @@ final class DiagramWorkspace {
                 committer: DaemonDiagramCommitter(diagramUuid: diagramUuid) { [weak self] response in
                     self?.adopt(response.tree)
                 },
-                baseRevision: nil)
+                baseRevision: nil
+            )
         case .dopePreview:
             let box = DiagramTreeBox(tree: empty)
             self.box = box
@@ -105,7 +99,8 @@ final class DiagramWorkspace {
                     // rebase and produced spurious revision conflicts.
                     self?.adopt(newTree)
                 },
-                baseRevision: 0)
+                baseRevision: 0
+            )
         }
     }
 
@@ -115,12 +110,22 @@ final class DiagramWorkspace {
         return DiagramTree(
             identity: DopeNodeIdentity(
                 uuid: id.savedDiagramUuid ?? UUID().uuidString.lowercased(),
-                version: 0, createdAt: now, updatedAt: now),
+                version: 0,
+                createdAt: now,
+                updatedAt: now
+            ),
             tier: session == nil ? "PROJECT" : "SESSION",
-            projectUuid: id.projectUuid, instanceUuid: nil,
-            sessionUuid: session, promptUuid: nil,
-            code: id.previewScopeCode ?? id.name, name: id.name, description: "",
-            gmccDiagramPath: nil, revision: 0, elements: [])
+            projectUuid: id.projectUuid,
+            instanceUuid: nil,
+            sessionUuid: session,
+            promptUuid: nil,
+            code: id.previewScopeCode ?? id.name,
+            name: id.name,
+            description: "",
+            gmccDiagramPath: nil,
+            revision: 0,
+            elements: []
+        )
     }
 
     private var environment: DiagramRenderEnvironment {
@@ -193,14 +198,18 @@ final class DiagramWorkspace {
                     // The TREE's project, not the route payload's: the row is
                     // authoritative about its own owner chain, and a promotion
                     // can have moved it since the route was built.
-                    projectUuid: response.tree.projectUuid, code: code)
+                    projectUuid: response.tree.projectUuid,
+                    code: code
+                )
             else {
                 // A code matching nothing is the LEGAL ghost state, not an
                 // error: the resolver renders an absent scope card.
                 continue
             }
             entries[code] = DiagramDopeContext.Entry(
-                tree: dope.tree, resolvedVia: dope.resolvedVia)
+                tree: dope.tree,
+                resolvedVia: dope.resolvedVia
+            )
             if primary == nil { primary = dope }
         }
         dopeEntries = entries
@@ -208,18 +217,22 @@ final class DiagramWorkspace {
     }
 
     private func fetchDope(
-        sessionUuid: String?, promptUuid: String?,
+        sessionUuid: String?,
+        promptUuid: String?,
         projectUuid: String? = nil,
         code: String?
     ) async throws -> DopeGetResponse {
         if let sessionUuid {
             return try await service.dopeGet(
                 sessionUuid: sessionUuid,
-                promptUuid: promptUuid, code: code)
+                promptUuid: promptUuid,
+                code: code
+            )
         }
         return try await service.dopeGet(
             projectUuid: projectUuid ?? id.projectUuid,
-            code: code)
+            code: code
+        )
     }
 
     private static func boundScopeCodes(in elements: [DiagramElementNode]) -> [String] {
@@ -244,10 +257,14 @@ final class DiagramWorkspace {
         do {
             let response = try await fetchDope(
                 sessionUuid: id.session?.sessionUUID.wireString,
-                promptUuid: nil, code: scopeCode)
+                promptUuid: nil,
+                code: scopeCode
+            )
             dopeEntries = [
                 response.tree.body.code: DiagramDopeContext.Entry(
-                    tree: response.tree, resolvedVia: response.resolvedVia)
+                    tree: response.tree,
+                    resolvedVia: response.resolvedVia
+                )
             ]
             dope = response
             loadError = nil
@@ -267,7 +284,7 @@ final class DiagramWorkspace {
         // A re-scaffold re-mints every element uuid — anything staged against
         // the old tree (a drag in flight when a dope event lands) is poison
         // and must be dropped BEFORE the swap.
-        editSession.discard()
+        editSession?.discard()
         rememberCenters()
         var mutations = DopeCanvasLayout.mutations(for: dopeTree)
         // Carryover: a card whose entity code was placed before keeps its
@@ -279,16 +296,29 @@ final class DiagramWorkspace {
             else { return mutation }
             return .elementAdd(
                 DiagramElementAdd(
-                    clientRef: add.clientRef, parentElementUuid: add.parentElementUuid,
-                    parentClientRef: add.parentClientRef, code: add.code, name: add.name,
-                    description: add.description, sortOrder: add.sortOrder,
-                    centerX: center.x, centerY: center.y,
-                    elementZ: add.elementZ, scale: add.scale, payload: add.payload))
+                    clientRef: add.clientRef,
+                    parentElementUuid: add.parentElementUuid,
+                    parentClientRef: add.parentClientRef,
+                    code: add.code,
+                    name: add.name,
+                    description: add.description,
+                    sortOrder: add.sortOrder,
+                    centerX: center.x,
+                    centerY: center.y,
+                    elementZ: add.elementZ,
+                    scale: add.scale,
+                    payload: add.payload
+                )
+            )
         }
         let fresh = Self.emptyTree(id: id)
         do {
             let scaffolded = try DiagramTreeReducer.apply(
-                mutations, to: fresh, expectedRevision: nil, minting: LiveDiagramMinting())
+                mutations,
+                to: fresh,
+                expectedRevision: nil,
+                minting: LiveDiagramMinting()
+            )
             // The user's drawn layers are NOT dope-derived — re-attach them
             // (identities intact) so a dope reload never deletes drawings.
             let preservedLayers = tree.elements.filter { node in
@@ -296,16 +326,19 @@ final class DiagramWorkspace {
                 return false
             }
             let newTree = DiagramTree(
-                identity: scaffolded.identity, tier: scaffolded.tier,
+                identity: scaffolded.identity,
+                tier: scaffolded.tier,
                 projectUuid: scaffolded.projectUuid,
                 instanceUuid: scaffolded.instanceUuid,
                 sessionUuid: scaffolded.sessionUuid,
                 promptUuid: scaffolded.promptUuid,
-                code: scaffolded.code, name: scaffolded.name,
+                code: scaffolded.code,
+                name: scaffolded.name,
                 description: scaffolded.description,
                 gmccDiagramPath: scaffolded.gmccDiagramPath,
                 revision: scaffolded.revision,
-                elements: scaffolded.elements + preservedLayers)
+                elements: scaffolded.elements + preservedLayers
+            )
             // The tree was built OUTSIDE the box, so the box must be
             // authoritative BEFORE the session rebases onto the new revision
             // — strictly ordered inside one task, never detached.
@@ -340,10 +373,12 @@ final class DiagramWorkspace {
     /// filter.
     private func adopt(_ newTree: DiagramTree) {
         tree = newTree
-        editSession.rebase(revision: newTree.revision)
+        editSession?.rebase(revision: newTree.revision)
         fullResolved = DiagramResolver.resolve(
-            newTree, dope: dopeContext,
-            environment: environment)
+            newTree,
+            dope: dopeContext,
+            environment: environment
+        )
         resolved = DiagramDomainFilter.apply(domainFilter, to: fullResolved)
         generation += 1
         if case .dopePreview = id.source { rememberCenters() }
@@ -378,9 +413,9 @@ final class DiagramWorkspace {
     /// behind — the staged prefix is already discarded by the session.
     func flush() async {
         do {
-            try await editSession.flush()
+            try await editSession?.flush()
         } catch {
-            editSession.discard()
+            editSession?.discard()
             if case .saved = id.source { await reloadDiagram() }
         }
     }

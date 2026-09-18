@@ -27,13 +27,17 @@ extension Store {
     }
 
     func ensureInstance(
-        _ db: Database, _ ctx: InstanceContext, projectUuid: String
+        _ db: Database,
+        _ ctx: InstanceContext,
+        projectUuid: String
     ) throws -> (uuid: String, created: Bool) {
         try ContextRepository(db: db, core: core).ensureInstance(ctx, projectUuid: projectUuid)
     }
 
     func ensureSession(
-        _ db: Database, _ ctx: SessionContext, instanceUuid: String
+        _ db: Database,
+        _ ctx: SessionContext,
+        instanceUuid: String
     ) throws -> (uuid: String, created: Bool) {
         try ContextRepository(db: db, core: core).ensureSession(ctx, instanceUuid: instanceUuid)
     }

@@ -3,18 +3,13 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0003 — full-text search over prompt/clarification/architecture
-    // text (the SEARCH message). Append-only: adds six external-content
-    // FTS5 mirrors + sync triggers, touches no domain row. Six separate
-    // tables is forced, not chosen — external-content FTS5 binds one
-    // virtual table to exactly one source via content_rowid; the search
-    // query UNIONs across them. The `_ad` triggers ride the globally
-    // enabled recursive_triggers pragma (Store) so they fire on FK
-    // cascade deletes too. Each table ends with a one-time
-    // `INSERT INTO <fts>(<fts>) VALUES('rebuild')` — triggers only fire
-    // on future writes, so without the rebuild all pre-existing history
-    // would be unsearchable. No PRAGMA in this body (silently ignored
-    // inside a transaction).
+    // m0003 — FTS5 search over prompt/clarification/architecture text. Six
+    // separate tables is forced: external-content FTS5 binds one virtual table
+    // to exactly one source via content_rowid, and the query UNIONs across them.
+    // The `_ad` triggers ride the globally enabled recursive_triggers pragma
+    // (Store) so they fire on FK cascade deletes too. Each table ends with a
+    // one-time 'rebuild' because triggers only fire on future writes. No PRAGMA
+    // in this body: pragmas are silently ignored inside a transaction.
     static func m0003_searchIndexes(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0003_searchIndexes") { db in
             struct FtsSpec {
@@ -24,22 +19,28 @@ extension Migrations {
             let specs = [
                 FtsSpec(
                     source: "prompt",
-                    columns: ["name", "goal", "detail", "backstory"]),
+                    columns: ["name", "goal", "detail", "backstory"]
+                ),
                 FtsSpec(
                     source: "clarification_summary",
-                    columns: ["refined_goal", "refined_detail", "backstory_note"]),
+                    columns: ["refined_goal", "refined_detail", "backstory_note"]
+                ),
                 FtsSpec(
                     source: "clarification",
-                    columns: ["question", "answer"]),
+                    columns: ["question", "answer"]
+                ),
                 FtsSpec(
                     source: "architecture_summary",
-                    columns: ["body"]),
+                    columns: ["body"]
+                ),
                 FtsSpec(
                     source: "architecture_general_change",
-                    columns: ["file_path", "reason_brief", "change_code"]),
+                    columns: ["file_path", "reason_brief", "change_code"]
+                ),
                 FtsSpec(
                     source: "architecture_persistence_change",
-                    columns: ["class_name", "file_path", "reason_brief"]),
+                    columns: ["class_name", "file_path", "reason_brief"]
+                ),
             ]
             for spec in specs {
                 let fts = "\(spec.source)_fts"
@@ -72,7 +73,8 @@ extension Migrations {
                         END;
 
                         INSERT INTO \(fts)(\(fts)) VALUES('rebuild');
-                        """)
+                        """
+                )
             }
 
             try db.execute(

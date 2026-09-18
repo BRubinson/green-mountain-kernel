@@ -3,46 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // The prompt lifecycle collapse. TWO independent halves in one
-    // migration, and they are here together only because they were decided
-    // together — neither needs the other to be correct.
-    //
-    // (a) DATA. The four middle prompt states fold into `initiated`. Safe
-    // because phase was never derived from status — BOT_NEXT reads db
-    // evidence — so no in-flight prompt loses its place.
-    //
-    // This is NOT the bare UPDATE it looks like it should be. `prompt.status`
-    // carries a CHECK naming all six old states, so the data and the
-    // constraint have to move together or each rejects the other: an UPDATE
-    // to 'initiated' fails the OLD check, and installing the NEW check first
-    // fails on the rows still holding old values. The remap therefore rides
-    // inside `prompt`'s own rebuild, as a CASE in the copy.
-    //
-    // (b) SCHEMA. Six per-prompt UNIQUE constraints come off, so a prompt
-    // sent back to draft can be run a second time and get a second set of
-    // summaries. SQLite cannot drop an inline UNIQUE: the constraint is a
-    // `sqlite_autoindex_*` that DROP INDEX refuses. Each table therefore
-    // goes through the documented 12-step rebuild — seven of them, `prompt`
-    // included.
-    //
-    // THREE THINGS THE REBUILD MUST NOT GET WRONG, all of them silent:
-    //
-    //  1. `id` MUST be copied, not regenerated. The FTS5 indexes are
-    //     EXTERNAL CONTENT keyed on `rowid`, which is `id`. Let SQLite
-    //     assign fresh ids and every FTS row points at a different record —
-    //     search keeps working and starts lying.
-    //  2. The AFTER INSERT/UPDATE/DELETE triggers are dropped with their
-    //     table and must be recreated verbatim. DROP TABLE does NOT fire
-    //     DELETE triggers, which is what keeps the FTS content intact while
-    //     the table is away.
-    //  3. `legacy_alter_table` is ON across the renames. Modern SQLite
-    //     "helpfully" rewrites references to a renamed table; here the
-    //     children already reference the FINAL name and must be left alone.
-    //
-    // Foreign keys are disabled for the duration by GRDB's default
-    // `.deferred` checks, which also runs `PRAGMA foreign_key_check` at the
-    // end — so the CASCADE children cannot be collected when the old table
-    // is dropped, and a broken reference still fails the migration.
+    // m0028 — the prompt lifecycle collapse: two independent halves in one
+    // migration. (a) DATA — the four middle prompt states fold into `initiated`,
+    // safe because phase is derived from db evidence, not from status. The remap
+    // rides inside `prompt`'s own rebuild as a CASE in the copy, because the
+    // status CHECK and the values have to move together or each rejects the other.
+    // (b) SCHEMA — six per-prompt UNIQUE constraints come off so a re-opened
+    // prompt can hold a second set of summaries. SQLite cannot drop an inline
+    // UNIQUE, so seven tables take the documented 12-step rebuild.
     static func m0028_promptLifecycleCollapse(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0028_promptLifecycleCollapse") { db in
             let retiredStates = ["clarifying", "architecting", "implementing", "reviewing"]
@@ -60,17 +28,13 @@ extension Migrations {
                 try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(table)") ?? -1
             }
 
-            // (a) AND (b) ARE ONE PASS FOR `prompt`, not two, and the ordering
-            // is the reason. `prompt.status` carries a CHECK naming all six old
-            // states, so the remap and the constraint have to change together:
-            // a bare UPDATE to 'initiated' would be rejected by the OLD check,
-            // and installing the NEW check before the remap would be rejected by
-            // the rows still holding old values. Mapping inside the rebuild's
-            // INSERT ... SELECT sidesteps both — the new table never sees a
-            // value its constraint forbids.
-            //
-            // `retiredStates` drives that CASE, so the list and the SQL cannot
-            // drift.
+            // (a) AND (b) ARE ONE PASS FOR `prompt`. The status CHECK and the
+            // values must change together: a bare UPDATE to 'initiated' is
+            // rejected by the OLD check, and installing the NEW check first is
+            // rejected by the rows still holding retired values. Mapping inside
+            // the rebuild's INSERT ... SELECT sidesteps both, so the new table
+            // never sees a value its constraint forbids. `retiredStates` drives
+            // the CASE, so the list and the SQL cannot drift.
             let remapList = retiredStates.map { "'\($0)'" }.joined(separator: ", ")
             let promptStatusExpr = "CASE WHEN status IN (\(remapList)) THEN 'initiated' ELSE status END"
 
@@ -92,8 +56,11 @@ extension Migrations {
                 let after: [String]
 
                 init(
-                    table: String, createSql: String, columns: String,
-                    selectColumns: String? = nil, after: [String]
+                    table: String,
+                    createSql: String,
+                    columns: String,
+                    selectColumns: String? = nil,
+                    after: [String]
                 ) {
                     self.table = table
                     self.createSql = createSql
@@ -375,10 +342,12 @@ extension Migrations {
                     sql: """
                         INSERT INTO new_\(rebuild.table) (\(rebuild.columns))
                         SELECT \(rebuild.selectColumns) FROM \(rebuild.table);
-                        """)
+                        """
+                )
                 try db.execute(sql: "DROP TABLE \(rebuild.table);")
                 try db.execute(
-                    sql: "ALTER TABLE new_\(rebuild.table) RENAME TO \(rebuild.table);")
+                    sql: "ALTER TABLE new_\(rebuild.table) RENAME TO \(rebuild.table);"
+                )
                 for statement in rebuild.after {
                     try db.execute(sql: statement)
                 }
@@ -391,7 +360,8 @@ extension Migrations {
             guard before == after else {
                 throw StoreError.corruptState(
                     entity: "prompt",
-                    detail: "m0028 row-count mismatch: before \(before) after \(after)")
+                    detail: "m0028 row-count mismatch: before \(before) after \(after)"
+                )
             }
 
             // The one check a row count cannot make. FTS is external content
@@ -406,11 +376,13 @@ extension Migrations {
                         db,
                         sql: """
                             SELECT COUNT(*) FROM \(table) WHERE id IS NULL OR id <= 0
-                            """) ?? -1
+                            """
+                    ) ?? -1
                 guard orphaned == 0 else {
                     throw StoreError.corruptState(
                         entity: table,
-                        detail: "m0028 lost rowid identity on \(orphaned) rows; FTS would be stale")
+                        detail: "m0028 lost rowid identity on \(orphaned) rows; FTS would be stale"
+                    )
                 }
             }
 
@@ -423,11 +395,13 @@ extension Migrations {
                     sql: """
                         SELECT COUNT(*) FROM prompt
                          WHERE status NOT IN ('draft', 'initiated', 'done')
-                        """) ?? -1
+                        """
+                ) ?? -1
             guard stranded == 0 else {
                 throw StoreError.corruptState(
                     entity: "prompt",
-                    detail: "m0028 left \(stranded) prompt rows outside draft/initiated/done")
+                    detail: "m0028 left \(stranded) prompt rows outside draft/initiated/done"
+                )
             }
 
             try db.execute(

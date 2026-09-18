@@ -65,7 +65,7 @@ public enum GmBridgeScript {
 
         public var isExecutable: Bool { true }
 
-        public func contents() throws -> String? {
+        public func contents() -> String? {
             guard !isEmpty else { return nil }
 
             let content = body.hasSuffix("\n") ? body : body + "\n"

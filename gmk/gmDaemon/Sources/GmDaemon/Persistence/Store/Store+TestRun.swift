@@ -2,21 +2,14 @@ import Foundation
 import GRDB
 import GmDaemonSdk
 
-// TEST_* — the agent-scoped test mutex (m0029). Bodies live in
-// TestRunRepository; these wrappers own the transaction.
+// TEST_* — the agent-scoped test mutex. Bodies live in TestRunRepository; these
+// wrappers own the transaction.
 //
-// All six COMPOSE inside `inTransaction { }` and none of them needs a
-// `StoreError.notComposable` refusal, which is worth saying explicitly because
-// the two families that DO refuse look superficially similar. `checkpointTruncate`
-// refuses because a WAL checkpoint inside a transaction is illegal in SQLite;
-// the four-phase repo verbs refuse because their phase 3 does filesystem work
-// holding no db lock, so composing one would pin the single writer across disk
-// I/O.
-//
-// The flock probe in `acquire` is neither. It is one `open` + one `flock` +
-// one `close` on a path already in hand — microseconds of syscall, no disk
-// I/O, no lock held across it, and no thread hop. Pinning the writer for that
-// long is the same order as the row write beside it.
+// All six COMPOSE inside `inTransaction { }` and none needs a
+// `StoreError.notComposable` refusal, unlike the two families that do:
+// `checkpointTruncate`, because a WAL checkpoint inside a transaction is illegal
+// in SQLite, and the four-phase repo verbs, whose phase 3 does filesystem work.
+// The flock probe in `acquire` is neither: one open, one flock, one close.
 
 extension Store {
 

@@ -1,6 +1,10 @@
 import Foundation
 
-let GM_CONCEPT_CDE = """
+/// COMPUTED, NOT A CONSTANT: the reference index at the bottom is built from
+/// `GmBridgeResource.all`, so a document declared under this skill is cited
+/// here automatically and one removed stops being cited. See `GM_CONCEPT_GMCC`.
+var GM_CONCEPT_CDE: String {
+    """
     # CDE — Contextual Development Environment
 
     The harness: toolkit and runtime where agents coordinate, persist work, and reach tools and subagents.
@@ -24,4 +28,11 @@ let GM_CONCEPT_CDE = """
     ## Workflows live elsewhere
 
     Specific workflows (lifecycle, phases, roles) are configured outside the harness. The CDE is the general environment they run inside.
+
+    ## Reference
+
+    Detail lives beside this file rather than in it — read it only when it names your situation:
+
+    \(GmBridgeResource.index(for: "cde"))
     """
+}

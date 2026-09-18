@@ -4,55 +4,14 @@ import GmDaemonSdk
 
 // StoreError lives in StoreError.swift; PersistedEvent in PersistedEvent.swift.
 
-/// SQLite access layer.
-///
-/// **This used to say "the daemon is the ONLY caller".** That became false BY
-/// DESIGN when the kernel collapsed the daemon, the relayed MCP surface and the
-/// UI into one process, and the sentence is kept here — corrected rather than
-/// deleted — so nobody reads the new shape as a mistake and "fixes" it back.
-///
-/// What is true now:
-///
-/// - **One process opens this db, and cannot be two.** The single-writer
-///   invariant moved UP, from "only the daemon calls Store" to "only the holder
-///   of the ownership lock can construct one". `KernelWriter` is the sole
-///   `Store(path:)` site and it consumes a token that only a won `flock` can
-///   produce, so a second instance cannot reach this type at all. That is a
-///   stronger guarantee than the old comment described, not a weaker one.
-/// - **In-process callers are now legitimate**, and they reach verbs through
-///   the same public methods the socket handlers call — never a parallel
-///   implementation. `DatabaseQueue` still serializes every access and IS the
-///   one connection pool.
-/// - **Out-of-process clients (`gm_hook`, and the MCP relay on behalf of a
-///   Claude session) still reach the db through the socket**, unchanged.
-///
-/// The transaction boundary lives in `StoreBoundary.swift`; `boundary` /
-/// `boundaryRead` replace what were direct `dbQueue.write` / `dbQueue.read`
-/// calls, so a verb called inside `inTransaction` enlists instead of trapping.
-///
-/// Domain methods live in per-family extensions (Store+Context, Store+Session,
-/// Store+Prompt, Store+Artifact, Store+FileChange, Store+Event, Store+Backup);
-/// this file holds lifecycle, health and maintenance, plus the forward layer
-/// onto StoreCore.
-///
-/// Store's five responsibilities after the StoreCore extraction — the fifth is
-/// the one that surprises people:
-///   1. Own `dbQueue` and the transaction boundary (every public verb).
-///   2. Own `core`, migrations, lifecycle, health reads, WAL checkpoint.
-///   3. Host the cross-family helper forwards. 15 of them are named directly
-///      by tests, so this layer is permanent — but under the (db, core) swap
-///      it is no longer on the repository-to-repository call path.
-///   4. Host the two hand mappers that cannot convert: `Store.dopeScopeRow`
-///      (test-pinned as a non-throwing function value) and `Store.sessionStub`
-///      (computed last_activity_at).
-///   5. Host ~624 lines of four-phase verb orchestration (Store+DopeRepoVerbs,
-///      Store+DiagramRepoVerbs): db read → pure projection → filesystem work
-///      with NO lock held → db write. A repository by construction holds an
-///      open `Database`, so this genuinely cannot move into one.
-///
-/// Consequently this refactor does NOT make Store small. The deliverable is
-/// the dependency direction — repositories stop holding a Store — not the line
-/// count.
+/// SQLite access layer. ONE PROCESS OPENS THIS DB AND CANNOT BE TWO:
+/// `KernelWriter` is the sole `Store(path:)` site and consumes a token only a
+/// won `flock` can produce. In-process callers reach verbs through the same
+/// public methods the socket handlers call, and `DatabaseQueue` serializes every
+/// access as the one connection pool. The transaction boundary lives in
+/// `StoreBoundary.swift`, so a verb called inside `inTransaction` enlists rather
+/// than trapping. This file holds lifecycle, health, the StoreCore forwards and
+/// the four-phase verb orchestration a repository cannot host.
 public final class Store: @unchecked Sendable {
     let dbQueue: DatabaseQueue
 
@@ -69,12 +28,9 @@ public final class Store: @unchecked Sendable {
     /// a subscriber is permitted to do — it is narrow, and the fan-out runs on
     /// the writer thread inside the commit hook.
     ///
-    /// THERE IS DELIBERATELY NO `eventSink` SETTER ANY MORE. This was a plain
-    /// settable property, and a second assignment displaced the first with no
-    /// error anywhere. Keeping a compatibility setter alongside the table would
-    /// mean the displacing assignment still compiles, which is the whole bug.
-    /// Two consumers now exist — the socket server and the in-process app host —
-    /// so the old shape is not merely untidy, it is wrong.
+    /// THERE IS DELIBERATELY NO `eventSink` SETTER. A settable property lets a
+    /// second assignment displace the first with no error anywhere, and two
+    /// consumers exist: the socket server and the in-process app host.
     @discardableResult
     public func subscribeToEvents(_ sink: @escaping (PersistedEvent) -> Void) -> UUID {
         core.subscribe(sink)
@@ -104,12 +60,10 @@ public final class Store: @unchecked Sendable {
     // MARK: - StoreCore forwards
     //
     // Bodies live on StoreCore; these exist because callers name them here.
-    // The instance forwards are NOT optional dressing: KbiteExportImportTests
-    // calls `store.insertBase(db, table:extra:)` directly, so it must remain an
-    // instance method with this exact signature, defaulted parameters and
-    // @discardableResult included. The statics keep ~100 internal `Store.X`
-    // references and 45 test call sites compiling unchanged —
-    // rewriting those to `StoreCore.` would be churn with no structural payoff.
+    // The instance forwards are not dressing: KbiteExportImportTests calls
+    // `store.insertBase(db, table:extra:)` directly, so it must stay an instance
+    // method with this exact signature, defaulted parameters and
+    // @discardableResult included.
 
     @discardableResult
     func insertBase(
@@ -205,11 +159,13 @@ public final class Store: @unchecked Sendable {
                     SELECT name FROM sqlite_master
                     WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name != 'grdb_migrations'
                     ORDER BY name
-                    """)
+                    """
+            )
             return try tables.map { table in
                 TableCount(
                     name: table,
-                    count: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(table)") ?? 0)
+                    count: try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM \(table)") ?? 0
+                )
             }
         }
     }

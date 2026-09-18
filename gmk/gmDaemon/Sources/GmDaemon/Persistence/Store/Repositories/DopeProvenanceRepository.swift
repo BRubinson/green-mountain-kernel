@@ -4,19 +4,12 @@ import GmDaemonSdk
 
 /// Reads and writes `dope_element_provenance` — the merge base. Runs INSIDE a
 /// Store-owned transaction; holds no dbQueue and never self-transacts. The
-/// merge-plan/resolve orchestrations (multi-transaction, filesystem sandbox
-/// reads between them) stay on the Store facade.
+/// merge-plan/resolve orchestrations stay on the Store facade.
 ///
-/// Two writers, and they are deliberately the only two:
-///   * `stampFromFiles` runs after a files -> db sync and records what each
-///     element looked like when it arrived, clearing the dirty flag. This IS
-///     the base.
-///   * `markLocallyModified` runs on a granular dope mutation and sets the
-///     dirty flag for the affected dot-path.
-///
-/// Everything is addressed by dot-path, never uuid: ingest re-mints every
-/// child uuid, so uuid-keyed provenance would be erased by the operation it
-/// exists to inform.
+/// Two writers, deliberately the only two: `stampFromFiles` records what each
+/// element looked like when it arrived and clears the dirty flag, which IS the
+/// base; `markLocallyModified` sets the dirty flag for one dot-path. Everything
+/// is addressed by dot-path, because ingest re-mints every child uuid.
 struct DopeProvenanceRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
@@ -28,12 +21,16 @@ struct DopeProvenanceRepository: RepositoryContext {
         // unifies this site's old `== 1` with the three sibling `!= 0` sites --
         // a no-op on every producible value (the write path stores only 0 or 1).
         let rows = try DopeElementProvenanceRecord.fetchAll(
-            db, where: "dope_scope_uuid = ?", arguments: [scopeUuid])
-        var out = [String: DopeMerge.Base]()
+            db,
+            where: "dope_scope_uuid = ?",
+            arguments: [scopeUuid]
+        )
+        var out: [String: DopeMerge.Base] = [:]
         for row in rows {
             out[row.dotPath] = DopeMerge.Base(
                 syncedContentHash: row.syncedContentHash,
-                locallyModified: row.locallyModified)
+                locallyModified: row.locallyModified
+            )
         }
         return out
     }
@@ -41,8 +38,8 @@ struct DopeProvenanceRepository: RepositoryContext {
     /// Record the base after a files -> db sync: every element that came from
     /// a file gets its hash stored and its dirty flag cleared.
     ///
-    /// Rows for paths no longer present are deleted, so provenance cannot
-    /// outlive the tree it describes and resurrect a stale base later.
+    /// Rows for paths absent from the tree are deleted, so provenance cannot
+    /// outlive what it describes and resurrect a stale base later.
     func stampFromFiles(scopeUuid: String, bundle: DopeDocumentBundle) throws {
         let elements = DopeMerge.elements(of: bundle)
         let now = Store.isoNow()
@@ -64,21 +61,27 @@ struct DopeProvenanceRepository: RepositoryContext {
                 arguments: [
                     UUID().uuidString.lowercased(), now, now, scopeUuid,
                     element.dotPath, element.kind, element.contentHash,
-                ])
+                ]
+            )
         }
 
-        let stale = try String.fetchAll(
-            db,
-            sql: """
-                SELECT dot_path FROM dope_element_provenance WHERE dope_scope_uuid = ?
-                """, arguments: [scopeUuid]
-        ).filter { !live.contains($0) }
+        let stale =
+            try String.fetchAll(
+                db,
+                sql: """
+                    SELECT dot_path FROM dope_element_provenance WHERE dope_scope_uuid = ?
+                    """,
+                arguments: [scopeUuid]
+            )
+            .filter { !live.contains($0) }
         for path in stale {
             try db.execute(
                 sql: """
                     DELETE FROM dope_element_provenance
                      WHERE dope_scope_uuid = ? AND dot_path = ?
-                    """, arguments: [scopeUuid, path])
+                    """,
+                arguments: [scopeUuid, path]
+            )
         }
     }
 
@@ -103,7 +106,8 @@ struct DopeProvenanceRepository: RepositoryContext {
             arguments: [
                 UUID().uuidString.lowercased(), now, now, scopeUuid,
                 dotPath, kind,
-            ])
+            ]
+        )
     }
 
     /// Resolve a node's dot-path from its uuid, for the level it sits at.
@@ -123,7 +127,9 @@ struct DopeProvenanceRepository: RepositoryContext {
                 db,
                 sql: """
                     SELECT code FROM dope_persistence WHERE uuid = ?
-                    """, arguments: [nodeUuid])
+                    """,
+                arguments: [nodeUuid]
+            )
         case .entity:
             return try String.fetchOne(
                 db,
@@ -132,7 +138,9 @@ struct DopeProvenanceRepository: RepositoryContext {
                       FROM dope_persistence_entity e
                       JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                      WHERE e.uuid = ?
-                    """, arguments: [nodeUuid])
+                    """,
+                arguments: [nodeUuid]
+            )
         case .property:
             return try String.fetchOne(
                 db,
@@ -142,7 +150,9 @@ struct DopeProvenanceRepository: RepositoryContext {
                       JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
                       JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
                      WHERE p.uuid = ?
-                    """, arguments: [nodeUuid])
+                    """,
+                arguments: [nodeUuid]
+            )
         case .enumeration:
             return try String.fetchOne(
                 db,
@@ -151,7 +161,9 @@ struct DopeProvenanceRepository: RepositoryContext {
                       FROM dope_persistence_enum n
                       JOIN dope_persistence d ON d.uuid = n.dope_persistence_uuid
                      WHERE n.uuid = ?
-                    """, arguments: [nodeUuid])
+                    """,
+                arguments: [nodeUuid]
+            )
         case .option:
             return try String.fetchOne(
                 db,
@@ -161,7 +173,9 @@ struct DopeProvenanceRepository: RepositoryContext {
                       JOIN dope_persistence_enum n ON n.uuid = o.dope_persistence_enum_uuid
                       JOIN dope_persistence d ON d.uuid = n.dope_persistence_uuid
                      WHERE o.uuid = ?
-                    """, arguments: [nodeUuid])
+                    """,
+                arguments: [nodeUuid]
+            )
         }
     }
 
@@ -173,6 +187,8 @@ struct DopeProvenanceRepository: RepositoryContext {
                 SELECT dot_path FROM dope_element_provenance
                  WHERE dope_scope_uuid = ? AND locally_modified = 1
                  ORDER BY dot_path
-                """, arguments: [scopeUuid])
+                """,
+            arguments: [scopeUuid]
+        )
     }
 }

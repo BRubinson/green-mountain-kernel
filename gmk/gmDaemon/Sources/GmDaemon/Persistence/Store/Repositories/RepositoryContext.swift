@@ -4,25 +4,12 @@ import GmDaemonSdk
 
 /// Everything a repository is allowed to hold: the ambient transaction's
 /// `Database`, and the shared write primitives.
-///
-/// Deliberately NOT a Store. There is no `dbQueue` reachable from here and no
-/// public verb, so nesting a transaction is not expressible — and GRDB 7 TRAPS
-/// on re-entrant `dbQueue.write` (DatabaseQueue.swift, "Database methods are
-/// not reentrant"), killing the daemon process rather than returning an error.
-/// Before this protocol, nothing but a doc comment repeated in 27 repositories
-/// stood between any of them and that trap.
-///
-/// The sibling accessors below exist so a cross-domain call is a CALL rather
-/// than a construction. Previously `DiagramRepository` reaching dope logic went
-/// DiagramRepository → Store (thin forward) → new DopeRepository → body, with
-/// Store acting as a service locator in the middle of a call that had nothing
-/// to do with it. Now it names the owner directly, which is also more honest:
-/// `clarification.touchSessionForPrompt(...)` tells you the body lives in
-/// ClarificationRepository, which the old `store.` spelling actively hid.
-///
-/// Adding a repository is one line here rather than a new spelling at N call
-/// sites. `EventRepository` deliberately does not conform — it holds only `db`
-/// and needs no core.
+/// Deliberately NOT a Store. No `dbQueue` is reachable from here and no public
+/// verb, so nesting a transaction is not expressible — and GRDB 7 TRAPS on a
+/// re-entrant `dbQueue.write`, killing the daemon rather than returning an
+/// error. The sibling accessors below make a cross-domain call a CALL rather
+/// than a construction, naming the owning repository directly.
+/// `EventRepository` does not conform: it holds only `db` and needs no core.
 protocol RepositoryContext {
     var db: Database { get }
     var core: StoreCore { get }

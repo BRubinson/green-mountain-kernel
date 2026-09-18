@@ -1,24 +1,12 @@
 import Foundation
 import GmDaemonSdk
 
-/// The fifteen phase verbs the pen did not serve, added at v30.
-///
-/// WHY THESE FIFTEEN, AND WHY NOW. Every one is a verb the daemon has always
-/// served and the pen has never exposed, so an agent needing one had to drop to
-/// `gm_hook call <VERB> --json '{...}'`. That is not a hypothetical: running the
-/// team workflow that produced this change required exactly that for
-/// `CLARIFY_OPEN`, `CLARIFY_SEAL`, `CLARIFY_FINALIZE`, `CARE_PACKAGE_OPEN`,
-/// `ARCH_OPEN`, `ARCH_PERSIST_ADD`, `ARCH_GENERAL_ADD`, `ARCH_PROPOSE` and
-/// `ARCH_APPROVE` — nine of the fifteen, in one prompt. The pen's own
-/// instruction text tells agents "where a pen tool exists, it is the write
-/// path"; these are the places that sentence had a hole in it.
-///
-/// THE GAP WAS INVISIBLE UNTIL THE GATE BECAME BIDIRECTIONAL. A roster check
-/// that only asks "does every served tool have a VerbSpec?" passes a pen that
-/// serves nothing at all. Asking the reverse — "does every declared pen tool
-/// get served?" — is what turned these fifteen from folklore into a build
-/// failure. See `GmPenTools.rosterProblems()`.
-///
+/// The phase verbs, each a door for a daemon verb an agent would otherwise have
+/// to reach through the shell, keeping the pen's promise that where a pen tool
+/// exists it is the write path. A MISSING DOOR IS ONLY VISIBLE TO A
+/// BIDIRECTIONAL GATE: asking only "does every served tool have a VerbSpec?"
+/// passes a pen serving nothing. See `GmCdeTools.rosterProblems()`.
+
 /// SHAPES ARE READ OFF THE REQUEST STRUCTS, NOT INVENTED. Each `params` list
 /// mirrors its `*Request` field for field, including which are required, so the
 /// published schema and the decoder cannot disagree.
@@ -35,8 +23,11 @@ func makePhaseDoorTools() -> [Tool] {
             run: { args, client in
                 try client.clarifyOpen(
                     ClarifyOpenRequest(
-                        promptUuid: try args.string("prompt_uuid")))
-            }),
+                        promptUuid: try args.string("prompt_uuid")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_answer_clarification_question",
             description:
@@ -58,8 +49,11 @@ func makePhaseDoorTools() -> [Tool] {
                         expectedVersion: try args.int64("expected_version"),
                         answerText: args.optString("answer_text"),
                         selectedOptionUuids: args.optStrings("selected_option_uuids"),
-                        skip: args.optBool("skip") ?? false))
-            }),
+                        skip: args.optBool("skip") ?? false
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_seal_clarification",
             description:
@@ -72,8 +66,11 @@ func makePhaseDoorTools() -> [Tool] {
                 try client.clarifySeal(
                     ClarifySealRequest(
                         summaryUuid: try args.string("summary_uuid"),
-                        expectedVersion: try args.int64("expected_version")))
-            }),
+                        expectedVersion: try args.int64("expected_version")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_finalize_clarification",
             description:
@@ -86,8 +83,11 @@ func makePhaseDoorTools() -> [Tool] {
                 try client.clarifyFinalize(
                     ClarifyFinalizeRequest(
                         summaryUuid: try args.string("summary_uuid"),
-                        expectedVersion: try args.int64("expected_version")))
-            }),
+                        expectedVersion: try args.int64("expected_version")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_open_care_package",
             description:
@@ -98,8 +98,11 @@ func makePhaseDoorTools() -> [Tool] {
             run: { args, client in
                 try client.carePackageOpen(
                     CarePackageOpenRequest(
-                        summaryUuid: try args.string("summary_uuid")))
-            }),
+                        summaryUuid: try args.string("summary_uuid")
+                    )
+                )
+            }
+        ),
 
         Tool(
             name: "rpir_close_brief",
@@ -131,8 +134,11 @@ func makePhaseDoorTools() -> [Tool] {
                         dopeRefs: args.optStrings("dope_refs") ?? [],
                         kbiteRefs: args.optStrings("kbite_refs") ?? [],
                         fileChangeRefs: args.optStrings("file_change_refs") ?? [],
-                        agentId: args.optString("agent_id")))
-            }),
+                        agentId: args.optString("agent_id")
+                    )
+                )
+            }
+        ),
 
         // ── Review ───────────────────────────────────────────────────────
         Tool(
@@ -145,8 +151,11 @@ func makePhaseDoorTools() -> [Tool] {
             run: { args, client in
                 try client.reviewOpen(
                     ReviewOpenRequest(
-                        promptUuid: try args.string("prompt_uuid")))
-            }),
+                        promptUuid: try args.string("prompt_uuid")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_resolve_review_finding",
             description:
@@ -160,14 +169,18 @@ func makePhaseDoorTools() -> [Tool] {
                 let raw = try args.string("status")
                 guard let status = ReviewFindingStatus(rawValue: raw), status != .open else {
                     throw ToolError(
-                        message: "status must be fixed, accepted or wont_fix — '\(raw)' is not a resolution")
+                        message: "status must be fixed, accepted or wont_fix — '\(raw)' is not a resolution"
+                    )
                 }
                 return try client.reviewResolve(
                     ReviewResolveRequest(
                         findingUuid: try args.string("finding_uuid"),
                         expectedVersion: try args.int64("expected_version"),
-                        status: status))
-            }),
+                        status: status
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_complete_review",
             description: "Seal the review with its overview and verdict.",
@@ -181,15 +194,19 @@ func makePhaseDoorTools() -> [Tool] {
                 let raw = try args.string("verdict")
                 guard let verdict = ReviewVerdict(rawValue: raw) else {
                     throw ToolError(
-                        message: "verdict must be approved, approved_with_nits or changes_requested — got '\(raw)'")
+                        message: "verdict must be approved, approved_with_nits or changes_requested — got '\(raw)'"
+                    )
                 }
                 return try client.reviewComplete(
                     ReviewCompleteRequest(
                         summaryUuid: try args.string("summary_uuid"),
                         expectedVersion: try args.int64("expected_version"),
                         overview: try args.string("overview"),
-                        verdict: verdict))
-            }),
+                        verdict: verdict
+                    )
+                )
+            }
+        ),
 
         // ── Architecture ─────────────────────────────────────────────────
         Tool(
@@ -202,8 +219,11 @@ func makePhaseDoorTools() -> [Tool] {
             run: { args, client in
                 try client.archOpen(
                     ArchOpenRequest(
-                        promptUuid: try args.string("prompt_uuid")))
-            }),
+                        promptUuid: try args.string("prompt_uuid")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_write_architecture_persistence_changes",
             description:
@@ -224,8 +244,11 @@ func makePhaseDoorTools() -> [Tool] {
                         filePath: try args.string("file_path"),
                         reasonBrief: try args.string("reason_brief"),
                         changeKind: args.optString("change_kind"),
-                        dopeRef: args.optString("dope_ref")))
-            }),
+                        dopeRef: args.optString("dope_ref")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_write_architecture_general_changes",
             description:
@@ -250,8 +273,11 @@ func makePhaseDoorTools() -> [Tool] {
                         className: args.optString("class_name"),
                         reasonBrief: try args.string("reason_brief"),
                         changeDepth: depth,
-                        changeCode: try args.string("change_code")))
-            }),
+                        changeCode: try args.string("change_code")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_write_architecture_field_changes",
             description:
@@ -284,8 +310,11 @@ func makePhaseDoorTools() -> [Tool] {
                         isIndexed: args.optBool("is_indexed") ?? false,
                         changeKind: args.optString("change_kind"),
                         renamedFrom: args.optString("renamed_from"),
-                        dopePropertyRef: args.optString("dope_property_ref")))
-            }),
+                        dopePropertyRef: args.optString("dope_property_ref")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_summarize_architecture",
             description: "Write the architecture summary's own body — the plan narrative over the expanded rows.",
@@ -299,8 +328,11 @@ func makePhaseDoorTools() -> [Tool] {
                     ArchSummarizeRequest(
                         summaryUuid: try args.string("summary_uuid"),
                         expectedVersion: try args.int64("expected_version"),
-                        body: try args.string("body")))
-            }),
+                        body: try args.string("body")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_propose_architecture",
             description: "drafting → proposed: put the expanded plan on the table for the plan gate.",
@@ -312,8 +344,11 @@ func makePhaseDoorTools() -> [Tool] {
                 try client.archPropose(
                     ArchProposeRequest(
                         summaryUuid: try args.string("summary_uuid"),
-                        expectedVersion: try args.int64("expected_version")))
-            }),
+                        expectedVersion: try args.int64("expected_version")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_approve_architecture",
             description:
@@ -326,8 +361,11 @@ func makePhaseDoorTools() -> [Tool] {
                 try client.archApprove(
                     ArchApproveRequest(
                         summaryUuid: try args.string("summary_uuid"),
-                        expectedVersion: try args.int64("expected_version")))
-            }),
+                        expectedVersion: try args.int64("expected_version")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "rpir_revise_architecture",
             description:
@@ -340,8 +378,11 @@ func makePhaseDoorTools() -> [Tool] {
                 try client.archRevise(
                     ArchReviseRequest(
                         summaryUuid: try args.string("summary_uuid"),
-                        expectedVersion: try args.int64("expected_version")))
-            }),
+                        expectedVersion: try args.int64("expected_version")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "kbite_open_maw",
             description:
@@ -354,8 +395,11 @@ func makePhaseDoorTools() -> [Tool] {
                 try client.openKbiteMaw(
                     KbiteMawOpenRequest(
                         kbiteName: try args.string("kbite_name"),
-                        mawPath: try args.string("maw_path")))
-            }),
+                        mawPath: try args.string("maw_path")
+                    )
+                )
+            }
+        ),
         Tool(
             name: "kbite_digest",
             description: "Digest a chewed maw into the database and archive its raw sources.",
@@ -367,7 +411,10 @@ func makePhaseDoorTools() -> [Tool] {
                 try client.digestKbite(
                     KbiteDigestRequest(
                         code: try args.string("code"),
-                        kbiteOpenPath: try args.string("kbite_open_path")))
-            }),
+                        kbiteOpenPath: try args.string("kbite_open_path")
+                    )
+                )
+            }
+        ),
     ]
 }

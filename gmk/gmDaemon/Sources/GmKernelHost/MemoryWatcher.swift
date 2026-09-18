@@ -1,27 +1,13 @@
 import Foundation
 
-/// Filesystem events for prompt memory/ directories — one watched root
-/// (the gmfs root), stream plumbing delegated to FSEventLane so re-rooting
-/// (A3) comes for free: the watcher is constructed once and lives for the
-/// daemon's lifetime; a config change pushes a new root rather than
-/// replacing the object.
+/// Filesystem events for prompt memory/ directories — one watched root (the
+/// gmfs root), stream plumbing delegated to FSEventLane, so a config change
+/// pushes a new root rather than replacing the watcher.
 ///
-/// HARD RULES (the lane contract):
-///   1. Holds NO Store and NO Server reference — `deliver` hops onto the
-///      server queue and does everything there.
-///   2. The lane's 1.0s latency is the debounce — an editor save storm
-///      becomes one callback per window.
-///   3. Events are EPHEMERAL: no daemon_event row, broadcast-only with id 0
-///      (never a replay cursor). A filesystem hint needs no durability.
-///
-/// EXACT-MATCH CONTRACT (A4): the prompt's stored gmfs_relative_storage_path
-/// is the authority. Resolution is case-sensitive string equality, so whoever
-/// creates the directory MUST use the path the daemon returned from
-/// PROMPT_CREATE, byte for byte — never re-derive {seq}_{name} client-side
-/// (the daemon now slugs the name at derivation).
-///
-/// Honest limitation: only prompts with a non-empty gmfs_relative_storage_path
-/// resolve; a prompt row without one keeps the client-side poll.
+/// Lane contract: holds no Store and no Server; the 1.0s latency debounces a
+/// save storm into one callback; events are EPHEMERAL, broadcast-only with id 0
+/// and no daemon_event row. Prompt resolution is case-sensitive equality on the
+/// stored gmfs_relative_storage_path; a row without one keeps the client poll.
 final class MemoryWatcher: @unchecked Sendable {
     private let lane = FSEventLane(label: "gmcc.daemon.lane", latency: 1.0)
     /// Lane-confined: mutated only inside a lane turn, read only by the
@@ -34,9 +20,8 @@ final class MemoryWatcher: @unchecked Sendable {
         lane.setHandler { [weak self] paths in self?.handle(paths: paths) }
     }
 
-    /// A3 entry point, pushed by the supervisor. nil or a nonexistent path
-    /// stops the stream — a daemon on a machine with no gmfs simply has no
-    /// watcher, same as at boot. Idempotent via the lane.
+    /// Pushed by the supervisor. nil or a nonexistent path stops the stream, so
+    /// a machine with no gmfs simply has no watcher. Idempotent via the lane.
     func setRoot(_ newRoot: String?) {
         let resolved = newRoot ?? ""
         lane.run { self.root = resolved }

@@ -4,44 +4,32 @@ extension GmBridgeHook {
 
     public static let pluginRoot = GmBridgeClaudeTypePath.pluginRoot
 
-    /// Where the binaries live, resolved AT HOOK TIME rather than at generate
-    /// time.
+    /// Where the binaries live, resolved at hook time rather than at generate time.
     ///
-    /// `${GM_FS_ROOT:-$HOME/gmfs}` and not a baked path, because there are THREE
-    /// environments — prod at `~/gmfs`, beta at `~/beta_gmfs`, and per-run test
-    /// roots under `~/test_gmfs/runs/` — and a hook fired in one of them must
-    /// reach that root's kernel. Baking `$HOME/gmfs` here is the recorded
-    /// reversal `gm_hook.sh` carries in its own header: it produced "one
-    /// session, two databases, no error, no signal".
-    ///
-    /// This is also the reason every hook below is SHELL FORM. Shell form is the
-    /// only handler type that expands a variable at hook time; exec form treats
+    /// `${GM_FS_ROOT:-$HOME/gmfs}` and not a baked path: there are three
+    /// environments, and a hook fired in one must reach that root's kernel. A
+    /// baked `$HOME/gmfs` gives one session two databases with no error and no
+    /// signal. It is also why every hook below is SHELL FORM — exec form treats
     /// the command as a literal path and would look for a directory named
     /// `${GM_FS_ROOT:-$HOME/gmfs}`.
     static let binDir = #"${GM_FS_ROOT:-$HOME/gmfs}/bin"#
 
-    /// The shim `gm_hook.sh` used to be, inlined.
+    /// The `gm_hook.sh` shim, inlined.
     ///
-    /// THE `[ -x ]` GUARD AND `exit 0` ARE THE WHOLE CONTRACT, not defensive
-    /// noise. A hook that exits non-zero BLOCKS the tool call it fired on, so a
-    /// machine with no kernel installed would have every `Edit` and every `Bash`
-    /// refused by its own tooling. Silence is the correct behaviour when the
-    /// binary is absent, and it is why this cannot be an exec-form command:
-    /// exec form cannot express a conditional.
+    /// The `[ -x ]` guard and `exit 0` are the whole contract: a hook that exits
+    /// non-zero BLOCKS the tool call it fired on, so a machine with no kernel
+    /// installed would have every `Edit` and every `Bash` refused by its own
+    /// tooling. Exec form cannot express that conditional.
     static func hookCommand(_ subcommand: String) -> String {
         #"[ -x "\#(binDir)/gm_hook" ] || exit 0; exec "\#(binDir)/gm_hook" hook \#(subcommand)"#
     }
 
     /// `check_gm_stale.sh`, inlined.
     ///
-    /// It reports a MISSING OR DANGLING binary, which is exactly why it could
-    /// not become a `gm_hook doctor` subcommand: a subcommand cannot run when
-    /// the binary it would report on is the thing that is absent. Folding it
-    /// into a subcommand would have turned the only broken-install report in the
-    /// system into silence.
-    ///
-    /// Exits 0 on every path — a stale install is a warning, never a blocked
-    /// session.
+    /// It reports a missing or dangling binary, which is why it cannot be a
+    /// `gm_hook doctor` subcommand: a subcommand cannot run when the binary it
+    /// would report on is the thing that is absent. Exits 0 on every path — a
+    /// stale install is a warning, never a blocked session.
     static let staleCheckCommand = #"""
         if [ ! -x "\#(binDir)/gm_hook" ]; then \
           echo "[GMB] gm_hook missing at \#(binDir) — run: bash \"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\"" >&2; \
@@ -76,13 +64,12 @@ extension GmBridgeHook {
                 MatcherGroup(
                     matcher: "Bash",
                     hooks: [
-                        // WARNS, NEVER BLOCKS (Endotherm ruling, prompt p1): a
-                        // Bash command that hand-invokes the file-change capture
-                        // write gets an allow-with-warning response — capture
-                        // belongs to the PostToolUse hook alone, and the guard
-                        // starts as a warning rather than an error. Exit is 0 on
-                        // every path; the hook contract holds. No socket, no
-                        // daemon — the match is pure string work in-process.
+                        // DENIES a Bash command that invokes `gm_hook`. The binary
+                        // is the harness's client, not an agent door; every
+                        // agent-facing verb is a pen tool. The decision rides the
+                        // JSON, so exit is 0 on every path and the hook contract
+                        // holds. No socket, no daemon — pure string work
+                        // in-process.
                         Handler(command: hookCommand("pre-tool-use"), timeout: 5)
                     ]
                 )

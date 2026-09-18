@@ -2,20 +2,13 @@ import Foundation
 import GmDaemonSdk
 import GmUxComponentLibrary
 
-/// The db-backed `DiagramCommitting`: one DIAGRAM_BATCH_APPLY, then one
-/// DIAGRAM_GET.
+/// The db-backed `DiagramCommitting`: one DIAGRAM_BATCH_APPLY, then one DIAGRAM_GET.
 ///
-/// The re-GET is not a paranoia round trip. The batch response carries the
-/// new revision and the minted uuids but NOT the resulting rows, and the
-/// editor needs what only a read has: every element's post-mutation version
-/// (each `elementUpdate` carries an `expectedVersion`, so a stale version
-/// makes the NEXT drag a VERSION_CONFLICT), plus everything the store
-/// normalized on the way in — minted codes, packed stroke vertices,
-/// clientRef-resolved connector targets. Rebuilding that client-side would
-/// be a third implementation of the reducer.
-///
-/// This is the "ONE swap" `LocalDiagramCommitter`'s contract promised: the
-/// edit session, the staging discipline and every call site are untouched.
+/// The re-GET is load-bearing. The batch response carries the new revision and the minted
+/// uuids but NOT the resulting rows, and the editor needs every element's post-mutation
+/// version — a stale one makes the NEXT drag a VERSION_CONFLICT — plus everything the store
+/// normalized on the way in: minted codes, packed stroke vertices, clientRef-resolved
+/// connector targets. Rebuilding that client-side is a second implementation of the reducer.
 final class DaemonDiagramCommitter: DiagramCommitting {
     private let diagramUuid: String
     private let onCommit: @MainActor @Sendable (DiagramGetResponse) -> Void
@@ -38,8 +31,10 @@ final class DaemonDiagramCommitter: DiagramCommitting {
         expectedRevision: Int64?
     ) async throws -> DiagramCommitOutcome {
         let applied = try await service.diagramBatchApply(
-            diagramUuid: diagramUuid, expectedRevision: expectedRevision,
-            mutations: mutations)
+            diagramUuid: diagramUuid,
+            expectedRevision: expectedRevision,
+            mutations: mutations
+        )
         // Index-aligned results: the clientRef the caller invented, paired
         // with the uuid the DB actually minted for it.
         var minted: [String: String] = [:]

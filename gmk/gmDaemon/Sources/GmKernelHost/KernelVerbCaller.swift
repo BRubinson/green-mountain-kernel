@@ -2,71 +2,40 @@ import Foundation
 import GmDaemonSdk
 
 /// `GmVerbCaller` satisfied WITHOUT a socket, by re-entering the dispatcher the
-/// kernel already runs.
+/// kernel already runs: a tool or hook body that dialled the daemon it runs
+/// inside would self-connect and deadlock behind its own call. It ENCODES the
+/// same envelope `DaemonClient` builds and hands it to `Server.dispatch`, so
+/// handlers see the same decode, the same guards and the same error envelopes.
 ///
-/// THE POINT: MCP tool bodies and hook bodies were written against
-/// `DaemonClient`. Run them unchanged inside the kernel and each one dials the
-/// daemon it is already running in — a self-connection, queued behind the very
-/// call that would have to service it. That is a deadlock, not a slow path.
-///
-/// Rather than retype ~110 verb methods against a second in-process client, the
-/// facade moved to `GmVerbCaller` (one line) and this conforms to it by
-/// ENCODING the same envelope those methods build and handing it to
-/// `Server.dispatch`. So all 96 handlers are reached exactly as a socket client
-/// reaches them — same decode, same guards, same error envelopes — with the
-/// socket hop removed.
-///
-/// RE-ENTRANCY IS ALREADY THE NORM HERE. `dispatch` is a pure `Data -> Data`
-/// function holding no per-call state, and `TX_BATCH` already re-enters it once
-/// per inner line. This adds a second caller to an entry point built for
-/// exactly that.
-///
-/// WHY IT COMPOSES INSIDE A TRANSACTION. `StoreBoundary` is ambient and
-/// RE-ENTRANT, so a verb reached through here while a boundary is open enlists
-/// in that boundary instead of opening its own. That is the property the whole
-/// harness envelope was for: a tool body that writes N rows writes them in ONE
-/// transaction. It holds only while the verb layer performs no thread hops
-/// inside a boundary — the ambient handle is thread-local. There are zero such
-/// hops today and this file adds none. If you add one, remove the hop; do not
-/// relax the boundary.
-///
-/// NOT AN ERROR PATH. A handler that fails reports it in its own `ok: false`
-/// envelope, and `request` below turns that back into a thrown `StoreError`
-/// exactly as `DaemonClient` does — so a caller cannot tell the two apart, which
-/// is the whole contract.
+/// `StoreBoundary` is ambient and RE-ENTRANT, so a verb reached here enlists in
+/// an open boundary — true only while the verb layer makes no thread hops in one.
 struct KernelVerbCaller: GmVerbCaller {
 
-    /// Injected rather than reached through a stored `Server`, matching what
-    /// `TxBatchHandler` already does — it keeps this testable without standing
-    /// up a socket, and it keeps the retain cycle out.
-    ///
-    /// `@Sendable` because `GmVerbCaller` requires `Sendable`, and it requires
-    /// it because a caller genuinely crosses executors: the app hands this one
-    /// from MainActor to the serial queue every verb call is trampolined onto.
-    /// The closure is safe to send — `Server.dispatch` is a `Data -> Data`
-    /// function holding no per-call state, which is the same property that lets
-    /// TX_BATCH and the harness envelope re-enter it.
+    /// Injected rather than reached through a stored `Server`: testable without
+    /// standing up a socket, and no retain cycle. `@Sendable` because a caller
+    /// genuinely crosses executors — the app hands this one from MainActor to
+    /// the serial queue every verb call is trampolined onto — and it is safe to
+    /// send because `Server.dispatch` holds no per-call state.
     let dispatch: @Sendable (Data) -> HandlerResult
 
     func request<Req: Codable & Sendable, Resp: Codable & Sendable>(
         type: MessageType,
         payload: Req,
-        responseType: Resp.Type
+        responseType _: Resp.Type
     ) throws -> Resp {
         let line = try NDJSON.encodeLine(RequestEnvelope(type: type, payload: payload))
         let result = dispatch(line)
         let response = try NDJSON.decode(ResponseEnvelope<Resp>.self, from: result.line)
 
-        // The failure arms below are a DELIBERATE MIRROR of `DaemonClient.request`,
-        // down to the error cases and the message. A caller reached through this
-        // type must not be able to tell it from a socket call — including when
-        // things go wrong, which is exactly when a divergence would be found the
-        // hard way. `payload` being optional on the envelope is what lets one
-        // decode serve both the success and failure shapes.
+        // The failure arms below MIRROR `DaemonClient.request`, down to the error
+        // cases and the message: a caller must not be able to tell this type from
+        // a socket call, least of all when things go wrong.
         if let error = response.error {
             if error.code == .protocolMismatch {
                 throw DaemonClientError.protocolMismatch(
-                    message: error.message, daemonVersion: error.daemonProtocolVersion)
+                    message: error.message,
+                    daemonVersion: error.daemonProtocolVersion
+                )
             }
             throw DaemonClientError.server(error)
         }

@@ -1,14 +1,11 @@
 import Foundation
 
-// Hoisted VERBATIM out of Sources/gm/Commands/Hook.swift. This block is the
-// parser-free half of the hook surface — payload decoding, write-target
-// resolution, and the Bash command scanner — and it moved to the
-// kit so both the shell client and anything else that must speak the hook
-// contract share ONE implementation. Two copies of a write-path scanner drift
-// apart in exactly the way that makes capture silently stop capturing.
-//
-// Types stay INTERNAL: HookRunner (same module) is the only caller that needs
-// them, and the tests reach them through @testable import GmDaemonSdk.
+// The parser-free half of the hook surface: payload decoding, write-target
+// resolution, and the Bash command scanner. It lives in the kit so everything
+// that speaks the hook contract shares ONE implementation — two copies of a
+// write-path scanner drift apart in the way that makes capture silently stop
+// capturing. Types stay INTERNAL; HookRunner is the only caller that needs
+// them.
 
 // MARK: - Dry-run reports
 
@@ -18,10 +15,8 @@ import Foundation
 struct HookDryRun: Encodable {
     let event: String
     let repoRoot: String
-    /// The runtime this write would land in. There is exactly ONE legitimate
-    /// value now that the second filesystem root is gone, so this printing
-    /// anything unexpected means the environment is misconfigured rather than
-    /// that the wrong runtime was selected.
+    /// The runtime this write would land in. Exactly one value is legitimate,
+    /// so anything unexpected here means a misconfigured environment.
     let gmFsRoot: String
     let changes: [FileChangeAdd]
 }
@@ -40,19 +35,12 @@ private func readStdin() -> Data {
 
 /// One Claude Code hook payload, decoded from the raw JSON on stdin.
 ///
-/// EVERY FIELD IS OPTIONAL AND EVERY DECODE IS TOLERANT. The payload shape
-/// varies by event and by tool — `tool_response` is an object for Edit and a
-/// different object for Bash, and other tools return a bare string — so a
-/// strict decode would throw on a sibling field and lose a change that was
-/// perfectly recordable. A missing field means "not recorded", never "fail".
-///
-/// Keys are spelled out literally instead of going through a key strategy:
-/// the top level is snake_case and `structuredPatch` inside `tool_response` is
-/// camelCase, and no single strategy reads both.
-/// PUBLIC ONLY WHERE A FRONT-END GENUINELY NEEDS IT. `decode` and `sessionId`
-/// are exposed because SessionStart's context-ensure rides the same payload and
-/// must read the conversation id out of it; everything else stays internal, so
-/// the kit's hook surface cannot be reached around through its own data types.
+/// EVERY FIELD IS OPTIONAL AND EVERY DECODE IS TOLERANT. The shape varies by
+/// event and by tool, so a strict decode would throw on a sibling field and
+/// lose a recordable change: a missing field means "not recorded", never
+/// "fail". Keys are spelled literally rather than via a key strategy, because
+/// the top level is snake_case and `structuredPatch` is camelCase and no
+/// single strategy reads both.
 public struct HookPayload: Equatable {
     public let sessionId: String?
     let hookEventName: String?
@@ -100,7 +88,8 @@ public struct HookPayload: Equatable {
             filePath: string(input["file_path"]),
             notebookPath: string(input["notebook_path"]),
             command: string(input["command"]),
-            structuredPatch: hunks(response["structuredPatch"]))
+            structuredPatch: hunks(response["structuredPatch"])
+        )
     }
 
     /// Empty strings are absences. Claude Code omits a field it has no value
@@ -137,20 +126,14 @@ struct HookWriteTarget: Equatable {
 }
 
 enum HookWriteTargets {
-    /// THE TOOL ALLOWLIST. Only these four tools produce rows, by name.
-    ///
-    /// A permissive rule — "any payload carrying a file_path" — would record
-    /// a change for a tool that only READ the file, and a wrong row is worse
-    /// than a missing one: an absent row is detectable at a gate and a wrong
-    /// one poisons the record the workflow machine reasons from. The hook
-    /// manifest's matcher decides what fires; this decides what counts.
     /// Can this payload name a write AT ALL, without asking git?
     ///
-    /// Mirrors `resolve`'s tool allowlist using only work that costs no
-    /// subprocess: a declared path is a field read, and the Bash allowlist is
-    /// pure string scanning over the command line. A `true` here is not a
-    /// promise that a row lands — git may still classify the path away — it
-    /// only means the expensive path is worth entering.
+    /// THE TOOL ALLOWLIST: only these tools produce rows, by name. A
+    /// permissive rule would record a change for a tool that only READ the
+    /// file, and a wrong row poisons the record while a missing one is
+    /// detectable at a gate. Nothing here costs a subprocess, and a `true` is
+    /// not a promise that a row lands — git may still classify the path away —
+    /// only that the expensive path is worth entering.
     static func mayHaveTargets(payload: HookPayload) -> Bool {
         switch payload.toolName {
         case "Edit", "Write", "NotebookEdit":
@@ -178,7 +161,8 @@ enum HookWriteTargets {
     /// hunks it wrote, so both the path and the line ranges are facts rather
     /// than inferences.
     private static func declaredPath(
-        payload: HookPayload, repoRoot: String
+        payload: HookPayload,
+        repoRoot: String
     ) -> [HookWriteTarget] {
         guard let absolute = payload.filePath ?? payload.notebookPath,
             let relativePath = GitPathClassifier.repoRelative(absolute, repoRoot: repoRoot)
@@ -189,14 +173,18 @@ enum HookWriteTargets {
         let changeKind: ChangeKind =
             payload.toolName == "Write"
             ? GitPathClassifier.classify(
-                relativePath: relativePath, repoRoot: repoRoot, declared: .write) ?? .create
+                relativePath: relativePath,
+                repoRoot: repoRoot,
+                declared: .write
+            ) ?? .create
             : .edit
         return [
             HookWriteTarget(
                 relativePath: relativePath,
                 changeKind: changeKind,
                 origin: FileChangeOrigin.hook,
-                ranges: StructuredPatchExpander.expand(payload.structuredPatch))
+                ranges: StructuredPatchExpander.expand(payload.structuredPatch)
+            )
         ]
     }
 
@@ -204,63 +192,52 @@ enum HookWriteTargets {
     /// ranges — a command line says nothing about line numbers, and a
     /// fabricated range would be worse than none.
     private static func commandPaths(
-        payload: HookPayload, repoRoot: String
+        payload: HookPayload,
+        repoRoot: String
     ) -> [HookWriteTarget] {
         guard let command = payload.command, let cwd = payload.cwd else { return [] }
-        return BashWritePaths.extract(command: command, cwd: cwd).compactMap { target in
-            guard
-                let relativePath = GitPathClassifier.repoRelative(
-                    target.path, repoRoot: repoRoot),
-                let changeKind = GitPathClassifier.classify(
-                    relativePath: relativePath, repoRoot: repoRoot, declared: target.intent)
-            else { return nil }
-            return HookWriteTarget(
-                relativePath: relativePath,
-                changeKind: changeKind,
-                origin: FileChangeOrigin.command,
-                ranges: [])
-        }
+        return BashWritePaths.extract(command: command, cwd: cwd)
+            .compactMap { target in
+                guard
+                    let relativePath = GitPathClassifier.repoRelative(
+                        target.path,
+                        repoRoot: repoRoot
+                    ),
+                    let changeKind = GitPathClassifier.classify(
+                        relativePath: relativePath,
+                        repoRoot: repoRoot,
+                        declared: target.intent
+                    )
+                else { return nil }
+                return HookWriteTarget(
+                    relativePath: relativePath,
+                    changeKind: changeKind,
+                    origin: FileChangeOrigin.command,
+                    ranges: []
+                )
+            }
     }
 }
 
 // MARK: - The Bash write allowlist
 
-/// THE PATHS A BASH COMMAND NAMED — and nothing else.
-///
-/// WHAT THIS IS. A named allowlist over the command line. Each recorded form
-/// below is a shape whose write TARGET is stated in the command itself:
-///
-///     >  FILE   and  >>  FILE     (unquoted redirections)
-///     tee [-a] FILE...
+/// THE PATHS A BASH COMMAND NAMED — and nothing else. Each recorded form is a
+/// shape whose write TARGET is stated in the command itself:
+///     >  FILE   and  >>  FILE     (unquoted redirections)    tee [-a] FILE...
 ///     sed -i[SUFFIX] ... FILE...        perl -i... ... FILE...
 ///     cp / install / ln SRC... DST  →  DST
 ///     mv SRC... DST                 →  DST written, every SRC deleted
 ///     rm [-rf] FILE...              →  deleted
 ///     touch FILE...
-///
-/// WHAT IT RECORDS NOTHING FOR, AS A DOCUMENTED GAP: every interpreter
-/// heredoc (`python - <<EOF`), `make`, `./script.sh`, `git apply`, unbalanced
-/// quotes, and any target spelled with an unexpanded `$VAR` or a glob. Those
-/// produce ZERO rows, silently. This is a known-incomplete capture surface,
-/// and it is named here rather than discovered at the first gate that blocks.
-///
-/// IT IS NOT A DIFF ENGINE. It holds no baseline, no cursor, no lock and no
-/// compare-and-swap, and it has nothing to advance. Its one use of git is a
-/// PATH-LIMITED `git status --porcelain -- <path>` that CLASSIFIES a path the
-/// command already named. It CANNOT DISCOVER A PATH. The next reader's first
-/// instinct will be that the delta engine came back through git; it did not,
-/// and this is the paragraph that says so.
-///
-/// IT THEREFORE CANNOT MISATTRIBUTE, which is the whole reason this mechanism
-/// was chosen. The designs it beat derived a write WINDOW from the payload's
-/// `duration_ms` and intersected it with a git listing; under the parallel
-/// fan-out this system runs by default, another agent's edit lands inside that
-/// window and is attributed to this command's agent. An absent row is
-/// detectable at a gate; a wrong row is not, and it poisons the record.
-///
-/// The segmenting rules are ported from the PreToolUse write guard's proven
-/// scanner: quoting is tracked, separators split only outside quotes, and
-/// every failure mode of the parse lands on "record nothing".
+
+/// A DOCUMENTED GAP, recording NOTHING silently: interpreter heredocs,
+/// `make`, `./script.sh`, `git apply`, unbalanced quotes, and any target
+/// spelled with an unexpanded `$VAR` or a glob. Every failure mode of the
+/// parse lands on "record nothing", because an absent row is detectable at a
+/// gate while a wrong row poisons the record. IT IS NOT A DIFF ENGINE: its one
+/// use of git is a PATH-LIMITED `git status --porcelain -- <path>` that
+/// CLASSIFIES a path the command already named, so it CANNOT DISCOVER A PATH
+/// and therefore CANNOT MISATTRIBUTE a parallel agent's edit.
 enum BashWritePaths {
     struct Target: Equatable {
         let path: String
@@ -344,7 +321,9 @@ enum BashWritePaths {
             let operands = operands(rest)
             guard operands.count >= 2, let destination = operands.last else { return [] }
             return destinations(
-                sources: operands.dropLast(), destination: destination, cwd: cwd
+                sources: operands.dropLast(),
+                destination: destination,
+                cwd: cwd
             )
             .map { Target(path: $0, intent: .write) }
         case "mv":
@@ -385,7 +364,9 @@ enum BashWritePaths {
     /// not DST — recording the directory would file a change against a path
     /// that is not a file at all.
     private static func destinations(
-        sources: some Collection<String>, destination: String, cwd: String
+        sources: some Collection<String>,
+        destination: String,
+        cwd: String
     ) -> [String] {
         // Resolved against the payload's cwd before the question is asked —
         // the hook process's own working directory is somebody else's.
@@ -408,22 +389,17 @@ enum BashWritePaths {
         var inPlace: Bool { flags.contains("i") }
     }
 
-    /// The sed/perl option walk. Both tools take CLUSTERS, and a cluster is
-    /// where a naive parser loses the file list: in `perl -pi -e 's/a/b/'` the
-    /// `-e` pulls the program out of the next word, while in `perl -pe
-    /// 's/a/b/'` the very same argument is pulled by an `e` sitting at the end
-    /// of a cluster. Miss that and the script is read as a filename.
-    ///
-    /// Three shapes, all handled here:
+    /// The sed/perl option walk. Both take CLUSTERS, which is where a naive
+    /// parser loses the file list and reads the script as a filename. Four
+    /// shapes are handled:
     ///   - `-e PROGRAM`   the argument is the next word
     ///   - `-e'PROGRAM'`  the argument is the rest of this word
     ///   - `-i.bak`       everything from the `.` is a SUFFIX, not more flags
-    ///
-    /// Plus one platform idiom that is not a cluster at all: BSD sed spells
-    /// in-place `-i ''`, so a bare `-i` followed by an EMPTY word consumes
-    /// that word as the suffix it is.
+    ///   - `-i ''`        BSD sed's in-place idiom: the EMPTY next word is the
+    ///                    suffix
     private static func scanOptions(
-        _ words: [String], argumentTaking: Set<Character>
+        _ words: [String],
+        argumentTaking: Set<Character>
     ) -> ParsedOptions {
         var flags: Set<Character> = []
         var positionals: [String] = []
@@ -514,7 +490,8 @@ enum BashWritePaths {
         return URL(
             fileURLWithPath: expanded,
             relativeTo: URL(fileURLWithPath: cwd, isDirectory: true)
-        ).standardizedFileURL.path
+        )
+        .standardizedFileURL.path
     }
 }
 
@@ -529,26 +506,13 @@ enum BashToken: Equatable {
 }
 
 /// The quoting-aware segmenter behind PostToolUse Bash capture.
-///
-/// A command line is split into COMMAND POSITIONS. The scanner walks it once
-/// carrying a context stack:
-///
-///     U  top-level unquoted     S  inside '…'     D  inside "…"
-///     C  inside $( … )          B  inside ` … `
-///
-/// Separators split only in U/C/B. Inside D, `$(` and a backtick still open a
-/// real command position; everything else is literal. Inside S nothing is
-/// special at all. This matters because `git commit -m "cleanup; rm -rf x"`
-/// contains no command position after the `;` — splitting there would invent
-/// a deletion out of a commit message.
-///
-/// HEREDOCS STOP THE SCAN at an unquoted `<<`, deliberately: a heredoc body is
-/// data whose lines are indistinguishable from commands without parsing the
-/// shell. Everything before the `<<` is still scanned.
-///
-/// AN UNBALANCED QUOTE RETURNS NIL — the whole command records nothing. The
-/// scanner cannot know where the intended word boundaries were, and a
-/// half-parsed path is a wrong path.
+/// A command line is split into COMMAND POSITIONS, walked once with a context
+/// stack over unquoted, `'…'`, `"…"`, `$( … )` and backtick states. Separators
+/// split only outside quotes, so `git commit -m "cleanup; rm -rf x"` holds no
+/// command position after the `;` and splitting there would invent a deletion
+/// out of a commit message. HEREDOCS STOP THE SCAN at an unquoted `<<`, since
+/// the body is indistinguishable from commands. AN UNBALANCED QUOTE RETURNS
+/// NIL: a half-parsed path is a wrong path.
 enum BashCommandScanner {
     private enum State { case unquoted, single, double, commandSub, backtick }
 
@@ -724,7 +688,9 @@ enum GitPathClassifier {
     /// like. THAT FALLTHROUGH IS A SAFETY NET, not an accident — it is why a
     /// `sed` script mistaken for a filename cannot reach the db.
     static func classify(
-        relativePath: String, repoRoot: String, declared: BashWritePaths.Intent
+        relativePath: String,
+        repoRoot: String,
+        declared: BashWritePaths.Intent
     ) -> ChangeKind? {
         if let code = statusCode(relativePath: relativePath, repoRoot: repoRoot) {
             if code.contains("?") { return .create }

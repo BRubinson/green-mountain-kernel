@@ -180,11 +180,10 @@ public struct SessionRow: Codable, Hashable, Sendable {
     }
 }
 
-/// One activation claim (v21): a running Claude Code instance (client_key,
-/// resolved from process ancestry by gm) is working prompt X. Claimed at
-/// `initiated` — which BRIEFING_OPEN stamps — and released at done. m0028 moved
-/// the claim earlier than it used to sit, so briefing, exploration and
-/// architecture now run under it too.
+/// One activation claim: a running Claude Code instance, keyed by the
+/// client_key resolved from process ancestry, is working prompt X. Claimed at
+/// `initiated`, which BRIEFING_OPEN stamps, and released at done — so briefing,
+/// exploration and architecture all run under it.
 public struct PromptActivationRow: Codable, Hashable, Sendable {
     public let uuid: String
     public let sessionUuid: String
@@ -607,15 +606,11 @@ public struct FileChangeRow: Codable, Hashable, Sendable {
 
 /// One row per agent_id: the merged answer to "who is agent X".
 ///
-/// The identity half (agentType, the Claude ids, the resolved session and
-/// prompt) comes from the SubagentStart payload; the authority half (role,
-/// methodology, workflowPhase) comes from the spawner's AGENT_REGISTER. Each
-/// half is written independently and either may arrive first, so any field
-/// can legitimately be nil.
-///
-/// NOT an agent_briefing: a briefing answers "what refs did this agent get"
-/// and is keyed per (prompt, step), which cannot hold four same-typed
-/// explorers — the exact case this row exists for.
+/// The identity half comes from the SubagentStart payload and the authority
+/// half from the spawner's AGENT_REGISTER. Each is written independently and
+/// either may arrive first, so any field can legitimately be nil. NOT an
+/// agent_briefing: a briefing is keyed per (prompt, step), which cannot hold
+/// four same-typed explorers — the case this row exists for.
 public struct AgentRegistrationRow: Codable, Hashable, Sendable {
     public let uuid: String
     public let version: Int64
@@ -1712,7 +1707,8 @@ public struct DopeScopeRow: Codable, Hashable, Sendable {
         guard let sessionUuid else {
             throw StoreError.badRequest(
                 detail: "scope \(uuid) is tier \(scopeType), which has no session; "
-                    + "this operation is session-tier only")
+                    + "this operation is session-tier only"
+            )
         }
         return sessionUuid
     }

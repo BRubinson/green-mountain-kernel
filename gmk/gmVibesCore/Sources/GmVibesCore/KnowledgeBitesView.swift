@@ -109,8 +109,10 @@ private struct KBiteSearchPane: View {
     private var hitList: some View {
         if let errorText {
             ContentUnavailableView(
-                "Search Unavailable", systemImage: "bolt.slash",
-                description: Text(errorText))
+                "Search Unavailable",
+                systemImage: "bolt.slash",
+                description: Text(errorText)
+            )
         } else if hits.isEmpty {
             ContentUnavailableView(
                 searched ? "No Matches" : "Search KBites",
@@ -118,7 +120,8 @@ private struct KBiteSearchPane: View {
                 description: Text(
                     searched
                         ? "No db-digested content matched. Kbites digested before the migration are browsable in the Digested tab."
-                        : "FTS5 search over kbite content digested into the GMCC database.")
+                        : "FTS5 search over kbite content digested into the GMCC database."
+                )
             )
         } else {
             List(hits, id: \.fileUuid, selection: $selectedFileUuid) { hit in

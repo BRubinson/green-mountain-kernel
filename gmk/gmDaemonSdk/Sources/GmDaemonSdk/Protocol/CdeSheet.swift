@@ -1,26 +1,20 @@
 import Foundation
 
 /// The agent-facing sheet, GENERATED FROM `VerbRegistry` rather than written
-/// down.
+/// down: reading the roster off the registry the pen serves from means a tool
+/// cannot be listed here unless it exists, nor exist without being listed.
 ///
-/// Generation is the whole point: a hand-written sheet is prose ABOUT a
-/// surface, so it can disagree with the surface. Reading the roster off the
-/// registry the pen serves from makes that disagreement unrepresentable — a
-/// tool cannot be listed here unless it exists, and cannot exist without being
-/// listed.
-///
-/// TWO PROPERTIES, TWO BUDGETS. `instructions` is what the MCP server returns
-/// from `initialize`, where the budget is tight (2048 bytes, asserted at
-/// startup). `text` is what a spawning agent receives as SubagentStart context,
-/// where there is room for the invariants an agent actually needs and cannot
-/// infer from a tool schema.
-public enum PenSheet {
+/// TWO PROPERTIES, TWO BUDGETS. `instructions` is the MCP server's
+/// `initialize` response and is capped at 2048 bytes, asserted at startup.
+/// `text` is what a spawning agent receives as SubagentStart context, where
+/// there is room for invariants a tool schema cannot carry.
+public enum CdeSheet {
 
     /// Compact orientation for the MCP `initialize` response.
     public static var instructions: String {
         let roster = self.roster
         return """
-            The GMCC pen: the GM-CDE workflow machine's record, as tools.
+            The GMCC cde server: the GM-CDE workflow machine's record, as tools.
 
             START HERE — rpir_next returns your current phase, its instructions, \
             your uuid bundle, and the gate blockers. Call it before anything else, \
@@ -88,7 +82,7 @@ public enum PenSheet {
         var writes: [String] = []
         var primaryCalls: [String] = []
         for spec in VerbRegistry.all.sorted(by: { $0.messageType.rawValue < $1.messageType.rawValue }) {
-            guard let tool = spec.penTool else { continue }
+            guard let tool = spec.cdeTool else { continue }
             // The primary's four are listed on their own line rather than
             // among the writes — METHODOLOGY, not a gate. Named rather than
             // withheld, so an agent can say it is ready for a specific one
@@ -104,7 +98,7 @@ public enum PenSheet {
                 if !reads.contains(tool) { writes.append(tool) }
             }
         }
-        for tool in VerbRegistry.compositePenTools.keys.sorted() where !reads.contains(tool) {
+        for tool in VerbRegistry.compositeCdeTools.keys.sorted() where !reads.contains(tool) {
             reads.append(tool)
         }
         return Roster(reads: reads, writes: writes, primaryCalls: primaryCalls.sorted())

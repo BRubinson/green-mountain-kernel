@@ -175,7 +175,8 @@ struct DopeEnumMissingSheet: View {
             ContentUnavailableView(
                 "Enum No Longer Present",
                 systemImage: "questionmark.square.dashed",
-                description: Text("`\(ref)` is not in the tree that is loaded now."))
+                description: Text("`\(ref)` is not in the tree that is loaded now.")
+            )
             Button("Done") { dismiss() }
                 .keyboardShortcut(.defaultAction)
         }

@@ -1,22 +1,13 @@
 import Foundation
 
-/// Turns what a person actually types — `10`, `p10`, `fast_startup`, `startup` —
-/// into a prompt uuid.
-///
-/// THE GAP THIS CLOSES: every prompt verb takes `--prompt-uuid` and nothing
-/// else. Resolving the seq a user typed meant listing every prompt in the
-/// session and filtering client-side, which is a round trip plus hand-written
-/// glue at every call site, re-invented slightly differently each time.
-///
-/// PURE ON PURPOSE. It folds over the stubs `PROMPT_LIST` already returns, so it
-/// needs no wire verb, no handler, and no migration — the `prompt` table already
-/// declares `UNIQUE(session_uuid, seq)` and `UNIQUE(session_uuid, code)`, which
-/// is what makes seq and code single-valued answers rather than best guesses.
-///
-/// AMBIGUITY IS A RESULT, NEVER A GUESS. A substring that matches three prompts
-/// returns all three for the caller to disambiguate. Silently picking the first
-/// would file a session's work against the wrong prompt, and the append-only db
-/// means that mistake is permanent.
+/// Turns what a person types — `10`, `p10`, `fast_startup` — into a prompt
+/// uuid. PURE: it folds over the stubs `PROMPT_LIST` already returns, so it
+/// needs no wire verb, handler or migration. `prompt` declares
+/// `UNIQUE(session_uuid, seq)` and `UNIQUE(session_uuid, code)`, which makes
+/// seq and code single-valued answers rather than best guesses. AMBIGUITY IS
+/// A RESULT, NEVER A GUESS: a substring matching three prompts returns all
+/// three, because picking the first would file work against the wrong prompt
+/// and the append-only db makes that permanent.
 public enum PromptResolver {
 
     /// How a selector matched — surfaced so a caller can tell an exact hit from

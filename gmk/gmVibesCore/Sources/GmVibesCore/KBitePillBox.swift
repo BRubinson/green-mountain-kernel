@@ -64,10 +64,12 @@ private struct KBitePill: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
             .background {
-                Capsule().fill(
-                    isSelected
-                        ? AnyShapeStyle(Color.accentColor.opacity(0.85))
-                        : AnyShapeStyle(.thinMaterial))
+                Capsule()
+                    .fill(
+                        isSelected
+                            ? AnyShapeStyle(Color.accentColor.opacity(0.85))
+                            : AnyShapeStyle(.thinMaterial)
+                    )
             }
             .overlay {
                 Capsule().stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.4))
@@ -85,7 +87,7 @@ private struct KBitePill: View {
 private struct KBiteFlowLayout: Layout {
     var spacing: CGFloat = 6
 
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
         var rowWidth: CGFloat = 0
         var totalHeight: CGFloat = 0
@@ -105,7 +107,7 @@ private struct KBiteFlowLayout: Layout {
         return CGSize(width: maxWidth.isFinite ? maxWidth : rowWidth, height: totalHeight)
     }
 
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+    func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
         var x = bounds.minX
         var y = bounds.minY
         var rowHeight: CGFloat = 0

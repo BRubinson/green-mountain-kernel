@@ -40,7 +40,11 @@ extension Store {
         relativePath: String,
         changeKind: ChangeKind
     ) throws -> String {
-        try FileChangeRepository(db: db, core: core).ensureSessionFile(
-            sessionUuid: sessionUuid, relativePath: relativePath, changeKind: changeKind)
+        try FileChangeRepository(db: db, core: core)
+            .ensureSessionFile(
+                sessionUuid: sessionUuid,
+                relativePath: relativePath,
+                changeKind: changeKind
+            )
     }
 }

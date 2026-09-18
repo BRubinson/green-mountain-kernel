@@ -2,19 +2,14 @@ import Foundation
 import Observation
 import GmDaemonSdk
 
-/// Per-prompt read model over CLARIFY_GET + ARCH_GET + EXPLORE_GET +
-/// REVIEW_GET — the app's only surface onto the db-native report subsystem
-/// (read-only by clarified scope; every write verb stays bot/CLI-side).
+/// Per-prompt read model over CLARIFY_GET + ARCH_GET + EXPLORE_GET + REVIEW_GET, the app's
+/// read-only surface onto the report subsystem; every write verb stays bot/CLI-side.
 ///
-/// Memoized on `SessionScope` beside the save actors so N panes on one prompt
-/// cost one fetch. SUMMARY_ABSENT is a NORMAL state (the summary was never
-/// opened) — it publishes `.absent`, never an error banner. Plain NOT_FOUND
-/// means the prompt uuid itself is unknown — a real failure, never absence.
-///
-/// Live refresh needs no registration: as of wire v8 every phase-change
-/// payload (CLARIFICATION/ARCHITECTURE/EXPLORATION/REVIEW_CHANGE) carries
-/// prompt_uuid, so the connection model routes them to the `.prompt` domain
-/// directly.
+/// Memoized on `SessionScope` beside the save actors so N panes on one prompt cost one fetch.
+/// SUMMARY_ABSENT is a NORMAL state and publishes `.absent`, never an error banner; plain
+/// NOT_FOUND means the prompt uuid is unknown, which is a real failure. Live refresh needs no
+/// registration: every phase-change payload carries prompt_uuid, so the connection model
+/// routes them to the `.prompt` domain directly.
 @Observable
 @MainActor
 final class PromptPhaseStore {
@@ -99,26 +94,17 @@ final class PromptPhaseStore {
 
     // MARK: - Refresh
 
-    /// Coalesced single-flight (house idiom) — the pane's event loop and the
-    /// section's first render must share one round trip set.
+    /// Coalesced single-flight: the pane's event loop and the section's first render share
+    /// one round trip set.
     ///
-    /// `lifecyclePhases: false` skips CLARIFY_GET/ARCH_GET — draft prompts
-    /// provably have neither (the two-guaranteed-absent round trips the old
-    /// all-or-nothing gate existed to prevent). `reports: false` skips
-    /// EXPLORE_GET/REVIEW_GET — legal ONLY for evidence-gated event-loop
-    /// wakes on a draft whose freshly-listed stub shows no report summaries
-    /// (an EXPLORATION_CHANGE re-lists the stub first, so the evidence is
-    /// never stale); the first load and every status change fetch reports
-    /// unconditionally because EXPLORE_OPEN is explicit-only and legally
-    /// runs while the prompt is still draft.
-    ///
-    /// `workflow: false` skips BOT_NEXT. It is its OWN axis, never folded into
-    /// `lifecyclePhases`: `gm prompt start` deliberately creates the
-    /// `bot_workflow` row while the prompt is still `draft`, so gating the
-    /// strip on the lifecycle axis would blind it on exactly the prompts that
-    /// most need it.
+    /// `lifecyclePhases: false` skips CLARIFY_GET/ARCH_GET, which a draft prompt provably has
+    /// neither of. `reports: false` skips EXPLORE_GET/REVIEW_GET, legal ONLY for an
+    /// evidence-gated wake on a draft whose freshly-listed stub shows no report summaries.
+    /// `workflow: false` skips BOT_NEXT, its own axis and never folded into `lifecyclePhases`:
+    /// `gm prompt start` creates the `bot_workflow` row while the prompt is still draft.
     func refresh(
-        lifecyclePhases: Bool = true, reports: Bool = true,
+        lifecyclePhases: Bool = true,
+        reports: Bool = true,
         workflow: Bool = true
     ) async {
         // Coalesce only with a run at least as wide on every axis.
@@ -164,7 +150,10 @@ final class PromptPhaseStore {
         let task = Task {
             await prior?.value
             await self.performRefresh(
-                lifecyclePhases: lifecyclePhases, reports: reports, workflow: workflow)
+                lifecyclePhases: lifecyclePhases,
+                reports: reports,
+                workflow: workflow
+            )
         }
         inFlight = (task, lifecyclePhases, reports, workflow, token)
         await task.value
@@ -251,23 +240,13 @@ final class PromptPhaseStore {
         }
     }
 
-    /// BOT_NEXT, honestly a write: it stamps `last_served_phase` and emits
-    /// WORKFLOW_CHANGE. Two consequences are handled here and nowhere else.
+    /// BOT_NEXT, honestly a write: it stamps `last_served_phase` and emits WORKFLOW_CHANGE.
     ///
-    /// THE FEEDBACK LOOP, written down where the next reader will find it:
-    /// BOT_NEXT stamps `last_served_phase` and emits WORKFLOW_CHANGE, which
-    /// `DaemonConnectionModel` routes to `.prompt(uuid)`, which triggers a
-    /// refresh, which issues another BOT_NEXT. The loop SELF-DAMPS — the
-    /// second call finds `lastServedPhase == current` and writes nothing, so
-    /// no event is emitted and the chain stops. Cost is exactly one extra
-    /// round trip per REAL phase change, and the derivation is deterministic
-    /// on db state, so it cannot oscillate. To verify: open a prompt pane,
-    /// watch the event stream, and confirm it goes quiet.
-    ///
-    /// SUMMARY_ABSENT is the normal no-`bot_workflow`-row state:
-    /// `resolve(promptUuid:)` throws exactly this when no row exists, so
-    /// never-started AND permanent `/gm_task` land on ONE `.absent` arm — the
-    /// header renders alone, with no distinguishing copy.
+    /// That event routes to `.prompt(uuid)`, triggering a refresh and another BOT_NEXT. The
+    /// loop SELF-DAMPS: the second call finds `lastServedPhase == current`, writes nothing and
+    /// emits nothing, so the cost is one extra round trip per real phase change.
+    /// SUMMARY_ABSENT is the normal no-`bot_workflow`-row state, so never-started and
+    /// permanent `/gm_task` land on one `.absent` arm with no distinguishing copy.
     private func fetchWorkflow() async -> Phase<BotNextResponse> {
         do {
             do {

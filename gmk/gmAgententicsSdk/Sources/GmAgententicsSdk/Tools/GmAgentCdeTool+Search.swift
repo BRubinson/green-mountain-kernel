@@ -30,9 +30,11 @@ public struct GmAgentRpirSearchExplorationTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeSearchArguments) async throws -> String {
+    public func call(arguments _: GmAgentCdeSearchArguments) throws -> String {
         throw GmAgentToolError.notWired(
-            tool: name, verb: "SEARCH kinds=exploration_summary,exploration_finding")
+            tool: name,
+            verb: "SEARCH kinds=exploration_summary,exploration_finding"
+        )
     }
 }
 
@@ -43,9 +45,11 @@ public struct GmAgentRpirSearchClarificationTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeSearchArguments) async throws -> String {
+    public func call(arguments _: GmAgentCdeSearchArguments) throws -> String {
         throw GmAgentToolError.notWired(
-            tool: name, verb: "SEARCH kinds=clarification_question,clarification_note")
+            tool: name,
+            verb: "SEARCH kinds=clarification_question,clarification_note"
+        )
     }
 }
 
@@ -56,13 +60,14 @@ public struct GmAgentRpirSearchArchitectureTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeSearchArguments) async throws -> String {
+    public func call(arguments _: GmAgentCdeSearchArguments) throws -> String {
         throw GmAgentToolError.notWired(
             tool: name,
             verb: """
                 SEARCH kinds=architecture_summary,architecture_general_change,\
                 architecture_persistence_change
-                """)
+                """
+        )
     }
 }
 
@@ -73,9 +78,11 @@ public struct GmAgentRpirSearchReviewTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeSearchArguments) async throws -> String {
+    public func call(arguments _: GmAgentCdeSearchArguments) throws -> String {
         throw GmAgentToolError.notWired(
-            tool: name, verb: "SEARCH kinds=review_summary,review_finding")
+            tool: name,
+            verb: "SEARCH kinds=review_summary,review_finding"
+        )
     }
 }
 
@@ -86,7 +93,7 @@ public struct GmAgentRpirSearchArchitectureOptionTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeSearchArguments) async throws -> String {
+    public func call(arguments _: GmAgentCdeSearchArguments) throws -> String {
         throw GmAgentToolError.notSupported(
             tool: name,
             detail: """
@@ -94,7 +101,8 @@ public struct GmAgentRpirSearchArchitectureOptionTool: GmAgentRpirTool {
                 never added to the FTS index. ARCH_GET reads them by uuid, but \
                 nothing searches their text. Closing this needs a new SearchKind \
                 plus its FTS table and triggers.
-                """)
+                """
+        )
     }
 }
 
@@ -114,8 +122,10 @@ public struct GmAgentCdeSearchFileChangesArguments: Sendable {
     public var limit: Int
 
     public init(
-        promptUuid: String = "", sessionUuid: String = "",
-        relativePath: String = "", limit: Int = 100
+        promptUuid: String = "",
+        sessionUuid: String = "",
+        relativePath: String = "",
+        limit: Int = 100
     ) {
         self.promptUuid = promptUuid
         self.sessionUuid = sessionUuid
@@ -131,7 +141,7 @@ public struct GmAgentCdeSearchFileChangesTool: GmAgentCdeTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeSearchFileChangesArguments) async throws -> String {
+    public func call(arguments _: GmAgentCdeSearchFileChangesArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "FILE_CHANGE_LIST")
     }
 }

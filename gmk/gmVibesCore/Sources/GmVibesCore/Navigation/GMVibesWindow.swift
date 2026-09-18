@@ -21,18 +21,14 @@ public struct GMVibesWindow: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // THE ENVIRONMENT BANNER, ABOVE EVERYTHING, ON EVERY WINDOW.
+            // THE ENVIRONMENT BANNER, ABOVE EVERYTHING, ON EVERY WINDOW. It renders nothing
+            // on production, and on beta and test it is the always-visible signal: the Dock
+            // tile cannot be, because LSUIElement means no tile until a window opens, and the
+            // menu-bar glyph is a template and carries no colour.
             //
-            // Renders nothing on production, so this costs a branch there. On
-            // beta and test it is the ALWAYS-VISIBLE signal — the Dock tile
-            // cannot be, because LSUIElement means there is no tile until a
-            // window opens, and the menu-bar glyph is a template and so cannot
-            // carry colour.
-            //
-            // Correct at FIRST PAINT: it reads `Paths.root`, which resolves the
-            // bundle's baked key synchronously in-process. Asking the daemon
-            // instead would put production chrome on screen for the frames
-            // before PATHS_GET answered.
+            // Correct at FIRST PAINT because it reads `Paths.root`, which resolves the
+            // bundle's baked key in-process. Asking the daemon would put production chrome on
+            // screen for the frames before PATHS_GET answered.
             EnvironmentBanner()
             // The rail SLIDES OVER content (ZStack) rather than pushing it aside:
             // an HStack would add its 200pt to the content's own minWidth and

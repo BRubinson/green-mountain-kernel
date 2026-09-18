@@ -32,21 +32,14 @@ struct KernelVitalsReading: Equatable, Sendable {
     var cpuPercent: Double?
 }
 
-/// The menu bar's vitals sampler: resident footprint, CPU load, uptime, plus
-/// the display strings for all three.
+/// The menu bar's vitals sampler: resident footprint, CPU load, uptime, and the display
+/// strings for all three. Unrelated to `MemoryWatcher` in `gmk/gmDaemon`, which watches
+/// prompt `memory/` directories and has nothing to do with RAM.
 ///
-/// NAME TRAP, and it is an easy one to walk into: `MemoryWatcher` already
-/// exists in `gmk/gmDaemon` and has NOTHING to do with RAM — it is the FSEvents
-/// watcher over prompt `memory/` directories. This type is the one that reads
-/// bytes. Nothing here extends, imports or resembles that one, deliberately.
-///
-/// Precedence, which matters because two processes are in play: a reported
-/// value always wins over a locally sampled one. The report describes the
-/// kernel that actually owns the store, and in CLIENT-ONLY mode that is not
-/// this process — showing our own footprint under the owner's label would be a
-/// quietly wrong number rather than a missing one. Local sampling is the
-/// fallback (and in writer mode it reads the same process anyway), so the rows
-/// stay populated when nothing has answered yet.
+/// A REPORTED value always wins over a locally sampled one, because the report describes the
+/// kernel that owns the store and in client-only mode that is another process. Showing our
+/// own footprint under the owner's label is a quietly wrong number rather than a missing one.
+/// Local sampling is the fallback that keeps the rows populated before anything has answered.
 @Observable
 @MainActor
 public final class KernelVitals {
@@ -182,7 +175,8 @@ public final class KernelVitals {
     private nonisolated static func read(cpu: CpuDeltaState) -> KernelVitalsReading {
         KernelVitalsReading(
             residentMemoryBytes: residentFootprintBytes(),
-            cpuPercent: cpuPercentDelta(cpu: cpu))
+            cpuPercent: cpuPercentDelta(cpu: cpu)
+        )
     }
 
     /// `phys_footprint` rather than `resident_size`: it is the number the
@@ -193,7 +187,8 @@ public final class KernelVitals {
     private nonisolated static func residentFootprintBytes() -> UInt64? {
         var info = task_vm_info_data_t()
         var count = mach_msg_type_number_t(
-            MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size)
+            MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<natural_t>.size
+        )
         let result = withUnsafeMutablePointer(to: &info) { pointer in
             pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { rebound in
                 task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), rebound, &count)
@@ -203,31 +198,21 @@ public final class KernelVitals {
         return UInt64(info.phys_footprint)
     }
 
-    /// CPU as a percentage of one core over the interval BETWEEN samples —
-    /// 100% is one saturated core, and a multi-threaded burst legitimately
-    /// exceeds it, exactly as Activity Monitor reports.
+    /// CPU as a percentage of one core over the interval BETWEEN samples: 100% is one
+    /// saturated core, and a multi-threaded burst legitimately exceeds it.
     ///
-    /// `proc_pid_rusage` reports CPU consumed CUMULATIVELY since launch, so its
-    /// absolute value says nothing about load now: a process that burned a core
-    /// for a minute at startup and has idled since would read hot forever. The
-    /// percentage is therefore a delta — CPU consumed since the previous sample
-    /// over monotonic time elapsed since the previous sample. The first sample
-    /// after a start has no predecessor and returns nil rather than a
+    /// `proc_pid_rusage` reports CPU consumed cumulatively since launch, so its absolute value
+    /// says nothing about load now. The percentage is a delta of CPU consumed over monotonic
+    /// time elapsed since the previous sample, and the first sample returns nil rather than a
     /// fabricated 0.
     private nonisolated static func cpuPercentDelta(cpu: CpuDeltaState) -> Double? {
-        // BOTH SIDES OF THE RATIO ARE MACH ABSOLUTE TIME UNITS, and that is the
-        // whole trick. `ri_user_time`/`ri_system_time` are documented in
-        // "nanoseconds" and are not — they are mach ticks, which on Apple
-        // silicon run 125/3 ns each. Dividing them by a real nanosecond clock
-        // (`DispatchTime.uptimeNanoseconds`) reports a busy core as 2.4%, and
-        // it does so ONLY on arm64: Intel's timebase is 1:1, so the bug hides
-        // on the machine nobody ships on any more. Measuring the wall side with
-        // `mach_absolute_time()` keeps the units identical, which needs no
-        // timebase conversion and cannot drift with the hardware.
-        //
-        // Mach absolute time also stops across system sleep, which is what we
-        // want here: the process consumes no CPU while asleep either, so the
-        // two sides pause together instead of a resume printing a fake idle.
+        // BOTH SIDES OF THE RATIO ARE MACH ABSOLUTE TIME UNITS. `ri_user_time` and
+        // `ri_system_time` are documented as nanoseconds and are not: they are mach ticks,
+        // 125/3 ns each on Apple silicon. Dividing them by a real nanosecond clock reports a
+        // busy core as 2.4%, and only on arm64, because Intel's timebase is 1:1. Measuring the
+        // wall side with `mach_absolute_time()` needs no timebase conversion and cannot drift
+        // with the hardware. It also stops across system sleep, which is right here: the
+        // process consumes no CPU while asleep, so both sides pause together.
         let wall = mach_absolute_time()
         guard let consumed = cpuTicks() else { return nil }
         defer {

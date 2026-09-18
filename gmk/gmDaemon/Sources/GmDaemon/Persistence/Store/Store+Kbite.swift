@@ -29,7 +29,9 @@ extension Store {
 
     /// The owner's own scope plus every ancestor scope+uuid.
     func resolveAncestorScopes(
-        _ db: Database, scope: KbiteScope, ownerUuid: String
+        _ db: Database,
+        scope: KbiteScope,
+        ownerUuid: String
     ) throws -> [(level: String, uuid: String)] {
         try KbiteRepository(db: db, core: core)
             .resolveAncestorScopes(scope: scope, ownerUuid: ownerUuid)

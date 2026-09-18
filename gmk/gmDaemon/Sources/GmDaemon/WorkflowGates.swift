@@ -2,55 +2,24 @@ import Foundation
 import GRDB
 import GmDaemonSdk
 
-/// The two phase-exit contracts the machine never declared: what
-/// "implementation is finished" and "the review fix loop is finished"
-/// actually mean in db evidence.
-///
-/// ADVISORY ONLY this release (decision 7). Nothing here refuses anything —
-/// BotWorkflowRepository.derivePhase appends these strings, prefixed
-/// `advisory: `, to the blockers it already REPORTS, and
-/// PromptRepository.setStatus's implementing → {reviewing, done} and
-/// reviewing → done transitions stay ungated.
-///
-/// WHY THESE READ AS THE *NEXT* PHASE'S ENTRY CONTRACT. Gate logic in this
-/// machine is ENTRY-only, and derivePhase walks the phase list in REVERSE
-/// taking the furthest phase whose entry gate passes. An implement EXIT
-/// contract therefore has to be written as REVIEW's entry contract, and a
-/// review_fix exit contract as DONE's — strengthening entryBlockers(.implement)
-/// would only hold the machine at plan_gate, which is the wrong end.
-///
-/// AND WHY THEY ARE NOT IN entryBlockers ANYWAY. Because derivePhase takes the
-/// FURTHEST passing gate, an unconditional new entry blocker on `.done` makes
-/// an already-`done` prompt carrying open sub-100 findings derive BACKWARDS to
-/// `.reviewFix` — silently regressing ~116 historical prompts and any live
-/// one. Calling these from the reporting step only makes that regression
-/// structurally impossible rather than merely avoided; the status scoping at
-/// the call site is then doing the smaller job of suppressing false advisories
-/// on done and historical prompts. Do not move them into entryBlockers.
-///
-/// Both predicates are plain indexed counts over rows
-/// `ArchitectureRepository.get` already computes for ARCH_GET and nobody
-/// reads as a gate — this is a second reader of existing evidence, not a new
-/// source of truth. `derivePhase` is on `FileChangeRepository.add`'s hot path
-/// (one sweep writes N rows), so the call site opts in rather than out.
+/// The two phase-exit contracts: what "implementation is finished" and "the
+/// review fix loop is finished" mean in db evidence. ADVISORY ONLY — derivePhase
+/// appends these strings, prefixed `advisory: `, to the blockers it reports.
+/// They read as the NEXT phase's entry contract because gate logic is ENTRY-only
+/// and derivePhase walks the phases in REVERSE. DO NOT MOVE THEM INTO
+/// entryBlockers: an entry blocker on `.done` derives an already-done prompt
+/// with open sub-100 findings BACKWARDS to `.reviewFix`. derivePhase is on
+/// `FileChangeRepository.add`'s hot path, so the call site opts in.
 enum WorkflowGates {
 
     /// The IMPLEMENT exit contract, read as REVIEW's entry contract.
     ///
-    /// Three questions, all against the plan of record:
-    /// 1. every planned persistence change has at least one recorded
-    ///    `file_change` against its path (`fileChangeCount > 0`);
-    /// 2. persistence-first ordering was not violated (`orderingRespected`
-    ///    is not `false` — `nil`, the vacuous case, passes);
-    /// 3. the plan carries general change rows but the prompt recorded NO
-    ///    file changes at all.
-    ///
-    /// (3) is what stops the predicate being vacuous. Checking only
-    /// persistence rows means the majority of prompts — every one whose plan
-    /// has no persistence changes — passes even if implementation wrote
-    /// nothing whatsoever, which reduces the contract back to prose.
-    ///
-    /// Empty = nothing to say.
+    /// Three questions against the plan of record: every planned persistence
+    /// change has at least one recorded `file_change` against its path;
+    /// persistence-first ordering was not violated, where `nil` passes
+    /// vacuously; and the plan carries general change rows while the prompt
+    /// recorded NO file changes at all. That last one stops the predicate being
+    /// vacuous for every plan with no persistence changes. Empty = nothing to say.
     static func implementExitUnmet(_ db: Database, promptUuid: String) throws -> [String] {
         var unmet: [String] = []
 
@@ -68,11 +37,14 @@ enum WorkflowGates {
                           JOIN session_file sf ON sf.uuid = fc.session_file_uuid
                           WHERE fc.prompt_uuid = s.prompt_uuid
                             AND sf.relative_path = pc.file_path)
-                    """, arguments: [promptUuid]) ?? 0
+                    """,
+                arguments: [promptUuid]
+            ) ?? 0
         if untouchedPersistence > 0 {
             unmet.append(
                 "\(untouchedPersistence) planned persistence change(s) have no recorded "
-                    + "file change (the edit never happened, or the plan is stale)")
+                    + "file change (the edit never happened, or the plan is stale)"
+            )
         }
 
         // (2) persistence-first ordering, same rule as ARCH_GET: the LAST
@@ -89,7 +61,9 @@ enum WorkflowGates {
                     JOIN file_change fc ON fc.session_file_uuid = sf.uuid
                     WHERE s.prompt_uuid = ? AND fc.prompt_uuid = s.prompt_uuid
                     GROUP BY pc.file_path)
-                """, arguments: [promptUuid])
+                """,
+            arguments: [promptUuid]
+        )
         let generalEarliestFirstTouch = try String.fetchOne(
             db,
             sql: """
@@ -99,14 +73,17 @@ enum WorkflowGates {
                 JOIN session_file sf ON sf.relative_path = gc.file_path
                 JOIN file_change fc ON fc.session_file_uuid = sf.uuid
                 WHERE s.prompt_uuid = ? AND fc.prompt_uuid = s.prompt_uuid
-                """, arguments: [promptUuid])
+                """,
+            arguments: [promptUuid]
+        )
         if let persistenceLatestFirstTouch, let generalEarliestFirstTouch,
             persistenceLatestFirstTouch > generalEarliestFirstTouch
         {
             unmet.append(
                 "persistence-first ordering not respected (a general change landed "
                     + "\(generalEarliestFirstTouch), a persistence change only "
-                    + "\(persistenceLatestFirstTouch)) — see mcp__plugin_gmcc_cde__rpir_get_architecture")
+                    + "\(persistenceLatestFirstTouch)) — see mcp__plugin_gmcc_cde__rpir_get_architecture"
+            )
         }
 
         // (3) a plan with general rows and not one recorded change.
@@ -118,16 +95,21 @@ enum WorkflowGates {
                     FROM architecture_general_change gc
                     JOIN architecture_summary s ON s.uuid = gc.architecture_summary_uuid
                     WHERE s.prompt_uuid = ?
-                    """, arguments: [promptUuid]) ?? 0
+                    """,
+                arguments: [promptUuid]
+            ) ?? 0
         if generalPlanned > 0 {
             let recorded =
                 try Int.fetchOne(
-                    db, sql: "SELECT COUNT(*) FROM file_change WHERE prompt_uuid = ?",
-                    arguments: [promptUuid]) ?? 0
+                    db,
+                    sql: "SELECT COUNT(*) FROM file_change WHERE prompt_uuid = ?",
+                    arguments: [promptUuid]
+                ) ?? 0
             if recorded == 0 {
                 unmet.append(
                     "\(generalPlanned) planned general change(s) and ZERO recorded file "
-                        + "changes — the machine can see no implementation at all")
+                        + "changes — the machine can see no implementation at all"
+                )
             }
         }
 
@@ -154,7 +136,9 @@ enum WorkflowGates {
                       AND f.finding_rating IS NOT NULL
                       AND f.finding_rating < 100
                       AND f.status = 'open'
-                    """, arguments: [promptUuid]) ?? 0
+                    """,
+                arguments: [promptUuid]
+            ) ?? 0
         guard open > 0 else { return [] }
         return [
             "\(open) open finding(s) rated below 100 — resolve them (REVIEW_RESOLVE) "

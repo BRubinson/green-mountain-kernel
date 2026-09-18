@@ -14,7 +14,8 @@ extension Store {
     public func listArtifacts(_ req: ArtifactListRequest) throws -> ArtifactListResponse {
         try boundaryRead { db in
             ArtifactListResponse(
-                artifacts: try ArtifactRepository(db: db, core: core).fetchRows(promptUuid: req.promptUuid))
+                artifacts: try ArtifactRepository(db: db, core: core).fetchRows(promptUuid: req.promptUuid)
+            )
         }
     }
 

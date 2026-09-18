@@ -182,7 +182,15 @@ echo "[GMB] building v$STAGE_VERSION ($ARCHES) from $REPO_ROOT @ $BUILD_SHA"
 
 # --- lint --------------------------------------------------------------------
 # Lint-only gate over every authored package; it never rewrites the tree.
+# The committed git hooks are activated here once per clone.
 if [ "$LINT" -eq 1 ]; then
+    HOOKS_PATH="$(git -C "$REPO_ROOT" config core.hooksPath || true)"
+    if [ -z "$HOOKS_PATH" ]; then
+        git -C "$REPO_ROOT" config core.hooksPath gmk/scripts/githooks
+        echo "[GMB] git hooks: core.hooksPath -> gmk/scripts/githooks"
+    elif [ "$HOOKS_PATH" != "gmk/scripts/githooks" ]; then
+        echo "[GMB] git hooks: core.hooksPath is $HOOKS_PATH (left alone; repo hooks live in gmk/scripts/githooks)"
+    fi
     bash "$SCRIPT_DIR/swift_lint_format.sh"
 else
     echo "[GMB] lint skipped (--no-lint)"

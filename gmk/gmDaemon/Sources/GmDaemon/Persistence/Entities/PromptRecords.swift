@@ -75,7 +75,8 @@ extension PromptArtifactRecord {
             promptUuid: promptUuid,
             filePath: filePath,
             note: note,
-            createdAt: createdAt)
+            createdAt: createdAt
+        )
     }
 }
 
@@ -102,7 +103,8 @@ extension PromptRecord {
             status: status,
             gmfsRelativeStoragePath: gmfsRelativeStoragePath,
             createdAt: createdAt,
-            updatedAt: updatedAt)
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -119,7 +121,8 @@ extension PromptQualifiedDiagramRecord {
             qualification: qualification,
             version: version,
             createdAt: createdAt,
-            updatedAt: updatedAt)
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -127,7 +130,11 @@ extension PromptActivationRecord {
     /// db → wire. Replicates the retired hand mapper exactly.
     func wireRow() -> PromptActivationRow {
         PromptActivationRow(
-            uuid: uuid, sessionUuid: sessionUuid, promptUuid: promptUuid,
-            clientKey: clientKey, createdAt: createdAt)
+            uuid: uuid,
+            sessionUuid: sessionUuid,
+            promptUuid: promptUuid,
+            clientKey: clientKey,
+            createdAt: createdAt
+        )
     }
 }

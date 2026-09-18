@@ -3,15 +3,10 @@ import GmAgententicsSdk
 
 // The plugin generator: `gm_bridge_writer [--check] <plugin-dir>`.
 //
-// AN EXECUTABLE IN THIS PACKAGE, NOT A `gm_kernel` SUBCOMMAND, and the platform
-// floor is why rather than taste. `gmAgententicsSdk` is macOS 27 with
-// `unsafeFlags`; `gmKernel`, `gmDaemon` and `gmDaemonSdk` are macOS 14. SwiftPM
-// checks floors at GRAPH RESOLUTION, before any `@available` scope exists, so a
-// `gm_kernel bridge emit` would drag 27 into `gm_hook`, `gm_daemon` and every CI
-// job. Reaching for `@available` is the plausible move that cannot work.
-//
-// The cost is nil: generation is a developer-machine act, like
-// `rebuild_local.sh`, and never runs on a user's machine.
+// An executable in this package rather than a `gm_kernel` subcommand: this package
+// floors at macOS 27 and the kernel at 14, and SwiftPM checks platform floors at
+// graph resolution, before any `@available` scope exists. Generation is a
+// developer-machine act and never runs on a user's machine.
 
 func usage() -> Never {
     FileHandle.standardError.write(
@@ -26,7 +21,10 @@ func usage() -> Never {
             bridge values in gmAgententicsSdk. The write is staged beside the target
             and swapped in, so a failure leaves the old tree intact.
 
-            """.utf8))
+            """
+            .utf8
+        )
+    )
     exit(2)
 }
 

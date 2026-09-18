@@ -2,17 +2,12 @@ import Foundation
 
 /// The committed-file form of one PUBLIC diagram —
 /// `{instance_root}/.gmcc/diagrams/{code}.diagram.doped.json`.
-///
-/// Uuid-free BY CONSTRUCTION (the DopeDocument doctrine: Body structs with
-/// nowhere to put a uuid): elements are identified by CODE, containment is
-/// JSON nesting, and a connector's target is a root→target slash-joined
-/// CODE PATH (`targetCodePath`) — element codes are only sibling-unique, so
-/// a bare code would be ambiguous. The importer re-resolves paths; an
-/// unresolvable path degrades to a ghost (nil target), never an error.
-///
-/// `version` is the diagram's revision, stamped scope-file-style. The TIER
-/// is deliberately NOT persisted: write gating makes it constant (PUBLIC is
-/// SESSION-tier only), so recording it would be dope's scope_type mistake.
+/// Uuid-free BY CONSTRUCTION: elements are identified by CODE, containment is
+/// JSON nesting, and a connector's target is a root→target slash-joined CODE
+/// PATH, since element codes are only sibling-unique. An unresolvable path
+/// degrades to a ghost (nil target), never an error. `version` is the
+/// diagram's revision; the TIER is not persisted, because write gating
+/// already makes it constant.
 public struct DiagramDocument: Codable, Hashable, Sendable {
     public struct ElementDoc: Codable, Hashable, Sendable {
         public let code: String
@@ -30,9 +25,14 @@ public struct DiagramDocument: Codable, Hashable, Sendable {
         public let children: [ElementDoc]
 
         public init(
-            code: String, name: String, description: String,
-            sortOrder: Int, centerX: Double, centerY: Double,
-            elementZ: Double, scale: Double,
+            code: String,
+            name: String,
+            description: String,
+            sortOrder: Int,
+            centerX: Double,
+            centerY: Double,
+            elementZ: Double,
+            scale: Double,
             payload: DiagramElementPayload,
             targetCodePath: String? = nil,
             children: [ElementDoc] = []
@@ -80,8 +80,12 @@ public struct DiagramDocument: Codable, Hashable, Sendable {
     public let elements: [ElementDoc]
 
     public init(
-        version: Int64, code: String, name: String, description: String,
-        dopeScopeCode: String?, elements: [ElementDoc]
+        version: Int64,
+        code: String,
+        name: String,
+        description: String,
+        dopeScopeCode: String?,
+        elements: [ElementDoc]
     ) {
         self.version = version
         self.code = code
@@ -154,27 +158,41 @@ public enum DiagramDocumentCodec {
                 payload = .connector(
                     ConnectorPayload(
                         targetElementUuid: nil,
-                        strokeColor: p.strokeColor, strokeWidth: p.strokeWidth,
-                        lineStyle: p.lineStyle, headKind: p.headKind,
-                        routingKind: p.routingKind, tailKind: p.tailKind,
-                        label: p.label))
+                        strokeColor: p.strokeColor,
+                        strokeWidth: p.strokeWidth,
+                        lineStyle: p.lineStyle,
+                        headKind: p.headKind,
+                        routingKind: p.routingKind,
+                        tailKind: p.tailKind,
+                        label: p.label
+                    )
+                )
             }
             return ElementDocBuild(
                 doc: DiagramDocument.ElementDoc(
-                    code: node.base.code, name: node.base.name,
+                    code: node.base.code,
+                    name: node.base.name,
                     description: node.base.description,
                     sortOrder: node.base.sortOrder,
-                    centerX: node.base.centerX, centerY: node.base.centerY,
-                    elementZ: node.base.elementZ, scale: node.base.scale,
-                    payload: payload, targetCodePath: targetCodePath,
-                    children: node.children.map { doc($0).doc }))
+                    centerX: node.base.centerX,
+                    centerY: node.base.centerY,
+                    elementZ: node.base.elementZ,
+                    scale: node.base.scale,
+                    payload: payload,
+                    targetCodePath: targetCodePath,
+                    children: node.children.map { doc($0).doc }
+                )
+            )
         }
 
         return DiagramDocument(
-            version: tree.revision, code: tree.code, name: tree.name,
+            version: tree.revision,
+            code: tree.code,
+            name: tree.name,
             description: tree.description,
             dopeScopeCode: dopeScopeCode,
-            elements: tree.elements.map { doc($0).doc })
+            elements: tree.elements.map { doc($0).doc }
+        )
     }
 
     private struct ElementDocBuild {

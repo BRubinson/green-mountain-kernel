@@ -2,21 +2,14 @@ import Foundation
 import GRDB
 import GmDaemonSdk
 
-// REVIEW_* — the db-native review report machine (replaces review.md).
-// reviewing → complete, plus the complete → reviewing revision edge. Open is
-// EXPLICIT-only: prompt status transitions never create or gate on this
-// summary (skip-to-done stays legal). Review verbs NEVER touch prompt.status.
-//
-// Same finding_rating semantics as Store+Exploration. Two deliberate
-// divergences from the clarify template, both by design:
-// - overview AND verdict are carried only by COMPLETE (primary-agent-only by
-//   write-path shape; verdict `legacy_unstated` exists for the verbatim
-//   migration of pre-m0004 review files that never state one).
-// - reviewResolve is UNGATED on summary status — the fix loop mutates finding
-//   status AFTER the summary completes, and a reopen mid-loop must not strand
-//   in-flight resolves (the inversion of the clarify child-lock).
-//
-// Bodies live in ReviewRepository; these wrappers own the transaction.
+// REVIEW_* — the db-native review report machine. reviewing → complete, plus the
+// complete → reviewing revision edge. Open is EXPLICIT-only, and review verbs
+// NEVER touch prompt.status.
+// Same finding_rating semantics as Store+Exploration, with two divergences from
+// the clarify template: overview AND verdict are carried only by COMPLETE, and
+// reviewResolve is UNGATED on summary status, because the fix loop mutates
+// finding status after the summary completes and a reopen mid-loop must not
+// strand in-flight resolves. Bodies live in ReviewRepository.
 
 extension Store {
     public func reviewOpen(_ req: ReviewOpenRequest) throws -> ReviewSummaryResponse {

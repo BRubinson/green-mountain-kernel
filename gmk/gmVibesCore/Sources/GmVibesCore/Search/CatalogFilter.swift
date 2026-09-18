@@ -1,22 +1,14 @@
 import Foundation
 import GmDaemonSdk
 
-/// The ONE project → instance → session tree traversal.
+/// The ONE project to instance to session tree traversal.
 ///
-/// Inclusion rule, stated once: keep a node if it matches the query, an
-/// ancestor matches (the whole subtree is relevant), or a descendant matches
-/// (ancestors stay visible so the hit is reachable). Matching reuses the
-/// `SearchQuery` / `matches(_:)` primitives on the kit rows.
-///
-/// The traversal also owns what every browse surface was hand-rolling around
-/// it: instance ordering (alphabetical for the drill-down pages — the
-/// CatalogStore snapshot keeps its recency sort for other consumers),
-/// per-instance session limits, active-session hoisting, and the
-/// checked-out exclusion the inactive-sessions sheet needs.
-///
-/// House rule (from InactiveSessionsSheet): surfaces derive a
-/// `FilteredCatalog` into `@State` on change — never in a computed property —
-/// so typing a character rescans the tree once, not once per body pass.
+/// Inclusion rule: keep a node if it matches the query, an ancestor matches, or a descendant
+/// matches, so the whole relevant subtree stays and every hit stays reachable. The traversal
+/// also owns instance ordering, per-instance session limits, active-session hoisting and the
+/// checked-out exclusion. HOUSE RULE: surfaces derive a `FilteredCatalog` into `@State` on
+/// change, never in a computed property, so typing a character rescans the tree once rather
+/// than once per body pass.
 struct CatalogFilter: Equatable {
     enum InstanceOrder: Equatable {
         /// Case-insensitive by instance name — the drill-down pages' order.
@@ -27,12 +19,12 @@ struct CatalogFilter: Equatable {
 
     var query: SearchQuery
     /// Scope to one project (project page); nil = all.
-    var projectUuid: String? = nil
+    var projectUuid: String?
     /// Scope to one instance (instance page); nil = all.
-    var instanceUuid: String? = nil
+    var instanceUuid: String?
     var instanceOrder: InstanceOrder = .alphabetical
     /// Per-instance session cap AFTER ordering/hoisting; nil = all.
-    var sessionsPerInstance: Int? = nil
+    var sessionsPerInstance: Int?
     /// Daemon-resolved active session uuid per instance uuid — a snapshot, so
     /// the filter stays Equatable and derivable.
     var activeSessionByInstance: [String: String] = [:]

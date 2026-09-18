@@ -155,7 +155,8 @@ extension Migrations {
                     CREATE INDEX idx_daemon_event_subject_uuid ON daemon_event(subject_uuid);
                     CREATE INDEX idx_daemon_event_kind ON daemon_event(kind);
                     CREATE INDEX idx_daemon_event_created_at ON daemon_event(created_at);
-                    """)
+                    """
+            )
 
             // Kbite content family (v16 prompt 4), folded into the single
             // re-baselined m0001: the digested-content side — resources,
@@ -232,7 +233,8 @@ extension Migrations {
                         INSERT INTO kbite_resource_file_fts(rowid, resource_file_name, resource_file_summary, resource_file_content)
                         VALUES (new.id, new.resource_file_name, new.resource_file_summary, new.resource_file_content);
                     END;
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",

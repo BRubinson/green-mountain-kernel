@@ -2,33 +2,14 @@ import Foundation
 import GmDaemon
 import GmDaemonSdk
 
-/// `HOOK_EVENT` — one Claude Code lifecycle hook, served by the kernel.
+/// `HOOK_EVENT` — one Claude Code lifecycle hook, served by the kernel. It
+/// re-points `HookLogic` / `HookRunner` at the in-process caller; those take
+/// their cwd from the PAYLOAD, since the kernel's own cwd is meaningless here.
 ///
-/// THE CALL SITE MOVED, NOT THE LOGIC. `HookLogic` and `HookRunner` already
-/// compile into this binary (they live in `GmDaemonSdk/Hook/`), and
-/// `HookRunner.postToolUse` already takes its cwd from the PAYLOAD rather than
-/// from the process — which is exactly what a hook served by a long-lived
-/// kernel needs, since the kernel's own cwd is meaningless here. So this verb
-/// re-points those functions at the in-process caller instead of relocating
-/// ~957 lines.
-///
-/// THE LAUNCHER STAYS A SHELL-FORM `command` HOOK. That is not a half-measure,
-/// it is what the harness permits: `SessionStart` accepts only `command` and
-/// `mcp_tool`, never `http`; an `mcp_tool` handler there is documented to
-/// expect a "not connected" error on first run; and `SessionStart` is precisely
-/// where the claude-session binding every later write depends on gets created.
-/// Shell form is additionally the only handler type that resolves
-/// `${GM_FS_ROOT:-$HOME/gmfs}` at hook time and the only one that can honour the
-/// silent exit-0 no-op contract. `async` is command-only too, which is what
-/// keeps `PostToolUse` off the tool-call critical path.
-///
-/// WHY `hookSafe` IS ON THE WIRE. A hook may never exit non-zero — a non-zero
-/// `PostToolUse` is a BLOCKED tool call — and `gm_hook call` exits non-zero on
-/// error. Making the contract part of the message means a caller cannot forget
-/// it and the daemon cannot answer the wrong way by accident. Under it, a
-/// BUSINESS failure comes back `ok: true` with the reason in `note`; framing and
-/// decode failures still throw, because those are not business failures and
-/// swallowing them would hide a broken client forever.
+/// `hookSafe` rides the wire because a hook may never exit non-zero — a
+/// non-zero `PostToolUse` is a BLOCKED tool call. Under it a BUSINESS failure
+/// answers `ok: true` with the reason in `note`; framing and decode failures
+/// still throw, since swallowing those hides a broken client forever.
 enum HookEventHandler {
 
     static func handle(
@@ -43,21 +24,23 @@ enum HookEventHandler {
         do {
             response = try run(req, caller: caller, store: store)
         } catch {
-            // The `hookSafe` contract, honoured in exactly one place.
-            //
-            // The failure is REPORTED, never merely dropped: a swallowed error
-            // that says nothing anywhere is how a hook silently stops recording
-            // and nobody notices for weeks. `note` is where it lands, and the
-            // response is still `recorded: false` so a reader can tell the
-            // difference between "nothing to do" and "tried and failed".
+            // The `hookSafe` contract, honoured in exactly one place. The
+            // failure is REPORTED in `note`, never merely dropped, and
+            // `recorded: false` keeps "nothing to do" distinguishable from
+            // "tried and failed".
             guard req.hookSafe else { throw error }
             response = HookEventResponse(
                 recorded: false,
-                note: "hook '\(req.event)' failed and was suppressed by hook_safe: \(error)")
+                note: "hook '\(req.event)' failed and was suppressed by hook_safe: \(error)"
+            )
         }
 
         let envelope = ResponseEnvelope<HookEventResponse>(
-            type: .hookEvent, requestId: head.requestId, ok: true, payload: response)
+            type: .hookEvent,
+            requestId: head.requestId,
+            ok: true,
+            payload: response
+        )
         return HandlerResult(line: try NDJSON.encodeLine(envelope))
     }
 
@@ -99,17 +82,23 @@ enum HookEventHandler {
             var context: String?
             try store.inTransaction {
                 context = HookRunner.subagentStart(
-                    stdin: payloadData, dryRun: false,
-                    sheetText: PenSheet.instructions, caller: caller)
+                    stdin: payloadData,
+                    dryRun: false,
+                    sheetText: CdeSheet.instructions,
+                    caller: caller
+                )
             }
             return HookEventResponse(
-                recorded: true, additionalContext: context)
+                recorded: true,
+                additionalContext: context
+            )
 
         default:
             // Recorded as a no-op, deliberately. See the doc comment above.
             return HookEventResponse(
                 recorded: false,
-                note: "no kernel-side handler for hook event '\(req.event)' — ignored")
+                note: "no kernel-side handler for hook event '\(req.event)' — ignored"
+            )
         }
     }
 }

@@ -2,23 +2,14 @@ import Foundation
 import GmDaemonSdk
 
 /// The pen's tool surface as a LIBRARY entry point — one call, one rendered
-/// result — so the kernel can serve `MCP_CALL` without a second copy of the
-/// roster, the narrowing table, or the budget logic.
-///
-/// WHY THIS EXISTS RATHER THAN A DISPATCH TABLE IN THE KERNEL. The obvious
-/// shape for `MCP_CALL` was to map a tool name to a `MessageType` and forward
-/// it. That works for the ~50 tools that are 1:1 with a verb and quietly loses
-/// everything else the pen does: the composites that fan out to several verbs,
-/// the per-tool `narrowing` that tells a caller WHAT to narrow, and the
-/// `degrade` closures that re-run a narrowed call so an over-budget read gets
-/// DATA plus instructions instead of a refusal. Those live in the `Tool` values
-/// below and nowhere else. Reaching them through one function keeps the pen's
-/// behaviour identical whether it is reached over stdio or over the wire.
-///
-/// THE STDIO PATH STILL USES THE SAME VALUES. `GmMcpServer.main()` has not
-/// changed; both doors read the one `tools` array, so `tools/list` and
-/// `MCP_CALL` cannot answer differently about what exists.
-public enum GmPenTools {
+/// result — so the kernel serves `MCP_CALL` without a second copy of the
+/// roster, the narrowing table or the budget logic. A dispatch table mapping a
+/// tool name to a `MessageType` would work for the tools that are 1:1 with a
+/// verb and lose the rest: the composites that fan out to several verbs, the
+/// per-tool `narrowing`, and the `degrade` closures that re-run a narrowed call
+/// so an over-budget read returns DATA plus instructions. Both doors read the
+/// one `tools` array, so they cannot disagree about what exists.
+public enum GmCdeTools {
 
     /// Every tool name this build serves. The runtime half of the bidirectional
     /// name-parity check — the build-time half stops a generated plugin naming
@@ -28,15 +19,16 @@ public enum GmPenTools {
         Set(tools.map(\.name))
     }
 
-    /// Run one tool and render its result under `PenResultBudget`.
+    /// Run one tool and render its result under `CdeResultBudget`.
     ///
-    /// - Parameter caller: how this body reaches the daemon. `DaemonClient` on
-    ///   the stdio path; `KernelVerbCaller` when the kernel serves `MCP_CALL`,
-    ///   which is what puts the body inside the ambient transaction boundary and
-    ///   gives a composite tool one transaction instead of N.
+    /// `caller` is `DaemonClient` on the stdio path and `KernelVerbCaller` when
+    /// the kernel serves `MCP_CALL`, which is what puts the body inside the
+    /// ambient transaction boundary and gives a composite tool one transaction
+    /// instead of N.
+    ///
     /// - Returns: the rendered JSON, already budget-checked. Over-budget results
     ///   come back as the `gmcc_oversize` envelope rather than truncated JSON.
-    /// - Throws: `GmPenToolError.unknownTool` for a name this build does not
+    /// - Throws: `GmCdeToolError.unknownTool` for a name this build does not
     ///   serve; whatever the tool body throws otherwise.
     public static func call(
         tool name: String,
@@ -44,24 +36,21 @@ public enum GmPenTools {
         caller: any GmVerbCaller
     ) throws -> String {
         guard let tool = tools.first(where: { $0.name == name }) else {
-            throw GmPenToolError.unknownTool(name)
+            throw GmCdeToolError.unknownTool(name)
         }
         let args = Args(json: try Self.bridge(arguments))
         let value = try tool.run(args, caller)
-        return try renderResult(tool: tool, args: args, client: caller, value: value)
+        return try renderResult(tool: tool, value: value)
     }
 
     /// `GmJsonValue` (the wire's untyped value) to the pen's own internal `JSON`.
     ///
-    /// AN ENCODE/PARSE ROUND TRIP, NOT A HAND-WRITTEN CONVERTER, and the choice
-    /// is deliberate. A case-by-case mapping between two JSON enums is the kind
-    /// of code that looks obviously correct and silently disagrees on the edges
-    /// — integers versus doubles being the one that bites here, since
-    /// `GmJsonValue` distinguishes `.int`/`.double` while `JSON` carries a single
-    /// `.number(Double)` and re-derives integrality on the way out. Serializing
-    /// and re-parsing routes both through `JSONSerialization`, which is the same
-    /// path the stdio door already takes, so the two doors cannot disagree about
-    /// what an argument means.
+    /// AN ENCODE/PARSE ROUND TRIP, NOT A HAND-WRITTEN CONVERTER. A case-by-case
+    /// mapping between two JSON enums disagrees silently on the edges, integers
+    /// versus doubles being the one that bites: `GmJsonValue` distinguishes
+    /// `.int`/`.double` while `JSON` carries one `.number(Double)`. Re-parsing
+    /// routes both through `JSONSerialization`, the same path the stdio door
+    /// takes, so the two doors cannot disagree about what an argument means.
     private static func bridge(_ value: GmJsonValue?) throws -> JSON {
         guard let value else { return .object([:]) }
         let data = try JSONEncoder().encode(value)
@@ -69,7 +58,7 @@ public enum GmPenTools {
     }
 }
 
-public enum GmPenToolError: Error, CustomStringConvertible {
+public enum GmCdeToolError: Error, CustomStringConvertible {
     case unknownTool(String)
 
     public var description: String {
@@ -88,7 +77,7 @@ public enum GmPenToolError: Error, CustomStringConvertible {
 /// "the plugin names a tool the server does not serve" unrepresentable instead
 /// of merely checked. `tools/list` and the generated `allowed-tools` frontmatter
 /// are then two renderings of one array.
-public struct GmPenToolDescriptor: Sendable, Hashable {
+public struct GmCdeToolDescriptor: Sendable, Hashable {
     public let name: String
     public let description: String
     /// The published JSON Schema, already in wire shape.
@@ -105,26 +94,29 @@ public struct GmPenToolDescriptor: Sendable, Hashable {
     public let isWrite: Bool
 }
 
-extension GmPenTools {
+extension GmCdeTools {
     /// The served roster, in a form something outside this module can render.
     ///
     /// SORTED BY NAME so a regenerated plugin is diffable. An unordered roster
     /// makes every regeneration look like a change to every file, which is how
     /// a real change gets lost in the noise of a reordering.
-    @MainActor public static var descriptors: [GmPenToolDescriptor] {
-        let writes = VerbRegistry.writePenTools
+    @MainActor public static var descriptors: [GmCdeToolDescriptor] {
+        let writes = VerbRegistry.writeCdeTools
         return
             tools
             .sorted { $0.name < $1.name }
             .map { tool in
                 let schema =
                     (try? JSONSerialization.data(
-                        withJSONObject: tool.inputSchema, options: [.sortedKeys])) ?? Data("{}".utf8)
-                return GmPenToolDescriptor(
+                        withJSONObject: tool.inputSchema,
+                        options: [.sortedKeys]
+                    )) ?? Data("{}".utf8)
+                return GmCdeToolDescriptor(
                     name: tool.name,
                     description: tool.description,
                     inputSchemaJSON: schema,
-                    isWrite: writes.contains(tool.name))
+                    isWrite: writes.contains(tool.name)
+                )
             }
     }
 }

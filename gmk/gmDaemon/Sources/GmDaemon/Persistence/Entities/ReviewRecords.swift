@@ -47,9 +47,16 @@ extension ReviewSummaryRecord {
     /// db → wire. Replicates the retired hand mapper exactly.
     func wireRow() -> ReviewSummaryRow {
         ReviewSummaryRow(
-            uuid: uuid, version: version, promptUuid: promptUuid,
-            status: status, verdict: verdict, overview: overview, agentId: agentId,
-            createdAt: createdAt, updatedAt: updatedAt)
+            uuid: uuid,
+            version: version,
+            promptUuid: promptUuid,
+            status: status,
+            verdict: verdict,
+            overview: overview,
+            agentId: agentId,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -60,10 +67,18 @@ extension ReviewFindingRecord {
     /// wire's Int, explicitly and non-truncating.
     func wireRow() -> ReviewFindingRow {
         ReviewFindingRow(
-            uuid: uuid, version: version, reviewSummaryUuid: reviewSummaryUuid,
-            kind: kind, title: title, body: body, filePath: filePath,
-            lineStart: lineStart.map(Int.init), lineEnd: lineEnd.map(Int.init),
-            agentName: agentName, findingRating: findingRating.map(Int.init),
-            status: status)
+            uuid: uuid,
+            version: version,
+            reviewSummaryUuid: reviewSummaryUuid,
+            kind: kind,
+            title: title,
+            body: body,
+            filePath: filePath,
+            lineStart: lineStart.map(Int.init),
+            lineEnd: lineEnd.map(Int.init),
+            agentName: agentName,
+            findingRating: findingRating.map(Int.init),
+            status: status
+        )
     }
 }

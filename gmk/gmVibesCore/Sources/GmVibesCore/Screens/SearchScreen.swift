@@ -110,7 +110,8 @@ struct SearchScreen: View {
     private func open(_ hit: SearchHit) {
         guard
             let windowID = catalog.sessionWindowID(
-                forSessionUuid: hit.sessionUuid, targetPromptUuid: hit.promptUuid
+                forSessionUuid: hit.sessionUuid,
+                targetPromptUuid: hit.promptUuid
             )
         else { return }
         nav.open(windowID)  // route swap, no presenter to tear down

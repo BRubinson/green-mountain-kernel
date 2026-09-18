@@ -77,7 +77,9 @@ struct DiagramDopeScopeSheet: View {
                 description: Text(
                     "This diagram has no resolvable dope scope "
                         + "binding — create diagrams over a dope scope to add its "
-                        + "entities here."))
+                        + "entities here."
+                )
+            )
         }
     }
 
@@ -146,9 +148,15 @@ struct DiagramDopeScopeSheet: View {
                         clientRef: containerRef,
                         code: "scope_\(scopeCode)",
                         name: dope.tree.body.name,
-                        centerX: 0, centerY: 0, elementZ: 0,
+                        centerX: 0,
+                        centerY: 0,
+                        elementZ: 0,
                         payload: .dopeScopePersistenceLayer(
-                            DopeScopePersistenceLayerPayload(dopeScopeCode: scopeCode)))))
+                            DopeScopePersistenceLayerPayload(dopeScopeCode: scopeCode)
+                        )
+                    )
+                )
+            )
         }
 
         let bounds = workspace.resolved.contentBounds
@@ -165,8 +173,12 @@ struct DiagramDopeScopeSheet: View {
                         parentElementUuid: parentUuid,
                         parentClientRef: parentUuid == nil ? containerRef : nil,
                         name: code,
-                        centerX: local.x, centerY: local.y,
-                        payload: .dopeEntity(DopeEntityPayload(entityCode: code)))))
+                        centerX: local.x,
+                        centerY: local.y,
+                        payload: .dopeEntity(DopeEntityPayload(entityCode: code))
+                    )
+                )
+            )
             y += 180
         }
         Task { await workspace.flush() }

@@ -1,38 +1,20 @@
 import CoreGraphics
 
-// MOVED UP out of the base layer into the component library.
-//
-// This is the one dependency in the whole split that points UPWARD from the
-// SDK rather than downward, and it exposed a premise worth recording: the
-// DiagramUI directory was treated as a clean carve because SwiftUI appears in
-// only 5 of its 14 files. True, and misleading — the other 9 are CoreGraphics
-// geometry (DiagramResolver, DiagramHitTest, DopeCanvasLayout, connector
-// routing), and they are a LOWER layer than the views beside them. One
-// directory, two layers.
-//
-// This file consumes `ResolvedDiagram` / `ResolvedElement`, the resolver's
-// output types. It moved here rather than dragging 986 lines of resolver down
-// into the SDK, because a layout algorithm over already-resolved geometry is
-// presentation, not domain — and because nothing outside the tests consumes it.
+// Layout over already-resolved geometry is presentation rather than domain, so
+// this consumes the resolver's `ResolvedDiagram` / `ResolvedElement` output from
+// the component library instead of sitting in the SDK beside them.
 
 import Foundation
 import GmDaemonSdk
 
-/// Organize-by-closeness: one deterministic pass over the entity cards that
-/// returns plain `elementUpdate` mutations, so the organize button flows
-/// through the SAME edit-session → committer → reducer funnel as a drag (no
-/// second write path, CAS for free).
+/// Organize-by-closeness: one deterministic pass over the entity cards returning
+/// plain `elementUpdate` mutations, so the organize button flows through the same
+/// edit-session → committer → reducer funnel as a drag.
 ///
-/// Kit-resident because the one constant that makes layouts routable is
-/// internal here: the router inflates every obstacle by
-/// `DiagramResolver.edgeRoutingPadding` per side, so card gaps below
-/// `2 × padding + 2` close the A* corridors entirely and edges degrade to
-/// the legacy cubic fallback. `minSeparation` is DERIVED from that value —
-/// never a hand-copied 26 — so a padding change breaks the fixture loudly.
-///
-/// Determinism is a correctness requirement (same input → same layout):
-/// fixed iteration counts, uuid-sorted traversal, no RNG, no wall-clock;
-/// coincident centers tie-break by an FNV-1a angle from the uuid.
+/// The router inflates every obstacle by `DiagramResolver.edgeRoutingPadding` per
+/// side, so card gaps below `2 × padding + 2` close the A* corridors entirely;
+/// `minSeparation` is DERIVED from that value, never a hand-copied number.
+/// Determinism is required: fixed iteration counts, uuid-sorted traversal, no RNG.
 public enum DiagramOrganizer {
 
     /// The corridor floor: below this gap the router's per-side inflation
@@ -61,8 +43,11 @@ public enum DiagramOrganizer {
                         uuid: element.uuid,
                         center: CGPoint(
                             x: element.frame.midX,
-                            y: element.frame.midY),
-                        size: element.frame.size))
+                            y: element.frame.midY
+                        ),
+                        size: element.frame.size
+                    )
+                )
             case .layer, .stroke, .shape, .text, .connector, .umlNode,
                 .scopeCard, .absentScope:
                 // Organize lays out ENTITY CARDS. Hand-placed drawing
@@ -204,11 +189,15 @@ public enum DiagramOrganizer {
             else { continue }
             let delta = CGSize(
                 width: newCenter.x - element.frame.midX,
-                height: newCenter.y - element.frame.midY)
+                height: newCenter.y - element.frame.midY
+            )
             mutations.append(
                 DiagramDrag.moveMutation(
-                    node: node, resolved: element,
-                    by: delta))
+                    node: node,
+                    resolved: element,
+                    by: delta
+                )
+            )
         }
         return mutations
     }

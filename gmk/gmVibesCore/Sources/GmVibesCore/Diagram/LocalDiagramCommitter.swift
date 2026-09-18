@@ -44,14 +44,19 @@ actor DiagramTreeBox {
         self.tree = tree
     }
 
-    func apply(_ mutations: [DiagramMutation], expectedRevision: Int64?)
+    func apply(
+        _ mutations: [DiagramMutation],
+        expectedRevision: Int64?
+    )
         throws -> (tree: DiagramTree, minted: [String: String])
     {
         let recorder = RecordingMinting()
         tree = try DiagramTreeReducer.apply(
-            mutations, to: tree,
+            mutations,
+            to: tree,
             expectedRevision: expectedRevision,
-            minting: recorder)
+            minting: recorder
+        )
         var minted: [String: String] = [:]
         var addIndex = 0
         for mutation in mutations {

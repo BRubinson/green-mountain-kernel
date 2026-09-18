@@ -1,19 +1,11 @@
 import Foundation
 
 /// Files → db boot reconciliation for a session's SESSION_INSTANCE dope scope.
-///
-/// The repo's `.gmcc` dope tree travels with the branch, but a fresh checkout
-/// mints a virgin scope (revision 0, empty tree) — so without this, every new
-/// branch starts with an empty session dope. On the boot path the FILES are
-/// authoritative forward: a virgin scope seeds wholesale, a scope behind the
-/// files re-adopts. The db is never authoritative here; a db ahead of the
-/// files means unpublished edits and only ever warns.
-///
-/// Direction is structural, not disciplinary: this type composes
-/// DOPE_READ_REPO / DOPE_LIST / DOPE_INIT / DOPE_INGEST(adopt) and has no
-/// path to DOPE_WRITE_REPO. Repo files are read, never written.
-///
-/// Every outcome is non-throwing — boot must never block on a domain model.
+/// Files are authoritative forward: a virgin scope seeds wholesale, a scope
+/// behind the files re-adopts, and a db ahead of the files only warns. The
+/// verbs composed here reach no DOPE_WRITE_REPO, so repo files are read and
+/// never written. Every outcome is non-throwing — boot must never block on a
+/// domain model.
 public enum DopeBootSync {
     public enum Outcome {
         /// No `.gmcc/scope.doped.json` on disk — the silent common case,
@@ -40,17 +32,21 @@ public enum DopeBootSync {
     /// `instanceRoot` is the repo checkout root (the tree lives at
     /// `{instanceRoot}/.gmcc`).
     public static func run(
-        client: DaemonClient, sessionUuid: String, instanceRoot: String
+        client: DaemonClient,
+        sessionUuid: String,
+        instanceRoot: String
     ) -> Outcome {
         let root = URL(fileURLWithPath: instanceRoot, isDirectory: true)
         let main = root.appendingPathComponent(
-            ".gmcc/\(DopeDocumentCodec.scopeFileName)")
+            ".gmcc/\(DopeDocumentCodec.scopeFileName)"
+        )
         guard FileManager.default.fileExists(atPath: main.path) else {
             // Before concluding "no dope", check for the retired layout —
             // otherwise a stale checkout is indistinguishable from a repo
             // that was never doped.
             let legacy = root.appendingPathComponent(
-                ".gmcc/\(DopeDocumentCodec.legacyDopeDirectoryName)/\(DopeDocumentCodec.legacyMainFileName)")
+                ".gmcc/\(DopeDocumentCodec.legacyDopeDirectoryName)/\(DopeDocumentCodec.legacyMainFileName)"
+            )
             if FileManager.default.fileExists(atPath: legacy.path) {
                 return .legacyLayout(path: legacy.path)
             }
@@ -80,7 +76,9 @@ public enum DopeBootSync {
                         sessionUuid: sessionUuid,
                         code: code,
                         name: repo.bundle.main.scope.name,
-                        description: repo.bundle.main.scope.description))
+                        description: repo.bundle.main.scope.description
+                    )
+                )
                 scopeUuid = created.scope.uuid
                 dbRevision = created.scope.revision
                 minted = true
@@ -92,13 +90,20 @@ public enum DopeBootSync {
             }
             let res = try client.dopeIngest(
                 DopeIngestRequest(
-                    scopeUuid: scopeUuid, dirPath: nil, adopt: true))
+                    scopeUuid: scopeUuid,
+                    dirPath: nil,
+                    adopt: true
+                )
+            )
             if minted || dbRevision == 0 {
                 return .seeded(code: code, revision: res.scope.revision, counts: res.counts)
             }
             return .readopted(
-                code: code, from: dbRevision, to: res.scope.revision,
-                counts: res.counts)
+                code: code,
+                from: dbRevision,
+                to: res.scope.revision,
+                counts: res.counts
+            )
         } catch {
             return .unreadable(String(describing: error))
         }

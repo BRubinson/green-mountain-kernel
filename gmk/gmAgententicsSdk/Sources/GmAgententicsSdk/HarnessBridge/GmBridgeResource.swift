@@ -2,18 +2,12 @@ import Foundation
 
 /// A plain file that lives INSIDE a skill directory, beside its `SKILL.md`.
 ///
-/// WHY THIS TYPE HAD TO EXIST. `GmBridgeSkill.File.relativePath` is hard-coded
-/// to `skills/<name>/SKILL.md`. That is correct for the skill itself and makes
-/// the four files under `skills/gmcc/ref/` STRUCTURALLY unrepresentable — not
-/// merely unwritten. No amount of filling in skill bodies could have produced
-/// them, because the skill type can only name one path. This is the smallest
-/// type that closes that hole: a path and some bytes.
-///
-/// DELIBERATELY NOT A SKILL. A skill carries frontmatter, tool grants, a model
-/// and an invocation contract; a reference document carries none of that and
-/// gets loaded by being READ, not by being invoked. Modelling these as skills
-/// would put four more entries in the skill listing — which has a character
-/// budget — for four files nothing invokes.
+/// `GmBridgeSkill.File.relativePath` is hard-coded to `skills/<name>/SKILL.md`,
+/// so a reference document beside it is otherwise unrepresentable. Deliberately
+/// not a skill: a skill carries frontmatter, tool grants and an invocation
+/// contract, while a reference is loaded by being READ, and modelling these as
+/// skills spends entries in the character-budgeted skill listing on files nothing
+/// invokes.
 public struct GmBridgeResource: Equatable, Sendable, GmBridgeFile {
 
     /// The skill directory this belongs to (`gmcc`), not a path.
@@ -21,11 +15,9 @@ public struct GmBridgeResource: Equatable, Sendable, GmBridgeFile {
 
     /// One line: WHEN a reader should open this, not what it contains.
     ///
-    /// It exists so the skill can carry an INDEX of its reference documents
-    /// rather than leaving them orphaned on disk. A file the skill never names
-    /// is a file the model never learns exists — which is exactly what these
-    /// four were before v30: 38KB sitting beside a 1.3KB SKILL.md with nothing
-    /// pointing at them.
+    /// It exists so the skill can carry an INDEX of its reference documents rather
+    /// than leaving them orphaned on disk. A file the skill never names is a file
+    /// the model never learns exists.
     public var summary: String
 
     /// The path BENEATH the skill directory (`ref/bot_workflows.md`).
@@ -54,7 +46,7 @@ public struct GmBridgeResource: Equatable, Sendable, GmBridgeFile {
 
     public var isEmpty: Bool { body.isEmpty }
 
-    public func contents() throws -> String? {
+    public func contents() -> String? {
         guard !isEmpty else { return nil }
         // Verbatim, with a guaranteed trailing newline. NO frontmatter is
         // synthesised: these are documents a skill points at, and inventing

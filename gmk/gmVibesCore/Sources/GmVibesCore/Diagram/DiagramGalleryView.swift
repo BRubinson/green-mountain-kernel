@@ -27,8 +27,8 @@ struct DiagramGalleryView<CardMenu: View>: View {
             let stream = daemon.hub.stream(for: .diagramList(scope.streamKey))
             await diagrams.searchGallery(scope, query: query)
             for await _ in stream {
-                // Re-runs the LAST query — a "deleted" event drops its card
-                // here, since the re-fetch simply no longer returns the row.
+                // Re-runs the LAST query: a "deleted" event drops its card here, because the
+                // re-fetch stops returning the row.
                 await diagrams.refreshGallery(scope)
             }
         }
@@ -62,8 +62,10 @@ struct DiagramGalleryView<CardMenu: View>: View {
     private var content: some View {
         if let error = diagrams.galleryErrors[scope] {
             ContentUnavailableView(
-                "Diagrams Unavailable", systemImage: "bolt.slash",
-                description: Text(error))
+                "Diagrams Unavailable",
+                systemImage: "bolt.slash",
+                description: Text(error)
+            )
         } else if rows.isEmpty {
             if diagrams.galleryLoaded(scope) {
                 ContentUnavailableView(
@@ -73,7 +75,9 @@ struct DiagramGalleryView<CardMenu: View>: View {
                     description: Text(
                         query.isEmpty
                             ? "Diagrams you create appear here."
-                            : "Nothing matches “\(query)”."))
+                            : "Nothing matches “\(query)”."
+                    )
+                )
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -83,7 +87,8 @@ struct DiagramGalleryView<CardMenu: View>: View {
                     columns: [
                         GridItem(
                             .adaptive(minimum: 200, maximum: 280),
-                            spacing: 12)
+                            spacing: 12
+                        )
                     ],
                     spacing: 12
                 ) {
@@ -156,7 +161,8 @@ private struct DiagramGalleryCard<Menu: View>: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(.separator.opacity(0.5), lineWidth: 1))
+                .strokeBorder(.separator.opacity(0.5), lineWidth: 1)
+        )
     }
 
     private var tierBadge: some View {
@@ -184,7 +190,9 @@ private struct DiagramThumbnailView: View {
             let size = canvas.totalSize
             let scale = min(
                 proxy.size.width / max(size.width, 1),
-                proxy.size.height / max(size.height, 1), 1)
+                proxy.size.height / max(size.height, 1),
+                1
+            )
             canvas
                 .frame(width: size.width, height: size.height)
                 .scaleEffect(scale, anchor: .center)

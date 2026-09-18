@@ -57,8 +57,12 @@ final class SocketConnection {
         var timeout = timeval(tv_sec: 30, tv_usec: 0)
         guard
             setsockopt(
-                conn.fd, SOL_SOCKET, SO_RCVTIMEO,
-                &timeout, socklen_t(MemoryLayout<timeval>.size)) == 0
+                conn.fd,
+                SOL_SOCKET,
+                SO_RCVTIMEO,
+                &timeout,
+                socklen_t(MemoryLayout<timeval>.size)
+            ) == 0
         else {
             let code = errno
             let err = String(cString: strerror(code))
@@ -195,8 +199,11 @@ final class SocketConnection {
     static func socketPath() -> String {
         let appSupport =
             NSSearchPathForDirectoriesInDomains(
-                .applicationSupportDirectory, .userDomainMask, true
-            ).first ?? NSHomeDirectory() + "/Library/Application Support"
+                .applicationSupportDirectory,
+                .userDomainMask,
+                true
+            )
+            .first ?? NSHomeDirectory() + "/Library/Application Support"
         let suite = ProcessInfo.processInfo.environment["IT2_SUITE"] ?? "iTerm2"
         return "\(appSupport)/\(suite)/private/socket"
     }

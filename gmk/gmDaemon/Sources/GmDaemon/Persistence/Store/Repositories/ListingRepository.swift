@@ -20,7 +20,9 @@ struct ListingRepository: RepositoryContext {
         if let projectUuid = req.projectUuid {
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM project WHERE uuid = ?", arguments: [projectUuid]
+                    db,
+                    sql: "SELECT 1 FROM project WHERE uuid = ?",
+                    arguments: [projectUuid]
                 ) != nil
             else {
                 throw StoreError.notFound(entity: "project", key: projectUuid)
@@ -56,7 +58,9 @@ struct ListingRepository: RepositoryContext {
         if let instanceUuid = req.instanceUuid {
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM instance WHERE uuid = ?", arguments: [instanceUuid]
+                    db,
+                    sql: "SELECT 1 FROM instance WHERE uuid = ?",
+                    arguments: [instanceUuid]
                 ) != nil
             else {
                 throw StoreError.notFound(entity: "instance", key: instanceUuid)

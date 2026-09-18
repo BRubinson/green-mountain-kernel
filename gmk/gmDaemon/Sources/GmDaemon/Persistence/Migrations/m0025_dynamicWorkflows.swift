@@ -3,31 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0025 — Dynamic workflows train. PRECONDITION: a BACKUP.
-    //
-    // One train, not five: later slices build against final shapes.
-    // Rebuilds use the m0005 create-copy-drop-rename grammar; every
-    // rebuilt table drops its pre-m0021 CHECKs (vocabulary lives in
-    // Swift registries); every FTS mirror on a rebuilt table is
-    // recreated (m0015: external content binds rowid, DROP TABLE takes
-    // the triggers with it).
-    //
-    // Deliberate data transformations (the only history rewrites):
-    // - exploration_summary rows migrate as agent_type='synthesis' —
-    //   which is what they were: per-prompt synthesis aggregates. The
-    //   per-prompt seal IS the synthesis-type row from now on.
-    // - exploration_key_file rows become findings (kind='key_file',
-    //   title=path, agent_name='legacy'); the table and its mirror drop.
-    // - agent_briefing bodies are DROPPED (user decision: briefings are
-    //   opinion-free ref sets); dope_refs/kbite_refs explode into child
-    //   rows. pre_architecture briefings retag to 'initial' where the
-    //   slot is free, else delete (consumed one-shot spawn plumbing).
-    // - clarification rows split: user/unanswered → question rows,
-    //   bot_inferred → internal notes. refined_goal/refined_detail/
-    //   backstory_note are preserved by seeding a care_package row per
-    //   summary that carried text — nothing authored is destroyed.
-    // - The finalize→prompt.goal copy is RETIRED in the Swift layer:
-    //   ZERO bot write doors to prompt content remain.
+    // m0025 — Dynamic workflows train. PRECONDITION: a BACKUP. One train, not
+    // five, so later slices build against final shapes. Rebuilds use the m0005
+    // create-copy-drop-rename grammar, drop their pre-m0021 CHECKs (vocabulary
+    // lives in Swift registries) and recreate every FTS mirror, because external
+    // content binds rowid and DROP TABLE takes the triggers with it.
+    // The data transformations below rewrite history deliberately: exploration
+    // summaries become agent_type='synthesis', key files become findings, and
+    // clarification text is preserved as a care_package row per summary.
     static func m0025_dynamicWorkflows(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0025_dynamicWorkflows") { db in
             // ---- Stash rows whose source columns are about to drop.
@@ -35,20 +18,23 @@ extension Migrations {
                 db,
                 sql: """
                     SELECT uuid, dope_refs, kbite_refs FROM agent_briefing
-                    """)
+                    """
+            )
             let summaryText = try Row.fetchAll(
                 db,
                 sql: """
                     SELECT uuid, refined_goal, refined_detail, backstory_note
                     FROM clarification_summary
                     WHERE refined_goal != '' OR refined_detail != '' OR backstory_note != ''
-                    """)
+                    """
+            )
             let explorationCounts =
                 try Int.fetchOne(
                     db,
                     sql: """
                         SELECT COUNT(*) FROM exploration_summary
-                        """) ?? 0
+                        """
+                ) ?? 0
 
             // ---- agent_briefing: retag pre_architecture as initial
             // (user: "migrate everything as explore ones"), initial wins
@@ -67,7 +53,8 @@ extension Migrations {
                       );
                     UPDATE agent_briefing SET briefing_for_step = 'initial'
                     WHERE briefing_for_step = 'pre_architecture';
-                    """)
+                    """
+            )
 
             // ---- agent_briefing rebuild: body/dope_refs/kbite_refs drop.
             try db.execute(
@@ -142,7 +129,8 @@ extension Migrations {
                     );
                     CREATE INDEX idx_agent_session_file_change_fk
                         ON agent_session_file_change(agent_briefing_uuid);
-                    """)
+                    """
+            )
 
             // Explode the stashed TEXT-JSON refs into child rows. Survivors
             // only — retagged deletions above already removed their parents.
@@ -162,7 +150,9 @@ extension Migrations {
                                     (uuid, version, created_at, updated_at,
                                      agent_briefing_uuid, dope_code, brief, seq)
                                 VALUES (?, 0, ?, ?, ?, ?, NULL, ?)
-                                """, arguments: [Store.newUuid(), now, now, briefingUuid, code, i])
+                                """,
+                            arguments: [Store.newUuid(), now, now, briefingUuid, code, i]
+                        )
                     }
                 }
                 struct KbiteRef: Decodable { let file_uuid: String; let brief: String? }
@@ -177,7 +167,9 @@ extension Migrations {
                                 db,
                                 sql: """
                                     SELECT EXISTS(SELECT 1 FROM kbite_resource_file WHERE uuid = ?)
-                                    """, arguments: [ref.file_uuid]) ?? false
+                                    """,
+                                arguments: [ref.file_uuid]
+                            ) ?? false
                         guard exists else { continue }
                         try db.execute(
                             sql: """
@@ -189,7 +181,8 @@ extension Migrations {
                             arguments: [
                                 Store.newUuid(), now, now, briefingUuid,
                                 ref.file_uuid, ref.brief, i,
-                            ])
+                            ]
+                        )
                     }
                 }
             }
@@ -240,10 +233,13 @@ extension Migrations {
                         VALUES (new.id, new.overview);
                     END;
                     INSERT INTO exploration_summary_fts(exploration_summary_fts) VALUES ('rebuild');
-                    """)
+                    """
+            )
             let migratedSummaries =
                 try Int.fetchOne(
-                    db, sql: "SELECT COUNT(*) FROM exploration_summary") ?? 0
+                    db,
+                    sql: "SELECT COUNT(*) FROM exploration_summary"
+                ) ?? 0
             guard migratedSummaries == explorationCounts else {
                 throw DatabaseError(message: "m0025: exploration_summary parity failed")
             }
@@ -309,7 +305,8 @@ extension Migrations {
                         VALUES (new.id, new.title, new.body, new.file_path);
                     END;
                     INSERT INTO exploration_finding_fts(exploration_finding_fts) VALUES ('rebuild');
-                    """)
+                    """
+            )
 
             // ---- care_package (created BEFORE the summary rebuild so the
             // seeds below can preserve the dropping text columns).
@@ -361,7 +358,8 @@ extension Migrations {
                     );
                     CREATE INDEX idx_care_package_exploration_ref_fk
                         ON care_package_exploration_ref(care_package_uuid);
-                    """)
+                    """
+            )
 
             // Preserve legacy refined_goal/refined_detail/backstory_note —
             // after the rebuild nothing else holds that authored text.
@@ -384,7 +382,8 @@ extension Migrations {
                     arguments: [
                         Store.newUuid(), now, now, summaryUuid,
                         parts.joined(separator: "\n\n"),
-                    ])
+                    ]
+                )
             }
 
             // ---- clarification_summary rebuild: the three text fields drop
@@ -408,7 +407,8 @@ extension Migrations {
 
                     CREATE INDEX idx_clarification_summary_prompt_uuid
                         ON clarification_summary(prompt_uuid);
-                    """)
+                    """
+            )
 
             // ---- clarification split: questions / options / answers / notes.
             try db.execute(
@@ -535,7 +535,8 @@ extension Migrations {
                         VALUES (new.id, new.body);
                     END;
                     INSERT INTO internal_clarification_note_fts(internal_clarification_note_fts) VALUES ('rebuild');
-                    """)
+                    """
+            )
 
             // ---- architecture options + delta/dope linkage columns.
             try db.execute(
@@ -565,7 +566,8 @@ extension Migrations {
                         ADD COLUMN renamed_from TEXT;
                     ALTER TABLE architecture_persistence_field_change
                         ADD COLUMN dope_property_ref TEXT;
-                    """)
+                    """
+            )
 
             // ---- file_change attribution axis + agent_id sweep.
             try db.execute(
@@ -576,7 +578,8 @@ extension Migrations {
                     ALTER TABLE file_change ADD COLUMN origin TEXT NOT NULL DEFAULT 'hook';
                     ALTER TABLE review_summary ADD COLUMN agent_id TEXT;
                     ALTER TABLE review_finding ADD COLUMN agent_id TEXT;
-                    """)
+                    """
+            )
 
             // ---- bot_workflow: the daemon-held workflow state machine row.
             // Deliberately thin: phase is DERIVED from db evidence at every
@@ -602,7 +605,8 @@ extension Migrations {
                         WHERE status = 'active' AND client_key IS NOT NULL;
                     CREATE INDEX idx_bot_workflow_session_fk
                         ON bot_workflow(session_uuid);
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",

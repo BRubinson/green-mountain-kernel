@@ -40,12 +40,20 @@ extension DopeScopeRecord {
     /// tombstoned dope node for all 14 readers of this row.
     func wireRow() -> DopeScopeRow {
         DopeScopeRow(
-            uuid: uuid, version: version,
-            projectUuid: projectUuid, instanceUuid: instanceUuid,
-            sessionUuid: sessionUuid, promptUuid: promptUuid,
-            scopeType: scopeType, code: code, name: name,
-            description: description, revision: revision,
+            uuid: uuid,
+            version: version,
+            projectUuid: projectUuid,
+            instanceUuid: instanceUuid,
+            sessionUuid: sessionUuid,
+            promptUuid: promptUuid,
+            scopeType: scopeType,
+            code: code,
+            name: name,
+            description: description,
+            revision: revision,
             deletedOn: deletedOn,
-            createdAt: createdAt, updatedAt: updatedAt)
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }

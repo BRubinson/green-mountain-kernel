@@ -82,7 +82,7 @@ public enum ChewedArtifactParser {
                     if !name.isEmpty { resourceName = name }
                 } else if trimmed.hasPrefix("**Confidence**:") {
                     let value = trimmed.dropFirst("**Confidence**:".count).trimmingCharacters(in: .whitespaces)
-                    confidence = Int(value.prefix { $0.isNumber })
+                    confidence = Int(value.prefix(while: \.isNumber))
                 }
 
             case .contents:
@@ -100,7 +100,12 @@ public enum ChewedArtifactParser {
                     if !isHeader && !isSeparator {
                         entries.append(
                             ChewedFileEntry(
-                                name: cells[0], type: cells[1], description: cells[2], fullPath: nil))
+                                name: cells[0],
+                                type: cells[1],
+                                description: cells[2],
+                                fullPath: nil
+                            )
+                        )
                     }
                 }
 
@@ -129,7 +134,11 @@ public enum ChewedArtifactParser {
             if let index = files.firstIndex(where: { $0.fullPath == nil && $0.name == basename }) {
                 let entry = files[index]
                 files[index] = ChewedFileEntry(
-                    name: entry.name, type: entry.type, description: entry.description, fullPath: path)
+                    name: entry.name,
+                    type: entry.type,
+                    description: entry.description,
+                    fullPath: path
+                )
             } else if !files.contains(where: { $0.fullPath == path }) {
                 let ext = URL(fileURLWithPath: path).pathExtension
                 files.append(ChewedFileEntry(name: basename, type: ext, description: "", fullPath: path))

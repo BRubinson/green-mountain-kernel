@@ -5,12 +5,10 @@ import GmDaemonSdk
 /// architecture options, apply the calibrated review rank, seal the care
 /// package.
 ///
-/// THEY ARE ORDINARY PEN TOOLS. Nothing here refuses anyone — the four are
-/// served by the same client as every other tool. What reserves them for the
+/// THEY ARE ORDINARY PEN TOOLS and refuse no one. What reserves them for the
 /// primary is METHODOLOGY, not policy: cross-agent calibration and the choice
-/// among options belong to one reader, and that is stated in the pen sheet and
-/// in each agent's own definition. A persona that finds one of these in its
-/// tool list may use it; a persona that does not, reports it is ready for one.
+/// among options belong to one reader. A persona holding one may use it; a
+/// persona without it reports that it is ready for one.
 func makePrimaryDoorTools() -> [Tool] {
     [
 
@@ -42,8 +40,11 @@ func makePrimaryDoorTools() -> [Tool] {
                         promptUuid: try args.string("prompt_uuid"),
                         expectedVersion: try args.int64("expected_version"),
                         status: status,
-                        clientKey: ClientKey.resolve()))
-            }),
+                        clientKey: ClientKey.resolve()
+                    )
+                )
+            }
+        ),
 
         Tool(
             name: "rpir_decide_architecture",
@@ -65,17 +66,21 @@ func makePrimaryDoorTools() -> [Tool] {
             // degrade is possible, because the only way to re-run it is to decide
             // again. So it names the read that shows the outcome instead; the
             // write-aware guard turns this into "completed, read it back".
-            narrowing: PenNarrowing(
+            narrowing: CdeNarrowing(
                 parameters: [],
                 retryWith: "rpir_get_architecture (the decision and its rationale are on the summary; "
-                    + "pass option_uuid for one option's body)"),
+                    + "pass option_uuid for one option's body)"
+            ),
             run: { args, client in
                 try client.archDecide(
                     ArchDecideRequest(
                         optionUuid: try args.string("option_uuid"),
                         expectedVersion: try args.int64("expected_version"),
-                        rationale: try args.string("rationale")))
-            }),
+                        rationale: try args.string("rationale")
+                    )
+                )
+            }
+        ),
 
         Tool(
             name: "rpir_rank_reviews",
@@ -108,8 +113,11 @@ func makePrimaryDoorTools() -> [Tool] {
                 return try client.reviewRank(
                     ReviewRankRequest(
                         summaryUuid: try args.string("summary_uuid"),
-                        ratings: ratings))
-            }),
+                        ratings: ratings
+                    )
+                )
+            }
+        ),
 
         Tool(
             name: "rpir_close_care_package",
@@ -131,7 +139,10 @@ func makePrimaryDoorTools() -> [Tool] {
                     CarePackageCompleteRequest(
                         packageUuid: try args.string("package_uuid"),
                         expectedVersion: try args.int64("expected_version"),
-                        clarifiedIntent: try args.string("clarified_intent")))
-            }),
+                        clarifiedIntent: try args.string("clarified_intent")
+                    )
+                )
+            }
+        ),
     ]
 }

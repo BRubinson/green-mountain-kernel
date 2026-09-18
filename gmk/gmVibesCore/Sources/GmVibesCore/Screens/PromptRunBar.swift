@@ -3,58 +3,14 @@ import AppKit
 import GmDaemonSdk
 import GmITerm2Client
 
-/// The disk reads behind the plugin preflight, taken ONCE per process.
+/// The disk reads behind the plugin preflight, taken ONCE per process, because
+/// `PromptRunBar.block` is recomputed on every view update. The cache cannot see a
+/// regeneration made while the app runs, so EVERY BLOCK MESSAGE ENDS IN "then relaunch".
 ///
-/// `PromptRunBar.block` is recomputed on every view update, so stat-ing a
-/// manifest per frame is a cost with no reader. The price of caching is that a
-/// regeneration while the app is running is not noticed until relaunch, and
-/// that is accepted: on the happy path the two versions agree BY CONSTRUCTION
-/// (`generate_plugin.sh` stamps the plugin manifest from `gmk/VERSION`), so
-/// this check exists for a stale DIRECTORY, not for a live edit.
-///
-/// EVERY BLOCK MESSAGE THEREFORE ENDS IN "then relaunch GMVibes". Without it
-/// the copy prescribes the live edit the cache cannot see: the reader runs the
-/// script named in the message, the manifest changes on disk, and the button
-/// stays disabled showing the same two stale version numbers.
-///
-/// ## The reference is the TREE's `gmk/VERSION`, never the app bundle
-///
-/// `CFBundleShortVersionString` is the WRONG question, and asking it disables
-/// the button on every Xcode Run. `build-dmg.sh` stamps `MARKETING_VERSION`
-/// from `gmk/VERSION` as a BUILD-SETTING OVERRIDE, so the value that actually
-/// sits in `project.pbxproj` is stale — a Beta bundle built from Xcode reports
-/// `3.9` against a plugin manifest of `54.0.2`, and the mismatch arm fires
-/// forever. An Xcode Run never goes through `build-dmg.sh`, so on that path the
-/// bundle version is simply not maintained. VERIFIED by reading a built Beta
-/// bundle, not inferred.
-///
-/// `gmk/VERSION` is read from the SAME TREE the plugin directory lives in, so
-/// the question becomes the only one that matters: *is the plugin in this tree
-/// current with this tree's VERSION file?* That is self-consistent regardless
-/// of what the bundle claims, and it still catches the case the preflight
-/// exists for — a stale tree whose plugin was never regenerated.
-///
-/// A `gmk/VERSION` that cannot be read returns `.ok`, deliberately. A missing
-/// VERSION file beside a valid plugin manifest is not evidence of staleness,
-/// and blocking on it would fail in the restrictive direction on a path that is
-/// otherwise fine.
-///
-/// ## Why the guard exists at all — PROVEN, not feared
-///
-/// `claude --plugin-dir <dir>` REPLACES the installed plugin; it does not
-/// collide with it and there is NO FALLBACK. Run against a clone that predates
-/// the `pen` → `cde` rename, `mcp list` reports `plugin:gmcc:pen` and
-/// `plugin:gmcc:cde` IS GONE.
-///
-/// So the hazard is SILENT RE-NAMESPACING. Point `--plugin-dir` at a stale tree
-/// and every `mcp__plugin_gmcc_cde__*` grant in every agent frontmatter
-/// resolves to NOTHING: the session boots, the agents load, the pen answers no
-/// tool anyone was granted, and the only symptom is agents that write nothing.
-///
-/// CONSIDERED AND REJECTED as the primary check: reading `<dir>/.mcp.json` and
-/// refusing unless the server key is `cde`. It names the actual symptom, but it
-/// puts knowledge of one server key inside the app and catches ONE symptom of
-/// staleness rather than staleness itself. The version check catches the class.
+/// The reference is the TREE's `gmk/VERSION`, never `CFBundleShortVersionString`, which is
+/// stale on any Xcode Run. `claude --plugin-dir <dir>` REPLACES the installed plugin with no
+/// fallback, so a stale tree resolves every `mcp__plugin_gmcc_cde__*` grant to nothing and the
+/// only symptom is agents that write nothing. An unreadable VERSION file returns `.ok`.
 private enum PluginPreflight {
     enum Result: Equatable {
         /// No baked directory — production, or a bundle built without one.
@@ -274,7 +230,8 @@ struct PromptRunBar: View {
                     colours the tab alone under Regular, and nothing here can tell \
                     which style your profile uses — which is why the environment \
                     rides the background instead.
-                    """)
+                    """
+                )
         }
     }
 
@@ -296,13 +253,18 @@ struct PromptRunBar: View {
                     + (session.usedDefaultProfile
                         ? " — the instance profile was rejected, so this pane uses the default profile and the wrong colours."
                         : ""),
-                symbol: "checkmark.circle.fill", tone: .green)
+                symbol: "checkmark.circle.fill",
+                tone: .green
+            )
         case .failed(let error):
             let copy = failureCopy(error)
             VStack(alignment: .leading, spacing: 4) {
                 message(
-                    copy.text, symbol: "xmark.octagon.fill", tone: .red,
-                    monospaced: copy.monospaced)
+                    copy.text,
+                    symbol: "xmark.octagon.fill",
+                    tone: .red,
+                    monospaced: copy.monospaced
+                )
                 if let affordance = copy.affordance {
                     affordanceButton(affordance)
                 }
@@ -311,7 +273,9 @@ struct PromptRunBar: View {
     }
 
     private func message(
-        _ text: String, symbol: String, tone: Color,
+        _ text: String,
+        symbol: String,
+        tone: Color,
         monospaced: Bool = false
     ) -> some View {
         Label {
@@ -342,8 +306,8 @@ struct PromptRunBar: View {
             Button("Open Automation Settings") {
                 if let url = URL(
                     string:
-                        "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")
-                {
+                        "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
+                ) {
                     NSWorkspace.shared.open(url)
                 }
             }
@@ -391,7 +355,9 @@ struct PromptRunBar: View {
         }
     }
 
-    private func failureCopy(_ error: ITerm2Error)
+    private func failureCopy(
+        _ error: ITerm2Error
+    )
         -> (text: String, affordance: Affordance?, monospaced: Bool)
     {
         switch error {
@@ -453,7 +419,8 @@ struct PromptRunBar: View {
             tierCommand: tierCommand,
             pluginDir: PluginPreflight.directory,
             badgeText: envBadgeText,
-            envBackgroundHex: EnvironmentKind.current.paneBackgroundHex)
+            envBackgroundHex: EnvironmentKind.current.paneBackgroundHex
+        )
         await launchPane(script: script, root: root, repo: repo)
     }
 
@@ -469,7 +436,8 @@ struct PromptRunBar: View {
             tabColorHex: launchColors.assign(promptUuid: stub.uuid).hex,
             badgeText: envBadgeText,
             envBackgroundHex: EnvironmentKind.current.paneBackgroundHex,
-            shell: loginShellPath())
+            shell: loginShellPath()
+        )
         await launchPane(script: script, root: root, repo: repo)
     }
 
@@ -484,11 +452,13 @@ struct PromptRunBar: View {
             let profileName = await ITerm.ensureProfile(
                 instanceUUID: windowID.instanceUUID,
                 instanceName: instanceName,
-                workingDir: repo.path)
+                workingDir: repo.path
+            )
             scriptURL = try PaneScriptWriter.write(script: script, root: root)
             let command = try paneCommandLine(
                 shell: loginShellPath(),
-                scriptPath: scriptURL!.path)
+                scriptPath: scriptURL!.path
+            )
             let properties =
                 ITerm.workingDirectoryProperties(repo.path) + [
                     .string("Custom Command", "Yes"),
@@ -497,10 +467,12 @@ struct PromptRunBar: View {
             let session = try await ITerm2Launcher.launchPane(
                 PaneLaunchRequest(
                     profileName: profileName,
-                    profileProperties: properties),
+                    profileProperties: properties
+                ),
                 progress: { stage in
                     MainActor.assumeIsolated { phase = .launching(stage) }
-                })
+                }
+            )
             phase = .launched(session)
         } catch {
             if let scriptURL { try? FileManager.default.removeItem(at: scriptURL) }

@@ -2,13 +2,10 @@ import Foundation
 
 /// Boot-side wrapper for BASE_PROJECT promotion.
 ///
-/// Shaped exactly like DopeBootSync, and for the same reason: it rides the
-/// SessionStart path, so EVERY outcome is non-throwing. "Boot must never
-/// block on a domain model" extends verbatim to publishing one.
-///
-/// Runs immediately after DopeBootSync.run inside CONTEXT_ENSURE, so the
-/// files -> db reconcile happens first and promotion publishes whatever that
-/// settled on.
+/// Rides the SessionStart path, so EVERY outcome is non-throwing — boot must
+/// never block on a domain model. Runs immediately after DopeBootSync.run
+/// inside CONTEXT_ENSURE, so the files → db reconcile settles first and
+/// promotion publishes its result.
 public enum DopePromotion {
     public enum Outcome {
         /// The session is not on the project's primary branch — the common,

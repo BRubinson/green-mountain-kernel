@@ -21,7 +21,9 @@ struct FileChangeRepository: RepositoryContext {
         if let promptUuid = req.promptUuid {
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM prompt WHERE uuid = ?", arguments: [promptUuid]
+                    db,
+                    sql: "SELECT 1 FROM prompt WHERE uuid = ?",
+                    arguments: [promptUuid]
                 ) != nil
             else {
                 throw StoreError.notFound(entity: "prompt", key: promptUuid)
@@ -37,26 +39,25 @@ struct FileChangeRepository: RepositoryContext {
         let origin = req.origin ?? FileChangeOrigin.hook
         guard FileChangeOrigin.all.contains(origin) else {
             throw StoreError.badRequest(
-                detail: "origin must be \(FileChangeOrigin.vocabulary) (got '\(origin)')")
+                detail: "origin must be \(FileChangeOrigin.vocabulary) (got '\(origin)')"
+            )
         }
         // THE BINDING GATE. A write that names a Claude conversation is
-        // payload-borne, and a payload-borne write resolves through the
-        // binding or not at all — this is the server-side half of the no-op
-        // contract, and it is strictly stronger than the env gate it replaces
-        // (which only ever tested whether one variable survived a
-        // subprocess).
-        //
-        // It runs before the ensure chain on purpose: ensureProject/
-        // ensureInstance CREATE rows, so after them every repo looks booted
-        // and the loud/silent distinction below collapses.
+        // payload-borne, and a payload-borne write resolves through the binding
+        // or not at all; this is the server-side half of the no-op contract.
+        // It runs before the ensure chain on purpose: ensureProject and
+        // ensureInstance CREATE rows, so after them every repo looks booted and
+        // the loud/silent distinction below collapses.
         var boundSessionUuid: String?
         if let claudeSessionId = req.claudeSessionId {
             boundSessionUuid = try claudeSessionBinding.resolveSession(
-                claudeSessionId: claudeSessionId)
+                claudeSessionId: claudeSessionId
+            )
             guard boundSessionUuid != nil else {
                 throw StoreError.hookUnbound(
                     claudeSessionId: claudeSessionId,
-                    booted: try bootedInstanceUuid(req) != nil)
+                    booted: try bootedInstanceUuid(req) != nil
+                )
             }
         }
         let context = ContextRepository(db: db, core: core)
@@ -67,7 +68,9 @@ struct FileChangeRepository: RepositoryContext {
         // architecture change rows and file changes always meet on the
         // same repo-relative string (absolute-outside-instance rejected).
         let relativePath = try Store.normalizeRepoRelativePath(
-            req.relativePath, repoRoot: req.instance.absoluteFileSystemPath)
+            req.relativePath,
+            repoRoot: req.instance.absoluteFileSystemPath
+        )
 
         // IDEMPOTENCY, as an explicit already-recorded SUCCESS. The point
         // query comes before ensureSessionFile because that call bumps
@@ -76,7 +79,10 @@ struct FileChangeRepository: RepositoryContext {
         // appends no event and does not touchSession.
         if let toolUseId = req.toolUseId,
             let recorded = try recordedChange(
-                toolUseId: toolUseId, sessionUuid: sessionUuid, relativePath: relativePath)
+                toolUseId: toolUseId,
+                sessionUuid: sessionUuid,
+                relativePath: relativePath
+            )
         {
             return recorded
         }
@@ -86,21 +92,18 @@ struct FileChangeRepository: RepositoryContext {
             relativePath: relativePath,
             changeKind: req.changeKind
         )
-        // OPT-IN attribution: the long-standing "omitted prompt means
-        // deliberately session-scoped" semantic stays intact for every other
-        // caller; only autoAttribute callers resolve a prompt, and an
-        // unresolvable one leaves the change unattributed — never a guess
-        // between two concurrent prompts.
-        //
+        // OPT-IN attribution: an omitted prompt still means deliberately
+        // session-scoped for every other caller. Only autoAttribute callers
+        // resolve a prompt, and an unresolvable one leaves the change
+        // unattributed rather than guessing between two concurrent prompts.
         // Only the PROMPT comes from the bound session; session_uuid and
         // session_file above stay cwd-derived, which is where the accepted
-        // branch-switch staleness comes from (see resolveAttributedPrompt). A
-        // caller with no conversation to name resolves the same ladder
-        // against the session its cwd landed in.
+        // branch-switch staleness comes from (see resolveAttributedPrompt).
         var attributedPromptUuid = req.promptUuid
         if attributedPromptUuid == nil, req.autoAttribute == true {
             attributedPromptUuid = try resolveAttributedPrompt(
-                sessionUuid: boundSessionUuid ?? sessionUuid)
+                sessionUuid: boundSessionUuid ?? sessionUuid
+            )
         }
         // workflow_phase is stamped SERVER-SIDE and DERIVED LIVE (the
         // machine's doctrine — last_served_phase is observability only and
@@ -112,9 +115,12 @@ struct FileChangeRepository: RepositoryContext {
             if let workflow = try workflows.fetchActive(promptUuid: promptUuid),
                 let variant = BotVariant(rawValue: workflow.variant)
             {
-                workflowPhase = try workflows.derivePhase(
-                    workflow: workflow, variant: variant
-                ).0.rawValue
+                workflowPhase =
+                    try workflows.derivePhase(
+                        workflow: workflow,
+                        variant: variant
+                    )
+                    .0.rawValue
             }
         }
         // The FK is satisfied by CONSTRUCTION rather than by precondition: an
@@ -129,12 +135,15 @@ struct FileChangeRepository: RepositoryContext {
                 claudeSessionId: req.claudeSessionId,
                 claudeTurnId: req.claudeTurnId,
                 sessionUuid: sessionUuid,
-                promptUuid: attributedPromptUuid))
+                promptUuid: attributedPromptUuid
+            )
+        )
 
         let fileChangeUuid: String
         do {
             fileChangeUuid = try core.insertBase(
-                db, table: "file_change",
+                db,
+                table: "file_change",
                 extra: [
                     "session_file_uuid": sessionFileUuid,
                     "session_uuid": sessionUuid,
@@ -153,28 +162,26 @@ struct FileChangeRepository: RepositoryContext {
                     "duration_ms": req.durationMs,
                     "transcript_path": req.transcriptPath,
                     "agent_registration_uuid": agentRegistrationUuid,
-                ])
+                ]
+            )
         } catch let error as DatabaseError
             where error.resultCode == .SQLITE_CONSTRAINT
             && error.extendedResultCode == .SQLITE_CONSTRAINT_UNIQUE
         {
-            // The partial UNIQUE fired after the point query above passed.
-            // Map it to the SAME already-recorded success rather than an
-            // error: the caller asked for this row to exist and it does.
-            // SQLite aborts the statement, not the transaction, so the
-            // surrounding work stands.
-            //
+            // The partial UNIQUE fired after the point query above passed. Map
+            // it to the SAME already-recorded success rather than an error: the
+            // caller asked for this row to exist and it does. SQLite aborts the
+            // statement, not the transaction, so surrounding work stands.
             // NARROWED TO *_UNIQUE ON PURPOSE. A bare SQLITE_CONSTRAINT also
-            // covers the foreign keys on this insert — and this train just
-            // added one, agent_registration_uuid — so the wide form could
-            // report a genuine FK failure as a dedup success whenever a row
-            // matching (tool_use_id, session, path) happened to exist. The
-            // catch may only ever mean the thing it claims to mean.
+            // covers this insert's foreign keys, so the wide form could report a
+            // genuine FK failure as a dedup success. The catch may only ever
+            // mean the thing it claims to mean.
             guard let toolUseId = req.toolUseId,
                 let recorded = try recordedChange(
                     toolUseId: toolUseId,
                     sessionUuid: sessionUuid,
-                    relativePath: relativePath)
+                    relativePath: relativePath
+                )
             else { throw error }
             return recorded
         }
@@ -185,7 +192,8 @@ struct FileChangeRepository: RepositoryContext {
         var rangeUuids: [String] = []
         for range in req.ranges.prefix(FileChangeLimits.maxRangesPerChange) {
             let rangeUuid = try core.insertBase(
-                db, table: "file_change_range",
+                db,
+                table: "file_change_range",
                 extra: [
                     "file_change_uuid": fileChangeUuid,
                     "line_start": range.lineStart,
@@ -193,7 +201,8 @@ struct FileChangeRepository: RepositoryContext {
                     "changed_content": range.changedContent.map {
                         String($0.prefix(FileChangeLimits.maxChangedContentCharacters))
                     },
-                ])
+                ]
+            )
             rangeUuids.append(rangeUuid)
         }
 
@@ -223,55 +232,42 @@ struct FileChangeRepository: RepositoryContext {
     // MARK: - Attribution
 
     /// The prompt a change belongs to, resolved from ONE session and nothing
-    /// else. Both rungs demand that the answer be unique; a session running
-    /// two prompts at once returns nil, and the change is recorded
-    /// session-scoped rather than guessed onto one of them.
-    ///
-    /// ACCEPTED BEHAVIOUR, deliberate and not a gap: for a payload-borne write
-    /// the session passed here is the one the conversation was PINNED to,
-    /// while the row's own session_uuid and session_file stay cwd-derived. So
-    /// after a mid-session `git checkout`, changes land in the new branch's
-    /// session attributed to the old branch's prompt, with no signal. That
-    /// was decided rather than overlooked: detecting it would need a drift
-    /// check, a branch column or a re-bind, all three of which were declined,
-    /// and claude_session_binding deliberately holds no column that could
-    /// support one.
+    /// else. Both rungs demand a unique answer; a session running two prompts at
+    /// once returns nil, and the change is recorded session-scoped.
+    /// ACCEPTED BEHAVIOUR: for a payload-borne write the session passed here is
+    /// the one the conversation was PINNED to, while the row's own session_uuid
+    /// and session_file stay cwd-derived, so after a mid-session `git checkout`
+    /// changes land in the new branch's session attributed to the old branch's
+    /// prompt, with no signal.
     func resolveAttributedPrompt(sessionUuid: String) throws -> String? {
         let workflowPrompts = try String.fetchAll(
             db,
             sql: "SELECT prompt_uuid FROM bot_workflow WHERE session_uuid = ? AND status = 'active'",
-            arguments: [sessionUuid])
+            arguments: [sessionUuid]
+        )
         if workflowPrompts.count == 1 { return workflowPrompts[0] }
         // Fallback when no single active workflow answers: the session's one
-        // RUNNING prompt. m0028 widened what "running" means — this used to
-        // look for the single prompt in `implementing`, which was a narrow and
-        // therefore fairly selective probe. `initiated` covers everything
-        // between start and finish, so a session holding two started prompts
-        // now returns nil here where before one of them might have been in
-        // `implementing` alone and won.
-        //
-        // That is the right trade and not a regression: returning nil means
-        // "cannot attribute", which is already this function's honest answer
-        // for an ambiguous session. The alternative — guessing between two
-        // started prompts — would file changes against the wrong prompt in an
-        // append-only db. The active bot_workflow row above remains the
-        // precise path, and it is the one that normally answers.
+        // RUNNING prompt. `initiated` covers everything between start and
+        // finish, so a session holding two started prompts returns nil here.
+        // That is the honest answer for an ambiguous session — guessing between
+        // two started prompts would file changes against the wrong one in an
+        // append-only db. The active bot_workflow row above is the precise path
+        // and normally answers.
         let running = try String.fetchAll(
             db,
             sql: "SELECT uuid FROM prompt WHERE session_uuid = ? AND status = ?",
-            arguments: [sessionUuid, PromptStatus.initiated.rawValue])
+            arguments: [sessionUuid, PromptStatus.initiated.rawValue]
+        )
         if running.count == 1 { return running[0] }
         return nil
     }
 
     /// Durable trace for a refused payload-borne write, appended by
-    /// `Store.addFileChange` in its OWN transaction — inside the refused write
-    /// it would roll back with it, and an event that vanishes is precisely the
-    /// silence this replaces.
-    ///
-    /// Only a repo the daemon KNOWS gets one. A PostToolUse hook fires in
-    /// every repo on the machine, so an unknown one producing an unbound
-    /// payload is ordinary and silent; a known one producing it is dead
+    /// `Store.addFileChange` in its OWN transaction: inside the refused write it
+    /// would roll back with it, and a vanishing event is the silence this
+    /// replaces. Only a repo the daemon KNOWS gets one — a PostToolUse hook
+    /// fires in every repo on the machine, so an unknown one producing an
+    /// unbound payload is ordinary, while a known one producing it is dead
     /// capture.
     func recordUnbound(_ req: FileChangeAdd, claudeSessionId: String) throws {
         guard let instanceUuid = try bootedInstanceUuid(req) else { return }
@@ -285,8 +281,11 @@ struct FileChangeRepository: RepositoryContext {
         if let toolUseId = req.toolUseId { payload["tool_use_id"] = toolUseId }
         if let agentId = req.agentId { payload["agent_id"] = agentId }
         try core.appendEvent(
-            db, kind: .hookUnbound, subjectUuid: instanceUuid,
-            payload: Store.jsonPayload(payload))
+            db,
+            kind: .hookUnbound,
+            subjectUuid: instanceUuid,
+            payload: Store.jsonPayload(payload)
+        )
     }
 
     /// Read-only bootedness: has this repo ever been through CONTEXT_ENSURE?
@@ -297,20 +296,25 @@ struct FileChangeRepository: RepositoryContext {
     private func bootedInstanceUuid(_ req: FileChangeAdd) throws -> String? {
         guard
             let projectUuid = try String.fetchOne(
-                db, sql: "SELECT uuid FROM project WHERE code = ?", arguments: [req.project.code]
+                db,
+                sql: "SELECT uuid FROM project WHERE code = ?",
+                arguments: [req.project.code]
             )
         else { return nil }
         return try String.fetchOne(
             db,
             sql: "SELECT uuid FROM instance WHERE project_uuid = ? AND name = ?",
-            arguments: [projectUuid, req.instance.name])
+            arguments: [projectUuid, req.instance.name]
+        )
     }
 
     /// The existing row for a (tool call, file) pair, as the response a fresh
     /// write would have produced. The pair — not tool_use_id alone — is the
     /// unit: one `sed -i a b c` is one tool_use_id and three rows.
     private func recordedChange(
-        toolUseId: String, sessionUuid: String, relativePath: String
+        toolUseId: String,
+        sessionUuid: String,
+        relativePath: String
     ) throws -> FileChangeAddResponse? {
         guard
             let row = try Row.fetchOne(
@@ -328,12 +332,14 @@ struct FileChangeRepository: RepositoryContext {
         let rangeUuids = try String.fetchAll(
             db,
             sql: "SELECT uuid FROM file_change_range WHERE file_change_uuid = ? ORDER BY id",
-            arguments: [fileChangeUuid])
+            arguments: [fileChangeUuid]
+        )
         return FileChangeAddResponse(
             sessionFileUuid: row["session_file_uuid"],
             fileChangeUuid: fileChangeUuid,
             rangeUuids: rangeUuids,
-            deduplicated: true)
+            deduplicated: true
+        )
     }
 
     /// nil sessionUuid means no session filter (whole-db query); a
@@ -345,7 +351,9 @@ struct FileChangeRepository: RepositoryContext {
         if let sessionUuid = req.sessionUuid {
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM session WHERE uuid = ?", arguments: [sessionUuid]
+                    db,
+                    sql: "SELECT 1 FROM session WHERE uuid = ?",
+                    arguments: [sessionUuid]
                 ) != nil
             else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
@@ -378,7 +386,8 @@ struct FileChangeRepository: RepositoryContext {
                 ORDER BY fc.id DESC
                 LIMIT \(limit)
                 """,
-            arguments: StatementArguments(arguments))
+            arguments: StatementArguments(arguments)
+        )
         // One IN(...) prefetch of all ranges grouped in memory — 2
         // statements total, not one per returned row (251 at limit 250).
         let uuids = rows.map { $0["uuid"] as String }
@@ -394,8 +403,10 @@ struct FileChangeRepository: RepositoryContext {
                 arguments: StatementArguments(uuids)
             ) {
                 let changeUuid: String = row["file_change_uuid"]
-                rangesByChange[changeUuid, default: []].append(
-                    ChangeRangeRow(lineStart: row["line_start"], lineEnd: row["line_end"]))
+                rangesByChange[changeUuid, default: []]
+                    .append(
+                        ChangeRangeRow(lineStart: row["line_start"], lineEnd: row["line_end"])
+                    )
             }
         }
         let changes = rows.map { row -> FileChangeRow in
@@ -447,11 +458,13 @@ struct FileChangeRepository: RepositoryContext {
             return existing
         }
         return try core.insertBase(
-            db, table: "session_file",
+            db,
+            table: "session_file",
             extra: [
                 "session_uuid": sessionUuid,
                 "relative_path": relativePath,
                 "active": active,
-            ])
+            ]
+        )
     }
 }

@@ -3,52 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0021 — the diagram vocabulary migration, and the LAST rebuild of
-    // diagram_element this schema should ever need.
-    //
-    // Four things ride together because they are one table rebuild each
-    // and SQLite cannot ALTER a CHECK:
-    //
-    // 1. diagram_element loses BOTH literal-list CHECKs. This is the
-    //    debt DopeCogElement.swift:11-19 already named in writing:
-    //
-    //      "The registry below is the whole extensibility story, and it
-    //       exists because of a specific piece of debt. m0010's
-    //       `diagram_element.element_type` carries a `CHECK
-    //       (element_type IN (...))`, so adding a type there means
-    //       rebuilding the table ... Adding a second element type is:
-    //       one case, one registry entry, one subtype table. Never a
-    //       migration."
-    //
-    //    Prompt 9 adds two types at once, which is the moment that debt
-    //    comes due twice. Validity moves wholly into
-    //    DiagramElementTypeSpec: both write paths validate against the
-    //    registry, fetchElementInfo THROWS corruptState on an unknown
-    //    element_type at read, and the subtype tables' UNIQUE
-    //    element_uuid remains the structural proof that exactly one
-    //    subtype row exists per element. That is the COGS mitigation
-    //    verbatim, applied to the family COGS was written about.
-    //
-    //    The parent-nullability CHECK goes with it: top-levelness is now
-    //    `spec.allowedParentTypes == nil`, a registry fact, so a new
-    //    top-level type is also no longer a migration.
-    //
-    // 2. diagram drops the INSTANCE tier. The ladder is
-    //    project/session/prompt; instance_uuid and its chain CHECK go
-    //    away, and session/prompt still reach an instance transitively
-    //    via session -> instance where anything needs one.
-    //
-    // 3. The `gmcc_diagram_path IS NULL OR tier != 'PROJECT'` CHECK goes
-    //    away. It existed because only an instance carried a checkout
-    //    path; screenshots now materialize under CKFS storage, which
-    //    every tier has, so a PROJECT-tier diagram finally has a
-    //    resolvable storage root.
-    //
-    // 4. The two new element types get their subtype tables, and strokes
-    //    get their packed representation as plain ADD COLUMNs.
-    //
-    // Live blast radius: 2 diagram rows, 27 diagram_element rows, and 0
-    // rows in every drawing/vertex table. Cheapest this will ever be.
+    // m0021 — the diagram vocabulary migration. Four changes ride together
+    // because each is a table rebuild and SQLite cannot ALTER a CHECK.
+    // 1. diagram_element loses both literal-list CHECKs; validity moves into
+    //    DiagramElementTypeSpec, so a new element type is a registry entry rather
+    //    than a migration, and top-levelness is `spec.allowedParentTypes == nil`.
+    // 2. diagram drops the INSTANCE tier; session/prompt reach an instance
+    //    transitively. 3. The gmcc_diagram_path CHECK goes: every tier has a
+    //    resolvable storage root. 4. Two subtype tables and packed strokes, ADDed.
     static func m0021_diagramVocabularyAndTierCollapse(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0021_diagramVocabularyAndTierCollapse") { db in
             let elementsBefore =
@@ -72,7 +34,8 @@ extension Migrations {
                                     WHERE other.tier = 'PROJECT'
                                       AND other.project_uuid = diagram.project_uuid
                                       AND other.code = diagram.code);
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: """
@@ -123,7 +86,8 @@ extension Migrations {
                     CREATE INDEX idx_diagram_prompt_fk ON diagram(prompt_uuid);
                     CREATE INDEX idx_diagram_dope_scope_code ON diagram(dope_scope_code);
                     CREATE INDEX idx_diagram_kbite_code ON diagram(kbite_code);
-                    """)
+                    """
+            )
 
             // diagram_element: same shape, minus both literal-list CHECKs.
             // The self-reference guard STAYS — it is a structural fact, not
@@ -167,7 +131,8 @@ extension Migrations {
                         ON diagram_element(diagram_uuid);
                     CREATE INDEX idx_diagram_element_parent_fk
                         ON diagram_element(parent_element_uuid);
-                    """)
+                    """
+            )
 
             // drawing_text — the first bounded element that is NOT
             // vertex-derived. Markdown wrapping needs a known layout width,
@@ -191,25 +156,17 @@ extension Migrations {
 
                     CREATE INDEX idx_diagram_drawing_text_element_fk
                         ON diagram_drawing_text(element_uuid);
-                    """)
+                    """
+            )
 
-            // connector — the diagram subsystem's FIRST element-to-element
-            // reference.
-            //
-            // target_element_uuid is NULLABLE with ON DELETE SET NULL, and
-            // that is load-bearing: ON DELETE CASCADE here would delete this
-            // SUBTYPE row while its diagram_element row survived with no
-            // subtype row at all, which is corruptState on every subsequent
-            // read of the whole diagram. SET NULL degrades a deleted target
-            // to a renderable ghost instead, matching the ghost-tolerant
-            // doctrine the dope code bindings already use.
-            //
-            // The self-reference half of the containment rule is cheap
-            // enough to state in SQL. The sibling half ("may target a peer
-            // of its own parent") cannot be: a CHECK cannot reference
-            // another table, which is the same reason m0016's binding rule
-            // is a Swift guard. It lives in DiagramContainment, called by
-            // both write paths.
+            // connector — the diagram subsystem's only element-to-element
+            // reference. target_element_uuid is NULLABLE with ON DELETE SET
+            // NULL, and that is load-bearing: CASCADE would delete this SUBTYPE
+            // row while its diagram_element row survived without one, which is
+            // corruptState on every later read of the diagram. SET NULL degrades
+            // a deleted target to a renderable ghost. Only the self-reference
+            // half of the containment rule is stated in SQL; the sibling half
+            // lives in DiagramContainment, since a CHECK cannot cross tables.
             try db.execute(
                 sql: """
                     CREATE TABLE diagram_connector (
@@ -231,7 +188,8 @@ extension Migrations {
                         ON diagram_connector(element_uuid);
                     CREATE INDEX idx_diagram_connector_target_fk
                         ON diagram_connector(target_element_uuid);
-                    """)
+                    """
+            )
 
             // Packed strokes, purely additive. diagram_stroke_vertex and
             // diagram_shape_vertex are untouched and their
@@ -245,7 +203,8 @@ extension Migrations {
                 sql: """
                     ALTER TABLE diagram_drawing_stroke ADD COLUMN packed_vertices BLOB;
                     ALTER TABLE diagram_drawing_stroke ADD COLUMN vertex_count INTEGER;
-                    """)
+                    """
+            )
 
             let elementsAfter =
                 try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM diagram_element") ?? -1
@@ -256,7 +215,8 @@ extension Migrations {
                     entity: "diagram",
                     detail: "m0021 row-count mismatch: elements "
                         + "\(elementsBefore)->\(elementsAfter), diagrams "
-                        + "\(diagramsBefore)->\(diagramsAfter)")
+                        + "\(diagramsBefore)->\(diagramsAfter)"
+                )
             }
 
             try db.execute(

@@ -78,16 +78,10 @@ public enum GmBridgeClaudePlugin {
 
         public var mcpServers: [String]?
 
-        // THERE IS DELIBERATELY NO `outputStyles` FIELD.
-        //
-        // It existed, it was set, and it took the whole plugin down: Claude Code
-        // validates this manifest strictly and answers an unknown key with
-        // "outputStyles: Invalid input", refusing to load ANY of the plugin —
-        // commands, agents, hooks and the MCP server included. An unrecognised
-        // key here is not inert.
-        //
-        // Output styles are shipped by EXISTING in `output-styles/`; the
-        // manifest never lists them. Do not re-add this as a convenience.
+        // THERE IS DELIBERATELY NO `outputStyles` FIELD. Claude Code validates this
+        // manifest strictly and answers an unknown key with "outputStyles: Invalid
+        // input", refusing to load any of the plugin. Output styles are shipped by
+        // existing in `output-styles/`; the manifest never lists them.
 
         public var lspServers: [String]?
 

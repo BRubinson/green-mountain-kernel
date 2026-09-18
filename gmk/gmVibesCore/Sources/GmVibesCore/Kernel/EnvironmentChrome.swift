@@ -4,23 +4,12 @@ import SwiftUI
 
 /// Which environment this bundle is looking at, and how it says so.
 ///
-/// ## Derived from the RESOLVED ROOT, never from a build flag
+/// Derived from the RESOLVED ROOT, never a build flag: a `#if` would be a second source of
+/// truth, and the disagreement that matters is a build wearing non-production chrome while
+/// resolving `~/gmfs`. The baked Info.plist key is what makes the root unspoofable.
 ///
-/// A `#if GM_TEST` would be a SECOND source of truth, and two sources of truth
-/// can disagree. The disagreement that matters is the one where a build wearing
-/// non-production chrome is actually resolving `~/gmfs` — a red bar over live
-/// data, lying at the exact moment the signal matters most.
-///
-/// Here, "am I isolated?" and "which database am I writing?" are the SAME
-/// expression. The badge cannot be wrong, because a wrong badge would require a
-/// wrong root, and the baked Info.plist key is what makes the root unspoofable.
-///
-/// ## Inode comparison, not string comparison
-///
-/// `Paths.isProductionRoot` compares `(st_dev, st_ino)` of `gm.db`, because
-/// `standardizedFileURL` does not resolve symlinks. A `~/prod_gmfs` symlink, an
-/// APFS firmlink, or `/Users` vs `/System/Volumes/Data/Users` would each make
-/// one root look like two and paint the warning chrome over production.
+/// `Paths.isProductionRoot` compares `(st_dev, st_ino)` of `gm.db` rather than paths, because
+/// `standardizedFileURL` does not resolve symlinks and a firmlink makes one root look like two.
 public enum EnvironmentKind: Sendable {
     case production
     case beta
@@ -70,21 +59,13 @@ public enum EnvironmentKind: Sendable {
         }
     }
 
-    /// The pane's BACKGROUND tint, as a bare hex string (no leading `#`).
-    /// `nil` on production — and nil means the escape is NOT EMITTED AT ALL,
-    /// so a production pane's script stays byte-identical to today's.
+    /// The pane's BACKGROUND tint as a bare hex string, with no leading `#`. `nil` on
+    /// production, and nil emits no escape at all.
     ///
-    /// NOT `bannerColor`, and that is a decision rather than a duplication.
-    /// `bannerColor` is `.systemOrange`: correct as a 22pt fill over app chrome,
-    /// unreadable as the ground behind terminal text. These are two different
-    /// QUANTITIES that happen to mean the same thing, not two descriptions of
-    /// one quantity. Deriving one by darkening the other was considered and
-    /// rejected — terminal contrast is not a linear function of a UI fill, and
-    /// a derived value is one nobody can read off the file.
-    ///
-    /// KEEP THE TINTS DARK AND LOW-SATURATION. These values are a starting
-    /// point, not a verified choice — nobody has looked at one in a real pane
-    /// yet. Never `systemOrange`.
+    /// Not `bannerColor`: that is a 22pt fill over app chrome and is unreadable as the ground
+    /// behind terminal text, so these are two quantities rather than two descriptions of one.
+    /// Terminal contrast is not a linear function of a UI fill, so neither derives from the
+    /// other. KEEP THE TINTS DARK AND LOW-SATURATION; never `systemOrange`.
     public var paneBackgroundHex: String? {
         switch self {
         case .production: return nil
@@ -135,17 +116,12 @@ public struct EnvironmentBanner: View {
 
 /// Dock-tile badging.
 ///
-/// ## The Dock tile is CONDITIONAL, and that is accepted rather than worked around
+/// The tile is CONDITIONAL: `INFOPLIST_KEY_LSUIElement = YES` leaves the app menu-bar
+/// resident with no Dock tile until a window opens, so a Dock badge cannot be the primary
+/// signal. The always-visible signals are the menu-bar glyph and the banner above.
 ///
-/// `INFOPLIST_KEY_LSUIElement = YES` means the app is menu-bar resident and has
-/// NO Dock tile at all until a window opens — `WindowPresence` raises the
-/// activation policy to `.regular` only while one is on screen. So a Dock badge
-/// cannot be the primary signal, and this is stated here rather than left for
-/// someone to discover as a bug: the ALWAYS-VISIBLE signals are the menu-bar
-/// glyph and the banner above.
-///
-/// Call this after the activation policy changes. It is a no-op on production
-/// and a no-op when there is no tile to draw on.
+/// Call this after the activation policy changes. It is a no-op on production and when there
+/// is no tile to draw on.
 @MainActor
 public enum EnvironmentDockBadge {
 
@@ -170,12 +146,17 @@ public enum EnvironmentDockBadge {
         let inset: CGFloat = 40
         let diameter: CGFloat = 300
         let circle = NSRect(
-            x: size.width - diameter - inset, y: inset,
-            width: diameter, height: diameter)
+            x: size.width - diameter - inset,
+            y: inset,
+            width: diameter,
+            height: diameter
+        )
         NSColor(
             cgColor: kind == .beta
                 ? NSColor.systemOrange.cgColor
-                : NSColor.systemRed.cgColor)?.setFill()
+                : NSColor.systemRed.cgColor
+        )?
+        .setFill()
         NSBezierPath(ovalIn: circle).fill()
 
         let letter = kind.badge as NSString
@@ -187,8 +168,10 @@ public enum EnvironmentDockBadge {
         letter.draw(
             at: NSPoint(
                 x: circle.midX - textSize.width / 2,
-                y: circle.midY - textSize.height / 2),
-            withAttributes: attributes)
+                y: circle.midY - textSize.height / 2
+            ),
+            withAttributes: attributes
+        )
 
         image.unlockFocus()
         return image

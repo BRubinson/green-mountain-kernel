@@ -1,19 +1,13 @@
 import Foundation
 
 // Typed one-method-per-message facade — the entire integration surface for
-// gm_hook, gm_mcp and GMVibes. Wraps the generic request plumbing; callers never touch
-// MessageType or responseType.
+// gm_hook, gm_mcp and GMVibes. Callers never touch MessageType or responseType.
 //
-// HUNG OFF `GmVerbCaller`, NOT `DaemonClient` (v30). Every method below is the
-// same one-liner over `request(type:payload:responseType:)`, so binding them to
-// the protocol instead of the concrete socket client hands this entire surface
-// to the kernel's in-process caller as well — for the cost of this one line.
-// That is what lets MCP tool bodies and hook bodies run kernel-side unchanged
-// instead of dialing the daemon they are already inside. See
-// `Client/GmVerbCaller.swift`.
-//
-// Nothing else in this file changed, and nothing else needs to: `DaemonClient`
-// conforms, so every existing caller resolves exactly as before.
+// HUNG OFF `GmVerbCaller`, NOT `DaemonClient`. Every method below is the same
+// one-liner over `request(type:payload:responseType:)`, so binding them to the
+// protocol hands this whole surface to the kernel's in-process caller too,
+// which is what lets MCP and hook bodies run kernel-side instead of dialing
+// the daemon they are already inside.
 
 extension GmVerbCaller {
     // MARK: - Infra
@@ -122,24 +116,30 @@ extension GmVerbCaller {
         _ req: PromptDiagramQualifyRequest
     ) throws -> PromptQualifiedDiagramRow {
         try request(
-            type: .promptDiagramQualify, payload: req,
-            responseType: PromptQualifiedDiagramRow.self)
+            type: .promptDiagramQualify,
+            payload: req,
+            responseType: PromptQualifiedDiagramRow.self
+        )
     }
 
     public func promptDiagramGet(
         _ req: PromptDiagramGetRequest
     ) throws -> PromptQualifiedDiagramRow {
         try request(
-            type: .promptDiagramGet, payload: req,
-            responseType: PromptQualifiedDiagramRow.self)
+            type: .promptDiagramGet,
+            payload: req,
+            responseType: PromptQualifiedDiagramRow.self
+        )
     }
 
     public func promptDiagramList(
         _ req: PromptDiagramListRequest
     ) throws -> PromptDiagramListResponse {
         try request(
-            type: .promptDiagramList, payload: req,
-            responseType: PromptDiagramListResponse.self)
+            type: .promptDiagramList,
+            payload: req,
+            responseType: PromptDiagramListResponse.self
+        )
     }
 
     // MARK: - File change
@@ -428,8 +428,10 @@ extension GmVerbCaller {
         _ req: InstanceCurrentSessionRequest
     ) throws -> InstanceCurrentSessionResponse {
         try request(
-            type: .instanceCurrentSession, payload: req,
-            responseType: InstanceCurrentSessionResponse.self)
+            type: .instanceCurrentSession,
+            payload: req,
+            responseType: InstanceCurrentSessionResponse.self
+        )
     }
 
     public func pathsGet() throws -> PathsGetResponse {
@@ -484,16 +486,20 @@ extension GmVerbCaller {
         _ r: DopeCogElementUpdateRequest
     ) throws -> DopeCogElementResponse {
         try request(
-            type: .dopeCogElementUpdate, payload: r,
-            responseType: DopeCogElementResponse.self)
+            type: .dopeCogElementUpdate,
+            payload: r,
+            responseType: DopeCogElementResponse.self
+        )
     }
 
     public func dopeCogElementDelete(
         _ r: DopeCogElementDeleteRequest
     ) throws -> DopeCogDeleteResponse {
         try request(
-            type: .dopeCogElementDelete, payload: r,
-            responseType: DopeCogDeleteResponse.self)
+            type: .dopeCogElementDelete,
+            payload: r,
+            responseType: DopeCogDeleteResponse.self
+        )
     }
 
     public func dopeSearch(_ req: DopeSearchRequest) throws -> DopeSearchResponse {

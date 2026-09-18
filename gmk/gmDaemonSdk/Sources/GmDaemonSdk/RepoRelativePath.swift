@@ -1,28 +1,18 @@
 import Foundation
 
-/// The repo-relative path normalizer, in the BASE layer.
-///
-/// MOVED DOWN out of `StoreCore` rather than made `public` there. It lives here
-/// for the same reason `StoreError` does: it is misfiled in a persistence
-/// target. It is purely lexical, Foundation-only, touches no database and no
-/// filesystem — nothing about it is persistence. Keeping it in the middle layer
-/// would have meant either widening a persistence internal to satisfy a
-/// base-layer test, or duplicating the normalizer, and a second copy of a join
-/// key's normalizer is how two writers start disagreeing about the same string.
-///
-/// `StoreCore` and `Store` keep thin forwarders, so no call site changed.
+/// The repo-relative path normalizer, in the BASE layer because it is purely
+/// lexical and Foundation-only: it touches no database and no filesystem, so
+/// nothing about it is persistence. A second copy of a join key's normalizer
+/// is how two writers start disagreeing about the same string, so `StoreCore`
+/// and `Store` keep thin forwarders rather than their own.
 public enum RepoRelativePath {
 
-    /// The comparison feature's join key contract: architecture change rows
-    /// and file_change rows meet on this string, so both write paths run
-    /// through this one normalizer. Purely lexical — NEVER touches the
-    /// filesystem (live instance roots include paths that no longer exist,
-    /// and architecture rows name files that don't exist yet).
-    ///
-    /// Relative paths are anchored by definition and pass through cleaned; an
-    /// absolute path inside the instance root is stripped to repo-relative;
-    /// an absolute path outside it is rejected (honest failure over a
-    /// silently zero-match join).
+    /// The join key contract: architecture change rows and file_change rows
+    /// meet on this string, so both write paths run through this normalizer.
+    /// Purely lexical — it NEVER touches the filesystem, since instance roots
+    /// name paths that are gone and architecture rows name files not yet
+    /// created. A relative path passes through cleaned, an absolute path inside
+    /// the instance root is stripped, and one outside it is rejected.
     public static func normalizeRepoRelativePath(_ raw: String, repoRoot: String) throws -> String {
         var path = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty else {
@@ -39,7 +29,8 @@ public enum RepoRelativePath {
             while root.hasSuffix("/") { root = String(root.dropLast()) }
             guard root.count > 1, path == root || path.hasPrefix(root + "/") else {
                 throw StoreError.badRequest(
-                    detail: "path is not inside the instance root (\(repoRoot)): \(raw)")
+                    detail: "path is not inside the instance root (\(repoRoot)): \(raw)"
+                )
             }
             path = String(path.dropFirst(root.count))
             if path.hasPrefix("/") { path = String(path.dropFirst()) }

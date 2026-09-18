@@ -9,7 +9,7 @@ import GmDaemonSdk
 /// checked-out branch.
 struct InactiveSessionsSheet: View {
     /// Scope to one project; nil = all projects.
-    var projectUuid: String? = nil
+    var projectUuid: String?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(CatalogStore.self) private var catalog
@@ -45,7 +45,8 @@ struct InactiveSessionsSheet: View {
             instanceOrder: .recency,
             checkedOutCodeByInstance: checkedOut,
             excludeCheckedOut: true
-        ).apply(to: catalog)
+        )
+        .apply(to: catalog)
 
         var out: [Row] = []
         for project in filtered.projects {
@@ -64,7 +65,8 @@ struct InactiveSessionsSheet: View {
                             branch: stub.code,
                             projectName: project.name,
                             instanceName: instance.name
-                        ))
+                        )
+                    )
                 }
             }
         }
@@ -91,7 +93,8 @@ struct InactiveSessionsSheet: View {
                     description: Text(
                         query.isEmpty
                             ? "Every session is currently checked out on its instance."
-                            : "No inactive session matches “\(query)”.")
+                            : "No inactive session matches “\(query)”."
+                    )
                 )
                 .frame(maxWidth: .infinity, minHeight: 160)
             } else {

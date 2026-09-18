@@ -26,7 +26,8 @@ extension Store {
             (try? JSONSerialization.jsonObject(with: fingerprintData)) is [String: Any]
         else {
             throw StoreError.badRequest(
-                detail: "render_fingerprint must be a JSON object (the render sidecar's contents)")
+                detail: "render_fingerprint must be a JSON object (the render sidecar's contents)"
+            )
         }
 
         return try boundary { db in

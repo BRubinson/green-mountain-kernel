@@ -2,35 +2,14 @@ import Foundation
 import GmDaemon
 import GmDaemonSdk
 
-/// What THIS process decided about itself, on its first line of life.
+/// The ARBITRATION RESULT: what THIS process is, decided locally before
+/// anything could open the database. Distinct from `GmVibesCore.KernelRole`,
+/// which is a DISPLAY value for whichever kernel answered the socket.
 ///
-/// ## Not to be confused with `KernelRole`
-///
-/// `GmVibesCore.KernelRole` is a DISPLAY value: the role of whatever kernel
-/// answered the socket, mapped from the wire's `writer_role` string, degrading
-/// to `.unknown` rather than asserting. This is the ARBITRATION RESULT: what
-/// this process is, decided locally, before anything could open the database.
-///
-/// They answer different questions and the names deliberately differ. A single
-/// shared type would have to be either a lie on one side or an optional on
-/// both.
-///
-/// ## The three outcomes, and why the third never fights
-///
-/// The distinction that decides everything is `Holder.bundlePath`, which
-/// `KernelOwnership` documents as "nil means the holder is HEADLESS":
-///
-/// - **We won.** We are the writer. Boot the services.
-/// - **A headless kernel holds it.** Take over: it is a fallback that exists
-///   because hooks, SSH and CI cannot launch an application, and a person who
-///   has just launched the app outranks it. SIGTERM, wait, re-acquire.
-/// - **Another APP COPY holds it.** Degrade to client mode and never fight.
-///   LaunchServices gives one instance per bundle PATH, so a debug build beside
-///   the installed app is an ordinary daily occurrence — and two GUIs trading a
-///   lock back and forth is worse than one of them being read-only.
-///
-/// Client mode is a DEGRADATION, never a refusal. A guard that refuses on the
-/// daily path is a guard somebody deletes.
+/// `Holder.bundlePath` decides the loser's branch: nil means a HEADLESS holder,
+/// which a person's freshly launched app outranks, so take it over; a bundle
+/// path means another APP COPY, and two GUIs trading a lock is worse than one
+/// being read-only. Client mode is a DEGRADATION, never a refusal.
 public enum KernelHostRole: ~Copyable {
 
     /// This process owns the database and is serving.
@@ -39,19 +18,14 @@ public enum KernelHostRole: ~Copyable {
     /// Someone else owns it. We read over the socket like any other client.
     case client(holder: KernelOwnership.Holder)
 
-    /// We won the lock and then could not open the database.
-    ///
-    /// A separate arm rather than folding into `.client`, because the two are
-    /// opposite situations: in client mode somebody IS serving, and here nobody
-    /// is. The case that reaches this is a schema written by newer bits, which
-    /// `KernelWriter.start` refuses on purpose — and a refusal the UI can name
-    /// is the entire value of refusing loudly.
+    /// We won the lock and then could not open the database. Separate from
+    /// `.client`, where somebody IS serving and here nobody is. The case that
+    /// reaches it is a schema written by newer bits, which `KernelWriter.start`
+    /// refuses loudly so the UI can name the refusal.
     case failed(Error)
 
-    /// Arbitrate. Call ONCE, before anything else can touch the database.
-    ///
-    /// - Parameter takeoverTimeout: how long to wait for a headless writer to
-    ///   yield before settling for client mode.
+    /// Arbitrate. Call ONCE, before anything else can touch the database;
+    /// `takeoverTimeout` bounds the wait for a headless writer to yield.
     public static func arbitrate(
         takeoverTimeout: TimeInterval = 5,
         log: @escaping (String) -> Void = { _ in }
@@ -65,7 +39,11 @@ public enum KernelHostRole: ~Copyable {
                 log("lock is held but the pidfile is unreadable — client mode")
                 return .client(
                     holder: KernelOwnership.Holder(
-                        pid: 0, executablePath: "(unknown — pidfile unreadable)", bundlePath: nil))
+                        pid: 0,
+                        executablePath: "(unknown — pidfile unreadable)",
+                        bundlePath: nil
+                    )
+                )
             }
 
             if let bundle = holder.bundlePath {
@@ -101,16 +79,10 @@ public enum KernelHostRole: ~Copyable {
         }
     }
 
-    /// SIGTERM a headless holder and wait for the lock.
-    ///
-    /// SIGTERM and never SIGKILL. `Boot.swift` installs a signal source that
-    /// runs the ordered shutdown — checkpoint, close, unlink — so the polite
-    /// signal is the entire reason this is safe. Escalating would throw away
-    /// the thing that makes it safe and leave a WAL to recover.
-    ///
-    /// The timeout falls back to client mode rather than retrying harder. A
-    /// headless kernel that will not yield in five seconds is busy with
-    /// something, and killing it is not an improvement.
+    /// SIGTERM a headless holder and wait for the lock. Never SIGKILL: the
+    /// polite signal is what runs `Boot.swift`'s ordered shutdown — checkpoint,
+    /// close, unlink — and is the entire reason this is safe. A timeout falls
+    /// back to client mode rather than escalating.
     private static func takeOver(
         from holder: KernelOwnership.Holder,
         timeout: TimeInterval,

@@ -3,41 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0023 — agent_briefing + prompt_activation: the context package a
-    // briefer agent assembles for a phase, and the activation registry that
-    // lets hooks attribute work without arguments.
-    //
-    // agent_briefing follows m0022's restraint, not the report families:
-    // a briefing is spawn-time plumbing consumed once, not a report built
-    // across turns — so no findings children, no FTS mirror, and a
-    // two-state consumption gate instead of a status machine. Re-opening
-    // an existing (owner, step) pair RESETS the row to building: a step's
-    // briefing is always its CURRENT briefing, never a pile of drafts.
-    //
-    // briefing_for_step and status carry NO db CHECK on purpose (the
-    // m0021 vocabulary rule): validity lives in BriefingStepSpec, so a
-    // future step (pre_implementation, pre_review) is a registry entry,
-    // never a migration.
-    //
-    // Ownership: session_uuid is ALWAYS populated (the daemon derives it
-    // from the prompt's owner chain), because it is the attribution
-    // anchor for task-owned rows and the single list key for GMVibes.
-    // prompt_uuid is NULL exactly when a /gm_task run owns the briefing.
-    // SQLite UNIQUE admits multiple NULLs, so uniqueness is a partial
-    // index PAIR: prompt-owned rows unique per (prompt, step), task-owned
-    // rows unique per (session, step). "The prompt belongs to the
-    // session" is a Swift store guard (m0016 precedent — a CHECK cannot
-    // reference another table).
-    //
-    // dope_scope_uuid + dope_scope_revision are the staleness evidence
-    // (m0022's fingerprint principle): stamped SERVER-SIDE at complete so
-    // the writing agent cannot mis-stamp, compared against the live scope
-    // revision at every read — the reader is WARNED about drift, never
-    // blocked, honoring the fetch-fresh-per-phase guardrail.
-    //
-    // dope_refs holds DOT-PATHS and kbite_refs {file_uuid, brief} pairs
-    // as TEXT JSON: point-in-time, deliberately non-normalized, dangling
-    // refs are legal and render as ghosts (diagram-binding precedent).
+    // m0023 — agent_briefing + prompt_activation: the context package a briefer
+    // assembles for a phase, and the activation registry hooks attribute through.
+    // Re-opening an (owner, step) pair RESETS the row to building: a step's
+    // briefing is always its CURRENT briefing. briefing_for_step and status carry
+    // NO db CHECK; validity lives in BriefingStepSpec. session_uuid is ALWAYS
+    // populated and prompt_uuid is NULL exactly for a task-owned briefing, so
+    // uniqueness is a partial index PAIR — SQLite UNIQUE admits multiple NULLs.
+    // dope_refs are DOT-PATHS as TEXT JSON; dangling refs are legal ghosts.
     static func m0023_agentBriefing(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0023_agentBriefing") { db in
             try db.execute(
@@ -89,7 +62,8 @@ extension Migrations {
                         ON prompt_activation(prompt_uuid);
                     CREATE INDEX idx_prompt_activation_session_fk
                         ON prompt_activation(session_uuid);
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",

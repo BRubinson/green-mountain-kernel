@@ -28,7 +28,10 @@ struct DopeEnumCatalog: Equatable {
         /// writes into `.doped.json` (kit formatter, never string-built here).
         var ref: String {
             DopeCode.formatPropertyRef(
-                domain: domainCode, entity: entityCode, property: propertyCode)
+                domain: domainCode,
+                entity: entityCode,
+                property: propertyCode
+            )
         }
         var id: String { propertyUuid }
     }
@@ -57,22 +60,27 @@ struct DopeEnumCatalog: Equatable {
         for domain in tree.domains {
             for enumNode in domain.enums {
                 let ref = DopeCode.formatEnumRef(
-                    domain: domain.body.code, enumCode: enumNode.body.code)
+                    domain: domain.body.code,
+                    enumCode: enumNode.body.code
+                )
                 definitions[ref] = Definition(domainName: domain.body.name, node: enumNode)
             }
             for entity in domain.entities {
                 for property in entity.properties {
                     guard let ref = property.body.enumRef else { continue }
-                    usages[ref, default: []].append(
-                        Usage(
-                            propertyUuid: property.identity.uuid,
-                            domainCode: domain.body.code,
-                            domainName: domain.body.name,
-                            entityCode: entity.body.code,
-                            entityName: entity.body.name,
-                            propertyCode: property.body.code,
-                            propertyName: property.body.name,
-                            nullable: property.body.nullable))
+                    usages[ref, default: []]
+                        .append(
+                            Usage(
+                                propertyUuid: property.identity.uuid,
+                                domainCode: domain.body.code,
+                                domainName: domain.body.name,
+                                entityCode: entity.body.code,
+                                entityName: entity.body.name,
+                                propertyCode: property.body.code,
+                                propertyName: property.body.name,
+                                nullable: property.body.nullable
+                            )
+                        )
                 }
             }
         }
@@ -86,8 +94,11 @@ struct DopeEnumCatalog: Equatable {
     func resolved(_ ref: String) -> Resolved? {
         guard let definition = definitions[ref] else { return nil }
         return Resolved(
-            ref: ref, domainName: definition.domainName,
-            node: definition.node, usages: usages[ref] ?? [])
+            ref: ref,
+            domainName: definition.domainName,
+            node: definition.node,
+            usages: usages[ref] ?? []
+        )
     }
 }
 

@@ -36,12 +36,14 @@ enum KbiteMawOpenHandler {
         }
 
         return try okResult(
-            .kbiteMawOpen, head,
+            .kbiteMawOpen,
+            head,
             KbiteMawOpenResponse(
                 mawPath: request.mawPath,
                 createdDirs: createdDirs,
                 createdIndex: createdIndex
-            ))
+            )
+        )
     }
 
     /// MAW_INDEX.md per the gmcc_kbite skill format (gm_crunch_open_maw Step 4).

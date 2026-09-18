@@ -1,25 +1,14 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// Three-state lifecycle badge, shared by the prompt navigator and the phase
-/// sections (moved out of SessionPromptEditorView, made internal).
+/// Three-state lifecycle badge, shared by the prompt navigator and the phase sections.
 ///
-/// IT SHOWS LESS THAN IT USED TO, and that is worth knowing rather than
-/// discovering. m0028 collapsed the lifecycle from six states to three, so this
-/// badge can say only whether a prompt is unstarted, running, or finished — it
-/// can no longer say whether a running prompt is clarifying, architecting,
-/// implementing or reviewing.
-///
-/// That detail is not lost, it moved: phase is derived from db evidence at every
-/// BOT_NEXT, and there are twelve phases rather than the six states this badge
-/// used to approximate. Showing real progress again means reading the derived
-/// phase rather than the prompt row. That is deliberately NOT done here — it is
-/// a live call per prompt where this is a pure function of a value the list
-/// already holds, and wiring it belongs to whoever wants the feature, with the
-/// twelve-phase vocabulary designed for properly.
+/// It reports only unstarted / running / finished, because that is all `PromptStatus` carries.
+/// Workflow progress lives in the derived phase served by BOT_NEXT, and reading it here would
+/// turn a pure function of a value the list already holds into a live call per prompt.
 struct PromptStatusBadge: View {
     let status: PromptStatus?
-    var tint: Color? = nil
+    var tint: Color?
     var body: some View {
         Text(label)
             .font(.caption2.weight(.medium))

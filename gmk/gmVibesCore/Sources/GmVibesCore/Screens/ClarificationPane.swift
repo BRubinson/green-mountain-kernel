@@ -1,18 +1,13 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// The app's render of the db-native clarification (CLARIFY_GET, m0025 split):
-/// user questions with option/selection children, weighted internal notes, and
-/// the care package (the standalone clarified-intent bundle).
+/// The app's render of the db-native clarification over CLARIFY_GET: questions with their
+/// option and selection children, weighted internal notes, and the care package.
 ///
-/// ANSWERING is the one write door here, and the app's only report-subsystem
-/// write at all: while the summary is `answering`, each question card can
-/// select options / type an answer / skip through CLARIFY_ANSWER. Everything
-/// else — the care package, the notes, the summary's own status — stays
-/// bot/CLI-side, and nothing on this pane ever writes prompt content.
-///
-/// ONE data path: the pane holds the whole `ClarifyGetResponse`, so neither the
-/// expanded care package nor the answering cards introduce a second fetch.
+/// ANSWERING is the one write door here, and the app's only report-subsystem write: while the
+/// summary is `answering`, a question card can select options, type an answer or skip through
+/// CLARIFY_ANSWER. Everything else stays bot/CLI-side. ONE data path — the pane holds the
+/// whole `ClarifyGetResponse`, so nothing below it introduces a second fetch.
 struct ClarificationPane: View {
     let phase: PromptPhaseStore.Phase<ClarifyGetResponse>
     /// Held ONLY so the question cards can reach `phases.answers` — the
@@ -59,7 +54,8 @@ struct ClarificationPane: View {
                 // non-nil IFF carePackage is (nil also on a pre-field daemon).
                 CarePackageSection(
                     package: package,
-                    staleness: response.carePackageStaleness)
+                    staleness: response.carePackageStaleness
+                )
             }
 
             if !response.questions.isEmpty {
@@ -71,7 +67,8 @@ struct ClarificationPane: View {
                         ClarificationQuestionCard(
                             question: question,
                             clarificationStatus: response.summary.clarificationStatus,
-                            answers: phases.answers)
+                            answers: phases.answers
+                        )
                     }
                 }
             }

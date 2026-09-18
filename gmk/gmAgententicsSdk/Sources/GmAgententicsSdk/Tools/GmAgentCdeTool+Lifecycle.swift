@@ -17,9 +17,11 @@ public struct GmAgentCdeInitTool: GmAgentCdeTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeInitArguments) async throws -> String {
+    public func call(arguments _: GmAgentCdeInitArguments) throws -> String {
         throw GmAgentToolError.notWired(
-            tool: name, verb: "CONTEXT_GET + PATHS_GET + AGENT_REGISTER")
+            tool: name,
+            verb: "CONTEXT_GET + PATHS_GET + AGENT_REGISTER"
+        )
     }
 }
 
@@ -57,8 +59,12 @@ public struct GmAgentLoadedPrompt: Sendable {
     public var kbiteCodes: [String]
 
     public init(
-        matchKind: GmAgentPromptMatchKind, promptUuid: String = "", status: String = "",
-        candidates: [String] = [], briefingUuids: [String] = [], kbiteCodes: [String] = []
+        matchKind: GmAgentPromptMatchKind,
+        promptUuid: String = "",
+        status: String = "",
+        candidates: [String] = [],
+        briefingUuids: [String] = [],
+        kbiteCodes: [String] = []
     ) {
         self.matchKind = matchKind
         self.promptUuid = promptUuid
@@ -76,7 +82,8 @@ public struct GmAgentCdeLoadPromptArguments: Sendable {
         description: """
             Which prompt: a number like 1, a code like p10, its exact name, a \
             unique piece of its name, or its uuid.
-            """)
+            """
+    )
     public var selector: String
 
     public init(selector: String) {
@@ -92,8 +99,8 @@ public struct GmAgentCdeLoadPromptTool: GmAgentCdeTool {
     public init() {}
 
     public func call(
-        arguments: GmAgentCdeLoadPromptArguments
-    ) async throws -> GmAgentLoadedPrompt {
+        arguments _: GmAgentCdeLoadPromptArguments
+    ) throws -> GmAgentLoadedPrompt {
         throw GmAgentToolError.notWired(tool: name, verb: "PROMPT_LIST + PROMPT_GET + BRIEFING_LIST")
     }
 }
@@ -111,7 +118,9 @@ public struct GmAgentCdeSetStatusArguments: Sendable {
         description: """
             Where to move it: 'initiated' to start, 'done' to finish, or 'draft' to \
             send a finished prompt back for editing.
-            """, .anyOf(GM_TOOL_ANYOF_PROMPT_STATUS))
+            """,
+        .anyOf(GM_TOOL_ANYOF_PROMPT_STATUS)
+    )
     public var status: String
 
     public init(promptUuid: String, expectedVersion: Int, status: String) {
@@ -128,7 +137,7 @@ public struct GmAgentCdeSetStatusTool: GmAgentCdeTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeSetStatusArguments) async throws -> String {
+    public func call(arguments _: GmAgentCdeSetStatusArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "PROMPT_SET_STATUS")
     }
 }
@@ -151,7 +160,7 @@ public struct GmAgentRpirNextTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentCdeNextArguments) async throws -> String {
+    public func call(arguments _: GmAgentCdeNextArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "BOT_NEXT")
     }
 }

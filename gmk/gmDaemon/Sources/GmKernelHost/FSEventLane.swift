@@ -3,15 +3,12 @@ import CoreServices
 
 /// The ONE watcher-lifecycle primitive shared by MemoryWatcher and
 /// CheckoutWatcher. FSEventStreamCreate takes a fixed path array at
-/// construction, so any change to the watched set means stopping and
-/// recreating the stream — that operation IS the whole mechanism, and having
-/// exactly one implementation of it keeps re-rooting (one path) and
-/// instance-set churn (N paths) from becoming two divergent code paths.
+/// construction, so any change to the watched set means stopping and recreating
+/// the stream; one implementation keeps re-rooting and instance-set churn from
+/// diverging.
 ///
-/// Inherits the existing lane contract verbatim: HOLDS NO Store AND NO Server
-/// — structurally cannot write to the db or touch connection state. All state
-/// (stream, current path set) is confined to `queue`; the handler fires on it
-/// too (FSEventStreamSetDispatchQueue).
+/// Lane contract: HOLDS NO Store AND NO Server, so it structurally cannot write
+/// to the db. All state is confined to `queue`, where the handler also fires.
 final class FSEventLane: @unchecked Sendable {
     /// SAFETY CAP: beyond this the path set is truncated (logged), so a
     /// runaway instance table degrades honestly instead of wedging the daemon.
@@ -50,7 +47,8 @@ final class FSEventLane: @unchecked Sendable {
             if next.count > Self.maxPaths {
                 FileHandle.standardError.write(
                     Data(
-                        "[gm_daemon] FSEventLane: \(next.count) paths exceeds cap \(Self.maxPaths) — truncating\n".utf8)
+                        "[gm_daemon] FSEventLane: \(next.count) paths exceeds cap \(Self.maxPaths) — truncating\n".utf8
+                    )
                 )
                 next = Array(next.prefix(Self.maxPaths))
             }
@@ -61,14 +59,19 @@ final class FSEventLane: @unchecked Sendable {
             var context = FSEventStreamContext(
                 version: 0,
                 info: Unmanaged.passUnretained(self).toOpaque(),
-                retain: nil, release: nil, copyDescription: nil)
+                retain: nil,
+                release: nil,
+                copyDescription: nil
+            )
             let callback: FSEventStreamCallback = { _, info, count, eventPaths, _, _ in
                 guard let info else { return }
                 let lane = Unmanaged<FSEventLane>.fromOpaque(info).takeUnretainedValue()
                 guard
-                    let paths = Unmanaged<CFArray>.fromOpaque(
-                        UnsafeRawPointer(eventPaths)
-                    ).takeUnretainedValue() as? [String]
+                    let paths = Unmanaged<CFArray>
+                        .fromOpaque(
+                            UnsafeRawPointer(eventPaths)
+                        )
+                        .takeUnretainedValue() as? [String]
                 else { return }
                 lane.handler?(Array(paths.prefix(count)))
             }
@@ -84,12 +87,15 @@ final class FSEventLane: @unchecked Sendable {
                     // char ** and the CFArray cast in the callback reads path
                     // bytes as an objc pointer — a SIGSEGV on the first event.
                     FSEventStreamCreateFlags(
-                        kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes)
+                        kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes
+                    )
                 )
             else {
                 FileHandle.standardError.write(
                     Data(
-                        "[gm_daemon] FSEventLane: FSEventStreamCreate failed for \(next)\n".utf8))
+                        "[gm_daemon] FSEventLane: FSEventStreamCreate failed for \(next)\n".utf8
+                    )
+                )
                 self.current = []
                 return
             }

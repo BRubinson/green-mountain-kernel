@@ -7,7 +7,7 @@ struct KBiteMarkdownView: View {
     var showOpenInWindow: Bool = true
     // When set + active, the body renders as highlighted plain text (find-in-page)
     // instead of block markdown.
-    var findQuery: SearchQuery = SearchQuery("")
+    var findQuery = SearchQuery("")
 
     @Environment(\.openWindow) private var openWindow
 

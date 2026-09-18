@@ -35,6 +35,7 @@ extension DaemonEventRecord {
             kind: kind,
             subjectUuid: subjectUuid,
             payload: payload,
-            createdAt: createdAt)
+            createdAt: createdAt
+        )
     }
 }

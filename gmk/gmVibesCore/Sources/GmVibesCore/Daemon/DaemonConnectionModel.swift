@@ -2,17 +2,13 @@ import Foundation
 import Observation
 import GmDaemonSdk
 
-/// App-wide daemon liveness + the single event subscription.
+/// App-wide daemon liveness plus the single event subscription.
 ///
-/// Health comes from the probe (STATUS + PING with autostart off), never
-/// inferred from the subscription alone — a quiet healthy stream is
-/// indistinguishable from a hung one, so while up the event consumption is
-/// raced against a 30s status watchdog (the app-wide liveness check that
-/// replaced per-view confirming polls). The supervising loop probes, then
-/// consumes events until the stream drops, then re-probes; a killed daemon
-/// goes red within one iteration and stays red (nothing here autostarts).
-/// DAEMON_START is unreceivable while down, so green is re-inferred from the
-/// next successful probe.
+/// Health comes from the probe (STATUS + PING with autostart off), never from the subscription
+/// alone: a quiet healthy stream is indistinguishable from a hung one, so event consumption is
+/// raced against a 30s status watchdog. The loop probes, consumes events until the stream
+/// drops, then re-probes; nothing here autostarts. DAEMON_START is unreceivable while down, so
+/// green is re-inferred from the next successful probe.
 @Observable @MainActor
 final class DaemonConnectionModel {
     enum Health: Equatable {
@@ -174,13 +170,17 @@ final class DaemonConnectionModel {
                 setHealth(
                     .down(
                         reason: intentionalStop ? "Daemon stopped" : error.userMessage,
-                        intentional: intentionalStop))
+                        intentional: intentionalStop
+                    )
+                )
             }
         } catch {
             setHealth(
                 .down(
                     reason: intentionalStop ? "Daemon stopped" : String(describing: error),
-                    intentional: intentionalStop))
+                    intentional: intentionalStop
+                )
+            )
         }
     }
 
@@ -218,7 +218,7 @@ final class DaemonConnectionModel {
         // re-baseline restarts event ids at 1 — replaying above the log head
         // would silently match nothing forever). Otherwise subscribe live;
         // the up-transition's invalidateAll() already resynced surfaces.
-        var sinceId: Int64? = nil
+        var sinceId: Int64?
         let defaults = UserDefaults.standard
         if let stored = (defaults.object(forKey: Self.cursorKey) as? NSNumber)?.int64Value, stored > 0 {
             lastPersistedCursor = max(lastPersistedCursor, stored)
@@ -304,20 +304,13 @@ final class DaemonConnectionModel {
         let currentSessionCode: String?
     }
 
-    /// The IN-PROCESS event door.
+    /// The in-process event door.
     ///
-    /// In client mode events arrive over the socket as SUBSCRIBE notifications
-    /// and `route` is reached from the read loop. When this app hosts the writer
-    /// there is no socket and no SUBSCRIBE — the store's post-commit fan-out
-    /// delivers the same `EventNotification` directly, and it needs a way in.
-    ///
-    /// A named door rather than widening `route` itself: the two arrival paths
-    /// should be greppable, and `route` staying private keeps the socket read
-    /// loop the only thing that can reach it by accident.
-    ///
-    /// The CALLER is responsible for being on MainActor by this point. The
-    /// fan-out fires on GRDB's writer thread inside the commit hook, and doing
-    /// UI work there would stall the single writer.
+    /// In client mode events arrive over the socket as SUBSCRIBE notifications. When this app
+    /// hosts the writer there is no socket: the store's post-commit fan-out delivers the same
+    /// `EventNotification` here, and `route` stays private to the socket read loop.
+    /// The CALLER must already be on MainActor — the fan-out fires on GRDB's writer thread
+    /// inside the commit hook, and UI work there stalls the single writer.
     func routeInProcess(_ event: EventNotification) {
         route(event)
     }
@@ -397,11 +390,13 @@ final class DaemonConnectionModel {
             guard let payload = event.payload, let data = payload.data(using: .utf8),
                 let decoded = try? WireCodec.decoder.decode(CheckoutChangePayload.self, from: data)
             else { break }
-            checkoutSink?.applyCheckoutChange(
-                instanceUuid: decoded.instanceUuid.lowercased(),
-                headState: decoded.headState,
-                currentBranch: decoded.currentBranch,
-                currentSessionCode: decoded.currentSessionCode)
+            checkoutSink?
+                .applyCheckoutChange(
+                    instanceUuid: decoded.instanceUuid.lowercased(),
+                    headState: decoded.headState,
+                    currentBranch: decoded.currentBranch,
+                    currentSessionCode: decoded.currentSessionCode
+                )
         case .clarificationChange, .architectureChange, .explorationChange, .reviewChange:
             // Subject is the SUMMARY uuid, but as of v8 EVERY phase payload
             // carries prompt_uuid — decode and route directly. NO fan-out on

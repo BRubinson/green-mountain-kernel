@@ -4,65 +4,43 @@ import SwiftUI
 
 @main
 struct GMVibesApp: App {
-    // Bounded flush of dirty prompt edits on quit (replaces the old
-    // synchronous main-thread write in onDisappear).
+    // Bounded flush of dirty prompt edits on quit.
     @NSApplicationDelegateAdaptor(GMVibesAppDelegate.self) private var appDelegate
     @State private var services: GMVibesServices
     @State private var vitals: KernelVitals
     @Environment(\.openWindow) private var openWindow
 
-    /// NO SECOND POLLER. `DaemonConnectionModel` already runs the health
-    /// watchdog and keeps `ping` current, so the vitals sampler is wired to READ
-    /// that rather than open its own connection — one socket, one cadence, and no
-    /// chance of the menu bar disagreeing with the status pill about whether the
-    /// kernel is up.
-    ///
-    /// Built in `init` because `KernelVitals` takes its report source as a
-    /// closure at construction, and a `@State` default cannot reference another
-    /// `@State` property.
+    /// NO SECOND POLLER. `DaemonConnectionModel` runs the health watchdog and keeps `ping`
+    /// current, so the vitals sampler READS that rather than opening its own connection: one
+    /// socket, one cadence, and no chance of the menu bar disagreeing with the status pill.
     init() {
-        // ORDER IS FIXED HERE AND MUST NOT BE TIDIED. `GMVibesServices()`
-        // ARBITRATES DATABASE OWNERSHIP on its first line — takes the flock,
-        // migrates, binds the socket, or degrades to client mode — so it has to
-        // exist before anything that reads from it. `KernelVitals` takes its
-        // report source as a closure precisely because a `@State` default cannot
-        // reference another `@State` property, which is what forces both into
-        // this initialiser rather than into property defaults.
+        // ORDER IS FIXED HERE AND MUST NOT BE TIDIED. `GMVibesServices()` ARBITRATES DATABASE
+        // OWNERSHIP on its first line — flock, migrate, bind the socket, or degrade to client
+        // mode — so it must exist before anything that reads from it. `KernelVitals` takes its
+        // report source as a closure because a `@State` default cannot reference another
+        // `@State` property, which is what forces both into this initialiser.
         let services = GMVibesServices()
         _services = State(initialValue: services)
         _vitals = State(initialValue: KernelVitals(report: { services.vitalsReport }))
-        // The delegate is built by the adaptor before `init` runs, so it cannot
-        // construct services of its own. Hand it the one we just made: its
-        // `applicationShouldTerminate` is what stops the kernel in order —
-        // flush the dirty drafts, then close the database — on every
-        // termination path, including the ones no menu item passes through.
+        // The adaptor builds the delegate before `init` runs, so it cannot construct services
+        // of its own. Its `applicationShouldTerminate` stops the kernel in order — flush the
+        // dirty drafts, then close the database — on every termination path.
         appDelegate.services = services
     }
 
-    /// Who holds the database, as the answering kernel reports it.
-    ///
-    /// The mapping lives on `GMVibesServices` in `GmVibesCore`, beside the
-    /// connection model it reads — see the facade note there for why the app
-    /// target is handed four scalars rather than the model itself.
+    /// Who holds the database, as the answering kernel reports it. The mapping lives on
+    /// `GMVibesServices`, beside the connection model it reads.
     private var role: KernelRole { services.kernelRole }
 
     var body: some Scene {
-        // THE MENU BAR IS DECLARED FIRST, BEFORE THE WindowGroup, AND THE ORDER
-        // IS LOAD-BEARING.
+        // THE MENU BAR IS DECLARED FIRST, BEFORE THE WindowGroup, AND THE ORDER IS
+        // LOAD-BEARING: scene order decides whether SwiftUI opens a window at launch, and a
+        // resident kernel must not pop one at every login.
         //
-        // Two reasons. A resident kernel that popped a window at every login
-        // would be a regression nobody asked for, and scene order is what decides
-        // whether SwiftUI opens one. And `INFOPLIST_KEY_LSUIElement = YES` removes
-        // the Dock icon — so without a menu-bar item shipping in the SAME change,
-        // the app would have no Dock presence AND no menu presence, which is
-        // strictly worse than having a Dock icon. The two must land together.
-        //
-        // LSUIElement governs the LAUNCH state only. It is process-wide, and the
-        // windows below are ordinary app windows that need a Dock entry, a
-        // ⌘-Tab slot, a main menu and a window manager willing to tile them —
-        // so `WindowPresence` raises the activation policy to `.regular` while
-        // any window is open and drops it back on the last close. Only the
-        // resident kernel is invisible; its windows are not.
+        // `INFOPLIST_KEY_LSUIElement = YES` governs the LAUNCH state only. The windows below
+        // are ordinary app windows needing a Dock entry, a ⌘-Tab slot, a main menu and a
+        // window manager willing to tile them, so `WindowPresence` raises the activation
+        // policy while any window is open. Only the resident kernel is invisible.
         MenuBarExtra {
             KernelMenuBarContent(
                 role: role,
@@ -86,7 +64,8 @@ struct GMVibesApp: App {
                 // is absent rather than disabled when this is nil, which is
                 // right for the writer (nothing to activate) and for a headless
                 // holder (no window to raise).
-                onActivateHolder: services.activateHolder)
+                onActivateHolder: services.activateHolder
+            )
         } label: {
             // NO `.renderingMode(.original)` here — template rendering is the
             // point. It is what lets the status bar tint the glyph with the
@@ -120,24 +99,12 @@ struct GMVibesApp: App {
 
 /// ⌘Q PUTS GM VIBES AWAY. IT DOES NOT END THE KERNEL.
 ///
-/// Once this process holds the database lock, the stock `NSApp.terminate` on ⌘Q
-/// would tear the writer out from under every hook and every MCP session on the
-/// machine — from a keystroke people press in a text editor without thinking.
-/// So `.appTermination` is replaced.
-///
-/// Replaced rather than merely disabled: an inert ⌘Q reads as a hung app, and
-/// the muscle memory has to land somewhere sensible. Closing every window is
-/// what "quit" means to the person pressing it — `WindowPresence` drops the
-/// activation policy back to `.accessory` on the last close, so the Dock icon
-/// and the ⌘-Tab slot disappear exactly as they would on a real quit. What
-/// survives is the menu bar item and the kernel behind it.
-///
-/// The kernel is stopped from ONE place: the menu bar's two-step confirming
-/// quit. That asymmetry is deliberate. Ending the writer should cost a
-/// deliberate gesture; putting the windows away should cost ⌘Q.
-///
-/// ⌘W keeps its stock meaning through the standard Close item — do not rebind
-/// it here.
+/// While this process holds the database lock, a stock `NSApp.terminate` would tear the writer
+/// out from under every hook and MCP session on the machine. `.appTermination` is REPLACED
+/// rather than disabled, because an inert ⌘Q reads as a hung app: it closes every window, and
+/// `WindowPresence` drops the activation policy on the last close so the Dock icon and ⌘-Tab
+/// slot disappear as on a real quit. The kernel is stopped from ONE place, the menu bar's
+/// two-step confirming quit. ⌘W keeps its stock meaning; do not rebind it here.
 struct KernelTerminationCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appTermination) {

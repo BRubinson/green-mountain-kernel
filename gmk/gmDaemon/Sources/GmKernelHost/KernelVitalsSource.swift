@@ -3,24 +3,13 @@ import Foundation
 import GmDaemonSdk
 
 /// The kernel's own resource usage and writer identity, as reported on the wire.
+/// The numbers a person wants are the WRITER's, and that is often not the
+/// process displaying them: the app may be a socket client of a headless kernel,
+/// or a second copy that lost the ownership lock. So the answering kernel
+/// measures itself and the client renders what it is told.
 ///
-/// ## Why the KERNEL measures itself
-///
-/// The menu bar could sample its own process, and `KernelVitals` in the app does
-/// exactly that as a fallback. But the numbers a person wants are the WRITER's —
-/// the process holding the database — and in the two shapes that matter those
-/// are not the same process:
-///
-/// - the app is a socket client and the writer is a headless `gm_kernel daemon`
-/// - a second app copy lost the ownership lock and runs client-only
-///
-/// In both, self-sampling would display the wrong process's memory beside a role
-/// row saying the database is owned elsewhere. So the answering kernel measures
-/// itself, and the client renders what it is told.
-///
-/// Every field is an additive OPTIONAL on the wire. A kernel that predates them
-/// answers nil and the UI reads "—" rather than zero, which is the honest
-/// rendering of "this peer does not report vitals".
+/// Every field is an additive OPTIONAL on the wire; a peer that reports no
+/// vitals answers nil, which the UI reads as "—" rather than zero.
 enum KernelVitalsSource {
 
     /// Resident footprint in bytes, via `TASK_VM_INFO`'s `phys_footprint`.
@@ -40,18 +29,14 @@ enum KernelVitalsSource {
         return UInt64(info.phys_footprint)
     }
 
-    /// CPU percent since the previous call, or nil on the first.
-    ///
-    /// A DELTA, because a cumulative total is meaningless to display: a kernel up
-    /// for a week has burned a lot of CPU and is doing nothing right now.
+    /// CPU percent since the previous call, or nil on the first. A DELTA: a
+    /// cumulative total says nothing about what the kernel is doing now.
     ///
     /// BOTH SIDES OF THE RATIO ARE MACH ABSOLUTE UNITS. `proc_pid_rusage`'s
     /// `ri_user_time`/`ri_system_time` are NOT nanoseconds, and dividing them by
     /// a nanosecond wall clock under-reports by the timebase ratio — on arm64 a
-    /// fully saturated core reads as roughly 2%, while on Intel, where the
-    /// timebase is 1:1, the same code looks correct. Measuring the wall side with
-    /// `mach_absolute_time()` keeps both sides in one unit, so there is no
-    /// conversion to get wrong.
+    /// saturated core then reads as roughly 2%. `mach_absolute_time()` keeps both
+    /// sides in one unit, so there is no conversion to get wrong.
     static func cpuPercent() -> Double? {
         var usage = rusage_info_v4()
         let rc = withUnsafeMutablePointer(to: &usage) { pointer in

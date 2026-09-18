@@ -3,45 +3,22 @@ import GRDB
 import GmDaemonSdk
 import XCTest
 
-/// The ONE environment every case in this package shares.
+/// The ONE environment every case in this package shares: it boots a real
+/// `gm_kernel` against a freshly minted temporary root, hands out a `DaemonClient`
+/// and a READ-ONLY database handle, and reaps both at the end.
 ///
-/// Boots a real `gm_kernel` against a freshly minted temporary root, hands out
-/// a `DaemonClient` and a READ-ONLY database handle, and reaps both when the
-/// bundle finishes.
-///
-/// ## One root per process — not a simplification, a constraint
-///
-/// `Paths.root` is a `static let`. Whatever root the process resolves first is
-/// the root it has forever. A per-suite or per-test environment CANNOT take
-/// effect, and code written as though it could fails silently against the first
-/// root that happened to win. That is why this is a process-scoped singleton
-/// rather than a fixture someone can instantiate twice.
-///
-/// ## Isolation by construction
-///
-/// Nothing here calls `Paths.*` to discover a path. The root is minted under
-/// `NSTemporaryDirectory()` and every path beneath it is string-appended, so
-/// there is no expression in this file that can resolve the installed runtime
-/// even by mistake. `GM_FS_ROOT` is WRITTEN into the spawned child's
-/// environment; it is never read to decide anything here.
-///
-/// ## Why the run id is short
-///
-/// The kernel binds a unix socket at `<root>/daemon.sock`, and `sun_path` is
-/// **104 bytes** on macOS. A timestamp-and-pid identifier plus a long home
-/// directory overruns that, and the failure is not a clear error — it is a
-/// listener that never binds and a client that times out looking healthy.
-/// Six hex characters under the system temp directory leaves ample headroom.
+/// `Paths.root` is a `static let`, so one root per PROCESS is a constraint and
+/// this must be a process-scoped singleton. Nothing here calls `Paths.*`: the root
+/// is minted under `NSTemporaryDirectory()`, every path beneath it is
+/// string-appended, and `GM_FS_ROOT` is WRITTEN into the spawned child.
 final class SharedEnvironment: NSObject, XCTestObservation {
 
     /// Process-scoped, and `nonisolated(unsafe)` on purpose.
     ///
-    /// Swift 6 is right that this is shared mutable state; what it cannot see is
-    /// that the suite runs SERIALLY by construction. XCTest does not parallelise
-    /// within a process, and this package chose XCTest over swift-testing
-    /// precisely because a single shared append-only database cannot survive
-    /// parallel cases. Adding a lock here would suggest concurrent access is
-    /// expected and supported. It is neither — if cases ever do run
+    /// The suite runs SERIALLY by construction: XCTest does not parallelise within
+    /// a process, and this package chose XCTest over swift-testing because one
+    /// shared append-only database cannot survive parallel cases. A lock here
+    /// would imply concurrent access is supported; if cases ever do run
     /// concurrently, the database is the problem, not this reference.
     nonisolated(unsafe) static let shared = SharedEnvironment()
 
@@ -68,7 +45,8 @@ final class SharedEnvironment: NSObject, XCTestObservation {
             .appendingPathComponent("gmk-\(id)", isDirectory: true)
         try? FileManager.default.createDirectory(
             at: root.appendingPathComponent("bin", isDirectory: true),
-            withIntermediateDirectories: true)
+            withIntermediateDirectories: true
+        )
 
         kernelBinary = Self.locateKernelBinary()
 
@@ -77,7 +55,8 @@ final class SharedEnvironment: NSObject, XCTestObservation {
         let socketPath = root.appendingPathComponent("daemon.sock", isDirectory: false).path
         precondition(
             socketPath.utf8.count < 104,
-            "socket path \(socketPath.utf8.count) bytes — sun_path is 104 on macOS; shorten the run id")
+            "socket path \(socketPath.utf8.count) bytes — sun_path is 104 on macOS; shorten the run id"
+        )
 
         guard let kernelBinary else { return }
 
@@ -89,7 +68,8 @@ final class SharedEnvironment: NSObject, XCTestObservation {
         client = DaemonClient(
             socketPath: socketPath,
             daemonBinaryPath: kernelBinary.path,
-            autostart: true)
+            autostart: true
+        )
     }
 
     /// True when a real kernel is reachable. Cases skip rather than fail when it
@@ -99,7 +79,10 @@ final class SharedEnvironment: NSObject, XCTestObservation {
         guard let client else { return false }
         return
             (try? client.request(
-                type: .ping, payload: PingRequest(), responseType: PingResponse.self)) != nil
+                type: .ping,
+                payload: PingRequest(),
+                responseType: PingResponse.self
+            )) != nil
     }
 
     /// Round-trip one verb. The suite's ONLY write path — every mutation goes
@@ -107,7 +90,9 @@ final class SharedEnvironment: NSObject, XCTestObservation {
     /// "public interfaces" literally true here rather than aspirational.
     @discardableResult
     func send<Req: Codable & Sendable, Resp: Codable & Sendable>(
-        _ type: MessageType, _ payload: Req, _ responseType: Resp.Type
+        _ type: MessageType,
+        _ payload: Req,
+        _ responseType: Resp.Type
     ) throws -> Resp {
         guard let client else {
             throw XCTSkip("no kernel")
@@ -115,14 +100,17 @@ final class SharedEnvironment: NSObject, XCTestObservation {
         return try client.request(type: type, payload: payload, responseType: responseType)
     }
 
-    func testBundleDidFinish(_ testBundle: Bundle) {
+    func testBundleDidFinish(_: Bundle) {
         shutdown()
     }
 
     private func shutdown() {
         if let client {
             _ = try? client.request(
-                type: .shutdown, payload: ShutdownRequest(), responseType: ShutdownResponse.self)
+                type: .shutdown,
+                payload: ShutdownRequest(),
+                responseType: ShutdownResponse.self
+            )
             client.close()
         }
         // Best-effort: the kernel may already be gone, and a failure to tidy a
@@ -145,21 +133,17 @@ final class SharedEnvironment: NSObject, XCTestObservation {
         config.readonly = true
         return try DatabaseQueue(
             path: root.appendingPathComponent("gm.db", isDirectory: false).path,
-            configuration: config)
+            configuration: config
+        )
     }
 
     // MARK: - Locating the binary under test
 
     /// Find the `gm_kernel` this suite should exercise.
     ///
-    /// Order:
-    ///   1. `GM_TEST_KERNEL_BIN` — what CI and `run_kernel_tests.sh` set.
-    ///   2. the repo's own `.build` products, so a developer who just ran
-    ///      `swift build` can run the suite with no extra ceremony.
-    ///
-    /// Deliberately NEVER `~/gmfs/bin/gm_kernel`. Falling back to the installed
-    /// runtime would mean the suite silently tested the LAST RELEASE instead of
-    /// the working tree — green for code that does not exist here.
+    /// `GM_TEST_KERNEL_BIN` first, then the repo's own `.build` products. Never
+    /// `~/gmfs/bin/gm_kernel`: falling back to the installed runtime would test the
+    /// last RELEASE instead of the working tree, going green for absent code.
     private static func locateKernelBinary() -> URL? {
         if let explicit = ProcessInfo.processInfo.environment["GM_TEST_KERNEL_BIN"],
             !explicit.isEmpty,
@@ -207,6 +191,7 @@ class KernelBackedTestCase: XCTestCase {
         try XCTSkipUnless(
             SharedEnvironment.shared.isAvailable,
             "no gm_kernel to test — build it first: "
-                + "swift build --package-path gmk/gmKernel  (or set GM_TEST_KERNEL_BIN)")
+                + "swift build --package-path gmk/gmKernel  (or set GM_TEST_KERNEL_BIN)"
+        )
     }
 }

@@ -52,7 +52,9 @@ public final class DaemonEventSubscription: @unchecked Sendable {
             guard !self.started else {
                 continuation.finish(
                     throwing: DaemonClientError.wire(
-                        "DaemonEventSubscription.events() may only be consumed once — create a new subscription"))
+                        "DaemonEventSubscription.events() may only be consumed once — create a new subscription"
+                    )
+                )
                 return
             }
             self.started = true

@@ -1,12 +1,8 @@
 ---
 description: Process crunchable resources in a maw to generate chewed analysis files
 argument-hint: <kbite_name>
-allowed-tools: Read, Write, Bash, Glob, Grep, Task, Skill
+allowed-tools: Read, Write, Bash, Glob, Grep, Task
 ---
-
-**Load the `gmcc` skill before anything else.** It carries the GMB identity and
-the GM-CDE rules every step below assumes. Do not begin the work until it is in
-context.
 
 Process crunchable resources in a maw into chewed analysis files.
 

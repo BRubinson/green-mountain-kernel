@@ -9,8 +9,11 @@ import GmDaemonSdk
 @MainActor
 protocol CheckoutEventSink: AnyObject {
     func applyCheckoutChange(
-        instanceUuid: String, headState: String,
-        currentBranch: String?, currentSessionCode: String?)
+        instanceUuid: String,
+        headState: String,
+        currentBranch: String?,
+        currentSessionCode: String?
+    )
 }
 
 /// Per-instance checked-out-session cache. The push edge is the daemon's
@@ -142,8 +145,10 @@ final class CheckoutWatcher: CheckoutEventSink {
     /// — a stub from the old branch is worse than none. Then one coalesced
     /// round trip fills `session` authoritatively.
     func applyCheckoutChange(
-        instanceUuid: String, headState: String,
-        currentBranch: String?, currentSessionCode: String?
+        instanceUuid: String,
+        headState: String,
+        currentBranch: String?,
+        currentSessionCode: String?
     ) {
         // A broadcast racing a catalog removal must not resurrect state for a
         // dropped instance — drop() is the only cleaner of stateByInstance.

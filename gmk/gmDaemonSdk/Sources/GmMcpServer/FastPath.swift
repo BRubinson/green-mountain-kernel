@@ -2,21 +2,12 @@ import Foundation
 import GmDaemonSdk
 
 /// The cold-start fast path: `cde_init` → `rpir_open_briefing` →
-/// `wait_for_briefing`.
-///
-/// WHY THESE ARE COMPOSITES, NOT VERBS. Every step below already exists as a
-/// daemon verb. What cost fifteen calls was never missing capability — it was
-/// that the capability was spread across five round trips plus reading a ref
-/// doc, an agent definition, and `WorkflowSpec.swift` itself to learn the shape
-/// of the phase about to be entered. Composing them client-side buys the whole
-/// win with no new `MessageType`, no handler, no migration, and no wire bump.
-///
-/// EVERY VERB TOUCHED HERE IS `.record` OR `.read`. `promptCreate`,
-/// `promptStart`, `promptResume` and `briefingOpen` are all
-/// `.record` in VerbRegistry and legal for this client's role. The belief that
-/// they were primary doors — and that this therefore needed a new
-/// primary-admitting surface — was simply wrong, and checking it is what turned
-/// a redesign into three wrappers.
+/// `wait_for_briefing`. COMPOSITES, NOT VERBS. Every step below already exists as a daemon verb;
+/// what cost fifteen calls was the capability being spread across five round
+/// trips plus the reading needed to learn the shape of the phase being entered.
+/// Composing them client-side needs no new `MessageType`, handler, migration or
+/// wire bump. Every verb touched here is `.record` or `.read`, so this surface
+/// needs no primary-door privilege.
 
 // MARK: - Response shapes
 
@@ -152,13 +143,24 @@ func makeFastPathTools() -> [Tool] {
                                 created: false,
                                 candidates: candidates.map {
                                     .init(seq: $0.seq, code: $0.code, name: $0.name, status: $0.status, uuid: $0.uuid)
-                                }),
-                            promptUuid: nil, sessionUuid: sessionUuid, seq: nil, code: nil, name: nil,
-                            status: nil, gmfsRelativeStoragePath: nil, phase: nil, instructions: nil,
-                            gateBlockers: [], nextPhase: nil, briefing: nil,
+                                }
+                            ),
+                            promptUuid: nil,
+                            sessionUuid: sessionUuid,
+                            seq: nil,
+                            code: nil,
+                            name: nil,
+                            status: nil,
+                            gmfsRelativeStoragePath: nil,
+                            phase: nil,
+                            instructions: nil,
+                            gateBlockers: [],
+                            nextPhase: nil,
+                            briefing: nil,
                             warnings: [
                                 "selector '\(selector)' matched \(candidates.count) prompts — pass a seq or an exact name"
-                            ])
+                            ]
+                        )
                     case .notFound:
                         break
                     }
@@ -174,10 +176,20 @@ func makeFastPathTools() -> [Tool] {
                     else {
                         return PromptInitResult(
                             resolution: .init(matchedBy: nil, created: false, candidates: nil),
-                            promptUuid: nil, sessionUuid: sessionUuid, seq: nil, code: nil, name: nil,
-                            status: nil, gmfsRelativeStoragePath: nil, phase: nil, instructions: nil,
-                            gateBlockers: [], nextPhase: nil, briefing: nil,
-                            warnings: ["no prompt matched. Pass create:true with name and detail to create one."])
+                            promptUuid: nil,
+                            sessionUuid: sessionUuid,
+                            seq: nil,
+                            code: nil,
+                            name: nil,
+                            status: nil,
+                            gmfsRelativeStoragePath: nil,
+                            phase: nil,
+                            instructions: nil,
+                            gateBlockers: [],
+                            nextPhase: nil,
+                            briefing: nil,
+                            warnings: ["no prompt matched. Pass create:true with name and detail to create one."]
+                        )
                     }
                     let row = try client.createPrompt(
                         PromptCreateRequest(
@@ -185,14 +197,24 @@ func makeFastPathTools() -> [Tool] {
                             name: name,
                             backstory: "",
                             goal: "",
-                            detail: detail))
+                            detail: detail
+                        )
+                    )
                     created = true
                     matchedBy = "created"
                     stub = PromptStub(
-                        uuid: row.uuid, sessionUuid: row.sessionUuid, seq: row.seq, code: row.code,
-                        name: row.name, status: row.status, version: row.version,
-                        gmfsRelativeStoragePath: row.gmfsRelativeStoragePath, reports: nil,
-                        createdAt: row.createdAt, updatedAt: row.updatedAt)
+                        uuid: row.uuid,
+                        sessionUuid: row.sessionUuid,
+                        seq: row.seq,
+                        code: row.code,
+                        name: row.name,
+                        status: row.status,
+                        version: row.version,
+                        gmfsRelativeStoragePath: row.gmfsRelativeStoragePath,
+                        reports: nil,
+                        createdAt: row.createdAt,
+                        updatedAt: row.updatedAt
+                    )
                 }
 
                 guard let prompt = stub else {
@@ -205,7 +227,9 @@ func makeFastPathTools() -> [Tool] {
                     PromptResumeRequest(
                         promptUuid: prompt.uuid,
                         variant: variant,
-                        clientKey: ClientKey.resolve()))
+                        clientKey: ClientKey.resolve()
+                    )
+                )
 
                 // 6. Current phase, its instructions, the gate blockers.
                 let next = try client.botNext(BotNextRequest(promptUuid: prompt.uuid))
@@ -229,7 +253,8 @@ func makeFastPathTools() -> [Tool] {
                     nextPhase = .init(
                         name: upcoming.rawValue,
                         instructions: WorkflowSpec.instructions(variant: variant, phase: upcoming),
-                        expectedAgents: WorkflowSpec.expectedExplorationAgents(for: variant).map { "\($0)" })
+                        expectedAgents: WorkflowSpec.expectedExplorationAgents(for: variant).map { "\($0)" }
+                    )
                 }
 
                 // 8. Briefing state, so the caller knows whether to open one.
@@ -260,8 +285,10 @@ func makeFastPathTools() -> [Tool] {
                     gateBlockers: next.gateBlockers,
                     nextPhase: nextPhase,
                     briefing: briefing,
-                    warnings: warnings)
-            }),
+                    warnings: warnings
+                )
+            }
+        ),
 
         Tool(
             name: "rpir_open_briefing",
@@ -279,8 +306,11 @@ func makeFastPathTools() -> [Tool] {
                     BriefingOpenRequest(
                         promptUuid: try args.string("prompt_uuid"),
                         briefingForStep: args.optString("step") ?? "initial",
-                        clientKey: ClientKey.resolve()))
-            }),
+                        clientKey: ClientKey.resolve()
+                    )
+                )
+            }
+        ),
 
     ]
 }

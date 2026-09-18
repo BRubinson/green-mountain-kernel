@@ -2,19 +2,14 @@ import Foundation
 import GRDB
 import GmDaemonSdk
 
-// BRIEFING_* (v21) — the agent-briefing machine: the context package a briefer
-// agent assembles for a phase, pulled by spawned agents at start.
+// BRIEFING_* — the agent-briefing machine: the context package a briefer
+// assembles for a phase, pulled by spawned agents at start.
 //
-// Modeled on m0022's RESTRAINT, not the report families: a briefing is
-// spawn-time plumbing consumed once, so there is no findings machinery, no
-// FTS mirror, and a two-state consumption gate (building → ready) instead of
-// a status machine. OPEN on an existing (owner, step) pair RESETS the row to
-// building — a step's briefing is always its CURRENT briefing, never a pile
-// of drafts. Staleness is COMPUTED at every read (stored scope revision vs
-// live, dot-paths re-resolved to surface ghosts) and only ever WARNS: the
-// fetch-fresh-per-phase guardrail as a computed signal, never a block.
-//
-// Bodies live in BriefingRepository; these wrappers own the transaction.
+// A briefing is spawn-time plumbing consumed once, so there is no findings
+// machinery, no FTS mirror, and a two-state gate rather than a status machine.
+// OPEN on an existing (owner, step) pair RESETS the row to building: a step's
+// briefing is always its CURRENT briefing. Staleness is COMPUTED at every read
+// and only ever WARNS. Bodies live in BriefingRepository.
 
 /// Registry-governed vocabularies (the m0021 element_type rule): the columns
 /// carry NO db CHECK, so a future step or status is an entry here — never a
@@ -39,7 +34,8 @@ public enum BriefingStepSpec {
     public static func validateStep(_ raw: String) throws -> String {
         guard steps.contains(raw) else {
             throw StoreError.badRequest(
-                detail: "unknown briefing step '\(raw)' — known: \(steps.joined(separator: ", "))")
+                detail: "unknown briefing step '\(raw)' — known: \(steps.joined(separator: ", "))"
+            )
         }
         return raw
     }

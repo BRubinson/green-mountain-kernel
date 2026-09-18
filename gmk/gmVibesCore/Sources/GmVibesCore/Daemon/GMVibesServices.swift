@@ -74,12 +74,9 @@ public final class GMVibesServices {
         // app-lifetime singletons, so no re-registration ever happens.
         daemon.checkoutSink = checkout
 
-        // WRITER MODE: swap the transport and take the events in-process.
-        //
-        // Both halves have to happen together. Adopting the verb caller without
-        // subscribing would leave the UI reading a store it never hears change
-        // from, because SUBSCRIBE is a socket verb and this process no longer
-        // dials the socket.
+        // WRITER MODE: swap the transport and take the events in-process. Both halves have
+        // to happen together — SUBSCRIBE is a socket verb, so adopting the verb caller alone
+        // leaves the UI reading a store it never hears change from.
         if let kernel {
             // The health loop must not gate on the on-disk binary when the
             // kernel is this very process. Set synchronously, in the same
@@ -88,14 +85,10 @@ public final class GMVibesServices {
             daemon.hostsKernelInProcess = true
             Task { await GMCCDaemonService.shared.adopt(inProcess: kernel.verbCaller) }
             kernelEventToken = kernel.store.subscribeToEvents { [weak self] event in
-                // FAN-OUT RUNS ON GRDB'S WRITER THREAD, inside the commit hook.
-                // Hand off immediately and touch nothing here: blocking stalls
-                // the single writer for every client on the machine, and calling
-                // back into the store deadlocks.
-                //
-                // This hop is NOT the thread hop the transaction boundary
-                // forbids — the commit has already landed, so we are past the
-                // boundary rather than inside it.
+                // FAN-OUT RUNS ON GRDB'S WRITER THREAD, inside the commit hook. Hand off
+                // immediately and touch nothing here: blocking stalls the single writer for
+                // every client, and calling back into the store deadlocks. The commit has
+                // already landed, so this hop is outside the transaction boundary.
                 let notification = event.notification
                 Task { @MainActor [weak self] in
                     self?.daemon.routeInProcess(notification)
@@ -106,13 +99,9 @@ public final class GMVibesServices {
 
     // MARK: - The app target's window onto the kernel
     //
-    // DELIBERATELY A FACADE, not `public let daemon`. The app entry point needs
-    // four scalars off the latest ping; exposing `DaemonConnectionModel` to hand
-    // them over would make an entire observable model — and everything its API
-    // touches — part of this module's public surface, to serve a handful of
-    // reads. These four properties are the whole of what `GMVibesApp` needs, and
-    // they keep the ping-to-view-model mapping in here, where the rest of it
-    // already lives.
+    // A FACADE, not `public let daemon`. Exposing `DaemonConnectionModel` would make an
+    // entire observable model part of this module's public surface to serve four scalars
+    // off the latest ping. These properties are the whole of what `GMVibesApp` needs.
 
     /// Vitals as the answering kernel last reported them, or nil before the
     /// first ping. Shaped for `KernelVitals(report:)`.
@@ -121,36 +110,31 @@ public final class GMVibesServices {
         return KernelVitalsReport(
             uptimeSeconds: ping.uptimeSeconds,
             residentMemoryBytes: ping.residentMemoryBytes,
-            cpuPercent: ping.cpuPercent)
+            cpuPercent: ping.cpuPercent
+        )
     }
 
-    /// Who holds the database.
+    /// Who holds the database. Answered locally when arbitration already knows, so the menu
+    /// bar does not read `.unknown` for the first second of its own kernel's life.
     ///
-    /// WE ANSWER LOCALLY WHEN WE KNOW. Arbitration already settled this before
-    /// the first ping existed, and waiting for the wire to tell us what we
-    /// decided ourselves would leave the menu bar reading `.unknown` for the
-    /// first second of its own kernel's life. The role row is the mitigation for
-    /// running as a client, and a mitigation nobody can see is cosmetic.
-    ///
-    /// In CLIENT mode the wire is still the authority — only the holder can
-    /// report on itself — and the existing mapping is unchanged. `writerRole`
-    /// and `writerBundlePath` are additive optionals, so a kernel predating them
-    /// answers nil and this reads `.unknown`.
-    ///
-    /// This adds NO connection and NO polling cadence. It short-circuits one
-    /// value; `DaemonConnectionModel` still runs the single health watchdog.
+    /// In CLIENT mode the wire is the authority, because only the holder can report on
+    /// itself. `writerRole` and `writerBundlePath` are additive optionals, so a kernel
+    /// without them answers nil and this reads `.unknown`. No extra connection and no
+    /// polling: `DaemonConnectionModel` still runs the single health watchdog.
     public var kernelRole: KernelRole {
         if kernel != nil { return .writer }
         if let kernelHolder {
             return .client(
                 holderPid: kernelHolder.pid,
-                bundlePath: kernelHolder.bundlePath)
+                bundlePath: kernelHolder.bundlePath
+            )
         }
         guard let ping = daemon.ping else { return .unknown }
         return KernelRole(
             writerRole: ping.writerRole,
             holderPid: ping.daemonPid,
-            bundlePath: ping.writerBundlePath)
+            bundlePath: ping.writerBundlePath
+        )
     }
 
     /// Bring the kernel that actually owns the store to the front.
@@ -182,25 +166,12 @@ public final class GMVibesServices {
 
     /// Stop the kernel, in order, before the process goes away.
     ///
-    /// A NO-OP IN CLIENT MODE, deliberately: a client holds no lock and owns no
-    /// database, and quitting it must not disturb the kernel that does.
+    /// A no-op in client mode: a client holds no lock and owns no database, and quitting it
+    /// must not disturb the kernel that does.
     ///
-    /// ## The draft flush is NOT passed in here, and that is the right shape
-    ///
-    /// The ordering problem this had to solve was that the app's dirty-edit
-    /// flush travelled THROUGH THE SOCKET — which cannot work once both ends are
-    /// one process and the listener has been cancelled. That is fixed by the
-    /// transport swap, not by this function: `GMCCDaemonService` now reaches the
-    /// verb layer directly, so the flush is an ordinary in-process write.
-    ///
-    /// Which leaves the simple ordering: flush (awaited, bounded) and THEN stop
-    /// the kernel. `GMVibesAppDelegate.applicationShouldTerminate` already owns
-    /// exactly that deadline, so the flush stays there rather than being smuggled
-    /// into a synchronous closure it could not have awaited anyway.
-    ///
-    /// `KernelServices.shutdown(beforeClose:)` still takes the hook — a
-    /// last-write-before-close is a real need — this caller simply does not have
-    /// one left.
+    /// The dirty-draft flush is NOT passed in here. The ordering is flush (awaited, bounded)
+    /// and THEN stop the kernel, and `GMVibesAppDelegate.applicationShouldTerminate` owns
+    /// that deadline — a synchronous closure here could not have awaited it.
     public func shutdownKernel() {
         guard let kernel else { return }
         if let token = kernelEventToken {

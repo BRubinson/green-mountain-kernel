@@ -1,16 +1,13 @@
 import Foundation
 
-// Unified search value type with two opposite semantics, so the same raw string
-// drives both the list filter and the in-view find-in-page without two predicates.
+// Unified search value with two opposite semantics, so one raw string drives both the list
+// filter and find-in-page without two predicates.
 //
-//   .tokenized  — trim, split on whitespace; a haystack matches if it contains
-//                 (individually) ANY of the tokens (token-OR, case/diacritic
-//                 insensitive). A whitespace-only query yields no tokens and
-//                 therefore matches NOTHING (a deliberate fix vs the old
-//                 whole-string `matches(query:)`, which matched ~everything on a
-//                 lone space). Used by the prompt-list + project-load filters.
-//   .literal    — the trimmed whole string; `ranges(in:)` enumerates every
-//                 occurrence. Used by find-in-page (exact substring, per match).
+//   .tokenized — trimmed and split on whitespace; a haystack matches if it contains ANY token,
+//                case and diacritic insensitive. A whitespace-only query yields no tokens and
+//                therefore matches NOTHING. Drives the prompt-list and project-load filters.
+//   .literal   — the trimmed whole string; `ranges(in:)` enumerates every occurrence. Drives
+//                find-in-page, which needs exact substrings, one range per match.
 struct SearchQuery: Equatable {
     enum Mode: Equatable { case tokenized, literal }
 

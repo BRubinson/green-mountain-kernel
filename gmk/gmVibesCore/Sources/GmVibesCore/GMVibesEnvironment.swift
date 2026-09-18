@@ -16,17 +16,12 @@ enum GMVibesEnvKey: String, CaseIterable, Hashable {
     case kbiteOpen = "GM_KBITE_OPEN"
 }
 
-/// Locator for the filesystem roots (memory files, folder-open actions, KBites
-/// browse tabs). Two layers with explicit precedence:
+/// Locator for the filesystem roots, in two layers with explicit precedence.
 ///
-/// - `probed` — process environment + conventional-location probe. Synchronous,
-///   filled in `init()`, and the reason folder-open and the KBites browser
-///   survive with the daemon down.
-/// - `fromDaemon` — PATHS_GET, adopted asynchronously by the window root's
-///   loader task (on `daemon.generation` and `.paths` invalidations). WINS on
-///   merge: the daemon's MemoryWatcher is rooted at ITS gmfs root, so a
-///   divergent client root would silently mis-resolve memories, and a
-///   Finder-launched app's stale exported var is the likelier wrong answer.
+/// `probed` is synchronous and filled in `init()`, which is why folder-open and the KBites
+/// browser survive with the daemon down. `fromDaemon` comes from PATHS_GET and WINS on merge:
+/// the daemon's MemoryWatcher is rooted at ITS gmfs root, so a divergent client root would
+/// silently mis-resolve memories.
 @Observable
 @MainActor
 final class GMVibesEnvironment {
@@ -44,19 +39,13 @@ final class GMVibesEnvironment {
         refresh()
     }
 
-    /// Synchronous fallback resolution (daemon-down path). Kept as the
-    /// "Re-scan" affordance too.
+    /// Synchronous fallback resolution for the daemon-down path, and the "Re-scan" affordance.
     ///
-    /// THE ROOT COMES FROM `Paths.root`, NOT FROM A PROBE. This used to read
-    /// `$GM_FS_ROOT` and otherwise look for `~/gmfs` on disk, which was wrong
-    /// in the one case that matters: a LaunchServices-launched app inherits no
-    /// environment, so the probe ALWAYS answered `~/gmfs` — and a non-production
-    /// build would have painted production chrome over its own data until the
-    /// daemon's `PATHS_GET` arrived, which is after first paint.
-    ///
-    /// `Paths.root` reads the bundle's baked key first and resolves
-    /// synchronously in-process, so the answer is correct at frame zero and
-    /// cannot be changed by how the app was started.
+    /// THE ROOT COMES FROM `Paths.root`, NEVER FROM A PROBE. A LaunchServices-launched app
+    /// inherits no environment, so an env-and-disk probe always answers `~/gmfs` and a
+    /// non-production build would paint production chrome over its own data until PATHS_GET
+    /// arrived, which is after first paint. `Paths.root` reads the bundle's baked key and
+    /// resolves in-process, so the answer is correct at frame zero whatever launched the app.
     func refresh() {
         let env = ProcessInfo.processInfo.environment
 
@@ -109,7 +98,8 @@ final class GMVibesEnvironment {
                 // (daemon root ≠ probed root) is at least diagnosable.
                 NSLog(
                     "GMVibes: PATHS_GET failed, keeping probed roots: %@",
-                    String(describing: error))
+                    String(describing: error)
+                )
             }
         }
         loadInFlight = task

@@ -4,27 +4,12 @@ import GmDaemonSdk
 
 /// Who owns the database, decided before anything can open it.
 ///
-/// ## The problem this type exists for
-///
-/// Single-writer used to be a PROCESS property enforced by a shape: only
-/// `gm_daemon` ever constructed a `Store`, and it took a `flock` first. Nothing
-/// in the type system said so — the guarantee was "there is one program that
-/// does this, and it does it correctly".
-///
-/// The collapse breaks that by construction. The writer now lives inside an
-/// application bundle, and macOS will happily run a second copy of one: an Xcode
-/// debug build beside the installed app, a copy in `~/Downloads`, or `open -n` on
-/// the installed bundle outright. LaunchServices gives one instance per bundle
-/// PATH, not one per application. Each of those copies would open the same
-/// `~/gmfs/gm.db` through GRDB's WAL, and two writers into append-only history is
-/// not recoverable.
-///
-/// So the lock stops being a step a correct program remembers to take, and
-/// becomes the only way to obtain the capability. `Token` cannot be constructed
-/// outside this file, `acquire()` is its only producer, and `KernelWriter.start`
-/// — the single `Store(path:)` site in the tree — consumes one. A losing instance
-/// cannot open the database because there is no expression that opens it.
-/// `KernelHostContractTests` scans for a second `Store(path:` so that stays true.
+/// LaunchServices gives one instance per bundle PATH, not per application, so a
+/// debug build beside the installed app is a second process that would open the
+/// same `gm.db` through GRDB's WAL — unrecoverable in append-only history. The
+/// lock is therefore the only way to obtain the capability: `Token` cannot be
+/// constructed outside this file, `acquire()` is its only producer, and
+/// `KernelWriter.start` — the single `Store(path:)` site — consumes one.
 public enum KernelOwnership {
 
     /// Proof that this process holds the exclusive database lock.
@@ -36,7 +21,6 @@ public enum KernelOwnership {
     /// what makes a CRASHED kernel leave no stale lock behind.
     public struct Token: ~Copyable {
         fileprivate let fd: Int32
-        fileprivate init(fd: Int32) { self.fd = fd }
     }
 
     /// Who holds the lock, when we did not get it.
@@ -64,13 +48,9 @@ public enum KernelOwnership {
     public static func acquire() throws -> Outcome {
         try Paths.ensureRuntimeDirs()
 
-        // The pidfile PATH IS DELIBERATELY UNCHANGED (`~/gmfs/daemon.pid`).
-        // Renaming runtime state to match the kernel's new name would be the
-        // most dangerous cosmetic edit available here: a new instance locking
-        // `kernel.pid` while an older one still holds `daemon.pid` takes a
-        // DIFFERENT LOCK, and the two would proceed to write the same database
-        // believing each was alone. The word "daemon" in a filename costs
-        // nothing; a second writer costs the history.
+        // The pidfile is DELIBERATELY `daemon.pid` in every root. A renamed
+        // pidfile is a DIFFERENT LOCK: two instances would each hold one and
+        // write the same database believing each was alone.
         let fd = open(Paths.pidfile.path, O_CREAT | O_RDWR, 0o644)
         guard fd >= 0 else {
             throw OwnershipError.cannotOpenPidfile(errno: errno)
@@ -86,7 +66,9 @@ public enum KernelOwnership {
                     ?? Holder(
                         pid: 0,
                         executablePath: "(unknown — pidfile unreadable)",
-                        bundlePath: nil))
+                        bundlePath: nil
+                    )
+            )
         }
 
         // Won it. Record WHO we are, so a loser can name us.
@@ -96,7 +78,8 @@ public enum KernelOwnership {
                 "\(getpid())",
                 Bundle.main.executablePath ?? CommandLine.arguments.first ?? "(unknown)",
                 Self.ownBundlePath() ?? "",
-            ].joined(separator: "\n") + "\n"
+            ]
+            .joined(separator: "\n") + "\n"
         _ = record.withCString { write(fd, $0, strlen($0)) }
 
         return .acquired(Token(fd: fd))
@@ -112,14 +95,9 @@ public enum KernelOwnership {
     }
 
     /// Three lines: pid, executable path, bundle path (empty when headless).
-    ///
-    /// The pidfile gaining two lines is safe because NOTHING reads its contents
-    /// — verified across the tree: it is written at boot and unlinked at
-    /// shutdown, and every other consumer only ever `flock`s it.
-    ///
-    /// One retry, because a loser can catch the winner between `ftruncate` and
-    /// `write` and see an empty file. Reporting "unknown holder" for a race that
-    /// resolves in microseconds would make the client-mode banner lie.
+    /// This is the only reader of the contents; every other consumer merely
+    /// `flock`s the file. One retry, because a loser can catch the winner
+    /// between `ftruncate` and `write` and see an empty file.
     private static func readHolder(fd: Int32) -> Holder? {
         for attempt in 0..<2 {
             lseek(fd, 0, SEEK_SET)

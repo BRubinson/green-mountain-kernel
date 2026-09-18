@@ -26,15 +26,12 @@ public enum KernelRole: Equatable, Sendable {
 
 /// The menu bar dropdown's content.
 ///
-/// STYLE REQUIREMENT: this is written for `.menuBarExtraStyle(.window)`, not the
-/// default `.menu`. AppKit's menu style renders only menu items and drops the
-/// role row's colour and layout on the floor — and the role row is the one thing
-/// here that has to be unmissable, so the panel style is load-bearing rather
-/// than a preference.
+/// STYLE REQUIREMENT: written for `.menuBarExtraStyle(.window)`, not the default `.menu`.
+/// AppKit's menu style renders only menu items and drops the role row's colour and layout,
+/// and the role row is the one thing here that has to be unmissable.
 ///
-/// Every action is INJECTED. The scene, the `WindowGroup` value and the quit
-/// path all belong to the app struct; this view knows the order of the rows and
-/// the words on them, and nothing about how a window is opened.
+/// Every action is INJECTED: this view knows the order of the rows and the words on them,
+/// and nothing about how a window is opened.
 public struct KernelMenuBarContent: View {
     let role: KernelRole
     let vitals: KernelVitals
@@ -87,18 +84,11 @@ public struct KernelMenuBarContent: View {
 
             Divider()
             menuRow("New Vibe Window", systemImage: "macwindow.badge.plus") {
-                // BEFORE the open, always. An LSUIElement process is not a
-                // regular app in the window server's eyes: it can order a
-                // window on screen without ever becoming active, and the new
-                // window then sits unfocused behind whatever the user was in.
-                // Read as "the button does nothing", which is the single
-                // easiest way to lose trust in a menu bar app.
-                //
-                // Still needed with `WindowPresence` in place, and the two are
-                // not redundant: this activates the CURRENT (accessory) process
-                // so the open is seen, while WindowPresence re-activates after
-                // the policy is raised. Opening from zero windows needs both,
-                // and opening from one needs only this one.
+                // BEFORE the open, always. An LSUIElement process can order a window on
+                // screen without becoming active, leaving the new window unfocused behind
+                // whatever the user was in. Not redundant with `WindowPresence`: this
+                // activates the current accessory process so the open is seen, while
+                // WindowPresence re-activates after the policy is raised.
                 NSApp.activate()
                 onNewWindow()
             }

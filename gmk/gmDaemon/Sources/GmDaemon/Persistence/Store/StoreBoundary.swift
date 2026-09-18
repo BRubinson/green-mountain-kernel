@@ -1,45 +1,14 @@
 import Foundation
 import GRDB
 
-/// THE transaction boundary, and the whole of the shared-service-layer
-/// deliverable.
-///
-/// ## Why this file exists
-///
-/// The kernel collapse put the UI, the relayed MCP surface and the daemon's own
-/// background services in one process sharing one `DatabaseQueue`. The ask was
-/// not merely "one connection pool" — it was **shared transaction boundaries**:
-/// two verbs that must land together, or not at all.
-///
-/// The verb layer was already ready for that and nobody had noticed.
-/// `RepositoryContext` is `{ db, core }` plus its named accessors, `StoreCore`
-/// deliberately holds no queue and exposes no verb, and every verb body in this
-/// module is already written against an **injected** `Database`. The only thing
-/// hard-wired was the boundary itself, in 133 sites in this one directory. So
-/// composition did not need a new vocabulary — it needed those 133 sites to
-/// route through one function that knows whether a transaction is already open.
-///
-/// That is why there is no `uow:` parameter here and no per-verb wrapper. An
-/// explicit unit-of-work parameter is the 96-verb retype wearing a different
-/// hat: it has to appear in every signature the composition can reach, which is
-/// exactly the second hand-maintained surface this design exists to avoid. The
-/// ~120 already-`public` verbs on the `Store+*` extensions compose as they are.
-///
-/// ## The correctness condition, and why it is checked rather than assumed
-///
-/// The ambient handle is **thread-local**, not global. GRDB runs a `write` body
-/// synchronously on one dedicated thread, and every nested verb call runs on
-/// that same thread, so a thread-local is exactly scoped to one transaction. A
-/// global would leak one transaction's handle into a concurrent caller and
-/// corrupt both.
-///
-/// This is only correct while the verb layer performs **no thread hops inside a
-/// boundary**. That holds today at zero occurrences — there is no
-/// `DispatchQueue`, no `Task {`, no `async` and no `await` anywhere under
-/// `Sources/GmDaemon/` or the handlers — and `TransactionBoundaryTests` pins it
-/// so a future hop fails the build instead of silently splitting a transaction
-/// across threads. If that test ever goes red the answer is to remove the hop,
-/// not to relax the boundary.
+/// THE transaction boundary: one process shares one `DatabaseQueue`, and what
+/// it needs is shared transaction boundaries — two verbs that land together or
+/// not at all. Every verb body is written against an INJECTED `Database`, so
+/// the 133 boundary sites route through one function that knows whether a
+/// transaction is already open. There is deliberately no `uow:` parameter.
+/// The ambient handle is THREAD-LOCAL, not global, and is correct only while
+/// the verb layer performs NO THREAD HOPS inside a boundary. Remove a hop;
+/// never relax the boundary.
 extension Store {
 
     // MARK: - The ambient handle
@@ -128,24 +97,12 @@ extension Store {
 
     /// Runs `body` inside ONE transaction. Every existing public `Store` verb
     /// called within it enlists, and the whole composite commits or rolls back
-    /// together:
-    ///
-    /// ```swift
-    /// try store.inTransaction {
-    ///     try store.promptSetStatus(...)
-    ///     try store.archDecide(...)
-    /// }
-    /// ```
-    ///
-    /// Nesting is safe and idempotent — an inner `inTransaction` enlists in the
-    /// outer one rather than opening a second — because it routes through
-    /// `boundary` like everything else.
-    ///
-    /// Two things deliberately cannot be composed, and both fail loudly rather
-    /// than misbehaving: `checkpointTruncate`, because a WAL checkpoint inside a
-    /// transaction is illegal in SQLite, and the four-phase repo verbs, because
-    /// they perform filesystem work between their read and their write and would
-    /// hold the single writer lock across it. See `StoreError.notComposable`.
+    /// together. Nesting is safe and idempotent: an inner `inTransaction`
+    /// enlists in the outer one rather than opening a second.
+    /// Two things deliberately cannot compose and fail loudly instead —
+    /// `checkpointTruncate`, since a WAL checkpoint inside a transaction is
+    /// illegal in SQLite, and the four-phase repo verbs, which would hold the
+    /// single writer across filesystem work.
     public func inTransaction<T>(_ body: () throws -> T) throws -> T {
         try boundary { _ in try body() }
     }

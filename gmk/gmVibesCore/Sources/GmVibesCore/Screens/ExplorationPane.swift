@@ -43,7 +43,8 @@ struct ExplorationPane: View {
     @ViewBuilder
     private func content(_ response: ExploreGetResponse) -> some View {
         let visible = response.findings.visibleFindings(
-            showLowPriority: showLowPriority, showTombstones: showTombstones
+            showLowPriority: showLowPriority,
+            showTombstones: showTombstones
         )
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {

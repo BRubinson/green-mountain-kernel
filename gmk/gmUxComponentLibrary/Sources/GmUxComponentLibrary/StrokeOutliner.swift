@@ -3,15 +3,12 @@ import Foundation
 import GmDaemonSdk
 
 /// Pressure-aware freehand outlining — a compact Swift port of the
-/// perfect-freehand algorithm (Steve Ruiz, MIT — ported from upstream
-/// source; the vendored excalidraw tree carries it only as an npm
-/// dependency, so the math lives here).
+/// perfect-freehand algorithm (Steve Ruiz, MIT).
 ///
-/// PURE and SwiftUI-free: centerline+pressure in, closed outline polygon
-/// out. Derivation happens at RESOLVE time over the persisted vertices —
-/// the codec stored centerline+pressure for exactly this, so no migration
-/// and no wire change is involved; bumping renderAlgoVersion is the only
-/// contract (the fingerprint's representative of render code).
+/// Pure and SwiftUI-free: centerline+pressure in, closed outline polygon out.
+/// Derivation happens at RESOLVE time over the persisted vertices, so a change
+/// here needs no migration and no wire change; bumping `renderAlgoVersion` is the
+/// only contract, since it is the fingerprint's representative of render code.
 public enum StrokeOutliner {
 
     public struct Options {
@@ -25,8 +22,10 @@ public enum StrokeOutliner {
         public var simulatePressure: Bool
 
         public init(
-            size: Double, thinning: Double = 0.6,
-            streamline: Double = 0.35, simulatePressure: Bool = true
+            size: Double,
+            thinning: Double = 0.6,
+            streamline: Double = 0.35,
+            simulatePressure: Bool = true
         ) {
             self.size = size
             self.thinning = thinning
@@ -39,7 +38,8 @@ public enum StrokeOutliner {
     /// round caps). Returns [] for degenerate input (< 2 distinct points) —
     /// callers fall back to the plain stroked centerline.
     public static func outline(
-        points: [CGPoint], pressures: [Double?],
+        points: [CGPoint],
+        pressures: [Double?],
         options: Options
     ) -> [CGPoint] {
         guard points.count >= 2, options.size > 0 else { return [] }
@@ -52,7 +52,8 @@ public enum StrokeOutliner {
             let previous = smoothed[smoothed.count - 1]
             let next = CGPoint(
                 x: previous.x + (point.x - previous.x) * t,
-                y: previous.y + (point.y - previous.y) * t)
+                y: previous.y + (point.y - previous.y) * t
+            )
             if hypot(next.x - previous.x, next.y - previous.y) > 0.01 {
                 smoothed.append(next)
             }
@@ -67,7 +68,8 @@ public enum StrokeOutliner {
             for index in 1..<smoothed.count {
                 let distance = hypot(
                     smoothed[index].x - smoothed[index - 1].x,
-                    smoothed[index].y - smoothed[index - 1].y)
+                    smoothed[index].y - smoothed[index - 1].y
+                )
                 let speed = min(1, distance / options.size)
                 running = min(1, max(0.1, running + ((1 - speed) - running) * 0.275))
                 pressure[index] = running
@@ -121,17 +123,21 @@ public enum StrokeOutliner {
             guard r > 0.1 else { return [] }
             while endAngle < startAngle { endAngle += 2 * .pi }
             let steps = 8
-            return (1..<steps).map { step in
-                let angle = startAngle + (endAngle - startAngle) * Double(step) / Double(steps)
-                return CGPoint(
-                    x: center.x + cos(angle) * r,
-                    y: center.y + sin(angle) * r)
-            }
+            return (1..<steps)
+                .map { step in
+                    let angle = startAngle + (endAngle - startAngle) * Double(step) / Double(steps)
+                    return CGPoint(
+                        x: center.x + cos(angle) * r,
+                        y: center.y + sin(angle) * r
+                    )
+                }
         }
         let startCap = cap(center: smoothed[0], from: right[0], to: left[0])
         let endCap = cap(
             center: smoothed[smoothed.count - 1],
-            from: left[left.count - 1], to: right[right.count - 1])
+            from: left[left.count - 1],
+            to: right[right.count - 1]
+        )
 
         return left + endCap + right.reversed() + startCap
     }

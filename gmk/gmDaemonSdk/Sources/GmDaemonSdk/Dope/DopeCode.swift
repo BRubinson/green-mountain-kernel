@@ -55,7 +55,8 @@ public enum DopeCode {
             .map(String.init)
         guard parts.count == 3, !parts.contains(where: \.isEmpty) else {
             throw ValidationError(
-                "\(field) '\(raw)' must be domain.entity.property or domain.enums.enum_code")
+                "\(field) '\(raw)' must be domain.entity.property or domain.enums.enum_code"
+            )
         }
         for (i, part) in parts.enumerated() where !(i == 1 && part == reservedEnumSegment) {
             try validateCode(part, field: "\(field) segment \(i + 1)")
@@ -79,7 +80,8 @@ public enum DopeCode {
         }
         guard parts[1] != reservedEnumSegment else {
             throw ValidationError(
-                "\(field) '\(raw)' names entity 'enums' — reserved (no entity may carry that code)")
+                "\(field) '\(raw)' names entity 'enums' — reserved (no entity may carry that code)"
+            )
         }
         return .entity(domain: parts[0], entity: parts[1])
     }

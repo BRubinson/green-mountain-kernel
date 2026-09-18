@@ -2,16 +2,11 @@ import Foundation
 
 /// The load-bearing tagged union: ONE type drives the wire codec, store
 /// persistence, containment validation, and the exhaustive-switch render
-/// protocol. `DopeNodeFields`' flat-optional union is deliberately NOT
-/// extended, and no clear* flags exist anywhere on this surface — an update
-/// carrying a payload REPLACES the subtype row (and vertex set) wholesale,
-/// so the typed-nil SET-dictionary idiom (the 6ffbda9 bug class) is
-/// structurally impossible here.
-///
-/// Encoding: `{"kind": "<element_type raw>", "fields": {...}}`. `kind` and
-/// `fields` are single-word keys — fixed points of the snake_case strategies
-/// (the Envelope.swift hazard); each case struct's own camelCase keys go
-/// through the shared strategy normally.
+/// protocol. No clear* flags exist on this surface — an update carrying a
+/// payload REPLACES the subtype row and its vertex set wholesale, so the
+/// typed-nil SET-dictionary idiom is structurally impossible here. Encoding
+/// is `{"kind": "<element_type raw>", "fields": {...}}`; `kind` and `fields`
+/// are single-word keys, fixed points of the snake_case strategies.
 public enum DiagramElementPayload: Codable, Hashable, Sendable {
     case drawingLayer(DrawingLayerPayload)
     case drawingStroke(DrawingStrokePayload)
@@ -44,8 +39,10 @@ public enum DiagramElementPayload: Codable, Hashable, Sendable {
         let kind = try c.decode(String.self, forKey: .kind)
         guard let type = DiagramElementType(rawValue: kind) else {
             throw DecodingError.dataCorruptedError(
-                forKey: .kind, in: c,
-                debugDescription: "unknown diagram element payload kind '\(kind)'")
+                forKey: .kind,
+                in: c,
+                debugDescription: "unknown diagram element payload kind '\(kind)'"
+            )
         }
         switch type {
         case .drawingLayer:
@@ -141,8 +138,10 @@ public struct DrawingStrokePayload: Codable, Hashable, Sendable {
     public let vertices: [DiagramVertex]
 
     public init(
-        tool: DiagramStrokeTool = .pencil, strokeColor: String = "#1a1a1a",
-        strokeWidth: Double = 2, vertices: [DiagramVertex] = []
+        tool: DiagramStrokeTool = .pencil,
+        strokeColor: String = "#1a1a1a",
+        strokeWidth: Double = 2,
+        vertices: [DiagramVertex] = []
     ) {
         self.tool = tool
         self.strokeColor = strokeColor
@@ -172,9 +171,12 @@ public struct DrawingShapePayload: Codable, Hashable, Sendable {
     public let vertices: [DiagramVertex]
 
     public init(
-        shapeKind: DiagramShapeKind, strokeColor: String = "#1a1a1a",
-        strokeWidth: Double = 2, fillColor: String? = nil,
-        cornerRadius: Double? = nil, vertices: [DiagramVertex] = []
+        shapeKind: DiagramShapeKind,
+        strokeColor: String = "#1a1a1a",
+        strokeWidth: Double = 2,
+        fillColor: String? = nil,
+        cornerRadius: Double? = nil,
+        vertices: [DiagramVertex] = []
     ) {
         self.shapeKind = shapeKind
         self.strokeColor = strokeColor
@@ -201,13 +203,11 @@ public struct DrawingShapePayload: Codable, Hashable, Sendable {
 
 /// A resizable markdown text box.
 ///
-/// The only bounded element in the family that is NOT vertex-derived: shapes
-/// take their frame from the bounding box of their vertices, but wrapping
-/// markdown needs a layout width up front, and re-deriving one from a vertex
-/// extent on every render would be both slower and circular (the wrapped
-/// height depends on the width). So the size is explicit — and it lives on
-/// this subtype, not on diagram_element, so no other type is affected and
-/// the tree-composing `scale` still applies on top of it.
+/// The only bounded element in the family that is NOT vertex-derived:
+/// wrapping markdown needs a layout width up front, and deriving one from a
+/// vertex extent is circular, since the wrapped height depends on the width.
+/// The size lives on this subtype rather than on diagram_element, so no other
+/// type is affected and the tree-composing `scale` still applies on top.
 public struct DrawingTextPayload: Codable, Hashable, Sendable {
     public let markdown: String
     public let width: Double
@@ -217,8 +217,11 @@ public struct DrawingTextPayload: Codable, Hashable, Sendable {
     public let backgroundColor: String?
 
     public init(
-        markdown: String = "", width: Double = 180, height: Double = 60,
-        fontSize: Double = 13, textColor: String = "#1a1a1a",
+        markdown: String = "",
+        width: Double = 180,
+        height: Double = 60,
+        fontSize: Double = 13,
+        textColor: String = "#1a1a1a",
         backgroundColor: String? = nil
     ) {
         self.markdown = markdown
@@ -278,18 +281,13 @@ public enum DiagramConnectorRouting: String, Codable, Hashable, CaseIterable, Se
 }
 
 /// A hand-drawn connection from the element it is parented under to a PEER
-/// of that element.
-///
-/// The subsystem's first element-to-element reference. `targetElementUuid`
-/// is optional on purpose at every layer: the column is `ON DELETE SET
-/// NULL`, because CASCADE on a subtype table would delete this row and leave
-/// its `diagram_element` row with no subtype at all — corruptState on every
-/// later read of the whole diagram. A deleted target instead degrades to a
-/// renderable ghost, the same tolerance the dope code bindings have.
-///
-/// In a batch, a connector may name its target by `targetClientRef` on the
-/// mutation instead — temp-id resolution is a batch concern a payload is
-/// structurally blind to, exactly as with `parentClientRef`.
+/// of that element. `targetElementUuid` is optional at every layer: the
+/// column is `ON DELETE
+/// SET NULL`, because CASCADE on a subtype table would leave the
+/// `diagram_element` row with no subtype and corrupt every later read of the
+/// diagram. A deleted target degrades to a renderable ghost. In a batch a
+/// connector may instead name its target by `targetClientRef` on the
+/// mutation; temp-id resolution is a batch concern a payload is blind to.
 public struct ConnectorPayload: Codable, Hashable, Sendable {
     public let targetElementUuid: String?
     public let strokeColor: String
@@ -301,11 +299,14 @@ public struct ConnectorPayload: Codable, Hashable, Sendable {
     public let label: String
 
     public init(
-        targetElementUuid: String? = nil, strokeColor: String = "#1a1a1a",
-        strokeWidth: Double = 2, lineStyle: DiagramConnectorLineStyle = .solid,
+        targetElementUuid: String? = nil,
+        strokeColor: String = "#1a1a1a",
+        strokeWidth: Double = 2,
+        lineStyle: DiagramConnectorLineStyle = .solid,
         headKind: DiagramConnectorHead = .arrow,
         routingKind: DiagramConnectorRouting = .orthogonalStep,
-        tailKind: DiagramConnectorHead = .none, label: String = ""
+        tailKind: DiagramConnectorHead = .none,
+        label: String = ""
     ) {
         self.targetElementUuid = targetElementUuid
         self.strokeColor = strokeColor
@@ -329,18 +330,26 @@ public struct ConnectorPayload: Codable, Hashable, Sendable {
         strokeWidth = try c.decodeIfPresent(Double.self, forKey: .strokeWidth) ?? 2
         lineStyle =
             try c.decodeIfPresent(
-                DiagramConnectorLineStyle.self, forKey: .lineStyle) ?? .solid
+                DiagramConnectorLineStyle.self,
+                forKey: .lineStyle
+            ) ?? .solid
         headKind =
             try c.decodeIfPresent(
-                DiagramConnectorHead.self, forKey: .headKind) ?? .arrow
+                DiagramConnectorHead.self,
+                forKey: .headKind
+            ) ?? .arrow
         // Defaults reproduce the pre-v23 look: the router's polyline was the
         // only renderer, and no connector had a tail decoration.
         routingKind =
             try c.decodeIfPresent(
-                DiagramConnectorRouting.self, forKey: .routingKind) ?? .orthogonalStep
+                DiagramConnectorRouting.self,
+                forKey: .routingKind
+            ) ?? .orthogonalStep
         tailKind =
             try c.decodeIfPresent(
-                DiagramConnectorHead.self, forKey: .tailKind) ?? .none
+                DiagramConnectorHead.self,
+                forKey: .tailKind
+            ) ?? .none
         label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
     }
 }
@@ -363,9 +372,14 @@ public struct UmlNodePayload: Codable, Hashable, Sendable {
     public let fillColor: String?
 
     public init(
-        nodeKind: DiagramNodeKind, width: Double = 160, height: Double = 90,
-        markdown: String = "", fontSize: Double? = nil, textColor: String? = nil,
-        strokeColor: String? = nil, strokeWidth: Double? = nil,
+        nodeKind: DiagramNodeKind,
+        width: Double = 160,
+        height: Double = 90,
+        markdown: String = "",
+        fontSize: Double? = nil,
+        textColor: String? = nil,
+        strokeColor: String? = nil,
+        strokeWidth: Double? = nil,
         fillColor: String? = nil
     ) {
         self.nodeKind = nodeKind
@@ -439,7 +453,10 @@ public enum FieldPatch<T: Codable & Hashable & Sendable>: Codable, Hashable, Sen
             self = .clear
         default:
             throw DecodingError.dataCorruptedError(
-                forKey: .op, in: c, debugDescription: "unknown field patch op '\(op)'")
+                forKey: .op,
+                in: c,
+                debugDescription: "unknown field patch op '\(op)'"
+            )
         }
     }
 

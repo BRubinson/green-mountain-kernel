@@ -2,19 +2,11 @@ import AppKit
 
 /// The menu bar glyph: a single snow-capped summit, drawn as line work.
 ///
-/// This IS a template image, and that is the whole design. The status bar
-/// flattens a template to one tint and adapts it to light and dark bars, to
-/// menu-bar tinting and to the highlighted state — which is what makes a glyph
-/// sit in a row of system icons instead of next to them. The colour version
-/// this replaced had to opt out of all of that to keep its green, and then had
-/// to carry its own outline to survive a light bar. None of that is needed once
-/// the icon is monochrome.
-///
-/// So: STROKES ONLY, no fill. Drawn in black — the tint is the system's to
-/// choose, and a template's colour information is discarded anyway; only the
-/// alpha survives. SF Symbols' proportions are the reference, which is why the
-/// line weight is a fraction of the box rather than a fixed number: the glyph
-/// has to sit at the same visual weight as the symbols on either side of it.
+/// A TEMPLATE image: the status bar flattens it to one tint and adapts it to light and dark
+/// bars, to tinting and to the highlighted state, which is what makes a glyph sit in a row of
+/// system icons rather than beside them. STROKES ONLY, no fill, drawn in black, since a
+/// template discards colour and keeps only alpha. Line weight is a fraction of the box rather
+/// than a fixed number, so the glyph carries the same visual weight as the SF Symbols beside it.
 public enum KernelMenuBarIcon {
     /// 18pt is the status bar's usable height; AppKit scales for Retina from
     /// the point size, so the drawing handler stays resolution-independent.
@@ -59,7 +51,11 @@ public enum KernelMenuBarIcon {
     private static func drawEnvironmentBadge(_ letter: String) {
         let diameter: CGFloat = 9
         let rect = NSRect(
-            x: side - diameter, y: 0, width: diameter, height: diameter)
+            x: side - diameter,
+            y: 0,
+            width: diameter,
+            height: diameter
+        )
         NSColor.black.setFill()
         NSBezierPath(ovalIn: rect).fill()
 
@@ -72,8 +68,10 @@ public enum KernelMenuBarIcon {
         text.draw(
             at: NSPoint(
                 x: rect.midX - textSize.width / 2,
-                y: rect.midY - textSize.height / 2),
-            withAttributes: attributes)
+                y: rect.midY - textSize.height / 2
+            ),
+            withAttributes: attributes
+        )
     }
 
     private static func draw() {
@@ -99,15 +97,12 @@ public enum KernelMenuBarIcon {
 
     // MARK: - Geometry
     //
-    // Points are in the 18×18 box, y up (the image is created unflipped), inset
-    // far enough that the stroke — which straddles the path, half in and half
-    // out — stays inside the box.
+    // Points are in the 18x18 box, y up (the image is created unflipped), inset far enough
+    // that the stroke, which straddles the path, stays inside the box.
     //
-    // Line work carries far less detail than a filled silhouette does: the
-    // stroke eats the small notches from both sides at once, so the flanking
-    // needles of the filled version are gone and ONE shoulder peak carries the
-    // app icon's jaggedness. Everything below is the shape that survives being
-    // drawn with a 1.25pt pen.
+    // Line work carries less detail than a filled silhouette: the stroke eats small notches
+    // from both sides at once, so ONE shoulder peak carries the jaggedness. What follows is
+    // the shape that survives a 1.25pt pen.
 
     private static let silhouette: [NSPoint] = [
         NSPoint(x: 2.2, y: 4.4),  // base left
@@ -117,24 +112,13 @@ public enum KernelMenuBarIcon {
         NSPoint(x: 15.8, y: 4.4),  // base right
     ]
 
-    /// An open zigzag across the summit's two flanks, its ends sitting ON them
-    /// (solved against each flank, not eyeballed) so the line meets the ridge
-    /// instead of stopping short of it or crossing through.
+    /// An open dip across the summit's two flanks, its ends solved against each flank so the
+    /// line meets the ridge instead of stopping short or crossing through. An outlined snow
+    /// CAP would read as a second mountain, so the snow line alone is the convention.
     ///
-    /// A snow CAP cannot be drawn in line work — an outlined cap is just a
-    /// smaller triangle stacked on the peak, which reads as a second mountain.
-    /// The snow line alone is the convention, and the zigzag is what separates
-    /// it from a contour line.
-    ///
-    /// ONE dip, not a zigzag, and that is a size limit rather than a taste.
-    /// Above the snow line this mountain is about 4pt wide, so every tooth of a
-    /// zigzag has to clear BOTH flanks by more than a stroke width or its
-    /// stroke merges with the ridge. Two earlier attempts did merge: the teeth
-    /// fused to the left flank and pinched the cap in two, leaving a small
-    /// triangular hole by the summit that read as an eye. There is no tooth
-    /// count that fits — the shallow V is what the width allows, and it still
-    /// says "snow line" rather than "contour" because it dips where a gully
-    /// would.
+    /// ONE dip is a size limit rather than a taste: above the snow line this mountain is about
+    /// 4pt wide, so any tooth must clear BOTH flanks by more than a stroke width or its stroke
+    /// merges with the ridge.
     private static let snowLine: [NSPoint] = [
         NSPoint(x: 8.95, y: 11.0),  // on the left flank
         NSPoint(x: 10.9, y: 9.9),  // the gully

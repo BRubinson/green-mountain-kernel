@@ -41,6 +41,7 @@ struct DiagramViewport: Equatable {
     mutating func center(on point: CGPoint, in size: CGSize) {
         offset = CGSize(
             width: size.width / 2 - point.x * zoom,
-            height: size.height / 2 - point.y * zoom)
+            height: size.height / 2 - point.y * zoom
+        )
     }
 }

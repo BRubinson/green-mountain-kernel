@@ -14,7 +14,8 @@ public struct GmAgentDopeSearchArguments: Sendable {
         description: """
             Which kinds of dope rows to search. Leave empty to search all of them. \
             Use this to ask for only persistence rows, or only cogs.
-            """)
+            """
+    )
     public var sources: [String]
 
     @Guide(description: GM_TOOL_GUIDE_SEARCH_LIMIT, .range(1...500))
@@ -38,7 +39,7 @@ public struct GmAgentDopeSearchGlobalTool: GmAgentDopeTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentDopeSearchArguments) async throws -> String {
+    public func call(arguments _: GmAgentDopeSearchArguments) throws -> String {
         throw GmAgentToolError.notSupported(
             tool: name,
             detail: """
@@ -47,7 +48,8 @@ public struct GmAgentDopeSearchGlobalTool: GmAgentDopeTool {
                 project_uuid. Reaching every project means fanning out over \
                 PROJECT_LIST client-side, or widening the enum (not decode-safe \
                 for a stale peer).
-                """)
+                """
+        )
     }
 }
 
@@ -58,7 +60,7 @@ public struct GmAgentDopeSearchSessionTool: GmAgentDopeTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentDopeSearchArguments) async throws -> String {
+    public func call(arguments _: GmAgentDopeSearchArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "DOPE_SEARCH")
     }
 }
@@ -100,13 +102,14 @@ public struct GmAgentDopeUpdateSessionTool: GmAgentDopeTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentDopeUpdateSessionArguments) async throws -> String {
+    public func call(arguments _: GmAgentDopeUpdateSessionArguments) throws -> String {
         throw GmAgentToolError.notSupported(
             tool: name,
             detail: """
                 no batch node-update verb exists (DOPE_NODE_UPDATE takes one \
                 node), and whether 'on disk' means DOPE_WRITE_REPO or \
                 DOPE_INGEST is undecided — see the doc comment before wiring.
-                """)
+                """
+        )
     }
 }

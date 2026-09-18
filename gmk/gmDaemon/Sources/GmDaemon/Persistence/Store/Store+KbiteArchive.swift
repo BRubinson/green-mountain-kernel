@@ -28,7 +28,9 @@ extension Store {
         // leave a partial document behind (the Backup.swift discipline).
         let destination = URL(fileURLWithPath: req.dbExportPath)
         try FileManager.default.createDirectory(
-            at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            at: destination.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
         do {
             try KbiteArchive.encode(document).write(to: destination)
         } catch {
@@ -61,7 +63,8 @@ extension Store {
         guard document.formatVersion == KbiteArchive.formatVersion else {
             throw StoreError.badRequest(
                 detail: "db_export.json format_version \(document.formatVersion) unsupported "
-                    + "(this daemon reads \(KbiteArchive.formatVersion))")
+                    + "(this daemon reads \(KbiteArchive.formatVersion))"
+            )
         }
         // The one choke point every wire caller passes: an archive code is
         // untrusted input that becomes a path component client-side and a
@@ -69,7 +72,8 @@ extension Store {
         guard KbiteArchive.isValidCode(document.code) else {
             throw StoreError.badRequest(
                 detail: "archive kbite code \(String(reflecting: document.code)) is not "
-                    + "snake_case ([a-z0-9_] only) — refusing to import")
+                    + "snake_case ([a-z0-9_] only) — refusing to import"
+            )
         }
         let rehydrated = document.rehydrated(rules: req.rehydrate)
 
@@ -106,7 +110,9 @@ extension KbiteExportDocument {
                         File(
                             resourceFileName: file.resourceFileName,
                             resourceFileSummary: KbiteArchive.rehydrate(
-                                file.resourceFileSummary, rules: rules),
+                                file.resourceFileSummary,
+                                rules: rules
+                            ),
                             resourceFileContent: file.resourceFileContent.map {
                                 KbiteArchive.rehydrate($0, rules: rules)
                             },

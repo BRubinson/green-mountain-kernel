@@ -137,8 +137,13 @@ extension ClarificationSummaryRecord {
     /// db → wire.
     func wireRow() -> ClarificationSummaryRow {
         ClarificationSummaryRow(
-            uuid: uuid, version: version, promptUuid: promptUuid,
-            status: status, createdAt: createdAt, updatedAt: updatedAt)
+            uuid: uuid,
+            version: version,
+            promptUuid: promptUuid,
+            status: status,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -146,14 +151,22 @@ extension UserClarificationQuestionRecord {
     /// db → wire. Options + selections are fetched by the repository and
     /// injected — the record stays a plain single-table mirror.
     func wireRow(
-        options: [ClarificationOptionRow], selectedOptionUuids: [String]
+        options: [ClarificationOptionRow],
+        selectedOptionUuids: [String]
     ) -> ClarificationQuestionRow {
         ClarificationQuestionRow(
-            uuid: uuid, version: version,
+            uuid: uuid,
+            version: version,
             clarificationSummaryUuid: clarificationSummaryUuid,
-            seq: seq, question: question, status: status,
-            answerText: answerText, agentId: agentId, agentName: agentName,
-            options: options, selectedOptionUuids: selectedOptionUuids)
+            seq: seq,
+            question: question,
+            status: status,
+            answerText: answerText,
+            agentId: agentId,
+            agentName: agentName,
+            options: options,
+            selectedOptionUuids: selectedOptionUuids
+        )
     }
 }
 
@@ -166,12 +179,17 @@ extension UserClarificationOptionRecord {
 extension InternalClarificationNoteRecord {
     func wireRow() -> ClarificationNoteRow {
         ClarificationNoteRow(
-            uuid: uuid, version: version,
+            uuid: uuid,
+            version: version,
             clarificationSummaryUuid: clarificationSummaryUuid,
-            body: body, confusedEntityUuid: confusedEntityUuid,
+            body: body,
+            confusedEntityUuid: confusedEntityUuid,
             confusedEntityType: confusedEntityType,
-            weight: weight.map(Int.init), questionUuid: questionUuid,
-            agentId: agentId, agentName: agentName)
+            weight: weight.map(Int.init),
+            questionUuid: questionUuid,
+            agentId: agentId,
+            agentName: agentName
+        )
     }
 }
 
@@ -183,12 +201,19 @@ extension CarePackageRecord {
         explorationRefs: [CarePackageExplorationRefRow]
     ) -> CarePackageRow {
         CarePackageRow(
-            uuid: uuid, version: version,
+            uuid: uuid,
+            version: version,
             clarificationSummaryUuid: clarificationSummaryUuid,
-            clarifiedIntent: clarifiedIntent, status: status,
-            dopeScopeUuid: dopeScopeUuid, dopeScopeRevision: dopeScopeRevision,
-            dopeRefs: dopeRefs, kbiteRefs: kbiteRefs, explorationRefs: explorationRefs,
-            createdAt: createdAt, updatedAt: updatedAt)
+            clarifiedIntent: clarifiedIntent,
+            status: status,
+            dopeScopeUuid: dopeScopeUuid,
+            dopeScopeRevision: dopeScopeRevision,
+            dopeRefs: dopeRefs,
+            kbiteRefs: kbiteRefs,
+            explorationRefs: explorationRefs,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
     }
 }
 
@@ -201,14 +226,23 @@ extension CarePackageDopeRefRecord {
 extension CarePackageKbiteRefRecord {
     func wireRow() -> CarePackageKbiteRefRow {
         CarePackageKbiteRefRow(
-            uuid: uuid, kbiteResourceFileUuid: kbiteResourceFileUuid, brief: brief, seq: Int(seq))
+            uuid: uuid,
+            kbiteResourceFileUuid: kbiteResourceFileUuid,
+            brief: brief,
+            seq: Int(seq)
+        )
     }
 }
 
 extension CarePackageExplorationRefRecord {
     func wireRow() -> CarePackageExplorationRefRow {
         CarePackageExplorationRefRow(
-            uuid: uuid, curatedTitle: curatedTitle, curatedBody: curatedBody,
-            filePath: filePath, sourceFindingUuid: sourceFindingUuid, seq: Int(seq))
+            uuid: uuid,
+            curatedTitle: curatedTitle,
+            curatedBody: curatedBody,
+            filePath: filePath,
+            sourceFindingUuid: sourceFindingUuid,
+            seq: Int(seq)
+        )
     }
 }

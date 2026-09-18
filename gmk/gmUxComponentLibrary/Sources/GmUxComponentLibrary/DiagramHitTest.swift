@@ -16,42 +16,27 @@ public enum DiagramHit: Sendable {
 }
 
 extension ResolvedDiagram {
-    /// Hit test in THREE ordered passes — a documented deviation from strict
-    /// reverse paint order, forced by two containment facts: (1) a
-    /// legacy-cubic fallback edge crossing a card must not steal the card's
-    /// drag (routed edges never enter a card's inflated ring, so for them
-    /// paint order and this order agree), and (2) a scope outline's frame is
-    /// the union of its children plus inset, so scope-before-edge would
-    /// swallow every edge drawn inside the scope.
-    ///
-    ///   1. Entity cards (present or ghost), reverse paint order — top-level
-    ///      reversed, each subtree's children reversed before the parent, so
-    ///      the last-painted sibling wins.
-    ///   2. Edges, by tolerance band over the routed polyline (or the
-    ///      endpoint segment when routing declined).
-    ///   3. Scope outlines (present or ghost), reverse paint order.
-    ///
-    /// `point` is DIAGRAM space; the host divides its screen tolerance by
-    /// zoom so the grab radius stays constant in screen points.
-    ///
-    /// A `.layer` is descended into but NEVER returned (its frame is the
-    /// union of its children — returning it would swallow every hit in the
-    /// drawing layer's bounding box).
-    ///
-    /// `includeInk` (m0024, the eraser's substrate) opts strokes and shapes
-    /// into the third pass — strokes by distance to their polyline inflated
-    /// by half their line width, shapes by their frame. The default is
-    /// byte-identical to the pre-m0024 behavior for every existing caller.
+    /// Hit test in THREE ordered passes: entity cards in reverse paint order, then
+    /// edges by tolerance band over the routed polyline, then scope outlines. That
+    /// deviates from strict reverse paint order because a fallback edge crossing a
+    /// card must not steal the card's drag, and a scope outline's frame is the
+    /// union of its children, so scope-before-edge would swallow every edge inside
+    /// it. `point` is DIAGRAM space, and a `.layer` is descended into but NEVER
+    /// returned. `includeInk` opts strokes and shapes into the third pass, strokes
+    /// by distance to their polyline inflated by half their line width.
     public func hitTest(
-        at point: CGPoint, edgeTolerance: CGFloat = 6,
+        at point: CGPoint,
+        edgeTolerance: CGFloat = 6,
         includeInk: Bool = false
     ) -> DiagramHit? {
         for element in topLevel.reversed() {
             if let hit = Self.hitElement(
-                element, at: point, cardsOnly: true,
+                element,
+                at: point,
+                cardsOnly: true,
                 includeInk: false,
-                inkTolerance: edgeTolerance)
-            {
+                inkTolerance: edgeTolerance
+            ) {
                 return .element(hit)
             }
         }
@@ -69,10 +54,12 @@ extension ResolvedDiagram {
         }
         for element in topLevel.reversed() {
             if let hit = Self.hitElement(
-                element, at: point, cardsOnly: false,
+                element,
+                at: point,
+                cardsOnly: false,
                 includeInk: includeInk,
-                inkTolerance: edgeTolerance)
-            {
+                inkTolerance: edgeTolerance
+            ) {
                 return .element(hit)
             }
         }
@@ -95,18 +82,22 @@ extension ResolvedDiagram {
     }
 
     private static func hitElement(
-        _ element: ResolvedElement, at point: CGPoint,
-        cardsOnly: Bool, includeInk: Bool,
+        _ element: ResolvedElement,
+        at point: CGPoint,
+        cardsOnly: Bool,
+        includeInk: Bool,
         inkTolerance: CGFloat
     ) -> ResolvedElement? {
         // Children first, reversed — the last-painted sibling wins, and an
         // entity card beats its containing scope outline.
         for child in element.children.reversed() {
             if let hit = hitElement(
-                child, at: point, cardsOnly: cardsOnly,
+                child,
+                at: point,
+                cardsOnly: cardsOnly,
                 includeInk: includeInk,
-                inkTolerance: inkTolerance)
-            {
+                inkTolerance: inkTolerance
+            ) {
                 return hit
             }
         }
@@ -121,9 +112,10 @@ extension ResolvedDiagram {
             let tolerance = max(inkTolerance, stroke.lineWidth / 2 + 2)
             for index in 0..<(stroke.points.count - 1) {
                 if distance(
-                    point, segment: stroke.points[index],
-                    stroke.points[index + 1]) <= tolerance
-                {
+                    point,
+                    segment: stroke.points[index],
+                    stroke.points[index + 1]
+                ) <= tolerance {
                     return element
                 }
             }

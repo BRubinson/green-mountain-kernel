@@ -2,7 +2,8 @@ import Foundation
 import GmDaemon
 import GmDaemonSdk
 
-/// ARCH_GET — summary + ordered change rows decorated with derived implementation state, unplanned changes, and the persistence-first ordering audit.
+/// ARCH_GET — summary plus ordered change rows, decorated with derived
+/// implementation state, unplanned changes, and the persistence-first audit.
 enum ArchGetHandler {
     static func handle(line: Data, head: EnvelopeHead, store: Store) throws -> HandlerResult {
         let request = try decodePayload(ArchGetRequest.self, from: line)

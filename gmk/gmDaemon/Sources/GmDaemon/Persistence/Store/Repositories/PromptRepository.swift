@@ -11,7 +11,9 @@ struct PromptRepository: RepositoryContext {
     func create(_ req: PromptCreateRequest) throws -> PromptRow {
         guard
             try Row.fetchOne(
-                db, sql: "SELECT 1 FROM session WHERE uuid = ?", arguments: [req.sessionUuid]
+                db,
+                sql: "SELECT 1 FROM session WHERE uuid = ?",
+                arguments: [req.sessionUuid]
             ) != nil
         else {
             throw StoreError.notFound(entity: "session", key: req.sessionUuid)
@@ -22,7 +24,8 @@ struct PromptRepository: RepositoryContext {
             (try Int64.fetchOne(
                 db,
                 sql: "SELECT COALESCE(MAX(seq), 0) FROM prompt WHERE session_uuid = ?",
-                arguments: [req.sessionUuid]) ?? 0) + 1
+                arguments: [req.sessionUuid]
+            ) ?? 0) + 1
         let code = req.code ?? "p\(seq)"
         // Item 7: derive the gmfs folder daemon-side when the caller
         // doesn't supply one — the session row (same transaction) already
@@ -35,7 +38,8 @@ struct PromptRepository: RepositoryContext {
                 try String.fetchOne(
                     db,
                     sql: "SELECT gmfs_relative_storage_path FROM session WHERE uuid = ?",
-                    arguments: [req.sessionUuid]) ?? ""
+                    arguments: [req.sessionUuid]
+                ) ?? ""
             if !sessionPath.isEmpty {
                 // A4: the name is slugged (forward-only, lossy) so the
                 // stored path — which the MemoryWatcher matches by exact
@@ -46,7 +50,9 @@ struct PromptRepository: RepositoryContext {
             }
         }
         let uuid = try core.insertBase(
-            db, table: "prompt", uuid: req.uuid,
+            db,
+            table: "prompt",
+            uuid: req.uuid,
             extra: [
                 "session_uuid": req.sessionUuid,
                 "seq": seq,
@@ -58,27 +64,34 @@ struct PromptRepository: RepositoryContext {
                 "command": req.command ?? "",
                 "status": PromptStatus.draft.rawValue,
                 "gmfs_relative_storage_path": gmfsPath,
-            ])
+            ]
+        )
         // Seed prompt kbites from the session registry (create-time-only
         // inheritance, same rule as the context chain).
         let sessionKbites = try String.fetchAll(
             db,
             sql: "SELECT kbite_uuid FROM session_active_kbite WHERE session_uuid = ?",
-            arguments: [req.sessionUuid])
+            arguments: [req.sessionUuid]
+        )
         for kbiteUuid in sessionKbites {
             try core.insertBase(
-                db, table: "prompt_active_kbite",
+                db,
+                table: "prompt_active_kbite",
                 extra: [
                     "prompt_uuid": uuid,
                     "kbite_uuid": kbiteUuid,
-                ])
+                ]
+            )
         }
         // Item 4: payload carries session_uuid so GMVibes can route the
         // event to one session instead of invalidating all of them.
         try core.appendEvent(
-            db, kind: .createPrompt, subjectUuid: uuid,
+            db,
+            kind: .createPrompt,
+            subjectUuid: uuid,
             payload: Store.jsonPayload(
-                ["seq": seq, "name": req.name, "session_uuid": req.sessionUuid]))
+                ["seq": seq, "name": req.name, "session_uuid": req.sessionUuid])
+        )
         // Item 3: prompt writes advance session recency (version untouched).
         try core.touchSession(db, uuid: req.sessionUuid)
         guard let row = try fetchRow(uuid: uuid) else {
@@ -94,7 +107,9 @@ struct PromptRepository: RepositoryContext {
         if let sessionUuid = req.sessionUuid {
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM session WHERE uuid = ?", arguments: [sessionUuid]
+                    db,
+                    sql: "SELECT 1 FROM session WHERE uuid = ?",
+                    arguments: [sessionUuid]
                 ) != nil
             else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
@@ -102,7 +117,8 @@ struct PromptRepository: RepositoryContext {
         }
         return PromptListResponse(
             prompts: try SessionRepository(db: db, core: core)
-                .fetchPromptStubs(sessionUuid: req.sessionUuid, withReports: req.withReports ?? false))
+                .fetchPromptStubs(sessionUuid: req.sessionUuid, withReports: req.withReports ?? false)
+        )
     }
 
     func get(_ req: PromptGetRequest) throws -> PromptGetResponse {
@@ -118,7 +134,9 @@ struct PromptRepository: RepositoryContext {
                 JOIN prompt_active_kbite j ON j.kbite_uuid = k.uuid
                 WHERE j.prompt_uuid = ?
                 ORDER BY k.code
-                """, arguments: [req.promptUuid])
+                """,
+            arguments: [req.promptUuid]
+        )
         let changeSummary = try SessionRepository(db: db, core: core)
             .changeSummary(where: "prompt_uuid = ?", arguments: [req.promptUuid])
         return PromptGetResponse(
@@ -134,7 +152,9 @@ struct PromptRepository: RepositoryContext {
     func updateContent(_ req: PromptUpdateContentRequest) throws -> PromptRow {
         guard
             let statusRaw = try String.fetchOne(
-                db, sql: "SELECT status FROM prompt WHERE uuid = ?", arguments: [req.promptUuid]
+                db,
+                sql: "SELECT status FROM prompt WHERE uuid = ?",
+                arguments: [req.promptUuid]
             )
         else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -153,11 +173,18 @@ struct PromptRepository: RepositoryContext {
             throw StoreError.emptyUpdate(entity: "prompt")
         }
         try core.updateBase(
-            db, table: "prompt", uuid: req.promptUuid,
-            expectedVersion: req.expectedVersion, set: set)
+            db,
+            table: "prompt",
+            uuid: req.promptUuid,
+            expectedVersion: req.expectedVersion,
+            set: set
+        )
         try core.appendEvent(
-            db, kind: .updatePrompt, subjectUuid: req.promptUuid,
-            payload: Store.jsonPayload(["fields": set.keys.sorted()]))
+            db,
+            kind: .updatePrompt,
+            subjectUuid: req.promptUuid,
+            payload: Store.jsonPayload(["fields": set.keys.sorted()])
+        )
         guard let row = try fetchRow(uuid: req.promptUuid) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
@@ -165,23 +192,15 @@ struct PromptRepository: RepositoryContext {
         return row
     }
 
-    /// Lifecycle v2: forward-only, adjacent-only per PromptStatus.allowedNext
-    /// (one skip edge, implementing → done). This is the SINGLE front door for
-    /// prompt transitions — clarify/arch verbs never touch prompt.status.
-    /// Gate coupling and create-on-enter side effects run inside this same
-    /// write transaction:
-    ///   draft → clarifying:        creates the clarification_summary
-    ///   clarifying → architecting: requires it complete; creates the
-    ///                              architecture_summary
-    ///   architecting → implementing: requires the architecture approved
-    /// Legacy (pre-m0002) prompts bypass absent-backing-row gates AND skip
-    /// create-on-enter — creating a summary for one would wedge it a state
-    /// later. They walk all six states on their gmfs artifacts; CLARIFY_OPEN
-    /// is the explicit adoption path.
+    /// The SINGLE front door for prompt transitions: forward-only and
+    /// adjacent-only per `PromptStatus.allowedNext`, with one skip edge.
+    /// Clarify and architecture verbs never touch prompt.status.
+    /// Activation claim and workflow close ride this same write transaction.
     func setStatus(_ req: PromptSetStatusRequest) throws -> PromptRow {
         guard
             let head = try Row.fetchOne(
-                db, sql: "SELECT status, created_at, session_uuid FROM prompt WHERE uuid = ?",
+                db,
+                sql: "SELECT status, created_at, session_uuid FROM prompt WHERE uuid = ?",
                 arguments: [req.promptUuid]
             )
         else {
@@ -193,68 +212,61 @@ struct PromptRepository: RepositoryContext {
         }
         guard from.allowedNext.contains(req.status) else {
             throw StoreError.invalidTransition(
-                from: from, to: req.status,
+                from: from,
+                to: req.status,
                 reason: from.allowedNext.isEmpty
                     ? "\(from.rawValue) is terminal"
                     : "legal next from \(from.rawValue): "
-                        + from.allowedNext.map(\.rawValue).sorted().joined(separator: ", "))
+                        + from.allowedNext.map(\.rawValue).sorted().joined(separator: ", ")
+            )
         }
-        // NO GATE SWITCH. m0028 removed it, and what it did is worth recording
-        // because its absence is the change rather than an omission.
-        //
-        // It used to do two jobs at once. It REFUSED a transition whose
-        // predecessor summary was not complete (clarification complete before
-        // architecting, architecture approved before implementing), and as a
-        // side effect it CREATED the next phase's backing summary via
-        // ensureSummary. With four of the six states gone there is nothing left
-        // to gate between: the only moves are draft → initiated → done and the
-        // done → draft edit edge.
-        //
-        // The creation half had to go somewhere, and it went where it always
-        // belonged — explicit opens. CLARIFY_OPEN, ARCH_OPTION_ADD and
-        // REVIEW_OPEN now create their own rows, so opening a summary is a
-        // call an agent makes rather than a thing that quietly happened to it
-        // while moving a status.
-        //
-        // The refusal half is not reimplemented elsewhere. BOT_NEXT's gate
-        // blockers still report what a phase is waiting on, which is the same
-        // information served advisorily instead of as a wall — matching the
-        // registry's stance that the machine classifies and guides but does not
-        // authorize.
+        // NO GATE SWITCH, deliberately. The only moves are draft → initiated →
+        // done plus the done → draft edit edge, so there is nothing to gate
+        // between. Summaries are created by explicit opens — CLARIFY_OPEN,
+        // ARCH_OPTION_ADD, REVIEW_OPEN — so opening one is a call an agent
+        // makes, never something that happens to it while moving a status.
+        // Nothing reimplements the refusal: BOT_NEXT's gate blockers report
+        // what a phase is waiting on advisorily, matching the registry's stance
+        // that the machine classifies and guides but does not authorize.
         try core.updateBase(
-            db, table: "prompt", uuid: req.promptUuid,
+            db,
+            table: "prompt",
+            uuid: req.promptUuid,
             expectedVersion: req.expectedVersion,
-            set: ["status": req.status.rawValue])
+            set: ["status": req.status.rawValue]
+        )
         // Activation is a SIDE EFFECT of the lifecycle door, not a verb:
-        // declaring work active already WAS moving the status. One claim per
+        // declaring work active already IS moving the status. One claim per
         // running Claude instance (client_key), so concurrent prompts on one
-        // session each keep their own claim — never a last-writer-wins
-        // pointer. done releases the PROMPT's claim regardless of which
-        // instance calls it.
-        //
-        // m0028 moved the claim EARLIER, from the old implementing state to
-        // `initiated`. That is a behaviour change, not just a rename: work is
-        // now claimed when the prompt starts rather than when implementation
-        // starts, so briefing, exploration and architecture run under the claim
-        // too. That is the more honest reading of "this instance is working on
-        // this prompt", and it is the only reading available once the states
-        // between start and finish are gone.
+        // session each keep their own claim rather than a last-writer-wins
+        // pointer, and `done` releases the PROMPT's claim whichever instance
+        // calls it. The claim is taken at `initiated`, so briefing, exploration
+        // and architecture all run under it.
         let sessionUuid: String = head["session_uuid"]
         if req.status == .initiated, let clientKey = req.clientKey {
-            try SessionRepository(db: db, core: core).claimActivation(
-                sessionUuid: sessionUuid,
-                promptUuid: req.promptUuid, clientKey: clientKey)
+            try SessionRepository(db: db, core: core)
+                .claimActivation(
+                    sessionUuid: sessionUuid,
+                    promptUuid: req.promptUuid,
+                    clientKey: clientKey
+                )
         } else if req.status == .done {
             try db.execute(
                 sql: "DELETE FROM prompt_activation WHERE prompt_uuid = ?",
-                arguments: [req.promptUuid])
+                arguments: [req.promptUuid]
+            )
             // m0025: done also closes the prompt's active workflow row.
-            try BotWorkflowRepository(db: db, core: core).closeForPrompt(
-                promptUuid: req.promptUuid)
+            try BotWorkflowRepository(db: db, core: core)
+                .closeForPrompt(
+                    promptUuid: req.promptUuid
+                )
         }
         try core.appendEvent(
-            db, kind: .promptStatusChange, subjectUuid: req.promptUuid,
-            payload: Store.jsonPayload(["from": from.rawValue, "to": req.status.rawValue]))
+            db,
+            kind: .promptStatusChange,
+            subjectUuid: req.promptUuid,
+            payload: Store.jsonPayload(["from": from.rawValue, "to": req.status.rawValue])
+        )
         try core.touchSession(db, uuid: sessionUuid)
         guard let row = try fetchRow(uuid: req.promptUuid) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)

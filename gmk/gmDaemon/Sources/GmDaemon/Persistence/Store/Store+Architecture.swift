@@ -40,25 +40,40 @@ extension Store {
 
     public func archPropose(_ req: ArchProposeRequest) throws -> ArchSummaryResponse {
         try boundary { db in
-            try ArchitectureRepository(db: db, core: core).transition(
-                summaryUuid: req.summaryUuid, expectedVersion: req.expectedVersion,
-                to: .proposed, action: "propose", requireFrom: .drafting)
+            try ArchitectureRepository(db: db, core: core)
+                .transition(
+                    summaryUuid: req.summaryUuid,
+                    expectedVersion: req.expectedVersion,
+                    to: .proposed,
+                    action: "propose",
+                    requireFrom: .drafting
+                )
         }
     }
 
     public func archApprove(_ req: ArchApproveRequest) throws -> ArchSummaryResponse {
         try boundary { db in
-            try ArchitectureRepository(db: db, core: core).transition(
-                summaryUuid: req.summaryUuid, expectedVersion: req.expectedVersion,
-                to: .approved, action: "approve", requireFrom: .proposed)
+            try ArchitectureRepository(db: db, core: core)
+                .transition(
+                    summaryUuid: req.summaryUuid,
+                    expectedVersion: req.expectedVersion,
+                    to: .approved,
+                    action: "approve",
+                    requireFrom: .proposed
+                )
         }
     }
 
     public func archRevise(_ req: ArchReviseRequest) throws -> ArchSummaryResponse {
         try boundary { db in
-            try ArchitectureRepository(db: db, core: core).transition(
-                summaryUuid: req.summaryUuid, expectedVersion: req.expectedVersion,
-                to: .drafting, action: "revise", requireFrom: .proposed)
+            try ArchitectureRepository(db: db, core: core)
+                .transition(
+                    summaryUuid: req.summaryUuid,
+                    expectedVersion: req.expectedVersion,
+                    to: .drafting,
+                    action: "revise",
+                    requireFrom: .proposed
+                )
         }
     }
 

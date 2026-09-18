@@ -5,19 +5,11 @@ import Foundation
 /// The twelve session profiles: four workflow missions and eight bespoke
 /// directives.
 ///
-/// The two halves answer different questions and are deliberately one type:
-///
-/// - **Mission profiles** (`task`/`bot`/`rpi`/`team`) are what a COMMAND
-///   embodies. They carry the mission text and the full phase walk, so the
-///   instruction describes the whole workflow rather than one step of it.
-/// - **Directive profiles** are what an AGENT embodies — one role, its own
-///   steps, and nothing else.
-///
-/// `team` is the one mission that does NOT wear every directive. It carries the
-/// primarch's alone, because a team flow spawns a subagent per lens and each of
-/// those already arrives wearing its own directive profile. Handing the primary
-/// all eight would duplicate into the primary's context exactly the text its
-/// subagents were spawned to hold.
+/// A mission profile is what a COMMAND embodies — mission text plus the whole
+/// phase walk. A directive profile is what an AGENT embodies — one role and its
+/// steps. `team` carries the primarch's directive alone: a team flow spawns a
+/// subagent per lens already wearing its own, so handing the primary all eight
+/// would duplicate that text into the primary's context.
 enum AgentGmkSessionProfile: String, Sendable, Hashable, Codable, CaseIterable {
 
     case task
@@ -70,7 +62,8 @@ enum AgentGmkSessionProfile: String, Sendable, Hashable, Codable, CaseIterable {
 
     private static let compiled: [AgentGmkSessionProfile: AgentGmkInstruction] =
         Dictionary(
-            uniqueKeysWithValues: allCases.map { ($0, AgentGmkInstruction($0.compile())) })
+            uniqueKeysWithValues: allCases.map { ($0, AgentGmkInstruction($0.compile())) }
+        )
 
     /// Assembly order is longest-lived content first: core, then personality,
     /// then the directive text, then the mission and its phase walk. A profile

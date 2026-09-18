@@ -3,22 +3,13 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0020 — the merge base for per-element reconciliation.
-    //
-    // In-session the db is the working truth and dumps to the repo; the
-    // files become the input only at a boundary (new session, new
-    // branch, git merge). At that boundary the rule is per-element:
-    // files win for anything this session never touched, and an element
-    // edited here that ALSO moved on disk is a real conflict.
-    //
-    // A three-way merge needs a base, and nothing stored one. This is
-    // it.
-    //
-    // KEYED BY DOT-PATH, NEVER BY UUID — the single most important
-    // property of this table. dopeIngest is a whole-tree wipe+reinsert
-    // that re-mints every child uuid, so a uuid-keyed provenance row
+    // m0020 — the merge base for per-element dope reconciliation. At a session,
+    // branch or merge boundary the rule is per-element: files win for anything
+    // this session never touched, and an element edited here that also moved on
+    // disk is a conflict. A three-way merge needs a base; this table is it.
+    // KEYED BY DOT-PATH, NEVER BY UUID — dopeIngest is a whole-tree wipe and
+    // reinsert that re-mints every child uuid, so a uuid-keyed provenance row
     // would be destroyed by the very operation it exists to inform.
-    // Dot-path codes are already how dope refs address nodes.
     static func m0020_dopeElementProvenance(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0020_dopeElementProvenance") { db in
             try db.execute(
@@ -44,7 +35,8 @@ extension Migrations {
                     CREATE INDEX idx_dope_element_provenance_dirty
                         ON dope_element_provenance(dope_scope_uuid, locally_modified)
                         WHERE locally_modified = 1;
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",

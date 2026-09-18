@@ -4,30 +4,14 @@ import GmDaemon
 import GmDaemonSdk
 import XCTest
 
-/// The migration ladder — the one family that CANNOT use the shared
-/// environment, and does not need to.
-///
-/// ## Why this is not a shared-environment test
+/// The migration ladder — the one family that CANNOT use the shared environment.
 ///
 /// A migration assertion needs a database built at an OLD schema and stepped
-/// forward. The shared environment only ever has ONE database and it is already
-/// at head — so running these against it would assert nothing, passing
-/// vacuously forever. That is a structural incompatibility, not a tooling gap.
-///
-/// ## Why it needed no fixture machinery either
-///
-/// This was carried as an open question through architecture, with three
-/// proposals for building fixture databases. Reading the code closed it: the
-/// problem was VISIBILITY, not environment. `Migrations`, `Migrations.migrator`
-/// and `currentSchemaVersion` are all `public`, and the ladder runs against an
-/// IN-MEMORY `DatabaseQueue` that needs no root, no daemon and no filesystem.
-/// The old suite reached for `@testable` for exactly one thing — `store.dbQueue`
-/// is internal — and dropping that one use is the entire port.
-///
-/// So these cases open their own database. That is the ONE exemption from the
-/// read-only rule in this package, and it is safe for a reason that does not
-/// generalise: there is no kernel, no `flock` and no file. Nothing to be a
-/// second writer TO.
+/// forward, while the shared environment holds one database already at head, so
+/// these would pass vacuously against it. The ladder runs against an IN-MEMORY
+/// `DatabaseQueue` needing no root, no daemon and no filesystem. Opening that
+/// database is the ONE exemption from this package's read-only rule, safe only
+/// because there is no kernel, no `flock` and no file to be a second writer to.
 final class MigrationLadderTests: XCTestCase {
 
     /// An empty database climbs to head, and the ledger ROW is written.
@@ -61,8 +45,10 @@ final class MigrationLadderTests: XCTestCase {
         }
         XCTAssertNotNil(head)
         XCTAssertLessThan(
-            head ?? .max, Migrations.currentSchemaVersion,
-            "upTo: must stop the ladder; if it climbs to head the family is vacuous")
+            head ?? .max,
+            Migrations.currentSchemaVersion,
+            "upTo: must stop the ladder; if it climbs to head the family is vacuous"
+        )
     }
 
     /// m0029's two tables exist at head, with the constraint that IS the feature.
@@ -79,7 +65,10 @@ final class MigrationLadderTests: XCTestCase {
         try queue.read { db in
             let tables = try Set(
                 String.fetchAll(
-                    db, sql: "SELECT name FROM sqlite_master WHERE type = 'table'"))
+                    db,
+                    sql: "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            )
             XCTAssertTrue(tables.contains("test_run"))
             XCTAssertTrue(tables.contains("project_test_lock"))
 
@@ -92,11 +81,14 @@ final class MigrationLadderTests: XCTestCase {
                         SELECT name FROM sqlite_master
                          WHERE type = 'index' AND tbl_name = 'project_test_lock'
                            AND name LIKE 'sqlite_autoindex%'
-                        """))
+                        """
+                )
+            )
             XCTAssertFalse(
                 autoindexes.isEmpty,
                 "project_test_lock lost its inline UNIQUE — a lock table without "
-                    + "uniqueness is not a lock")
+                    + "uniqueness is not a lock"
+            )
 
             // No CHECK constraints on the enum columns: post-m0021 the
             // vocabulary lives in Swift, because an inline CHECK costs a
@@ -106,10 +98,12 @@ final class MigrationLadderTests: XCTestCase {
                     db,
                     sql: """
                         SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'test_run'
-                        """) ?? ""
+                        """
+                ) ?? ""
             XCTAssertFalse(
                 ddl.uppercased().contains("CHECK"),
-                "test_run must carry no CHECK — states live in TestRunState")
+                "test_run must carry no CHECK — states live in TestRunState"
+            )
         }
     }
 
@@ -126,7 +120,9 @@ final class MigrationLadderTests: XCTestCase {
             try Int.fetchAll($0, sql: "SELECT version FROM schema_migrations ORDER BY version")
         }
         XCTAssertEqual(
-            versions, Array(1...Migrations.currentSchemaVersion),
-            "the ledger must be dense and duplicate-free from 1 to head")
+            versions,
+            Array(1...Migrations.currentSchemaVersion),
+            "the ledger must be dense and duplicate-free from 1 to head"
+        )
     }
 }

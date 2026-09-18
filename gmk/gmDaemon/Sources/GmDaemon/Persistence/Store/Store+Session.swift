@@ -47,10 +47,17 @@ extension Store {
     }
 
     func claimActivation(
-        _ db: Database, sessionUuid: String, promptUuid: String, clientKey: String
+        _ db: Database,
+        sessionUuid: String,
+        promptUuid: String,
+        clientKey: String
     ) throws {
-        try SessionRepository(db: db, core: core).claimActivation(
-            sessionUuid: sessionUuid, promptUuid: promptUuid, clientKey: clientKey)
+        try SessionRepository(db: db, core: core)
+            .claimActivation(
+                sessionUuid: sessionUuid,
+                promptUuid: promptUuid,
+                clientKey: clientKey
+            )
     }
 
     func evictDeadActivations(_ db: Database, sessionUuid: String) throws {
@@ -62,17 +69,27 @@ extension Store {
     }
 
     func resolveActivePrompt(
-        _ db: Database, sessionUuid: String, clientKey: String?
+        _ db: Database,
+        sessionUuid: String,
+        clientKey: String?
     ) throws -> String? {
-        try SessionRepository(db: db, core: core).resolveActivePrompt(
-            sessionUuid: sessionUuid, clientKey: clientKey)
+        try SessionRepository(db: db, core: core)
+            .resolveActivePrompt(
+                sessionUuid: sessionUuid,
+                clientKey: clientKey
+            )
     }
 
     func fetchPromptStubs(
-        _ db: Database, sessionUuid: String?, withReports: Bool = false
+        _ db: Database,
+        sessionUuid: String?,
+        withReports: Bool = false
     ) throws -> [PromptStub] {
-        try SessionRepository(db: db, core: core).fetchPromptStubs(
-            sessionUuid: sessionUuid, withReports: withReports)
+        try SessionRepository(db: db, core: core)
+            .fetchPromptStubs(
+                sessionUuid: sessionUuid,
+                withReports: withReports
+            )
     }
 
     func changeSummary(
@@ -80,8 +97,11 @@ extension Store {
         where condition: String,
         arguments: StatementArguments
     ) throws -> ChangeSummary {
-        try SessionRepository(db: db, core: core).changeSummary(
-            where: condition, arguments: arguments)
+        try SessionRepository(db: db, core: core)
+            .changeSummary(
+                where: condition,
+                arguments: arguments
+            )
     }
 
     func promptChangeSummaries(_ db: Database, sessionUuid: String) throws -> [PromptChangeSummary] {

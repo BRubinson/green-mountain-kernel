@@ -83,8 +83,8 @@ struct LandingView: View {
     private var launcher: some View {
         ScrollView {
             VStack(spacing: 28) {
-                // The env vars no longer gate browsing (the daemon does), but
-                // the Memories tab and folder-open actions still need them.
+                // The daemon gates browsing; the env vars are still what the Memories tab
+                // and the folder-open actions resolve against.
                 if !gmcc.isLoaded {
                     EnvWarningStrip()
                 }
@@ -213,7 +213,8 @@ private struct InstanceSearchSection: View {
             sessionsPerInstance: 3,
             activeSessionByInstance: active,
             hoistActive: true
-        ).apply(to: catalog)
+        )
+        .apply(to: catalog)
         if activeByInstance != active { activeByInstance = active }
         if filtered != next { filtered = next }
     }
@@ -236,7 +237,8 @@ private struct InstanceSearchSection: View {
                     description: Text(
                         query.isEmpty
                             ? "The daemon catalog has no instances yet."
-                            : "Nothing matches “\(query)”.")
+                            : "Nothing matches “\(query)”."
+                    )
                 )
                 .frame(maxWidth: .infinity, minHeight: 140)
             } else {
@@ -265,7 +267,7 @@ private struct InstanceSearchSection: View {
         .onChange(of: checkout.stateByInstance) { _, _ in refilter() }
     }
 
-    private func openSession(_ stub: SessionStub, _ instance: InstanceRow) {
+    private func openSession(_ stub: SessionStub, _: InstanceRow) {
         // CatalogStore's factory: nil on a malformed uuid ⇒ inert row, never
         // a fabricated identity.
         guard let windowID = catalog.sessionWindowID(forSessionUuid: stub.uuid) else { return }
@@ -425,15 +427,14 @@ private struct DaemonGateState: View {
         }
     }
 
-    /// Root-aware: `install_gm.sh` fetches the newest PUBLISHED release and
-    /// installs into `~/gmfs` — for a declared test/beta root that is the
-    /// wrong root and the wrong bits. Those roots are staged from a checkout
-    /// by `gm_env.sh`. Keyed on the declared environment label rather than
-    /// `Paths.isProductionRoot`, because the inode comparison reads false on
-    /// any root whose `gm.db` does not exist yet — exactly the state this
-    /// screen shows. Production declares `GMEnvironment = prod` (Release bakes
-    /// GM_ENV like every configuration), and `gm_env.sh` refuses `create prod`,
-    /// so the prod label routes to the installer alongside the no-label CLI case.
+    /// Root-aware: `install_gm.sh` installs the newest published release into `~/gmfs`, which
+    /// is the wrong root and the wrong bits for a declared test/beta root. Those are staged
+    /// from a checkout by `gm_env.sh`.
+    ///
+    /// Keyed on the declared environment label rather than `Paths.isProductionRoot`, because
+    /// the inode comparison reads false on any root whose `gm.db` does not exist yet, which is
+    /// exactly the state this screen shows. `gm_env.sh` refuses `create prod`, so the prod
+    /// label routes to the installer alongside the no-label CLI case.
     private static var remediationCommand: String {
         guard let env = Paths.declaredEnvironmentName, env != "prod" else {
             return "cd ~/Dev/green-mountain-kernel && bash plugins/gmcc/scripts/install_gm.sh"

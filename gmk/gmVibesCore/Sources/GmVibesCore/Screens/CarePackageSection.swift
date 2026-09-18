@@ -1,21 +1,14 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// The care package expanded — the clarified-intent bundle a multi-agent clarify
-/// flow curates, rendered as its children instead of as a count.
+/// The care package expanded: the clarified-intent bundle a multi-agent clarify flow curates,
+/// rendered as its children instead of as a count.
 ///
-/// Replaces `ClarificationPane.carePackageBlock` and the literal
-/// "N dope · M kbite · K exploration refs" line it ended with. Every field here
-/// was already decoded by CLARIFY_GET and thrown away; the expansion introduces
-/// NO new fetch and no second pane — it reuses the one
-/// ClarificationPane -> PromptPhaseStore.clarification data flow, so the
-/// `package_ref_add` events that already invalidate the prompt keep this live.
-///
-/// READ-ONLY. Every care-package write stays bot/CLI-side; the app's only
-/// clarify write is answering a question.
-///
-/// Markdown rendering for the intent and the curated bodies is deliberately cut,
-/// matching every other report body in the app: plain selectable `Text`.
+/// Every field here comes from the `ClarifyGetResponse` the pane already holds, so this
+/// introduces no fetch and no second pane, and the `package_ref_add` events that invalidate
+/// the prompt keep it live. READ-ONLY: every care-package write stays bot/CLI-side, and the
+/// app's only clarify write is answering a question. Bodies render as plain selectable `Text`,
+/// matching every other report body in the app.
 struct CarePackageSection: View {
     let package: CarePackageRow
     let staleness: CarePackageStaleness?
@@ -87,7 +80,8 @@ struct CarePackageSection: View {
                 VStack(alignment: .leading, spacing: 2) {
                     DopeDotPathChip(
                         path: ref.dopeCode,
-                        isGhost: ghosts.contains(ref.dopeCode))
+                        isGhost: ghosts.contains(ref.dopeCode)
+                    )
                     if let note = ref.note, !note.isEmpty {
                         Text(note)
                             .font(.caption)

@@ -1,13 +1,12 @@
 import Foundation
 
-/// Pure .git/HEAD resolution — item 2's core, shared by SESSION_RESOLVE and
+/// Pure .git/HEAD resolution, shared by SESSION_RESOLVE and
 /// INSTANCE_CURRENT_SESSION. No subprocess, no git library: HEAD is a tiny
-/// text file (21–37 bytes for a symbolic ref; 41 detached — never assume a
-/// fixed size, always read the whole file).
+/// text file, and its size varies, so always read the whole of it.
 ///
-/// Failure discipline: a missing or unreadable repo path is COMMON (live
-/// instance rows point at paths that no longer exist) and must resolve to
-/// .unavailable, never throw — these reads run on the daemon's serial queue.
+/// A missing or unreadable repo path is COMMON — live instance rows point at
+/// paths that are gone — and must resolve to .unavailable, never throw, since
+/// these reads run on the daemon's serial queue.
 public enum GitHead {
     public enum State: Sendable, Equatable {
         /// HEAD is a symbolic ref; associated value is the bare branch name

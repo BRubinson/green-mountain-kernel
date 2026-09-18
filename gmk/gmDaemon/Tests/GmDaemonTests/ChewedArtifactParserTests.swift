@@ -24,14 +24,18 @@ final class ChewedArtifactParserTests: XCTestCase {
                 |------|------|-------------|
                 | `sources/VT100/VT100Parser.m` | m | byte-stream parser |
                 | sources/VT100/VT100Token.h | h | token IR |
-                """, fallbackName: "fallback")
+                """,
+            fallbackName: "fallback"
+        )
 
         XCTAssertEqual(
             artifact.files.map(\.name),
             [
                 "sources/VT100/VT100Parser.m",
                 "sources/VT100/VT100Token.h",
-            ], "a code-quoted File cell must resolve to the same path as a bare one")
+            ],
+            "a code-quoted File cell must resolve to the same path as a bare one"
+        )
     }
 
     func testBacktickedCellStillClassifiesAsTextType() {
@@ -44,12 +48,15 @@ final class ChewedArtifactParserTests: XCTestCase {
                 | File | Type | Description |
                 |------|------|-------------|
                 | `Trigger.m` | m | base trigger |
-                """, fallbackName: "demo")
+                """,
+            fallbackName: "demo"
+        )
 
         let name = try! XCTUnwrap(artifact.files.first).name
         XCTAssertTrue(
             ChewedArtifactParser.isTextType(fileName: name),
-            "backticked cell must survive as an inlinable text type")
+            "backticked cell must survive as an inlinable text type"
+        )
     }
 
     func testHeaderAndSeparatorRowsAreNotIngestedAsFiles() {
@@ -60,7 +67,9 @@ final class ChewedArtifactParserTests: XCTestCase {
                 | File | Type | Description |
                 |------|------|-------------|
                 | real.swift | swift | the only file |
-                """, fallbackName: "demo")
+                """,
+            fallbackName: "demo"
+        )
 
         XCTAssertEqual(artifact.files.map(\.name), ["real.swift"])
     }
@@ -72,7 +81,8 @@ final class ChewedArtifactParserTests: XCTestCase {
         for name in ["VT100Terminal.m", "iTermAPIHelper.m", "Bridge.mm"] {
             XCTAssertTrue(
                 ChewedArtifactParser.isTextType(fileName: name),
-                "\(name) must inline — its .h counterpart already did")
+                "\(name) must inline — its .h counterpart already did"
+            )
         }
     }
 
@@ -84,7 +94,8 @@ final class ChewedArtifactParserTests: XCTestCase {
             XCTAssertEqual(
                 ChewedArtifactParser.isTextType(fileName: "x.\(impl)"),
                 ChewedArtifactParser.isTextType(fileName: "x.\(header)"),
-                ".\(impl) and .\(header) must inline alike")
+                ".\(impl) and .\(header) must inline alike"
+            )
         }
     }
 
@@ -111,7 +122,9 @@ final class ChewedArtifactParserTests: XCTestCase {
         // resourceName picks the directory relative entries resolve against, so
         // a drifting header silently points every path at a missing folder.
         let artifact = ChewedArtifactParser.parse(
-            text: "# Chewed: iTerm2_vt100_engine\n", fallbackName: "wrong")
+            text: "# Chewed: iTerm2_vt100_engine\n",
+            fallbackName: "wrong"
+        )
         XCTAssertEqual(artifact.resourceName, "iTerm2_vt100_engine")
     }
 
@@ -134,11 +147,15 @@ final class ChewedArtifactParserTests: XCTestCase {
                 | Location | Importance | Confidence |
                 |----------|------------|------------|
                 | not-a-file | 90 | 80 |
-                """, fallbackName: "demo")
+                """,
+            fallbackName: "demo"
+        )
 
         XCTAssertEqual(
-            artifact.files.map(\.name), ["real.swift"],
-            "a later table must not contribute file rows")
+            artifact.files.map(\.name),
+            ["real.swift"],
+            "a later table must not contribute file rows"
+        )
     }
 
     func testFullPathsBackfillMatchesByBasename() {
@@ -152,7 +169,9 @@ final class ChewedArtifactParserTests: XCTestCase {
 
                 **Full Paths**:
                 - `/tmp/iterm/VT100Parser.m`
-                """, fallbackName: "demo")
+                """,
+            fallbackName: "demo"
+        )
 
         XCTAssertEqual(artifact.files.count, 1, "back-fill must not duplicate the row")
         XCTAssertEqual(artifact.files.first?.fullPath, "/tmp/iterm/VT100Parser.m")
@@ -169,7 +188,9 @@ final class ChewedArtifactParserTests: XCTestCase {
                 ## 4. Keywords
 
                 VT100 Parser, escape-codes, VT100 Parser, OSC 133
-                """, fallbackName: "demo")
+                """,
+            fallbackName: "demo"
+        )
 
         XCTAssertEqual(artifact.keywords, ["vt100_parser", "escape_codes", "osc_133"])
     }

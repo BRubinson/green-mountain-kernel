@@ -1,38 +1,14 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// The ONLY lifecycle chrome in the app: the status chip plus exactly two
-/// controls — **Mark done** and **Back to Draft**. It replaces the six-state
-/// lifecycle rail, which was deleted outright; there is no fallback rail and
-/// no second progress surface anywhere.
+/// The ONLY lifecycle chrome in the app: the status chip plus two controls, Mark done and
+/// Back to Draft. The daemon's lifecycle has a real backward edge, done → draft, so Back to
+/// Draft is live on a done prompt and gated by `allowedNext` everywhere else.
 ///
-/// ### Why both actions
-/// The workflow options were written against a care-package intent saying
-/// Back to Draft is removed. The user reversed that mid-flight ("okay keep
-/// back o draft too"). **Back to Draft is kept**: the chip carries BOTH
-/// actions, `PromptStatus.allowedNext` and the `Gate` enum survive wholesale
-/// from the deleted lifecycle rail rather than being narrowed to the Done
-/// edge. The daemon's lifecycle has a real backward edge — done → draft
-/// re-opens a finished prompt — so Back to Draft is LIVE on a done prompt
-/// and gated by `allowedNext` everywhere else.
-///
-/// ### Why this type is independent of the strip
-/// The chip and both actions render from `stub.status` +
-/// `PromptStatus.allowedNext` ALONE. This view never reads `phases.workflow`
-/// — `WorkflowStrip` is its SIBLING at the call site, not its parent and not
-/// its child. That is the structural reason deleting the rail is safe: the
-/// strip can fail completely, render nothing at all, or be wrong about a
-/// variant this build has never heard of, and the lifecycle controls still
-/// work. When the prompt has no `bot_workflow` row (never started, and
-/// `/gm_task` where the absence is permanent) this header renders ALONE —
-/// no strip, no empty state, no distinguishing copy.
-///
-/// `phases` is taken for ONE reason: `transition(to:)`'s `invalidTransition`
-/// arm resyncs it, exactly as the deleted lifecycle rail did. It is never
-/// consulted for rendering or gating.
-///
-/// A daemon `INVALID_TRANSITION` is a lost race — its reason string
-/// (preserved by `DaemonError.invalidTransition(reason:)`) surfaces verbatim.
+/// Both controls render from `stub.status` and `PromptStatus.allowedNext` ALONE. This view
+/// never reads `phases.workflow`: `WorkflowStrip` is its SIBLING at the call site, so the
+/// strip can fail completely and the lifecycle controls still work. `phases` is taken for one
+/// reason — `transition(to:)`'s `invalidTransition` arm resyncs it — and never for rendering.
 struct PromptStatusHeader: View {
     let stub: PromptStub
     let phases: PromptPhaseStore
@@ -147,12 +123,14 @@ struct PromptStatusHeader: View {
             guard status != .done else {
                 return .blocked(
                     reason: "This prompt is already done",
-                    fix: "there is nothing left to advance")
+                    fix: "there is nothing left to advance"
+                )
             }
             guard status.allowedNext.contains(.done) else {
                 return .blocked(
                     reason: "Done is reachable once the prompt is Initiated (this prompt is \(status.rawValue))",
-                    fix: "start it with the bot first")
+                    fix: "start it with the bot first"
+                )
             }
             return .open
         case .draft:
@@ -160,12 +138,14 @@ struct PromptStatusHeader: View {
             guard status != .draft else {
                 return .blocked(
                     reason: "This prompt is already a draft",
-                    fix: "there is nothing to go back to")
+                    fix: "there is nothing to go back to"
+                )
             }
             guard status.allowedNext.contains(.draft) else {
                 return .blocked(
                     reason: "Back to Draft re-opens a finished prompt (this prompt is \(status.rawValue))",
-                    fix: "it becomes available once the prompt is Done")
+                    fix: "it becomes available once the prompt is Done"
+                )
             }
             return .open
         default:
@@ -205,7 +185,8 @@ struct PromptStatusHeader: View {
                     promptUuid: stub.uuid,
                     expectedVersion: version,
                     status: next
-                ))
+                )
+            )
             await store.refreshPrompt(uuid: stub.uuid)
             await store.refresh()
         } catch let error as DaemonError {

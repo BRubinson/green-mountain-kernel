@@ -2,25 +2,14 @@ import Foundation
 import GRDB
 import GmDaemonSdk
 
-// EXPLORE_* — the db-native exploration report machine (replaces explore.md).
-// exploring → complete, plus the complete → exploring revision edge: explore
-// is the most re-run report (resume, team fallback), so re-runs update the
-// same summary — db-native last-run-wins. Open is EXPLICIT-only: exploration
-// runs while the prompt is still `draft`, so unlike clarify/arch there is no
-// setPromptStatus create-on-enter slot and none is wired. Explore verbs NEVER
-// touch prompt.status.
-//
-// finding_rating semantics (0 = absolute critical … 999 = always-false-
-// positive tombstone; read threshold 100): NULL marks an unranked finding —
-// the universal work-in-progress marker. COMPLETE refuses while any NULL
-// remains; GETs always return NULL-rated rows in the full partition (they
-// are the resume work-queue); the with-reports stub surfaces the count.
-// overview is carried ONLY by COMPLETE — there is no earlier write path, so
-// the narrative is structurally written after the ranked findings exist
-// (primary-agent-only by shape, the clarifyFinalize precedent).
-//
-// Bodies live in ExplorationRepository; these wrappers own the transaction.
-// The rank/validation statics below stay on Store — Store+Review shares them.
+// EXPLORE_* — the db-native exploration report machine. exploring → complete,
+// plus the complete → exploring revision edge, since explore is the most re-run
+// report and a re-run updates the same summary. Open is EXPLICIT-only, and
+// explore verbs NEVER touch prompt.status.
+// finding_rating runs 0 (critical) to 999 (tombstone), read threshold 100, and
+// NULL marks an unranked finding: COMPLETE refuses while any NULL remains, and
+// GETs return NULL-rated rows in the full partition as the resume work-queue.
+// overview is carried ONLY by COMPLETE. Bodies live in ExplorationRepository.
 
 extension Store {
 
@@ -104,7 +93,9 @@ extension Store {
     }
 
     static func validatedFindingText(
-        title: String, body: String, agentName: String,
+        title: String,
+        body: String,
+        agentName: String,
         allowEmptyBody: Bool = false
     ) throws -> (title: String, body: String, agentName: String) {
         let title = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -120,7 +111,8 @@ extension Store {
         guard !agentName.isEmpty else { throw StoreError.badRequest(detail: "agent_name is empty") }
         guard body.utf8.count <= Store.maxNarrativeBytes else {
             throw StoreError.badRequest(
-                detail: "finding body exceeds \(Store.maxNarrativeBytes / (1024 * 1024)) MB")
+                detail: "finding body exceeds \(Store.maxNarrativeBytes / (1024 * 1024)) MB"
+            )
         }
         return (title, body, agentName)
     }
@@ -138,7 +130,8 @@ extension Store {
         }
         guard overview.utf8.count <= Store.maxNarrativeBytes else {
             throw StoreError.badRequest(
-                detail: "\(entity) overview exceeds \(Store.maxNarrativeBytes / (1024 * 1024)) MB")
+                detail: "\(entity) overview exceeds \(Store.maxNarrativeBytes / (1024 * 1024)) MB"
+            )
         }
         return overview
     }
@@ -166,38 +159,51 @@ extension Store {
             }
             guard (0...999).contains(pair.rating) else {
                 throw StoreError.badRequest(
-                    detail: "finding_rating must be 0–999 (got \(pair.rating) for \(pair.findingUuid))")
+                    detail: "finding_rating must be 0–999 (got \(pair.rating) for \(pair.findingUuid))"
+                )
             }
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM \(table) WHERE uuid = ? AND \(parentColumn) = ?",
+                    db,
+                    sql: "SELECT 1 FROM \(table) WHERE uuid = ? AND \(parentColumn) = ?",
                     arguments: [pair.findingUuid, summaryUuid]
                 ) != nil
             else {
                 throw StoreError.badRequest(
-                    detail: "finding \(pair.findingUuid) does not belong to summary \(summaryUuid)")
+                    detail: "finding \(pair.findingUuid) does not belong to summary \(summaryUuid)"
+                )
             }
         }
         for pair in ratings {
             guard
                 let version = try Int64.fetchOne(
-                    db, sql: "SELECT version FROM \(table) WHERE uuid = ?", arguments: [pair.findingUuid]
+                    db,
+                    sql: "SELECT version FROM \(table) WHERE uuid = ?",
+                    arguments: [pair.findingUuid]
                 )
             else {
                 throw StoreError.notFound(entity: table, key: pair.findingUuid)
             }
             try updateBase(
-                db, table: table, uuid: pair.findingUuid,
-                expectedVersion: version, set: ["finding_rating": pair.rating])
+                db,
+                table: table,
+                uuid: pair.findingUuid,
+                expectedVersion: version,
+                set: ["finding_rating": pair.rating]
+            )
         }
     }
 
     func unrankedCount(
-        _ db: Database, table: String, parentColumn: String, summaryUuid: String
+        _ db: Database,
+        table: String,
+        parentColumn: String,
+        summaryUuid: String
     ) throws -> Int {
         try Int.fetchOne(
             db,
             sql: "SELECT COUNT(*) FROM \(table) WHERE \(parentColumn) = ? AND finding_rating IS NULL",
-            arguments: [summaryUuid]) ?? 0
+            arguments: [summaryUuid]
+        ) ?? 0
     }
 }

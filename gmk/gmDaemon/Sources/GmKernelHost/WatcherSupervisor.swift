@@ -24,7 +24,7 @@ final class WatcherSupervisor: @unchecked Sendable {
 
     /// Recompute both watched sets from committed db state.
     func rebuild() {
-        let gmfs = (try? store.configValue(.gmFsRoot)).flatMap { $0 }
+        let gmfs = (try? store.configValue(.gmFsRoot)).flatMap(\.self)
         let watchableGmfs = gmfs.flatMap {
             FileManager.default.fileExists(atPath: $0) ? $0 : nil
         }
@@ -33,15 +33,17 @@ final class WatcherSupervisor: @unchecked Sendable {
         let instances =
             (try? store.listInstances(
                 InstanceListRequest(projectUuid: nil)
-            ).instances) ?? []
-        // Instances whose path no longer exists drop out; they rejoin on the
-        // next rebuild if the repo reappears. KNOWN LIMIT: a repo cloned back
-        // between rebuilds is not re-watched until the next instance creation
-        // or config write — SESSION_RESOLVE remains the authority for state.
+            )
+            .instances) ?? []
+        // Instances whose path is gone drop out and rejoin on a later rebuild.
+        // KNOWN LIMIT: a repo cloned back between rebuilds is not re-watched
+        // until the next instance creation or config write; SESSION_RESOLVE
+        // remains the authority for state.
         let roots = instances.compactMap { instance -> (String, String, String)? in
-            GitHead.gitDirectory(repoRoot: instance.absoluteFileSystemPath).map {
-                (instance.uuid, instance.absoluteFileSystemPath, $0)
-            }
+            GitHead.gitDirectory(repoRoot: instance.absoluteFileSystemPath)
+                .map {
+                    (instance.uuid, instance.absoluteFileSystemPath, $0)
+                }
         }
         checkout.setRoots(roots.map { (instanceUuid: $0.0, repoRoot: $0.1, gitDir: $0.2) })
 
@@ -50,7 +52,8 @@ final class WatcherSupervisor: @unchecked Sendable {
             print(
                 "[\(Store.isoNow())] watchers: memory "
                     + (watchableGmfs.map { "on \($0)" } ?? "disabled (no gmfs_root configured or path missing)")
-                    + ", checkout on \(roots.count) instance repo(s)")
+                    + ", checkout on \(roots.count) instance repo(s)"
+            )
             fflush(stdout)
         }
     }

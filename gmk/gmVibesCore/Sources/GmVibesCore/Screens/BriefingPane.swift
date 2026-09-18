@@ -1,15 +1,13 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// Read-only briefing section (BRIEFING_LIST + per-row BRIEFING_GET): the
-/// context packages a briefer agent assembled per phase step. One sub-section
-/// per row, keyed by `briefing_for_step` (registry-extensible — whatever LIST
-/// returns is rendered, never a hardcoded step set). Staleness is the
-/// daemon's read-time computation; it renders as a subtle amber badge with
-/// expandable ghost-path detail — warn, never block. That badge and the
-/// dot-path chip flow now live in `DesignSystem/DopeStalenessBadge.swift`,
-/// shared verbatim with the care package. All briefing writes stay
-/// bot/CLI-side.
+/// Read-only briefing section over BRIEFING_LIST plus per-row BRIEFING_GET: the context
+/// packages a briefer agent assembled per phase step.
+///
+/// One sub-section per row, keyed by `briefing_for_step`, so whatever LIST returns is rendered
+/// and no step set is hardcoded. Staleness is the daemon's read-time computation and renders
+/// through `DesignSystem/DopeStalenessBadge.swift`, shared with the care package: it warns and
+/// never blocks. All briefing writes stay bot/CLI-side.
 struct BriefingPane: View {
     let phase: PromptPhaseStore.Phase<[PromptPhaseStore.BriefingItem]>
 

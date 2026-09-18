@@ -10,26 +10,11 @@ import Foundation
 /// Writes the ENTIRE `plugins/gmcc` Claude Code plugin from the bridge values in
 /// this package, and from nothing else.
 ///
-/// THE BRIDGE IS THE ONLY SOURCE. Every byte this emits comes from a
-/// `GmBridgeFile` declared in `HarnessBridge/`. It reads no file from the
-/// existing plugin, imports nothing from `gmDaemonSdk`, and consults no
-/// hand-kept list — so "the plugin says X but the code says Y" is not a state
-/// this writer can produce. If something is missing from the output, the fix is
-/// to declare it in the bridge, never to special-case it here.
-///
-/// WHY IT IS A LOOP AND NOT A TEMPLATE ENGINE. Every bridge type already knows
-/// its own `relativePath` and renders its own `contents()` — the JSON files
-/// through `GmBridgeJsonFile`'s deterministic encoder, the markdown files
-/// through their own YAML-frontmatter builders. The writer's whole job is to ask
-/// each one and put the bytes where it says. That is the property worth
-/// protecting: adding a file type to the plugin means adding a bridge type, and
-/// this file does not change.
-///
-/// DETERMINISM IS LOAD-BEARING. Output is sorted by path and the JSON encoder is
-/// `.sortedKeys` + `.withoutEscapingSlashes` with a trailing newline. A
-/// regenerated plugin has to be DIFFABLE — the whole point of "delete and
-/// rewrite" is being able to read what changed, and an unordered walk makes
-/// every regeneration look like it changed everything.
+/// Nothing is read back out of the existing plugin, so a missing file is fixed by
+/// declaring a `GmBridgeFile`, never by special-casing it here. Each type renders
+/// its own `contents()`, leaving the writer a loop. Output is sorted by path and
+/// JSON is `.sortedKeys` + `.withoutEscapingSlashes`: a delete-and-rewrite plugin
+/// is reviewable only while its regeneration stays diffable.
 public enum GmBridgeWriter {
 
     /// What one run did, so a caller can report it without re-reading the tree.
@@ -37,13 +22,10 @@ public enum GmBridgeWriter {
         public var written: [String] = []
         /// Declared, but rendered nothing — `contents()` returned nil.
         ///
-        /// NOT SILENT, and that is the entire lesson of this change. Six
-        /// `GmBridgeScript` bodies defaulted to the empty string, `isEmpty` sent
-        /// `contents()` to nil, and a writer that skipped them quietly would
-        /// have emitted `hooks.json` and `.mcp.json` pointing at scripts that do
-        /// not exist — a plugin that installs, boots, and records nothing. Every
-        /// omission is reported and `verify` turns the boot-critical ones into a
-        /// refusal.
+        /// Never silent. A quietly skipped script leaves `hooks.json` and
+        /// `.mcp.json` pointing at files that do not exist — a plugin that
+        /// installs, boots and records nothing. Every omission is reported, and
+        /// `verify` turns the boot-critical ones into a refusal.
         public var omitted: [String] = []
         public var bytes: Int = 0
     }
@@ -140,19 +122,17 @@ public enum GmBridgeWriter {
         return Report(
             written: rendered.map(\.path).sorted(),
             omitted: omitted.sorted(),
-            bytes: rendered.reduce(0) { $0 + $1.body.utf8.count })
+            bytes: rendered.reduce(0) { $0 + $1.body.utf8.count }
+        )
     }
 
     /// Delete `directory` and rewrite it from the bridge.
     ///
-    /// STAGE-AND-SWAP, NOT rm-THEN-WRITE. The tree is built beside the target
-    /// and moved into place through a trash directory, so the destructive window
-    /// is two renames wide instead of spanning the whole render. A crash halfway
-    /// through a direct write leaves a half-plugin that still LOOKS installed;
-    /// a crash here leaves either the old tree or the new one.
-    ///
-    /// `verify()` runs FIRST, so a bridge that cannot render a bootable plugin
-    /// never gets as far as deleting the one that works.
+    /// Stage-and-swap rather than rm-then-write: the tree is built beside the
+    /// target and moved in through a trash directory, so a crash leaves either the
+    /// old tree or the new one rather than a half-plugin that still looks
+    /// installed. `verify()` runs first, so a bridge that cannot render a bootable
+    /// plugin never reaches the delete.
     @discardableResult
     public static func write(to directory: URL) throws -> Report {
         guard directory.path.hasPrefix("/") else {

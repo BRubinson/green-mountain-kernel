@@ -36,7 +36,8 @@ public enum ITerm2App {
             configuration.activates = false
             do {
                 _ = try await NSWorkspace.shared.openApplication(
-                    at: url, configuration: configuration
+                    at: url,
+                    configuration: configuration
                 )
             } catch {
                 throw .transportFailed(

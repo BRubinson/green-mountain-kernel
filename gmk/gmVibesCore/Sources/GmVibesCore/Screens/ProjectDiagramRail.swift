@@ -3,16 +3,12 @@ import GmDaemonSdk
 
 /// The project page's right-hand diagram gallery.
 ///
-/// The browse surface is DIAGRAM_SEARCH across ALL tiers — the project page
-/// is where every diagram in the project is findable, which is exactly the
-/// union DIAGRAM_LIST refuses to be. The create path still runs on the
-/// PROJECT-tier owner list (uniqueCode needs exactly that tier's codes).
+/// The browse surface is DIAGRAM_SEARCH across ALL tiers, the union DIAGRAM_LIST refuses to
+/// be, while the create path runs on the PROJECT-tier owner list that `uniqueCode` needs.
 ///
-/// Above the cards sits the COMPUTED persistence diagram: the project's
-/// own dope scope (the PROJECT_ITEM overlay, else the BASE_PROJECT scope
-/// `gm dope promote` maintains) laid out on the fly. It is a preview — no
-/// diagram row, nothing written — so opening the project's domain model never
-/// mints a document nobody asked for.
+/// Above the cards sits the COMPUTED persistence diagram: the project's own dope scope laid
+/// out on the fly. It is a preview with no diagram row and nothing written, so opening the
+/// project's domain model never mints a document nobody asked for.
 struct ProjectDiagramRail: View {
     @Environment(DaemonConnectionModel.self) private var daemon
     @Environment(DiagramCatalogStore.self) private var diagrams
@@ -71,7 +67,9 @@ struct ProjectDiagramRail: View {
         .alert(
             "Diagram action failed",
             isPresented: Binding(
-                get: { actionError != nil }, set: { if !$0 { actionError = nil } })
+                get: { actionError != nil },
+                set: { if !$0 { actionError = nil } }
+            )
         ) {
             Button("OK", role: .cancel) { actionError = nil }
         } message: {
@@ -108,7 +106,10 @@ struct ProjectDiagramRail: View {
                 DiagramWindowID(
                     source: .dopePreview(scopeCode: dopeScopeCode),
                     name: "Project Persistence",
-                    session: nil, projectUuid: projectUuid))
+                    session: nil,
+                    projectUuid: projectUuid
+                )
+            )
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "sparkles.rectangle.stack")
@@ -152,7 +153,7 @@ struct ProjectDiagramRail: View {
             .flatMap { catalog.sessionsByInstance[$0.uuid] ?? [] }
             .sorted { $0.lastActivityAt > $1.lastActivityAt }
             .prefix(12)
-            .map { $0 }
+            .map(\.self)
     }
 
     // MARK: - Actions
@@ -162,7 +163,8 @@ struct ProjectDiagramRail: View {
         // "computed from dope" and the create path binds nothing.
         guard
             let response = try? await GMCCDaemonService.shared.dopeGet(
-                projectUuid: projectUuid)
+                projectUuid: projectUuid
+            )
         else { return }
         dopeScopeCode = response.tree.body.code
     }
@@ -172,19 +174,26 @@ struct ProjectDiagramRail: View {
             let base = dopeScopeCode.map { "\($0)_canvas" } ?? "project_canvas"
             let code = SessionDiagramsPane.uniqueCode(
                 base: base,
-                taken: Set(rows.map(\.code)))
+                taken: Set(rows.map(\.code))
+            )
             _ = try await diagrams.create(
-                owner: owner, code: code,
+                owner: owner,
+                code: code,
                 name: dopeScopeCode.map { "\($0) canvas" } ?? "Project Diagram",
-                dopeScopeCode: dopeScopeCode, projectUuid: projectUuid)
+                dopeScopeCode: dopeScopeCode,
+                projectUuid: projectUuid
+            )
         }
     }
 
     private func move(_ row: DiagramRow, to sessionUuid: String) {
         run {
             try await diagrams.promote(
-                row, to: .session, ownerUuid: sessionUuid,
-                from: owner)
+                row,
+                to: .session,
+                ownerUuid: sessionUuid,
+                from: owner
+            )
             await diagrams.refreshGallery(galleryScope)
         }
     }

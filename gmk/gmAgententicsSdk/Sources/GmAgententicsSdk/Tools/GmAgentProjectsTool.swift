@@ -30,7 +30,7 @@ public struct GmAgentProjectsSearchTool: GmAgentProjectsTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentProjectsSearchArguments) async throws -> String {
+    public func call(arguments _: GmAgentProjectsSearchArguments) throws -> String {
         throw GmAgentToolError.notSupported(
             tool: name,
             detail: """
@@ -38,7 +38,8 @@ public struct GmAgentProjectsSearchTool: GmAgentProjectsTool {
                 are a filter input, never a result, and PROJECT_LIST has no \
                 query. Searching all three means composing the two verbs \
                 client-side.
-                """)
+                """
+        )
     }
 }
 
@@ -64,8 +65,12 @@ public struct GmAgentProjectsUpdateSessionArguments: Sendable {
     public var removeKbiteCodes: [String]
 
     public init(
-        sessionUuid: String, expectedVersion: Int, backstory: String = "",
-        goal: String = "", addKbiteCodes: [String] = [], removeKbiteCodes: [String] = []
+        sessionUuid: String,
+        expectedVersion: Int,
+        backstory: String = "",
+        goal: String = "",
+        addKbiteCodes: [String] = [],
+        removeKbiteCodes: [String] = []
     ) {
         self.sessionUuid = sessionUuid
         self.expectedVersion = expectedVersion
@@ -83,8 +88,10 @@ public struct GmAgentProjectsUpdateSessionTool: GmAgentProjectsTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentProjectsUpdateSessionArguments) async throws -> String {
+    public func call(arguments _: GmAgentProjectsUpdateSessionArguments) throws -> String {
         throw GmAgentToolError.notWired(
-            tool: name, verb: "SESSION_UPDATE + KBITE_ADD/KBITE_REMOVE")
+            tool: name,
+            verb: "SESSION_UPDATE + KBITE_ADD/KBITE_REMOVE"
+        )
     }
 }

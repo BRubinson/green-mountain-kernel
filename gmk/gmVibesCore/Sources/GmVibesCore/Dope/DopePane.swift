@@ -21,7 +21,7 @@ struct DopePane: View {
     /// prompt phase cards don't offer the viewer. Passed in rather than read
     /// from @Environment so the pane stays host-agnostic
     /// (GlobalToolbarGroup's convention).
-    var onOpenDiagram: ((String) -> Void)? = nil
+    var onOpenDiagram: ((String) -> Void)?
 
     @State private var showInit = false
     @State private var searchText = ""
@@ -64,10 +64,11 @@ struct DopePane: View {
                         Text(
                             promptUuid == nil
                                 ? "This session has no dope scope. Initialize one to start modeling."
-                                : "Neither this prompt nor the session has a dope scope yet.")
+                                : "Neither this prompt nor the session has a dope scope yet."
+                        )
                         if !knownCodes.isEmpty {
-                            // Reached when a pinned code no longer resolves —
-                            // name the codes that DO exist, not a blank.
+                            // Reached when a pinned code fails to resolve: name the codes
+                            // that DO exist, not a blank.
                             Text("Known scope codes: \(knownCodes.joined(separator: ", "))")
                                 .font(.caption.monospaced())
                                 .foregroundStyle(.secondary)
@@ -89,7 +90,8 @@ struct DopePane: View {
                     Text(
                         showsPicker
                             ? "More than one dope scope matches. Choose which to open."
-                            : daemonMessage)
+                            : daemonMessage
+                    )
                 } actions: {
                     if showsPicker { scopePicker }
                 }
@@ -108,11 +110,15 @@ struct DopePane: View {
         }
         .sheet(isPresented: $showInit) {
             DopeInitSheet(
-                store: store, key: target, forPrompt: promptUuid != nil,
+                store: store,
+                key: target,
+                forPrompt: promptUuid != nil,
                 siblingCodes: knownCodes,
                 sameTypeCodes: (promptUuid == nil
                     ? store.sessionCandidates(target)
-                    : promptRows).map(\.code))
+                    : promptRows)
+                    .map(\.code)
+            )
         }
         // Event-driven refresh on the dedicated dope domain (NOT .session —
         // see the DOPE_CHANGE arm). Stream hoisted before the first load so a
@@ -195,8 +201,11 @@ struct DopePane: View {
                 treeControls
             }
             DopeTreeView(
-                tree: response.tree, query: trimmedQuery, expansion: expansion,
-                showBaseDomains: showBaseDomains)
+                tree: response.tree,
+                query: trimmedQuery,
+                expansion: expansion,
+                showBaseDomains: showBaseDomains
+            )
         }
     }
 
@@ -287,7 +296,8 @@ struct DopePane: View {
             .help(
                 showBaseDomains
                     ? "Hide base composable domains"
-                    : "Show base composable domains (hidden by default; view state only)")
+                    : "Show base composable domains (hidden by default; view state only)"
+            )
             Button {
                 expansion.broadcast(expanded: true)
             } label: {
@@ -442,9 +452,13 @@ struct DopeTreeView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(renderedDomains, id: \.domain.identity.uuid) { item in
                         DomainCard(
-                            domain: item.domain, isBase: item.isBase,
-                            query: query, expansion: expansion,
-                            inspector: inspector, baseCatalog: baseCatalog)
+                            domain: item.domain,
+                            isBase: item.isBase,
+                            query: query,
+                            expansion: expansion,
+                            inspector: inspector,
+                            baseCatalog: baseCatalog
+                        )
                     }
                 }
             }
@@ -453,7 +467,8 @@ struct DopeTreeView: View {
             if let resolved = catalog.resolved(selection.ref) {
                 DopeEnumSheet(
                     info: resolved,
-                    originPropertyUuid: selection.originPropertyUuid)
+                    originPropertyUuid: selection.originPropertyUuid
+                )
             } else {
                 DopeEnumMissingSheet(ref: selection.ref)
             }
@@ -493,10 +508,13 @@ private struct DomainCard: View {
                 }
                 ForEach(visibleEntities, id: \.identity.uuid) { entity in
                     EntityRow(
-                        entity: entity, domainCode: domain.body.code,
+                        entity: entity,
+                        domainCode: domain.body.code,
                         query: query,
-                        expansion: expansion, inspector: inspector,
-                        baseCatalog: baseCatalog)
+                        expansion: expansion,
+                        inspector: inspector,
+                        baseCatalog: baseCatalog
+                    )
                 }
                 ForEach(visibleEnums, id: \.identity.uuid) { enumNode in
                     EnumRow(enumNode: enumNode, query: query, expansion: expansion)
@@ -584,8 +602,10 @@ private struct EntityRow: View {
 
     private func propertyRef(_ property: DopePropertyNode) -> String {
         DopeCode.formatPropertyRef(
-            domain: domainCode, entity: entity.body.code,
-            property: property.body.code)
+            domain: domainCode,
+            entity: entity.body.code,
+            property: property.body.code
+        )
     }
 
     var body: some View {
@@ -594,13 +614,17 @@ private struct EntityRow: View {
                 ForEach(renderedProperties, id: \.identity.uuid) { property in
                     if let origin = property.body.baseOriginRef {
                         PropertyRow(
-                            property: property, inspector: inspector,
+                            property: property,
+                            inspector: inspector,
                             ref: propertyRef(property),
-                            mode: .materialized(origin: origin))
+                            mode: .materialized(origin: origin)
+                        )
                     } else {
                         PropertyRow(
-                            property: property, inspector: inspector,
-                            ref: propertyRef(property))
+                            property: property,
+                            inspector: inspector,
+                            ref: propertyRef(property)
+                        )
                     }
                 }
                 ForEach(inheritedProperties) { inherited in
@@ -608,9 +632,11 @@ private struct EntityRow: View {
                     // declared on the base entity, so the ORIGIN path is the
                     // one that actually resolves.
                     PropertyRow(
-                        property: inherited.node, inspector: inspector,
+                        property: inherited.node,
+                        inspector: inspector,
                         ref: inherited.originRef,
-                        mode: .inherited(origin: inherited.originRef))
+                        mode: .inherited(origin: inherited.originRef)
+                    )
                 }
                 if entity.properties.isEmpty && inheritedProperties.isEmpty {
                     Text("No properties.")

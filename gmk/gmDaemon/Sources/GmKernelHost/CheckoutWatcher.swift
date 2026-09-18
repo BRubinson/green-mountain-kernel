@@ -1,15 +1,12 @@
 import Foundation
 
-/// A8's source: filesystem events for instance repos' git directories,
-/// filtered to HEAD itself. Watches the git DIRECTORY, never the repository
-/// root — the root would fire on every source file the user saves. Everything
-/// else under the git dir is noise too (index, refs, objects, packed-refs, gc
-/// temp files), so only paths ending in /HEAD are delivered.
+/// Filesystem events for instance repos' git directories, delivering only paths
+/// ending in /HEAD. Watches the git DIRECTORY, never the repository root, which
+/// would fire on every source file the user saves.
 ///
-/// Same lane contract as MemoryWatcher: no Store, no Server; `deliver` hops
-/// onto the server queue, which resolves the head state there (the same tiny
-/// HEAD read the poll messages already perform) and dedupes against its own
-/// per-instance last-emitted cache — only a genuine change broadcasts.
+/// Lane contract as MemoryWatcher: no Store, no Server; `deliver` hops onto the
+/// server queue, which resolves the head state there and dedupes against its own
+/// per-instance cache, so only a genuine change broadcasts.
 final class CheckoutWatcher: @unchecked Sendable {
     private let lane = FSEventLane(label: "gmcc.daemon.git", latency: 0.5)
     /// Lane-confined: gitDir → (instanceUuid, repoRoot).
@@ -26,7 +23,8 @@ final class CheckoutWatcher: @unchecked Sendable {
         lane.run {
             self.byGitDir = Dictionary(
                 roots.map { ($0.gitDir, ($0.instanceUuid, $0.repoRoot)) },
-                uniquingKeysWith: { first, _ in first })
+                uniquingKeysWith: { first, _ in first }
+            )
         }
         lane.setPaths(roots.map(\.gitDir))
     }

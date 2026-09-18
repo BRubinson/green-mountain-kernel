@@ -22,7 +22,7 @@ public struct GmAgentRpirOpenArchitectureTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirOpenArchitectureArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirOpenArchitectureArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_OPEN")
     }
 }
@@ -47,15 +47,20 @@ public struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
             Option this proposal REPLACES, by uuid. Leave empty for a new \
             proposal. The old row stays as rejected history, and if it was the \
             selected plan the new one takes the selection.
-            """)
+            """
+    )
     public var supersedesOptionUuid: String
 
     @Guide(description: "Version of the replaced option. Required with supersedesOptionUuid.")
     public var expectedVersion: Int
 
     public init(
-        summaryUuid: String, agentName: String, agentId: String = "", body: String,
-        supersedesOptionUuid: String = "", expectedVersion: Int = 0
+        summaryUuid: String,
+        agentName: String,
+        agentId: String = "",
+        body: String,
+        supersedesOptionUuid: String = "",
+        expectedVersion: Int = 0
     ) {
         self.summaryUuid = summaryUuid
         self.agentName = agentName
@@ -74,8 +79,8 @@ public struct GmAgentRpirOpenArchitectureOptionTool: GmAgentRpirTool {
     public init() {}
 
     public func call(
-        arguments: GmAgentRpirOpenArchitectureOptionArguments
-    ) async throws -> String {
+        arguments _: GmAgentRpirOpenArchitectureOptionArguments
+    ) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_OPTION_ADD")
     }
 }
@@ -111,9 +116,15 @@ public struct GmAgentPersistenceFieldChange: Sendable {
     public var dopePropertyRef: String
 
     public init(
-        fieldName: String, dataType: String, changeReason: String, changePurpose: String,
-        nullable: Bool = false, isForeignKey: Bool = false, changeKind: String = "add",
-        renamedFrom: String = "", dopePropertyRef: String = ""
+        fieldName: String,
+        dataType: String,
+        changeReason: String,
+        changePurpose: String,
+        nullable: Bool = false,
+        isForeignKey: Bool = false,
+        changeKind: String = "add",
+        renamedFrom: String = "",
+        dopePropertyRef: String = ""
     ) {
         self.fieldName = fieldName
         self.dataType = dataType
@@ -149,8 +160,11 @@ public struct GmAgentPersistenceChange: Sendable {
     public var fields: [GmAgentPersistenceFieldChange]
 
     public init(
-        className: String, filePath: String, reasonBrief: String,
-        changeKind: String = "modify", dopeRef: String = "",
+        className: String,
+        filePath: String,
+        reasonBrief: String,
+        changeKind: String = "modify",
+        dopeRef: String = "",
         fields: [GmAgentPersistenceFieldChange] = []
     ) {
         self.className = className
@@ -185,10 +199,12 @@ public struct GmAgentRpirWriteArchitecturePersistenceChangesTool: GmAgentRpirToo
     public init() {}
 
     public func call(
-        arguments: GmAgentRpirWritePersistenceChangesArguments
-    ) async throws -> String {
+        arguments _: GmAgentRpirWritePersistenceChangesArguments
+    ) throws -> String {
         throw GmAgentToolError.notWired(
-            tool: name, verb: "ARCH_PERSIST_ADD + ARCH_FIELD_ADD (looped)")
+            tool: name,
+            verb: "ARCH_PERSIST_ADD + ARCH_FIELD_ADD (looped)"
+        )
     }
 }
 
@@ -211,12 +227,16 @@ public struct GmAgentGeneralChange: Sendable {
         description: """
             The instruction whoever implements this will follow. Write it to them, \
             not about them.
-            """)
+            """
+    )
     public var changeCode: String
 
     public init(
-        filePath: String, className: String = "", reasonBrief: String,
-        changeDepth: String = "actual", changeCode: String
+        filePath: String,
+        className: String = "",
+        reasonBrief: String,
+        changeDepth: String = "actual",
+        changeCode: String
     ) {
         self.filePath = filePath
         self.className = className
@@ -248,7 +268,7 @@ public struct GmAgentRpirWriteArchitectureGeneralChangesTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirWriteGeneralChangesArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirWriteGeneralChangesArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_GENERAL_ADD (looped)")
     }
 }
@@ -275,7 +295,7 @@ public struct GmAgentRpirWriteArchitectureFieldChangesTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirWriteFieldChangesArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirWriteFieldChangesArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_FIELD_ADD (looped)")
     }
 }
@@ -306,7 +326,7 @@ public struct GmAgentRpirSummarizeArchitectureTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirSummarizeArchitectureArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirSummarizeArchitectureArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_SUMMARIZE")
     }
 }
@@ -333,7 +353,7 @@ public struct GmAgentRpirProposeArchitectureTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirArchitectureGateArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirArchitectureGateArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_PROPOSE")
     }
 }
@@ -345,7 +365,7 @@ public struct GmAgentRpirApproveArchitectureTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirArchitectureGateArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirArchitectureGateArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_APPROVE")
     }
 }
@@ -357,7 +377,7 @@ public struct GmAgentRpirReviseArchitectureTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirArchitectureGateArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirArchitectureGateArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_REVISE")
     }
 }
@@ -375,7 +395,8 @@ public struct GmAgentRpirDecideArchitectureArguments: Sendable {
         description: """
             Why this plan won, and what the rejected ones still contribute. A \
             decision with no reasoning gets argued again later.
-            """)
+            """
+    )
     public var rationale: String
 
     public init(optionUuid: String, expectedVersion: Int, rationale: String) {
@@ -392,7 +413,7 @@ public struct GmAgentRpirDecideArchitectureTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirDecideArchitectureArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirDecideArchitectureArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_DECIDE")
     }
 }
@@ -423,7 +444,7 @@ public struct GmAgentRpirGetArchitectureTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirGetArchitectureArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirGetArchitectureArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_GET")
     }
 }

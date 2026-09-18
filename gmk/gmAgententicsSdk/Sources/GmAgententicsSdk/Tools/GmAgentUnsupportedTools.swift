@@ -16,7 +16,7 @@ public struct GmAgentDiagramPlaceholderTool: GmAgentDiagramTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentNoArguments) async throws -> String {
+    public func call(arguments _: GmAgentNoArguments) throws -> String {
         throw GmAgentToolError.notImplemented(family: .diagram)
     }
 }
@@ -28,7 +28,7 @@ public struct GmAgentSystemPlaceholderTool: GmAgentSystemTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentNoArguments) async throws -> String {
+    public func call(arguments _: GmAgentNoArguments) throws -> String {
         throw GmAgentToolError.notImplemented(family: .system)
     }
 }
@@ -40,7 +40,7 @@ public struct GmAgentFsPlaceholderTool: GmAgentFsTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentNoArguments) async throws -> String {
+    public func call(arguments _: GmAgentNoArguments) throws -> String {
         throw GmAgentToolError.notImplemented(family: .fs)
     }
 }

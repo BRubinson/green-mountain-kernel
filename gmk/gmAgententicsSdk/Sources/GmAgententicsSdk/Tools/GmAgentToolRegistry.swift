@@ -6,7 +6,7 @@ import FoundationModels
 @available(GmAgentOs 1.0, *)
 public enum GmAgentTools {
 
-    public enum dope {
+    public enum Dope {
         public static let searchGlobal = GmAgentDopeSearchGlobalTool()
         public static let searchSession = GmAgentDopeSearchSessionTool()
         public static let updateSessionDope = GmAgentDopeUpdateSessionTool()
@@ -16,7 +16,7 @@ public enum GmAgentTools {
         ]
     }
 
-    public enum kbite {
+    public enum Kbite {
         public static let search = GmAgentKbiteSearchTool()
         public static let openMaw = GmAgentKbiteOpenMawTool()
         public static let digest = GmAgentKbiteDigestTool()
@@ -24,32 +24,32 @@ public enum GmAgentTools {
         public static let all: [any GmAgentTool] = [search, openMaw, digest]
     }
 
-    public enum diagram {
+    public enum Diagram {
         public static let notSupported = GmAgentDiagramPlaceholderTool()
 
         public static let all: [any GmAgentTool] = [notSupported]
     }
 
-    public enum projects {
+    public enum Projects {
         public static let search = GmAgentProjectsSearchTool()
         public static let updateSession = GmAgentProjectsUpdateSessionTool()
 
         public static let all: [any GmAgentTool] = [search, updateSession]
     }
 
-    public enum system {
+    public enum System {
         public static let notSupported = GmAgentSystemPlaceholderTool()
 
         public static let all: [any GmAgentTool] = [notSupported]
     }
 
-    public enum fs {
+    public enum Fs {
         public static let notSupported = GmAgentFsPlaceholderTool()
 
         public static let all: [any GmAgentTool] = [notSupported]
     }
 
-    public enum cde {
+    public enum Cde {
 
         public static let initialize = GmAgentCdeInitTool()
         public static let loadPrompt = GmAgentCdeLoadPromptTool()
@@ -61,7 +61,7 @@ public enum GmAgentTools {
         ]
     }
 
-    public enum rpir {
+    public enum Rpir {
 
         public static let next = GmAgentRpirNextTool()
 
@@ -88,6 +88,7 @@ public enum GmAgentTools {
         public static let writeCarePackage = GmAgentRpirWriteCarePackageTool()
         public static let closeCarePackage = GmAgentRpirCloseCarePackageTool()
         public static let getClarification = GmAgentRpirGetClarificationTool()
+        public static let getCarePackage = GmAgentRpirGetCarePackageTool()
 
         public static let openArchitecture = GmAgentRpirOpenArchitectureTool()
         public static let openArchitectureOption = GmAgentRpirOpenArchitectureOptionTool()
@@ -125,6 +126,7 @@ public enum GmAgentTools {
             openClarification, writeClarificationQuestions, writeClarificationNotes,
             answerClarificationQuestion, sealClarification, finalizeClarification,
             openCarePackage, writeCarePackage, closeCarePackage, getClarification,
+            getCarePackage,
             openArchitecture, openArchitectureOption, writeArchitecturePersistenceChanges,
             writeArchitectureFieldChanges, writeArchitectureGeneralChanges,
             summarizeArchitecture, proposeArchitecture, approveArchitecture,
@@ -137,19 +139,19 @@ public enum GmAgentTools {
     }
 
     public static let all: [any GmAgentTool] =
-        dope.all + kbite.all + diagram.all + cde.all + rpir.all + projects.all
-        + system.all + fs.all
+        Dope.all + Kbite.all + Diagram.all + Cde.all + Rpir.all + Projects.all
+        + System.all + Fs.all
 
     public static func tools(in family: GmAgentToolFamily) -> [any GmAgentTool] {
         switch family {
-        case .dope: return dope.all
-        case .kbite: return kbite.all
-        case .diagram: return diagram.all
-        case .cde: return cde.all
-        case .rpir: return rpir.all
-        case .projects: return projects.all
-        case .system: return system.all
-        case .fs: return fs.all
+        case .dope: return Dope.all
+        case .kbite: return Kbite.all
+        case .diagram: return Diagram.all
+        case .cde: return Cde.all
+        case .rpir: return Rpir.all
+        case .projects: return Projects.all
+        case .system: return System.all
+        case .fs: return Fs.all
         }
     }
 }

@@ -19,7 +19,8 @@ struct ProjectRepository: RepositoryContext {
             let trimmed = branch.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else {
                 throw StoreError.badRequest(
-                    detail: "primary_project_branch must not be blank")
+                    detail: "primary_project_branch must not be blank"
+                )
             }
             set["primary_project_branch"] = trimmed
         }
@@ -27,11 +28,18 @@ struct ProjectRepository: RepositoryContext {
             throw StoreError.emptyUpdate(entity: "project")
         }
         try core.updateBase(
-            db, table: "project", uuid: req.projectUuid,
-            expectedVersion: req.expectedVersion, set: set)
+            db,
+            table: "project",
+            uuid: req.projectUuid,
+            expectedVersion: req.expectedVersion,
+            set: set
+        )
         try core.appendEvent(
-            db, kind: .updateProject, subjectUuid: req.projectUuid,
-            payload: Store.jsonPayload(["fields": set.keys.sorted()]))
+            db,
+            kind: .updateProject,
+            subjectUuid: req.projectUuid,
+            payload: Store.jsonPayload(["fields": set.keys.sorted()])
+        )
         guard let row = try fetchRow(uuid: req.projectUuid) else {
             throw StoreError.notFound(entity: "project", key: req.projectUuid)
         }

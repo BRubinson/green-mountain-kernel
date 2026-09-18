@@ -12,7 +12,9 @@ struct SearchRepository: RepositoryContext {
         if let sessionUuid = req.sessionUuid {
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM session WHERE uuid = ?", arguments: [sessionUuid]
+                    db,
+                    sql: "SELECT 1 FROM session WHERE uuid = ?",
+                    arguments: [sessionUuid]
                 ) != nil
             else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
@@ -32,23 +34,28 @@ struct SearchRepository: RepositoryContext {
             arms.joined(separator: "\nUNION ALL\n")
             + "\nORDER BY score LIMIT \(limit)"
         return SearchResponse(
-            hits: try Row.fetchAll(
-                db, sql: sql, arguments: StatementArguments(arguments)
-            ).map { row in
-                SearchHit(
-                    kind: row["kind"],
-                    subjectUuid: row["subject_uuid"],
-                    promptUuid: row["prompt_uuid"],
-                    promptSeq: row["prompt_seq"],
-                    promptName: row["prompt_name"],
-                    promptStatus: row["prompt_status"],
-                    sessionUuid: row["session_uuid"],
-                    sessionCode: row["session_code"],
-                    title: row["title"],
-                    excerpt: row["excerpt"],
-                    score: row["score"]
+            hits:
+                try Row.fetchAll(
+                    db,
+                    sql: sql,
+                    arguments: StatementArguments(arguments)
                 )
-            })
+                .map { row in
+                    SearchHit(
+                        kind: row["kind"],
+                        subjectUuid: row["subject_uuid"],
+                        promptUuid: row["prompt_uuid"],
+                        promptSeq: row["prompt_seq"],
+                        promptName: row["prompt_name"],
+                        promptStatus: row["prompt_status"],
+                        sessionUuid: row["session_uuid"],
+                        sessionCode: row["session_code"],
+                        title: row["title"],
+                        excerpt: row["excerpt"],
+                        score: row["score"]
+                    )
+                }
+        )
     }
 
     /// One UNION arm per kind. Every arm produces the identical column list;

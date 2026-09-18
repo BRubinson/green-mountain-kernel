@@ -73,7 +73,9 @@ public enum MarkdownDocument {
                 blocks.append(
                     .codeBlock(
                         language: lang.isEmpty ? nil : lang,
-                        code: code.joined(separator: "\n")))
+                        code: code.joined(separator: "\n")
+                    )
+                )
                 continue
             }
 
@@ -228,10 +230,11 @@ public enum MarkdownDocument {
     private static func isTableSeparator(_ s: String) -> Bool {
         guard s.contains("|"), s.contains("-") else { return false }
         // Each cell is dashes with optional leading/trailing colons.
-        return splitTableRow(s).allSatisfy { cell in
-            let c = cell.trimmingCharacters(in: .whitespaces)
-            return !c.isEmpty && c.allSatisfy { $0 == "-" || $0 == ":" }
-        }
+        return splitTableRow(s)
+            .allSatisfy { cell in
+                let c = cell.trimmingCharacters(in: .whitespaces)
+                return !c.isEmpty && c.allSatisfy { $0 == "-" || $0 == ":" }
+            }
     }
 
     private static func splitTableRow(_ s: String) -> [String] {

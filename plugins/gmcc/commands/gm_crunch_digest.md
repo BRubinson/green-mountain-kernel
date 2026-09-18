@@ -1,12 +1,8 @@
 ---
 description: Digest chewed maw resources into the kernel db and archive raw sources
 argument-hint: <kbite_name>
-allowed-tools: Read, Write, Bash, Glob, Grep, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest, Skill
+allowed-tools: Read, Write, Bash, Glob, Grep, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest
 ---
-
-**Load the `gmcc` skill before anything else.** It carries the GMB identity and
-the GM-CDE rules every step below assumes. Do not begin the work until it is in
-context.
 
 Digest chewed maw resources into the kernel db and archive the raw sources.
 
@@ -20,4 +16,4 @@ Digest chewed maw resources into the kernel db and archive the raw sources.
 
 **Contract:**
     1. Digest is the one step that writes the record. Verify before deleting the maw — step 5 is not reversible from here.
-    2. Take `gm_hook call BACKUP --json '{}'` first.
+    2. There is no agent-side backup door. Put the digest to the Endotherm before step 3 when the kbite already exists.

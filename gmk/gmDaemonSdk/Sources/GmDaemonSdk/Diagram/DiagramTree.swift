@@ -1,14 +1,10 @@
 import Foundation
 
-/// The DIAGRAM read tree. Identity reuses DopeNodeIdentity (a generic
-/// uuid/version/timestamp quad — the mirror-don't-share decision is scoped
-/// to the level machinery, not to plain value shapes). Each node carries the
-/// SAME tagged payload enum GMVibes sends back in mutations, so the read and
-/// write currencies cannot drift.
-///
-/// CodingKey constraint (see DopeTree.swift): child-collection keys are
-/// single words (`elements`, `children`, `payload`) — fixed points of the
-/// snake_case strategies; bare-case multiword keys convert normally.
+/// The DIAGRAM read tree. Identity reuses DopeNodeIdentity, and each node
+/// carries the SAME tagged payload enum GMVibes sends back in mutations, so
+/// the read and write currencies cannot drift. Child-collection CodingKeys
+/// are single words — fixed points of the snake_case strategies, where an
+/// explicit snake_case raw value would silently decode to nil.
 
 /// The shared, always-present element columns.
 public struct DiagramElementBase: Codable, Hashable, Sendable {
@@ -27,8 +23,14 @@ public struct DiagramElementBase: Codable, Hashable, Sendable {
     public let scale: Double
 
     public init(
-        code: String, name: String, description: String, sortOrder: Int,
-        centerX: Double, centerY: Double, elementZ: Double, scale: Double
+        code: String,
+        name: String,
+        description: String,
+        sortOrder: Int,
+        centerX: Double,
+        centerY: Double,
+        elementZ: Double,
+        scale: Double
     ) {
         self.code = code
         self.name = name
@@ -50,8 +52,10 @@ public struct DiagramElementNode: Codable, Hashable, Sendable {
     private enum CodingKeys: String, CodingKey { case payload, children }
 
     public init(
-        identity: DopeNodeIdentity, base: DiagramElementBase,
-        payload: DiagramElementPayload, children: [DiagramElementNode]
+        identity: DopeNodeIdentity,
+        base: DiagramElementBase,
+        payload: DiagramElementPayload,
+        children: [DiagramElementNode]
     ) {
         self.identity = identity
         self.base = base
@@ -100,10 +104,18 @@ public struct DiagramTree: Codable, Hashable, Sendable {
     }
 
     public init(
-        identity: DopeNodeIdentity, tier: String, projectUuid: String,
-        instanceUuid: String?, sessionUuid: String?, promptUuid: String?,
-        code: String, name: String, description: String,
-        gmccDiagramPath: String?, revision: Int64, elements: [DiagramElementNode]
+        identity: DopeNodeIdentity,
+        tier: String,
+        projectUuid: String,
+        instanceUuid: String?,
+        sessionUuid: String?,
+        promptUuid: String?,
+        code: String,
+        name: String,
+        description: String,
+        gmccDiagramPath: String?,
+        revision: Int64,
+        elements: [DiagramElementNode]
     ) {
         self.identity = identity
         self.tier = tier
@@ -167,8 +179,11 @@ public struct DiagramBindingResolution: Codable, Hashable, Sendable {
     public let dopeRevision: Int64?
 
     public init(
-        elementUuid: String, dopeScopeCode: String, resolvedVia: String?,
-        scopeUuid: String?, dopeRevision: Int64?
+        elementUuid: String,
+        dopeScopeCode: String,
+        resolvedVia: String?,
+        scopeUuid: String?,
+        dopeRevision: Int64?
     ) {
         self.elementUuid = elementUuid
         self.dopeScopeCode = dopeScopeCode

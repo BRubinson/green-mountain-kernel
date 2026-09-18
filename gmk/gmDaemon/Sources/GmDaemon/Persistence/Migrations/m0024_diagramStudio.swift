@@ -3,37 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0024 — Diagram Studio: the visibility axis, the first diagram FTS
-    // mirror, the uml_node subtype, and connector routing/tail vocabulary.
-    //
-    // visibility is a NEW axis, not a tier: DiagramTier stays pure
-    // ownership and --promote-tier is untouched. PRIVATE = db-only;
-    // PUBLIC = repo-serializable, legal ONLY on SESSION-tier rows — a
-    // Swift store guard mirroring Store+DopeRepo.requireRepoWritableScope
-    // (m0016 precedent: the rule crosses tables, so no CHECK can hold
-    // it). The column itself is CHECKless like every vocabulary column
-    // since m0021: validity lives in DiagramVisibility.
-    //
-    // diagram_uml_node: ONE table for every UML node kind (node_kind is
-    // the vocabulary column, the drawing_shape/shape_kind precedent) —
-    // six tables would make reshape a delete+recreate, which ghosts
-    // every incoming connector via target_element_uuid's ON DELETE SET
-    // NULL. Explicit width/height like drawing_text: markdown wrapping
-    // needs a known layout width, and the kit never measures text.
-    // Chrome columns are nullable — nil means "theme default" so a node
-    // with no explicit colors renders correctly in both schemes.
-    //
-    // routing_kind/tail_kind defaults reproduce the pre-m0024 render
-    // byte-for-byte: orthogonal_step IS today's routed polyline and
-    // every existing connector has no tail decoration.
-    //
-    // diagram_fts: the update trigger is deliberately AFTER UPDATE OF
-    // code, name, description — the diagram row is the first FTS source
-    // that is HOT on unrelated columns (revision bumps on every stroke),
-    // and a plain AFTER UPDATE would churn the index once per pencil
-    // gesture. Any future rebuild of the diagram table must recreate
-    // this mirror and its triggers (external content binds rowid —
-    // m0015's lesson).
+    // m0024 — Diagram Studio: the visibility axis, the first diagram FTS mirror,
+    // the uml_node subtype, and connector routing/tail vocabulary.
+    // visibility is an axis, not a tier: PRIVATE is db-only, PUBLIC is
+    // repo-serializable and legal ONLY on SESSION-tier rows, guarded in Swift
+    // because the rule crosses tables. ONE diagram_uml_node table for every node
+    // kind: six would make reshape a delete+recreate, ghosting every incoming
+    // connector. The diagram_fts update trigger fires AFTER UPDATE OF code, name,
+    // description only — revision bumps on every stroke would churn the index.
     static func m0024_diagramStudio(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0024_diagramStudio") { db in
             try db.execute(
@@ -43,7 +20,8 @@ extension Migrations {
 
                     ALTER TABLE diagram_connector ADD COLUMN routing_kind TEXT NOT NULL DEFAULT 'orthogonal_step';
                     ALTER TABLE diagram_connector ADD COLUMN tail_kind TEXT NOT NULL DEFAULT 'none';
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: """
@@ -64,7 +42,8 @@ extension Migrations {
 
                     CREATE INDEX idx_diagram_uml_node_element_fk
                         ON diagram_uml_node(element_uuid);
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: """
@@ -89,7 +68,8 @@ extension Migrations {
                     END;
 
                     INSERT INTO diagram_fts(diagram_fts) VALUES ('rebuild');
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",

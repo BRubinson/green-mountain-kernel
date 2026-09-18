@@ -30,7 +30,7 @@ public struct GmAgentRpirOpenExplorationTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirOpenExplorationArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirOpenExplorationArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "EXPLORE_OPEN")
     }
 }
@@ -54,7 +54,11 @@ public struct GmAgentExplorationFinding: Sendable {
     public var rating: Int?
 
     public init(
-        kind: String, title: String, body: String, filePath: String = "", rating: Int? = nil
+        kind: String,
+        title: String,
+        body: String,
+        filePath: String = "",
+        rating: Int? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -90,7 +94,7 @@ public struct GmAgentRpirWriteExplorationsTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirWriteExplorationsArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirWriteExplorationsArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "EXPLORE_FINDING_ADD (looped)")
     }
 }
@@ -132,7 +136,7 @@ public struct GmAgentRpirRankExplorationsTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirRankExplorationsArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirRankExplorationsArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "EXPLORE_RANK")
     }
 }
@@ -163,7 +167,7 @@ public struct GmAgentRpirCompleteExplorationTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirCompleteExplorationArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirCompleteExplorationArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "EXPLORE_COMPLETE")
     }
 }
@@ -194,7 +198,7 @@ public struct GmAgentRpirGetExplorationTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirGetExplorationArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirGetExplorationArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "EXPLORE_GET")
     }
 }

@@ -3,22 +3,14 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0026 — Session-bound hook attribution. PRECONDITION: a BACKUP.
-    //
-    // One attribution path, resolved from the PostToolUse payload plus
-    // the db. claude_session_binding maps Claude Code's conversation uuid
-    // to a gmcc session; agent_registration answers "who is agent X" for
-    // an opaque agent_id; file_change grows the typed payload columns the
-    // two resolve against. Pure ADD — file_change carries a CHECK only on
-    // change_kind, which is untouched, so no table is rebuilt.
-    //
-    // claude_turn_id is THE naming trap of this migration. The payload
-    // field is called prompt_id, but it is Claude Code's TURN id and has
-    // nothing to do with a gmcc prompt uuid; the column is named for what
-    // it holds so the confusion cannot be inherited by a reader.
-    //
-    // The new columns are NULL for every pre-m0026 row. There is no
-    // backfill: nothing outside a payload can know a tool_use_id.
+    // m0026 — session-bound hook attribution. PRECONDITION: a BACKUP.
+    // claude_session_binding maps Claude Code's conversation uuid to a gmcc
+    // session; agent_registration answers "who is agent X" for an opaque
+    // agent_id; file_change grows the typed payload columns the two resolve
+    // against. Pure ADD — file_change's only CHECK is on change_kind.
+    // claude_turn_id is the naming trap here: the payload calls it prompt_id, but
+    // it is Claude Code's TURN id and has nothing to do with a gmcc prompt uuid.
+    // The new columns are NULL for older rows; nothing can backfill a tool_use_id.
     static func m0026_claudeSessionAttribution(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0026_claudeSessionAttribution") { db in
             // ---- claude_session_binding: the payload-side attribution key.
@@ -50,22 +42,17 @@ extension Migrations {
                         ON claude_session_binding(claude_session_id);
                     CREATE INDEX idx_claude_session_binding_session_fk
                         ON claude_session_binding(session_uuid);
-                    """)
+                    """
+            )
 
             // ---- agent_registration: identity for an opaque agent_id.
-            // Two writers merge into ONE row per agent: the SubagentStart
-            // hook writes IDENTITY (agent_id, agent_type, claude ids, the
-            // resolved session), AGENT_REGISTER writes AUTHORITY (role,
-            // methodology, workflow_phase). The join happens at READ time, so
-            // ordering is not a constraint — a spawner that only learns agent
-            // ids when a dynamic workflow reports back registers late and
-            // still explains rows already written.
-            //
-            // NOT a reuse of agent_briefing, and the two are adjacent enough
-            // to be confused: a briefing answers "what refs did this agent
-            // get", a registration answers "who is agent X". The briefing's
-            // UNIQUE(prompt_uuid, briefing_for_step) cannot hold four
-            // same-typed explorers, which is the exact case this table is for.
+            // Two writers merge into ONE row per agent: the SubagentStart hook
+            // writes IDENTITY, AGENT_REGISTER writes AUTHORITY. The join happens
+            // at READ time, so ordering is not a constraint — an agent that
+            // registers late still explains rows already written.
+            // Adjacent to agent_briefing and easily confused with it: a briefing
+            // answers "what refs did this agent get". agent_briefing's
+            // UNIQUE(prompt_uuid, step) cannot hold four same-typed explorers.
             try db.execute(
                 sql: """
                     CREATE TABLE agent_registration (
@@ -106,7 +93,8 @@ extension Migrations {
                         ON agent_registration(agent_id);
                     CREATE INDEX idx_agent_registration_prompt_fk
                         ON agent_registration(prompt_uuid);
-                    """)
+                    """
+            )
 
             // ---- file_change: the payload capture set, one typed column per
             // field rather than a blob, so every axis is queryable. agent_id
@@ -149,7 +137,8 @@ extension Migrations {
                         ON file_change(agent_id);
                     CREATE INDEX idx_file_change_agent_registration_fk
                         ON file_change(agent_registration_uuid);
-                    """)
+                    """
+            )
 
             try db.execute(
                 sql: "INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)",

@@ -14,9 +14,13 @@ struct ContextRepository: RepositoryContext {
     func ensureContext(_ req: ContextEnsureRequest) throws -> ContextEnsureResponse {
         let (projectUuid, createdProject) = try ensureProject(req.project)
         let (instanceUuid, createdInstance) = try ensureInstance(
-            req.instance, projectUuid: projectUuid)
+            req.instance,
+            projectUuid: projectUuid
+        )
         let (sessionUuid, createdSession) = try ensureSession(
-            req.session, instanceUuid: instanceUuid)
+            req.session,
+            instanceUuid: instanceUuid
+        )
         // The binding rides this call because SessionStart already makes it:
         // pinning here costs no second process and cannot be forgotten
         // independently of creating the session it points at. Pin-once is the
@@ -24,7 +28,9 @@ struct ContextRepository: RepositoryContext {
         // conversation ensured is the one it stays bound to.
         if let claudeSessionId = req.claudeSessionId {
             try claudeSessionBinding.pin(
-                claudeSessionId: claudeSessionId, sessionUuid: sessionUuid)
+                claudeSessionId: claudeSessionId,
+                sessionUuid: sessionUuid
+            )
         }
         // Counted AFTER the pin above, so a caller that just bound this session
         // is told 1 rather than the pre-pin 0 and does not warn about a session
@@ -33,7 +39,8 @@ struct ContextRepository: RepositoryContext {
             try Int.fetchOne(
                 db,
                 sql: "SELECT COUNT(*) FROM claude_session_binding WHERE session_uuid = ?",
-                arguments: [sessionUuid]) ?? 0
+                arguments: [sessionUuid]
+            ) ?? 0
         return ContextEnsureResponse(
             projectUuid: projectUuid,
             instanceUuid: instanceUuid,
@@ -48,20 +55,25 @@ struct ContextRepository: RepositoryContext {
     /// Read-only resolution — never creates rows.
     func getContext(_ req: ContextGetRequest) throws -> ContextGetResponse {
         let projectUuid = try String.fetchOne(
-            db, sql: "SELECT uuid FROM project WHERE code = ?", arguments: [req.projectCode])
+            db,
+            sql: "SELECT uuid FROM project WHERE code = ?",
+            arguments: [req.projectCode]
+        )
         var instanceUuid: String?
         if let projectUuid {
             instanceUuid = try String.fetchOne(
                 db,
                 sql: "SELECT uuid FROM instance WHERE project_uuid = ? AND name = ?",
-                arguments: [projectUuid, req.instanceName])
+                arguments: [projectUuid, req.instanceName]
+            )
         }
         var sessionUuid: String?
         if let instanceUuid {
             sessionUuid = try String.fetchOne(
                 db,
                 sql: "SELECT uuid FROM session WHERE instance_uuid = ? AND code = ?",
-                arguments: [instanceUuid, req.sessionCode])
+                arguments: [instanceUuid, req.sessionCode]
+            )
         }
         var kbiteCodes: [String] = []
         if let sessionUuid {
@@ -72,7 +84,9 @@ struct ContextRepository: RepositoryContext {
                     JOIN session_active_kbite j ON j.kbite_uuid = k.uuid
                     WHERE j.session_uuid = ?
                     ORDER BY k.code
-                    """, arguments: [sessionUuid])
+                    """,
+                arguments: [sessionUuid]
+            )
         }
         return ContextGetResponse(
             projectUuid: projectUuid,
@@ -86,25 +100,31 @@ struct ContextRepository: RepositoryContext {
 
     func ensureProject(_ ctx: ProjectContext) throws -> (uuid: String, created: Bool) {
         if let existing = try String.fetchOne(
-            db, sql: "SELECT uuid FROM project WHERE code = ?", arguments: [ctx.code]
+            db,
+            sql: "SELECT uuid FROM project WHERE code = ?",
+            arguments: [ctx.code]
         ) {
             return (existing, false)
         }
         let uuid = try core.insertBase(
-            db, table: "project", uuid: ctx.uuid,
+            db,
+            table: "project",
+            uuid: ctx.uuid,
             extra: [
                 "git_repo_name": ctx.gitRepoName,
                 "code": ctx.code,
                 "name": ctx.name,
                 "gmfs_relative_storage_path": ctx.gmfsRelativeStoragePath,
-            ])
+            ]
+        )
         try seedKbites(level: "project", ownerUuid: uuid, codes: ctx.kbiteCodes, parent: nil)
         try core.appendEvent(db, kind: .createProject, subjectUuid: uuid)
         return (uuid, true)
     }
 
     func ensureInstance(
-        _ ctx: InstanceContext, projectUuid: String
+        _ ctx: InstanceContext,
+        projectUuid: String
     ) throws -> (uuid: String, created: Bool) {
         if let existing = try String.fetchOne(
             db,
@@ -114,23 +134,30 @@ struct ContextRepository: RepositoryContext {
             return (existing, false)
         }
         let uuid = try core.insertBase(
-            db, table: "instance", uuid: ctx.uuid,
+            db,
+            table: "instance",
+            uuid: ctx.uuid,
             extra: [
                 "project_uuid": projectUuid,
                 "code": ctx.code,
                 "name": ctx.name,
                 "absolute_file_system_path": ctx.absoluteFileSystemPath,
                 "gmfs_relative_storage_path": ctx.gmfsRelativeStoragePath,
-            ])
+            ]
+        )
         try seedKbites(
-            level: "instance", ownerUuid: uuid, codes: ctx.kbiteCodes,
-            parent: (level: "project", uuid: projectUuid))
+            level: "instance",
+            ownerUuid: uuid,
+            codes: ctx.kbiteCodes,
+            parent: (level: "project", uuid: projectUuid)
+        )
         try core.appendEvent(db, kind: .createInstance, subjectUuid: uuid)
         return (uuid, true)
     }
 
     func ensureSession(
-        _ ctx: SessionContext, instanceUuid: String
+        _ ctx: SessionContext,
+        instanceUuid: String
     ) throws -> (uuid: String, created: Bool) {
         if let existing = try String.fetchOne(
             db,
@@ -140,7 +167,9 @@ struct ContextRepository: RepositoryContext {
             return (existing, false)
         }
         let uuid = try core.insertBase(
-            db, table: "session", uuid: ctx.uuid,
+            db,
+            table: "session",
+            uuid: ctx.uuid,
             extra: [
                 "instance_uuid": instanceUuid,
                 "code": ctx.code,
@@ -149,10 +178,14 @@ struct ContextRepository: RepositoryContext {
                 "goal": ctx.goal,
                 "status": SessionStatus.active.rawValue,
                 "gmfs_relative_storage_path": ctx.gmfsRelativeStoragePath,
-            ])
+            ]
+        )
         try seedKbites(
-            level: "session", ownerUuid: uuid, codes: ctx.kbiteCodes,
-            parent: (level: "instance", uuid: instanceUuid))
+            level: "session",
+            ownerUuid: uuid,
+            codes: ctx.kbiteCodes,
+            parent: (level: "instance", uuid: instanceUuid)
+        )
         try core.appendEvent(db, kind: .createSession, subjectUuid: uuid)
         return (uuid, true)
     }
@@ -162,7 +195,9 @@ struct ContextRepository: RepositoryContext {
     /// Upsert a kbite row by code, returning its uuid.
     func ensureKbite(code: String) throws -> String {
         if let existing = try String.fetchOne(
-            db, sql: "SELECT uuid FROM kbite WHERE code = ?", arguments: [code]
+            db,
+            sql: "SELECT uuid FROM kbite WHERE code = ?",
+            arguments: [code]
         ) {
             return existing
         }
@@ -187,16 +222,19 @@ struct ContextRepository: RepositoryContext {
             let inherited = try String.fetchAll(
                 db,
                 sql: "SELECT kbite_uuid FROM \(parent.level)_active_kbite WHERE \(parent.level)_uuid = ?",
-                arguments: [parent.uuid])
+                arguments: [parent.uuid]
+            )
             kbiteUuids.formUnion(inherited)
         }
         for kbiteUuid in kbiteUuids.sorted() {
             try core.insertBase(
-                db, table: "\(level)_active_kbite",
+                db,
+                table: "\(level)_active_kbite",
                 extra: [
                     "\(level)_uuid": ownerUuid,
                     "kbite_uuid": kbiteUuid,
-                ])
+                ]
+            )
         }
     }
 }

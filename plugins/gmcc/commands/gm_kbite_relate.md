@@ -1,12 +1,8 @@
 ---
 description: Define a relationship between two kbites for cross-referencing
 argument-hint: <kbite_from> <kbite_to> <relationship>
-allowed-tools: Read, Write, Bash, Glob, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest, Skill
+allowed-tools: Read, Write, Bash, Glob, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest
 ---
-
-**Load the `gmcc` skill before anything else.** It carries the GMB identity and
-the GM-CDE rules every step below assumes. Do not begin the work until it is in
-context.
 
 Define a relationship between two kbites for cross-referencing.
 

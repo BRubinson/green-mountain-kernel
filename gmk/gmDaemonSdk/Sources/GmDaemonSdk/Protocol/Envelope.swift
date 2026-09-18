@@ -7,188 +7,10 @@ import Foundation
 /// rejected — the daemon stays up (an old pinned-Kit GMVibes must never be
 /// able to kill-loop a fresh daemon).
 public enum GmWireProtocol {
-    /// v18 — m0017 RENAMED a wire field on an existing message rather than
-    /// adding one: DopePropertyBody.related_property_ref became
-    /// relationship_target_ref, and DopeNodeFields.related_property_uuid
-    /// became relationship_target_uuid.
-    ///
-    /// That is an INCOMPATIBLE change under the rule in CLAUDE.md, and the
-    /// failure it prevents is silent rather than loud: both fields are
-    /// Optional, so a stale peer's `related_property_ref` decodes to nil, and
-    /// a relationship property with a nil target then trips
-    ///   CHECK ((data_type = 'relationship') = (relationship_target_uuid IS NOT NULL))
-    /// at write time — or worse, writes nothing where a reference was meant.
-    /// The handshake has to reject that peer instead of letting it through.
-    ///
-    /// v19 — m0018 RENAMED a payload TAG on an existing message: the
-    /// diagram element type `dope_scope` became
-    /// `dope_scope_persistence_layer`, and DiagramElementPayload's
-    /// `dopeScope(DopeScopePayload)` case renamed with it.
-    ///
-    /// Incompatible for the same reason v18 was, and louder about it: the tag
-    /// IS the discriminator, so a stale peer sending `dope_scope` decodes to
-    /// an unknown case, and one receiving `dope_scope_persistence_layer`
-    /// cannot map it onto any case it knows. The db CHECK now names only the
-    /// new value too, so a stale writer's rows would be rejected outright.
-    /// Reject the peer at the handshake instead.
-    ///
-    /// (The additive OPTIONAL fields that landed alongside it —
-    /// DopeCogElementAddRequest.dope_persistence_code and
-    /// DopeCogElementNode.dope_persistence_code — would NOT have bumped this
-    /// on their own; they decode safely in both directions.)
-    /// v20 — three NEW message types: PROMPT_DIAGRAM_QUALIFY / _GET / _LIST,
-    /// the prompt_qualified_diagram surface (m0022). A new message type is an
-    /// unambiguous bump under CLAUDE.md: a stale daemon answers UNKNOWN_TYPE
-    /// to a verb that is supposed to exist, and a stale client cannot be told
-    /// the verb is there.
-    ///
-    /// What did NOT bump this: the DiagramElementPayload cases added earlier
-    /// in this same body of work. Those are ADDITIVE tags on an existing
-    /// message and they ride under the additive-OPTIONAL convention — the
-    /// convention was not abandoned, it simply does not cover new message
-    /// types. Read the v18/v19 notes above for what a RENAME costs by
-    /// contrast.
-    ///
-    /// And a bonus that falls out of landing v20 at all: those additive tags
-    /// carried an accepted risk — an older peer meeting an unknown payload tag
-    /// fails in the decoder rather than at the door. Once every peer is at
-    /// v20 that risk is retired for free, because the handshake rejects a
-    /// stale peer before any payload reaches a decoder.
-    ///
-    /// v21 → v22: KBITE_EXPORT / KBITE_IMPORT / KBITE_DELETE — the
-    /// portable-kbite family. Three new message types, so the bump is
-    /// mandatory under the same rule as v20.
-    ///
-    /// v22 → v23: the Diagram Studio train. Four new message types —
-    /// DIAGRAM_SEARCH / DIAGRAM_DELETE / DIAGRAM_WRITE_REPO /
-    /// DIAGRAM_INGEST — force the bump, and every otherwise-UNSAFE addition
-    /// deliberately rides the same fence (the v20 "bonus", used on purpose
-    /// this time): the uml_node payload kind, the widened
-    /// DiagramConnectorHead vocabulary, ConnectorPayload.routingKind /
-    /// tailKind, and diagram.visibility. A pre-v23 peer never reaches the
-    /// decoders these would crash — the handshake rejects it at the door.
-    /// v23 → v24: the dynamic-workflows train (m0025). New message families
-    /// — PROMPT_START / PROMPT_RESUME / BOT_NEXT / BOT_GET,
-    /// CLARIFY_QUESTION_ADD / CLARIFY_NOTE_ADD (CLARIFY_ASK retired; ANSWER
-    /// retooled in place), CARE_PACKAGE_OPEN/REF_ADD/COMPLETE/GET,
-    /// ARCH_OPTION_ADD / ARCH_DECIDE — force the bump, and the honest row
-    /// reshapes ride the same fence: ExplorationSummaryRow +agentType
-    /// (per-agent rows), the merged finding/file pair (EXPLORE_RANK now
-    /// prompt-scoped), AgentBriefingRow's typed ref children riding
-    /// BRIEFING_COMPLETE (body gone), the slimmed ClarificationSummaryRow,
-    /// and SearchKind's retired clarification/key-file cases.
-    ///
-    /// v24 → v25: session-bound hook attribution (m0026). TWO structural
-    /// changes force it, and only these two: the NEW message type
-    /// AGENT_REGISTER, and the REMOVAL of BOT_SET_BASELINE. Both are
-    /// unambiguous under CLAUDE.md — a stale daemon answers UNKNOWN_TYPE to a
-    /// verb that is supposed to exist, and a stale client keeps sending one
-    /// that no longer does.
-    ///
-    /// What did NOT bump this, and rides the same fence: every payload field
-    /// of the attribution axis — ContextEnsureRequest.claude_session_id,
-    /// FileChangeAdd's claude_session_id / claude_turn_id / tool_use_id /
-    /// tool_name / agent_type / permission_mode / duration_ms /
-    /// transcript_path, FileChangeAddResponse.deduplicated and the matching
-    /// FileChangeRow fields. Those are additive OPTIONALs that decode safely
-    /// in both directions, which is the convention that keeps GMVibes'
-    /// vendored kit compatible. FileChangeAdd.client_key going away is
-    /// likewise decode-safe (an unknown key is ignored) — it needs no bump of
-    /// its own and simply travels with this one.
-    ///
-    /// v25 → v26: CKFS retired for GMFS. TWO reasons, and the second is the
-    /// one worth reading.
-    ///
-    /// (a) `ckfs_relative_storage_path` → `gmfs_relative_storage_path` is a
-    /// RENAME on an existing message, not an additive OPTIONAL field. It does
-    /// NOT decode safely in both directions: a stale client sending the old key
-    /// to a new daemon, or reading the new key it does not know, lands on `nil`
-    /// for a TEXT NOT NULL column. The same goes for `PathsGetResponse`, where
-    /// `ckfs_root` is dropped outright rather than renamed. Per CLAUDE.md, a
-    /// rename on an existing message is exactly when this number moves.
-    ///
-    /// (b) It is also a SAFETY FEATURE for the parallel-stack period. Two
-    /// daemons now coexist on separate sockets (the retired runtime's socket
-    /// and `~/gmfs/daemon.sock`). If a stale client reaches the wrong one, the
-    /// version check fails LOUDLY on the HELLO rather than mis-decoding a
-    /// renamed field to nil and writing a plausible-looking wrong row — which
-    /// is precisely the silent failure the m0017 model warns about. Not bumping
-    /// would have made the two stacks *look* interoperable.
-    /// v26 → v27: the prompt lifecycle collapse (m0028). PromptStatus loses
-    /// FOUR arms — the four middle states between draft and done — and gains
-    /// one. Removing a case from an enum on an existing message is the same
-    /// class of change as the v18/v19 renames and bumps for the same reason:
-    /// it does not decode safely in either direction. A stale client sending
-    /// the old middle state reaches a daemon with no such case, and a stale
-    /// client receiving the new one cannot map it — and because `status` is a
-    /// plain TEXT column with no CHECK, the failure would be a plausible-looking
-    /// wrong row rather than a loud rejection. That is precisely the silent
-    /// failure the m0017 note warns about, so the handshake has to catch the
-    /// peer first.
-    ///
-    /// What did NOT bump this and rides along: DopeSearchRequest.sources
-    /// ([DopeSearchSource]?). An additive OPTIONAL field that decodes safely in
-    /// both directions, and whose nil means exactly what the absent field meant
-    /// — every union arm. It needed no bump of its own and simply travels with
-    /// this one.
-    ///
-    /// v27 → v28: TX_BATCH. A NEW MESSAGE TYPE, which is the first of the two
-    /// documented reasons this number moves. It carries N opaque NDJSON request
-    /// lines executed inside ONE transaction, which is what gives a relayed MCP
-    /// tool body multi-step atomicity now that the kernel hosts the writer in
-    /// the same process as the UI.
-    ///
-    /// What did NOT bump this and rides along: the four vitals/role fields on
-    /// `PingResponse` and `StatusResponse` (`residentMemoryBytes`, `cpuPercent`,
-    /// `writerRole`, `writerBundlePath`). Every one is an additive OPTIONAL on
-    /// an existing message, so they decode safely in both directions and a nil
-    /// means exactly what the absent field meant — the peer does not report
-    /// vitals. They needed no bump of their own. They DO move
-    /// `wire_keys.golden`, which is a frozen fixture rather than a protocol
-    /// version, and it is regenerated in the same commit.
-    ///
-    /// v28 → v29: the test-run lock surface. SIX NEW MESSAGE TYPES
-    /// (`TEST_SUITE_LIST`, `TEST_LOCK_STATUS`, `TEST_LOCK_ACQUIRE`,
-    /// `TEST_LOCK_RELEASE`, `TEST_RUN_START`, `TEST_RUN_STATUS`) — the first of
-    /// the two documented reasons this number moves, and one bump covers all
-    /// six because they land together.
-    ///
-    /// What did NOT bump this and rides along: `PingResponse.gmfsRoot`. An
-    /// additive OPTIONAL on an existing message, so it decodes safely in both
-    /// directions and a nil means exactly what the absent field meant — the peer
-    /// does not report its root. The four vitals/role fields at v28 are the
-    /// precedent. Recorded because the rule only means something if the
-    /// distinction is actually held: had the six message types not been in this
-    /// pass, `gmfsRoot` would have shipped at 28 and moved nothing.
-    ///
-    /// v29 → v30: the harness envelope. TWO NEW MESSAGE TYPES — `MCP_CALL` and
-    /// `HOOK_EVENT` — landed together so the bump is spent ONCE, which is the
-    /// same reasoning the six test-lock types used at v29. They turn the MCP
-    /// surface and the hook surface into two transports over one `(verb, json)`
-    /// envelope, with the tool and hook bodies moving kernel-side where
-    /// `inTransaction` is reachable.
-    ///
-    /// Both carry the IDENTITY TRIPLE — `client_key`, `cwd`, `project_dir` — as
-    /// explicit REQUIRED fields, and that is the load-bearing part rather than a
-    /// convenience. `ClientKey.resolve()` walks process ancestry for a `claude`
-    /// parent and returns `claude:<pid>:<starttime>`; that string IS the
-    /// activation-claim key. A kernel process is not a descendant of any Claude
-    /// instance, so it resolves nil and the activation registry would silently
-    /// degrade to last-writer-wins across concurrent prompts. The harness-side
-    /// child therefore survives — thinned, not deleted — and resolves the triple
-    /// before forwarding. Same for `cwd`: `main()` chdirs to
-    /// `$CLAUDE_PROJECT_DIR` so `GitContext.detect()` resolves the right repo,
-    /// and one long-lived process cannot hold N cwds.
-    ///
-    /// `HOOK_EVENT` additionally carries `hook_safe`. It is a WIRE field rather
-    /// than a client convention on purpose: with it set the daemon never returns
-    /// an error envelope for a business failure, because a hook may never exit
-    /// non-zero and `gm_hook call` currently does. Making it part of the message
-    /// stops that being something a caller can forget.
-    ///
-    /// Both join `TxBatchHandler.denied`. `TX_BATCH` denies itself for
-    /// no-nesting, and an `MCP_CALL` that expands into a batch would defeat that
-    /// through an alias.
+    /// Bumped by a NEW message type, or by an incompatible change to an
+    /// existing one: a renamed field, or a REMOVED enum case. Additive
+    /// OPTIONAL fields do NOT bump — they decode safely in both directions.
+    /// Message types that land together share a single bump.
     public static let version = 30
 }
 
@@ -364,38 +186,27 @@ public enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     // the inner lines stay opaque so this verb needs no knowledge of the
     // ~230 it can carry.
     case txBatch = "TX_BATCH"
-    // Agent-scoped test mutual exclusion (v29).
-    //
-    // This is a mutex for AGENTS, layered ABOVE the kernel's own flock
-    // single-writer guarantee and not to be confused with it: flock stops two
-    // kernels writing one database; this stops two agents building and testing
-    // one repository. They protect different things, and once a test run owns
-    // its own ephemeral root there is no database contention left for this to
-    // protect — what stays contended is the BUILD and the CHECKOUT.
-    //
-    // Deliberately does NOT include a "run the tests" verb. Execution needs
-    // supervision, output streaming and cancellation, and none of those are
-    // this change; TEST_RUN_START records that a run was started and what will
-    // signal its completion, which is what lets another agent decide whether to
-    // wait. The suites themselves are configured in the REPO, not here.
+    // Agent-scoped test mutual exclusion: a mutex for AGENTS, layered ABOVE
+    // the kernel's flock and not to be confused with it. flock stops two
+    // kernels writing one database; this stops two agents contending for the
+    // BUILD and the CHECKOUT. There is deliberately no "run the tests" verb —
+    // execution needs supervision, streaming and cancellation. TEST_RUN_START
+    // records that a run began and what will signal its completion, which is
+    // what lets another agent decide whether to wait.
     case testSuiteList = "TEST_SUITE_LIST"
     case testLockStatus = "TEST_LOCK_STATUS"
     case testLockAcquire = "TEST_LOCK_ACQUIRE"
     case testLockRelease = "TEST_LOCK_RELEASE"
     case testRunStart = "TEST_RUN_START"
     case testRunStatus = "TEST_RUN_STATUS"
-    // The harness envelope (v30). MCP tools and hooks become two TRANSPORTS
-    // over one (verb, json) envelope, with the bodies kernel-side where
-    // `inTransaction` is reachable.
-    //
-    // TWO cases rather than one HARNESS_CALL{kind, name}: the exhaustive
-    // dispatcher switch is one of the very few guard rails still ENFORCED — a
-    // new MessageType with no handler arm does not COMPILE — and a single case
-    // discriminated by a payload field moves that check from the compiler to a
-    // runtime string comparison. The duplication buys a build failure.
-    //
-    // Both carry the identity triple explicitly; see the version note above for
-    // why the harness-side child cannot be deleted, only thinned.
+    // The harness envelope: MCP tools and hooks as two TRANSPORTS over one
+    // (verb, json) envelope, with the bodies kernel-side where `inTransaction`
+    // is reachable. TWO cases rather than one HARNESS_CALL{kind, name} because
+    // the exhaustive dispatcher switch is enforced by the compiler, and one
+    // case discriminated by a payload field would move that to a runtime string
+    // comparison. Both carry the identity triple explicitly: a kernel is no
+    // Claude descendant, so it cannot resolve `client_key` itself, and one
+    // long-lived process cannot hold N cwds.
     case mcpCall = "MCP_CALL"
     case hookEvent = "HOOK_EVENT"
     // Daemon → client only

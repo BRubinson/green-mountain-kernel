@@ -124,8 +124,10 @@ struct SessionScreen: View {
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
             // The sidebar prompt filter (name/content).
             .searchable(
-                text: $promptQuery, placement: .sidebar,
-                prompt: "Filter this session")
+                text: $promptQuery,
+                placement: .sidebar,
+                prompt: "Filter this session"
+            )
         } content: {
             detailContent
         }
@@ -184,7 +186,8 @@ struct SessionScreen: View {
             )
         case .diagrams:
             SessionDiagramsPane(
-                scope: scope, windowID: windowID,
+                scope: scope,
+                windowID: windowID,
                 projectUuid: instanceRow?.projectUuid ?? ""
             ) { diagramID in
                 nav.go(.diagram(diagramID))
@@ -195,15 +198,21 @@ struct SessionScreen: View {
             // saved diagrams live one tab over, and computing a throwaway
             // canvas must never mint a diagram row behind the user's back.
             DopePane(
-                scope: scope, promptUuid: nil,
+                scope: scope,
+                promptUuid: nil,
                 onOpenDiagram: { scopeCode in
                     nav.go(
                         .diagram(
                             DiagramWindowID(
                                 source: .dopePreview(scopeCode: scopeCode),
-                                name: scopeCode, session: windowID,
-                                projectUuid: instanceRow?.projectUuid ?? "")))
-                })
+                                name: scopeCode,
+                                session: windowID,
+                                projectUuid: instanceRow?.projectUuid ?? ""
+                            )
+                        )
+                    )
+                }
+            )
         }
     }
 }
@@ -232,7 +241,8 @@ private struct PromptListPane: View {
                     description: Text(
                         searching
                             ? "No prompt matches the sidebar filter."
-                            : "Create a prompt with + in the sidebar.")
+                            : "Create a prompt with + in the sidebar."
+                    )
                 )
             }
         } else {
@@ -365,7 +375,7 @@ struct SessionPromptListSidebar: View {
     /// Activation mode (the session screen): rows are Buttons and clicking
     /// NAVIGATES — no selection binding, so arrow keys/type-select/VoiceOver
     /// focus can never swap the window route.
-    var onOpen: ((PromptStub) -> Void)? = nil
+    var onOpen: ((PromptStub) -> Void)?
 
     var body: some View {
         List(selection: onOpen == nil ? $selectedUuid : .constant(nil)) {
@@ -454,7 +464,8 @@ struct PromptNavRow: View {
             PromptDiagramBadge(promptUuid: stub.uuid)
             PromptStatusBadge(
                 status: PromptStatus(rawValue: stub.status),
-                tint: launchColors.color(for: stub.uuid)?.color)
+                tint: launchColors.color(for: stub.uuid)?.color
+            )
         }
         .padding(.vertical, 2)
     }

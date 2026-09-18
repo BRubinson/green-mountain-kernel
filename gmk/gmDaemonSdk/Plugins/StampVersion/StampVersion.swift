@@ -1,26 +1,18 @@
 import Foundation
 import PackagePlugin
 
-/// Generates `GmVersion.swift` — the ONE version symbol for the whole gmk graph
-/// — inside the build graph, from `gmk/VERSION`.
-///
-/// It lives in the BASE package on purpose: every other package already depends
-/// on `GmDaemonSdk`, so stamping here gives the version to all of them without a
-/// new edge and without a second copy of this plugin. `gmDaemon`'s own
-/// `StampBuildInfo` is unchanged and still stamps `sha`/`date`/`version` for the
-/// build identity `gm_hook ping` reports; this is the shared PIN, not the build
-/// stamp, and the two answer different questions.
-///
-/// As a prebuild plugin the stamp happens because the target is being built —
-/// Xcode, every CI job and a clean clone all get it with no prior shell step.
-/// The generated file lands in the plugin work directory, never in the source
-/// tree, so there is nothing to gitignore and nothing to accidentally commit.
+/// Generates `GmVersion.swift`, the ONE version symbol for the gmk graph, from `gmk/VERSION`.
+/// It lives in the base package so every dependent gets it without a new edge or a second
+/// plugin. This is the shared PIN; `gmDaemon`'s `StampBuildInfo` is the build identity
+/// (sha, date, version) and answers a different question. A prebuild plugin stamps because
+/// the target is being built, and the file lands in the plugin work directory, never the tree.
 @main
 struct StampVersion: BuildToolPlugin {
 
     func createBuildCommands(
-        context: PluginContext, target: Target
-    ) async throws -> [Command] {
+        context: PluginContext,
+        target: Target
+    ) -> [Command] {
         let outputDir = context.pluginWorkDirectoryURL
         let output = outputDir.appending(path: "GmVersion.swift")
 
@@ -32,25 +24,11 @@ struct StampVersion: BuildToolPlugin {
             (try? String(contentsOf: versionFile, encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
 
-        // WRITE ONLY WHEN THE CONTENT CHANGES. This is not a micro-optimisation;
-        // it is the difference between a 1-second warm build and a 48-second one
-        // for every package in the repository.
-        //
-        // A .prebuildCommand runs UNCONDITIONALLY before every build. The obvious
-        // `cat > "$OUT"` therefore rewrites this file on every invocation, moving
-        // its mtime even when the version is byte-identical. Release builds are
-        // whole-module, so ANY moved input recompiles the ENTIRE module — and
-        // GmDaemonSdk is the base package every other package depends on. One
-        // unconditional write invalidated the whole graph, every time.
-        //
-        // Measured before the fix, universal release, nothing changed between
-        // runs: gmDaemonSdk 48s / 48s / 49s, single-threaded. The control — a
-        // package with no stamp plugin — was 1s warm. The delta was this write.
-        //
-        // Render to a sibling temp path, compare with `cmp -s`, and move only on
-        // difference. The `mv` is atomic within the same directory, so a reader
-        // never sees a half-written file. On no difference the temp is discarded
-        // and $OUT keeps its original mtime, which is the whole point.
+        // WRITE ONLY WHEN THE CONTENT CHANGES. A prebuild command runs before every build;
+        // an unconditional write moves the mtime, and a moved input recompiles every
+        // whole-module dependent of this base package (48 s warm instead of 1 s).
+        // Render to a sibling temp path, `cmp -s`, and `mv` only on difference: the move is
+        // atomic within the directory, and on no difference $OUT keeps its mtime.
         let script = """
             set -e
             mkdir -p "$(dirname "$OUT")"

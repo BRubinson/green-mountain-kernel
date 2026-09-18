@@ -48,6 +48,7 @@ extension KbiteRecord {
             version: version,
             code: code,
             createdAt: createdAt,
-            updatedAt: updatedAt)
+            updatedAt: updatedAt
+        )
     }
 }

@@ -1,0 +1,5 @@
+gmk/gmClaudeForFoundationModels/
+gmk/gmITerm2Client/Sources/GmITerm2Client/Generated/
+.build/
+DerivedData/
+plugins/

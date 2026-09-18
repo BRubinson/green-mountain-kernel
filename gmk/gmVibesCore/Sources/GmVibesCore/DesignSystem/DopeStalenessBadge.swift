@@ -1,23 +1,14 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// ONE badge for both staleness types, generic over `DopeScopeStalenessReporting`.
+/// ONE badge for both staleness types, generic over `DopeScopeStalenessReporting`, so a care
+/// package's ghosts render as the same pixels as a briefing's.
 ///
-/// MOVED (not copied) out of `BriefingPane` — the badge and the dot-path chip
-/// flow were private there and served a single pane. `CarePackageStaleness`
-/// carries the identical shape, so the care package's ghosts render as the same
-/// pixels as a briefing's because this is literally the same view code.
-/// BriefingPane must render IDENTICALLY after the extraction: it is a move,
-/// not a redesign.
-///
-/// Staleness is the daemon's read-time computation (`DopeRepository.scopeStaleness`),
-/// never a stored column. It warns, it never blocks — nothing here disables a
-/// control or hides content.
-///
-/// The generic parameter is why the protocol exists at N=2: callers hand over
-/// either `BriefingStaleness` (non-optional on `BriefingGetResponse`, promoted
-/// to `Optional` at the call) or `CarePackageStaleness?` (nil on a daemon that
-/// predates the additive field), and inference picks `S` up from the argument.
+/// Staleness is the daemon's read-time computation (`DopeRepository.scopeStaleness`), never a
+/// stored column. It warns and never blocks: nothing here disables a control or hides content.
+/// The generic parameter is why the protocol exists at N=2 — callers hand over either
+/// `BriefingStaleness` or `CarePackageStaleness?`, and inference picks `S` up from the
+/// argument.
 struct DopeStalenessBadge<S: DopeScopeStalenessReporting>: View {
     let staleness: S?
 
@@ -61,10 +52,9 @@ struct DopeStalenessBadge<S: DopeScopeStalenessReporting>: View {
 
 // MARK: - Dot-path chips
 
-/// One dope dot-path chip — the shared atom. A ghost (a path that no longer
-/// resolves against the live scope) is struck through and demoted to secondary;
-/// it is still rendered, because a dangling path is a legal state the user needs
-/// to see, not an error to swallow.
+/// One dope dot-path chip. A ghost — a path that does not resolve against the live scope —
+/// is struck through and demoted to secondary, but still rendered: a dangling path is a legal
+/// state the user needs to see, not an error to swallow.
 struct DopeDotPathChip: View {
     let path: String
     let isGhost: Bool

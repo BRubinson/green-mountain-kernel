@@ -375,7 +375,8 @@ public enum GmBridgeHook {
                 command: command,
                 args: args,
                 timeout: timeout,
-                async: async)
+                async: async
+            )
         }
 
         public static func http(

@@ -68,7 +68,8 @@ final class RecentsModel {
                             instanceName: instance.name,
                             instanceUuid: instance.uuid,
                             activity: activity == .distantPast ? fallback : activity
-                        ))
+                        )
+                    )
                 }
             }
         }
@@ -88,9 +89,8 @@ final class RecentsModel {
 
     private func parse(_ raw: String) -> Date {
         if let cached = dateCache[raw] { return cached }
-        // The hot key is now lastActivityAt, which mints a NEW string on
-        // every file change — unlike the old created/updated keys the cache
-        // was designed around, it no longer saturates. Bound it.
+        // The hot key is lastActivityAt, which mints a NEW string on every file change, so
+        // the cache never saturates. Bound it.
         if dateCache.count > 2048 { dateCache.removeAll(keepingCapacity: true) }
         let parsed = Self.isoFormatter.date(from: raw) ?? .distantPast
         dateCache[raw] = parsed

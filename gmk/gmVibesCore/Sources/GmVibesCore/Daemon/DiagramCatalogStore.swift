@@ -139,8 +139,10 @@ final class DiagramCatalogStore {
         galleryQueries[scope] = trimmed
         do {
             let rows = try await service.diagramSearch(
-                projectUuid: scope.projectUuid, sessionUuid: scope.sessionUuid,
-                query: trimmed.isEmpty ? nil : trimmed)
+                projectUuid: scope.projectUuid,
+                sessionUuid: scope.sessionUuid,
+                query: trimmed.isEmpty ? nil : trimmed
+            )
             // A slower response for a superseded query must not clobber the
             // current one's rows.
             guard galleryQueries[scope] == trimmed else { return }
@@ -191,7 +193,8 @@ final class DiagramCatalogStore {
     func delete(_ row: DiagramRow, scope: GalleryScope) async throws {
         _ = try await service.diagramDelete(
             diagramUuid: row.uuid,
-            expectedRevision: row.revision)
+            expectedRevision: row.revision
+        )
         thumbnailsByUuid[row.uuid] = nil
         await refreshGallery(scope)
     }
@@ -200,16 +203,22 @@ final class DiagramCatalogStore {
     /// is daemon-guarded to SESSION tier — refusals surface as thrown errors,
     /// never pre-blocked here.
     func setVisibility(
-        _ row: DiagramRow, to visibility: DiagramVisibility,
+        _ row: DiagramRow,
+        to visibility: DiagramVisibility,
         scope: GalleryScope
     ) async throws {
         _ = try await service.diagramBatchApply(
-            diagramUuid: row.uuid, expectedRevision: nil,
+            diagramUuid: row.uuid,
+            expectedRevision: nil,
             mutations: [
                 .diagramUpdate(
                     DiagramRowUpdate(
-                        expectedVersion: row.version, visibility: visibility))
-            ])
+                        expectedVersion: row.version,
+                        visibility: visibility
+                    )
+                )
+            ]
+        )
         await refreshGallery(scope)
     }
 
@@ -224,7 +233,9 @@ final class DiagramCatalogStore {
     /// A returned-not-created row is left exactly as it is.
     @discardableResult
     func create(
-        owner: Owner, code: String, name: String,
+        owner: Owner,
+        code: String,
+        name: String,
         description: String? = nil,
         dopeScopeCode: String? = nil,
         projectUuid: String,
@@ -235,25 +246,37 @@ final class DiagramCatalogStore {
         switch owner {
         case .project(let uuid):
             request = DiagramInitRequest(
-                projectUuid: uuid, code: code, name: name,
+                projectUuid: uuid,
+                code: code,
+                name: name,
                 description: description,
-                dopeScopeCode: dopeScopeCode)
+                dopeScopeCode: dopeScopeCode
+            )
         case .session(let uuid):
             request = DiagramInitRequest(
-                sessionUuid: uuid, code: code, name: name,
+                sessionUuid: uuid,
+                code: code,
+                name: name,
                 description: description,
-                dopeScopeCode: dopeScopeCode)
+                dopeScopeCode: dopeScopeCode
+            )
         case .prompt(let uuid):
             request = DiagramInitRequest(
-                promptUuid: uuid, code: code, name: name,
+                promptUuid: uuid,
+                code: code,
+                name: name,
                 description: description,
-                dopeScopeCode: dopeScopeCode)
+                dopeScopeCode: dopeScopeCode
+            )
         }
         let response = try await service.diagramInit(request)
         if response.created, seedFromDope, let dopeScopeCode {
             await seed(
-                response.diagram, dopeScopeCode: dopeScopeCode,
-                projectUuid: projectUuid, sessionUuid: sessionUuid)
+                response.diagram,
+                dopeScopeCode: dopeScopeCode,
+                projectUuid: projectUuid,
+                sessionUuid: sessionUuid
+            )
         }
         await refresh(owner)
         return response.diagram
@@ -263,25 +286,31 @@ final class DiagramCatalogStore {
     /// the CLI generator uses (card heights come from the resolver, so the
     /// app and the daemon can never lay out differently).
     private func seed(
-        _ diagram: DiagramRow, dopeScopeCode: String,
-        projectUuid: String, sessionUuid: String?
+        _ diagram: DiagramRow,
+        dopeScopeCode: String,
+        projectUuid: String,
+        sessionUuid: String?
     ) async {
         do {
             let dope: DopeGetResponse
             if let sessionUuid {
                 dope = try await service.dopeGet(
                     sessionUuid: sessionUuid,
-                    code: dopeScopeCode)
+                    code: dopeScopeCode
+                )
             } else {
                 dope = try await service.dopeGet(
                     projectUuid: projectUuid,
-                    code: dopeScopeCode)
+                    code: dopeScopeCode
+                )
             }
             let mutations = DopeCanvasLayout.mutations(for: dope.tree)
             guard !mutations.isEmpty else { return }
             _ = try await service.diagramBatchApply(
-                diagramUuid: diagram.uuid, expectedRevision: diagram.revision,
-                mutations: mutations)
+                diagramUuid: diagram.uuid,
+                expectedRevision: diagram.revision,
+                mutations: mutations
+            )
         } catch {
             // A seed failure leaves an EMPTY diagram, which is a legal state
             // the editor renders fine — better than refusing to create the
@@ -296,22 +325,23 @@ final class DiagramCatalogStore {
 
     /// Copy a diagram to another tier.
     ///
-    /// Client-side composition, deliberately: there is no DIAGRAM_COPY
-    /// message and adding one would bump the wire. So it is DIAGRAM_INIT for
-    /// the target, then ONE elementAdd batch replaying the source tree with
-    /// clientRef / targetClientRef remapping — parents and connector targets
-    /// are named by temp id because the target's uuids do not exist until the
-    /// batch runs. Accepted cost: the pair is NOT atomic. A failed batch
-    /// leaves an empty diagram behind (there is no DIAGRAM_DELETE to clean it
-    /// up with), so the error says so rather than pretending nothing
-    /// happened.
+    /// Client-side composition: there is no DIAGRAM_COPY message and adding one bumps the wire.
+    /// DIAGRAM_INIT for the target, then one elementAdd batch replaying the source tree with
+    /// clientRef / targetClientRef remapping, since the target's uuids do not exist until the
+    /// batch runs. The pair is NOT atomic: a failed batch leaves an empty diagram behind and
+    /// there is no DIAGRAM_DELETE to clean it up, so the error says so.
     @discardableResult
     func copy(
-        _ source: DiagramRow, to owner: Owner, code: String, name: String,
+        _ source: DiagramRow,
+        to owner: Owner,
+        code: String,
+        name: String,
         projectUuid: String
     ) async throws -> DiagramRow {
         let created = try await create(
-            owner: owner, code: code, name: name,
+            owner: owner,
+            code: code,
+            name: name,
             description: source.description.isEmpty
                 ? nil : source.description,
             dopeScopeCode: source.dopeScopeCode,
@@ -319,17 +349,22 @@ final class DiagramCatalogStore {
             sessionUuid: nil,
             // The COPY carries the content; a
             // scaffold on top would double it.
-            seedFromDope: false)
+            seedFromDope: false
+        )
         let tree = try await service.diagramGet(diagramUuid: source.uuid).tree
         let mutations = Self.replayMutations(for: tree.elements)
         guard !mutations.isEmpty else { return created }
         do {
             _ = try await service.diagramBatchApply(
-                diagramUuid: created.uuid, expectedRevision: nil,
-                mutations: mutations)
+                diagramUuid: created.uuid,
+                expectedRevision: nil,
+                mutations: mutations
+            )
         } catch {
             throw DiagramCopyError.contentFailed(
-                diagramName: created.name, underlying: String(describing: error))
+                diagramName: created.name,
+                underlying: String(describing: error)
+            )
         }
         await refresh(owner)
         return created
@@ -359,12 +394,20 @@ final class DiagramCatalogStore {
                 structure.append(
                     .elementAdd(
                         DiagramElementAdd(
-                            clientRef: ref, parentClientRef: parentRef,
-                            code: node.base.code, name: node.base.name,
-                            description: node.base.description, sortOrder: node.base.sortOrder,
-                            centerX: node.base.centerX, centerY: node.base.centerY,
-                            elementZ: node.base.elementZ, scale: node.base.scale,
-                            payload: node.payload)))
+                            clientRef: ref,
+                            parentClientRef: parentRef,
+                            code: node.base.code,
+                            name: node.base.name,
+                            description: node.base.description,
+                            sortOrder: node.base.sortOrder,
+                            centerX: node.base.centerX,
+                            centerY: node.base.centerY,
+                            elementZ: node.base.elementZ,
+                            scale: node.base.scale,
+                            payload: node.payload
+                        )
+                    )
+                )
                 walk(node.children, parentRef: ref)
             }
         }
@@ -383,15 +426,27 @@ final class DiagramCatalogStore {
                         clientRef: refs[node.identity.uuid],
                         parentClientRef: parentRef.isEmpty ? nil : parentRef,
                         targetClientRef: targetRef,
-                        code: node.base.code, name: node.base.name,
-                        description: node.base.description, sortOrder: node.base.sortOrder,
-                        centerX: node.base.centerX, centerY: node.base.centerY,
-                        elementZ: node.base.elementZ, scale: node.base.scale,
+                        code: node.base.code,
+                        name: node.base.name,
+                        description: node.base.description,
+                        sortOrder: node.base.sortOrder,
+                        centerX: node.base.centerX,
+                        centerY: node.base.centerY,
+                        elementZ: node.base.elementZ,
+                        scale: node.base.scale,
                         payload: .connector(
                             ConnectorPayload(
-                                targetElementUuid: nil, strokeColor: payload.strokeColor,
-                                strokeWidth: payload.strokeWidth, lineStyle: payload.lineStyle,
-                                headKind: payload.headKind, label: payload.label)))))
+                                targetElementUuid: nil,
+                                strokeColor: payload.strokeColor,
+                                strokeWidth: payload.strokeWidth,
+                                lineStyle: payload.lineStyle,
+                                headKind: payload.headKind,
+                                label: payload.label
+                            )
+                        )
+                    )
+                )
+            )
         }
         return structure
     }
@@ -400,17 +455,23 @@ final class DiagramCatalogStore {
     /// re-derived server-side). Rides `DiagramRowUpdate.promotion` through
     /// batch-apply — the diagram row has no update message of its own.
     func promote(
-        _ row: DiagramRow, to tier: DiagramTier, ownerUuid: String,
+        _ row: DiagramRow,
+        to tier: DiagramTier,
+        ownerUuid: String,
         from owner: Owner
     ) async throws {
         _ = try await service.diagramBatchApply(
-            diagramUuid: row.uuid, expectedRevision: nil,
+            diagramUuid: row.uuid,
+            expectedRevision: nil,
             mutations: [
                 .diagramUpdate(
                     DiagramRowUpdate(
                         expectedVersion: row.version,
-                        promotion: DiagramPromotion(tier: tier, ownerUuid: ownerUuid)))
-            ])
+                        promotion: DiagramPromotion(tier: tier, ownerUuid: ownerUuid)
+                    )
+                )
+            ]
+        )
         await refresh(owner)
         switch tier {
         case .project: await refresh(.project(ownerUuid))

@@ -57,8 +57,10 @@ struct DiagramToolStrip: View {
         domainPills
 
         DiagramSearchField(
-            workspace: workspace, viewState: viewState,
-            onCenter: onCenter)
+            workspace: workspace,
+            viewState: viewState,
+            onCenter: onCenter
+        )
 
         Button {
             onOrganize()
@@ -99,7 +101,8 @@ struct DiagramToolStrip: View {
                     } label: {
                         Label(
                             domain.body.name,
-                            systemImage: active ? "checkmark.circle.fill" : "circle")
+                            systemImage: active ? "checkmark.circle.fill" : "circle"
+                        )
                     }
                 }
                 if !workspace.domainFilter.isEmpty {
@@ -111,7 +114,8 @@ struct DiagramToolStrip: View {
                     workspace.domainFilter.isEmpty
                         ? "Domains"
                         : "Domains (\(workspace.domainFilter.count))",
-                    systemImage: "square.stack.3d.up")
+                    systemImage: "square.stack.3d.up"
+                )
             }
             .help("Filter the diagram to selected domains")
         }
@@ -185,7 +189,8 @@ private struct DiagramSearchField: View {
             if hits.isEmpty {
                 Text(
                     viewState.searchText.isEmpty
-                        ? "Type in the search field first" : "No matches")
+                        ? "Type in the search field first" : "No matches"
+                )
             }
             ForEach(hits) { hit in
                 Button(hit.label) { jump(to: hit) }
@@ -215,7 +220,9 @@ private struct DiagramSearchField: View {
                         Hit(
                             entityCode: entityCode,
                             label: "\(entity.body.name)  ·  \(entityCode)",
-                            rowIndex: nil))
+                            rowIndex: nil
+                        )
+                    )
                 }
                 // rowIndex maps 1:1 to DRAWN rows for OWN properties (the
                 // composed-base union only appends after them).
@@ -225,7 +232,9 @@ private struct DiagramSearchField: View {
                         Hit(
                             entityCode: entityCode,
                             label: "\(property.body.code)  ·  \(entityCode)",
-                            rowIndex: index))
+                            rowIndex: index
+                        )
+                    )
                 }
             }
             if result.count > 20 { break }
@@ -243,11 +252,13 @@ private struct DiagramSearchField: View {
         guard let element = cardElement(entityCode: hit.entityCode) else { return }
         viewState.selection = DiagramSelectionState(
             selectedElementUuid: element.uuid,
-            highlightedElementUuids: [element.uuid])
+            highlightedElementUuids: [element.uuid]
+        )
         if let rowIndex = hit.rowIndex {
             let y = element.rowCenterY(
                 rowIndex,
-                environment: workspace.resolved.environment)
+                environment: workspace.resolved.environment
+            )
             onCenter(CGPoint(x: element.frame.midX, y: y))
         } else {
             onCenter(CGPoint(x: element.frame.midX, y: element.frame.midY))

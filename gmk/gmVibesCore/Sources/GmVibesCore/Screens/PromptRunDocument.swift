@@ -1,30 +1,14 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// The post-draft RUN DOCUMENT: one continuous card assembling the existing
-/// phase panes into a narrative read of the prompt's run — Backstory, Intent,
-/// then the phase record (Briefing → Exploration → Clarification → Plan →
-/// Review) and a utility footer. The draft editor's per-phase disclosure
-/// cards stay on the draft branch; past draft the record IS the document.
+/// The post-draft RUN DOCUMENT: one continuous card assembling the phase panes into a
+/// narrative read of the prompt's run. Every section EMBEDS its existing pane unchanged, so
+/// the panes' contracts ride along: the clarification answer cards stay live, the widen
+/// closures reach the same store intent flags, and staleness badges render as they do there.
 ///
-/// Every phase section EMBEDS its existing pane unchanged, so the panes'
-/// contracts ride along for free: the clarification answer cards stay LIVE
-/// (CLARIFY_ANSWER works post-draft), the exploration/review widen closures
-/// reach the same store intent flags, and staleness badges render where the
-/// panes already render them.
-///
-/// Evidence gating is uniform and pure: a section renders only when the run
-/// left evidence for it. `.absent` renders NOTHING — `/gm_task` prompts have
-/// no workflow row forever, and a permanent "not opened yet" stub per phase
-/// would bury the record in placeholders. `.failed` renders ONE dim caption
-/// line: an error must not be indistinguishable from an empty record. While
-/// a phase is still `.idle` the PROMPT_LIST reports stub is the cold-start
-/// fallback (the same evidence source seedPhaseExpansion reads).
-///
-/// No expansion @State: post-draft sections are always expanded, gated by
-/// evidence only. The two DisclosureGroups (Backstory, Dope) default
-/// collapsed on their own internal state — deliberate compact chrome, not
-/// phase emphasis.
+/// Evidence gating is uniform: a section renders only when the run left evidence for it.
+/// `.absent` renders NOTHING, because `/gm_task` prompts never get a workflow row and a stub
+/// per phase would bury the record. `.failed` renders ONE dim caption line.
 struct PromptRunDocument: View {
     let stub: PromptStub
     let phases: PromptPhaseStore
@@ -60,46 +44,57 @@ struct PromptRunDocument: View {
             }
             intentSection
             phaseSection(
-                "Briefing", icon: "shippingbox",
+                "Briefing",
+                icon: "shippingbox",
                 evidence(
-                    phases.briefings, stubEvidence: false,
-                    hasContent: { !$0.isEmpty })
+                    phases.briefings,
+                    stubEvidence: false,
+                    hasContent: { !$0.isEmpty }
+                )
             ) {
                 BriefingPane(phase: phases.briefings)
             }
             phaseSection(
-                "Exploration", icon: "binoculars",
+                "Exploration",
+                icon: "binoculars",
                 evidence(
                     phases.exploration,
-                    stubEvidence: stub.reports?.exploration != nil)
+                    stubEvidence: stub.reports?.exploration != nil
+                )
             ) {
                 ExplorationPane(phase: phases.exploration) {
                     await phases.requestFullExploration()
                 }
             }
             phaseSection(
-                "Clarification", icon: "questionmark.bubble",
+                "Clarification",
+                icon: "questionmark.bubble",
                 evidence(
                     phases.clarification,
-                    stubEvidence: stub.reports?.clarification != nil)
+                    stubEvidence: stub.reports?.clarification != nil
+                )
             ) {
                 // `phases` rides along ONLY so the question cards reach
                 // `phases.answers` — answering stays live post-draft.
                 ClarificationPane(phase: phases.clarification, phases: phases)
             }
             phaseSection(
-                "Plan", icon: "square.stack.3d.up",
+                "Plan",
+                icon: "square.stack.3d.up",
                 evidence(
                     phases.architecture,
-                    stubEvidence: stub.reports?.architecture != nil)
+                    stubEvidence: stub.reports?.architecture != nil
+                )
             ) {
                 ArchitecturePane(phase: phases.architecture)
             }
             phaseSection(
-                "Review", icon: "checkmark.seal",
+                "Review",
+                icon: "checkmark.seal",
                 evidence(
                     phases.review,
-                    stubEvidence: stub.reports?.review != nil)
+                    stubEvidence: stub.reports?.review != nil
+                )
             ) {
                 ReviewPane(phase: phases.review) {
                     await phases.requestFullReview()
@@ -155,7 +150,8 @@ struct PromptRunDocument: View {
     /// than a per-section card — one continuous container, generalized from
     /// the editor's refinedSection idiom.
     private func documentSection(
-        _ title: String, icon: String,
+        _ title: String,
+        icon: String,
         @ViewBuilder content: () -> some View
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -169,7 +165,8 @@ struct PromptRunDocument: View {
 
     @ViewBuilder
     private func phaseSection(
-        _ title: String, icon: String,
+        _ title: String,
+        icon: String,
         _ evidence: SectionEvidence,
         @ViewBuilder content: () -> some View
     ) -> some View {
@@ -196,7 +193,8 @@ struct PromptRunDocument: View {
     private var backstorySection: some View {
         DisclosureGroup(isExpanded: $backstoryExpanded) {
             HighlightedText(
-                source: backstory, query: findQuery,
+                source: backstory,
+                query: findQuery,
                 activeLocalOccurrence: activeLocal("backstory")
             )
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -255,7 +253,8 @@ struct PromptRunDocument: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             HighlightedText(
-                source: goal.isEmpty ? "—" : goal, query: findQuery,
+                source: goal.isEmpty ? "—" : goal,
+                query: findQuery,
                 activeLocalOccurrence: activeLocal("goal")
             )
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -264,7 +263,8 @@ struct PromptRunDocument: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
             HighlightedText(
-                source: detail.isEmpty ? "—" : detail, query: findQuery,
+                source: detail.isEmpty ? "—" : detail,
+                query: findQuery,
                 activeLocalOccurrence: activeLocal("detail")
             )
             .frame(maxWidth: .infinity, alignment: .topLeading)

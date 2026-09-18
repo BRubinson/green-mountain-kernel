@@ -18,8 +18,10 @@ struct ProjectsView: View {
         ScreenScaffold(title: "Projects") {
             ProjectTreeView(query: $query, expanded: $expanded)
                 .searchable(
-                    text: $query, placement: .toolbar,
-                    prompt: "Search projects, instances & sessions")
+                    text: $query,
+                    placement: .toolbar,
+                    prompt: "Search projects, instances & sessions"
+                )
         }
     }
 }
@@ -44,7 +46,8 @@ private struct ProjectTreeView: View {
                     project: project,
                     filtered: filtered,
                     searching: !query.isEmpty,
-                    expanded: $expanded)
+                    expanded: $expanded
+                )
             }
             if filtered.projects.isEmpty {
                 emptyRow
@@ -78,7 +81,8 @@ private struct ProjectTreeView: View {
         // pages are the alphabetical surfaces) and SHOWS instance-less
         // projects (the tree renders a "No instances." row for them).
         let next = CatalogFilter(
-            query: SearchQuery(query), instanceOrder: .recency,
+            query: SearchQuery(query),
+            instanceOrder: .recency,
             includeEmptyProjects: true
         )
         .apply(to: catalog)
@@ -117,12 +121,15 @@ private struct ProjectFolderRow: View {
                 project: project,
                 filtered: filtered,
                 searching: searching,
-                expanded: $expanded)
+                expanded: $expanded
+            )
         } label: {
             HStack(spacing: 6) {
                 FolderLabel(
-                    name: project.name, subtitle: project.code,
-                    systemImage: "folder")
+                    name: project.name,
+                    subtitle: project.code,
+                    systemImage: "folder"
+                )
                 Spacer(minLength: 4)
                 // Always rendered, matching the landing card. Hover-reveal
                 // was tried first and simply could not be found.
@@ -176,7 +183,8 @@ private struct InstanceLevel: View {
                     instance: instance,
                     filtered: filtered,
                     searching: searching,
-                    expanded: $expanded)
+                    expanded: $expanded
+                )
             }
         }
     }
@@ -195,11 +203,14 @@ private struct InstanceFolderRow: View {
             SessionLevel(
                 instance: instance,
                 filtered: filtered,
-                searching: searching)
+                searching: searching
+            )
         } label: {
             FolderLabel(
-                name: instance.name, subtitle: instance.code,
-                systemImage: "folder")
+                name: instance.name,
+                subtitle: instance.code,
+                systemImage: "folder"
+            )
         }
     }
 

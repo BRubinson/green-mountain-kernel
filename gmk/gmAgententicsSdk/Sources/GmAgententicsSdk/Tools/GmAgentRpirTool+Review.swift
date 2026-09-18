@@ -22,7 +22,7 @@ public struct GmAgentRpirOpenReviewTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirOpenReviewArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirOpenReviewArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_OPEN")
     }
 }
@@ -40,7 +40,8 @@ public struct GmAgentReviewFinding: Sendable {
         description: """
             The problem itself: what breaks, and the inputs or state that make it \
             break. A claim with no failure case is an opinion.
-            """)
+            """
+    )
     public var body: String
 
     @Guide(description: "Repo-relative file it is in, or empty.")
@@ -56,8 +57,13 @@ public struct GmAgentReviewFinding: Sendable {
     public var rating: Int?
 
     public init(
-        kind: String, title: String, body: String, filePath: String = "",
-        lineStart: Int = 0, lineEnd: Int = 0, rating: Int? = nil
+        kind: String,
+        title: String,
+        body: String,
+        filePath: String = "",
+        lineStart: Int = 0,
+        lineEnd: Int = 0,
+        rating: Int? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -95,7 +101,7 @@ public struct GmAgentRpirWriteReviewsTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirWriteReviewsArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirWriteReviewsArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_FINDING_ADD (looped)")
     }
 }
@@ -122,7 +128,7 @@ public struct GmAgentRpirRankReviewsTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirRankReviewsArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirRankReviewsArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_RANK")
     }
 }
@@ -157,7 +163,7 @@ public struct GmAgentRpirCompleteReviewTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirCompleteReviewArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirCompleteReviewArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_COMPLETE")
     }
 }
@@ -189,8 +195,8 @@ public struct GmAgentRpirResolveReviewFindingTool: GmAgentRpirTool {
     public init() {}
 
     public func call(
-        arguments: GmAgentRpirResolveReviewFindingArguments
-    ) async throws -> String {
+        arguments _: GmAgentRpirResolveReviewFindingArguments
+    ) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_RESOLVE")
     }
 }
@@ -205,7 +211,9 @@ public struct GmAgentRpirGetReviewArguments: Sendable {
         description: """
             Only return problems this bad or worse, 0 to 999. Use a small number to \
             keep the answer short.
-            """, .range(0...999))
+            """,
+        .range(0...999)
+    )
     public var maxRating: Int
 
     public init(promptUuid: String, maxRating: Int = 100) {
@@ -221,7 +229,7 @@ public struct GmAgentRpirGetReviewTool: GmAgentRpirTool {
 
     public init() {}
 
-    public func call(arguments: GmAgentRpirGetReviewArguments) async throws -> String {
+    public func call(arguments _: GmAgentRpirGetReviewArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_GET")
     }
 }

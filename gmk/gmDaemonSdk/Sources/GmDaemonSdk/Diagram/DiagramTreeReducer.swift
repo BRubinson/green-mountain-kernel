@@ -1,22 +1,13 @@
 import Foundation
 
-/// The pure, in-memory implementation of `applyDiagramMutations` — the
-/// SECOND implementation of the daemon's one write path, kit-resident so it
-/// can never silently drift from `Store+Diagram.swift`: the parity test runs
-/// identical batches through both and asserts identical trees. GMVibes'
-/// non-persisted viewer commits through this (a ~20-line `DiagramCommitting`
-/// wrapper); switching persistence on later is one conformer swap, not a
-/// semantics change.
-///
-/// Semantics mirrored from the store, in order: whole-batch expectedRevision
-/// CAS; strict array order; all-or-nothing (throwing leaves the input tree
-/// untouched — value semantics make rollback free); in-batch clientRef →
-/// uuid ledger (`parentClientRef` resolves only to EARLIER adds); payload
-/// tag = element type; `DiagramElementTypeSpec` containment; code
-/// validation + `prefix_%04d` minting (max numeric suffix + 1, absurd
-/// suffixes ignored); per-element expectedVersion CAS; a present payload
-/// replaces the subtype wholesale; subtree-cascade delete; exactly ONE
-/// `revision + 1` for the whole batch.
+/// The pure, in-memory implementation of `applyDiagramMutations`, and the
+/// SECOND implementation of the daemon's one write path: a parity test runs
+/// identical batches through this and `Store+Diagram.swift` and asserts
+/// identical trees. Semantics mirrored from the store, in order: whole-batch
+/// expectedRevision CAS; strict array order; all-or-nothing; a clientRef
+/// ledger where `parentClientRef` resolves only to EARLIER adds; payload tag
+/// = element type; containment; code validation and `prefix_%04d` minting;
+/// per-element CAS; cascade delete; exactly ONE `revision + 1` per batch.
 
 /// Uuid/timestamp injection so tests are deterministic and the app supplies
 /// real `UUID()`s.
@@ -57,7 +48,8 @@ public enum DiagramTreeReducer {
     static let maxMintedSuffix = 999_999
 
     public static func apply(
-        _ mutations: [DiagramMutation], to tree: DiagramTree,
+        _ mutations: [DiagramMutation],
+        to tree: DiagramTree,
         expectedRevision: Int64? = nil,
         minting: some DiagramIdentityMinting
     ) throws -> DiagramTree {
@@ -67,7 +59,8 @@ public enum DiagramTreeReducer {
         if let expected = expectedRevision, expected != tree.revision {
             throw DiagramReducerError.revisionConflict(
                 expected: expected,
-                actual: tree.revision)
+                actual: tree.revision
+            )
         }
 
         var elements = tree.elements
@@ -92,13 +85,20 @@ public enum DiagramTreeReducer {
                 uuid: tree.identity.uuid,
                 version: row.version,
                 createdAt: tree.identity.createdAt,
-                updatedAt: row.updatedAt),
-            tier: tree.tier, projectUuid: tree.projectUuid,
-            instanceUuid: tree.instanceUuid, sessionUuid: tree.sessionUuid,
-            promptUuid: tree.promptUuid, code: row.code, name: row.name,
-            description: row.description, gmccDiagramPath: row.gmccDiagramPath,
+                updatedAt: row.updatedAt
+            ),
+            tier: tree.tier,
+            projectUuid: tree.projectUuid,
+            instanceUuid: tree.instanceUuid,
+            sessionUuid: tree.sessionUuid,
+            promptUuid: tree.promptUuid,
+            code: row.code,
+            name: row.name,
+            description: row.description,
+            gmccDiagramPath: row.gmccDiagramPath,
             revision: tree.revision + 1,
-            elements: normalized(elements))
+            elements: normalized(elements)
+        )
     }
 
     // MARK: - Diagram row state
@@ -124,20 +124,24 @@ public enum DiagramTreeReducer {
     // MARK: - element_add
 
     private static func applyAdd(
-        _ add: DiagramElementAdd, elements: inout [DiagramElementNode],
-        ledger: inout [String: String], minting: some DiagramIdentityMinting
+        _ add: DiagramElementAdd,
+        elements: inout [DiagramElementNode],
+        ledger: inout [String: String],
+        minting: some DiagramIdentityMinting
     ) throws {
         let type = add.payload.elementType
         if add.parentElementUuid != nil, add.parentClientRef != nil {
             throw DiagramReducerError.badRequest(
-                detail: "pass parentElementUuid OR parentClientRef, not both")
+                detail: "pass parentElementUuid OR parentClientRef, not both"
+            )
         }
         var parentUuid = add.parentElementUuid
         if let ref = add.parentClientRef {
             guard let resolved = ledger[ref] else {
                 throw DiagramReducerError.badRequest(
                     detail:
-                        "parentClientRef '\(ref)' does not name an earlier elementAdd in this batch")
+                        "parentClientRef '\(ref)' does not name an earlier elementAdd in this batch"
+                )
             }
             parentUuid = resolved
         }
@@ -157,14 +161,16 @@ public enum DiagramTreeReducer {
         if case .connector(let connector) = payload {
             if connector.targetElementUuid != nil, add.targetClientRef != nil {
                 throw DiagramReducerError.badRequest(
-                    detail: "pass targetElementUuid OR targetClientRef, not both")
+                    detail: "pass targetElementUuid OR targetClientRef, not both"
+                )
             }
             var targetUuid = connector.targetElementUuid
             if let ref = add.targetClientRef {
                 guard let resolved = ledger[ref] else {
                     throw DiagramReducerError.badRequest(
                         detail:
-                            "targetClientRef '\(ref)' does not name an earlier elementAdd in this batch")
+                            "targetClientRef '\(ref)' does not name an earlier elementAdd in this batch"
+                    )
                 }
                 targetUuid = resolved
             }
@@ -173,8 +179,11 @@ public enum DiagramTreeReducer {
                 // is impossible here by construction; the rest of the rule
                 // still needs checking.
                 try validateConnectorTarget(
-                    referrerUuid: "(new connector)", parentOfReferrer: parentUuid,
-                    targetUuid: targetUuid, elements: elements)
+                    referrerUuid: "(new connector)",
+                    parentOfReferrer: parentUuid,
+                    targetUuid: targetUuid,
+                    elements: elements
+                )
                 payload = .connector(
                     ConnectorPayload(
                         targetElementUuid: targetUuid,
@@ -184,11 +193,14 @@ public enum DiagramTreeReducer {
                         headKind: connector.headKind,
                         routingKind: connector.routingKind,
                         tailKind: connector.tailKind,
-                        label: connector.label))
+                        label: connector.label
+                    )
+                )
             }
         } else if add.targetClientRef != nil {
             throw DiagramReducerError.badRequest(
-                detail: "targetClientRef is only meaningful for a connector element")
+                detail: "targetClientRef is only meaningful for a connector element"
+            )
         }
 
         let code: String
@@ -215,14 +227,24 @@ public enum DiagramTreeReducer {
         let now = minting.now()
         let node = DiagramElementNode(
             identity: DopeNodeIdentity(
-                uuid: minting.mintUuid(), version: 0,
-                createdAt: now, updatedAt: now),
+                uuid: minting.mintUuid(),
+                version: 0,
+                createdAt: now,
+                updatedAt: now
+            ),
             base: DiagramElementBase(
-                code: code, name: add.name ?? type.defaultName,
-                description: add.description ?? "", sortOrder: sortOrder,
-                centerX: add.centerX ?? 0, centerY: add.centerY ?? 0,
-                elementZ: add.elementZ ?? 0, scale: add.scale ?? 1),
-            payload: payload, children: [])
+                code: code,
+                name: add.name ?? type.defaultName,
+                description: add.description ?? "",
+                sortOrder: sortOrder,
+                centerX: add.centerX ?? 0,
+                centerY: add.centerY ?? 0,
+                elementZ: add.elementZ ?? 0,
+                scale: add.scale ?? 1
+            ),
+            payload: payload,
+            children: []
+        )
 
         if let parentUuid {
             guard insertChild(node, under: parentUuid, in: &elements) else {
@@ -237,7 +259,8 @@ public enum DiagramTreeReducer {
     // MARK: - element_update
 
     private static func applyUpdate(
-        _ update: DiagramElementUpdate, elements: inout [DiagramElementNode],
+        _ update: DiagramElementUpdate,
+        elements: inout [DiagramElementNode],
         minting: some DiagramIdentityMinting
     ) throws {
         guard let node = findNode(update.elementUuid, in: elements) else {
@@ -246,7 +269,9 @@ public enum DiagramTreeReducer {
         guard node.identity.version == update.expectedVersion else {
             throw DiagramReducerError.versionConflict(
                 elementUuid: update.elementUuid,
-                expected: update.expectedVersion, actual: node.identity.version)
+                expected: update.expectedVersion,
+                actual: node.identity.version
+            )
         }
         let type = node.payload.elementType
         if let code = update.code {
@@ -288,8 +313,10 @@ public enum DiagramTreeReducer {
                 throw DiagramReducerError.notFound(elementUuid: update.parentElementUuid!)
             }
             try validateShape(
-                type: type, parentType: finalParentType,
-                payload: update.payload ?? node.payload)
+                type: type,
+                parentType: finalParentType,
+                payload: update.payload ?? node.payload
+            )
         }
 
         // Detach when reparenting, then rewrite in place.
@@ -311,7 +338,8 @@ public enum DiagramTreeReducer {
     }
 
     private static func rewritten(
-        _ node: DiagramElementNode, update: DiagramElementUpdate,
+        _ node: DiagramElementNode,
+        update: DiagramElementUpdate,
         minting: some DiagramIdentityMinting
     ) -> DiagramElementNode {
         DiagramElementNode(
@@ -319,7 +347,8 @@ public enum DiagramTreeReducer {
                 uuid: node.identity.uuid,
                 version: node.identity.version + 1,
                 createdAt: node.identity.createdAt,
-                updatedAt: minting.now()),
+                updatedAt: minting.now()
+            ),
             base: DiagramElementBase(
                 code: update.code ?? node.base.code,
                 name: update.name ?? node.base.name,
@@ -328,16 +357,19 @@ public enum DiagramTreeReducer {
                 centerX: update.centerX ?? node.base.centerX,
                 centerY: update.centerY ?? node.base.centerY,
                 elementZ: update.elementZ ?? node.base.elementZ,
-                scale: update.scale ?? node.base.scale),
+                scale: update.scale ?? node.base.scale
+            ),
             payload: update.payload.map(DiagramStrokeCodec.normalizedForStorage)
                 ?? node.payload,
-            children: node.children)
+            children: node.children
+        )
     }
 
     // MARK: - element_delete
 
     private static func applyDelete(
-        _ delete: DiagramElementDelete, elements: inout [DiagramElementNode]
+        _ delete: DiagramElementDelete,
+        elements: inout [DiagramElementNode]
     ) throws {
         guard let node = findNode(delete.elementUuid, in: elements) else {
             throw DiagramReducerError.notFound(elementUuid: delete.elementUuid)
@@ -345,7 +377,9 @@ public enum DiagramTreeReducer {
         guard node.identity.version == delete.expectedVersion else {
             throw DiagramReducerError.versionConflict(
                 elementUuid: delete.elementUuid,
-                expected: delete.expectedVersion, actual: node.identity.version)
+                expected: delete.expectedVersion,
+                actual: node.identity.version
+            )
         }
         _ = removeNode(delete.elementUuid, in: &elements)
     }
@@ -353,17 +387,21 @@ public enum DiagramTreeReducer {
     // MARK: - diagram_update
 
     private static func applyRowUpdate(
-        _ update: DiagramRowUpdate, row: inout RowState,
+        _ update: DiagramRowUpdate,
+        row: inout RowState,
         minting: some DiagramIdentityMinting
     ) throws {
         guard row.version == update.expectedVersion else {
             throw DiagramReducerError.versionConflict(
-                elementUuid: "diagram", expected: update.expectedVersion,
-                actual: row.version)
+                elementUuid: "diagram",
+                expected: update.expectedVersion,
+                actual: row.version
+            )
         }
         guard update.promotion == nil else {
             throw DiagramReducerError.badRequest(
-                detail: "tier promotion is not supported by the local reducer")
+                detail: "tier promotion is not supported by the local reducer"
+            )
         }
         if let code = update.code {
             try mapValidation { try DopeCode.validateCode(code, field: "diagram code") }
@@ -384,7 +422,8 @@ public enum DiagramTreeReducer {
     // MARK: - Shape validation (mirrors validateDiagramElementShape)
 
     private static func validateShape(
-        type: DiagramElementType, parentType: DiagramElementType?,
+        type: DiagramElementType,
+        parentType: DiagramElementType?,
         payload: DiagramElementPayload
     ) throws {
         let spec = DiagramElementTypeSpec.spec(for: type)
@@ -393,18 +432,21 @@ public enum DiagramTreeReducer {
                 throw DiagramReducerError.badRequest(
                     detail:
                         "\(type.rawValue) elements need a parent element ("
-                        + allowed.map(\.rawValue).sorted().joined(separator: "/") + ")")
+                        + allowed.map(\.rawValue).sorted().joined(separator: "/") + ")"
+                )
             }
             guard allowed.contains(parentType) else {
                 throw DiagramReducerError.badRequest(
                     detail:
                         "a \(type.rawValue) cannot live under a \(parentType.rawValue) (legal: "
-                        + allowed.map(\.rawValue).sorted().joined(separator: "/") + ")")
+                        + allowed.map(\.rawValue).sorted().joined(separator: "/") + ")"
+                )
             }
         } else if parentType != nil {
             throw DiagramReducerError.badRequest(
                 detail:
-                    "\(type.rawValue) is a top-level element type and cannot have a parent")
+                    "\(type.rawValue) is a top-level element type and cannot have a parent"
+            )
         }
         switch payload {
         case .dopeScopePersistenceLayer(let p):
@@ -418,39 +460,47 @@ public enum DiagramTreeReducer {
         case .drawingStroke(let p):
             if !p.vertices.isEmpty, p.vertices.count < 2 {
                 throw DiagramReducerError.badRequest(
-                    detail: "a stroke needs at least 2 vertices (or none)")
+                    detail: "a stroke needs at least 2 vertices (or none)"
+                )
             }
         case .drawingShape(let p):
             if p.cornerRadius != nil, p.shapeKind != .rectangle {
                 throw DiagramReducerError.badRequest(
-                    detail: "corner_radius is only legal on rectangles")
+                    detail: "corner_radius is only legal on rectangles"
+                )
             }
         case .drawingText(let p):
             guard p.width > 0, p.height > 0 else {
                 throw DiagramReducerError.badRequest(
-                    detail: "a text box needs a positive width and height")
+                    detail: "a text box needs a positive width and height"
+                )
             }
             guard p.fontSize > 0 else {
                 throw DiagramReducerError.badRequest(
-                    detail: "a text box needs a positive font size")
+                    detail: "a text box needs a positive font size"
+                )
             }
         case .umlNode(let p):
             guard p.width > 0, p.height > 0 else {
                 throw DiagramReducerError.badRequest(
-                    detail: "a uml node needs a positive width and height")
+                    detail: "a uml node needs a positive width and height"
+                )
             }
             if let fontSize = p.fontSize, fontSize <= 0 {
                 throw DiagramReducerError.badRequest(
-                    detail: "a uml node's font size must be positive when set")
+                    detail: "a uml node's font size must be positive when set"
+                )
             }
             if let strokeWidth = p.strokeWidth, strokeWidth <= 0 {
                 throw DiagramReducerError.badRequest(
-                    detail: "a uml node's stroke width must be positive when set")
+                    detail: "a uml node's stroke width must be positive when set"
+                )
             }
         case .connector(let p):
             guard p.strokeWidth > 0 else {
                 throw DiagramReducerError.badRequest(
-                    detail: "a connector needs a positive stroke width")
+                    detail: "a connector needs a positive stroke width"
+                )
             }
             // The endpoint's CONTAINMENT rule is not checkable here: it
             // needs the target's parentage, which is tree context this
@@ -469,8 +519,10 @@ public enum DiagramTreeReducer {
     /// do. This is the half of the parity contract a fixture alone would not
     /// guarantee.
     private static func validateConnectorTarget(
-        referrerUuid: String, parentOfReferrer: String?,
-        targetUuid: String, elements: [DiagramElementNode]
+        referrerUuid: String,
+        parentOfReferrer: String?,
+        targetUuid: String,
+        elements: [DiagramElementNode]
     ) throws {
         let spec = DiagramElementTypeSpec.spec(for: .connector)
         guard let ref = spec.elementRefs.first else { return }
@@ -490,7 +542,10 @@ public enum DiagramTreeReducer {
             throw DiagramReducerError.badRequest(
                 detail: violation.message(
                     role: "connector \(ref.role)",
-                    referrer: referrerUuid, target: targetUuid))
+                    referrer: referrerUuid,
+                    target: targetUuid
+                )
+            )
         }
     }
 
@@ -568,14 +623,16 @@ public enum DiagramTreeReducer {
     }
 
     private static func insertChild(
-        _ node: DiagramElementNode, under parentUuid: String,
+        _ node: DiagramElementNode,
+        under parentUuid: String,
         in elements: inout [DiagramElementNode]
     ) -> Bool {
         for index in elements.indices {
             if elements[index].identity.uuid == parentUuid {
                 elements[index] = withChildren(
                     elements[index],
-                    elements[index].children + [node])
+                    elements[index].children + [node]
+                )
                 return true
             }
             var children = elements[index].children
@@ -588,7 +645,8 @@ public enum DiagramTreeReducer {
     }
 
     private static func rewriteNode(
-        _ uuid: String, in elements: inout [DiagramElementNode],
+        _ uuid: String,
+        in elements: inout [DiagramElementNode],
         transform: (DiagramElementNode) -> DiagramElementNode
     ) -> Bool {
         for index in elements.indices {
@@ -610,8 +668,11 @@ public enum DiagramTreeReducer {
         _ children: [DiagramElementNode]
     ) -> DiagramElementNode {
         DiagramElementNode(
-            identity: node.identity, base: node.base,
-            payload: node.payload, children: children)
+            identity: node.identity,
+            base: node.base,
+            payload: node.payload,
+            children: children
+        )
     }
 
     /// The store reads children `ORDER BY element_z, sort_order, code` —

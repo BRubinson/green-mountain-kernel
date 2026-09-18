@@ -126,7 +126,8 @@ let package = Package(
                 .product(name: "GmDaemonSdk", package: "gmDaemonSdk"),
                 .product(
                     name: "ClaudeForFoundationModels",
-                    package: "gmClaudeForFoundationModels"),
+                    package: "gmClaudeForFoundationModels"
+                ),
             ],
             swiftSettings: [gmAgentOs]
         ),

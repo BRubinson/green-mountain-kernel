@@ -1,12 +1,8 @@
 ---
 description: Export one digested kbite to a portable gmcc_kbite zip
 argument-hint: <kbite_code> [output_dir]
-allowed-tools: Read, Bash, Glob, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest, Skill
+allowed-tools: Read, Bash, Glob, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest
 ---
-
-**Load the `gmcc` skill before anything else.** It carries the GMB identity and
-the GM-CDE rules every step below assumes. Do not begin the work until it is in
-context.
 
 Export one digested kbite to a portable `gmcc_kbite` zip.
 

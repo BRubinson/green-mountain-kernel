@@ -21,18 +21,12 @@ public enum GmEnvironment {
 
     /// The daemon-free root resolution used when the db value is unavailable.
     ///
-    /// DELEGATES TO `Paths.root` for the ambient case rather than re-deriving
-    /// it. Three separate resolvers used to exist — this one, `Paths.root`, and
-    /// the app's own — and they agreed only by coincidence. The moment the
-    /// baked Info.plist key landed they would have disagreed for real, with a
-    /// shell-facing surface reporting one root while the process actually wrote
-    /// another. One resolver cannot disagree with itself.
-    ///
-    /// `env` stays injectable, and the explicit-env path stays env-only ON
-    /// PURPOSE: a caller passing a dictionary is stating a hypothetical ("what
-    /// would a session with THIS environment resolve?"), and answering that
-    /// from this process's bundle would ignore the question. Only the default
-    /// — the ambient case — goes through `Paths.root`.
+    /// The ambient case DELEGATES TO `Paths.root` rather than re-deriving it;
+    /// one resolver cannot disagree with itself, and a second would let a
+    /// shell-facing surface report one root while the process writes another.
+    /// The explicit-`env` path stays env-only: a caller passing a dictionary
+    /// is asking what a session with THAT environment would resolve, and
+    /// answering from this process's bundle would ignore the question.
     public static func fallbackFsRoot(
         env: [String: String]? = nil
     ) -> URL {
@@ -45,43 +39,26 @@ public enum GmEnvironment {
 
     /// The full CLAUDE_ENV_FILE line set — one `export KEY='VALUE'` per line.
     ///
-    /// CLAUDE_ENV_FILE is a **shell script** Claude Code runs as a preamble
-    /// before every Bash command, so the shape is load-bearing twice over:
-    ///
-    /// - `export`, because a bare assignment sets a shell variable that no
-    ///   child process inherits. Without it `getenv("GM_FS_ROOT")` is empty in
-    ///   every gm/daemon/script invocation the session makes, and a session
-    ///   that cannot name its own runtime is the failure this file prevents.
-    /// - single quotes, because an unquoted value stops at the first space.
-    ///   A PATH carrying a component like `/Applications/VMware Fusion.app/…`
-    ///   truncates the assignment, so PATH is never set at all and the
-    ///   remainder runs as a command — one shell error on every tool call.
-    ///
-    /// Values ship as fully-resolved literals; single quoting means no
-    /// expansion happens, so a `$PATH` reference would never resolve.
-    ///
-    /// - `dbFsRoot`: pathsGet().gmFsRoot when the daemon answered — emitting
-    ///   the DB value makes the env/db match invariant true by construction.
-    /// - `env` / `bin`: injection seams. Production callers pass neither.
+    /// CLAUDE_ENV_FILE is a shell script run as a preamble before every Bash
+    /// command, so both halves of the shape are load-bearing. `export`,
+    /// because a bare assignment sets a shell variable no child inherits.
+    /// Single quotes, because an unquoted value stops at the first space and a
+    /// PATH component holding one truncates the assignment. Passing `dbFsRoot`
+    /// makes the env/db match invariant true by construction.
     public static func emit(
-        pluginRoot: String, inheritedPath: String, dbFsRoot: String? = nil,
+        pluginRoot: String,
+        inheritedPath: String,
+        dbFsRoot: String? = nil,
         env: [String: String] = ProcessInfo.processInfo.environment,
         bin: URL = Paths.bin
     ) -> [String] {
         var pairs = [("GM_BOOTED", "1"), ("GM_PLUGIN_ROOT", pluginRoot)]
-        // ONE root, emitted ONCE, and now exactly one legitimate value. This
-        // was two lines when there were two filesystem roots, then one line
-        // whose value could still legitimately vary per session; with the
-        // snapshot runtime gone it is one line with one answer, and a
-        // disagreement is a misconfiguration rather than a mode.
-        //
-        // Precedence, and the reason for it:
-        //   1. the db value when the daemon answered — emitting the db's own
-        //      answer makes the env/db agreement invariant true by construction
-        //   2. the inherited claim (the SessionStart hook set it, and
-        //      Paths.root already resolved against it) — forwarding rather than
-        //      recomputing keeps the session and its in-session clients
-        //      pointed at the same runtime
+        // ONE root, emitted ONCE, with exactly one legitimate value; a
+        // disagreement is a misconfiguration rather than a mode. Precedence:
+        //   1. the db value when the daemon answered, which makes env/db
+        //      agreement true by construction
+        //   2. the inherited claim, forwarded rather than recomputed so the
+        //      session and its in-session clients share one runtime
         //   3. the daemon-free fallback
         pairs.append(("GM_FS_ROOT", dbFsRoot ?? fallbackFsRoot(env: env).path))
         pairs.append(("PATH", pathValue(current: inheritedPath, bin: bin)))
@@ -109,21 +86,14 @@ public enum GmEnvironment {
         return ([mine] + survivors).joined(separator: ":")
     }
 
-    /// Env-vs-db agreement (the user's r35 ruling: "both should always match
-    /// or we get worried"). The db is the source; the env is the claim.
+    /// Env-vs-db agreement: the db is the source, the env is the claim.
     ///
-    /// ONE comparison, because there is now one root. This used to be two
-    /// checks against two vars, and the weaker of the two was set only in a
-    /// snapshot runtime — so on an ordinary session that check silently did
-    /// nothing. One always-present var turns the rule from "compare two vars
-    /// against two config rows, one of which may legitimately be absent" into
-    /// "compare one var against one config row, always present," which is a
-    /// check that cannot quietly stop running.
-    ///
-    /// `env` is injectable. The claim is an INPUT to this check, so a test must
-    /// be able to supply it: reading the process environment made the mismatch
-    /// assertion conditional on the runtime being installed, and a test that
-    /// silently stops asserting is worse than one that fails.
+    /// ONE comparison against one always-present var and one config row, which
+    /// is a check that cannot quietly stop running. `env` is injectable
+    /// because the claim is an INPUT here — reading the process environment
+    /// would make the mismatch assertion conditional on the runtime being
+    /// installed, and a check that silently stops asserting is worse than one
+    /// that fails.
     public static func check(
         _ paths: PathsGetResponse,
         env: [String: String] = ProcessInfo.processInfo.environment
@@ -140,7 +110,9 @@ public enum GmEnvironment {
                         "[GMB] WARN: gmfs_root disagreement — env \(claimed) vs daemon \(paths.gmFsRoot). "
                         + "Either the daemon answering this socket lives elsewhere, or the db "
                         + "disagrees with the session. Fix with: gm_hook call CONFIG_SET "
-                        + "--json '{\"key\":\"gmfs_root\",\"value\":\"<correct>\"}'."))
+                        + "--json '{\"key\":\"gmfs_root\",\"value\":\"<correct>\"}'."
+                )
+            )
         }
         return findings
     }

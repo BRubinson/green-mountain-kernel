@@ -52,7 +52,9 @@ final class SessionStore {
             // summaries). SEQUENTIAL after it, never concurrent: the daemon's
             // single serial queue has no fairness.
             let enriched = try await service.listPrompts(
-                sessionUuid: sessionUuid, withReports: true)
+                sessionUuid: sessionUuid,
+                withReports: true
+            )
             let sorted = enriched.sorted { $0.seq > $1.seq }
             if prompts != sorted { prompts = sorted }
             if changeSummary != response.changeSummary { changeSummary = response.changeSummary }
@@ -60,7 +62,7 @@ final class SessionStore {
             if lastError != nil { lastError = nil }
             hasLoaded = true
 
-            // Drop details for prompts that no longer exist.
+            // Drop details for prompts the listing stopped returning.
             let live = Set(sorted.map(\.uuid))
             for gone in promptDetails.keys where !live.contains(gone) {
                 promptDetails[gone] = nil

@@ -1,20 +1,14 @@
 import Foundation
 import GmDaemonSdk
 
-/// The whole corner-case surface of the workflow strip, in one pure,
-/// testable place.
+/// The whole corner-case surface of the workflow strip, in one pure place.
 ///
-/// **No SwiftUI import.** That is not an accident of style — it is why this
-/// type can be exercised from `GMVibesTests` without a host app, and it is
-/// the reason the strip's degraded states are modelled *values* instead of
-/// prose acceptance criteria scattered through a view body.
-///
-/// Every rule `make` encodes is a version-skew state this monorepo actually
-/// produces: the app is built against one compiled-in `WorkflowSpec` and
-/// talks to whatever daemon binary is installed in `~/gmfs/bin`, which may
-/// be serving another. A variant this build has never heard of, or a phase
-/// code that is not in this build's graph, is a routine Tuesday — never a
-/// crash, never an empty strip, never a dropped highlight.
+/// NO SwiftUI import: that is what lets this type be exercised without a host app, and why
+/// the strip's degraded states are modelled as values rather than prose in a view body.
+/// Every rule `make` encodes is a version-skew state this monorepo produces, since the app is
+/// built against one compiled-in `WorkflowSpec` and talks to whatever daemon is installed.
+/// An unknown variant or phase code is routine: never a crash, an empty strip, or a dropped
+/// highlight.
 struct WorkflowStripModel: Equatable {
 
     enum PillState: Equatable {
@@ -89,11 +83,13 @@ struct WorkflowStripModel: Equatable {
                         state: closed ? .done : .current,
                         // No variant means no (variant, phase) pair to
                         // look instructions up with.
-                        instructions: nil)
+                        instructions: nil
+                    )
                 ],
                 blockers: response.gateBlockers,
                 closed: closed,
-                variantLabel: nil)
+                variantLabel: nil
+            )
         }
 
         let graph = WorkflowSpec.phases(for: variant)
@@ -103,13 +99,15 @@ struct WorkflowStripModel: Equatable {
         // if the registry gains it there). Both are the same fact here.
         let servedIndex = graph.firstIndex { $0.rawValue == served }
 
-        var pills = graph.enumerated().map { index, phase in
-            Pill(
-                id: phase.rawValue,
-                title: title(forPhaseCode: phase.rawValue),
-                state: pillState(index: index, servedIndex: servedIndex, closed: closed),
-                instructions: WorkflowSpec.instructions(variant: variant, phase: phase))
-        }
+        var pills = graph.enumerated()
+            .map { index, phase in
+                Pill(
+                    id: phase.rawValue,
+                    title: title(forPhaseCode: phase.rawValue),
+                    state: pillState(index: index, servedIndex: servedIndex, closed: closed),
+                    instructions: WorkflowSpec.instructions(variant: variant, phase: phase)
+                )
+            }
 
         // Rule 2: keep the highlight rather than dropping it. An unknown
         // served phase is appended as a trailing pill so a daemon/app skew
@@ -122,14 +120,17 @@ struct WorkflowStripModel: Equatable {
                     id: served,
                     title: title(forPhaseCode: served),
                     state: closed ? .done : .unknown,
-                    instructions: nil))
+                    instructions: nil
+                )
+            )
         }
 
         return WorkflowStripModel(
             pills: pills,
             blockers: response.gateBlockers,
             closed: closed,
-            variantLabel: "\(variant.rawValue) · \(graph.count) phases")
+            variantLabel: "\(variant.rawValue) · \(graph.count) phases"
+        )
     }
 
     /// Rule 4 (and rule 3's override of it).

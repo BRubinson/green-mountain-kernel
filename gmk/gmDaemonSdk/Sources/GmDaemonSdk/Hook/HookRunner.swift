@@ -1,17 +1,12 @@
 import Foundation
 
 /// The hook surface's ORCHESTRATION, owned by the kit rather than by a
-/// front-end binary.
-///
-/// Every front-end that fronts a Claude Code hook calls these two functions and
-/// adds nothing of its own. That is the whole point: the hook contract — never
-/// block a tool call, never wedge a spawn, never write to stderr, always exit 0
-/// — is a property of THIS code, not of whichever binary the shim happened to
-/// exec. When the CLI front-end goes away, the contract does not move with it.
-///
-/// NEITHER FUNCTION THROWS. A hook that throws prints and exits non-zero, which
-/// is exactly the noise a hook may not produce. Every failure path returns
-/// quietly.
+/// front-end binary. Every front-end calls these two functions and adds
+/// nothing, so the hook contract — never block a tool call, never wedge a
+/// spawn, never write to stderr, always exit 0 — is a property of THIS code
+/// rather than of whichever binary the shim exec'd. NEITHER FUNCTION THROWS:
+/// a throw prints and exits non-zero, which is exactly the noise a hook may
+/// not produce, so every failure path returns quietly.
 public enum HookRunner {
 
     /// Record the file changes one tool call made.
@@ -20,15 +15,17 @@ public enum HookRunner {
     /// that fires this for something else records nothing rather than inventing
     /// a change from a `file_path` that was only ever read.
     ///
+    /// A nil `caller` opens a short-lived socket client, which is what the
+    /// shell-form front-end does. The kernel passes its own in-process caller
+    /// instead, so a `HOOK_EVENT` served in-process does not dial the daemon it
+    /// is already inside — a self-connection queued behind the call that must
+    /// service it is a deadlock, not a slow path.
+    ///
     /// - Returns: the dry-run report when `dryRun` is set, otherwise nil.
-    /// - Parameter caller: how to reach the daemon. `nil` opens a short-lived
-    ///   socket client, which is what the shell-form hook front-end does. The
-    ///   kernel passes its own in-process caller instead, so a `HOOK_EVENT`
-    ///   served in-process does not dial the daemon it is already inside — that
-    ///   would be a self-connection queued behind the very call that must
-    ///   service it, which is a deadlock rather than a slow path.
     public static func postToolUse(
-        stdin: Data, dryRun: Bool, caller: (any GmVerbCaller)? = nil
+        stdin: Data,
+        dryRun: Bool,
+        caller: (any GmVerbCaller)? = nil
     ) -> String? {
         guard let payload = HookPayload.decode(stdin), let cwd = payload.cwd else {
             return nil
@@ -72,7 +69,8 @@ public enum HookRunner {
                 agentType: payload.agentType,
                 permissionMode: payload.permissionMode,
                 durationMs: payload.durationMs,
-                transcriptPath: payload.transcriptPath)
+                transcriptPath: payload.transcriptPath
+            )
         }
 
         if dryRun {
@@ -81,7 +79,9 @@ public enum HookRunner {
                     event: payload.hookEventName ?? "PostToolUse",
                     repoRoot: git.repoRoot,
                     gmFsRoot: Paths.root.path,
-                    changes: changes))
+                    changes: changes
+                )
+            )
         }
         // Per-change `try?`: one refused path must not cost the others their
         // row, and a refusal is already durable daemon-side. A dead daemon loses
@@ -98,22 +98,21 @@ public enum HookRunner {
     /// shape fires SubagentStart carrying agent_id, so this beats the agent to
     /// any write it could make.
     ///
-    /// - Parameter sheetText: the context block handed to the spawning agent.
-    ///   Injected rather than reached for, so the kit does not depend on whose
-    ///   sheet it is — the generated pen sheet, today, and nothing else once the
-    ///   CLI's is gone.
-    /// - Returns: the JSON line to print on stdout (the dry-run report under
-    ///   `dryRun`, otherwise the SubagentStart `additionalContext` response).
-    /// - Parameter caller: see `postToolUse(stdin:dryRun:caller:)`.
+    /// `sheetText` is injected rather than reached for, so the kit does not
+    /// depend on whose context sheet it is. `caller` behaves as in
+    /// `postToolUse(stdin:dryRun:caller:)`.
+    ///
+    /// - Returns: the JSON line to print on stdout — the dry-run report under
+    ///   `dryRun`, otherwise the SubagentStart `additionalContext` response.
     public static func subagentStart(
-        stdin: Data, dryRun: Bool, sheetText: String, caller: (any GmVerbCaller)? = nil
+        stdin: Data,
+        dryRun: Bool,
+        sheetText: String,
+        caller: (any GmVerbCaller)? = nil
     ) -> String? {
-        // The cwd is still REQUIRED even though nothing here reads it: a payload
-        // without one is a payload this hook cannot trust, and returning nil is
-        // the silent no-op the contract asks for. It used to be consumed by the
-        // snapshot-marker walk, which is gone with the sandbox — but the guard
-        // outlived its consumer on purpose, because "no cwd" still means "not a
-        // hook firing in a repo we can identify".
+        // The cwd is REQUIRED even though nothing here reads it: "no cwd" means
+        // a hook not firing in a repo we can identify, so the payload cannot be
+        // trusted, and nil is the silent no-op the contract asks for.
         guard let payload = HookPayload.decode(stdin), payload.cwd != nil else {
             return nil
         }
@@ -127,14 +126,17 @@ public enum HookRunner {
                 agentId: agentId,
                 agentType: payload.agentType,
                 claudeSessionId: payload.sessionId,
-                claudeTurnId: payload.claudeTurnId)
+                claudeTurnId: payload.claudeTurnId
+            )
         }
         if dryRun {
             return encodeJSON(
                 SubagentStartDryRun(
                     event: payload.hookEventName ?? "SubagentStart",
                     gmFsRoot: Paths.root.path,
-                    registration: registration))
+                    registration: registration
+                )
+            )
         }
 
         // REGISTRATION FAILURE IS ANNOUNCED, NOT SWALLOWED. An agent whose
@@ -162,8 +164,10 @@ public enum HookRunner {
                         BriefingStubRequest(
                             agentType: payload.agentType,
                             sessionUuid: sessionUuid,
-                            clientKey: ClientKey.resolve())
-                    ).stub) ?? ""
+                            clientKey: ClientKey.resolve()
+                        )
+                    )
+                    .stub) ?? ""
             }
         }
 
@@ -173,47 +177,60 @@ public enum HookRunner {
         return additionalContextLine(context)
     }
 
-    /// Warn — never block — when a Bash command hand-invokes the file-change
-    /// capture write (Endotherm ruling, prompt p1: capture belongs to the
-    /// PostToolUse hook alone, and a hand-typed capture row is a forgery of the
-    /// machine's own record; the guard STARTS as a warning, not an error).
+    /// DENY a Bash command that invokes `gm_hook`.
+    /// `gm_hook` is the HARNESS'S client, not the agent's: SessionStart,
+    /// SubagentStart, PreToolUse and PostToolUse call it without passing
+    /// through the Bash tool, so this guard cannot fire on them. Every
+    /// agent-facing verb is a pen tool, typed and budget-guarded, while the CLI
+    /// prints unbudgeted JSON the harness truncates mid-document. Every
+    /// invocation is blocked, which also subsumes capture forgery: a capture
+    /// row can only be hand-written through the binary this denies.
+
+    /// COMMAND POSITION ONLY. The match is `gm_hook`, bare or path-qualified,
+    /// where a command starts — line start, after `;` `&&` `||` `|` `(` or
+    /// `$(`, or after `exec` — never anywhere in the string. `grep gm_hook`
+    /// and `ls ~/gmfs/bin` are not invocations, and blocking them would make
+    /// this repository undevelopable from inside its own tooling. `env X=1
+    /// gm_hook` and `bash -c "gm_hook …"` remain deliberate gaps: the guard
+    /// stops the reach, not a determined circumvention.
     ///
-    /// The spellings are DERIVED from `VerbRegistry`'s `.fileChangeAdd` row —
-    /// its MessageType, its canonical `gm` invocation and every alias — never
-    /// hand-listed, so a new alias is covered the day it is registered.
-    ///
-    /// - Returns: the PreToolUse hook response line (allow + warning) when the
-    ///   command matches, otherwise nil for silence. Exit is always 0 either
-    ///   way — the hook contract holds.
+    /// - Returns: the PreToolUse hook response line (deny + reason) when the
+    ///   command invokes the binary, otherwise nil for silence. Exit is always 0
+    ///   either way — the hook contract holds; the DECISION is in the JSON.
     public static func preToolUse(stdin: Data) -> String? {
         guard let payload = HookPayload.decode(stdin),
             payload.toolName == "Bash",
             let command = payload.command, !command.isEmpty,
-            let spec = VerbRegistry.spec(for: .fileChangeAdd)
+            invokesGmHook(command)
         else { return nil }
-        var patterns = [spec.messageType.rawValue]
-        for invocation in spec.gmInvocations {
-            patterns.append(invocation)
-            // The same subcommand reached through the gm_hook binary name.
-            if invocation.hasPrefix("gm ") {
-                patterns.append("gm_hook " + invocation.dropFirst(3))
-            }
-        }
-        guard patterns.contains(where: command.contains) else { return nil }
-        let warning =
-            "[GMB] warning: file-change capture belongs to the PostToolUse hook "
-            + "alone (Bash included) — a hand-invoked capture write forges the machine's "
-            + "record. This command was allowed, but do not write capture rows yourself."
+        let reason =
+            "[GMB] denied: `gm_hook` is the harness's own client — the SessionStart, "
+            + "SubagentStart, PreToolUse and PostToolUse hooks call it; an agent never does. "
+            + "Every agent-facing verb is a pen tool (mcp__plugin_gmcc_cde__*). A verb with "
+            + "no pen tool is a missing door to REPORT to the Endotherm, not a shell to reach "
+            + "for. File-change capture belongs to the PostToolUse hook alone."
         let response: [String: Any] = [
             "hookSpecificOutput": [
                 "hookEventName": "PreToolUse",
-                "permissionDecision": "allow",
-                "permissionDecisionReason": warning,
+                "permissionDecision": "deny",
+                "permissionDecisionReason": reason,
             ],
-            "systemMessage": warning,
+            "systemMessage": reason,
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: response) else { return nil }
         return String(data: data, encoding: .utf8)
+    }
+
+    /// Whether a shell command line invokes `gm_hook` in command position.
+    ///
+    /// Public so the suite can pin the boundary without a hook payload: the
+    /// cases that MUST match and the cases that MUST NOT are both load-bearing.
+    public static func invokesGmHook(_ command: String) -> Bool {
+        // (start | ; & | ( `  | exec) [spaces] [path/]gm_hook [quote] (space | end)
+        // The optional quote is the hook launcher's own spelling —
+        // `"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook" hook …` — pasted back.
+        let pattern = #"(?:^|[;&|(`]|\$\(|\bexec)\s*(?:\S*/)?gm_hook["']?(?=\s|$)"#
+        return command.range(of: pattern, options: .regularExpression) != nil
     }
 
     // MARK: - Front-end helpers
@@ -247,20 +264,14 @@ public enum HookRunner {
     }
 }
 
-/// Open a client, run one body, always close. The hook's own variant: unlike a
-/// front-end's, it maps NO error onto an exit code, because a hook has no exit
-/// code to map onto — every failure here is swallowed by the caller's `try?`
-/// and the hook returns quietly.
 /// Runs `body` against a verb caller, opening a short-lived socket client only
-/// when one was not supplied.
+/// when one was not supplied, and closing only what it opened. It maps NO error
+/// onto an exit code, because a hook has none to map onto.
 ///
-/// THE INJECTED CASE IS NOT AN OPTIMISATION. When the kernel serves `HOOK_EVENT`
-/// it passes its own in-process caller; opening a `DaemonClient` there would
-/// connect the kernel to itself, on the serial queue that would have to answer
-/// — a deadlock. The `nil` default keeps every existing shell-form front-end
-/// reading exactly as it did.
-///
-/// Only the socket case is closed, because only the socket case was opened here.
+/// THE INJECTED CASE IS NOT AN OPTIMISATION. When the kernel serves
+/// `HOOK_EVENT` it passes its own in-process caller; opening a `DaemonClient`
+/// there would connect the kernel to itself on the serial queue that would
+/// have to answer, which is a deadlock.
 private func withKitClient<T>(
     _ caller: (any GmVerbCaller)?,
     _ body: (any GmVerbCaller) throws -> T

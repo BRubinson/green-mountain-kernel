@@ -6,12 +6,10 @@ import GmDaemonSdk
 /// machine. Runs INSIDE a Store-owned transaction; holds no dbQueue and
 /// never self-transacts.
 ///
-/// m0025 model: the summary is a slim status machine; questions
-/// (user_clarification_question + option/answer children) and internal
-/// notes are the content; the care package is the standalone clarified-
-/// intent bundle. FINALIZE IS A PURE GATE — it never writes the prompt row
-/// (the old refined_goal→prompt.goal copy is retired; prompt content is
-/// human input only).
+/// The summary is a slim status machine; questions and internal notes are the
+/// content; the care package is the standalone clarified-intent bundle.
+/// FINALIZE IS A PURE GATE and never writes the prompt row: prompt content is
+/// human input only.
 struct ClarificationRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
@@ -20,16 +18,15 @@ struct ClarificationRepository: RepositoryContext {
 
     /// Idempotent: returns the existing summary or creates one at `building`.
     ///
-    /// CLARIFY_OPEN is now its ONLY caller. setPromptStatus used to call it too,
-    /// as the create-on-enter side effect of draft → clarifying; m0028 removed
-    /// that state and with it the side effect, so opening a clarification is
-    /// something an agent does deliberately rather than something that happens
-    /// to it while moving a status.
+    /// CLARIFY_OPEN is its ONLY caller, so opening a clarification is something
+    /// an agent does deliberately, never a side effect of moving a status.
     @discardableResult
     func ensureSummary(promptUuid: String) throws -> (uuid: String, created: Bool) {
         guard
             try Row.fetchOne(
-                db, sql: "SELECT 1 FROM prompt WHERE uuid = ?", arguments: [promptUuid]
+                db,
+                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
+                arguments: [promptUuid]
             ) != nil
         else {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
@@ -45,14 +42,19 @@ struct ClarificationRepository: RepositoryContext {
             return (existing, false)
         }
         let uuid = try core.insertBase(
-            db, table: "clarification_summary",
+            db,
+            table: "clarification_summary",
             extra: [
                 "prompt_uuid": promptUuid,
                 "status": ClarificationStatus.building.rawValue,
-            ])
+            ]
+        )
         try core.appendEvent(
-            db, kind: .clarificationChange, subjectUuid: uuid,
-            payload: Store.jsonPayload(["action": "open", "prompt_uuid": promptUuid]))
+            db,
+            kind: .clarificationChange,
+            subjectUuid: uuid,
+            payload: Store.jsonPayload(["action": "open", "prompt_uuid": promptUuid])
+        )
         return (uuid, true)
     }
 
@@ -78,8 +80,11 @@ struct ClarificationRepository: RepositoryContext {
                 || summary.clarificationStatus == .answering
         else {
             throw StoreError.invalidEntityTransition(
-                entity: "clarification", from: summary.status, to: "question-add",
-                reason: "questions can be inserted while building or answering — reopen a complete summary first")
+                entity: "clarification",
+                from: summary.status,
+                to: "question-add",
+                reason: "questions can be inserted while building or answering — reopen a complete summary first"
+            )
         }
         let question = req.question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty else {
@@ -90,9 +95,11 @@ struct ClarificationRepository: RepositoryContext {
                 db,
                 sql:
                     "SELECT COALESCE(MAX(seq), 0) FROM user_clarification_question WHERE clarification_summary_uuid = ?",
-                arguments: [req.summaryUuid]) ?? 0) + 1
+                arguments: [req.summaryUuid]
+            ) ?? 0) + 1
         let uuid = try core.insertBase(
-            db, table: "user_clarification_question",
+            db,
+            table: "user_clarification_question",
             extra: [
                 "clarification_summary_uuid": req.summaryUuid,
                 "seq": seq,
@@ -100,26 +107,32 @@ struct ClarificationRepository: RepositoryContext {
                 "status": ClarificationRowStatus.open.rawValue,
                 "agent_id": req.agentId,
                 "agent_name": req.agentName.map(Store.normalizedAgentName),
-            ])
+            ]
+        )
         for (i, body) in (req.options ?? []).enumerated() {
             let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmed.isEmpty else {
                 throw StoreError.badRequest(detail: "option \(i + 1) is empty")
             }
             try core.insertBase(
-                db, table: "user_clarification_option",
+                db,
+                table: "user_clarification_option",
                 extra: [
                     "question_uuid": uuid,
                     "seq": i + 1,
                     "body": trimmed,
-                ])
+                ]
+            )
         }
         try core.appendEvent(
-            db, kind: .clarificationChange, subjectUuid: req.summaryUuid,
+            db,
+            kind: .clarificationChange,
+            subjectUuid: req.summaryUuid,
             payload: Store.jsonPayload([
                 "action": "question_add", "seq": seq,
                 "prompt_uuid": summary.promptUuid,
-            ]))
+            ])
+        )
         guard let row = try fetchQuestion(uuid: uuid) else {
             throw StoreError.notFound(entity: "user_clarification_question", key: uuid)
         }
@@ -140,7 +153,8 @@ struct ClarificationRepository: RepositoryContext {
         if let weight = req.weight {
             guard (0...999).contains(weight) else {
                 throw StoreError.badRequest(
-                    detail: "weight must be 0–999 (finding_rating polarity, 0 = critical)")
+                    detail: "weight must be 0–999 (finding_rating polarity, 0 = critical)"
+                )
             }
         }
         // CHECKless column, Swift-registry vocabulary (the post-m0021 rule).
@@ -148,13 +162,15 @@ struct ClarificationRepository: RepositoryContext {
             let legal = ["exploration_finding", "briefing", "question", "other"]
             guard legal.contains(entityType) else {
                 throw StoreError.badRequest(
-                    detail: "confused_entity_type must be one of \(legal.joined(separator: "|"))")
+                    detail: "confused_entity_type must be one of \(legal.joined(separator: "|"))"
+                )
             }
         }
         if let questionUuid = req.questionUuid {
             guard
                 try Row.fetchOne(
-                    db, sql: "SELECT 1 FROM user_clarification_question WHERE uuid = ?",
+                    db,
+                    sql: "SELECT 1 FROM user_clarification_question WHERE uuid = ?",
                     arguments: [questionUuid]
                 ) != nil
             else {
@@ -162,7 +178,8 @@ struct ClarificationRepository: RepositoryContext {
             }
         }
         let uuid = try core.insertBase(
-            db, table: "internal_clarification_note",
+            db,
+            table: "internal_clarification_note",
             extra: [
                 "clarification_summary_uuid": req.summaryUuid,
                 "body": body,
@@ -172,12 +189,16 @@ struct ClarificationRepository: RepositoryContext {
                 "question_uuid": req.questionUuid,
                 "agent_id": req.agentId,
                 "agent_name": req.agentName.map(Store.normalizedAgentName),
-            ])
+            ]
+        )
         try core.appendEvent(
-            db, kind: .clarificationChange, subjectUuid: req.summaryUuid,
+            db,
+            kind: .clarificationChange,
+            subjectUuid: req.summaryUuid,
             payload: Store.jsonPayload([
                 "action": "note_add", "prompt_uuid": summary.promptUuid,
-            ]))
+            ])
+        )
         guard let row = try fetchNote(uuid: uuid) else {
             throw StoreError.notFound(entity: "internal_clarification_note", key: uuid)
         }
@@ -197,8 +218,11 @@ struct ClarificationRepository: RepositoryContext {
             summary.clarificationStatus == .answering
         else {
             throw StoreError.invalidEntityTransition(
-                entity: "clarification", from: "summary", to: "answer",
-                reason: "answers are writable only while the summary is answering (seal first, reopen after complete)")
+                entity: "clarification",
+                from: "summary",
+                to: "answer",
+                reason: "answers are writable only while the summary is answering (seal first, reopen after complete)"
+            )
         }
         var set: [String: (any DatabaseValueConvertible)?] = [:]
         if req.skip {
@@ -208,45 +232,61 @@ struct ClarificationRepository: RepositoryContext {
             set["answer_text"] = nil as String?
             try db.execute(
                 sql: "DELETE FROM user_clarification_answer WHERE question_uuid = ?",
-                arguments: [req.questionUuid])
+                arguments: [req.questionUuid]
+            )
         } else {
             let answerText = req.answerText?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let selections = req.selectedOptionUuids ?? []
             guard !answerText.isEmpty || !selections.isEmpty else {
                 throw StoreError.badRequest(
-                    detail: "answer needs --answer text and/or --select option uuid(s) (or --skip)")
+                    detail: "answer needs --answer text and/or --select option uuid(s) (or --skip)"
+                )
             }
             let valid = try Set(
                 String.fetchAll(
-                    db, sql: "SELECT uuid FROM user_clarification_option WHERE question_uuid = ?",
-                    arguments: [req.questionUuid]))
+                    db,
+                    sql: "SELECT uuid FROM user_clarification_option WHERE question_uuid = ?",
+                    arguments: [req.questionUuid]
+                )
+            )
             for optionUuid in selections where !valid.contains(optionUuid) {
                 throw StoreError.badRequest(
-                    detail: "option \(optionUuid) does not belong to question \(req.questionUuid)")
+                    detail: "option \(optionUuid) does not belong to question \(req.questionUuid)"
+                )
             }
             try db.execute(
                 sql: "DELETE FROM user_clarification_answer WHERE question_uuid = ?",
-                arguments: [req.questionUuid])
+                arguments: [req.questionUuid]
+            )
             for optionUuid in selections {
                 try core.insertBase(
-                    db, table: "user_clarification_answer",
+                    db,
+                    table: "user_clarification_answer",
                     extra: [
                         "question_uuid": req.questionUuid,
                         "option_uuid": optionUuid,
-                    ])
+                    ]
+                )
             }
             set["answer_text"] = answerText.isEmpty ? nil : answerText
             set["status"] = ClarificationRowStatus.answered.rawValue
         }
         try core.updateBase(
-            db, table: "user_clarification_question", uuid: req.questionUuid,
-            expectedVersion: req.expectedVersion, set: set)
+            db,
+            table: "user_clarification_question",
+            uuid: req.questionUuid,
+            expectedVersion: req.expectedVersion,
+            set: set
+        )
         try core.appendEvent(
-            db, kind: .clarificationChange, subjectUuid: row.clarificationSummaryUuid,
+            db,
+            kind: .clarificationChange,
+            subjectUuid: row.clarificationSummaryUuid,
             payload: Store.jsonPayload([
                 "action": req.skip ? "skip" : "answer", "question_uuid": req.questionUuid,
                 "prompt_uuid": summary.promptUuid,
-            ]))
+            ])
+        )
         guard let updated = try fetchQuestion(uuid: req.questionUuid) else {
             throw StoreError.notFound(entity: "user_clarification_question", key: req.questionUuid)
         }
@@ -263,9 +303,11 @@ struct ClarificationRepository: RepositoryContext {
         }
         guard summary.clarificationStatus == .answering else {
             throw StoreError.invalidEntityTransition(
-                entity: "clarification", from: summary.status,
+                entity: "clarification",
+                from: summary.status,
                 to: ClarificationStatus.complete.rawValue,
-                reason: "finalize runs from answering")
+                reason: "finalize runs from answering"
+            )
         }
         let openCount =
             try Int.fetchOne(
@@ -273,26 +315,33 @@ struct ClarificationRepository: RepositoryContext {
                 sql: """
                     SELECT COUNT(*) FROM user_clarification_question
                     WHERE clarification_summary_uuid = ? AND status = 'open'
-                    """, arguments: [req.summaryUuid]) ?? 0
+                    """,
+                arguments: [req.summaryUuid]
+            ) ?? 0
         guard openCount == 0 else {
             throw StoreError.invalidEntityTransition(
-                entity: "clarification", from: summary.status,
+                entity: "clarification",
+                from: summary.status,
                 to: ClarificationStatus.complete.rawValue,
-                reason: "\(openCount) question(s) still open — answer or skip them")
+                reason: "\(openCount) question(s) still open — answer or skip them"
+            )
         }
         // Variants whose phase graph includes the care package REQUIRE a
         // ready one at finalize — the clarified intent lives only there, and
         // sailing past finalize without it strands the architects.
         let package = try fetchPackage(bySummary: req.summaryUuid)
         if let variantRaw = try String.fetchOne(
-            db, sql: "SELECT variant FROM bot_workflow WHERE prompt_uuid = ? AND status = 'active'",
-            arguments: [summary.promptUuid]),
+            db,
+            sql: "SELECT variant FROM bot_workflow WHERE prompt_uuid = ? AND status = 'active'",
+            arguments: [summary.promptUuid]
+        ),
             let variant = BotVariant(rawValue: variantRaw),
             WorkflowSpec.phases(for: variant).contains(.carePackage)
         {
             guard let package, package.status == "ready" else {
                 throw StoreError.invalidEntityTransition(
-                    entity: "clarification", from: summary.status,
+                    entity: "clarification",
+                    from: summary.status,
                     to: ClarificationStatus.complete.rawValue,
                     reason:
                         "the \(variantRaw) variant requires a READY care package before finalize — gm_hook call CARE_PACKAGE_OPEN, then care_ref_add, then care_package_complete first"
@@ -301,18 +350,26 @@ struct ClarificationRepository: RepositoryContext {
         } else if let package {
             guard package.status == "ready" else {
                 throw StoreError.invalidEntityTransition(
-                    entity: "clarification", from: summary.status,
+                    entity: "clarification",
+                    from: summary.status,
                     to: ClarificationStatus.complete.rawValue,
-                    reason: "care package is still building — run care_package_complete first")
+                    reason: "care package is still building — run care_package_complete first"
+                )
             }
         }
         try core.updateBase(
-            db, table: "clarification_summary", uuid: req.summaryUuid,
+            db,
+            table: "clarification_summary",
+            uuid: req.summaryUuid,
             expectedVersion: req.expectedVersion,
-            set: ["status": ClarificationStatus.complete.rawValue])
+            set: ["status": ClarificationStatus.complete.rawValue]
+        )
         try core.appendEvent(
-            db, kind: .clarificationChange, subjectUuid: req.summaryUuid,
-            payload: Store.jsonPayload(["action": "finalize", "prompt_uuid": summary.promptUuid]))
+            db,
+            kind: .clarificationChange,
+            subjectUuid: req.summaryUuid,
+            payload: Store.jsonPayload(["action": "finalize", "prompt_uuid": summary.promptUuid])
+        )
         try touchSessionForPrompt(promptUuid: summary.promptUuid)
 
         guard let updatedSummary = try fetchSummary(uuid: req.summaryUuid) else {
@@ -324,7 +381,9 @@ struct ClarificationRepository: RepositoryContext {
     func get(_ req: ClarifyGetRequest) throws -> ClarifyGetResponse {
         guard
             try String.fetchOne(
-                db, sql: "SELECT uuid FROM prompt WHERE uuid = ?", arguments: [req.promptUuid]
+                db,
+                sql: "SELECT uuid FROM prompt WHERE uuid = ?",
+                arguments: [req.promptUuid]
             ) != nil
         else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -333,7 +392,9 @@ struct ClarificationRepository: RepositoryContext {
             // A6: the prompt EXISTS (guard above) — this absence is a
             // discriminated SUMMARY_ABSENT, not NOT_FOUND: open a summary.
             throw StoreError.summaryAbsent(
-                entity: "clarification", promptUuid: req.promptUuid)
+                entity: "clarification",
+                promptUuid: req.promptUuid
+            )
         }
         let package = try fetchPackage(bySummary: summary.uuid)
         let questions = try fetchQuestions(summaryUuid: summary.uuid)
@@ -342,12 +403,14 @@ struct ClarificationRepository: RepositoryContext {
             let s = try dope.scopeStaleness(
                 scopeUuid: pkg.dopeScopeUuid,
                 stampedRevision: pkg.dopeScopeRevision,
-                dotPaths: pkg.dopeRefs.map(\.dopeCode))
+                dotPaths: pkg.dopeRefs.map(\.dopeCode)
+            )
             return CarePackageStaleness(
                 stampedRevision: s.stamped,
                 currentRevision: s.current,
                 drifted: s.drifted,
-                ghostDotPaths: s.ghosts)
+                ghostDotPaths: s.ghosts
+            )
         }
 
         // THE UNNARROWED REQUEST IS THE HISTORICAL RESPONSE, BYTE FOR BYTE —
@@ -359,7 +422,8 @@ struct ClarificationRepository: RepositoryContext {
                 notes: allNotes,
                 carePackage: package,
                 // INVARIANT: non-nil IFF carePackage is non-nil.
-                carePackageStaleness: staleness)
+                carePackageStaleness: staleness
+            )
         }
 
         // Weight window, mirroring the rating windows: an UNWEIGHTED note is
@@ -373,7 +437,7 @@ struct ClarificationRepository: RepositoryContext {
                 allNotes
                 .filter { ($0.weight ?? Int.min) > ceiling }
                 .map { note in
-                    let body = PenExcerpt.take(note.body)
+                    let body = CdeExcerpt.take(note.body)
                     return ClarificationNoteStub(
                         uuid: note.uuid,
                         weight: note.weight,
@@ -381,7 +445,8 @@ struct ClarificationRepository: RepositoryContext {
                         questionUuid: note.questionUuid,
                         bodyExcerpt: body.excerpt,
                         bodyChars: body.chars,
-                        bodyTruncated: body.truncated)
+                        bodyTruncated: body.truncated
+                    )
                 }
         } else {
             notes = allNotes
@@ -400,7 +465,8 @@ struct ClarificationRepository: RepositoryContext {
             carePackage: keepPackage ? package : nil,
             carePackageStaleness: keepPackage ? staleness : nil,
             carePackageStub: keepPackage ? nil : package.map(CarePackageStub.init(package:)),
-            noteStubs: noteStubs)
+            noteStubs: noteStubs
+        )
     }
 
     // DELIBERATELY NOT DONE: no `staleness` on CarePackageResponse
@@ -417,17 +483,22 @@ struct ClarificationRepository: RepositoryContext {
             return CarePackageResponse(package: existing, created: false)
         }
         let uuid = try core.insertBase(
-            db, table: "care_package",
+            db,
+            table: "care_package",
             extra: [
                 "clarification_summary_uuid": req.summaryUuid,
                 "clarified_intent": "",
                 "status": "building",
-            ])
+            ]
+        )
         try core.appendEvent(
-            db, kind: .clarificationChange, subjectUuid: uuid,
+            db,
+            kind: .clarificationChange,
+            subjectUuid: uuid,
             payload: Store.jsonPayload([
                 "action": "package_open", "prompt_uuid": summary.promptUuid,
-            ]))
+            ])
+        )
         try touchSessionForPrompt(promptUuid: summary.promptUuid)
         guard let package = try fetchPackage(uuid: uuid) else {
             throw StoreError.notFound(entity: "care_package", key: uuid)
@@ -441,8 +512,11 @@ struct ClarificationRepository: RepositoryContext {
         }
         guard package.status == "building" else {
             throw StoreError.invalidEntityTransition(
-                entity: "care_package", from: package.status, to: "ref-add",
-                reason: "refs can be added only while building")
+                entity: "care_package",
+                from: package.status,
+                to: "ref-add",
+                reason: "refs can be added only while building"
+            )
         }
         switch req.kind {
         case .dope:
@@ -450,13 +524,15 @@ struct ClarificationRepository: RepositoryContext {
                 throw StoreError.badRequest(detail: "kind dope requires --dope-code")
             }
             try core.insertBase(
-                db, table: "care_package_dope_ref",
+                db,
+                table: "care_package_dope_ref",
                 extra: [
                     "care_package_uuid": req.packageUuid,
                     "dope_code": code,
                     "note": req.note,
                     "seq": try nextRefSeq(table: "care_package_dope_ref", packageUuid: req.packageUuid),
-                ])
+                ]
+            )
         case .kbite:
             guard let fileUuid = req.kbiteFileUuid, !fileUuid.isEmpty else {
                 throw StoreError.badRequest(detail: "kind kbite requires --kbite-file-uuid")
@@ -472,32 +548,38 @@ struct ClarificationRepository: RepositoryContext {
                 throw StoreError.notFound(entity: "kbite_resource_file", key: fileUuid)
             }
             try core.insertBase(
-                db, table: "care_package_kbite_ref",
+                db,
+                table: "care_package_kbite_ref",
                 extra: [
                     "care_package_uuid": req.packageUuid,
                     "kbite_resource_file_uuid": fileUuid,
                     "brief": brief["resource_file_summary"] as String?,
                     "seq": try nextRefSeq(table: "care_package_kbite_ref", packageUuid: req.packageUuid),
-                ])
+                ]
+            )
         case .exploration:
             guard let title = req.curatedTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
                 let body = req.curatedBody?.trimmingCharacters(in: .whitespacesAndNewlines),
                 !title.isEmpty, !body.isEmpty
             else {
                 throw StoreError.badRequest(
-                    detail: "kind exploration requires --title and --body (the curated COPY)")
+                    detail: "kind exploration requires --title and --body (the curated COPY)"
+                )
             }
             if let source = req.sourceFindingUuid {
                 guard
                     try Row.fetchOne(
-                        db, sql: "SELECT 1 FROM exploration_finding WHERE uuid = ?", arguments: [source]
+                        db,
+                        sql: "SELECT 1 FROM exploration_finding WHERE uuid = ?",
+                        arguments: [source]
                     ) != nil
                 else {
                     throw StoreError.notFound(entity: "exploration_finding", key: source)
                 }
             }
             try core.insertBase(
-                db, table: "care_package_exploration_ref",
+                db,
+                table: "care_package_exploration_ref",
                 extra: [
                     "care_package_uuid": req.packageUuid,
                     "curated_title": title,
@@ -505,18 +587,24 @@ struct ClarificationRepository: RepositoryContext {
                     "file_path": req.filePath,
                     "source_finding_uuid": req.sourceFindingUuid,
                     "seq": try nextRefSeq(
-                        table: "care_package_exploration_ref", packageUuid: req.packageUuid),
-                ])
+                        table: "care_package_exploration_ref",
+                        packageUuid: req.packageUuid
+                    ),
+                ]
+            )
         }
         // Durable event + session touch like every sibling content verb —
         // GMVibes' care-package pane refreshes off the event stream.
         if let summary = try fetchSummary(uuid: package.clarificationSummaryUuid) {
             try core.appendEvent(
-                db, kind: .clarificationChange, subjectUuid: req.packageUuid,
+                db,
+                kind: .clarificationChange,
+                subjectUuid: req.packageUuid,
                 payload: Store.jsonPayload([
                     "action": "package_ref_add", "kind": req.kind.rawValue,
                     "prompt_uuid": summary.promptUuid,
-                ]))
+                ])
+            )
             try touchSessionForPrompt(promptUuid: summary.promptUuid)
         }
         guard let updated = try fetchPackage(uuid: req.packageUuid) else {
@@ -533,40 +621,55 @@ struct ClarificationRepository: RepositoryContext {
         }
         guard package.status == "building" else {
             throw StoreError.invalidEntityTransition(
-                entity: "care_package", from: package.status, to: "ready",
-                reason: "package-complete runs from building")
+                entity: "care_package",
+                from: package.status,
+                to: "ready",
+                reason: "package-complete runs from building"
+            )
         }
         let intent = try Store.validatedOverview(req.clarifiedIntent, entity: "care_package")
         guard let summary = try fetchSummary(uuid: package.clarificationSummaryUuid) else {
             throw StoreError.notFound(
-                entity: "clarification_summary", key: package.clarificationSummaryUuid)
+                entity: "clarification_summary",
+                key: package.clarificationSummaryUuid
+            )
         }
         guard
             let sessionUuid = try String.fetchOne(
-                db, sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
+                db,
+                sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
                 arguments: [summary.promptUuid]
             )
         else {
             throw StoreError.notFound(entity: "prompt", key: summary.promptUuid)
         }
-        let scope = try dope.dopeScopeCandidates(
-            sessionUuid: sessionUuid, scopeType: .sessionInstance
-        ).first
+        let scope =
+            try dope.dopeScopeCandidates(
+                sessionUuid: sessionUuid,
+                scopeType: .sessionInstance
+            )
+            .first
         try core.updateBase(
-            db, table: "care_package", uuid: req.packageUuid,
+            db,
+            table: "care_package",
+            uuid: req.packageUuid,
             expectedVersion: req.expectedVersion,
             set: [
                 "status": "ready",
                 "clarified_intent": intent,
                 "dope_scope_uuid": scope?.uuid,
                 "dope_scope_revision": scope?.revision,
-            ])
+            ]
+        )
         try core.appendEvent(
-            db, kind: .clarificationChange, subjectUuid: req.packageUuid,
+            db,
+            kind: .clarificationChange,
+            subjectUuid: req.packageUuid,
             payload: Store.jsonPayload([
                 "action": "package_complete", "prompt_uuid": summary.promptUuid,
                 "dope_scope_revision": scope?.revision,
-            ]))
+            ])
+        )
         try touchSessionForPrompt(promptUuid: summary.promptUuid)
         guard let updated = try fetchPackage(uuid: req.packageUuid) else {
             throw StoreError.notFound(entity: "care_package", key: req.packageUuid)
@@ -577,7 +680,9 @@ struct ClarificationRepository: RepositoryContext {
     func packageGet(_ req: CarePackageGetRequest) throws -> CarePackageResponse {
         guard
             try Row.fetchOne(
-                db, sql: "SELECT 1 FROM prompt WHERE uuid = ?", arguments: [req.promptUuid]
+                db,
+                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
+                arguments: [req.promptUuid]
             ) != nil
         else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -599,7 +704,7 @@ struct ClarificationRepository: RepositoryContext {
         // ones left out are named, in full, by the stub roster.
         let kept = req.refUuid.map { uuid in package.explorationRefs.filter { $0.uuid == uuid } } ?? []
         let stubs = package.explorationRefs.map { ref -> CarePackageExplorationRefStub in
-            let body = PenExcerpt.take(ref.curatedBody)
+            let body = CdeExcerpt.take(ref.curatedBody)
             return CarePackageExplorationRefStub(
                 uuid: ref.uuid,
                 curatedTitle: ref.curatedTitle,
@@ -608,7 +713,8 @@ struct ClarificationRepository: RepositoryContext {
                 seq: ref.seq,
                 curatedBodyExcerpt: body.excerpt,
                 curatedBodyChars: body.chars,
-                curatedBodyTruncated: body.truncated)
+                curatedBodyTruncated: body.truncated
+            )
         }
         return CarePackageResponse(
             package: CarePackageRow(
@@ -625,8 +731,10 @@ struct ClarificationRepository: RepositoryContext {
                 kbiteRefs: package.kbiteRefs,
                 explorationRefs: kept,
                 createdAt: package.createdAt,
-                updatedAt: package.updatedAt),
-            explorationRefStubs: stubs)
+                updatedAt: package.updatedAt
+            ),
+            explorationRefStubs: stubs
+        )
     }
 
     // MARK: - Shared transition + fetch helpers
@@ -646,18 +754,28 @@ struct ClarificationRepository: RepositoryContext {
         }
         guard from == requireFrom, from.allowedNext.contains(to) else {
             throw StoreError.invalidEntityTransition(
-                entity: "clarification", from: from.rawValue, to: to.rawValue,
-                reason: "\(action) runs from \(requireFrom.rawValue) — this summary is \(from.rawValue)")
+                entity: "clarification",
+                from: from.rawValue,
+                to: to.rawValue,
+                reason: "\(action) runs from \(requireFrom.rawValue) — this summary is \(from.rawValue)"
+            )
         }
         try core.updateBase(
-            db, table: "clarification_summary", uuid: summaryUuid,
-            expectedVersion: expectedVersion, set: ["status": to.rawValue])
+            db,
+            table: "clarification_summary",
+            uuid: summaryUuid,
+            expectedVersion: expectedVersion,
+            set: ["status": to.rawValue]
+        )
         try core.appendEvent(
-            db, kind: .clarificationChange, subjectUuid: summaryUuid,
+            db,
+            kind: .clarificationChange,
+            subjectUuid: summaryUuid,
             payload: Store.jsonPayload([
                 "action": action, "from": from.rawValue, "to": to.rawValue,
                 "prompt_uuid": summary.promptUuid,
-            ]))
+            ])
+        )
         guard let updated = try fetchSummary(uuid: summaryUuid) else {
             throw StoreError.notFound(entity: "clarification_summary", key: summaryUuid)
         }
@@ -668,7 +786,9 @@ struct ClarificationRepository: RepositoryContext {
     /// writes advance session recency without bumping the session version.
     func touchSessionForPrompt(promptUuid: String) throws {
         if let sessionUuid = try String.fetchOne(
-            db, sql: "SELECT session_uuid FROM prompt WHERE uuid = ?", arguments: [promptUuid]
+            db,
+            sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
+            arguments: [promptUuid]
         ) {
             try core.touchSession(db, uuid: sessionUuid)
         }
@@ -683,12 +803,18 @@ struct ClarificationRepository: RepositoryContext {
     }
 
     private func fetchSummary(
-        where condition: String, key: String
+        where condition: String,
+        key: String
     ) throws -> ClarificationSummaryRow? {
-        try ClarificationSummaryRecord.fetchAll(
-            db, where: condition, arguments: [key],
-            orderBy: "created_at DESC, id DESC"
-        ).first?.wireRow()
+        try ClarificationSummaryRecord
+            .fetchAll(
+                db,
+                where: condition,
+                arguments: [key],
+                orderBy: "created_at DESC, id DESC"
+            )
+            .first?
+            .wireRow()
     }
 
     private func fetchQuestion(uuid: String) throws -> ClarificationQuestionRow? {
@@ -700,65 +826,110 @@ struct ClarificationRepository: RepositoryContext {
     }
 
     private func fetchQuestions(
-        where condition: String, key: String
+        where condition: String,
+        key: String
     ) throws -> [ClarificationQuestionRow] {
         try UserClarificationQuestionRecord.fetchAll(
-            db, where: condition, arguments: [key], orderBy: "seq"
-        ).map { record in
-            let options = try UserClarificationOptionRecord.fetchAll(
-                db, where: "question_uuid = ?", arguments: [record.uuid], orderBy: "seq"
-            ).map { $0.wireRow() }
+            db,
+            where: condition,
+            arguments: [key],
+            orderBy: "seq"
+        )
+        .map { record in
+            let options =
+                try UserClarificationOptionRecord.fetchAll(
+                    db,
+                    where: "question_uuid = ?",
+                    arguments: [record.uuid],
+                    orderBy: "seq"
+                )
+                .map { $0.wireRow() }
             let selected = try String.fetchAll(
                 db,
                 sql: "SELECT option_uuid FROM user_clarification_answer WHERE question_uuid = ? ORDER BY id",
-                arguments: [record.uuid])
+                arguments: [record.uuid]
+            )
             return record.wireRow(options: options, selectedOptionUuids: selected)
         }
     }
 
     private func fetchNote(uuid: String) throws -> ClarificationNoteRow? {
-        try InternalClarificationNoteRecord.fetchAll(
-            db, where: "uuid = ?", arguments: [uuid]
-        ).first?.wireRow()
+        try InternalClarificationNoteRecord
+            .fetchAll(
+                db,
+                where: "uuid = ?",
+                arguments: [uuid]
+            )
+            .first?
+            .wireRow()
     }
 
     func fetchNotes(summaryUuid: String) throws -> [ClarificationNoteRow] {
         // weight polarity: critical (low) first; unweighted last.
         try InternalClarificationNoteRecord.fetchAll(
-            db, where: "clarification_summary_uuid = ?", arguments: [summaryUuid],
+            db,
+            where: "clarification_summary_uuid = ?",
+            arguments: [summaryUuid],
             orderBy: "weight IS NULL, weight, id"
-        ).map { $0.wireRow() }
+        )
+        .map { $0.wireRow() }
     }
 
     private func fetchPackage(uuid: String) throws -> CarePackageRow? {
         try CarePackageRecord.fetchAll(
-            db, where: "uuid = ?", arguments: [uuid]
-        ).first.map(assemblePackage)
+            db,
+            where: "uuid = ?",
+            arguments: [uuid]
+        )
+        .first.map(assemblePackage)
     }
 
     private func fetchPackage(bySummary summaryUuid: String) throws -> CarePackageRow? {
         try CarePackageRecord.fetchAll(
-            db, where: "clarification_summary_uuid = ?", arguments: [summaryUuid]
-        ).first.map(assemblePackage)
+            db,
+            where: "clarification_summary_uuid = ?",
+            arguments: [summaryUuid]
+        )
+        .first.map(assemblePackage)
     }
 
     private func assemblePackage(_ record: CarePackageRecord) throws -> CarePackageRow {
-        let dopeRefs = try CarePackageDopeRefRecord.fetchAll(
-            db, where: "care_package_uuid = ?", arguments: [record.uuid], orderBy: "seq"
-        ).map { $0.wireRow() }
-        let kbiteRefs = try CarePackageKbiteRefRecord.fetchAll(
-            db, where: "care_package_uuid = ?", arguments: [record.uuid], orderBy: "seq"
-        ).map { $0.wireRow() }
-        let explorationRefs = try CarePackageExplorationRefRecord.fetchAll(
-            db, where: "care_package_uuid = ?", arguments: [record.uuid], orderBy: "seq"
-        ).map { $0.wireRow() }
+        let dopeRefs =
+            try CarePackageDopeRefRecord.fetchAll(
+                db,
+                where: "care_package_uuid = ?",
+                arguments: [record.uuid],
+                orderBy: "seq"
+            )
+            .map { $0.wireRow() }
+        let kbiteRefs =
+            try CarePackageKbiteRefRecord.fetchAll(
+                db,
+                where: "care_package_uuid = ?",
+                arguments: [record.uuid],
+                orderBy: "seq"
+            )
+            .map { $0.wireRow() }
+        let explorationRefs =
+            try CarePackageExplorationRefRecord.fetchAll(
+                db,
+                where: "care_package_uuid = ?",
+                arguments: [record.uuid],
+                orderBy: "seq"
+            )
+            .map { $0.wireRow() }
         return record.wireRow(
-            dopeRefs: dopeRefs, kbiteRefs: kbiteRefs, explorationRefs: explorationRefs)
+            dopeRefs: dopeRefs,
+            kbiteRefs: kbiteRefs,
+            explorationRefs: explorationRefs
+        )
     }
 
     private func nextRefSeq(table: String, packageUuid: String) throws -> Int64 {
         (try Int64.fetchOne(
-            db, sql: "SELECT COALESCE(MAX(seq), 0) FROM \(table) WHERE care_package_uuid = ?",
-            arguments: [packageUuid]) ?? 0) + 1
+            db,
+            sql: "SELECT COALESCE(MAX(seq), 0) FROM \(table) WHERE care_package_uuid = ?",
+            arguments: [packageUuid]
+        ) ?? 0) + 1
     }
 }

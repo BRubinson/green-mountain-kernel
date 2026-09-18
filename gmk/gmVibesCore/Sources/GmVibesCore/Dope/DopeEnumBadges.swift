@@ -1,15 +1,13 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// Single-line capsule strip of an enum's option codes with a trailing "+N"
-/// overflow chip. `ViewThatFits` picks the widest candidate that fits the
-/// width the property row leaves over.
+/// Single-line capsule strip of an enum's option codes with a trailing "+N" overflow chip.
+/// `ViewThatFits` picks the widest candidate that fits the width the property row leaves over.
 ///
-/// The candidates are written out rather than generated with `ForEach`:
-/// `ViewThatFits` flattening a `ForEach` into separate candidates is not a
-/// documented guarantee, and silently getting ONE candidate would defeat the
-/// whole mechanism. `limit` caps the ladder — a 40-option enum previews at
-/// most `limit` chips; the inspector dialog is where all of them live.
+/// The candidates are written out rather than generated with `ForEach`, because `ViewThatFits`
+/// flattening a `ForEach` into separate candidates is not a documented guarantee and silently
+/// getting ONE candidate defeats the mechanism. `limit` caps the ladder; the inspector dialog
+/// is where every option lives.
 struct DopeEnumBadgeStrip: View {
     let options: [DopeOptionNode]
     var limit = 6
@@ -65,6 +63,7 @@ private struct DopeOptionBadge: View {
             .help(
                 option.body.description.isEmpty
                     ? option.body.name
-                    : "\(option.body.name) — \(option.body.description)")
+                    : "\(option.body.name) — \(option.body.description)"
+            )
     }
 }

@@ -8,11 +8,9 @@ only** — prompt-scoped scratch files under `memory/`, plus the kbite
 content store.
 
 The **pen** (`mcp__plugin_gmcc_cde__*`, served by `gm_mcp`) is the agent's
-channel: every CDE workflow verb has a pen tool. `gm_hook call` remains the
-ops door for non-CDE verbs only; its output is unbudgeted and the harness
-truncates it, so nothing workflow-critical rides it.
-`gm_hook verbs --json` is the catalogue. See
-`skills/gm_daemon/SKILL.md`.
+ONLY channel. The kernel's CLI is the harness's client — the hooks call it,
+an agent never does, and the PreToolUse hook denies it from Bash. A verb
+with no pen tool is a missing door to report. See the `kernel` skill.
 
 ## Static Plugin Files (Installed to ~/.claude/plugins/gmcc/)
 ```
@@ -67,21 +65,22 @@ of the plugin payload, so installing the plugin does not distribute them.
 │                           └── {id}_{name}/                  # one folder per prompt
 │                               └── memory/                  # usually empty — every report
 │                                                             # is a db row
-└── kbites/                                                   # kbite_root (gm_hook paths --json)
+└── kbites/                                                   # kbite_root
     ├── {kbite_name}/KBITE_PURPOSE.md                         # identity-level
     ├── digested/{kbite_name}/...                             # kbite_digested_root — raw-source archive (text is db-canonical)
     └── open/{kbite_name}/...                                 # kbite_open_root — in-progress maws
 ```
 
-Each row carries its own `gmfs_relative_storage_path`; the roots come from
-`gm_hook paths --json`. The db stores **pointers + captions** to the
+Each row carries its own `gmfs_relative_storage_path`; every root above
+resolves under `$GM_FS_ROOT`. The db stores **pointers + captions** to the
 `memory/*.md` files (`prompt_artifact` rows) — never their bodies. The
 daemon never writes files; bot workflows create the folders and write the
-markdown, then register each file with `ARTIFACT_ADD`.
+markdown. Registering a file as an artifact has no pen tool — see "Prompt
+Folder Layout" below.
 
 ## Identity Resolution (How a path becomes a session)
 
-Identity is derived daemon-side by `gm_hook context ensure`
+Identity is derived daemon-side by the SessionStart hook
 (`GitContext`/`ContextBuilder` in Swift). Given a git repository:
 
 | Concept | Source | Derived value |
@@ -108,30 +107,30 @@ A project corresponds to exactly one git repo (by basename). An instance is a un
 
 ## Lazy Creation on SessionStart
 
-On every SessionStart, `gm_session_startup.sh`:
+On every SessionStart, the harness runs `gm_session_startup.sh`, which
+hands the work to the kernel's own client. THE HARNESS CALLS IT; AN AGENT
+NEVER DOES. What it does:
 
-1. Confirms the git repo, locates the plugin root, and locates the `gm_hook`
-   binary under the one runtime root. It computes nothing the daemon computes.
-2. Calls `gm_hook context ensure --hook-payload` (best-effort):
-   idempotently upserts the project → instance → session rows in the db
-   (reusing existing uuids, seeding kbite inheritance at create time), pins
-   the claude session binding every later hook write resolves through,
-   creates the session's artifact home
-   (`{gmfs_relative_storage_path}/prompts/` under `$GM_FS_ROOT` — the
-   physical home for prompt `memory/` folders), and runs the dope boot
-   sync. If the daemon/binary is unavailable it warns and continues.
-3. Prints the pen sheet (`gm_hook pen-sheet`) into the session's context.
-4. Emits the session env via `gm_hook context env` into
-   `$CLAUDE_ENV_FILE`: `GM_BOOTED`, `GM_PLUGIN_ROOT`, `GM_FS_ROOT`,
-   `PATH` (the active runtime's `bin/` first, so bare `gm_hook` resolves
-   to the correct prod/sandbox binary), plus `GM_FS_ROOT` when sandboxed.
-   Per-level path vars do not exist — roots come from `gm_hook paths` and
-   per-row locations from `gmfs_relative_storage_path`.
+1. Confirms the git repo and locates the plugin root and the kernel under
+   the one runtime root. It computes nothing the daemon computes.
+2. Ensures context (best-effort): idempotently upserts the project →
+   instance → session rows in the db (reusing existing uuids, seeding
+   kbite inheritance at create time), pins the claude session binding
+   every later hook write resolves through, creates the session's
+   artifact home (`{gmfs_relative_storage_path}/prompts/` under
+   `$GM_FS_ROOT` — the physical home for prompt `memory/` folders), and
+   runs the dope boot sync. If the daemon is unavailable it warns and
+   continues.
+3. Prints the pen sheet into the session's context.
+4. Emits the session env into `$CLAUDE_ENV_FILE`: `GM_BOOTED`,
+   `GM_PLUGIN_ROOT`, `GM_FS_ROOT`, `PATH`. Per-level path vars do not
+   exist — roots resolve under `$GM_FS_ROOT` and per-row locations from
+   `gmfs_relative_storage_path`.
 
 This means **commands can always assume the env + session dir exist**;
-db rows exist whenever the daemon was reachable at SessionStart (and
-`gm_hook context ensure` may be re-run by any command at any time — it is
-idempotent).
+db rows exist whenever the daemon was reachable at SessionStart. If they
+do not, restart the session: the hook is idempotent and re-running it is
+the harness's move, not an agent's.
 
 ## Db-Backed Data Model
 
@@ -142,26 +141,24 @@ Hierarchy: `project → instance → session → prompt`, plus
 `file_change_range` (edit tracking), `kbite` + `*_active_kbite`
 junctions (registry), `daemon_event` (append-only audit log).
 
-Key reads — the pen first, the passthrough for what it does not cover:
+Key reads, all pen tools:
 
 ```
-prompt_get         full content + artifacts + kbite codes + change summary
-bot_current_prompt the workflow's prompt row, without being told a uuid
-file_change_list   recorded edits for a prompt (or a session, or one path)
+cde_load_prompt          full content + artifacts + kbite codes + change summary
+rpir_next                the workflow's phase, uuid bundle and blockers, no uuid needed
+cde_search_file_changes  recorded edits for a prompt (or a session, or one path)
+projects_search          projects, instances and sessions by name or id
+rpir_search_*            full text over past explorations, clarifications, plans, reviews
 ```
 
-```bash
-gm_hook context ensure                                   # uuid triple for $PWD + branch
-gm_hook call SESSION_GET  --json '{"session_uuid":"U"}'  # session row + prompt stubs + change summaries
-gm_hook call PROMPT_LIST  --json '{"session_uuid":"U","with_reports":true}'
-gm_hook call ARTIFACT_LIST --json '{"prompt_uuid":"U"}'
-gm_hook call SEARCH       --json '{"query":"<topic>"}'   # across reports
-```
+A session-wide prompt listing, an artifact listing and a cross-report
+search have no pen tool. That is a missing door to report, not a cue to
+shell to the kernel — the PreToolUse hook denies it.
 
 ### Optimistic concurrency (`expected_version`)
 
-Every mutation (`SESSION_UPDATE`, `PROMPT_UPDATE_CONTENT`,
-`prompt_set_status`, every pen write) carries `expected_version` — the row
+Every mutation (`projects_update_session`, `cde_set_status`, every pen
+write) carries `expected_version` — the row
 version the edit was based on. Capture `version` from the previous
 create/get/mutation (a fresh create returns `version: 0`; each mutation
 returns the incremented version). A stale version yields
@@ -184,15 +181,11 @@ prompt-scoped file you register as an artifact lands.
 
 `{id}` is the db prompt row's `seq`; `{name}` its `name`. All identity,
 content (`backstory`/`goal`/`detail`), status, and command live on the
-prompt row. Any file you write under `memory/` is registered with:
-
-```bash
-gm_hook call ARTIFACT_ADD --json \
-  '{"prompt_uuid":"U","file_path":"<abs path>","note":"<one-sentence caption>"}'
-```
-
-(Upserts on `(prompt_uuid, file_path)` — last-run-wins overwrite of the
-file is fine; re-register to refresh the note.)
+prompt row. Registering a file written under `memory/` as an artifact has
+no pen tool: name the file and its one-sentence caption in your report so
+the Endotherm can register it. (Registration upserts on
+`(prompt_uuid, file_path)`, so a last-run-wins overwrite of the file is
+fine.)
 
 ## Prompt Lifecycle
 
@@ -262,14 +255,11 @@ rows and registered artifacts; there is no phase-history equivalent.
 Kbites are inherited at create time down the chain
 (project → instance → session → prompt) into the `*_active_kbite`
 junction tables; after seeding, each level is independent. The db is the
-sole registry. Read the active list as `kbite_codes` on `prompt_get` or
-`SESSION_GET`, or list a scope:
+sole registry. Read the active list as `kbite_codes` on `cde_load_prompt`.
+Listing a scope's registry and adding a kbite to one have no pen tool;
+both are operator acts.
 
-```bash
-gm_hook call KBITE_LIST --json '{"scope":"session","owner_uuid":"U"}'   # "all": true for every kbite row
-gm_hook call KBITE_ADD  --json '{"scope":"session","owner_uuid":"U","code":"C"}'
-```
-
-Kbites are added only on explicit user request — see
+Kbites are added only on explicit user request, and then by reporting the
+request rather than performing it — see
 `ref/kbite_awareness.md`. Digested kbite text is db-canonical: load it via
 `kbite_search` / `kbite_file_get`, not from the filesystem.

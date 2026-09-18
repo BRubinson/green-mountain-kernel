@@ -1,19 +1,11 @@
 import Foundation
 
 /// The containment rules for element-to-element references, as ONE pure
-/// predicate both write paths call.
-///
-/// Why this file exists: `Store+Diagram` validates against SQL lookups and
-/// `DiagramTreeReducer` validates against an in-memory tree, and the two are
-/// held together only by parity fixtures. A rule this fiddly — an identity
-/// exclusion layered on a peer-set test — hand-written twice would drift.
-/// Sharing the PREDICATE while each side keeps its own way of answering
-/// "who is this element's parent" makes the contract structural instead of
-/// aspirational.
-///
-/// It is a Swift guard rather than a SQL CHECK because it cannot be one: a
-/// CHECK cannot reference another table. That is the same reason m0016's
-/// diagram dope binding is a Swift guard.
+/// predicate both write paths call. `Store+Diagram` answers "who is this
+/// element's parent" from SQL and `DiagramTreeReducer` from an in-memory
+/// tree; sharing the PREDICATE is what keeps the rule from drifting between
+/// them. It is a Swift guard rather than a SQL CHECK because a CHECK cannot
+/// reference another table.
 public enum DiagramContainment {
 
     /// What a reference violated, so both implementations produce the same
@@ -43,17 +35,13 @@ public enum DiagramContainment {
         }
     }
 
-    /// Evaluate one reference. Returns nil when the reference is legal.
+    /// Evaluate one reference, returning nil when it is legal.
     ///
     /// Callers resolve the parentage however they like — SQL lookups on one
-    /// side, a tree walk on the other — which is exactly the seam that lets
-    /// one predicate serve both implementations.
-    ///
-    /// - Parameters:
-    ///   - grandparentOfReferrer: the `parent_element_uuid` of the
-    ///     referrer's parent, i.e. the parent the target must also have.
-    ///     nil means the referrer's parent is top-level, so a legal target
-    ///     is also top-level.
+    /// side, a tree walk on the other — which is the seam that lets one
+    /// predicate serve both implementations. `grandparentOfReferrer` is the
+    /// parent the target must also have; nil means the referrer's parent is
+    /// top-level, so a legal target is top-level too.
     public static func validateReference(
         rule: DiagramElementRefSpec.ContainmentRule,
         referrerUuid: String,

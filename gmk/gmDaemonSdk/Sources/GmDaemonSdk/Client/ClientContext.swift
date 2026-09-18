@@ -96,15 +96,9 @@ public struct GitContext {
 }
 
 public enum GmFsYaml {
-    /// The content root — `Paths.contentRoot`, not a second resolution of it.
-    ///
-    /// This used to re-derive the root from the env itself, which was
-    /// defensible while there were TWO roots and this one wanted the content
-    /// one. With a single `GM_FS_ROOT` the two resolutions became the same
-    /// twelve lines twice, and a second source of truth for the root is
-    /// precisely what the write-containment rule cannot afford: a containment
-    /// check is a prefix test against ONE root, and two roots that are "always
-    /// equal" are two roots that can disagree.
+    /// The content root — `Paths.contentRoot`, never a second resolution of
+    /// it. Write containment is a prefix test against ONE root, and two roots
+    /// that are "always equal" are two roots that can disagree.
     public static var root: URL { Paths.contentRoot }
 
     /// Extract the first top-level `uuid:` from a gmfs data yaml, if present.
@@ -158,7 +152,8 @@ public enum ContextBuilder {
     /// which derives its git context from the payload's cwd and must not
     /// re-derive it from the hook process's own.
     public static func ensureRequest(
-        for git: GitContext, claudeSessionId: String? = nil
+        for git: GitContext,
+        claudeSessionId: String? = nil
     ) -> ContextEnsureRequest {
         let projectRel = "projects/\(git.repoName)"
         let instanceRel = "\(projectRel)/instances/\(git.instanceCode)"
@@ -202,19 +197,13 @@ public enum ContextBuilder {
 }
 
 /// The calling Claude Code instance's identity, resolved from process
-/// ancestry: walk parents until the nearest `claude` process and key on its
-/// pid + start time (start time defeats pid reuse). Every process a Claude
-/// instance spawns — Bash tool commands, hook scripts, Task subagents — is a
-/// descendant of that instance, so they all resolve the SAME key, while a
-/// second Claude instance running a different prompt on the same GMCC session
-/// resolves a different one. That is what lets the daemon's activation
-/// registry keep several prompts active per session without last-writer-wins
-/// clobbering, and what makes a spawned agent's briefing lookup
-/// deterministic (no uuid has to survive a spawn prompt).
-///
-/// nil when no claude ancestor exists (a bare terminal running gm_hook by hand):
-/// callers omit the key and the daemon falls back to the session's single
-/// activation when unambiguous.
+/// ancestry: walk parents to the nearest `claude` process and key on its pid
+/// plus start time, which defeats pid reuse. Everything that instance spawns
+/// resolves the SAME key, while a second instance on the same GMCC session
+/// resolves a different one, so the activation registry can hold several
+/// active prompts per session without last-writer-wins clobbering. nil when
+/// no claude ancestor exists: callers omit the key and the daemon falls back
+/// to the session's single activation when unambiguous.
 public enum ClientKey {
     public static func resolve() -> String? {
         var pid = getpid()

@@ -4,61 +4,22 @@ import GmDaemonSdk
 
 /// The transaction-scoped write core: the five shared primitives, the
 /// post-commit event sink, and the shared static contracts.
-///
-/// Holds NO DatabaseQueue and exposes NO verb. That absence is the entire
-/// point. A repository handed a `StoreCore` has no path back to
-/// `dbQueue.write`, so re-entering a transaction from inside one is not
-/// expressible — and GRDB 7 TRAPS on re-entrancy (DatabaseQueue.swift,
-/// "Database methods are not reentrant"), killing the daemon process rather
-/// than returning an error to the client. Before this type, that safety was
-/// convention enforced by a doc comment repeated in every repository.
-///
-/// This absence is also what made the ambient transaction boundary cheap: with
-/// every verb body already written against an INJECTED `Database` and no queue
-/// reachable from here, composition needed one re-entrant boundary rather than
-/// a new typed surface over ~230 verbs. See `StoreBoundary.swift`.
-///
-/// `eventSink` is the only stored state here; the other four primitives close
-/// over nothing but the `Database` they are passed.
-///
-/// Every body below is a VERBATIM relocation from Store.swift, comments
-/// included. The invariants they encode (insertBase's twin keys.sorted(),
-/// appendEvent's lastInsertedRowID adjacency and single timestamp,
-/// touchSession's deliberate non-bump, updateBase/deleteBase's same-transaction
-/// zero-rows discrimination) are all things a tidy-up can break with no test
-/// failure — so they were moved, not retyped.
+/// Holds NO DatabaseQueue and exposes NO verb, and that absence is the point. A
+/// repository handed a `StoreCore` has no path back to `dbQueue.write`, so
+/// re-entering a transaction is not expressible — and GRDB 7 TRAPS on
+/// re-entrancy, killing the daemon rather than returning an error. It is also
+/// what makes the ambient boundary cheap. `eventSink` is the only stored state;
+/// the other four primitives close over nothing but the `Database` passed in.
 final class StoreCore: @unchecked Sendable {
 
     /// Post-commit event fan-out. appendEvent registers each event via GRDB's
     /// afterNextTransaction(onCommit:), so events fire only for committed
-    /// transactions (a rolled-back write can never leak a phantom event) and
-    /// never while the db lock is held.
-    ///
-    /// ## Why this is a TABLE and not one closure
-    ///
-    /// This was `var eventSink: ((PersistedEvent) -> Void)?` — a plain settable
-    /// property, assigned once by the server. Not assign-once: a SECOND
-    /// assignment silently DISPLACED the first, and nothing anywhere reported
-    /// it. That was harmless only while exactly one consumer existed.
-    ///
-    /// The app hosting the writer in-process is the second consumer. Under the
-    /// old shape, `GMVibesServices` taking the sink would have stopped every
-    /// socket client receiving events — no error, no log, just a UI that
-    /// updates and a `gm_hook` that never hears anything again. So the sink
-    /// became a subscription.
-    ///
-    /// ## What a subscriber may do, and it is narrow
-    ///
-    /// `emit` runs INSIDE GRDB's commit hook, on the writer thread, with the
-    /// transaction boundary's thread-local still live. A subscriber that blocks
-    /// stalls the single writer for every other client; one that calls back into
-    /// the store DEADLOCKS. Hand off immediately — queue it, or hop to a
-    /// different executor — and do nothing else here.
-    ///
-    /// Hopping in a subscriber does NOT violate the no-thread-hops-inside-a-
-    /// boundary rule that `StoreBoundary` documents. The commit has already
-    /// landed by the time this fires; the hop is after the boundary's work, not
-    /// inside it.
+    /// transactions and never while the db lock is held. A TABLE and not one
+    /// closure, because a settable sink lets a second assignment displace the
+    /// first, and two consumers exist.
+    /// `emit` runs INSIDE the commit hook on the writer thread: a subscriber
+    /// that blocks stalls the single writer, one that calls back DEADLOCKS, so
+    /// hand off immediately. Hopping there is safe; the commit has landed.
     private var subscribers: [UUID: (PersistedEvent) -> Void] = [:]
 
     /// Guards `subscribers` alone. Subscription happens on whatever thread the
@@ -188,7 +149,8 @@ final class StoreCore: @unchecked Sendable {
     func touchSession(_ db: Database, uuid: String) throws {
         try db.execute(
             sql: "UPDATE session SET updated_at = ? WHERE uuid = ?",
-            arguments: [StoreCore.isoNow(), uuid])
+            arguments: [StoreCore.isoNow(), uuid]
+        )
     }
 
     /// Insert a row with the five BaseEntity columns plus `extra` columns.
@@ -234,7 +196,9 @@ final class StoreCore: @unchecked Sendable {
         guard db.changesCount == 0 else { return }
         guard
             let actual = try Int64.fetchOne(
-                db, sql: "SELECT version FROM \(table) WHERE uuid = ?", arguments: [uuid]
+                db,
+                sql: "SELECT version FROM \(table) WHERE uuid = ?",
+                arguments: [uuid]
             )
         else {
             throw StoreError.notFound(entity: table, key: uuid)
@@ -255,11 +219,14 @@ final class StoreCore: @unchecked Sendable {
     ) throws {
         try db.execute(
             sql: "DELETE FROM \(table) WHERE uuid = ? AND version = ?",
-            arguments: [uuid, expectedVersion])
+            arguments: [uuid, expectedVersion]
+        )
         guard db.changesCount == 0 else { return }
         guard
             let actual = try Int64.fetchOne(
-                db, sql: "SELECT version FROM \(table) WHERE uuid = ?", arguments: [uuid]
+                db,
+                sql: "SELECT version FROM \(table) WHERE uuid = ?",
+                arguments: [uuid]
             )
         else {
             throw StoreError.notFound(entity: table, key: uuid)
@@ -281,12 +248,15 @@ final class StoreCore: @unchecked Sendable {
         // broadcast and a later replay of the same event id never differ.
         let createdAt = StoreCore.isoNow()
         let uuid = try insertBase(
-            db, table: "daemon_event", now: createdAt,
+            db,
+            table: "daemon_event",
+            now: createdAt,
             extra: [
                 "kind": kind.rawValue,
                 "subject_uuid": subjectUuid,
                 "payload": payload,
-            ])
+            ]
+        )
         let event = PersistedEvent(
             id: db.lastInsertedRowID,
             kind: kind.rawValue,

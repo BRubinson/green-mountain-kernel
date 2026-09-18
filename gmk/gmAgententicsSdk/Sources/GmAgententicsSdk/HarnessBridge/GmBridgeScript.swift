@@ -22,29 +22,22 @@ extension GmBridgeScript {
         body: installBody
     )
 
-    /// The release-store contract. Emitted from ONE constant, which is what
-    /// retires the unchecked vendored twin — see `GmBridgeScript+Bodies.swift`.
+    /// The release-store contract, emitted from ONE constant so the plugin's copy
+    /// cannot drift from the authored one. See `GmBridgeScript+Bodies.swift`.
     public static let releaseStore = File(
         name: "gm_releases.sh",
         interpreter: .bash,
         body: releaseStoreBody
     )
 
-    /// THREE SCRIPTS ARE DELIBERATELY ABSENT, and their absence is the decision
-    /// rather than an omission:
+    /// Three scripts are deliberately absent as files:
     ///
-    /// - `gm_hook.sh` — inlined as a generated SHELL-FORM command string in
-    ///   `hooks.json`. Shell form is the only handler type that resolves
-    ///   `${GM_FS_ROOT:-$HOME/gmfs}` at hook time and the only one that can hold
-    ///   the silent exit-0 no-op contract.
-    /// - `run_mcp.sh` — replaced by the `.mcp.json` launcher. Note that stdio
-    ///   `command`/`args` substitute only the three `CLAUDE_*` placeholders and
-    ///   are spawned with NO SHELL, so the launcher runs `/bin/sh -c` rather
-    ///   than relying on `${VAR:-default}` in the command itself.
-    /// - `check_gm_stale.sh` — folded into an inline `[ -x ]` test in the same
-    ///   hook string. It could NOT become a `gm_hook doctor` subcommand: it works
-    ///   precisely because it needs no binary, and a subcommand that cannot run
-    ///   when the binary is missing cannot report that the binary is missing.
+    /// - `gm_hook.sh` — inlined as a shell-form command in `hooks.json`, the only
+    ///   handler type resolving `${GM_FS_ROOT:-$HOME/gmfs}` at hook time and able
+    ///   to hold the silent exit-0 no-op contract.
+    /// - `run_mcp.sh` — the `.mcp.json` launcher runs `/bin/sh -c`, since stdio
+    ///   `command`/`args` substitute only the three `CLAUDE_*` placeholders.
+    /// - `check_gm_stale.sh` — an inline `[ -x ]` test, needing no binary at all.
     public static let all: [File] = [
         sessionStartup, install, releaseStore,
     ]

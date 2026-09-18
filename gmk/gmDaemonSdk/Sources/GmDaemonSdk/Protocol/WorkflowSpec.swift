@@ -1,59 +1,31 @@
 import Foundation
 
-// LIVES IN THE BASE LAYER, not beside the Store.
-//
-// It was filed under Database/ and had to move down for the same reason
-// StoreError did: `Protocol/VerbRegistry.swift` declares
-// `case record(agentPhases: [WorkflowSpec.Phase]?)`, so the wire-verb registry
-// — base layer — names this type. Leaving it in the persistence target is a
-// base-depends-on-middle cycle the moment the modules separate.
-//
-// It also has a second, independent claim on this layer: gm_mcp reads it, and
-// gm_mcp links the SDK alone and never touches persistence.
-//
-// Nothing here is persistence. No GRDB, no Store, no database access — it is
-// declarative phase and instruction data that happens to describe a db-derived
-// workflow.
+// LIVES IN THE BASE LAYER, not beside the Store. `Protocol/VerbRegistry.swift`
+// names `WorkflowSpec.Phase`, so filing this under persistence would be a
+// base-depends-on-middle cycle once the modules separate, and gm_mcp reads it
+// while linking the SDK alone. Nothing here is persistence: no GRDB, no Store,
+// no database access — declarative phase and instruction data that happens to
+// describe a db-derived workflow.
 
 /// The workflow phase registry: the per-variant ordered phase graph for the
 /// daemon-held bot state machine, and the instruction text each phase hands
-/// whoever asks for it.
-///
-/// Phase is DERIVED from db evidence at every BOT_NEXT — no stored cursor, so
-/// resume is the only code path there is. Gates are evaluated by
-/// BotWorkflowRepository against these codes, and a new phase or variant is an
-/// entry here rather than a schema change.
-///
-/// PHASE IS NOT PROMPT STATUS, and m0028 made the distinction load-bearing
-/// rather than merely true. The prompt row now carries three states —
-/// draft / initiated / done — while this file still describes twelve phases.
-/// That is not a mismatch: the phases are derived from evidence rather than read
-/// off the prompt, which is what let the four middle states go without the
-/// machine losing its place.
-///
-/// ONE EXCEPTION EXISTED and is worth naming rather than rounding off, because
-/// "derivation never reads status" is the kind of claim that gets repeated until
-/// someone relies on it: the `implement` ENTRY GATE also required the prompt to
-/// be in `implementing`. m0028 dropped that condition rather than restating it
-/// as `initiated` — with three states it would have been true whenever the phase
-/// was reachable, which is not a gate. Architecture approval, which is what the
-/// condition was a proxy for, remains the real one. The practical consequence
-/// for the prose below is that the mid-workflow `set-status` calls are GONE:
-/// the prompt is stamped initiated when its briefing opens, and the next status
-/// move it makes is to done. Phase boundaries are crossed by opening and sealing
-/// the phase's own rows, which is what they always actually meant.
-///
-/// Instruction prose is compiled into the binary and drift-guarded by
-/// WorkflowSpecTests, which asserts more than presence: WHERE A PEN TOOL
-/// EXISTS, THE PROSE MUST NAME THE PEN TOOL. This text is served verbatim
-/// through rpir_next to the agents doing the work, so a block that names the
-/// wrong write path is the wrong write path, everywhere, at once.
-///
-/// CDE WORKFLOW WORK IS PEN-ONLY (v31, prompt p1). Every step this spec
-/// instructs has a pen tool, and the prose below names it. A tool an agent
-/// cannot see is a missing GRANT — a fact to report, never a cue to shell to
-/// the wire: the CLI's unbudgeted output is silently truncated by the
-/// harness, which is the failure that forced this rule.
+/// whoever asks for it. Phase is DERIVED from db evidence at every BOT_NEXT —
+/// no stored cursor, so resume is the only code path there is. A new phase or
+/// variant is an entry here rather than a schema change.
+
+/// PHASE IS NOT PROMPT STATUS. The prompt row carries three states while this
+/// file describes twelve phases, and that is not a mismatch: phases are derived
+/// from evidence rather than read off the prompt. Derivation never reads status,
+/// and the only status moves are to `initiated` when a briefing opens and to
+/// `done` at the end. Phase boundaries are crossed by opening and sealing the
+/// phase's own rows.
+
+/// WHERE A PEN TOOL EXISTS, THE PROSE MUST NAME THE PEN TOOL. This text is
+/// served verbatim through rpir_next to the agents doing the work, so a block
+/// naming the wrong write path is the wrong write path everywhere at once.
+/// CDE workflow work is pen-only: a tool an agent cannot see is a missing
+/// GRANT to report, never a cue to shell to the wire, whose unbudgeted output
+/// the harness silently truncates.
 public enum WorkflowSpec {
 
     /// Phase codes, in canonical order of appearance across variants.
@@ -107,20 +79,12 @@ public enum WorkflowSpec {
         }
     }
 
-    /// Compiled-in instruction text per (variant, phase). Less is more: each
-    /// block is what its reader needs NOW — the call, the gate, and nothing
-    /// else. Never leave a pair empty, and never name an invocation the pen
-    /// already covers.
-    ///
-    /// THOSE TWO RULES ARE NOW CONVENTIONS AND NOTHING ENFORCES THEM.
-    /// `WorkflowSpecTests` used to fail the build on both; it was deleted with
-    /// the rest of the repository contract tier in the test rebuild. Check by
-    /// hand when adding a phase — an empty block ships a phase whose reader is
-    /// told nothing, and it will not fail anything on the way out.
-    ///
-    /// This function has a SECOND consumer now: `gmAgententicsSdk` reads it live
-    /// when assembling a session's per-phase instructions, so its text reaches a
-    /// model directly rather than only a harness.
+    /// Compiled-in instruction text per (variant, phase). Each block is what
+    /// its reader needs NOW — the call, the gate, nothing else. Never leave a
+    /// pair empty and never name an invocation the pen already covers; both
+    /// are conventions nothing enforces, so check by hand when adding a phase.
+    /// `gmAgententicsSdk` is a second consumer and reads this live, so the text
+    /// reaches a model directly rather than only a harness.
     public static func instructions(variant: BotVariant, phase: Phase) -> String {
         switch phase {
         case .briefing:

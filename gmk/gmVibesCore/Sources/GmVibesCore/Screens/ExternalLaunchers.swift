@@ -86,18 +86,14 @@ enum BotTier: String, CaseIterable, Identifiable {
 
 // MARK: - Launcher preference
 
-/// Feature 1, in full: which slash command the resume-command launcher emits
-/// when invoked without an explicit choice, and which tier the cluster
-/// highlights. App-side `UserDefaults` — deliberately NOT dope, NOT
-/// `daemon_config`, NOT a `run_option_profile`: GMVibes has no runtime
-/// channel into the Claude Code session its buttons launch, so this is a
-/// preference about the clipboard string and nothing more.
+/// Which slash command the resume-command launcher emits without an explicit choice, and
+/// which tier the cluster highlights.
 ///
-/// It is set **explicitly**, through `BotLauncherCluster`'s inline picker —
-/// never learned from the last tier clicked. A user copying `/gm_bot` once to
-/// try it must not silently change their default; a transient selection is
-/// not a configured one. (This replaces the old per-window `@State
-/// selectedTier`, which meant nothing across windows and was lost on close.)
+/// App-side `UserDefaults` rather than dope, `daemon_config` or a `run_option_profile`: the
+/// app has no runtime channel into the Claude Code session its buttons launch, so this is a
+/// preference about the clipboard string and nothing more. It is set EXPLICITLY through
+/// `BotLauncherCluster`'s picker and never learned from the last tier clicked, because a
+/// transient selection is not a configured one.
 enum BotLauncherPreference {
     /// The `@AppStorage` key. Views bind it directly —
     /// `@AppStorage(BotLauncherPreference.key) var tier = BotLauncherPreference.fallback`
@@ -166,7 +162,8 @@ enum ITerm {
             let profileName = await ensureProfile(
                 instanceUUID: instanceUUID,
                 instanceName: instanceName,
-                workingDir: dir.path)
+                workingDir: dir.path
+            )
             await launch(dir: dir, profileName: profileName)
         }
     }
@@ -178,9 +175,11 @@ enum ITerm {
     ) async -> String? {
         let guid = "gmvibes-\(instanceUUID.uuidString)"
         let name = "GMVibes — \(instanceName)"
-        return await Task.detached(priority: .userInitiated) {
-            writeProfile(guid: guid, name: name, workingDir: workingDir) ? name : nil
-        }.value
+        return
+            await Task.detached(priority: .userInitiated) {
+                writeProfile(guid: guid, name: name, workingDir: workingDir) ? name : nil
+            }
+            .value
     }
 
     @MainActor
@@ -188,7 +187,8 @@ enum ITerm {
         do {
             _ = try await ITerm2Launcher.openWindow(
                 profileName: profileName,
-                profileProperties: workingDirectoryProperties(dir.path))
+                profileProperties: workingDirectoryProperties(dir.path)
+            )
             return
         } catch {
         }
@@ -216,10 +216,12 @@ enum ITerm {
     // `nonisolated` so the profile write can run off the main actor.
     private nonisolated static func dynamicProfilesDir() -> URL? {
         guard
-            let appSup = FileManager.default.urls(
-                for: .applicationSupportDirectory,
-                in: .userDomainMask
-            ).first
+            let appSup = FileManager.default
+                .urls(
+                    for: .applicationSupportDirectory,
+                    in: .userDomainMask
+                )
+                .first
         else { return nil }
         let dir = appSup.appendingPathComponent("iTerm2/DynamicProfiles", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -244,7 +246,8 @@ enum ITerm {
         guard JSONSerialization.isValidJSONObject(payload),
             let data = try? JSONSerialization.data(
                 withJSONObject: payload,
-                options: [.prettyPrinted])
+                options: [.prettyPrinted]
+            )
         else { return false }
         let url = dir.appendingPathComponent("\(guid).json")
         let tmp = dir.appendingPathComponent(".\(guid).json.tmp")

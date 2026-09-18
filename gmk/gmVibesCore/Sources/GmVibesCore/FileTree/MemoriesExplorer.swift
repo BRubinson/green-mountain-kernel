@@ -17,7 +17,7 @@ struct MemoriesExplorer: View {
     /// root, by definition described by the prompt's artifact rows, so the
     /// `.prompt` domain (ADD_ARTIFACT et al.) drives it. A nil promptUuid
     /// refreshes once and stays static.
-    var promptUuid: String? = nil
+    var promptUuid: String?
     var isDaemonWatched: Bool = false
 
     @Environment(FileTreeStore.self) private var fs
@@ -63,8 +63,10 @@ struct MemoriesExplorer: View {
         // (which retired the 1s poll).
         .task(
             id: RefreshKey(
-                root: rootURL, generation: daemon.generation,
-                daemonWatched: isDaemonWatched)
+                root: rootURL,
+                generation: daemon.generation,
+                daemonWatched: isDaemonWatched
+            )
         ) {
             guard let promptUuid else { await refreshOnce(); return }
             let domain: InvalidationHub.Domain =
@@ -247,9 +249,11 @@ private struct MemoriesReader: View {
             // Read once per file off-main, then parse once — never per render.
             find.reset()
             loaded = false
-            let raw = await Task.detached(priority: .userInitiated) {
-                FileTreeStore.readRawFile(at: url)
-            }.value
+            let raw =
+                await Task.detached(priority: .userInitiated) {
+                    FileTreeStore.readRawFile(at: url)
+                }
+                .value
             source = raw
             isMarkdown = url.pathExtension.lowercased() == "md"
             blocks = isMarkdown ? MarkdownDocument.parse(raw) : []

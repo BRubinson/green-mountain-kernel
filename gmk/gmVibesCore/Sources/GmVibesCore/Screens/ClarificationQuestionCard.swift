@@ -1,26 +1,14 @@
 import SwiftUI
 import GmDaemonSdk
 
-/// One clarification question — Feature 2's answering surface, and the only
-/// interactive control in the whole report subsystem.
+/// One clarification question: the answering surface, and the only interactive control in the
+/// report subsystem.
 ///
-/// ## The gate
-///
-/// `ClarificationRepository.answer()` throws `invalidEntityTransition` unless
-/// the summary is `answering` ("answers are writable only while the summary is
-/// answering"). So the controls exist ONLY in that state: `building` and
-/// `complete` render today's read-only layout, byte for byte, and there is no
-/// disabled-control tease of a write the daemon would refuse. The `.disabled`
-/// term restating the gate is deliberate belt-and-braces — the branch already
-/// makes it redundant, and it should stay redundant.
-///
-/// Save carries one ADDITIONAL disable: text and selection both empty, which
-/// mirrors the daemon's `badRequest`, so the user never eats a server error for
-/// pressing a button the app offered.
-///
-/// Every edit is local until Save. There is no autosave and no Submit-all —
-/// each question is its own round trip with its own version cell, so a
-/// collision on one question never touches the drafts of the others.
+/// `ClarificationRepository.answer()` throws unless the summary is `answering`, so the
+/// controls exist only in that state and `building` / `complete` render read-only. The
+/// `.disabled` term restating the gate is deliberate belt-and-braces. Save carries one further
+/// disable, text and selection both empty, mirroring the daemon's `badRequest`. Every edit is
+/// local until Save: each question is its own round trip with its own version cell.
 struct ClarificationQuestionCard: View {
     let question: ClarificationQuestionRow
     /// The summary's status — the gate, passed down rather than re-derived.

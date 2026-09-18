@@ -1,32 +1,21 @@
 import SwiftUI
 import AppKit
 
-// A code-editor-style editable markdown field for the prompt editor's
-// Backstory/Goal/Detail sections, backed by a single NSTextView (TextKit 1) inside an
-// NSScrollView with an NSRulerView line-number gutter.
+// A code-editor-style editable markdown field for the prompt editor, backed by one NSTextView
+// (TextKit 1) inside an NSScrollView with an NSRulerView line-number gutter.
 //
-// Why AppKit: the field must behave like a NORMAL text view — ⌘A selects the whole
-// section, selection spans lines, and the selection stays visible (greyed) when focus
-// leaves — AND keep a precise, wrap-aware line-number gutter (one number per logical
-// line, aligned to its first wrapped row). Those are native NSTextView/TextKit
-// behaviors; SwiftUI exposes neither cross-line selection persistence nor per-line
-// layout geometry.
-//
-// The NSScrollView hosts the text view (so width-tracking / wrapping work the standard
-// way) but does NOT scroll: scrollers are off and the view is sized exactly to its
-// content via `sizeThatFits`, so the host's outer SwiftUI ScrollView scrolls the page.
-//
-// The public contract stays a plain `Binding<String>`: header styling (purplish,
-// level-scaled font, `#` markers kept) is re-derived into the text storage on every edit
-// and never persisted. Wrapping is display-only — the model keeps one logical line per
-// "\n" — so the host's persistence / undo / autosave (keyed on the String) are untouched.
+// AppKit because SwiftUI exposes neither cross-line selection persistence nor the per-line
+// layout geometry a wrap-aware gutter needs. The NSScrollView does NOT scroll: scrollers are
+// off and the view is sized to its content, so the host's outer ScrollView scrolls the page.
+// The public contract is a plain `Binding<String>` — header styling is re-derived into the
+// text storage on every edit and never persisted, and wrapping is display-only.
 struct MarkdownSourceEditor: NSViewRepresentable {
     @Binding var text: String
     var minHeight: CGFloat
     // Find-in-page: when this field is the active find segment, select the active match
     // so it's visible inside the editor.
-    var query: SearchQuery = SearchQuery("")
-    var activeOccurrence: Int? = nil
+    var query = SearchQuery("")
+    var activeOccurrence: Int?
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -82,7 +71,7 @@ struct MarkdownSourceEditor: NSViewRepresentable {
         return scrollView
     }
 
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+    func updateNSView(_: NSScrollView, context: Context) {
         context.coordinator.parent = self
         if context.coordinator.textView?.string != text {
             context.coordinator.setText(text, preservingSelection: true)
@@ -93,7 +82,8 @@ struct MarkdownSourceEditor: NSViewRepresentable {
     // Self-size: lay the text out at the proposed content width and report the used
     // height, so the editor grows to fit inside the host's vertical ScrollView.
     func sizeThatFits(
-        _ proposal: ProposedViewSize, nsView scrollView: NSScrollView,
+        _ proposal: ProposedViewSize,
+        nsView scrollView: NSScrollView,
         context: Context
     ) -> CGSize? {
         let width = proposal.width ?? scrollView.bounds.width
@@ -118,7 +108,8 @@ struct MarkdownSourceEditor: NSViewRepresentable {
         private let measuringStorage = NSTextStorage()
         private let measuringLayout = NSLayoutManager()
         private let measuringContainer = NSTextContainer(
-            size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude))
+            size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        )
 
         init(_ parent: MarkdownSourceEditor) {
             self.parent = parent
@@ -172,7 +163,8 @@ struct MarkdownSourceEditor: NSViewRepresentable {
                 ts.addAttribute(
                     .foregroundColor,
                     value: level != nil ? MarkdownHeaderStyle.nsHeaderColor : MarkdownHeaderStyle.nsBodyColor,
-                    range: lineRange)
+                    range: lineRange
+                )
                 idx = NSMaxRange(lineRange)
             }
             ts.endEditing()
@@ -199,7 +191,9 @@ struct MarkdownSourceEditor: NSViewRepresentable {
             let s = tv.string
             if measuringStorage.string != s {
                 measuringStorage.replaceCharacters(
-                    in: NSRange(location: 0, length: measuringStorage.length), with: s)
+                    in: NSRange(location: 0, length: measuringStorage.length),
+                    with: s
+                )
             }
             Self.applyStyling(to: measuringStorage)
             measuringContainer.size = NSSize(width: contentWidth, height: CGFloat.greatestFiniteMagnitude)
@@ -250,9 +244,9 @@ final class LineNumberRuler: NSRulerView {
         ruleThickness = 32
     }
 
-    required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    required init(coder _: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    override func drawHashMarksAndLabels(in rect: NSRect) {
+    override func drawHashMarksAndLabels(in _: NSRect) {
         guard let tv = clientView as? NSTextView,
             let lm = tv.layoutManager, let tc = tv.textContainer
         else { return }
@@ -270,7 +264,8 @@ final class LineNumberRuler: NSRulerView {
             let size = str.size(withAttributes: attrs)
             str.draw(
                 at: NSPoint(x: ruleThickness - size.width - 6, y: fragMinY + relativeY + inset),
-                withAttributes: attrs)
+                withAttributes: attrs
+            )
         }
 
         var idx = 0

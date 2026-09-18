@@ -6,34 +6,17 @@ import GmMcpServer
 
 // gm_kernel — the multi-call dispatcher.
 //
-// ── DISPATCH ORDER: argv[0] WINS, AND THAT IS NOT A PREFERENCE ──────────────
-//
-// `gm_hook call BACKUP --json '{...}'` arrives with argv[1] == "call". A
-// subcommand-first rule would try to dispatch `call` as a personality, fail, and
-// break the one caller that fires on every tool use. So the binary looks at the
-// NAME it was invoked under first, and only consults a subcommand when that name
-// carries no meaning.
-//
-// The `~/gmfs/bin` symlinks (`gm_daemon`, `gm_mcp`, `gm_hook`) are what make
-// argv[0] meaningful, which is why they are part of the release-store contract
-// rather than a convenience.
-//
-// ── A BARE INVOCATION IS NOT A WRITER ───────────────────────────────────────
-//
-// `gm_kernel` with no personality prints usage and exits 2. It deliberately does
-// NOT default to the daemon. Of every possible dispatch default this is the one
-// that could cost data: a stray invocation — a typo, a script losing an argument,
-// a launchd plist with an empty ProgramArguments — must not quietly become a
-// process that opens the database.
-//
-// The GUI kernel is not reachable from here either. The app bundle is its own
-// executable; this binary is the CLI half, and it has no AppKit linked.
+// argv[0] WINS over argv[1]: `gm_hook call BACKUP` arrives with argv[1] == "call",
+// so a subcommand-first rule would dispatch `call` as a personality and break the
+// caller that fires on every tool use. The `~/gmfs/bin` symlinks are what make
+// argv[0] meaningful, which is why they belong to the release-store contract.
+// A bare `gm_kernel` prints usage and exits 2 rather than defaulting to the
+// daemon: a stray invocation must not quietly open the database.
 
 // `usage` IS DECLARED BEFORE THE DISPATCH ON PURPOSE. Top-level code in
 // `main.swift` executes sequentially, so a `let` referenced above its own
-// declaration is read before it is initialized — which is a SIGSEGV at runtime,
-// not a compile error. This file crashed exactly that way with the string at the
-// bottom, and only on the paths that printed it, so `--version` looked fine.
+// declaration is read before initialization — a SIGSEGV at runtime rather than a
+// compile error, and only on the paths that print it.
 
 let usage = """
     gm_kernel — the GM kernel binary. One Mach-O, three personalities.

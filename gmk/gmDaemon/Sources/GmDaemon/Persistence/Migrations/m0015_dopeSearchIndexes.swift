@@ -3,17 +3,11 @@ import GRDB
 import GmDaemonSdk
 
 extension Migrations {
-    // m0015 — FTS5 mirrors over the dope tables. Pure ADD, and exactly
-    // the migration m0007's own comment anticipated: "mirrors attach later
-    // as a pure-ADD migration exactly as m0003 did for m0002's tables."
-    //
-    // The FtsSpec loop is a PRIVATE COPY of m0003's, per the frozen-
-    // migration rule — a registered migration never reaches out to shared
-    // code that might change under it.
-    //
-    // Sequenced strictly AFTER both rebuilds: a DROP TABLE takes its
-    // triggers with it (m0005 step 5), so mirrors attached before m0012/
-    // m0013 would have been silently destroyed.
+    // m0015 — FTS5 mirrors over the dope tables. Pure ADD. The FtsSpec loop is a
+    // PRIVATE COPY of m0003's: a registered migration never reaches out to
+    // shared code that might change under it. Sequenced strictly AFTER the
+    // m0012/m0013 rebuilds — a DROP TABLE takes its triggers with it, so mirrors
+    // attached earlier would be destroyed silently.
     static func m0015_dopeSearchIndexes(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0015_dopeSearchIndexes") { db in
             struct FtsSpec {
@@ -25,14 +19,17 @@ extension Migrations {
                 FtsSpec(source: "dope_persistence", columns: ["code", "name", "description"]),
                 FtsSpec(
                     source: "dope_persistence_entity",
-                    columns: ["code", "name", "description"]),
+                    columns: ["code", "name", "description"]
+                ),
                 FtsSpec(
                     source: "dope_persistence_entity_property",
-                    columns: ["code", "name", "description"]),
+                    columns: ["code", "name", "description"]
+                ),
                 FtsSpec(source: "dope_persistence_enum", columns: ["code", "name", "description"]),
                 FtsSpec(
                     source: "dope_persistence_enum_option",
-                    columns: ["code", "name", "description"]),
+                    columns: ["code", "name", "description"]
+                ),
                 FtsSpec(source: "dope_cog", columns: ["code", "name", "description"]),
                 FtsSpec(source: "dope_cog_element", columns: ["code", "name", "description"]),
             ]
@@ -67,7 +64,8 @@ extension Migrations {
                         END;
 
                         INSERT INTO \(fts)(\(fts)) VALUES('rebuild');
-                        """)
+                        """
+                )
             }
 
             try db.execute(

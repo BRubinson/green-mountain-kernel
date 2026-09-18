@@ -2,19 +2,13 @@ import Foundation
 import Observation
 import GmDaemonSdk
 
-/// Read model over DOPE_LIST + DOPE_GET + DOPE_READ_REPO (plus the one
-/// DOPE_INIT write).
+/// Read model over DOPE_LIST + DOPE_GET + DOPE_READ_REPO, plus the one DOPE_INIT write.
 ///
-/// SCOPE-LEVEL, one per `SessionScope`, serving BOTH dope surfaces (the
-/// session tab and the prompt phase card) — deliberately not prompt-keyed:
-/// DOPE_GET with a promptUuid falls back to the SESSION_BASE tree
-/// (`resolvedVia` reports which answered), so the two surfaces routinely
-/// render the SAME tree. Prompt-keyed stores would double-fetch it, and a
-/// SESSION_BASE write could never invalidate a prompt surface rendering the
-/// fallback. Here one event wake reloads every live key.
-///
-/// Refresh rides the `.dope(sessionUuid)` hub domain (see the DOPE_CHANGE
-/// arm) — never `.session`, which would storm SESSION_GET per node write.
+/// Scope-level, one per `SessionScope`, serving both dope surfaces rather than prompt-keyed:
+/// DOPE_GET with a promptUuid falls back to the SESSION_BASE tree (`resolvedVia` reports which
+/// answered), so the two surfaces routinely render the same tree and one event wake reloads
+/// every live key. Refresh rides the `.dope(sessionUuid)` hub domain, never `.session`, which
+/// would storm SESSION_GET per node write.
 @Observable
 @MainActor
 final class DopeStore {
@@ -30,7 +24,7 @@ final class DopeStore {
         let promptUuid: String?
         // `var` with a default (a defaulted `let` is dropped from the
         // memberwise init), so Key(promptUuid:) call sites keep compiling.
-        var code: String? = nil
+        var code: String?
 
         /// The code-agnostic identity of this surface's TARGET — the key
         /// under which DOPE_LIST candidates and the user's pick are stored.
@@ -126,7 +120,7 @@ final class DopeStore {
         target.promptUuid == nil ? [] : candidates(for: target)
     }
 
-    func sessionCandidates(_ target: Key) -> [DopeScopeRow] {
+    func sessionCandidates(_: Key) -> [DopeScopeRow] {
         candidates(for: Key(promptUuid: nil))
     }
 
@@ -191,7 +185,9 @@ final class DopeStore {
     private func performListLoad(_ target: Key) async {
         do {
             let response = try await service.dopeList(
-                sessionUuid: sessionUuid, promptUuid: target.promptUuid)
+                sessionUuid: sessionUuid,
+                promptUuid: target.promptUuid
+            )
             if scopeCandidates[target] != response.scopes {
                 scopeCandidates[target] = response.scopes
             }
@@ -248,8 +244,11 @@ final class DopeStore {
         do {
             next = .loaded(
                 try await service.dopeGet(
-                    sessionUuid: sessionUuid, promptUuid: key.promptUuid,
-                    code: key.code))
+                    sessionUuid: sessionUuid,
+                    promptUuid: key.promptUuid,
+                    code: key.code
+                )
+            )
         } catch DaemonError.summaryAbsent {
             next = .absent
         } catch DaemonError.server(let code, let message) where code == "BAD_REQUEST" {
@@ -295,7 +294,8 @@ final class DopeStore {
                 code: code,
                 name: name,
                 description: description.isEmpty ? nil : description
-            ))
+            )
+        )
         // Pin what was just created: without this, a second scope on an
         // already-populated target would resolve to the alphabetically first
         // candidate — the opposite of what the user just asked for.
