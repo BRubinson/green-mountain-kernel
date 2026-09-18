@@ -10,22 +10,24 @@ struct SearchResultsList: View {
     let hits: [SearchHit]
     let searched: Bool
     let errorText: String?
-    @Binding var selection: String?   // SearchHit.rowID
+    @Binding var selection: String?  // SearchHit.rowID
     let idleDescription: String
     let destination: (SearchHit) -> SessionWindowID?
     let onOpen: (SearchHit) -> Void
 
     var body: some View {
         if let errorText {
-            ContentUnavailableView("Search Unavailable", systemImage: "bolt.slash",
-                                   description: Text(errorText))
+            ContentUnavailableView(
+                "Search Unavailable", systemImage: "bolt.slash",
+                description: Text(errorText))
         } else if hits.isEmpty {
             ContentUnavailableView(
                 searched ? "No Matches" : "Search",
                 systemImage: "magnifyingglass",
-                description: Text(searched
-                    ? "Nothing in prompts, clarifications, architecture, exploration, or review matched."
-                    : idleDescription)
+                description: Text(
+                    searched
+                        ? "Nothing in prompts, clarifications, architecture, exploration, or review matched."
+                        : idleDescription)
             )
         } else {
             List(hits, id: \.rowID, selection: $selection) { hit in

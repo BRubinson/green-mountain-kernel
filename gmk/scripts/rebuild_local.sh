@@ -41,6 +41,7 @@
 #   rebuild_local.sh --universal  # arm64 + x86_64 — slower, rarely needed now
 #   rebuild_local.sh --fast       # accepted, no-op synonym for the default
 #   rebuild_local.sh --no-activate
+#   rebuild_local.sh --no-lint    # skip the swift-format gate (swift_lint_format.sh)
 #
 #   rebuild_local.sh --env beta   # build into the beta environment's store
 #
@@ -97,6 +98,7 @@ ACTIVATE=1
 # true rather than aspirational.
 BUILD_APP=0
 ENV_EXPLICIT=0
+LINT=1
 while [ $# -gt 0 ]; do
     case "$1" in
         # Accepted and intentionally inert — arm64 IS the default now. Kept so an
@@ -105,6 +107,7 @@ while [ $# -gt 0 ]; do
         --universal)   ARCH_FLAGS="--arch arm64 --arch x86_64"; ARCHES="arm64,x86_64" ;;
         --app)         BUILD_APP=1 ;;
         --no-activate) ACTIVATE=0 ;;
+        --no-lint)     LINT=0 ;;
         # Which environment's store to build into. Default prod — unchanged for
         # every existing caller. GM_FS_ROOT still wins if it is set explicitly,
         # so a harness minting a scratch root needs no flag at all.
@@ -176,6 +179,14 @@ fi
 # was previously invisible, which is the kind of quiet that costs an afternoon.
 echo "[GMB] environment: $GM_ENV   root: $GM_FS_ROOT"
 echo "[GMB] building v$STAGE_VERSION ($ARCHES) from $REPO_ROOT @ $BUILD_SHA"
+
+# --- lint --------------------------------------------------------------------
+# Lint-only gate over every authored package; it never rewrites the tree.
+if [ "$LINT" -eq 1 ]; then
+    bash "$SCRIPT_DIR/swift_lint_format.sh"
+else
+    echo "[GMB] lint skipped (--no-lint)"
+fi
 
 # --- build -------------------------------------------------------------------
 # Each package on its own so a failure names the module that broke rather than

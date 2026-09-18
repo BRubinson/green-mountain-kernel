@@ -133,8 +133,9 @@ final class TestLockTests: KernelBackedTestCase {
 
         let afterDeath = try env.send(
             .testLockStatus, TestLockStatusRequest(projectUuid: project), TestLockResponse.self)
-        XCTAssertEqual(afterDeath.state, .open,
-                       "a dead holder must free the lock at the NEXT read, with no timeout")
+        XCTAssertEqual(
+            afterDeath.state, .open,
+            "a dead holder must free the lock at the NEXT read, with no timeout")
     }
 
     /// Reclaiming marks the orphan `abandoned`, not `failed`.
@@ -184,14 +185,16 @@ final class TestLockTests: KernelBackedTestCase {
 
         let db = try env.readOnlyDatabase()
         let runs = try db.read {
-            try Int.fetchOne($0,
+            try Int.fetchOne(
+                $0,
                 sql: "SELECT COUNT(*) FROM test_run WHERE project_uuid = ?",
                 arguments: [project])
         }
         XCTAssertEqual(runs, 3, "the ledger must keep every run; only the claim cell is mutable")
 
         let cells = try db.read {
-            try Int.fetchOne($0,
+            try Int.fetchOne(
+                $0,
                 sql: "SELECT COUNT(*) FROM project_test_lock WHERE project_uuid = ?",
                 arguments: [project])
         }
@@ -205,13 +208,14 @@ final class TestLockTests: KernelBackedTestCase {
         defer { flock(lock.fd, LOCK_UN); close(lock.fd) }
 
         _ = try acquire(project: project, lockPath: lock.path)
-        XCTAssertThrowsError(try env.send(
-            .testLockRelease,
-            TestLockReleaseRequest(
-                projectUuid: project,
-                runUuid: UUID().uuidString.lowercased(),
-                finalState: .passed),
-            TestLockResponse.self))
+        XCTAssertThrowsError(
+            try env.send(
+                .testLockRelease,
+                TestLockReleaseRequest(
+                    projectUuid: project,
+                    runUuid: UUID().uuidString.lowercased(),
+                    finalState: .passed),
+                TestLockResponse.self))
     }
 
     /// A release stamps the run terminal and re-opens the project.

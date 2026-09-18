@@ -55,12 +55,14 @@ struct CreatePromptView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     } else {
                         ForEach(availableKbites, id: \.self) { kbite in
-                            Toggle(kbite, isOn: Binding(
-                                get: { selectedKbites.contains(kbite) },
-                                set: { on in
-                                    if on { selectedKbites.insert(kbite) } else { selectedKbites.remove(kbite) }
-                                }
-                            ))
+                            Toggle(
+                                kbite,
+                                isOn: Binding(
+                                    get: { selectedKbites.contains(kbite) },
+                                    set: { on in
+                                        if on { selectedKbites.insert(kbite) } else { selectedKbites.remove(kbite) }
+                                    }
+                                ))
                         }
                     }
                 }
@@ -93,10 +95,12 @@ struct CreatePromptView: View {
 
     private func loadKbites() async {
         // Session-scope registry seeds the preselection (kbite inheritance).
-        let sessionCodes = (try? await GMCCDaemonService.shared.listKbites(
-            scope: .session, ownerUuid: store.sessionUuid))?.map(\.code) ?? []
-        let names = (try? await GMCCDaemonService.shared.listKbites(
-            scope: .session, ownerUuid: store.sessionUuid, all: true))?.map(\.code) ?? []
+        let sessionCodes =
+            (try? await GMCCDaemonService.shared.listKbites(
+                scope: .session, ownerUuid: store.sessionUuid))?.map(\.code) ?? []
+        let names =
+            (try? await GMCCDaemonService.shared.listKbites(
+                scope: .session, ownerUuid: store.sessionUuid, all: true))?.map(\.code) ?? []
         // Always surface inherited kbites even if the registry list misses them.
         let preselected = Set(sessionCodes)
         let merged = Set(names).union(preselected)
@@ -110,21 +114,22 @@ struct CreatePromptView: View {
         isSaving = true
         errorText = nil
         let service = GMCCDaemonService.shared
-        let kbites = availableKbites.filter { selectedKbites.contains($0) }   // stable order
+        let kbites = availableKbites.filter { selectedKbites.contains($0) }  // stable order
         do {
             // Code passed EXPLICITLY — a nil code defaults to "p{seq}".
             // gmfsRelativeStoragePath stays nil: the daemon allocates seq
             // atomically and derives the slugged path itself (v8); the
             // returned row's path is the only folder the resolver (and the
             // daemon's MemoryWatcher) will ever look at.
-            let row = try await service.createPrompt(PromptCreateRequest(
-                sessionUuid: store.sessionUuid,
-                code: segment,
-                name: name.trimmingCharacters(in: .whitespaces),
-                backstory: backstory,
-                goal: goal,
-                detail: detail
-            ))
+            let row = try await service.createPrompt(
+                PromptCreateRequest(
+                    sessionUuid: store.sessionUuid,
+                    code: segment,
+                    name: name.trimmingCharacters(in: .whitespaces),
+                    backstory: backstory,
+                    goal: goal,
+                    detail: detail
+                ))
             for code in kbites {
                 _ = try? await service.addKbite(scope: .prompt, ownerUuid: row.uuid, code: code)
             }
@@ -138,7 +143,8 @@ struct CreatePromptView: View {
             // guessing legs, so a conventionally-named folder could never be
             // found again.
             if let root = gmcc[.gmFsRoot], !root.isEmpty,
-               !row.gmfsRelativeStoragePath.isEmpty {
+                !row.gmfsRelativeStoragePath.isEmpty
+            {
                 let memory = URL(fileURLWithPath: root, isDirectory: true)
                     .appendingPathComponent(row.gmfsRelativeStoragePath, isDirectory: true)
                     .appendingPathComponent("memory", isDirectory: true)

@@ -105,7 +105,9 @@ struct SessionPromptScreen: View {
                     // The session-base dope model, WITHOUT leaving the editor.
                     // The prompt-scope card is already on screen below, so
                     // this deliberately targets SESSION_BASE (promptUuid: nil).
-                    Button { showSessionDope.toggle() } label: {
+                    Button {
+                        showSessionDope.toggle()
+                    } label: {
                         Label("Session Dope", systemImage: "cube.transparent")
                             .labelStyle(.iconOnly)
                     }
@@ -120,7 +122,9 @@ struct SessionPromptScreen: View {
                             .environment(daemon)
                             .frame(width: 760, height: 560)
                     }
-                    Button { showCreatePrompt = true } label: {
+                    Button {
+                        showCreatePrompt = true
+                    } label: {
                         Label("New Prompt", systemImage: "plus")
                             .labelStyle(.iconOnly)
                     }
@@ -151,8 +155,9 @@ struct SessionPromptScreen: View {
             }
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
             // The sidebar filter's writer (name + prefetched content match).
-            .searchable(text: $promptQuery, placement: .sidebar,
-                        prompt: "Filter prompts")
+            .searchable(
+                text: $promptQuery, placement: .sidebar,
+                prompt: "Filter prompts")
         } content: {
             detailContent
         }
@@ -328,8 +333,10 @@ private struct PromptEditorPane: View {
     @State private var dopeExpanded = false
     @Environment(WindowNav.self) private var nav
 
-    init(stub: PromptStub, scope: SessionScope, windowID: SessionWindowID,
-         history: PromptEditHistory) {
+    init(
+        stub: PromptStub, scope: SessionScope, windowID: SessionWindowID,
+        history: PromptEditHistory
+    ) {
         self.stub = stub
         self.scope = scope
         self.windowID = windowID
@@ -341,8 +348,9 @@ private struct PromptEditorPane: View {
         // between two panes on one prompt — the shared actor version-checks
         // the second flush instead). No side effects here: registration
         // happens in load(), so SwiftUI re-running init is harmless.
-        _draftBox = State(initialValue: PromptDraftBox(
-            promptKey: "\(stub.uuid)#\(UUID().uuidString)"))
+        _draftBox = State(
+            initialValue: PromptDraftBox(
+                promptKey: "\(stub.uuid)#\(UUID().uuidString)"))
     }
 
     // The three fields are editable only while the prompt is a draft; a
@@ -391,8 +399,9 @@ private struct PromptEditorPane: View {
     /// the human triple stays primary and the intent renders alongside it).
     private var clarifiedIntent: String? {
         guard !editable, case .loaded(let response) = phases.clarification,
-              let intent = response.carePackage?.clarifiedIntent,
-              !intent.isEmpty else { return nil }
+            let intent = response.carePackage?.clarifiedIntent,
+            !intent.isEmpty
+        else { return nil }
         return intent
     }
 
@@ -427,8 +436,8 @@ private struct PromptEditorPane: View {
     private func segmentID(_ field: Field) -> String {
         switch field {
         case .backstory: "backstory"
-        case .goal:      "goal"
-        case .detail:    "detail"
+        case .goal: "goal"
+        case .detail: "detail"
         }
     }
 
@@ -461,10 +470,18 @@ private struct PromptEditorPane: View {
         .toolbar {
             if editable {
                 ToolbarItemGroup {
-                    Button { applyUndo() } label: { Label("Undo", systemImage: "arrow.uturn.backward") }
-                        .disabled(!history.canUndo)
-                    Button { applyRedo() } label: { Label("Redo", systemImage: "arrow.uturn.forward") }
-                        .disabled(!history.canRedo)
+                    Button {
+                        applyUndo()
+                    } label: {
+                        Label("Undo", systemImage: "arrow.uturn.backward")
+                    }
+                    .disabled(!history.canUndo)
+                    Button {
+                        applyRedo()
+                    } label: {
+                        Label("Redo", systemImage: "arrow.uturn.forward")
+                    }
+                    .disabled(!history.canRedo)
                 }
             }
             // All external open actions folded into ONE menu (was 5 VS Code
@@ -496,14 +513,16 @@ private struct PromptEditorPane: View {
                         // Navigate THIS window to the memories page (route-
                         // switched view, Back returns to the editor) — not a
                         // separate OS window.
-                        nav.go(.promptMemories(PromptMemoriesWindowID(
-                            memoryRootURL: root,
-                            promptName: stub.name,
-                            selectedFile: memoriesModel.selectedFile,
-                            expanded: Array(memoriesModel.expanded),
-                            promptUuid: stub.uuid,
-                            isDaemonWatched: paths.memoryIsDaemonWatched
-                        )))
+                        nav.go(
+                            .promptMemories(
+                                PromptMemoriesWindowID(
+                                    memoryRootURL: root,
+                                    promptName: stub.name,
+                                    selectedFile: memoriesModel.selectedFile,
+                                    expanded: Array(memoriesModel.expanded),
+                                    promptUuid: stub.uuid,
+                                    isDaemonWatched: paths.memoryIsDaemonWatched
+                                )))
                     } else {
                         showMemories.toggle()
                     }
@@ -593,17 +612,23 @@ private struct PromptEditorPane: View {
             // Gate on the raw status instead; load() clears saveIssue first
             // thing, so its own `if editable` machinery gates come up true.
             if PromptStatus(rawValue: stub.status) == .draft,
-               saver == nil || saveIssue == .locked {
+                saver == nil || saveIssue == .locked
+            {
                 Task { await load() }
             }
             Task { await phases.refresh(lifecyclePhases: phasesApply) }
         }
         // cmd+F opens the inline find bar over the three sections; nil while
         // the memories inspector is open so its reader owns the shortcut.
-        .focusedSceneValue(\.findInPage, showMemories ? nil : {
-            find.reset()
-            find.isPresented = true
-        })
+        .focusedSceneValue(
+            \.findInPage,
+            showMemories
+                ? nil
+                : {
+                    find.reset()
+                    find.isPresented = true
+                }
+        )
         .onChange(of: showMemories) { _, open in
             if open {
                 find.isPresented = false
@@ -640,8 +665,9 @@ private struct PromptEditorPane: View {
         ScrollViewReader { proxy in
             VStack(spacing: 0) {
                 if find.isPresented && supportsFind {
-                    FindBar(find: find, total: findMatches.total,
-                            onStep: { stepFind($0, proxy: proxy) })
+                    FindBar(
+                        find: find, total: findMatches.total,
+                        onStep: { stepFind($0, proxy: proxy) })
                 }
                 ScrollView {
                     VStack(spacing: 16) {
@@ -651,13 +677,14 @@ private struct PromptEditorPane: View {
                         // a failed BOT_NEXT) still leaves a working
                         // lifecycle control behind.
                         PromptStatusHeader(stub: stub, phases: phases, store: store)
-                        PromptRunBar(stub: stub,
-                                     windowID: windowID,
-                                     repoFolder: paths.repoFolder,
-                                     sessionCode: catalog.sessionsByUuid[store.sessionUuid]?.code,
-                                     gmFsRoot: gmcc[.gmFsRoot],
-                                     instanceName: catalog.instance(
-                                        uuid: windowID.instanceUUID.wireString)?.name ?? "—")
+                        PromptRunBar(
+                            stub: stub,
+                            windowID: windowID,
+                            repoFolder: paths.repoFolder,
+                            sessionCode: catalog.sessionsByUuid[store.sessionUuid]?.code,
+                            gmFsRoot: gmcc[.gmFsRoot],
+                            instanceName: catalog.instance(
+                                uuid: windowID.instanceUUID.wireString)?.name ?? "—")
                         WorkflowStrip(phase: phases.workflow)
                         saveIssueBanner
                         // The one status fork: the draft EDITOR keeps its
@@ -666,81 +693,96 @@ private struct PromptEditorPane: View {
                         // chrome (the .locked banner and its Copy All survive
                         // in both branches).
                         if editable {
-                        if !editable {
-                            // The initial prompt is read-only once past draft;
-                            // memories (the top-bar slot) are the live surface.
-                            Label("Initial prompt — read-only", systemImage: "lock.fill")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        KBitePillBox(available: availableKbites, selected: $selectedKbites)
-                        sectionEditor("Backstory", field: .backstory, text: $backstory,
-                                      minHeight: 90, hint: "Narrative context (inherited from the session).")
-                        if let intent = clarifiedIntent {
-                            refinedSection("Clarified Intent", refined: intent, original: goal)
-                        }
-                        sectionEditor("Goal", field: .goal, text: $goal,
-                                      minHeight: 120, hint: "The outcome / acceptance criteria.")
-                        sectionEditor("Detail", field: .detail, text: $detail,
-                                      minHeight: 220, hint: "The approach, constraints, specifics.")
-                        // Briefings lead the stack chronologically: the
-                        // briefer's initial briefing precedes clarification.
-                        // UNGATED like Exploration/Review — BRIEFING_OPEN is
-                        // explicit-only and legally exists at draft.
-                        phaseCard("Briefing", systemImage: "shippingbox",
-                                  expanded: $briefingExpanded,
-                                  accessory: { EmptyView() }) {
-                            BriefingPane(phase: phases.briefings)
-                        }
-                        phaseCard("Clarification", systemImage: "questionmark.bubble",
-                                  expanded: $clarifyExpanded,
-                                  accessory: { EmptyView() }) {
-                            if phasesApply {
-                                // `phases` rides along ONLY so the question
-                                // cards reach `phases.answers` — the pane's
-                                // data still comes from the phase value.
-                                ClarificationPane(phase: phases.clarification, phases: phases)
-                            } else {
-                                notStarted("Clarification begins when the prompt leaves Draft.")
+                            if !editable {
+                                // The initial prompt is read-only once past draft;
+                                // memories (the top-bar slot) are the live surface.
+                                Label("Initial prompt — read-only", systemImage: "lock.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                        }
-                        phaseCard("Architecture", systemImage: "square.stack.3d.up",
-                                  expanded: $archExpanded,
-                                  accessory: { EmptyView() }) {
-                            if phasesApply {
-                                ArchitecturePane(phase: phases.architecture)
-                            } else {
-                                notStarted("Architecture begins after clarification completes.")
+                            KBitePillBox(available: availableKbites, selected: $selectedKbites)
+                            sectionEditor(
+                                "Backstory", field: .backstory, text: $backstory,
+                                minHeight: 90, hint: "Narrative context (inherited from the session).")
+                            if let intent = clarifiedIntent {
+                                refinedSection("Clarified Intent", refined: intent, original: goal)
                             }
-                        }
-                        // Exploration/review are UNGATED: their summaries are
-                        // explicit-only opens that legally exist at draft.
-                        phaseCard("Exploration", systemImage: "binoculars",
-                                  expanded: $exploreExpanded,
-                                  accessory: { ReportBadgeCluster(items: explorationBadges) }) {
-                            ExplorationPane(phase: phases.exploration) {
-                                await phases.requestFullExploration()
+                            sectionEditor(
+                                "Goal", field: .goal, text: $goal,
+                                minHeight: 120, hint: "The outcome / acceptance criteria.")
+                            sectionEditor(
+                                "Detail", field: .detail, text: $detail,
+                                minHeight: 220, hint: "The approach, constraints, specifics.")
+                            // Briefings lead the stack chronologically: the
+                            // briefer's initial briefing precedes clarification.
+                            // UNGATED like Exploration/Review — BRIEFING_OPEN is
+                            // explicit-only and legally exists at draft.
+                            phaseCard(
+                                "Briefing", systemImage: "shippingbox",
+                                expanded: $briefingExpanded,
+                                accessory: { EmptyView() }
+                            ) {
+                                BriefingPane(phase: phases.briefings)
                             }
-                        }
-                        phaseCard("Review", systemImage: "checkmark.seal",
-                                  expanded: $reviewExpanded,
-                                  accessory: { ReportBadgeCluster(items: reviewBadges) }) {
-                            ReviewPane(phase: phases.review) {
-                                await phases.requestFullReview()
+                            phaseCard(
+                                "Clarification", systemImage: "questionmark.bubble",
+                                expanded: $clarifyExpanded,
+                                accessory: { EmptyView() }
+                            ) {
+                                if phasesApply {
+                                    // `phases` rides along ONLY so the question
+                                    // cards reach `phases.answers` — the pane's
+                                    // data still comes from the phase value.
+                                    ClarificationPane(phase: phases.clarification, phases: phases)
+                                } else {
+                                    notStarted("Clarification begins when the prompt leaves Draft.")
+                                }
                             }
-                        }
-                        // The prompt-level dope surface: the FIFTH phase card
-                        // (the editor's idiom for read-only subsystem sections
-                        // — its tab bar was deliberately removed). PROMPT
-                        // scope preferred, SESSION_BASE fallback; the pane's
-                        // resolvedVia chip shows which answered.
-                        phaseCard("Dope", systemImage: "cube.transparent",
-                                  expanded: $dopeExpanded,
-                                  accessory: { EmptyView() }) {
-                            DopePane(scope: scope, promptUuid: stub.uuid, scrollable: false)
-                                .frame(minHeight: 120)
-                        }
+                            phaseCard(
+                                "Architecture", systemImage: "square.stack.3d.up",
+                                expanded: $archExpanded,
+                                accessory: { EmptyView() }
+                            ) {
+                                if phasesApply {
+                                    ArchitecturePane(phase: phases.architecture)
+                                } else {
+                                    notStarted("Architecture begins after clarification completes.")
+                                }
+                            }
+                            // Exploration/review are UNGATED: their summaries are
+                            // explicit-only opens that legally exist at draft.
+                            phaseCard(
+                                "Exploration", systemImage: "binoculars",
+                                expanded: $exploreExpanded,
+                                accessory: { ReportBadgeCluster(items: explorationBadges) }
+                            ) {
+                                ExplorationPane(phase: phases.exploration) {
+                                    await phases.requestFullExploration()
+                                }
+                            }
+                            phaseCard(
+                                "Review", systemImage: "checkmark.seal",
+                                expanded: $reviewExpanded,
+                                accessory: { ReportBadgeCluster(items: reviewBadges) }
+                            ) {
+                                ReviewPane(phase: phases.review) {
+                                    await phases.requestFullReview()
+                                }
+                            }
+                            // The prompt-level dope surface: the FIFTH phase card
+                            // (the editor's idiom for read-only subsystem sections
+                            // — its tab bar was deliberately removed). PROMPT
+                            // scope preferred, SESSION_BASE fallback; the pane's
+                            // resolvedVia chip shows which answered.
+                            phaseCard(
+                                "Dope", systemImage: "cube.transparent",
+                                expanded: $dopeExpanded,
+                                accessory: { EmptyView() }
+                            ) {
+                                DopePane(scope: scope, promptUuid: stub.uuid, scrollable: false)
+                                    .frame(minHeight: 120)
+                            }
                         } else {
                             PromptRunDocument(
                                 stub: stub,
@@ -772,8 +814,10 @@ private struct PromptEditorPane: View {
     @ViewBuilder
     private var saveIssueBanner: some View {
         if externalChange != nil || saveIssue == .conflict {
-            banner(color: .orange, icon: "exclamationmark.triangle.fill",
-                   text: "This prompt changed elsewhere.") {
+            banner(
+                color: .orange, icon: "exclamationmark.triangle.fill",
+                text: "This prompt changed elsewhere."
+            ) {
                 Button("Reload") { acceptExternal() }
                     .buttonStyle(.bordered).controlSize(.small)
             }
@@ -781,16 +825,20 @@ private struct PromptEditorPane: View {
             // No undo-history promise: the Undo toolbar hides with `editable`
             // and a locked prompt can't be written anyway. The buffers are
             // still on screen — offer a copy instead.
-            banner(color: .blue, icon: "lock.fill",
-                   text: "This prompt left Draft — content is now read-only. Your unsaved text is still shown below.") {
+            banner(
+                color: .blue, icon: "lock.fill",
+                text: "This prompt left Draft — content is now read-only. Your unsaved text is still shown below."
+            ) {
                 Button("Copy All") {
                     Clipboard.copy("## Backstory\n\(backstory)\n\n## Goal\n\(goal)\n\n## Detail\n\(detail)")
                 }
                 .buttonStyle(.bordered).controlSize(.small)
             }
         } else if case .failed(let message) = saveIssue {
-            banner(color: .red, icon: "xmark.octagon.fill",
-                   text: "Save failed: \(message)") {
+            banner(
+                color: .red, icon: "xmark.octagon.fill",
+                text: "Save failed: \(message)"
+            ) {
                 Button("Retry") {
                     saveIssue = nil
                     flushSoon()
@@ -800,8 +848,10 @@ private struct PromptEditorPane: View {
         }
     }
 
-    private func banner(color: Color, icon: String, text: String,
-                        @ViewBuilder action: () -> some View) -> some View {
+    private func banner(
+        color: Color, icon: String, text: String,
+        @ViewBuilder action: () -> some View
+    ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon).foregroundStyle(color)
             Text(text).font(.callout)
@@ -823,10 +873,12 @@ private struct PromptEditorPane: View {
 
     /// Persistent section card: sections NEVER disappear with status — status
     /// only drives which one is expanded by default (seedPhaseExpansion).
-    private func phaseCard(_ title: String, systemImage: String,
-                           expanded: Binding<Bool>,
-                           @ViewBuilder accessory: () -> some View,
-                           @ViewBuilder content: () -> some View) -> some View {
+    private func phaseCard(
+        _ title: String, systemImage: String,
+        expanded: Binding<Bool>,
+        @ViewBuilder accessory: () -> some View,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
         let built = content()
         let trailing = accessory()
         return DisclosureGroup(isExpanded: expanded) {
@@ -837,7 +889,7 @@ private struct PromptEditorPane: View {
                 Label(title, systemImage: systemImage)
                     .font(.headline)
                 Spacer()
-                trailing   // count badges — header signal, never a control
+                trailing  // count badges — header signal, never a control
             }
         }
         .padding(12)
@@ -941,12 +993,16 @@ private struct PromptEditorPane: View {
     // MARK: Section (initial)
 
     @ViewBuilder
-    private func sectionEditor(_ title: String, field: Field, text: Binding<String>,
-                              minHeight: CGFloat, hint: String) -> some View {
+    private func sectionEditor(
+        _ title: String, field: Field, text: Binding<String>,
+        minHeight: CGFloat, hint: String
+    ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
                 // The title doubles as a quick-copy control.
-                Button { copy(field: field, text: text.wrappedValue) } label: {
+                Button {
+                    copy(field: field, text: text.wrappedValue)
+                } label: {
                     HStack(spacing: 5) {
                         Text(title).font(.headline)
                         Image(systemName: copiedField == field ? "checkmark" : "doc.on.doc")
@@ -964,25 +1020,29 @@ private struct PromptEditorPane: View {
             if editable {
                 // AppKit-backed editor with live markdown header highlighting + a
                 // line-number gutter. cmd+F routes to the inline find-in-page bar.
-                MarkdownSourceEditor(text: text, minHeight: minHeight,
-                                     query: findQuery,
-                                     activeOccurrence: activeLocal(segmentID(field)))
-                    .background(.black.opacity(0.04), in: .rect(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(.separator))
-                    .id(segmentID(field))
-                    .onChange(of: text.wrappedValue) { _, _ in
-                        draftBox.markDirty(currentState())
-                        scheduleSave()
-                    }
+                MarkdownSourceEditor(
+                    text: text, minHeight: minHeight,
+                    query: findQuery,
+                    activeOccurrence: activeLocal(segmentID(field))
+                )
+                .background(.black.opacity(0.04), in: .rect(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.separator))
+                .id(segmentID(field))
+                .onChange(of: text.wrappedValue) { _, _ in
+                    draftBox.markDirty(currentState())
+                    scheduleSave()
+                }
             } else {
-                HighlightedText(source: text.wrappedValue.isEmpty ? "—" : text.wrappedValue,
-                                query: findQuery,
-                                activeLocalOccurrence: activeLocal(segmentID(field)))
-                    .padding(8)
-                    .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
-                    .background(.black.opacity(0.04), in: .rect(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(.separator))
-                    .id(segmentID(field))
+                HighlightedText(
+                    source: text.wrappedValue.isEmpty ? "—" : text.wrappedValue,
+                    query: findQuery,
+                    activeLocalOccurrence: activeLocal(segmentID(field))
+                )
+                .padding(8)
+                .frame(maxWidth: .infinity, minHeight: minHeight, alignment: .topLeading)
+                .background(.black.opacity(0.04), in: .rect(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.separator))
+                .id(segmentID(field))
             }
             Text(hint).font(.caption2).foregroundStyle(.tertiary)
         }
@@ -1017,13 +1077,13 @@ private struct PromptEditorPane: View {
         // run document renders them). onDisappear's unregister/flush stays
         // unconditional — both no-op for a never-registered, saver-less box.
         if editable {
-        // Scope-memoized: panes on the same prompt share one actor for WRITE
-        // SERIALIZATION only. The version argument seeds a fresh actor; an
-        // existing actor's threading is authoritative and is never rewound
-        // here (a stale cached snapshot must not clobber a peer's writes).
-        let newSaver = scope.saver(forPrompt: prompt.uuid, version: prompt.version)
-        saver = newSaver
-        draftBox.saver = newSaver
+            // Scope-memoized: panes on the same prompt share one actor for WRITE
+            // SERIALIZATION only. The version argument seeds a fresh actor; an
+            // existing actor's threading is authoritative and is never rewound
+            // here (a stale cached snapshot must not clobber a peer's writes).
+            let newSaver = scope.saver(forPrompt: prompt.uuid, version: prompt.version)
+            saver = newSaver
+            draftBox.saver = newSaver
         }
         // Pane-local echo watermark: the highest version THIS pane has written
         // or synchronized to. The shared actor's watermark can't distinguish a
@@ -1033,13 +1093,13 @@ private struct PromptEditorPane: View {
         let s = currentState()
         lastSaved = s
         if editable {
-        // Keyed by the STABLE prompt uuid, not draftBox.promptKey — that key
-        // is per-pane-unique (uuid#random) by design for the flush registry,
-        // and loading under it would reset the injected shared stack on every
-        // pane recreation, defeating the survive-teardown contract.
-        history.load(promptKey: stub.uuid, current: s)
-        // Register with the quit-flush registry (bounded drain on termination).
-        PromptFlushRegistry.shared.register(draftBox)
+            // Keyed by the STABLE prompt uuid, not draftBox.promptKey — that key
+            // is per-pane-unique (uuid#random) by design for the flush registry,
+            // and loading under it would reset the injected shared stack on every
+            // pane recreation, defeating the survive-teardown contract.
+            history.load(promptKey: stub.uuid, current: s)
+            // Register with the quit-flush registry (bounded drain on termination).
+            PromptFlushRegistry.shared.register(draftBox)
         }
         loaded = true
         await resolvePaths()
@@ -1092,8 +1152,9 @@ private struct PromptEditorPane: View {
 
     private func openInITerm(_ url: URL?) {
         guard let url else { return }
-        ITerm.open(dir: url, instanceUUID: windowID.instanceUUID,
-                   instanceName: catalog.instance(uuid: windowID.instanceUUID.wireString)?.name ?? "—")
+        ITerm.open(
+            dir: url, instanceUUID: windowID.instanceUUID,
+            instanceName: catalog.instance(uuid: windowID.instanceUUID.wireString)?.name ?? "—")
     }
 
     private func currentState() -> PromptEditHistory.EditState {
@@ -1125,7 +1186,7 @@ private struct PromptEditorPane: View {
         guard loaded, let saver else { return }
         let s = currentState()
         if s == lastSaved {
-            if record { history.record(s) }   // no-op if cursor already matches
+            if record { history.record(s) }  // no-op if cursor already matches
             return
         }
         let outcome = await saver.save(backstory: s.backstory, goal: s.goal, detail: s.detail)
@@ -1140,11 +1201,11 @@ private struct PromptEditorPane: View {
             await store.refreshPrompt(uuid: stub.uuid)
             externalChange = store.promptDetails[stub.uuid]?.prompt
             saveIssue = .conflict
-            history.record(s)   // keep the local text reachable via undo
+            history.record(s)  // keep the local text reachable via undo
         case .locked:
             saveIssue = .locked
-            history.record(s)   // preserve unsaved edits as an orphaned draft
-            draftBox.markSaved(s)   // don't retry a locked draft at quit
+            history.record(s)  // preserve unsaved edits as an orphaned draft
+            draftBox.markSaved(s)  // don't retry a locked draft at quit
             await store.refreshPrompt(uuid: stub.uuid)
         case .failed(let message):
             saveIssue = .failed(message)
@@ -1158,8 +1219,9 @@ private struct PromptEditorPane: View {
     // Adopt silently only when the buffer is clean.
     private func reconcileExternal() async {
         guard loaded, let saver,
-              let fresh = store.promptDetails[stub.uuid]?.prompt else { return }
-        guard fresh.version > localWatermark else { return }   // own echo — drop
+            let fresh = store.promptDetails[stub.uuid]?.prompt
+        else { return }
+        guard fresh.version > localWatermark else { return }  // own echo — drop
         if currentState() == lastSaved {
             backstory = fresh.backstory
             goal = fresh.goal
@@ -1168,7 +1230,7 @@ private struct PromptEditorPane: View {
             localWatermark = fresh.version
             await saver.adoptVersion(fresh.version)
         } else {
-            externalChange = fresh   // never clobber in-flight typing
+            externalChange = fresh  // never clobber in-flight typing
         }
     }
 
@@ -1192,8 +1254,9 @@ private struct PromptEditorPane: View {
     // current selection so an already-registered kbite missing from the db
     // still renders (and can be deselected).
     private func loadAvailableKbites() async {
-        let refs = (try? await GMCCDaemonService.shared.listKbites(
-            scope: .prompt, ownerUuid: stub.uuid, all: true)) ?? []
+        let refs =
+            (try? await GMCCDaemonService.shared.listKbites(
+                scope: .prompt, ownerUuid: stub.uuid, all: true)) ?? []
         availableKbites = Set(refs.map(\.code)).union(selectedKbites).sorted()
     }
 

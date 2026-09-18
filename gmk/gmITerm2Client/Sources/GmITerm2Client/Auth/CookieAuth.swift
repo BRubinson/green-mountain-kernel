@@ -38,8 +38,9 @@ enum CookieAuth {
 
         guard process.terminationStatus == 0 else { return (nil, nil) }
 
-        guard let output = String(data: data, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            let output = String(data: data, encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
         else {
             return (nil, nil)
         }

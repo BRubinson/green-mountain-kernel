@@ -146,7 +146,8 @@ final class DopeStore {
         let prompts = promptCandidates(target)
         let sessions = sessionCandidates(target)
         if let chosen = selectedCodes[target],
-           (prompts + sessions).contains(where: { $0.code == chosen }) {
+            (prompts + sessions).contains(where: { $0.code == chosen })
+        {
             return chosen
         }
         if prompts.count > 1 { return prompts.first?.code }
@@ -245,9 +246,10 @@ final class DopeStore {
     private func performLoad(_ key: Key) async {
         let next: Phase
         do {
-            next = .loaded(try await service.dopeGet(
-                sessionUuid: sessionUuid, promptUuid: key.promptUuid,
-                code: key.code))
+            next = .loaded(
+                try await service.dopeGet(
+                    sessionUuid: sessionUuid, promptUuid: key.promptUuid,
+                    code: key.code))
         } catch DaemonError.summaryAbsent {
             next = .absent
         } catch DaemonError.server(let code, let message) where code == "BAD_REQUEST" {
@@ -286,13 +288,14 @@ final class DopeStore {
     /// DOPE_INIT (idempotent create-or-return). Throws typed DaemonError for
     /// the sheet to render; a success reloads the surface.
     func initScope(key: Key, code: String, name: String, description: String) async throws {
-        _ = try await service.dopeInit(DopeInitRequest(
-            sessionUuid: sessionUuid,
-            promptUuid: key.promptUuid,
-            code: code,
-            name: name,
-            description: description.isEmpty ? nil : description
-        ))
+        _ = try await service.dopeInit(
+            DopeInitRequest(
+                sessionUuid: sessionUuid,
+                promptUuid: key.promptUuid,
+                code: code,
+                name: name,
+                description: description.isEmpty ? nil : description
+            ))
         // Pin what was just created: without this, a second scope on an
         // already-populated target would resolve to the alphabetically first
         // candidate — the opposite of what the user just asked for.

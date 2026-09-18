@@ -145,8 +145,9 @@ struct PromptStatusHeader: View {
             // becomes an honest gate reason instead of the self-contradicting
             // "advance the prompt first" the old edge copy would produce.
             guard status != .done else {
-                return .blocked(reason: "This prompt is already done",
-                                fix: "there is nothing left to advance")
+                return .blocked(
+                    reason: "This prompt is already done",
+                    fix: "there is nothing left to advance")
             }
             guard status.allowedNext.contains(.done) else {
                 return .blocked(
@@ -157,8 +158,9 @@ struct PromptStatusHeader: View {
         case .draft:
             guard let status else { return .unknown }
             guard status != .draft else {
-                return .blocked(reason: "This prompt is already a draft",
-                                fix: "there is nothing to go back to")
+                return .blocked(
+                    reason: "This prompt is already a draft",
+                    fix: "there is nothing to go back to")
             }
             guard status.allowedNext.contains(.draft) else {
                 return .blocked(
@@ -198,11 +200,12 @@ struct PromptStatusHeader: View {
         await store.refreshPrompt(uuid: stub.uuid)
         let version = store.prompts.first(where: { $0.uuid == stub.uuid })?.version ?? stub.version
         do {
-            _ = try await GMCCDaemonService.shared.setPromptStatus(PromptSetStatusRequest(
-                promptUuid: stub.uuid,
-                expectedVersion: version,
-                status: next
-            ))
+            _ = try await GMCCDaemonService.shared.setPromptStatus(
+                PromptSetStatusRequest(
+                    promptUuid: stub.uuid,
+                    expectedVersion: version,
+                    status: next
+                ))
             await store.refreshPrompt(uuid: stub.uuid)
             await store.refresh()
         } catch let error as DaemonError {

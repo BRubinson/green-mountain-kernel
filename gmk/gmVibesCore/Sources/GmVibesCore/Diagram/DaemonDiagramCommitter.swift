@@ -21,8 +21,10 @@ final class DaemonDiagramCommitter: DiagramCommitting {
     private let onCommit: @MainActor @Sendable (DiagramGetResponse) -> Void
     private let service = GMCCDaemonService.shared
 
-    init(diagramUuid: String,
-         onCommit: @escaping @MainActor @Sendable (DiagramGetResponse) -> Void) {
+    init(
+        diagramUuid: String,
+        onCommit: @escaping @MainActor @Sendable (DiagramGetResponse) -> Void
+    ) {
         self.diagramUuid = diagramUuid
         self.onCommit = onCommit
     }
@@ -31,8 +33,10 @@ final class DaemonDiagramCommitter: DiagramCommitting {
         try await commitReporting(mutations, expectedRevision: expectedRevision).revision
     }
 
-    func commitReporting(_ mutations: [DiagramMutation],
-                         expectedRevision: Int64?) async throws -> DiagramCommitOutcome {
+    func commitReporting(
+        _ mutations: [DiagramMutation],
+        expectedRevision: Int64?
+    ) async throws -> DiagramCommitOutcome {
         let applied = try await service.diagramBatchApply(
             diagramUuid: diagramUuid, expectedRevision: expectedRevision,
             mutations: mutations)

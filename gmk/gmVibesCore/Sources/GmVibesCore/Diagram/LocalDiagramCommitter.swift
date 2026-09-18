@@ -48,9 +48,10 @@ actor DiagramTreeBox {
         throws -> (tree: DiagramTree, minted: [String: String])
     {
         let recorder = RecordingMinting()
-        tree = try DiagramTreeReducer.apply(mutations, to: tree,
-                                            expectedRevision: expectedRevision,
-                                            minting: recorder)
+        tree = try DiagramTreeReducer.apply(
+            mutations, to: tree,
+            expectedRevision: expectedRevision,
+            minting: recorder)
         var minted: [String: String] = [:]
         var addIndex = 0
         for mutation in mutations {
@@ -86,8 +87,10 @@ final class LocalDiagramCommitter: DiagramCommitting {
         try await commitReporting(mutations, expectedRevision: expectedRevision).revision
     }
 
-    func commitReporting(_ mutations: [DiagramMutation],
-                         expectedRevision: Int64?) async throws -> DiagramCommitOutcome {
+    func commitReporting(
+        _ mutations: [DiagramMutation],
+        expectedRevision: Int64?
+    ) async throws -> DiagramCommitOutcome {
         let applied = try await box.apply(mutations, expectedRevision: expectedRevision)
         let notify = onCommit
         let tree = applied.tree

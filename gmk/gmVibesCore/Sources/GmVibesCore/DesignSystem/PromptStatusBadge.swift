@@ -39,10 +39,10 @@ struct PromptStatusBadge: View {
         // both appearances, which mattered less when six shades shared the rail
         // and the reader was scanning position as much as colour.
         switch status {
-        case .draft:     return .orange
+        case .draft: return .orange
         case .initiated: return .blue
-        case .done:      return .green
-        case .none:      return .gray
+        case .done: return .green
+        case .none: return .gray
         }
     }
 }

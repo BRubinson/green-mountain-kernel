@@ -11,8 +11,8 @@ import GmITerm2Client
 // The three GMCC bot fidelity tiers. Each maps to a resume command that the
 // editor copies to the clipboard for the user to paste into Claude Code.
 enum BotTier: String, CaseIterable, Identifiable {
-    case gmBot     = "/gm_bot"
-    case gmBotRPI  = "/gm_bot_rpi"
+    case gmBot = "/gm_bot"
+    case gmBotRPI = "/gm_bot_rpi"
     case gmBotTeam = "/gm_bot_team"
 
     var id: String { rawValue }
@@ -43,8 +43,8 @@ enum BotTier: String, CaseIterable, Identifiable {
             .appendingPathComponent(".claude-plugin", isDirectory: true)
             .appendingPathComponent("plugin.json")
         guard let data = try? Data(contentsOf: manifest),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let name = object["name"] as? String, !name.isEmpty
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let name = object["name"] as? String, !name.isEmpty
         else { return "gmcc" }
         return name
     }()
@@ -54,8 +54,8 @@ enum BotTier: String, CaseIterable, Identifiable {
     // 1 / 2 / 3-person icons — increasing crew size by fidelity tier.
     var symbol: String {
         switch self {
-        case .gmBot:     return "person.fill"
-        case .gmBotRPI:  return "person.2.fill"
+        case .gmBot: return "person.fill"
+        case .gmBotRPI: return "person.2.fill"
         case .gmBotTeam: return "person.3.fill"
         }
     }
@@ -72,8 +72,8 @@ enum BotTier: String, CaseIterable, Identifiable {
     /// fidelity tier. (It is also absent from `BotVariant` itself.)
     var variant: BotVariant {
         switch self {
-        case .gmBot:     return .bot
-        case .gmBotRPI:  return .rpi
+        case .gmBot: return .bot
+        case .gmBotRPI: return .rpi
         case .gmBotTeam: return .team
         }
     }
@@ -114,7 +114,8 @@ enum BotLauncherPreference {
     static var tier: BotTier {
         get {
             guard let raw = UserDefaults.standard.string(forKey: key),
-                  let tier = BotTier(rawValue: raw) else { return fallback }
+                let tier = BotTier(rawValue: raw)
+            else { return fallback }
             return tier
         }
         set { UserDefaults.standard.set(newValue.rawValue, forKey: key) }
@@ -162,16 +163,19 @@ enum ITerm {
     @MainActor
     static func open(dir: URL, instanceUUID: UUID, instanceName: String) {
         Task {
-            let profileName = await ensureProfile(instanceUUID: instanceUUID,
-                                                  instanceName: instanceName,
-                                                  workingDir: dir.path)
+            let profileName = await ensureProfile(
+                instanceUUID: instanceUUID,
+                instanceName: instanceName,
+                workingDir: dir.path)
             await launch(dir: dir, profileName: profileName)
         }
     }
 
-    static func ensureProfile(instanceUUID: UUID,
-                              instanceName: String,
-                              workingDir: String) async -> String? {
+    static func ensureProfile(
+        instanceUUID: UUID,
+        instanceName: String,
+        workingDir: String
+    ) async -> String? {
         let guid = "gmvibes-\(instanceUUID.uuidString)"
         let name = "GMVibes — \(instanceName)"
         return await Task.detached(priority: .userInitiated) {
@@ -192,8 +196,10 @@ enum ITerm {
     }
 
     static func workingDirectoryProperties(_ path: String) -> [PaneProfileProperty] {
-        [.string("Custom Directory", "Yes"),
-         .string("Working Directory", path)]
+        [
+            .string("Custom Directory", "Yes"),
+            .string("Working Directory", path),
+        ]
     }
 
     @MainActor
@@ -209,8 +215,12 @@ enum ITerm {
     // ~/Library/Application Support/iTerm2/DynamicProfiles, created if absent.
     // `nonisolated` so the profile write can run off the main actor.
     private nonisolated static func dynamicProfilesDir() -> URL? {
-        guard let appSup = FileManager.default.urls(for: .applicationSupportDirectory,
-                                                    in: .userDomainMask).first else { return nil }
+        guard
+            let appSup = FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+        else { return nil }
         let dir = appSup.appendingPathComponent("iTerm2/DynamicProfiles", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
@@ -221,15 +231,21 @@ enum ITerm {
     // `nonisolated` so it can run off the main actor (pure FileManager/JSON work).
     private nonisolated static func writeProfile(guid: String, name: String, workingDir: String) -> Bool {
         guard let dir = dynamicProfilesDir() else { return false }
-        let payload: [String: Any] = ["Profiles": [[
-            "Guid": guid,
-            "Name": name,
-            "Custom Directory": "Yes",
-            "Working Directory": workingDir,
-        ]]]
+        let payload: [String: Any] = [
+            "Profiles": [
+                [
+                    "Guid": guid,
+                    "Name": name,
+                    "Custom Directory": "Yes",
+                    "Working Directory": workingDir,
+                ]
+            ]
+        ]
         guard JSONSerialization.isValidJSONObject(payload),
-              let data = try? JSONSerialization.data(withJSONObject: payload,
-                                                     options: [.prettyPrinted]) else { return false }
+            let data = try? JSONSerialization.data(
+                withJSONObject: payload,
+                options: [.prettyPrinted])
+        else { return false }
         let url = dir.appendingPathComponent("\(guid).json")
         let tmp = dir.appendingPathComponent(".\(guid).json.tmp")
         do {

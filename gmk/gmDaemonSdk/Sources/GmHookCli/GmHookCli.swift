@@ -60,7 +60,8 @@ public enum GmHookCli {
                 if let line = HookRunner.postToolUse(stdin: stdin, dryRun: dryRun) { print(line) }
             case "subagent-start":
                 if let line = HookRunner.subagentStart(
-                    stdin: stdin, dryRun: dryRun, sheetText: PenSheet.text) {
+                    stdin: stdin, dryRun: dryRun, sheetText: PenSheet.text)
+                {
                     print(line)
                 }
             default:

@@ -133,7 +133,8 @@ public enum GmFsYaml {
     static func unquoted(_ value: String) -> String {
         var v = value
         if v.count >= 2,
-           (v.hasPrefix("\"") && v.hasSuffix("\"")) || (v.hasPrefix("'") && v.hasSuffix("'")) {
+            (v.hasPrefix("\"") && v.hasSuffix("\"")) || (v.hasPrefix("'") && v.hasSuffix("'"))
+        {
             v = String(v.dropFirst().dropLast())
         }
         return v

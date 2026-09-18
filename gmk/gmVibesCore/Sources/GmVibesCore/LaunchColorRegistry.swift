@@ -31,11 +31,12 @@ final class LaunchColorRegistry {
         cursor = (cursor + 1) % Self.palette.count
         let assigned = LaunchColor(
             hex: String(format: "%02x%02x%02x", Int(r), Int(g), Int(b)),
-            color: Color(.sRGB,
-                         red: Double(r) / 255.0,
-                         green: Double(g) / 255.0,
-                         blue: Double(b) / 255.0,
-                         opacity: 1))
+            color: Color(
+                .sRGB,
+                red: Double(r) / 255.0,
+                green: Double(g) / 255.0,
+                blue: Double(b) / 255.0,
+                opacity: 1))
         assignments[promptUuid] = assigned
         return assigned
     }

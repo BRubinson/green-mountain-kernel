@@ -15,8 +15,9 @@ public enum DopeCogProjection {
             .sorted { ($0.sortOrder, $0.code) < ($1.sortOrder, $1.code) }
 
         return DopeCogDocument(
-            body: DopeCogBody(code: cog.code, name: cog.name,
-                              description: cog.description, sortOrder: cog.sortOrder),
+            body: DopeCogBody(
+                code: cog.code, name: cog.name,
+                description: cog.description, sortOrder: cog.sortOrder),
             elements: roots.map { root in
                 let owners = (byParent[root.uuid] ?? [])
                     .filter { $0.elementType == DopeCogElementType.persistenceOwner.rawValue }
@@ -37,9 +38,11 @@ public enum DopeCogProjection {
     public static func ownerElement(
         parentCode: String, persistenceCode: String, sortOrder: Int
     ) -> (code: String, name: String, description: String, sortOrder: Int) {
-        (code: "\(parentCode)_owns_\(persistenceCode)",
-         name: persistenceCode,
-         description: "",
-         sortOrder: sortOrder)
+        (
+            code: "\(parentCode)_owns_\(persistenceCode)",
+            name: persistenceCode,
+            description: "",
+            sortOrder: sortOrder
+        )
     }
 }

@@ -55,17 +55,20 @@ struct DiagramScreen: View {
     }
 
     var body: some View {
-        ScreenScaffold(title: "Diagram · \(windowID.name)",
-                       subtitle: subtitle) {
+        ScreenScaffold(
+            title: "Diagram · \(windowID.name)",
+            subtitle: subtitle
+        ) {
             content
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                DiagramToolStrip(workspace: workspace, viewState: viewState,
-                                 onCenter: center(on:), onFit: fit,
-                                 onOrganize: organize, onCopy: copyToClipboard,
-                                 onInsertNode: insertNode(_:),
-                                 onAddDopeScope: { showDopeScopeSheet = true })
+                DiagramToolStrip(
+                    workspace: workspace, viewState: viewState,
+                    onCenter: center(on:), onFit: fit,
+                    onOrganize: organize, onCopy: copyToClipboard,
+                    onInsertNode: insertNode(_:),
+                    onAddDopeScope: { showDopeScopeSheet = true })
             }
         }
         .sheet(isPresented: $showDopeScopeSheet) {
@@ -107,17 +110,19 @@ struct DiagramScreen: View {
         // selection or drag freeze that now points at something not drawn.
         .onChange(of: workspace.generation) {
             if let selected = viewState.selection.selectedElementUuid,
-               workspace.resolved.element(uuid: selected) == nil {
+                workspace.resolved.element(uuid: selected) == nil
+            {
                 clearSelection()
             }
             if let draft = viewState.dragDraft,
-               workspace.resolved.element(uuid: draft.elementUuid) == nil {
+                workspace.resolved.element(uuid: draft.elementUuid) == nil
+            {
                 viewState.dragDraft = nil
             }
             attemptInitialFit()
         }
         .onChange(of: colorScheme) { _, newScheme in
-            workspace.reskin(newScheme)   // O(1) — no A* re-run
+            workspace.reskin(newScheme)  // O(1) — no A* re-run
         }
     }
 
@@ -147,8 +152,9 @@ struct DiagramScreen: View {
         if workspace.loaded {
             canvasHost
         } else if let error = workspace.loadError {
-            ContentUnavailableView("Diagram Unavailable", systemImage: "bolt.slash",
-                                   description: Text(error))
+            ContentUnavailableView(
+                "Diagram Unavailable", systemImage: "bolt.slash",
+                description: Text(error))
         } else {
             ProgressView("Loading diagram…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -172,9 +178,10 @@ struct DiagramScreen: View {
                 DiagramSceneView(resolved: resolved, offset: sceneOffset(viewport)) {
                     EmptyView()
                 } overlay: {
-                    DiagramDraftOverlay(dragDraft: viewState.dragDraft,
-                                        drawDraft: viewState.drawDraft,
-                                        offset: sceneOffset(viewport))
+                    DiagramDraftOverlay(
+                        dragDraft: viewState.dragDraft,
+                        drawDraft: viewState.drawDraft,
+                        offset: sceneOffset(viewport))
                 }
                 .environment(\.diagramSelection, effectiveSelection)
                 .scaleEffect(viewport.zoom, anchor: .topLeading)
@@ -204,8 +211,9 @@ struct DiagramScreen: View {
     /// Pan expressed in DIAGRAM space for the kit's offset parameter:
     /// (diagram + offset/zoom)·zoom = diagram·zoom + offset == toScreen.
     private func sceneOffset(_ viewport: DiagramViewport) -> CGSize {
-        CGSize(width: viewport.offset.width / viewport.zoom,
-               height: viewport.offset.height / viewport.zoom)
+        CGSize(
+            width: viewport.offset.width / viewport.zoom,
+            height: viewport.offset.height / viewport.zoom)
     }
 
     /// The dragged card dims in place while its ghost tracks the cursor;
@@ -250,9 +258,11 @@ struct DiagramScreen: View {
                     // Restage ONE coalesced elementUpdate per sample — the
                     // divisor arithmetic lives in the kit.
                     if let element = viewState.dragDraft.flatMap({
-                        $0.frozen.element(uuid: uuid) }) {
-                        workspace.editSession.restage(DiagramDrag.moveMutation(
-                            node: node, resolved: element, by: delta))
+                        $0.frozen.element(uuid: uuid)
+                    }) {
+                        workspace.editSession.restage(
+                            DiagramDrag.moveMutation(
+                                node: node, resolved: element, by: delta))
                     }
                 case .draw(let tool, let anchor):
                     if viewState.drawDraft == nil {
@@ -272,7 +282,8 @@ struct DiagramScreen: View {
                     // (never layers, cards, or scope containers).
                     if case .element(let element)? = workspace.resolved.hitTest(
                         at: p, edgeTolerance: 6 / viewState.viewport.zoom,
-                        includeInk: true) {
+                        includeInk: true)
+                    {
                         switch element.kind {
                         case .stroke, .shape:
                             viewState.erasedUuids.insert(element.uuid)
@@ -340,7 +351,8 @@ struct DiagramScreen: View {
             // empty space has nothing to hang it from, so that pans.
             if case .element(let element)? = workspace.resolved.hitTest(
                 at: p, edgeTolerance: 6 / viewState.viewport.zoom),
-               workspace.node(uuid: element.uuid) != nil {
+                workspace.node(uuid: element.uuid) != nil
+            {
                 select(element.uuid)
                 intent = .connect(fromUuid: element.uuid, anchor: p)
             } else {
@@ -389,8 +401,9 @@ struct DiagramScreen: View {
                     base = viewState.viewport.zoom
                     zoomBase = base
                 }
-                viewState.viewport.zoom(to: base * value.magnification,
-                                        anchor: value.startLocation)
+                viewState.viewport.zoom(
+                    to: base * value.magnification,
+                    anchor: value.startLocation)
             }
             .onEnded { _ in zoomBase = nil }
     }
@@ -418,8 +431,10 @@ struct DiagramScreen: View {
     private func fit() {
         let bounds = workspace.resolved.contentBounds.insetBy(dx: -48, dy: -48)
         guard hostSize != .zero, bounds.width > 0, bounds.height > 0 else { return }
-        let zoom = min(min(hostSize.width / bounds.width,
-                           hostSize.height / bounds.height), 1)
+        let zoom = min(
+            min(
+                hostSize.width / bounds.width,
+                hostSize.height / bounds.height), 1)
         viewState.viewport.zoom = max(zoom, DiagramViewport.zoomRange.lowerBound)
         viewState.viewport.center(
             on: CGPoint(x: bounds.midX, y: bounds.midY), in: hostSize)
@@ -428,10 +443,13 @@ struct DiagramScreen: View {
     // MARK: - Draw mode
 
     /// Commit a freehand stroke through the shared drawing-layer funnel.
-    private func commitDrawing(tool: DiagramTool, from anchor: CGPoint,
-                               draft: DiagramViewState.DrawDraft) {
+    private func commitDrawing(
+        tool: DiagramTool, from anchor: CGPoint,
+        draft: DiagramViewState.DrawDraft
+    ) {
         guard tool == .freehand,
-              let add = freehandAdd(draft: draft) else { return }
+            let add = freehandAdd(draft: draft)
+        else { return }
         stageOnDrawingLayer(center: add.center, payload: add.payload)
         flushSelectingNewElement()
     }
@@ -443,21 +461,27 @@ struct DiagramScreen: View {
     private func stageOnDrawingLayer(center: CGPoint, payload: DiagramElementPayload) {
         let session = workspace.editSession!
         if let layer = workspace.drawingLayer {
-            session.stage(.elementAdd(DiagramElementAdd(
-                clientRef: Self.newElementRef,
-                parentElementUuid: layer.identity.uuid,
-                centerX: center.x, centerY: center.y,
-                payload: payload)))
+            session.stage(
+                .elementAdd(
+                    DiagramElementAdd(
+                        clientRef: Self.newElementRef,
+                        parentElementUuid: layer.identity.uuid,
+                        centerX: center.x, centerY: center.y,
+                        payload: payload)))
         } else {
-            session.stage(.elementAdd(DiagramElementAdd(
-                clientRef: "drawing_layer",
-                elementZ: workspace.maxTopLevelZ + 10,
-                payload: .drawingLayer(DrawingLayerPayload()))))
-            session.stage(.elementAdd(DiagramElementAdd(
-                clientRef: Self.newElementRef,
-                parentClientRef: "drawing_layer",
-                centerX: center.x, centerY: center.y,
-                payload: payload)))
+            session.stage(
+                .elementAdd(
+                    DiagramElementAdd(
+                        clientRef: "drawing_layer",
+                        elementZ: workspace.maxTopLevelZ + 10,
+                        payload: .drawingLayer(DrawingLayerPayload()))))
+            session.stage(
+                .elementAdd(
+                    DiagramElementAdd(
+                        clientRef: Self.newElementRef,
+                        parentClientRef: "drawing_layer",
+                        centerX: center.x, centerY: center.y,
+                        payload: payload)))
         }
     }
 
@@ -471,25 +495,35 @@ struct DiagramScreen: View {
     {
         guard draft.points.count >= 2 else { return nil }
         let xs = draft.points.map(\.x), ys = draft.points.map(\.y)
-        let center = CGPoint(x: (xs.min()! + xs.max()!) / 2,
-                             y: (ys.min()! + ys.max()!) / 2)
-        let vertices = DiagramStrokeCodec.decimate(draft.points.map {
-            DiagramVertex(x: $0.x - center.x, y: $0.y - center.y)
-        })
-        return (center, .drawingStroke(DrawingStrokePayload(
-            tool: .pencil, strokeColor: "#e67326", strokeWidth: 2,
-            vertices: vertices)))
+        let center = CGPoint(
+            x: (xs.min()! + xs.max()!) / 2,
+            y: (ys.min()! + ys.max()!) / 2)
+        let vertices = DiagramStrokeCodec.decimate(
+            draft.points.map {
+                DiagramVertex(x: $0.x - center.x, y: $0.y - center.y)
+            })
+        return (
+            center,
+            .drawingStroke(
+                DrawingStrokePayload(
+                    tool: .pencil, strokeColor: "#e67326", strokeWidth: 2,
+                    vertices: vertices))
+        )
     }
 
     /// Insert one UML node at the viewport center, parented under the (lazily
     /// created) drawing layer — the same funnel a drawn stroke rides.
     private func insertNode(_ kind: DiagramNodeKind) {
-        let center = hostSize == .zero
+        let center =
+            hostSize == .zero
             ? CGPoint.zero
             : viewState.viewport.canvasPoint(
                 CGPoint(x: hostSize.width / 2, y: hostSize.height / 2))
-        stageOnDrawingLayer(center: center, payload: .umlNode(UmlNodePayload(
-            nodeKind: kind, width: 170, height: 100, markdown: "## Title")))
+        stageOnDrawingLayer(
+            center: center,
+            payload: .umlNode(
+                UmlNodePayload(
+                    nodeKind: kind, width: 170, height: 100, markdown: "## Title")))
         flushSelectingNewElement()
     }
 
@@ -502,8 +536,10 @@ struct DiagramScreen: View {
         let session = workspace.editSession!
         for uuid in uuids {
             guard let node = workspace.node(uuid: uuid) else { continue }
-            session.stage(.elementDelete(DiagramElementDelete(
-                elementUuid: uuid, expectedVersion: node.identity.version)))
+            session.stage(
+                .elementDelete(
+                    DiagramElementDelete(
+                        elementUuid: uuid, expectedVersion: node.identity.version)))
         }
         Task {
             await workspace.flush()
@@ -520,16 +556,19 @@ struct DiagramScreen: View {
     /// the write path would reject it, and a validation error on a drag is
     /// noise, not information.
     private func commitConnector(from fromUuid: String, to point: CGPoint) {
-        guard case .element(let target)? = workspace.resolved.hitTest(
+        guard
+            case .element(let target)? = workspace.resolved.hitTest(
                 at: point, edgeTolerance: 6 / viewState.viewport.zoom),
-              target.uuid != fromUuid,
-              workspace.parentUuid(of: fromUuid) == workspace.parentUuid(of: target.uuid)
+            target.uuid != fromUuid,
+            workspace.parentUuid(of: fromUuid) == workspace.parentUuid(of: target.uuid)
         else { return }
         let session = workspace.editSession!
-        session.stage(.elementAdd(DiagramElementAdd(
-            clientRef: Self.newElementRef,
-            parentElementUuid: fromUuid,
-            payload: .connector(ConnectorPayload(targetElementUuid: target.uuid)))))
+        session.stage(
+            .elementAdd(
+                DiagramElementAdd(
+                    clientRef: Self.newElementRef,
+                    parentElementUuid: fromUuid,
+                    payload: .connector(ConnectorPayload(targetElementUuid: target.uuid)))))
         flushSelectingNewElement()
     }
 
@@ -552,8 +591,9 @@ struct DiagramScreen: View {
     // MARK: - Organize / clipboard
 
     private func organize() {
-        let mutations = DiagramOrganizer.organize(workspace.resolved,
-                                                  tree: workspace.tree)
+        let mutations = DiagramOrganizer.organize(
+            workspace.resolved,
+            tree: workspace.tree)
         guard !mutations.isEmpty else { return }
         let session = workspace.editSession!
         for mutation in mutations { session.stage(mutation) }
@@ -588,8 +628,9 @@ private struct DiagramDraftOverlay: View {
         Canvas { context, _ in
             context.translateBy(x: offset.width, y: offset.height)
             if let draft = dragDraft {
-                let frame = draft.frame.offsetBy(dx: draft.delta.width,
-                                                 dy: draft.delta.height)
+                let frame = draft.frame.offsetBy(
+                    dx: draft.delta.width,
+                    dy: draft.delta.height)
                 context.stroke(
                     Path(roundedRect: frame, cornerRadius: 6),
                     with: .color(.accentColor),
@@ -606,9 +647,10 @@ private struct DiagramDraftOverlay: View {
                 }
                 // Brand orange (RGBAColor.brandOrange) — matches the #e67326
                 // the committed shape payload carries.
-                context.stroke(path,
-                               with: .color(Color(red: 0.9, green: 0.45, blue: 0.15)),
-                               style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                context.stroke(
+                    path,
+                    with: .color(Color(red: 0.9, green: 0.45, blue: 0.15)),
+                    style: StrokeStyle(lineWidth: 2, lineCap: .round))
             }
         }
         .allowsHitTesting(false)

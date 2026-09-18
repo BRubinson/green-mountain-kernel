@@ -25,9 +25,13 @@ nonisolated enum GmFsPathResolver {
         var out = ""
         var lastWasSep = false
         for ch in lower {
-            if ch == "/" { out += "__"; lastWasSep = false }
-            else if ch.isLetter || ch.isNumber || ch == "-" { out.append(ch); lastWasSep = false }
-            else { if !lastWasSep && !out.isEmpty { out.append("_") }; lastWasSep = true }
+            if ch == "/" {
+                out += "__"; lastWasSep = false
+            } else if ch.isLetter || ch.isNumber || ch == "-" {
+                out.append(ch); lastWasSep = false
+            } else {
+                if !lastWasSep && !out.isEmpty { out.append("_") }; lastWasSep = true
+            }
         }
         while out.hasSuffix("_") { out.removeLast() }
         while out.hasPrefix("_") { out.removeFirst() }
@@ -96,8 +100,10 @@ nonisolated enum GmFsPathResolver {
         storagePath: String = "",
         artifacts: [ArtifactRow]
     ) -> ResolvedMemory {
-        let watched: URL? = storagePath.isEmpty ? nil :
-            URL(fileURLWithPath: gmFsRoot, isDirectory: true)
+        let watched: URL? =
+            storagePath.isEmpty
+            ? nil
+            : URL(fileURLWithPath: gmFsRoot, isDirectory: true)
                 .appendingPathComponent(storagePath, isDirectory: true)
                 .appendingPathComponent("memory", isDirectory: true)
         func wrap(_ root: URL?) -> ResolvedMemory {
@@ -108,7 +114,8 @@ nonisolated enum GmFsPathResolver {
         }
         let parents = artifacts.compactMap { artifact -> URL? in
             let path = artifact.filePath
-            let fileURL: URL = path.hasPrefix("/")
+            let fileURL: URL =
+                path.hasPrefix("/")
                 ? URL(fileURLWithPath: path)
                 : URL(fileURLWithPath: gmFsRoot, isDirectory: true).appendingPathComponent(path)
             let parent = fileURL.deletingLastPathComponent()
@@ -117,7 +124,8 @@ nonisolated enum GmFsPathResolver {
         if var common = parents.first {
             for parent in parents.dropFirst() {
                 while common.path != "/" && parent.path != common.path
-                    && !parent.path.hasPrefix(common.path + "/") {
+                    && !parent.path.hasPrefix(common.path + "/")
+                {
                     common.deleteLastPathComponent()
                 }
             }

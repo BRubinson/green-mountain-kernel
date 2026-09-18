@@ -17,8 +17,9 @@ struct ProjectsView: View {
         // ScreenScaffold hosts only the title + searchable chrome (no path).
         ScreenScaffold(title: "Projects") {
             ProjectTreeView(query: $query, expanded: $expanded)
-                .searchable(text: $query, placement: .toolbar,
-                            prompt: "Search projects, instances & sessions")
+                .searchable(
+                    text: $query, placement: .toolbar,
+                    prompt: "Search projects, instances & sessions")
         }
     }
 }
@@ -39,10 +40,11 @@ private struct ProjectTreeView: View {
     var body: some View {
         List {
             ForEach(filtered.projects, id: \.uuid) { project in
-                ProjectFolderRow(project: project,
-                                 filtered: filtered,
-                                 searching: !query.isEmpty,
-                                 expanded: $expanded)
+                ProjectFolderRow(
+                    project: project,
+                    filtered: filtered,
+                    searching: !query.isEmpty,
+                    expanded: $expanded)
             }
             if filtered.projects.isEmpty {
                 emptyRow
@@ -75,9 +77,11 @@ private struct ProjectTreeView: View {
         // This browser keeps the catalog's recency order (the drill-down
         // pages are the alphabetical surfaces) and SHOWS instance-less
         // projects (the tree renders a "No instances." row for them).
-        let next = CatalogFilter(query: SearchQuery(query), instanceOrder: .recency,
-                                 includeEmptyProjects: true)
-            .apply(to: catalog)
+        let next = CatalogFilter(
+            query: SearchQuery(query), instanceOrder: .recency,
+            includeEmptyProjects: true
+        )
+        .apply(to: catalog)
         if filtered != next { filtered = next }
     }
 
@@ -109,14 +113,16 @@ private struct ProjectFolderRow: View {
 
     var body: some View {
         DisclosureGroup(isExpanded: expansionBinding) {
-            InstanceLevel(project: project,
-                          filtered: filtered,
-                          searching: searching,
-                          expanded: $expanded)
+            InstanceLevel(
+                project: project,
+                filtered: filtered,
+                searching: searching,
+                expanded: $expanded)
         } label: {
             HStack(spacing: 6) {
-                FolderLabel(name: project.name, subtitle: project.code,
-                            systemImage: "folder")
+                FolderLabel(
+                    name: project.name, subtitle: project.code,
+                    systemImage: "folder")
                 Spacer(minLength: 4)
                 // Always rendered, matching the landing card. Hover-reveal
                 // was tried first and simply could not be found.
@@ -166,10 +172,11 @@ private struct InstanceLevel: View {
                 .foregroundStyle(.secondary)
         } else {
             ForEach(instances, id: \.uuid) { instance in
-                InstanceFolderRow(instance: instance,
-                                  filtered: filtered,
-                                  searching: searching,
-                                  expanded: $expanded)
+                InstanceFolderRow(
+                    instance: instance,
+                    filtered: filtered,
+                    searching: searching,
+                    expanded: $expanded)
             }
         }
     }
@@ -185,12 +192,14 @@ private struct InstanceFolderRow: View {
 
     var body: some View {
         DisclosureGroup(isExpanded: expansionBinding) {
-            SessionLevel(instance: instance,
-                         filtered: filtered,
-                         searching: searching)
+            SessionLevel(
+                instance: instance,
+                filtered: filtered,
+                searching: searching)
         } label: {
-            FolderLabel(name: instance.name, subtitle: instance.code,
-                        systemImage: "folder")
+            FolderLabel(
+                name: instance.name, subtitle: instance.code,
+                systemImage: "folder")
         }
     }
 

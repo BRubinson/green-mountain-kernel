@@ -36,9 +36,10 @@ public enum KbiteArchive {
     /// components on import — same snake_case shape every locally-typed code
     /// already has. One segment, no separators, no dots.
     public static func isValidCode(_ code: String) -> Bool {
-        !code.isEmpty && code.count <= 100 && code.allSatisfy {
-            ($0 >= "a" && $0 <= "z") || ($0 >= "0" && $0 <= "9") || $0 == "_"
-        }
+        !code.isEmpty && code.count <= 100
+            && code.allSatisfy {
+                ($0 >= "a" && $0 <= "z") || ($0 >= "0" && $0 <= "9") || $0 == "_"
+            }
     }
 
     /// Machine roots → placeholders. Longest prefix first, so overlapping

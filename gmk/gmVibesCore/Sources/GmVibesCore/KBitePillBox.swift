@@ -64,8 +64,10 @@ private struct KBitePill: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
             .background {
-                Capsule().fill(isSelected ? AnyShapeStyle(Color.accentColor.opacity(0.85))
-                                          : AnyShapeStyle(.thinMaterial))
+                Capsule().fill(
+                    isSelected
+                        ? AnyShapeStyle(Color.accentColor.opacity(0.85))
+                        : AnyShapeStyle(.thinMaterial))
             }
             .overlay {
                 Capsule().stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.4))

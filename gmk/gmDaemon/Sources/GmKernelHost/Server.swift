@@ -115,8 +115,10 @@ final class Server: @unchecked Sendable {
     /// write and the instance creation. Coalesced so a burst produces one
     /// recompute; both downstream pushes are idempotent anyway.
     private func watchedStateMayHaveChanged(_ kind: String) {
-        guard kind == DaemonEventKind.configSet.rawValue
-            || kind == DaemonEventKind.createInstance.rawValue else { return }
+        guard
+            kind == DaemonEventKind.configSet.rawValue
+                || kind == DaemonEventKind.createInstance.rawValue
+        else { return }
         queue.async {
             guard !self.rebuildPending else { return }
             self.rebuildPending = true
@@ -142,12 +144,13 @@ final class Server: @unchecked Sendable {
             var payload: [String: Any] = ["instance_uuid": instanceUuid, "head_state": state]
             payload["current_branch"] = branch ?? NSNull()
             payload["current_session_code"] = code ?? NSNull()
-            self.broadcast(EventNotification(
-                id: 0,
-                kind: DaemonEventKind.checkoutChange.rawValue,
-                subjectUuid: instanceUuid,
-                payload: Store.jsonPayload(payload),
-                createdAt: Store.isoNow()))
+            self.broadcast(
+                EventNotification(
+                    id: 0,
+                    kind: DaemonEventKind.checkoutChange.rawValue,
+                    subjectUuid: instanceUuid,
+                    payload: Store.jsonPayload(payload),
+                    createdAt: Store.isoNow()))
         }
     }
 
@@ -170,20 +173,22 @@ final class Server: @unchecked Sendable {
             guard let promptUuid = try? self.store.promptUuid(byStoragePath: storagePath) else {
                 return
             }
-            self.broadcast(EventNotification(
-                id: 0,
-                kind: DaemonEventKind.promptMemoryChange.rawValue,
-                subjectUuid: promptUuid,
-                payload: "{\"gmfs_relative_storage_path\":\(Self.jsonString(storagePath))}",
-                createdAt: Store.isoNow()))
+            self.broadcast(
+                EventNotification(
+                    id: 0,
+                    kind: DaemonEventKind.promptMemoryChange.rawValue,
+                    subjectUuid: promptUuid,
+                    payload: "{\"gmfs_relative_storage_path\":\(Self.jsonString(storagePath))}",
+                    createdAt: Store.isoNow()))
         }
     }
 
     /// JSON-encode one string safely (paths can carry quotes/backslashes).
     private static func jsonString(_ value: String) -> String {
         guard let data = try? JSONEncoder().encode([value]),
-              let text = String(data: data, encoding: .utf8),
-              text.count >= 2 else { return "\"\"" }
+            let text = String(data: data, encoding: .utf8),
+            text.count >= 2
+        else { return "\"\"" }
         return String(text.dropFirst().dropLast())
     }
 
@@ -261,7 +266,7 @@ final class Server: @unchecked Sendable {
         // instead of racing the async sends.
         let group = DispatchGroup()
         goodbyeGroup = group
-        try? store.recordDaemonStop()   // fan-out → subscribers see DAEMON_STOP, then EOF
+        try? store.recordDaemonStop()  // fan-out → subscribers see DAEMON_STOP, then EOF
         goodbyeGroup = nil
         try? store.checkpointTruncate()
         try? store.closeDatabase()
@@ -307,7 +312,8 @@ final class Server: @unchecked Sendable {
 
         guard rawHead.protocolVersion == GmWireProtocol.version else {
             let clientNewer = rawHead.protocolVersion > GmWireProtocol.version
-            let message = clientNewer
+            let message =
+                clientNewer
                 ? "daemon speaks v\(GmWireProtocol.version), client spoke newer v\(rawHead.protocolVersion) — daemon exiting for restart"
                 : "daemon speaks v\(GmWireProtocol.version), client spoke older v\(rawHead.protocolVersion) — rejected, daemon stays up"
             let result = errorResult(
@@ -745,9 +751,10 @@ final class Server: @unchecked Sendable {
         // Encoding a payload-less envelope of concrete types cannot realistically
         // fail; the fallback is still a decodable error line rather than a
         // bare newline the client would report as a contextless wire error.
-        let fallback = Data(
-            #"{"protocol_version":\#(GmWireProtocol.version),"type":"ERROR","request_id":"","ok":false,"error":{"code":"INTERNAL_ERROR","message":"error-envelope encoding failed"}}"#
-                .utf8) + Data([0x0A])
+        let fallback =
+            Data(
+                #"{"protocol_version":\#(GmWireProtocol.version),"type":"ERROR","request_id":"","ok":false,"error":{"code":"INTERNAL_ERROR","message":"error-envelope encoding failed"}}"#
+                    .utf8) + Data([0x0A])
         let line = (try? NDJSON.encodeLine(envelope)) ?? fallback
         return HandlerResult(line: line)
     }
@@ -817,9 +824,11 @@ final class ClientConnection: @unchecked Sendable {
                     send(result.line)
                 }
             case .shutdown:
-                connection.send(content: result.line, completion: .contentProcessed { _ in
-                    server.shutdown()
-                })
+                connection.send(
+                    content: result.line,
+                    completion: .contentProcessed { _ in
+                        server.shutdown()
+                    })
             }
         }
     }

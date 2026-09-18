@@ -35,8 +35,11 @@ public enum DiagramStorage {
         let middle = try sanitizedSegments(
             gmccDiagramPath ?? defaultDirectory, label: "gmcc_diagram_path")
         try validateName(diagramCode, label: "diagram code")
-        return (owner + middle + [screenshotsDirectory,
-                                  "\(diagramCode).\(fileExtension)"]).joined(separator: "/")
+        return
+            (owner + middle + [
+                screenshotsDirectory,
+                "\(diagramCode).\(fileExtension)",
+            ]).joined(separator: "/")
     }
 
     /// The fingerprint sidecar sits beside its PNG, same stem.
@@ -120,9 +123,11 @@ public struct DiagramRenderFingerprint: Codable, Hashable, Sendable {
     public let scale: Double
     public let algoVersion: Int
 
-    public init(diagramUuid: String, diagramRevision: Int64,
-                dopeRevisions: [String: Int64], scheme: String, scale: Double,
-                algoVersion: Int = DiagramRenderFingerprint.renderAlgoVersion) {
+    public init(
+        diagramUuid: String, diagramRevision: Int64,
+        dopeRevisions: [String: Int64], scheme: String, scale: Double,
+        algoVersion: Int = DiagramRenderFingerprint.renderAlgoVersion
+    ) {
         self.diagramUuid = diagramUuid
         self.diagramRevision = diagramRevision
         self.dopeRevisions = dopeRevisions

@@ -84,7 +84,7 @@
       "sort_order" : 10
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Store+Briefing.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Persistence/Migrations/m0025_dynamicWorkflows.swift",
   "sort_order" : 21,
   "version" : 767
 }

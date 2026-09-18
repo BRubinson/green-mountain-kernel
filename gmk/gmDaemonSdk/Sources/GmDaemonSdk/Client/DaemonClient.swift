@@ -179,7 +179,7 @@ public final class DaemonClient: @unchecked Sendable {
             throw DaemonClientError.unreachable(
                 "daemon binary missing at \(daemonBinaryPath) — run install_gm.sh")
         }
-        var delay: UInt32 = 100_000 // µs
+        var delay: UInt32 = 100_000  // µs
         for _ in 0..<10 {
             guard spawnDaemon() else {
                 throw DaemonClientError.unreachable(

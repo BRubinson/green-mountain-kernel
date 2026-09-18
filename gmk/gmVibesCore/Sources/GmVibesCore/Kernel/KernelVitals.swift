@@ -14,9 +14,11 @@ public struct KernelVitalsReport: Equatable, Sendable {
     var residentMemoryBytes: UInt64?
     var cpuPercent: Double?
 
-    init(uptimeSeconds: Int? = nil,
-         residentMemoryBytes: UInt64? = nil,
-         cpuPercent: Double? = nil) {
+    init(
+        uptimeSeconds: Int? = nil,
+        residentMemoryBytes: UInt64? = nil,
+        cpuPercent: Double? = nil
+    ) {
         self.uptimeSeconds = uptimeSeconds
         self.residentMemoryBytes = residentMemoryBytes
         self.cpuPercent = cpuPercent
@@ -70,8 +72,10 @@ public final class KernelVitals {
     private var ticker: DispatchSourceTimer?
     private let cpu = CpuDeltaState()
 
-    public init(interval: TimeInterval = 2,
-                report: @escaping @MainActor () -> KernelVitalsReport? = { nil }) {
+    public init(
+        interval: TimeInterval = 2,
+        report: @escaping @MainActor () -> KernelVitalsReport? = { nil }
+    ) {
         self.interval = interval
         self.report = report
     }
@@ -231,8 +235,8 @@ public final class KernelVitals {
             cpu.previousWallTicks = wall
         }
         guard let previousCpu = cpu.previousCpuTicks,
-              let previousWall = cpu.previousWallTicks,
-              wall > previousWall, consumed >= previousCpu
+            let previousWall = cpu.previousWallTicks,
+            wall > previousWall, consumed >= previousCpu
         else { return nil }
         return Double(consumed - previousCpu) / Double(wall - previousWall) * 100
     }

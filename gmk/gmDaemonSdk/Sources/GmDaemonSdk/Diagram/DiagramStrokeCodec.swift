@@ -75,10 +75,11 @@ public enum DiagramStrokeCodec {
         _ payload: DiagramElementPayload
     ) -> DiagramElementPayload {
         guard case .drawingStroke(let stroke) = payload else { return payload }
-        return .drawingStroke(DrawingStrokePayload(
-            tool: stroke.tool, strokeColor: stroke.strokeColor,
-            strokeWidth: stroke.strokeWidth,
-            vertices: normalizedForStorage(stroke.vertices)))
+        return .drawingStroke(
+            DrawingStrokePayload(
+                tool: stroke.tool, strokeColor: stroke.strokeColor,
+                strokeWidth: stroke.strokeWidth,
+                vertices: normalizedForStorage(stroke.vertices)))
     }
 
     static func quantizedPressure(_ p: Double) -> Double {
@@ -120,26 +121,29 @@ public enum DiagramStrokeCodec {
             throw StoreError.corruptState(
                 entity: "diagram_drawing_stroke",
                 detail: "packed stroke is \(data.count) bytes, expected \(expected) "
-                      + "for \(count) vertices")
+                    + "for \(count) vertices")
         }
         let bytes = [UInt8](data)
         var vertices: [DiagramVertex] = []
         vertices.reserveCapacity(count)
         for index in 0..<count {
             let base = index * bytesPerVertex
-            let xBits = UInt32(bytes[base])
+            let xBits =
+                UInt32(bytes[base])
                 | UInt32(bytes[base + 1]) << 8
                 | UInt32(bytes[base + 2]) << 16
                 | UInt32(bytes[base + 3]) << 24
-            let yBits = UInt32(bytes[base + 4])
+            let yBits =
+                UInt32(bytes[base + 4])
                 | UInt32(bytes[base + 5]) << 8
                 | UInt32(bytes[base + 6]) << 16
                 | UInt32(bytes[base + 7]) << 24
             let raw = bytes[base + 8]
-            vertices.append(DiagramVertex(
-                x: Double(Float(bitPattern: xBits)),
-                y: Double(Float(bitPattern: yBits)),
-                pressure: raw == nilPressure ? nil : Double(raw) / pressureScale))
+            vertices.append(
+                DiagramVertex(
+                    x: Double(Float(bitPattern: xBits)),
+                    y: Double(Float(bitPattern: yBits)),
+                    pressure: raw == nilPressure ? nil : Double(raw) / pressureScale))
         }
         return vertices
     }

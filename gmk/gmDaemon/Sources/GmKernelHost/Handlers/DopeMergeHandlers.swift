@@ -10,12 +10,15 @@ enum DopeMergePlanHandler {
         let request = try decodePayload(DopeMergePlanRequest.self, from: line)
         let plan = try store.dopeMergePlan(scopeUuid: request.scopeUuid)
         let rows = plan.map {
-            DopeMergeOutcomeRow(dotPath: $0.dotPath, kind: $0.kind,
-                                decision: $0.decision.rawValue)
+            DopeMergeOutcomeRow(
+                dotPath: $0.dotPath, kind: $0.kind,
+                decision: $0.decision.rawValue)
         }
-        return try okResult(.dopeMergePlan, head, DopeMergePlanResponse(
-            outcomes: rows,
-            conflictCount: DopeMerge.conflicts(in: plan).count))
+        return try okResult(
+            .dopeMergePlan, head,
+            DopeMergePlanResponse(
+                outcomes: rows,
+                conflictCount: DopeMerge.conflicts(in: plan).count))
     }
 }
 
@@ -27,7 +30,9 @@ enum DopeResolveHandler {
         let resolved = try store.dopeResolve(
             scopeUuid: request.scopeUuid, dotPath: request.dotPath,
             takeOurs: request.takeOurs)
-        return try okResult(.dopeResolve, head, DopeResolveResponse(
-            resolved: resolved, takeOurs: request.takeOurs))
+        return try okResult(
+            .dopeResolve, head,
+            DopeResolveResponse(
+                resolved: resolved, takeOurs: request.takeOurs))
     }
 }

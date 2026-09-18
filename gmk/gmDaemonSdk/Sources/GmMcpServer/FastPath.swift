@@ -87,180 +87,200 @@ struct BriefingWaitResult: Encodable {
 /// A function rather than a global `let`: `Tool` holds a closure and is not
 /// Sendable, which Swift 6 refuses as shared mutable state at file scope. The
 /// roster in main.swift escapes this only by living in top-level code.
-func makeFastPathTools() -> [Tool] { [
+func makeFastPathTools() -> [Tool] {
+    [
 
-    Tool(
-        name: "cde_init",
-        description: """
-            START A BOT RUN. Resolve a prompt by what a person actually types — a seq (10), \
-            a code (p10), a name, or a unique fragment of one — or create it, enter the workflow \
-            machine, and return everything needed to act: the uuid bundle, the derived phase and \
-            its instructions, the NEXT phase's expected agents, gate blockers, and whether a \
-            briefing is needed or already exists. Always reports whether the prompt is NEW or \
-            RESUMED. Session and project come from the working directory and git branch, so no \
-            uuid has to be known in advance. An ambiguous selector returns candidates and \
-            touches nothing.
-            """,
-        params: [
-            ("selector", "string", "Prompt seq (10), code (p10), exact name, or a unique fragment of a name", false),
-            ("variant", "string", "Workflow variant: bot | rpi | team (default bot)", false),
-            ("create", "boolean", "Create the prompt when the selector matches nothing. Requires name and detail — a typo must never create a prompt", false),
-            ("name", "string", "Name for a newly created prompt (with create)", false),
-            ("detail", "string", "Detail text for a newly created prompt (with create). STAY TRUE: the user's passed prompt, verbatim", false),
-        ],
-        run: { args, client in
-            let variant = BotVariant(rawValue: args.optString("variant") ?? "bot") ?? .bot
-            var warnings: [String] = []
+        Tool(
+            name: "cde_init",
+            description: """
+                START A BOT RUN. Resolve a prompt by what a person actually types — a seq (10), \
+                a code (p10), a name, or a unique fragment of one — or create it, enter the workflow \
+                machine, and return everything needed to act: the uuid bundle, the derived phase and \
+                its instructions, the NEXT phase's expected agents, gate blockers, and whether a \
+                briefing is needed or already exists. Always reports whether the prompt is NEW or \
+                RESUMED. Session and project come from the working directory and git branch, so no \
+                uuid has to be known in advance. An ambiguous selector returns candidates and \
+                touches nothing.
+                """,
+            params: [
+                (
+                    "selector", "string", "Prompt seq (10), code (p10), exact name, or a unique fragment of a name",
+                    false
+                ),
+                ("variant", "string", "Workflow variant: bot | rpi | team (default bot)", false),
+                (
+                    "create", "boolean",
+                    "Create the prompt when the selector matches nothing. Requires name and detail — a typo must never create a prompt",
+                    false
+                ),
+                ("name", "string", "Name for a newly created prompt (with create)", false),
+                (
+                    "detail", "string",
+                    "Detail text for a newly created prompt (with create). STAY TRUE: the user's passed prompt, verbatim",
+                    false
+                ),
+            ],
+            run: { args, client in
+                let variant = BotVariant(rawValue: args.optString("variant") ?? "bot") ?? .bot
+                var warnings: [String] = []
 
-            // 1. $PWD + git branch -> project / instance / session. This is the
-            //    "keyed on cwd+branch" resolution: the caller holds no uuid and
-            //    is never asked for one.
-            let context = try ContextBuilder.ensureRequest()
-            let ensured = try client.ensureContext(context)
-            let sessionUuid = ensured.sessionUuid
+                // 1. $PWD + git branch -> project / instance / session. This is the
+                //    "keyed on cwd+branch" resolution: the caller holds no uuid and
+                //    is never asked for one.
+                let context = try ContextBuilder.ensureRequest()
+                let ensured = try client.ensureContext(context)
+                let sessionUuid = ensured.sessionUuid
 
-            // 2 + 3. The candidate set, then a pure fold over it.
-            let selector = args.optString("selector")
-            var stub: PromptStub?
-            var matchedBy: String?
-            var created = false
+                // 2 + 3. The candidate set, then a pure fold over it.
+                let selector = args.optString("selector")
+                var stub: PromptStub?
+                var matchedBy: String?
+                var created = false
 
-            if let selector, !selector.isEmpty {
-                let stubs = try client.listPrompts(PromptListRequest(sessionUuid: sessionUuid)).prompts
-                switch PromptResolver.resolve(selector, in: stubs) {
-                case let .matched(hit, by):
-                    stub = hit
-                    matchedBy = by.rawValue
-                case let .ambiguous(candidates):
-                    // NOTHING IS TOUCHED. Returning a guess here would file a
-                    // whole run against the wrong prompt, permanently.
-                    return PromptInitResult(
-                        resolution: .init(
-                            matchedBy: nil,
-                            created: false,
-                            candidates: candidates.map {
-                                .init(seq: $0.seq, code: $0.code, name: $0.name, status: $0.status, uuid: $0.uuid)
-                            }),
-                        promptUuid: nil, sessionUuid: sessionUuid, seq: nil, code: nil, name: nil,
-                        status: nil, gmfsRelativeStoragePath: nil, phase: nil, instructions: nil,
-                        gateBlockers: [], nextPhase: nil, briefing: nil,
-                        warnings: ["selector '\(selector)' matched \(candidates.count) prompts — pass a seq or an exact name"])
-                case .notFound:
-                    break
+                if let selector, !selector.isEmpty {
+                    let stubs = try client.listPrompts(PromptListRequest(sessionUuid: sessionUuid)).prompts
+                    switch PromptResolver.resolve(selector, in: stubs) {
+                    case let .matched(hit, by):
+                        stub = hit
+                        matchedBy = by.rawValue
+                    case let .ambiguous(candidates):
+                        // NOTHING IS TOUCHED. Returning a guess here would file a
+                        // whole run against the wrong prompt, permanently.
+                        return PromptInitResult(
+                            resolution: .init(
+                                matchedBy: nil,
+                                created: false,
+                                candidates: candidates.map {
+                                    .init(seq: $0.seq, code: $0.code, name: $0.name, status: $0.status, uuid: $0.uuid)
+                                }),
+                            promptUuid: nil, sessionUuid: sessionUuid, seq: nil, code: nil, name: nil,
+                            status: nil, gmfsRelativeStoragePath: nil, phase: nil, instructions: nil,
+                            gateBlockers: [], nextPhase: nil, briefing: nil,
+                            warnings: [
+                                "selector '\(selector)' matched \(candidates.count) prompts — pass a seq or an exact name"
+                            ])
+                    case .notFound:
+                        break
+                    }
                 }
-            }
 
-            // 4. Creation is OPT-IN and needs both halves. A mistyped selector
-            //    must not silently become a new prompt.
-            if stub == nil {
-                let wantsCreate = args.json["create"]?.boolValue ?? false
-                guard wantsCreate,
-                      let name = args.optString("name"),
-                      let detail = args.optString("detail")
-                else {
-                    return PromptInitResult(
-                        resolution: .init(matchedBy: nil, created: false, candidates: nil),
-                        promptUuid: nil, sessionUuid: sessionUuid, seq: nil, code: nil, name: nil,
-                        status: nil, gmfsRelativeStoragePath: nil, phase: nil, instructions: nil,
-                        gateBlockers: [], nextPhase: nil, briefing: nil,
-                        warnings: ["no prompt matched. Pass create:true with name and detail to create one."])
+                // 4. Creation is OPT-IN and needs both halves. A mistyped selector
+                //    must not silently become a new prompt.
+                if stub == nil {
+                    let wantsCreate = args.json["create"]?.boolValue ?? false
+                    guard wantsCreate,
+                        let name = args.optString("name"),
+                        let detail = args.optString("detail")
+                    else {
+                        return PromptInitResult(
+                            resolution: .init(matchedBy: nil, created: false, candidates: nil),
+                            promptUuid: nil, sessionUuid: sessionUuid, seq: nil, code: nil, name: nil,
+                            status: nil, gmfsRelativeStoragePath: nil, phase: nil, instructions: nil,
+                            gateBlockers: [], nextPhase: nil, briefing: nil,
+                            warnings: ["no prompt matched. Pass create:true with name and detail to create one."])
+                    }
+                    let row = try client.createPrompt(
+                        PromptCreateRequest(
+                            sessionUuid: sessionUuid,
+                            name: name,
+                            backstory: "",
+                            goal: "",
+                            detail: detail))
+                    created = true
+                    matchedBy = "created"
+                    stub = PromptStub(
+                        uuid: row.uuid, sessionUuid: row.sessionUuid, seq: row.seq, code: row.code,
+                        name: row.name, status: row.status, version: row.version,
+                        gmfsRelativeStoragePath: row.gmfsRelativeStoragePath, reports: nil,
+                        createdAt: row.createdAt, updatedAt: row.updatedAt)
                 }
-                let row = try client.createPrompt(PromptCreateRequest(
+
+                guard let prompt = stub else {
+                    throw ToolError(message: "prompt resolution produced no row")
+                }
+
+                // 5. resume IS the first-run path — fetch-or-create, phase derived
+                //    from db evidence, so resuming and starting are one call.
+                let resumed = try client.promptResume(
+                    PromptResumeRequest(
+                        promptUuid: prompt.uuid,
+                        variant: variant,
+                        clientKey: ClientKey.resolve()))
+
+                // 6. Current phase, its instructions, the gate blockers.
+                let next = try client.botNext(BotNextRequest(promptUuid: prompt.uuid))
+
+                // 7. THE LOOKAHEAD. Six of the fifteen calls went to a ref doc,
+                //    agent frontmatter and WorkflowSpec.swift to learn the shape of
+                //    the phase about to be entered. These are pure functions on the
+                //    compiled-in spec — no round trip, no reading.
+                let phases = WorkflowSpec.phases(for: variant)
+                var nextPhase: PromptInitResult.NextPhase?
+                // COMPARE RAW VALUES, NOT CASE NAMES. Phase has String raw values and
+                // no CustomStringConvertible, so "\(Phase.clarifyOpen)" is
+                // "clarifyOpen" while rpir_next emits "clarify_open" — the six
+                // multi-word phases (clarify_open, clarify_user, care_package,
+                // arch_options, plan_gate, review_fix) could never match, and
+                // next_phase came back silently null for half the graph. The name
+                // below is emitted for the same reason: "reviewFix" is a spelling
+                // used nowhere else on the wire.
+                if let current = phases.firstIndex(where: { $0.rawValue == next.phase }) {
+                    let upcoming = current + 1 < phases.count ? phases[current + 1] : phases[current]
+                    nextPhase = .init(
+                        name: upcoming.rawValue,
+                        instructions: WorkflowSpec.instructions(variant: variant, phase: upcoming),
+                        expectedAgents: WorkflowSpec.expectedExplorationAgents(for: variant).map { "\($0)" })
+                }
+
+                // 8. Briefing state, so the caller knows whether to open one.
+                var briefing: PromptInitResult.BriefingState = .init(state: "absent", uuid: nil, version: nil)
+                if let got = try? client.briefingGet(BriefingGetRequest(promptUuid: prompt.uuid, step: "initial")) {
+                    briefing = .init(state: got.briefing.status, uuid: got.briefing.uuid, version: got.briefing.version)
+                }
+
+                // CAPTURE HEALTH. A session with no binding records nothing from the
+                // PostToolUse hook, and the old failure mode was learning that never.
+                if let bindings = ensured.claudeSessionBindingCount, bindings == 0 {
+                    warnings.append(
+                        "this session has no claude_session_binding row — PostToolUse file-change capture is OFF for it. Restart the session so SessionStart can bind it."
+                    )
+                }
+
+                return PromptInitResult(
+                    resolution: .init(matchedBy: matchedBy, created: created || resumed.created, candidates: nil),
+                    promptUuid: prompt.uuid,
                     sessionUuid: sessionUuid,
-                    name: name,
-                    backstory: "",
-                    goal: "",
-                    detail: detail))
-                created = true
-                matchedBy = "created"
-                stub = PromptStub(
-                    uuid: row.uuid, sessionUuid: row.sessionUuid, seq: row.seq, code: row.code,
-                    name: row.name, status: row.status, version: row.version,
-                    gmfsRelativeStoragePath: row.gmfsRelativeStoragePath, reports: nil,
-                    createdAt: row.createdAt, updatedAt: row.updatedAt)
-            }
+                    seq: prompt.seq,
+                    code: prompt.code,
+                    name: prompt.name,
+                    status: prompt.status,
+                    gmfsRelativeStoragePath: prompt.gmfsRelativeStoragePath,
+                    phase: next.phase,
+                    instructions: next.instructions,
+                    gateBlockers: next.gateBlockers,
+                    nextPhase: nextPhase,
+                    briefing: briefing,
+                    warnings: warnings)
+            }),
 
-            guard let prompt = stub else {
-                throw ToolError(message: "prompt resolution produced no row")
-            }
+        Tool(
+            name: "rpir_open_briefing",
+            description: """
+                Open the briefing row a briefer then fills. The only legal response to the \
+                'initial briefing not ready' gate blocker, and the very next call after cde_init \
+                for a prompt whose briefing is absent.
+                """,
+            params: [
+                ("prompt_uuid", "string", "Owner prompt uuid", true),
+                ("step", "string", "Briefing step (default initial)", false),
+            ],
+            run: { args, client in
+                try client.briefingOpen(
+                    BriefingOpenRequest(
+                        promptUuid: try args.string("prompt_uuid"),
+                        briefingForStep: args.optString("step") ?? "initial",
+                        clientKey: ClientKey.resolve()))
+            }),
 
-            // 5. resume IS the first-run path — fetch-or-create, phase derived
-            //    from db evidence, so resuming and starting are one call.
-            let resumed = try client.promptResume(PromptResumeRequest(
-                promptUuid: prompt.uuid,
-                variant: variant,
-                clientKey: ClientKey.resolve()))
-
-            // 6. Current phase, its instructions, the gate blockers.
-            let next = try client.botNext(BotNextRequest(promptUuid: prompt.uuid))
-
-            // 7. THE LOOKAHEAD. Six of the fifteen calls went to a ref doc,
-            //    agent frontmatter and WorkflowSpec.swift to learn the shape of
-            //    the phase about to be entered. These are pure functions on the
-            //    compiled-in spec — no round trip, no reading.
-            let phases = WorkflowSpec.phases(for: variant)
-            var nextPhase: PromptInitResult.NextPhase?
-            // COMPARE RAW VALUES, NOT CASE NAMES. Phase has String raw values and
-            // no CustomStringConvertible, so "\(Phase.clarifyOpen)" is
-            // "clarifyOpen" while rpir_next emits "clarify_open" — the six
-            // multi-word phases (clarify_open, clarify_user, care_package,
-            // arch_options, plan_gate, review_fix) could never match, and
-            // next_phase came back silently null for half the graph. The name
-            // below is emitted for the same reason: "reviewFix" is a spelling
-            // used nowhere else on the wire.
-            if let current = phases.firstIndex(where: { $0.rawValue == next.phase }) {
-                let upcoming = current + 1 < phases.count ? phases[current + 1] : phases[current]
-                nextPhase = .init(
-                    name: upcoming.rawValue,
-                    instructions: WorkflowSpec.instructions(variant: variant, phase: upcoming),
-                    expectedAgents: WorkflowSpec.expectedExplorationAgents(for: variant).map { "\($0)" })
-            }
-
-            // 8. Briefing state, so the caller knows whether to open one.
-            var briefing: PromptInitResult.BriefingState = .init(state: "absent", uuid: nil, version: nil)
-            if let got = try? client.briefingGet(BriefingGetRequest(promptUuid: prompt.uuid, step: "initial")) {
-                briefing = .init(state: got.briefing.status, uuid: got.briefing.uuid, version: got.briefing.version)
-            }
-
-            // CAPTURE HEALTH. A session with no binding records nothing from the
-            // PostToolUse hook, and the old failure mode was learning that never.
-            if let bindings = ensured.claudeSessionBindingCount, bindings == 0 {
-                warnings.append("this session has no claude_session_binding row — PostToolUse file-change capture is OFF for it. Restart the session so SessionStart can bind it.")
-            }
-
-            return PromptInitResult(
-                resolution: .init(matchedBy: matchedBy, created: created || resumed.created, candidates: nil),
-                promptUuid: prompt.uuid,
-                sessionUuid: sessionUuid,
-                seq: prompt.seq,
-                code: prompt.code,
-                name: prompt.name,
-                status: prompt.status,
-                gmfsRelativeStoragePath: prompt.gmfsRelativeStoragePath,
-                phase: next.phase,
-                instructions: next.instructions,
-                gateBlockers: next.gateBlockers,
-                nextPhase: nextPhase,
-                briefing: briefing,
-                warnings: warnings)
-        }),
-
-    Tool(
-        name: "rpir_open_briefing",
-        description: """
-            Open the briefing row a briefer then fills. The only legal response to the \
-            'initial briefing not ready' gate blocker, and the very next call after cde_init \
-            for a prompt whose briefing is absent.
-            """,
-        params: [
-            ("prompt_uuid", "string", "Owner prompt uuid", true),
-            ("step", "string", "Briefing step (default initial)", false),
-        ],
-        run: { args, client in
-            try client.briefingOpen(BriefingOpenRequest(
-                promptUuid: try args.string("prompt_uuid"),
-                briefingForStep: args.optString("step") ?? "initial",
-                clientKey: ClientKey.resolve()))
-        }),
-
-] }
+    ]
+}

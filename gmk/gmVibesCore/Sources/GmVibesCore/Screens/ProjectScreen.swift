@@ -31,8 +31,9 @@ struct ProjectScreen: View {
             // as its instances are.
             HStack(spacing: 0) {
                 content
-                    .searchable(text: $query, placement: .toolbar,
-                                prompt: "Search instances & sessions")
+                    .searchable(
+                        text: $query, placement: .toolbar,
+                        prompt: "Search instances & sessions")
                 Divider()
                 ProjectDiagramRail(projectUuid: projectUuid) { diagramID in
                     nav.go(.diagram(diagramID))
@@ -65,9 +66,10 @@ struct ProjectScreen: View {
             ContentUnavailableView(
                 query.isEmpty ? "No Instances" : "No Matches",
                 systemImage: query.isEmpty ? "internaldrive" : "magnifyingglass",
-                description: Text(query.isEmpty
-                    ? "This project has no instances in the GMCC database."
-                    : "Nothing matches “\(query)”.")
+                description: Text(
+                    query.isEmpty
+                        ? "This project has no instances in the GMCC database."
+                        : "Nothing matches “\(query)”.")
             )
         } else {
             ScrollView {

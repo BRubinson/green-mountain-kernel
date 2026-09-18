@@ -29,7 +29,7 @@ enum SessionTab: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .prompts: "New Prompt"
         case .diagrams: nil  // diagrams are created from the canvas, not here
-        case .dope: nil      // Init is the pane's affordance, not a sidebar +
+        case .dope: nil  // Init is the pane's affordance, not a sidebar +
         }
     }
 }
@@ -112,9 +112,9 @@ struct SessionScreen: View {
                     case .prompts:
                         showCreatePrompt = true
                     case .diagrams:
-                        break   // no + affordance; diagrams open from a scope
+                        break  // no + affordance; diagrams open from a scope
                     case .dope:
-                        break   // unreachable: newItemLabel is nil, button hidden
+                        break  // unreachable: newItemLabel is nil, button hidden
                     }
                 },
                 onSearchSession: {
@@ -123,8 +123,9 @@ struct SessionScreen: View {
             )
             .navigationSplitViewColumnWidth(min: 240, ideal: 280, max: 360)
             // The sidebar prompt filter (name/content).
-            .searchable(text: $promptQuery, placement: .sidebar,
-                        prompt: "Filter this session")
+            .searchable(
+                text: $promptQuery, placement: .sidebar,
+                prompt: "Filter this session")
         } content: {
             detailContent
         }
@@ -182,8 +183,10 @@ struct SessionScreen: View {
                 onOpen: { openPrompt($0.uuid) }
             )
         case .diagrams:
-            SessionDiagramsPane(scope: scope, windowID: windowID,
-                                projectUuid: instanceRow?.projectUuid ?? "") { diagramID in
+            SessionDiagramsPane(
+                scope: scope, windowID: windowID,
+                projectUuid: instanceRow?.projectUuid ?? ""
+            ) { diagramID in
                 nav.go(.diagram(diagramID))
             }
         case .dope:
@@ -191,12 +194,16 @@ struct SessionScreen: View {
             // Diagram button opens the NON-PERSISTED preview of that scope —
             // saved diagrams live one tab over, and computing a throwaway
             // canvas must never mint a diagram row behind the user's back.
-            DopePane(scope: scope, promptUuid: nil, onOpenDiagram: { scopeCode in
-                nav.go(.diagram(DiagramWindowID(
-                    source: .dopePreview(scopeCode: scopeCode),
-                    name: scopeCode, session: windowID,
-                    projectUuid: instanceRow?.projectUuid ?? "")))
-            })
+            DopePane(
+                scope: scope, promptUuid: nil,
+                onOpenDiagram: { scopeCode in
+                    nav.go(
+                        .diagram(
+                            DiagramWindowID(
+                                source: .dopePreview(scopeCode: scopeCode),
+                                name: scopeCode, session: windowID,
+                                projectUuid: instanceRow?.projectUuid ?? "")))
+                })
         }
     }
 }
@@ -222,9 +229,10 @@ private struct PromptListPane: View {
                 ContentUnavailableView(
                     searching ? "No Matching Prompts" : "No Prompts Yet",
                     systemImage: "doc.text",
-                    description: Text(searching
-                        ? "No prompt matches the sidebar filter."
-                        : "Create a prompt with + in the sidebar.")
+                    description: Text(
+                        searching
+                            ? "No prompt matches the sidebar filter."
+                            : "Create a prompt with + in the sidebar.")
                 )
             }
         } else {
@@ -399,7 +407,9 @@ struct SessionPromptListSidebar: View {
                     if let summary = changeSummary, summary.changeCount > 0 {
                         HStack(spacing: 4) {
                             Image(systemName: "plusminus").font(.caption2)
-                            Text("\(summary.changeCount) changes · \(summary.distinctFiles) files · \(summary.totalLineSpan) lines")
+                            Text(
+                                "\(summary.changeCount) changes · \(summary.distinctFiles) files · \(summary.totalLineSpan) lines"
+                            )
                         }
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
@@ -442,8 +452,9 @@ struct PromptNavRow: View {
             }
             Spacer()
             PromptDiagramBadge(promptUuid: stub.uuid)
-            PromptStatusBadge(status: PromptStatus(rawValue: stub.status),
-                              tint: launchColors.color(for: stub.uuid)?.color)
+            PromptStatusBadge(
+                status: PromptStatus(rawValue: stub.status),
+                tint: launchColors.color(for: stub.uuid)?.color)
         }
         .padding(.vertical, 2)
     }

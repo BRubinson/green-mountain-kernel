@@ -90,6 +90,6 @@ let package = Package(
                 .product(name: "GmDaemonSdk", package: "gmDaemonSdk"),
                 .product(name: "GmDaemon", package: "gmDaemon"),
             ]
-        ),
+        )
     ]
 )

@@ -48,7 +48,7 @@ let package = Package(
     // same rule gmDaemonSdk's manifest states for the same reason.
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "gm_kernel", targets: ["gm_kernel"]),
+        .executable(name: "gm_kernel", targets: ["gm_kernel"])
     ],
     dependencies: [
         .package(path: "../gmDaemonSdk"),
@@ -63,6 +63,6 @@ let package = Package(
                 .product(name: "GmHookCli", package: "gmDaemonSdk"),
                 .product(name: "GmDaemonSdk", package: "gmDaemonSdk"),
             ]
-        ),
+        )
     ]
 )

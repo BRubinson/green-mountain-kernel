@@ -53,13 +53,15 @@ public struct KernelMenuBarContent: View {
     /// would flash and vanish, reading as a quit that did not happen.
     @State private var confirmingQuit = false
 
-    public init(role: KernelRole,
-         vitals: KernelVitals,
-         protocolVersion: Int? = nil,
-         buildSha: String? = nil,
-         onNewWindow: @escaping () -> Void,
-         onQuit: @escaping () -> Void,
-         onActivateHolder: (() -> Void)? = nil) {
+    public init(
+        role: KernelRole,
+        vitals: KernelVitals,
+        protocolVersion: Int? = nil,
+        buildSha: String? = nil,
+        onNewWindow: @escaping () -> Void,
+        onQuit: @escaping () -> Void,
+        onActivateHolder: (() -> Void)? = nil
+    ) {
         self.role = role
         self.vitals = vitals
         self.protocolVersion = protocolVersion
@@ -269,9 +271,11 @@ public struct KernelMenuBarContent: View {
     /// A menu-shaped row for the panel style: full-width hit target, secondary
     /// symbol, no button chrome — `.menu` gives this for free and `.window`
     /// does not.
-    private func menuRow(_ title: String,
-                         systemImage: String,
-                         action: @escaping () -> Void) -> some View {
+    private func menuRow(
+        _ title: String,
+        systemImage: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: systemImage).frame(width: 14)

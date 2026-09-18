@@ -46,7 +46,8 @@ public struct DopeRepoSandbox: Sendable {
         }
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: trimmed, isDirectory: &isDirectory),
-              isDirectory.boolValue else {
+            isDirectory.boolValue
+        else {
             throw SandboxError("instance root is missing or stale: \(trimmed)")
         }
         guard GitHead.gitDirectory(repoRoot: trimmed) != nil else {
@@ -97,8 +98,9 @@ public struct DopeRepoSandbox: Sendable {
 
     public func cogIndexFile(code: String) throws -> URL {
         let dir = try cogDirectory(code: code)
-        return try contained(dir.appendingPathComponent(
-            "\(code).index\(DopeDocumentCodec.cogFileSuffix)"))
+        return try contained(
+            dir.appendingPathComponent(
+                "\(code).index\(DopeDocumentCodec.cogFileSuffix)"))
     }
 
     /// One domain's directory. The layout gained a level, and the old
@@ -111,22 +113,25 @@ public struct DopeRepoSandbox: Sendable {
 
     public func domainIndexFile(code: String) throws -> URL {
         let dir = try domainDirectory(code: code)
-        return try contained(dir.appendingPathComponent(
-            "\(code).index\(DopeDocumentCodec.persistenceFileSuffix)"))
+        return try contained(
+            dir.appendingPathComponent(
+                "\(code).index\(DopeDocumentCodec.persistenceFileSuffix)"))
     }
 
     public func domainEntityFile(domain: String, entity: String) throws -> URL {
         try DopeCode.validateCode(entity, field: "entity code")
         let dir = try domainDirectory(code: domain)
-        return try contained(dir.appendingPathComponent(
-            DopePersistenceIndexDocument.expectedEntityFile(domain: domain, entity: entity)))
+        return try contained(
+            dir.appendingPathComponent(
+                DopePersistenceIndexDocument.expectedEntityFile(domain: domain, entity: entity)))
     }
 
     public func domainEnumFile(domain: String, enumCode: String) throws -> URL {
         try DopeCode.validateCode(enumCode, field: "enum code")
         let dir = try domainDirectory(code: domain)
-        return try contained(dir.appendingPathComponent(
-            DopePersistenceIndexDocument.expectedEnumFile(domain: domain, enumCode: enumCode)))
+        return try contained(
+            dir.appendingPathComponent(
+                DopePersistenceIndexDocument.expectedEnumFile(domain: domain, enumCode: enumCode)))
     }
 
     /// The final belt-and-braces guard on every path this type hands out —
@@ -172,7 +177,8 @@ public struct DopeRepoSandbox: Sendable {
             let expected = DopeScopeDocument.expectedFile(forPersistenceCode: code)
             guard mapped == expected else {
                 throw SandboxError(
-                    "\(DopeDocumentCodec.scopeFileName) maps persistence '\(code)' to '\(mapped)' — refused; expected '\(expected)' (the map is data, never followed)")
+                    "\(DopeDocumentCodec.scopeFileName) maps persistence '\(code)' to '\(mapped)' — refused; expected '\(expected)' (the map is data, never followed)"
+                )
             }
             files.append(try readDomain(code: code, warnings: &warnings))
         }
@@ -186,7 +192,8 @@ public struct DopeRepoSandbox: Sendable {
             let expected = DopeScopeDocument.expectedCogFile(forCogCode: code)
             guard mapped == expected else {
                 throw SandboxError(
-                    "\(DopeDocumentCodec.scopeFileName) maps cog '\(code)' to '\(mapped)' — refused; expected '\(expected)' (the map is data, never followed)")
+                    "\(DopeDocumentCodec.scopeFileName) maps cog '\(code)' to '\(mapped)' — refused; expected '\(expected)' (the map is data, never followed)"
+                )
             }
             let url = try cogIndexFile(code: code)
             guard FileManager.default.fileExists(atPath: url.path) else {
@@ -234,7 +241,8 @@ public struct DopeRepoSandbox: Sendable {
         }
         guard index.body.code == code else {
             throw SandboxError(
-                "persistence index for '\(code)' declares code '\(index.body.code)' — directory name and code must agree")
+                "persistence index for '\(code)' declares code '\(index.body.code)' — directory name and code must agree"
+            )
         }
 
         var entities: [DopeEntityDocument] = []
@@ -243,7 +251,8 @@ public struct DopeRepoSandbox: Sendable {
                 domain: code, entity: entityCode)
             guard mapped == expected else {
                 throw SandboxError(
-                    "\(code) index maps entity '\(entityCode)' to '\(mapped)' — refused; expected '\(expected)' (the map is data, never followed)")
+                    "\(code) index maps entity '\(entityCode)' to '\(mapped)' — refused; expected '\(expected)' (the map is data, never followed)"
+                )
             }
             let url = try domainEntityFile(domain: code, entity: entityCode)
             guard FileManager.default.fileExists(atPath: url.path) else {
@@ -268,7 +277,8 @@ public struct DopeRepoSandbox: Sendable {
                 domain: code, enumCode: enumCode)
             guard mapped == expected else {
                 throw SandboxError(
-                    "\(code) index maps enum '\(enumCode)' to '\(mapped)' — refused; expected '\(expected)' (the map is data, never followed)")
+                    "\(code) index maps enum '\(enumCode)' to '\(mapped)' — refused; expected '\(expected)' (the map is data, never followed)"
+                )
             }
             let url = try domainEnumFile(domain: code, enumCode: enumCode)
             guard FileManager.default.fileExists(atPath: url.path) else {
@@ -302,7 +312,7 @@ public struct DopeRepoSandbox: Sendable {
     /// exists on disk.
     public func peekRevision() -> Int64? {
         guard let data = try? Data(contentsOf: mainFile),
-              let main = try? DopeDocumentCodec.decoder.decode(DopeScopeDocument.self, from: data)
+            let main = try? DopeDocumentCodec.decoder.decode(DopeScopeDocument.self, from: data)
         else { return nil }
         return main.version
     }
@@ -351,8 +361,9 @@ public struct DopeRepoSandbox: Sendable {
         var written: [String] = []
         func stage(_ data: Data, _ relative: String) throws {
             let url = staging.appendingPathComponent(relative)
-            try fm.createDirectory(at: url.deletingLastPathComponent(),
-                                   withIntermediateDirectories: true)
+            try fm.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true)
             try data.write(to: url, options: .atomic)
             written.append(".gmcc/" + relative)
         }
@@ -368,8 +379,9 @@ public struct DopeRepoSandbox: Sendable {
                     domain: code, entity: entity.body.code)
                 try stage(
                     DopeDocumentCodec.encoder.encode(
-                        DopeEntityFileDocument(version: file.version, body: entity.body,
-                                               properties: entity.properties)),
+                        DopeEntityFileDocument(
+                            version: file.version, body: entity.body,
+                            properties: entity.properties)),
                     "\(dir)/\(name)")
             }
             for en in file.enums {
@@ -378,31 +390,40 @@ public struct DopeRepoSandbox: Sendable {
                     domain: code, enumCode: en.body.code)
                 try stage(
                     DopeDocumentCodec.encoder.encode(
-                        DopeEnumFileDocument(version: file.version, body: en.body,
-                                             options: en.options)),
+                        DopeEnumFileDocument(
+                            version: file.version, body: en.body,
+                            options: en.options)),
                     "\(dir)/\(name)")
             }
             let index = DopePersistenceIndexDocument(
                 version: file.version,
                 body: file.body,
-                entities: Dictionary(uniqueKeysWithValues: file.entities.map {
-                    ($0.body.code,
-                     DopePersistenceIndexDocument.expectedEntityFile(
-                        domain: code, entity: $0.body.code))
-                }),
-                enums: Dictionary(uniqueKeysWithValues: file.enums.map {
-                    ($0.body.code,
-                     DopePersistenceIndexDocument.expectedEnumFile(
-                        domain: code, enumCode: $0.body.code))
-                }))
-            try stage(DopeDocumentCodec.encoder.encode(index),
-                      DopeScopeDocument.expectedFile(forPersistenceCode: code))
+                entities: Dictionary(
+                    uniqueKeysWithValues: file.entities.map {
+                        (
+                            $0.body.code,
+                            DopePersistenceIndexDocument.expectedEntityFile(
+                                domain: code, entity: $0.body.code)
+                        )
+                    }),
+                enums: Dictionary(
+                    uniqueKeysWithValues: file.enums.map {
+                        (
+                            $0.body.code,
+                            DopePersistenceIndexDocument.expectedEnumFile(
+                                domain: code, enumCode: $0.body.code)
+                        )
+                    }))
+            try stage(
+                DopeDocumentCodec.encoder.encode(index),
+                DopeScopeDocument.expectedFile(forPersistenceCode: code))
         }
 
         for cog in bundle.cogFiles {
             try DopeCode.validateCode(cog.body.code, field: "cog code")
-            try stage(DopeDocumentCodec.encoder.encode(cog),
-                      DopeScopeDocument.expectedCogFile(forCogCode: cog.body.code))
+            try stage(
+                DopeDocumentCodec.encoder.encode(cog),
+                DopeScopeDocument.expectedCogFile(forCogCode: cog.body.code))
         }
 
         // Swap the dope-owned subtree only. `.gmcc/` itself is NOT replaced:

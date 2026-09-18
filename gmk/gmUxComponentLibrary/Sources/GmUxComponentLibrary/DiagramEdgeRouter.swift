@@ -46,8 +46,10 @@ public enum DiagramEdgeRouter {
         /// (duplicate cards binding one entity emit identical refs).
         public let fromElementUuid: String
 
-        public init(fromFrame: CGRect, toFrame: CGRect, sourceRowY: CGFloat,
-                    propertyRef: String, fromElementUuid: String) {
+        public init(
+            fromFrame: CGRect, toFrame: CGRect, sourceRowY: CGFloat,
+            propertyRef: String, fromElementUuid: String
+        ) {
             self.fromFrame = fromFrame
             self.toFrame = toFrame
             self.sourceRowY = sourceRowY
@@ -97,8 +99,10 @@ public enum DiagramEdgeRouter {
         isSane(rect.minX) && isSane(rect.minY) && isSane(rect.maxX) && isSane(rect.maxY)
     }
 
-    public static func route(edges: [EdgeRequest], obstacles: [Obstacle],
-                             padding: CGFloat = 12) -> [RoutedPolyline] {
+    public static func route(
+        edges: [EdgeRequest], obstacles: [Obstacle],
+        padding: CGFloat = 12
+    ) -> [RoutedPolyline] {
         guard !edges.isEmpty else { return [] }
         // Sanitize BEFORE the integer boundary: db doubles are unvalidated,
         // and a NaN/inf/huge coordinate must degrade (obstacle dropped, edge
@@ -113,24 +117,31 @@ public enum DiagramEdgeRouter {
         // coordinates by construction).
         let candidates: [(sources: [Terminal], targets: [Terminal])] = edges.map { edge in
             guard isSane(edge.fromFrame), isSane(edge.toFrame),
-                  isSane(edge.sourceRowY) else { return ([], []) }
-            let srcRing = ownRing(for: edge.fromFrame, obstacles: obstacles,
-                                  rects: rects, padding: padding)
-            let tgtRing = ownRing(for: edge.toFrame, obstacles: obstacles,
-                                  rects: rects, padding: padding)
+                isSane(edge.sourceRowY)
+            else { return ([], []) }
+            let srcRing = ownRing(
+                for: edge.fromFrame, obstacles: obstacles,
+                rects: rects, padding: padding)
+            let tgtRing = ownRing(
+                for: edge.toFrame, obstacles: obstacles,
+                rects: rects, padding: padding)
             let rowY = Quant.q(edge.sourceRowY)
             let midY = Quant.q(edge.toFrame.midY)
             let sources = [
-                Terminal(anchor: QPoint(x: Quant.q(edge.fromFrame.minX), y: rowY),
-                         terminus: QPoint(x: srcRing.minX, y: rowY)),
-                Terminal(anchor: QPoint(x: Quant.q(edge.fromFrame.maxX), y: rowY),
-                         terminus: QPoint(x: srcRing.maxX, y: rowY)),
+                Terminal(
+                    anchor: QPoint(x: Quant.q(edge.fromFrame.minX), y: rowY),
+                    terminus: QPoint(x: srcRing.minX, y: rowY)),
+                Terminal(
+                    anchor: QPoint(x: Quant.q(edge.fromFrame.maxX), y: rowY),
+                    terminus: QPoint(x: srcRing.maxX, y: rowY)),
             ].filter { valid($0, ownRing: srcRing, rects: rects) }
             let targets = [
-                Terminal(anchor: QPoint(x: Quant.q(edge.toFrame.minX), y: midY),
-                         terminus: QPoint(x: tgtRing.minX, y: midY)),
-                Terminal(anchor: QPoint(x: Quant.q(edge.toFrame.maxX), y: midY),
-                         terminus: QPoint(x: tgtRing.maxX, y: midY)),
+                Terminal(
+                    anchor: QPoint(x: Quant.q(edge.toFrame.minX), y: midY),
+                    terminus: QPoint(x: tgtRing.minX, y: midY)),
+                Terminal(
+                    anchor: QPoint(x: Quant.q(edge.toFrame.maxX), y: midY),
+                    terminus: QPoint(x: tgtRing.maxX, y: midY)),
             ].filter { valid($0, ownRing: tgtRing, rects: rects) }
             return (sources, targets)
         }
@@ -148,13 +159,16 @@ public enum DiagramEdgeRouter {
 
         var paths: [[QPoint]?] = candidates.map { set in
             guard !set.sources.isEmpty, !set.targets.isEmpty else { return nil }
-            return PathSearch.route(sources: set.sources, targets: set.targets,
-                                    field: field, bendPenaltyQ: bendQ)
-                .map(simplify)
+            return PathSearch.route(
+                sources: set.sources, targets: set.targets,
+                field: field, bendPenaltyQ: bendQ
+            )
+            .map(simplify)
         }
 
-        TrackAllocator.nudge(&paths, edges: edges, field: field,
-                             spacingQ: Quant.q(nudgeSpacingPoints))
+        TrackAllocator.nudge(
+            &paths, edges: edges, field: field,
+            spacingQ: Quant.q(nudgeSpacingPoints))
 
         return paths.map { path in
             guard let path else { return RoutedPolyline(points: [], routed: false) }
@@ -178,8 +192,10 @@ public enum DiagramEdgeRouter {
     /// The endpoint's own inflated ring. The card IS an obstacle; matching
     /// by quantized frame recovers its scale-inflated rect. A frame with no
     /// obstacle entry (defensive) gets a scale-1 ring.
-    private static func ownRing(for frame: CGRect, obstacles: [Obstacle],
-                                rects: [QRect], padding: CGFloat) -> QRect {
+    private static func ownRing(
+        for frame: CGRect, obstacles: [Obstacle],
+        rects: [QRect], padding: CGFloat
+    ) -> QRect {
         let q = QRect(inflating: frame, by: 0)
         for (index, obstacle) in obstacles.enumerated()
         where QRect(inflating: obstacle.frame, by: 0) == q {
@@ -194,8 +210,10 @@ public enum DiagramEdgeRouter {
     /// interior (a card small enough to sit between anchor and terminus
     /// would otherwise be skewered — stubs are never searched, so this is
     /// their only blocked test). Both checked cheaply before search.
-    private static func valid(_ terminal: Terminal, ownRing: QRect,
-                              rects: [QRect]) -> Bool {
+    private static func valid(
+        _ terminal: Terminal, ownRing: QRect,
+        rects: [QRect]
+    ) -> Bool {
         let y = terminal.terminus.y
         let lo = min(terminal.anchor.x, terminal.terminus.x)
         let hi = max(terminal.anchor.x, terminal.terminus.x)
@@ -339,12 +357,15 @@ struct RoutingField {
     /// Free perpendicular distance from a run at `coordinate` spanning
     /// (lo, hi) to the nearest inflated boundary on each side — the corridor
     /// slack that bounds nudge offsets. `vertical:` flips the roles.
-    func slack(coordinate: Int64, lo: Int64, hi: Int64,
-               vertical: Bool) -> (before: Int64, after: Int64) {
+    func slack(
+        coordinate: Int64, lo: Int64, hi: Int64,
+        vertical: Bool
+    ) -> (before: Int64, after: Int64) {
         var gapBefore = Int64.max / 4
         var gapAfter = Int64.max / 4
         for rect in rects {
-            let (spanLo, spanHi, sideLo, sideHi) = vertical
+            let (spanLo, spanHi, sideLo, sideHi) =
+                vertical
                 ? (rect.minY, rect.maxY, rect.minX, rect.maxX)
                 : (rect.minX, rect.maxX, rect.minY, rect.maxY)
             guard lo < spanHi && hi > spanLo else { continue }
@@ -384,9 +405,11 @@ enum PathSearch {
 
     /// States: nodeIndex * 2 + axis (0 = horizontal arrival, 1 = vertical).
     /// The virtual goal is state -1 handled out of band.
-    static func route(sources: [DiagramEdgeRouter.Terminal],
-                      targets: [DiagramEdgeRouter.Terminal],
-                      field: RoutingField, bendPenaltyQ: Int64) -> [QPoint]? {
+    static func route(
+        sources: [DiagramEdgeRouter.Terminal],
+        targets: [DiagramEdgeRouter.Terminal],
+        field: RoutingField, bendPenaltyQ: Int64
+    ) -> [QPoint]? {
         let xCount = field.xs.count
         let yCount = field.ys.count
         let nodeCount = xCount * yCount
@@ -396,13 +419,14 @@ enum PathSearch {
         var goalNodes: [(node: Int, terminal: DiagramEdgeRouter.Terminal)] = []
         for terminal in targets {
             guard let xi = field.xIndex(of: terminal.terminus.x),
-                  let yi = field.yIndex(of: terminal.terminus.y) else { continue }
+                let yi = field.yIndex(of: terminal.terminus.y)
+            else { continue }
             goalNodes.append((yi * xCount + xi, terminal))
         }
         guard !goalNodes.isEmpty else { return nil }
 
         var g = [Int64](repeating: .max, count: nodeCount * 2)
-        var parent = [Int32](repeating: -2, count: nodeCount * 2) // -2 unvisited
+        var parent = [Int32](repeating: -2, count: nodeCount * 2)  // -2 unvisited
         var heap: [HeapEntry] = []
         var counter: Int32 = 0
 
@@ -422,8 +446,10 @@ enum PathSearch {
             guard cost < g[state] else { return }
             g[state] = cost
             parent[state] = from
-            heap.append(HeapEntry(f: cost + heuristic(state / 2), counter: counter,
-                                  state: Int32(state)))
+            heap.append(
+                HeapEntry(
+                    f: cost + heuristic(state / 2), counter: counter,
+                    state: Int32(state)))
             counter += 1
             var i = heap.count - 1
             while i > 0 {
@@ -442,11 +468,13 @@ enum PathSearch {
                 let l = 2 * i + 1, r = 2 * i + 2
                 var smallest = i
                 if l < heap.count,
-                   (heap[l].f, heap[l].counter) < (heap[smallest].f, heap[smallest].counter) {
+                    (heap[l].f, heap[l].counter) < (heap[smallest].f, heap[smallest].counter)
+                {
                     smallest = l
                 }
                 if r < heap.count,
-                   (heap[r].f, heap[r].counter) < (heap[smallest].f, heap[smallest].counter) {
+                    (heap[r].f, heap[r].counter) < (heap[smallest].f, heap[smallest].counter)
+                {
                     smallest = r
                 }
                 if smallest == i { break }
@@ -459,8 +487,9 @@ enum PathSearch {
         // recover which source terminal won.
         for (index, terminal) in sources.enumerated() {
             guard let xi = field.xIndex(of: terminal.terminus.x),
-                  let yi = field.yIndex(of: terminal.terminus.y) else { continue }
-            let state = (yi * xCount + xi) * 2 + 0 // stubs are horizontal
+                let yi = field.yIndex(of: terminal.terminus.y)
+            else { continue }
+            let state = (yi * xCount + xi) * 2 + 0  // stubs are horizontal
             push(state: state, cost: terminal.stubLength, from: Int32(-index - 10))
         }
         guard !heap.isEmpty else { return nil }
@@ -470,7 +499,7 @@ enum PathSearch {
         while let entry = pop() {
             let state = Int(entry.state)
             let cost = g[state]
-            if entry.f > cost + heuristic(state / 2) { continue } // stale
+            if entry.f > cost + heuristic(state / 2) { continue }  // stale
             if let best = bestGoal, cost >= best.cost { break }
 
             let node = state / 2
@@ -478,7 +507,8 @@ enum PathSearch {
             // Goal check: exiting through a target stub (horizontal) costs
             // its length plus a bend when we arrived vertically.
             for goal in goalNodes where goal.node == node {
-                let exit = cost + goal.terminal.stubLength
+                let exit =
+                    cost + goal.terminal.stubLength
                     + (axis == 1 ? bendPenaltyQ : 0)
                 if bestGoal == nil || exit < bestGoal!.cost {
                     bestGoal = (exit, state, goal.terminal)
@@ -491,26 +521,30 @@ enum PathSearch {
             if xi > 0, field.horizontalOpen(yi: yi, fromXi: xi - 1) {
                 let length = field.xs[xi] - field.xs[xi - 1]
                 let bend: Int64 = axis == 0 ? 0 : bendPenaltyQ
-                push(state: (node - 1) * 2 + 0, cost: cost + length + bend,
-                     from: Int32(state))
+                push(
+                    state: (node - 1) * 2 + 0, cost: cost + length + bend,
+                    from: Int32(state))
             }
             if yi > 0, field.verticalOpen(xi: xi, fromYi: yi - 1) {
                 let length = field.ys[yi] - field.ys[yi - 1]
                 let bend: Int64 = axis == 1 ? 0 : bendPenaltyQ
-                push(state: (node - xCount) * 2 + 1, cost: cost + length + bend,
-                     from: Int32(state))
+                push(
+                    state: (node - xCount) * 2 + 1, cost: cost + length + bend,
+                    from: Int32(state))
             }
             if yi < yCount - 1, field.verticalOpen(xi: xi, fromYi: yi) {
                 let length = field.ys[yi + 1] - field.ys[yi]
                 let bend: Int64 = axis == 1 ? 0 : bendPenaltyQ
-                push(state: (node + xCount) * 2 + 1, cost: cost + length + bend,
-                     from: Int32(state))
+                push(
+                    state: (node + xCount) * 2 + 1, cost: cost + length + bend,
+                    from: Int32(state))
             }
             if xi < xCount - 1, field.horizontalOpen(yi: yi, fromXi: xi) {
                 let length = field.xs[xi + 1] - field.xs[xi]
                 let bend: Int64 = axis == 0 ? 0 : bendPenaltyQ
-                push(state: (node + 1) * 2 + 0, cost: cost + length + bend,
-                     from: Int32(state))
+                push(
+                    state: (node + 1) * 2 + 0, cost: cost + length + bend,
+                    from: Int32(state))
             }
         }
 
@@ -556,8 +590,10 @@ enum TrackAllocator {
         let orderKey: (String, String, Int)
     }
 
-    static func nudge(_ paths: inout [[QPoint]?], edges: [DiagramEdgeRouter.EdgeRequest],
-                      field: RoutingField, spacingQ: Int64) {
+    static func nudge(
+        _ paths: inout [[QPoint]?], edges: [DiagramEdgeRouter.EdgeRequest],
+        field: RoutingField, spacingQ: Int64
+    ) {
         var segments: [SegmentRef] = []
         for (pathIndex, path) in paths.enumerated() {
             guard let path, path.count >= 4 else { continue }
@@ -567,13 +603,16 @@ enum TrackAllocator {
                 let a = path[segIndex], b = path[segIndex + 1]
                 if a == b { continue }
                 let vertical = a.x == b.x
-                segments.append(SegmentRef(
-                    pathIndex: pathIndex, segIndex: segIndex, vertical: vertical,
-                    coordinate: vertical ? a.x : a.y,
-                    lo: vertical ? min(a.y, b.y) : min(a.x, b.x),
-                    hi: vertical ? max(a.y, b.y) : max(a.x, b.x),
-                    orderKey: (edges[pathIndex].propertyRef,
-                               edges[pathIndex].fromElementUuid, segIndex)))
+                segments.append(
+                    SegmentRef(
+                        pathIndex: pathIndex, segIndex: segIndex, vertical: vertical,
+                        coordinate: vertical ? a.x : a.y,
+                        lo: vertical ? min(a.y, b.y) : min(a.x, b.x),
+                        hi: vertical ? max(a.y, b.y) : max(a.x, b.x),
+                        orderKey: (
+                            edges[pathIndex].propertyRef,
+                            edges[pathIndex].fromElementUuid, segIndex
+                        )))
             }
         }
 
@@ -595,8 +634,9 @@ enum TrackAllocator {
             while next < segments.count {
                 let seg = segments[next]
                 guard seg.vertical == head.vertical,
-                      seg.coordinate == head.coordinate,
-                      seg.lo <= reach else { break }
+                    seg.coordinate == head.coordinate,
+                    seg.lo <= reach
+                else { break }
                 reach = max(reach, seg.hi)
                 group.append(seg)
                 next += 1
@@ -611,8 +651,9 @@ enum TrackAllocator {
             // run's current line, shifted (and compressed when needed) to
             // stay within half the corridor slack each side — a run hugging
             // an inflated ring shifts INTO the corridor instead of freezing.
-            let gaps = field.slack(coordinate: head.coordinate, lo: spanLo,
-                                   hi: spanHi, vertical: head.vertical)
+            let gaps = field.slack(
+                coordinate: head.coordinate, lo: spanLo,
+                hi: spanHi, vertical: head.vertical)
             let lowBound = -gaps.before / 2
             let highBound = gaps.after / 2
             let count = Int64(group.count)

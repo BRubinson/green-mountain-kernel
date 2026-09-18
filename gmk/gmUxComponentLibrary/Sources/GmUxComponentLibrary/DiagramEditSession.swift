@@ -22,8 +22,10 @@ public protocol DiagramCommitting: Sendable {
     ///
     /// Defaulted onto `commit` so a revision-only conformer (a test double, a
     /// host that never needs the ids back) keeps compiling untouched.
-    func commitReporting(_ mutations: [DiagramMutation],
-                         expectedRevision: Int64?) async throws -> DiagramCommitOutcome
+    func commitReporting(
+        _ mutations: [DiagramMutation],
+        expectedRevision: Int64?
+    ) async throws -> DiagramCommitOutcome
 }
 
 /// What one commit reports back. `revision` advances the CAS gate; the
@@ -56,115 +58,115 @@ public enum DiagramEditSessionError: Error, Sendable {
 }
 
 #if canImport(Observation)
-import Observation
-import GmDaemonSdk
+    import Observation
+    import GmDaemonSdk
 
-/// Window-lived staging store for interactive editing: stage mutations
-/// per-frame (cheap value appends), flush once at gesture end. Absorbing
-/// per-frame updates here — never as daemon round trips — is what keeps the
-/// single-writer daemon and the revision counter meaningful.
-@Observable
-public final class DiagramEditSession {
-    public private(set) var staged: [DiagramMutation] = []
-    /// The revision the working state was built from; used as the CAS gate
-    /// on flush and advanced by every successful commit.
-    public private(set) var baseRevision: Int64?
-    public private(set) var lastError: String?
-    /// clientRef -> minted uuid from the LAST successful flush. The window
-    /// between a gesture-end add and the caller's follow-up (select the new
-    /// element, connect to it) is exactly one flush wide, so one batch's
-    /// worth is all any caller has ever needed.
-    public private(set) var lastMintedUuids: [String: String] = [:]
+    /// Window-lived staging store for interactive editing: stage mutations
+    /// per-frame (cheap value appends), flush once at gesture end. Absorbing
+    /// per-frame updates here — never as daemon round trips — is what keeps the
+    /// single-writer daemon and the revision counter meaningful.
+    @Observable
+    public final class DiagramEditSession {
+        public private(set) var staged: [DiagramMutation] = []
+        /// The revision the working state was built from; used as the CAS gate
+        /// on flush and advanced by every successful commit.
+        public private(set) var baseRevision: Int64?
+        public private(set) var lastError: String?
+        /// clientRef -> minted uuid from the LAST successful flush. The window
+        /// between a gesture-end add and the caller's follow-up (select the new
+        /// element, connect to it) is exactly one flush wide, so one batch's
+        /// worth is all any caller has ever needed.
+        public private(set) var lastMintedUuids: [String: String] = [:]
 
-    private let committer: any DiagramCommitting
+        private let committer: any DiagramCommitting
 
-    public init(committer: any DiagramCommitting, baseRevision: Int64? = nil) {
-        self.committer = committer
-        self.baseRevision = baseRevision
-    }
+        public init(committer: any DiagramCommitting, baseRevision: Int64? = nil) {
+            self.committer = committer
+            self.baseRevision = baseRevision
+        }
 
-    public func stage(_ mutation: DiagramMutation) {
-        staged.append(mutation)
-    }
-
-    /// Per-frame collapse: replace the last staged mutation ONLY when it
-    /// targets the same element (same kind + element identity); otherwise
-    /// append — restaging element A must never clobber a pending edit to
-    /// element B.
-    public func restage(_ mutation: DiagramMutation) {
-        if let last = staged.last, Self.sameTarget(last, mutation) {
-            staged[staged.count - 1] = mutation
-        } else {
+        public func stage(_ mutation: DiagramMutation) {
             staged.append(mutation)
         }
-    }
 
-    private static func sameTarget(_ a: DiagramMutation, _ b: DiagramMutation) -> Bool {
-        switch (a, b) {
-        case (.elementUpdate(let x), .elementUpdate(let y)):
-            return x.elementUuid == y.elementUuid
-        case (.elementAdd(let x), .elementAdd(let y)):
-            return x.clientRef != nil && x.clientRef == y.clientRef
-        case (.diagramUpdate, .diagramUpdate):
-            return true
-        default:
-            return false
-        }
-    }
-
-    public func discard() {
-        staged.removeAll()
-        // Invalidates any in-flight flush's committed-prefix bookkeeping:
-        // everything staged after this point is NEW and must survive that
-        // flush's completion (see the generation check in flush()).
-        discardGeneration += 1
-    }
-
-    private var inFlight = false
-    /// Bumped by discard(). A flush that started before a discard must NOT
-    /// removeFirst() its committed prefix afterwards — the prefix is already
-    /// gone and the removal would eat post-discard stages (or trap when
-    /// fewer remain than were committed).
-    private var discardGeneration = 0
-
-    /// Gesture-end commit: everything staged at call time, one transaction,
-    /// one revision. Mutations staged DURING the awaited commit stay staged
-    /// for the next flush (only the committed prefix is removed), and a
-    /// second flush while one is in flight is refused rather than
-    /// double-committing.
-    @discardableResult
-    public func flush(guarded: Bool = true) async throws -> Int64? {
-        guard !staged.isEmpty else { return baseRevision }
-        guard !inFlight else {
-            throw DiagramEditSessionError.flushInFlight
-        }
-        inFlight = true
-        defer { inFlight = false }
-        let mutations = staged
-        let generation = discardGeneration
-        do {
-            let outcome = try await committer.commitReporting(
-                mutations, expectedRevision: guarded ? baseRevision : nil)
-            let revision = outcome.revision
-            lastMintedUuids = outcome.mintedUuids
-            if generation == discardGeneration {
-                staged.removeFirst(mutations.count)
+        /// Per-frame collapse: replace the last staged mutation ONLY when it
+        /// targets the same element (same kind + element identity); otherwise
+        /// append — restaging element A must never clobber a pending edit to
+        /// element B.
+        public func restage(_ mutation: DiagramMutation) {
+            if let last = staged.last, Self.sameTarget(last, mutation) {
+                staged[staged.count - 1] = mutation
+            } else {
+                staged.append(mutation)
             }
-            // else: a discard landed during the await — the committed prefix
-            // is already gone and anything now staged is post-discard work.
+        }
+
+        private static func sameTarget(_ a: DiagramMutation, _ b: DiagramMutation) -> Bool {
+            switch (a, b) {
+            case (.elementUpdate(let x), .elementUpdate(let y)):
+                return x.elementUuid == y.elementUuid
+            case (.elementAdd(let x), .elementAdd(let y)):
+                return x.clientRef != nil && x.clientRef == y.clientRef
+            case (.diagramUpdate, .diagramUpdate):
+                return true
+            default:
+                return false
+            }
+        }
+
+        public func discard() {
+            staged.removeAll()
+            // Invalidates any in-flight flush's committed-prefix bookkeeping:
+            // everything staged after this point is NEW and must survive that
+            // flush's completion (see the generation check in flush()).
+            discardGeneration += 1
+        }
+
+        private var inFlight = false
+        /// Bumped by discard(). A flush that started before a discard must NOT
+        /// removeFirst() its committed prefix afterwards — the prefix is already
+        /// gone and the removal would eat post-discard stages (or trap when
+        /// fewer remain than were committed).
+        private var discardGeneration = 0
+
+        /// Gesture-end commit: everything staged at call time, one transaction,
+        /// one revision. Mutations staged DURING the awaited commit stay staged
+        /// for the next flush (only the committed prefix is removed), and a
+        /// second flush while one is in flight is refused rather than
+        /// double-committing.
+        @discardableResult
+        public func flush(guarded: Bool = true) async throws -> Int64? {
+            guard !staged.isEmpty else { return baseRevision }
+            guard !inFlight else {
+                throw DiagramEditSessionError.flushInFlight
+            }
+            inFlight = true
+            defer { inFlight = false }
+            let mutations = staged
+            let generation = discardGeneration
+            do {
+                let outcome = try await committer.commitReporting(
+                    mutations, expectedRevision: guarded ? baseRevision : nil)
+                let revision = outcome.revision
+                lastMintedUuids = outcome.mintedUuids
+                if generation == discardGeneration {
+                    staged.removeFirst(mutations.count)
+                }
+                // else: a discard landed during the await — the committed prefix
+                // is already gone and anything now staged is post-discard work.
+                baseRevision = revision
+                lastError = nil
+                return revision
+            } catch {
+                lastError = String(describing: error)
+                throw error
+            }
+        }
+
+        /// Re-anchor after an external refresh (e.g. a DIAGRAM_CHANGE event from
+        /// another window prompted a refetch).
+        public func rebase(revision: Int64) {
             baseRevision = revision
-            lastError = nil
-            return revision
-        } catch {
-            lastError = String(describing: error)
-            throw error
         }
     }
-
-    /// Re-anchor after an external refresh (e.g. a DIAGRAM_CHANGE event from
-    /// another window prompted a refetch).
-    public func rebase(revision: Int64) {
-        baseRevision = revision
-    }
-}
 #endif

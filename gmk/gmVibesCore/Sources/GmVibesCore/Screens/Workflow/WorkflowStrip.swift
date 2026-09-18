@@ -102,7 +102,7 @@ struct WorkflowStrip: View {
 
     private func tint(for state: WorkflowStripModel.PillState) -> AnyShapeStyle {
         switch state {
-        case .done:    AnyShapeStyle(.secondary)
+        case .done: AnyShapeStyle(.secondary)
         case .current: AnyShapeStyle(Color.accentColor)
         case .pending: AnyShapeStyle(.tertiary)
         // A phase this build's WorkflowSpec does not contain: the daemon is
@@ -115,7 +115,7 @@ struct WorkflowStrip: View {
         switch state {
         case .current: AnyShapeStyle(Color.accentColor.opacity(0.18))
         case .unknown: AnyShapeStyle(Color.orange.opacity(0.15))
-        case .done:    AnyShapeStyle(.quaternary.opacity(0.5))
+        case .done: AnyShapeStyle(.quaternary.opacity(0.5))
         case .pending: AnyShapeStyle(Color.clear)
         }
     }

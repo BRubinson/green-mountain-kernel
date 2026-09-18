@@ -169,7 +169,8 @@ struct Args {
         if let range {
             let parts = range.split(separator: ":", maxSplits: 1)
             guard parts.count == 2, let low = Int(parts[0]), let high = Int(parts[1]),
-                  (0...999).contains(low), (0...999).contains(high), low <= high else {
+                (0...999).contains(low), (0...999).contains(high), low <= high
+            else {
                 throw ToolError(message: "rating_range expects A:B with 0 <= A <= B <= 999, got '\(range)'")
             }
             return (false, low, high)
@@ -251,8 +252,10 @@ private func botSelector(_ args: Args, _ client: any GmVerbCaller) -> (String?, 
 private func resolvePromptUuid(_ args: Args, _ client: any GmVerbCaller) throws -> String {
     if let explicit = args.optString("prompt_uuid") { return explicit }
     let (prompt, key, session) = botSelector(args, client)
-    return try client.botGet(BotGetRequest(
-        promptUuid: prompt, clientKey: key, sessionUuid: session)).workflow.promptUuid
+    return try client.botGet(
+        BotGetRequest(
+            promptUuid: prompt, clientKey: key, sessionUuid: session)
+    ).workflow.promptUuid
 }
 
 /// Shared schema rows for the two rating-windowed reads.
@@ -278,483 +281,573 @@ private let promptSelectorParam: (String, String, String, Bool) =
 // in this process. Annotating it says that out loud rather than making the
 // closures `@Sendable`, which would mean touching the 40-odd tool bodies in the
 // same pass that moves the writer.
-nonisolated(unsafe) let tools: [Tool] = [
-    Tool(
-        name: "rpir_next",
-        description: "Current workflow phase + instructions + uuid bundle + gate blockers. Zero-uuid: resolves YOUR workflow.",
-        params: [("prompt_uuid", "string", "Explicit prompt uuid (escape hatch)", false)],
-        run: { args, client in
-            let (prompt, key, session) = botSelector(args, client)
-            return try client.botNext(BotNextRequest(
-                promptUuid: prompt, clientKey: key, sessionUuid: session))
-        }),
-    Tool(
-        name: "cde_load_prompt",
-        description: "The workflow's prompt row — read the prompt without being told a uuid.",
-        params: [("prompt_uuid", "string", "Explicit prompt uuid (escape hatch)", false)],
-        run: { args, client in
-            let (prompt, key, session) = botSelector(args, client)
-            let workflow = try client.botGet(BotGetRequest(
-                promptUuid: prompt, clientKey: key, sessionUuid: session)).workflow
-            return try client.getPrompt(PromptGetRequest(promptUuid: workflow.promptUuid))
-        }),
-    Tool(
-        name: "rpir_open_exploration",
-        description: "Fetch-or-open an exploration summary (identity is the self-reported agent_type; 'synthesis' is the prompt-level seal row the clarifier opens once everything is ranked).",
-        params: [
-            ("agent_type", "string", "aggressive|conservative|pragmatic|alternative|general|synthesis", true),
-            ("agent_id", "string", "Self-reported agent id for dedup/tracking", false),
-            ("prompt_uuid", "string", "Explicit prompt uuid (escape hatch)", false),
-        ],
-        run: { args, client in
-            let agentType = try args.string("agent_type")
-            // No synthesis guard here, by design: any agent may open and
-            // seal the synthesis row once everything is ranked. The merged
-            // clarifier opens it (it never explored, so nothing else can have
-            // opened one for it) and completes it in the same pass.
-            let (prompt, key, session) = botSelector(args, client)
-            let workflow = try client.botGet(BotGetRequest(
-                promptUuid: prompt, clientKey: key, sessionUuid: session)).workflow
-            return try client.exploreOpen(ExploreOpenRequest(
-                promptUuid: workflow.promptUuid,
-                agentType: agentType,
-                agentId: args.optString("agent_id")))
-        }),
-    Tool(
-        name: "rpir_load_exploration_brief",
-        description: "Fetch a briefing + staleness. Zero-uuid form: pass only step and YOUR briefing resolves.",
-        params: [
-            ("briefing_uuid", "string", "Explicit briefing uuid", false),
-            ("prompt_uuid", "string", "Owner prompt uuid", false),
-            ("step", "string", "Briefing step (initial)", false),
-        ],
-        run: { args, client in
-            var session: String?
-            if args.optString("briefing_uuid") == nil, args.optString("prompt_uuid") == nil {
-                session = try? ContextBuilder.resolveSessionUuid(client)
-            }
-            return try client.briefingGet(BriefingGetRequest(
-                briefingUuid: args.optString("briefing_uuid"),
-                promptUuid: args.optString("prompt_uuid"),
-                sessionUuid: session,
-                step: args.optString("step") ?? "initial",
-                clientKey: ClientKey.resolve()))
-        }),
-    Tool(
-        name: "rpir_write_brief",
-        description: """
-            building → ready: write the briefing's ref set (opinion-free; the daemon \
-            stamps staleness + kbite briefs). ALL THREE ref classes are REQUIRED of \
-            you: a briefing records what it LOOKED FOR, not only what it found. Pass \
-            [] for a class you searched and came up empty on — that is a real answer. \
-            Omitting a class is refused, because absent is indistinguishable from \
-            never having looked.
-            """,
-        params: [
-            ("briefing_uuid", "string", "The briefing to complete", true),
-            ("expected_version", "number", "The briefing version this write was based on", true),
-            ("dope_refs", "array", "Dope dot-path CODES (never uuids). Pass [] if you searched and found none — omitting this is refused", true),
-            ("kbite_refs", "array", "Kbite file uuids. Pass [] if you searched and found none — omitting this is refused", true),
-            ("file_change_refs", "array", "file_change uuids. Pass [] if there are none — omitting this is refused", true),
-            ("agent_id", "string", "Self-reported agent id", false),
-        ],
-        run: { args, client in
-            try client.briefingComplete(BriefingCompleteRequest(
-                briefingUuid: try args.string("briefing_uuid"),
-                expectedVersion: try args.int64("expected_version"),
-                dopeRefs: args.optStrings("dope_refs"),
-                kbiteRefs: args.optStrings("kbite_refs"),
-                fileChangeRefs: args.optStrings("file_change_refs"),
-                agentId: args.optString("agent_id")))
-        }),
-    Tool(
-        name: "rpir_write_explorations",
-        description: "Insert an exploration finding (self-rate 0=critical…999=ignore; unranked blocks the synthesis seal).",
-        params: [
-            ("summary_uuid", "string", "Your exploration summary uuid", true),
-            ("kind", "string", "persistence_model|implementation_pattern|existing_functionality|scope_creep_risk|general_relevant_change|key_file|other", true),
-            ("title", "string", "Finding title", true),
-            ("body", "string", "Finding body", true),
-            ("file_path", "string", "Repo-relative anchor path", false),
-            ("agent_name", "string", "Your methodology persona", true),
-            ("agent_id", "string", "Self-reported agent id", false),
-            ("rating", "number", "0-999 self-rating", false),
-        ],
-        run: { args, client in
-            guard let kind = ExplorationFindingKind(rawValue: try args.string("kind")) else {
-                throw ToolError(message: "unknown finding kind")
-            }
-            return try client.exploreFindingAdd(ExploreFindingAddRequest(
-                summaryUuid: try args.string("summary_uuid"),
-                kind: kind,
-                title: try args.string("title"),
-                body: try args.string("body"),
-                filePath: args.optString("file_path"),
-                agentName: try args.string("agent_name"),
-                agentId: args.optString("agent_id"),
-                rating: args.optInt("rating")))
-        }),
-    Tool(
-        name: "rpir_complete_exploration",
-        description: "Seal a summary with its overview — your own methodology row, or the synthesis row once every finding is ranked (it refuses while anything is unranked).",
-        params: [
-            ("summary_uuid", "string", "Your exploration summary uuid", true),
-            ("expected_version", "number", "The summary version this write was based on", true),
-            ("overview", "string", "Your overview narrative", true),
-        ],
-        run: { args, client in
-            try client.exploreComplete(ExploreCompleteRequest(
-                summaryUuid: try args.string("summary_uuid"),
-                expectedVersion: try args.int64("expected_version"),
-                overview: try args.string("overview")))
-        }),
-    Tool(
-        name: "rpir_write_reviews",
-        description: "Insert a review finding (self-rate 0=critical…999=ignore).",
-        params: [
-            ("summary_uuid", "string", "The review summary uuid", true),
-            ("kind", "string", "correctness_bug|spec_deviation|regression_risk|security|simplification|other", true),
-            ("title", "string", "Finding title", true),
-            ("body", "string", "Finding body", true),
-            ("file_path", "string", "Repo-relative path", false),
-            ("line_start", "number", "First line", false),
-            ("line_end", "number", "Last line", false),
-            ("agent_name", "string", "Your methodology persona", true),
-            ("agent_id", "string", "Self-reported agent id", false),
-            ("rating", "number", "0-999 self-rating", false),
-        ],
-        run: { args, client in
-            guard let kind = ReviewFindingKind(rawValue: try args.string("kind")) else {
-                throw ToolError(message: "unknown finding kind")
-            }
-            return try client.reviewFindingAdd(ReviewFindingAddRequest(
-                summaryUuid: try args.string("summary_uuid"),
-                kind: kind,
-                title: try args.string("title"),
-                body: try args.string("body"),
-                filePath: args.optString("file_path"),
-                lineStart: args.optInt("line_start"),
-                lineEnd: args.optInt("line_end"),
-                agentName: try args.string("agent_name"),
-                agentId: args.optString("agent_id"),
-                rating: args.optInt("rating")))
-        }),
-    Tool(
-        name: "rpir_write_clarification_questions",
-        description: "Insert a user-facing clarification question (+ordered options) while the summary is building.",
-        params: [
-            ("summary_uuid", "string", "The clarification summary uuid", true),
-            ("question", "string", "The question text", true),
-            ("options", "array", "Ordered pre-authored options", false),
-            ("agent_name", "string", "Your persona", false),
-            ("agent_id", "string", "Self-reported agent id", false),
-        ],
-        run: { args, client in
-            try client.clarifyQuestionAdd(ClarifyQuestionAddRequest(
-                summaryUuid: try args.string("summary_uuid"),
-                question: try args.string("question"),
-                options: args.optStrings("options"),
-                agentName: args.optString("agent_name"),
-                agentId: args.optString("agent_id")))
-        }),
-    Tool(
-        name: "rpir_write_clarification_notes",
-        description: "Insert an internal clarification note (weight 0=critical…999; any summary state).",
-        params: [
-            ("summary_uuid", "string", "The clarification summary uuid", true),
-            ("body", "string", "The note text", true),
-            ("confused_entity_uuid", "string", "Soft ref to the confusing entity", false),
-            ("confused_entity_type", "string", "exploration_finding|briefing|question|other", false),
-            ("weight", "number", "0-999 importance (0=critical)", false),
-            ("question_uuid", "string", "Attach to an answered question", false),
-            ("agent_name", "string", "Your persona", false),
-            ("agent_id", "string", "Self-reported agent id", false),
-        ],
-        run: { args, client in
-            try client.clarifyNoteAdd(ClarifyNoteAddRequest(
-                summaryUuid: try args.string("summary_uuid"),
-                body: try args.string("body"),
-                confusedEntityUuid: args.optString("confused_entity_uuid"),
-                confusedEntityType: args.optString("confused_entity_type"),
-                weight: args.optInt("weight"),
-                questionUuid: args.optString("question_uuid"),
-                agentName: args.optString("agent_name"),
-                agentId: args.optString("agent_id")))
-        }),
-    Tool(
-        name: "rpir_write_care_package",
-        description: "Add one care package ref while building (dope code / kbite file / curated exploration COPY — never re-explore).",
-        params: [
-            ("package_uuid", "string", "The care package uuid", true),
-            ("kind", "string", "dope|kbite|exploration", true),
-            ("dope_code", "string", "Dope dot-path CODE (kind dope)", false),
-            ("note", "string", "Curatorial note (kind dope)", false),
-            ("kbite_file_uuid", "string", "Kbite file uuid (kind kbite)", false),
-            ("title", "string", "Curated title (kind exploration)", false),
-            ("body", "string", "Curated body (kind exploration)", false),
-            ("file_path", "string", "Repo-relative anchor (kind exploration)", false),
-            ("source_finding_uuid", "string", "Provenance ref (kind exploration)", false),
-        ],
-        run: { args, client in
-            guard let kind = CarePackageRefKind(rawValue: try args.string("kind")) else {
-                throw ToolError(message: "kind must be dope|kbite|exploration")
-            }
-            return try client.carePackageRefAdd(CarePackageRefAddRequest(
-                packageUuid: try args.string("package_uuid"),
-                kind: kind,
-                dopeCode: args.optString("dope_code"),
-                note: args.optString("note"),
-                kbiteFileUuid: args.optString("kbite_file_uuid"),
-                curatedTitle: args.optString("title"),
-                curatedBody: args.optString("body"),
-                filePath: args.optString("file_path"),
-                sourceFindingUuid: args.optString("source_finding_uuid")))
-        }),
-    Tool(
-        name: "rpir_open_architecture_option",
-        description: "Write YOUR methodology's architecture Option row (the architect pen; one per agent_name). To REVISE an existing proposal, pass supersedes_option_uuid + expected_version together: the old row is kept as rejected history and a selected row hands its selection to the revision.",
-        params: [
-            ("summary_uuid", "string", "The architecture summary uuid", true),
-            ("agent_name", "string", "Your methodology persona", true),
-            ("agent_id", "string", "Self-reported agent id", false),
-            ("body", "string", "Your full proposal (markdown)", true),
-            ("supersedes_option_uuid", "string", "Option row this proposal REPLACES (revision door; requires expected_version)", false),
-            ("expected_version", "number", "The superseded row's version (revision door; requires supersedes_option_uuid)", false),
-        ],
-        run: { args, client in
-            try client.archOptionAdd(ArchOptionAddRequest(
-                summaryUuid: try args.string("summary_uuid"),
-                agentName: try args.string("agent_name"),
-                agentId: args.optString("agent_id"),
-                body: try args.string("body"),
-                supersedesOptionUuid: args.optString("supersedes_option_uuid"),
-                expectedVersion: args.optInt("expected_version").map(Int64.init)))
-        }),
-    Tool(
-        name: "dope_search_session",
-        description: "FTS over the session's dope tree (hits carry dot-paths).",
-        params: [
-            ("query", "string", "The search query", true),
-            ("scope", "string", "prompt|session|project (default session)", false),
-            ("session_uuid", "string", "Explicit session uuid", false),
-            ("prompt_uuid", "string", "Prompt scope selector", false),
-            ("limit", "number", "Max hits", false),
-        ],
-        narrowing: PenNarrowing(
-            parameters: ["limit", "scope"],
-            retryWith: "dope_search_session with a smaller limit, or scope narrowed to prompt"),
-        run: { args, client in
-            let scopeRaw = args.optString("scope") ?? "session"
-            guard let scope = DopeSearchScope(rawValue: scopeRaw) else {
-                throw ToolError(message: "scope must be prompt|session|project")
-            }
-            var session = args.optString("session_uuid")
-            if session == nil, scope != .project {
-                session = try? ContextBuilder.resolveSessionUuid(client)
-            }
-            return try client.dopeSearch(DopeSearchRequest(
-                query: try args.string("query"),
-                scope: scope,
-                sessionUuid: session,
-                promptUuid: args.optString("prompt_uuid"),
-                limit: args.optInt("limit")))
-        }),
-    Tool(
-        name: "kbite_search",
-        description: "bm25-ranked kbite file stubs with briefs — read briefs, then kbite_file_get.",
-        params: [
-            ("query", "string", "The search query", true),
-            ("limit", "number", "Max hits", false),
-        ],
-        narrowing: PenNarrowing(
-            parameters: ["limit"],
-            retryWith: "kbite_search with a smaller limit, then kbite_file_get for the one file worth opening"),
-        run: { args, client in
-            try client.searchKbites(KbiteSearchRequest(
-                query: try args.string("query"),
-                limit: args.optInt("limit")))
-        }),
-
-    // ── Reading the record ───────────────────────────────────────────────
-    //
-    // The half of the pen that makes the other half usable: an agent reads
-    // the prompt's own rows here instead of shelling out to `gm ... get`.
-    // Every one is prompt-keyed and zero-uuid by default. rpir_rank_explorations rides
-    // along because it is the same reader's next move — read the findings,
-    // calibrate them in one batch.
-
-    Tool(
-        name: "rpir_get_exploration",
-        description: "The prompt's exploration record: summaries, key files, findings inside the rating window, stubs outside it. Default window is ratings under 100; unranked findings are ALWAYS full rows (they are the work queue).",
-        params: [
-            promptSelectorParam,
-            ("agent_type", "string", "Filter to one agent's summary (omit for all)", false),
-        ] + ratingWindowParams,
-        // Already windowed — no new parameter is owed here, only the
-        // declaration that lets the guard name the one that exists.
-        narrowing: PenNarrowing(
-            parameters: ["max_rating", "rating_range", "agent_type"],
-            retryWith: "rpir_get_exploration with max_rating=0 for the critical findings, or agent_type to read one methodology's summary"),
-        degrade: { args, client in
-            try client.exploreGet(ExploreGetRequest(
-                promptUuid: try resolvePromptUuid(args, client),
-                agentType: args.optString("agent_type"),
-                ratingMax: 0))
-        },
-        run: { args, client in
-            let window = try args.ratingWindow()
-            return try client.exploreGet(ExploreGetRequest(
-                promptUuid: try resolvePromptUuid(args, client),
-                agentType: args.optString("agent_type"),
-                full: window.full,
-                ratingMin: window.min,
-                ratingMax: window.max))
-        }),
-    Tool(
-        name: "rpir_rank_explorations",
-        description: "Batch-rank exploration findings PROMPT-wide: one atomic calibrated batch across every summary. One bad pair rejects the whole batch; 0 unranked is what lets the synthesis seal pass.",
-        params: [
-            ("ratings", "array", "\"<finding-uuid>:<0-999>\" pairs (0=critical, 999=tombstone)", true),
-            promptSelectorParam,
-        ],
-        run: { args, client in
-            let raw = args.optStrings("ratings") ?? []
-            guard !raw.isEmpty else {
-                throw ToolError(message: "pass at least one rating as \"<finding-uuid>:<0-999>\"")
-            }
-            let pairs: [FindingRating] = try raw.map { pair in
-                let parts = pair.split(separator: ":", maxSplits: 1)
-                guard parts.count == 2, let rating = Int(parts[1]), (0...999).contains(rating) else {
-                    throw ToolError(message: "rating '\(pair)' is not <finding-uuid>:<0-999>")
+nonisolated(unsafe) let tools: [Tool] =
+    [
+        Tool(
+            name: "rpir_next",
+            description:
+                "Current workflow phase + instructions + uuid bundle + gate blockers. Zero-uuid: resolves YOUR workflow.",
+            params: [("prompt_uuid", "string", "Explicit prompt uuid (escape hatch)", false)],
+            run: { args, client in
+                let (prompt, key, session) = botSelector(args, client)
+                return try client.botNext(
+                    BotNextRequest(
+                        promptUuid: prompt, clientKey: key, sessionUuid: session))
+            }),
+        Tool(
+            name: "cde_load_prompt",
+            description: "The workflow's prompt row — read the prompt without being told a uuid.",
+            params: [("prompt_uuid", "string", "Explicit prompt uuid (escape hatch)", false)],
+            run: { args, client in
+                let (prompt, key, session) = botSelector(args, client)
+                let workflow = try client.botGet(
+                    BotGetRequest(
+                        promptUuid: prompt, clientKey: key, sessionUuid: session)
+                ).workflow
+                return try client.getPrompt(PromptGetRequest(promptUuid: workflow.promptUuid))
+            }),
+        Tool(
+            name: "rpir_open_exploration",
+            description:
+                "Fetch-or-open an exploration summary (identity is the self-reported agent_type; 'synthesis' is the prompt-level seal row the clarifier opens once everything is ranked).",
+            params: [
+                ("agent_type", "string", "aggressive|conservative|pragmatic|alternative|general|synthesis", true),
+                ("agent_id", "string", "Self-reported agent id for dedup/tracking", false),
+                ("prompt_uuid", "string", "Explicit prompt uuid (escape hatch)", false),
+            ],
+            run: { args, client in
+                let agentType = try args.string("agent_type")
+                // No synthesis guard here, by design: any agent may open and
+                // seal the synthesis row once everything is ranked. The merged
+                // clarifier opens it (it never explored, so nothing else can have
+                // opened one for it) and completes it in the same pass.
+                let (prompt, key, session) = botSelector(args, client)
+                let workflow = try client.botGet(
+                    BotGetRequest(
+                        promptUuid: prompt, clientKey: key, sessionUuid: session)
+                ).workflow
+                return try client.exploreOpen(
+                    ExploreOpenRequest(
+                        promptUuid: workflow.promptUuid,
+                        agentType: agentType,
+                        agentId: args.optString("agent_id")))
+            }),
+        Tool(
+            name: "rpir_load_exploration_brief",
+            description: "Fetch a briefing + staleness. Zero-uuid form: pass only step and YOUR briefing resolves.",
+            params: [
+                ("briefing_uuid", "string", "Explicit briefing uuid", false),
+                ("prompt_uuid", "string", "Owner prompt uuid", false),
+                ("step", "string", "Briefing step (initial)", false),
+            ],
+            run: { args, client in
+                var session: String?
+                if args.optString("briefing_uuid") == nil, args.optString("prompt_uuid") == nil {
+                    session = try? ContextBuilder.resolveSessionUuid(client)
                 }
-                return FindingRating(findingUuid: String(parts[0]), rating: rating)
-            }
-            return try client.exploreRank(ExploreRankRequest(
-                promptUuid: try resolvePromptUuid(args, client), ratings: pairs))
-        }),
-    Tool(
-        name: "rpir_get_review",
-        description: "The prompt's review record: summary, findings inside the rating window, stubs outside it. Same window semantics as rpir_get_exploration.",
-        params: [promptSelectorParam] + ratingWindowParams,
-        narrowing: PenNarrowing(
-            parameters: ["max_rating", "rating_range"],
-            retryWith: "rpir_get_review with max_rating=0 for the critical findings only"),
-        degrade: { args, client in
-            try client.reviewGet(ReviewGetRequest(
-                promptUuid: try resolvePromptUuid(args, client), ratingMax: 0))
-        },
-        run: { args, client in
-            let window = try args.ratingWindow()
-            return try client.reviewGet(ReviewGetRequest(
-                promptUuid: try resolvePromptUuid(args, client),
-                full: window.full,
-                ratingMin: window.min,
-                ratingMax: window.max))
-        }),
-    Tool(
-        name: "rpir_get_clarification",
-        description: "The prompt's clarification record: summary, questions (+answers), notes, and the care package with its dope staleness when one exists.",
-        params: [
-            promptSelectorParam,
-            ("include_care_package", "boolean", "Embed the full care package (default true; false leaves a counts-only care_package_stub — the package reads whole through care_package_get)", false),
-            ("note_weight_max", "number", "Weight window over the notes: at or below stays a full row, above drops to note_stubs (unweighted notes are always full)", false),
-        ],
-        // Two things here grow without bound — the embedded care package and
-        // the note bodies — and each has its own switch. Questions are NOT
-        // windowed: a question plus its pre-authored options is bounded by
-        // what a human can answer.
-        narrowing: PenNarrowing(
-            parameters: ["include_care_package", "note_weight_max"],
-            retryWith: "rpir_get_clarification with include_care_package=false (then care_package_get for the package itself), and note_weight_max=0 for the critical notes only"),
-        degrade: { args, client in
-            try client.clarifyGet(ClarifyGetRequest(
-                promptUuid: try resolvePromptUuid(args, client),
-                includeCarePackage: false,
-                noteWeightMax: 0))
-        },
-        run: { args, client in
-            try client.clarifyGet(ClarifyGetRequest(
-                promptUuid: try resolvePromptUuid(args, client),
-                includeCarePackage: args.optBool("include_care_package"),
-                noteWeightMax: args.optInt("note_weight_max")))
-        }),
-    Tool(
-        name: "rpir_get_architecture",
-        description: "The approved architecture with its implementation state: persistence changes before general changes, each joined to its recorded file changes, plus the touched-but-unplanned set. This is the implementation spec. Option bodies and change_code are STUBBED by default — pass option_uuid / change_uuid / full to read one in full.",
-        params: [
-            promptSelectorParam,
-            ("include_options", "boolean", "Return every architect option's full BODY inline (default false — stubs carry uuid, agent, status, selected, body_chars)", false),
-            ("option_uuid", "string", "Return exactly this option's body in full", false),
-            ("full", "boolean", "Return every general change's change_code verbatim (default false — stubs carry a leading excerpt + change_code_chars)", false),
-            ("change_uuid", "string", "Return exactly this general change's change_code in full", false),
-            ("limit", "number", "Page size over the general change rows (persistence changes are never paged)", false),
-            ("cursor", "string", "Continuation from a previous result's change_page.next_cursor", false),
-        ],
-        // THE PEN IS WHAT NARROWS, NOT THE DAEMON. ArchGetRequest's wire
-        // default is still "everything full" so every existing caller —
-        // GMVibes building against this package included — is unchanged by
-        // construction. It is this client, the one feeding an agent harness
-        // with a hard result cap, that opts into the stub form; the schema
-        // above is how an agent opts back out.
-        narrowing: PenNarrowing(
-            parameters: ["limit", "cursor", "option_uuid", "change_uuid"],
-            retryWith: "rpir_get_architecture with limit (e.g. 10) and a cursor to page the general changes; then option_uuid / change_uuid to read one body at a time"),
-        degrade: { args, client in
-            try client.archGet(ArchGetRequest(
-                promptUuid: try resolvePromptUuid(args, client),
-                includeOptions: false,
-                full: false,
-                limit: 10))
-        },
-        run: { args, client in
-            try client.archGet(ArchGetRequest(
-                promptUuid: try resolvePromptUuid(args, client),
-                includeOptions: args.optBool("include_options") ?? false,
-                optionUuid: args.optString("option_uuid"),
-                full: args.optBool("full") ?? false,
-                changeUuid: args.optString("change_uuid"),
-                limit: args.optInt("limit"),
-                cursor: args.optString("cursor")))
-        }),
-    Tool(
-        name: "cde_search_file_changes",
-        description: "Recorded file changes for the prompt (or an explicit session/path). What the machine believes you have touched — read it to check your own capture.",
-        params: [
-            promptSelectorParam,
-            ("session_uuid", "string", "List a whole session instead of one prompt", false),
-            ("path", "string", "Filter to one repo-relative path", false),
-            ("limit", "number", "Max rows", false),
-        ],
-        narrowing: PenNarrowing(
-            parameters: ["limit", "path"],
-            retryWith: "cde_search_file_changes with limit 25 or fewer, or path to scope to one file"),
-        // THE DEGRADE MUST FIT THE BUDGET BY ARITHMETIC, not by hope. A change
-        // row with its line ranges runs ~1,200 bytes, so the old limit of 100
-        // asked for ~120,000 against a 45,000 budget and could NEVER fit: the
-        // call returned zero rows and advised retrying with the same 100.
-        // Measured on a 202-change prompt: 100 -> 109,994 bytes, 60 -> 66,023,
-        // 30 -> fits. 25 keeps headroom for rows carrying many ranges.
-        degrade: { args, client in
-            let session = args.optString("session_uuid")
-            let prompt = session == nil ? try resolvePromptUuid(args, client) : args.optString("prompt_uuid")
-            return try client.listFileChanges(FileChangeListRequest(
-                sessionUuid: session,
-                promptUuid: prompt,
-                relativePath: args.optString("path"),
-                limit: 25))
-        },
-        run: { args, client in
-            let session = args.optString("session_uuid")
-            // An explicit session read is session-scoped; otherwise the
-            // prompt is resolved the same way every other record read is.
-            let prompt = session == nil ? try resolvePromptUuid(args, client) : args.optString("prompt_uuid")
-            return try client.listFileChanges(FileChangeListRequest(
-                sessionUuid: session,
-                promptUuid: prompt,
-                relativePath: args.optString("path"),
-                limit: args.optInt("limit")))
-        }),
-] + makeFastPathTools() + makePrimaryDoorTools() + makePhaseDoorTools() + makeBridgeDoorTools() + makeRecallDoors()
+                return try client.briefingGet(
+                    BriefingGetRequest(
+                        briefingUuid: args.optString("briefing_uuid"),
+                        promptUuid: args.optString("prompt_uuid"),
+                        sessionUuid: session,
+                        step: args.optString("step") ?? "initial",
+                        clientKey: ClientKey.resolve()))
+            }),
+        Tool(
+            name: "rpir_write_brief",
+            description: """
+                building → ready: write the briefing's ref set (opinion-free; the daemon \
+                stamps staleness + kbite briefs). ALL THREE ref classes are REQUIRED of \
+                you: a briefing records what it LOOKED FOR, not only what it found. Pass \
+                [] for a class you searched and came up empty on — that is a real answer. \
+                Omitting a class is refused, because absent is indistinguishable from \
+                never having looked.
+                """,
+            params: [
+                ("briefing_uuid", "string", "The briefing to complete", true),
+                ("expected_version", "number", "The briefing version this write was based on", true),
+                (
+                    "dope_refs", "array",
+                    "Dope dot-path CODES (never uuids). Pass [] if you searched and found none — omitting this is refused",
+                    true
+                ),
+                (
+                    "kbite_refs", "array",
+                    "Kbite file uuids. Pass [] if you searched and found none — omitting this is refused", true
+                ),
+                (
+                    "file_change_refs", "array",
+                    "file_change uuids. Pass [] if there are none — omitting this is refused", true
+                ),
+                ("agent_id", "string", "Self-reported agent id", false),
+            ],
+            run: { args, client in
+                try client.briefingComplete(
+                    BriefingCompleteRequest(
+                        briefingUuid: try args.string("briefing_uuid"),
+                        expectedVersion: try args.int64("expected_version"),
+                        dopeRefs: args.optStrings("dope_refs"),
+                        kbiteRefs: args.optStrings("kbite_refs"),
+                        fileChangeRefs: args.optStrings("file_change_refs"),
+                        agentId: args.optString("agent_id")))
+            }),
+        Tool(
+            name: "rpir_write_explorations",
+            description:
+                "Insert an exploration finding (self-rate 0=critical…999=ignore; unranked blocks the synthesis seal).",
+            params: [
+                ("summary_uuid", "string", "Your exploration summary uuid", true),
+                (
+                    "kind", "string",
+                    "persistence_model|implementation_pattern|existing_functionality|scope_creep_risk|general_relevant_change|key_file|other",
+                    true
+                ),
+                ("title", "string", "Finding title", true),
+                ("body", "string", "Finding body", true),
+                ("file_path", "string", "Repo-relative anchor path", false),
+                ("agent_name", "string", "Your methodology persona", true),
+                ("agent_id", "string", "Self-reported agent id", false),
+                ("rating", "number", "0-999 self-rating", false),
+            ],
+            run: { args, client in
+                guard let kind = ExplorationFindingKind(rawValue: try args.string("kind")) else {
+                    throw ToolError(message: "unknown finding kind")
+                }
+                return try client.exploreFindingAdd(
+                    ExploreFindingAddRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        kind: kind,
+                        title: try args.string("title"),
+                        body: try args.string("body"),
+                        filePath: args.optString("file_path"),
+                        agentName: try args.string("agent_name"),
+                        agentId: args.optString("agent_id"),
+                        rating: args.optInt("rating")))
+            }),
+        Tool(
+            name: "rpir_complete_exploration",
+            description:
+                "Seal a summary with its overview — your own methodology row, or the synthesis row once every finding is ranked (it refuses while anything is unranked).",
+            params: [
+                ("summary_uuid", "string", "Your exploration summary uuid", true),
+                ("expected_version", "number", "The summary version this write was based on", true),
+                ("overview", "string", "Your overview narrative", true),
+            ],
+            run: { args, client in
+                try client.exploreComplete(
+                    ExploreCompleteRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        expectedVersion: try args.int64("expected_version"),
+                        overview: try args.string("overview")))
+            }),
+        Tool(
+            name: "rpir_write_reviews",
+            description: "Insert a review finding (self-rate 0=critical…999=ignore).",
+            params: [
+                ("summary_uuid", "string", "The review summary uuid", true),
+                (
+                    "kind", "string", "correctness_bug|spec_deviation|regression_risk|security|simplification|other",
+                    true
+                ),
+                ("title", "string", "Finding title", true),
+                ("body", "string", "Finding body", true),
+                ("file_path", "string", "Repo-relative path", false),
+                ("line_start", "number", "First line", false),
+                ("line_end", "number", "Last line", false),
+                ("agent_name", "string", "Your methodology persona", true),
+                ("agent_id", "string", "Self-reported agent id", false),
+                ("rating", "number", "0-999 self-rating", false),
+            ],
+            run: { args, client in
+                guard let kind = ReviewFindingKind(rawValue: try args.string("kind")) else {
+                    throw ToolError(message: "unknown finding kind")
+                }
+                return try client.reviewFindingAdd(
+                    ReviewFindingAddRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        kind: kind,
+                        title: try args.string("title"),
+                        body: try args.string("body"),
+                        filePath: args.optString("file_path"),
+                        lineStart: args.optInt("line_start"),
+                        lineEnd: args.optInt("line_end"),
+                        agentName: try args.string("agent_name"),
+                        agentId: args.optString("agent_id"),
+                        rating: args.optInt("rating")))
+            }),
+        Tool(
+            name: "rpir_write_clarification_questions",
+            description:
+                "Insert a user-facing clarification question (+ordered options) while the summary is building.",
+            params: [
+                ("summary_uuid", "string", "The clarification summary uuid", true),
+                ("question", "string", "The question text", true),
+                ("options", "array", "Ordered pre-authored options", false),
+                ("agent_name", "string", "Your persona", false),
+                ("agent_id", "string", "Self-reported agent id", false),
+            ],
+            run: { args, client in
+                try client.clarifyQuestionAdd(
+                    ClarifyQuestionAddRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        question: try args.string("question"),
+                        options: args.optStrings("options"),
+                        agentName: args.optString("agent_name"),
+                        agentId: args.optString("agent_id")))
+            }),
+        Tool(
+            name: "rpir_write_clarification_notes",
+            description: "Insert an internal clarification note (weight 0=critical…999; any summary state).",
+            params: [
+                ("summary_uuid", "string", "The clarification summary uuid", true),
+                ("body", "string", "The note text", true),
+                ("confused_entity_uuid", "string", "Soft ref to the confusing entity", false),
+                ("confused_entity_type", "string", "exploration_finding|briefing|question|other", false),
+                ("weight", "number", "0-999 importance (0=critical)", false),
+                ("question_uuid", "string", "Attach to an answered question", false),
+                ("agent_name", "string", "Your persona", false),
+                ("agent_id", "string", "Self-reported agent id", false),
+            ],
+            run: { args, client in
+                try client.clarifyNoteAdd(
+                    ClarifyNoteAddRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        body: try args.string("body"),
+                        confusedEntityUuid: args.optString("confused_entity_uuid"),
+                        confusedEntityType: args.optString("confused_entity_type"),
+                        weight: args.optInt("weight"),
+                        questionUuid: args.optString("question_uuid"),
+                        agentName: args.optString("agent_name"),
+                        agentId: args.optString("agent_id")))
+            }),
+        Tool(
+            name: "rpir_write_care_package",
+            description:
+                "Add one care package ref while building (dope code / kbite file / curated exploration COPY — never re-explore).",
+            params: [
+                ("package_uuid", "string", "The care package uuid", true),
+                ("kind", "string", "dope|kbite|exploration", true),
+                ("dope_code", "string", "Dope dot-path CODE (kind dope)", false),
+                ("note", "string", "Curatorial note (kind dope)", false),
+                ("kbite_file_uuid", "string", "Kbite file uuid (kind kbite)", false),
+                ("title", "string", "Curated title (kind exploration)", false),
+                ("body", "string", "Curated body (kind exploration)", false),
+                ("file_path", "string", "Repo-relative anchor (kind exploration)", false),
+                ("source_finding_uuid", "string", "Provenance ref (kind exploration)", false),
+            ],
+            run: { args, client in
+                guard let kind = CarePackageRefKind(rawValue: try args.string("kind")) else {
+                    throw ToolError(message: "kind must be dope|kbite|exploration")
+                }
+                return try client.carePackageRefAdd(
+                    CarePackageRefAddRequest(
+                        packageUuid: try args.string("package_uuid"),
+                        kind: kind,
+                        dopeCode: args.optString("dope_code"),
+                        note: args.optString("note"),
+                        kbiteFileUuid: args.optString("kbite_file_uuid"),
+                        curatedTitle: args.optString("title"),
+                        curatedBody: args.optString("body"),
+                        filePath: args.optString("file_path"),
+                        sourceFindingUuid: args.optString("source_finding_uuid")))
+            }),
+        Tool(
+            name: "rpir_open_architecture_option",
+            description:
+                "Write YOUR methodology's architecture Option row (the architect pen; one per agent_name). To REVISE an existing proposal, pass supersedes_option_uuid + expected_version together: the old row is kept as rejected history and a selected row hands its selection to the revision.",
+            params: [
+                ("summary_uuid", "string", "The architecture summary uuid", true),
+                ("agent_name", "string", "Your methodology persona", true),
+                ("agent_id", "string", "Self-reported agent id", false),
+                ("body", "string", "Your full proposal (markdown)", true),
+                (
+                    "supersedes_option_uuid", "string",
+                    "Option row this proposal REPLACES (revision door; requires expected_version)", false
+                ),
+                (
+                    "expected_version", "number",
+                    "The superseded row's version (revision door; requires supersedes_option_uuid)", false
+                ),
+            ],
+            run: { args, client in
+                try client.archOptionAdd(
+                    ArchOptionAddRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        agentName: try args.string("agent_name"),
+                        agentId: args.optString("agent_id"),
+                        body: try args.string("body"),
+                        supersedesOptionUuid: args.optString("supersedes_option_uuid"),
+                        expectedVersion: args.optInt("expected_version").map(Int64.init)))
+            }),
+        Tool(
+            name: "dope_search_session",
+            description: "FTS over the session's dope tree (hits carry dot-paths).",
+            params: [
+                ("query", "string", "The search query", true),
+                ("scope", "string", "prompt|session|project (default session)", false),
+                ("session_uuid", "string", "Explicit session uuid", false),
+                ("prompt_uuid", "string", "Prompt scope selector", false),
+                ("limit", "number", "Max hits", false),
+            ],
+            narrowing: PenNarrowing(
+                parameters: ["limit", "scope"],
+                retryWith: "dope_search_session with a smaller limit, or scope narrowed to prompt"),
+            run: { args, client in
+                let scopeRaw = args.optString("scope") ?? "session"
+                guard let scope = DopeSearchScope(rawValue: scopeRaw) else {
+                    throw ToolError(message: "scope must be prompt|session|project")
+                }
+                var session = args.optString("session_uuid")
+                if session == nil, scope != .project {
+                    session = try? ContextBuilder.resolveSessionUuid(client)
+                }
+                return try client.dopeSearch(
+                    DopeSearchRequest(
+                        query: try args.string("query"),
+                        scope: scope,
+                        sessionUuid: session,
+                        promptUuid: args.optString("prompt_uuid"),
+                        limit: args.optInt("limit")))
+            }),
+        Tool(
+            name: "kbite_search",
+            description: "bm25-ranked kbite file stubs with briefs — read briefs, then kbite_file_get.",
+            params: [
+                ("query", "string", "The search query", true),
+                ("limit", "number", "Max hits", false),
+            ],
+            narrowing: PenNarrowing(
+                parameters: ["limit"],
+                retryWith: "kbite_search with a smaller limit, then kbite_file_get for the one file worth opening"),
+            run: { args, client in
+                try client.searchKbites(
+                    KbiteSearchRequest(
+                        query: try args.string("query"),
+                        limit: args.optInt("limit")))
+            }),
+
+        // ── Reading the record ───────────────────────────────────────────────
+        //
+        // The half of the pen that makes the other half usable: an agent reads
+        // the prompt's own rows here instead of shelling out to `gm ... get`.
+        // Every one is prompt-keyed and zero-uuid by default. rpir_rank_explorations rides
+        // along because it is the same reader's next move — read the findings,
+        // calibrate them in one batch.
+
+        Tool(
+            name: "rpir_get_exploration",
+            description:
+                "The prompt's exploration record: summaries, key files, findings inside the rating window, stubs outside it. Default window is ratings under 100; unranked findings are ALWAYS full rows (they are the work queue).",
+            params: [
+                promptSelectorParam,
+                ("agent_type", "string", "Filter to one agent's summary (omit for all)", false),
+            ] + ratingWindowParams,
+            // Already windowed — no new parameter is owed here, only the
+            // declaration that lets the guard name the one that exists.
+            narrowing: PenNarrowing(
+                parameters: ["max_rating", "rating_range", "agent_type"],
+                retryWith:
+                    "rpir_get_exploration with max_rating=0 for the critical findings, or agent_type to read one methodology's summary"
+            ),
+            degrade: { args, client in
+                try client.exploreGet(
+                    ExploreGetRequest(
+                        promptUuid: try resolvePromptUuid(args, client),
+                        agentType: args.optString("agent_type"),
+                        ratingMax: 0))
+            },
+            run: { args, client in
+                let window = try args.ratingWindow()
+                return try client.exploreGet(
+                    ExploreGetRequest(
+                        promptUuid: try resolvePromptUuid(args, client),
+                        agentType: args.optString("agent_type"),
+                        full: window.full,
+                        ratingMin: window.min,
+                        ratingMax: window.max))
+            }),
+        Tool(
+            name: "rpir_rank_explorations",
+            description:
+                "Batch-rank exploration findings PROMPT-wide: one atomic calibrated batch across every summary. One bad pair rejects the whole batch; 0 unranked is what lets the synthesis seal pass.",
+            params: [
+                ("ratings", "array", "\"<finding-uuid>:<0-999>\" pairs (0=critical, 999=tombstone)", true),
+                promptSelectorParam,
+            ],
+            run: { args, client in
+                let raw = args.optStrings("ratings") ?? []
+                guard !raw.isEmpty else {
+                    throw ToolError(message: "pass at least one rating as \"<finding-uuid>:<0-999>\"")
+                }
+                let pairs: [FindingRating] = try raw.map { pair in
+                    let parts = pair.split(separator: ":", maxSplits: 1)
+                    guard parts.count == 2, let rating = Int(parts[1]), (0...999).contains(rating) else {
+                        throw ToolError(message: "rating '\(pair)' is not <finding-uuid>:<0-999>")
+                    }
+                    return FindingRating(findingUuid: String(parts[0]), rating: rating)
+                }
+                return try client.exploreRank(
+                    ExploreRankRequest(
+                        promptUuid: try resolvePromptUuid(args, client), ratings: pairs))
+            }),
+        Tool(
+            name: "rpir_get_review",
+            description:
+                "The prompt's review record: summary, findings inside the rating window, stubs outside it. Same window semantics as rpir_get_exploration.",
+            params: [promptSelectorParam] + ratingWindowParams,
+            narrowing: PenNarrowing(
+                parameters: ["max_rating", "rating_range"],
+                retryWith: "rpir_get_review with max_rating=0 for the critical findings only"),
+            degrade: { args, client in
+                try client.reviewGet(
+                    ReviewGetRequest(
+                        promptUuid: try resolvePromptUuid(args, client), ratingMax: 0))
+            },
+            run: { args, client in
+                let window = try args.ratingWindow()
+                return try client.reviewGet(
+                    ReviewGetRequest(
+                        promptUuid: try resolvePromptUuid(args, client),
+                        full: window.full,
+                        ratingMin: window.min,
+                        ratingMax: window.max))
+            }),
+        Tool(
+            name: "rpir_get_clarification",
+            description:
+                "The prompt's clarification record: summary, questions (+answers), notes, and the care package with its dope staleness when one exists.",
+            params: [
+                promptSelectorParam,
+                (
+                    "include_care_package", "boolean",
+                    "Embed the full care package (default true; false leaves a counts-only care_package_stub — the package reads whole through care_package_get)",
+                    false
+                ),
+                (
+                    "note_weight_max", "number",
+                    "Weight window over the notes: at or below stays a full row, above drops to note_stubs (unweighted notes are always full)",
+                    false
+                ),
+            ],
+            // Two things here grow without bound — the embedded care package and
+            // the note bodies — and each has its own switch. Questions are NOT
+            // windowed: a question plus its pre-authored options is bounded by
+            // what a human can answer.
+            narrowing: PenNarrowing(
+                parameters: ["include_care_package", "note_weight_max"],
+                retryWith:
+                    "rpir_get_clarification with include_care_package=false (then care_package_get for the package itself), and note_weight_max=0 for the critical notes only"
+            ),
+            degrade: { args, client in
+                try client.clarifyGet(
+                    ClarifyGetRequest(
+                        promptUuid: try resolvePromptUuid(args, client),
+                        includeCarePackage: false,
+                        noteWeightMax: 0))
+            },
+            run: { args, client in
+                try client.clarifyGet(
+                    ClarifyGetRequest(
+                        promptUuid: try resolvePromptUuid(args, client),
+                        includeCarePackage: args.optBool("include_care_package"),
+                        noteWeightMax: args.optInt("note_weight_max")))
+            }),
+        Tool(
+            name: "rpir_get_architecture",
+            description:
+                "The approved architecture with its implementation state: persistence changes before general changes, each joined to its recorded file changes, plus the touched-but-unplanned set. This is the implementation spec. Option bodies and change_code are STUBBED by default — pass option_uuid / change_uuid / full to read one in full.",
+            params: [
+                promptSelectorParam,
+                (
+                    "include_options", "boolean",
+                    "Return every architect option's full BODY inline (default false — stubs carry uuid, agent, status, selected, body_chars)",
+                    false
+                ),
+                ("option_uuid", "string", "Return exactly this option's body in full", false),
+                (
+                    "full", "boolean",
+                    "Return every general change's change_code verbatim (default false — stubs carry a leading excerpt + change_code_chars)",
+                    false
+                ),
+                ("change_uuid", "string", "Return exactly this general change's change_code in full", false),
+                (
+                    "limit", "number", "Page size over the general change rows (persistence changes are never paged)",
+                    false
+                ),
+                ("cursor", "string", "Continuation from a previous result's change_page.next_cursor", false),
+            ],
+            // THE PEN IS WHAT NARROWS, NOT THE DAEMON. ArchGetRequest's wire
+            // default is still "everything full" so every existing caller —
+            // GMVibes building against this package included — is unchanged by
+            // construction. It is this client, the one feeding an agent harness
+            // with a hard result cap, that opts into the stub form; the schema
+            // above is how an agent opts back out.
+            narrowing: PenNarrowing(
+                parameters: ["limit", "cursor", "option_uuid", "change_uuid"],
+                retryWith:
+                    "rpir_get_architecture with limit (e.g. 10) and a cursor to page the general changes; then option_uuid / change_uuid to read one body at a time"
+            ),
+            degrade: { args, client in
+                try client.archGet(
+                    ArchGetRequest(
+                        promptUuid: try resolvePromptUuid(args, client),
+                        includeOptions: false,
+                        full: false,
+                        limit: 10))
+            },
+            run: { args, client in
+                try client.archGet(
+                    ArchGetRequest(
+                        promptUuid: try resolvePromptUuid(args, client),
+                        includeOptions: args.optBool("include_options") ?? false,
+                        optionUuid: args.optString("option_uuid"),
+                        full: args.optBool("full") ?? false,
+                        changeUuid: args.optString("change_uuid"),
+                        limit: args.optInt("limit"),
+                        cursor: args.optString("cursor")))
+            }),
+        Tool(
+            name: "cde_search_file_changes",
+            description:
+                "Recorded file changes for the prompt (or an explicit session/path). What the machine believes you have touched — read it to check your own capture.",
+            params: [
+                promptSelectorParam,
+                ("session_uuid", "string", "List a whole session instead of one prompt", false),
+                ("path", "string", "Filter to one repo-relative path", false),
+                ("limit", "number", "Max rows", false),
+            ],
+            narrowing: PenNarrowing(
+                parameters: ["limit", "path"],
+                retryWith: "cde_search_file_changes with limit 25 or fewer, or path to scope to one file"),
+            // THE DEGRADE MUST FIT THE BUDGET BY ARITHMETIC, not by hope. A change
+            // row with its line ranges runs ~1,200 bytes, so the old limit of 100
+            // asked for ~120,000 against a 45,000 budget and could NEVER fit: the
+            // call returned zero rows and advised retrying with the same 100.
+            // Measured on a 202-change prompt: 100 -> 109,994 bytes, 60 -> 66,023,
+            // 30 -> fits. 25 keeps headroom for rows carrying many ranges.
+            degrade: { args, client in
+                let session = args.optString("session_uuid")
+                let prompt = session == nil ? try resolvePromptUuid(args, client) : args.optString("prompt_uuid")
+                return try client.listFileChanges(
+                    FileChangeListRequest(
+                        sessionUuid: session,
+                        promptUuid: prompt,
+                        relativePath: args.optString("path"),
+                        limit: 25))
+            },
+            run: { args, client in
+                let session = args.optString("session_uuid")
+                // An explicit session read is session-scoped; otherwise the
+                // prompt is resolved the same way every other record read is.
+                let prompt = session == nil ? try resolvePromptUuid(args, client) : args.optString("prompt_uuid")
+                return try client.listFileChanges(
+                    FileChangeListRequest(
+                        sessionUuid: session,
+                        promptUuid: prompt,
+                        relativePath: args.optString("path"),
+                        limit: args.optInt("limit")))
+            }),
+    ] + makeFastPathTools() + makePrimaryDoorTools() + makePhaseDoorTools() + makeBridgeDoorTools() + makeRecallDoors()
 // MARK: - Upfront loading
 
 // EVERY PEN TOOL LOADS UPFRONT, declared once as `"alwaysLoad": true` on this
@@ -909,91 +1002,105 @@ public enum GmMcpServer {
     /// more concurrent; it would just make that existing call illegal.
     @MainActor
     public static func main() {
-    // Servers spawn with the project dir as cwd; CLAUDE_PROJECT_DIR is the
-    // stable root — chdir so GitContext.detect() resolves the right repo even
-    // if the harness launched us elsewhere.
-    if let projectDir = ProcessInfo.processInfo.environment["CLAUDE_PROJECT_DIR"],
-       !projectDir.isEmpty {
-        FileManager.default.changeCurrentDirectoryPath(projectDir)
-    }
-
-    // ONE CLIENT, ONE SOCKET. Every pen tool is served by the same connection —
-    // there is no caller role on the wire and nothing for the daemon to decide
-    // about who is on the other end.
-    let client = DaemonClient()
-    defer { client.close() }
-
-    validateRosterAgainstRegistry()
-
-    while let line = readLine(strippingNewline: true) {
-        guard !line.isEmpty, let message = JSON.parse(Data(line.utf8)) else { continue }
-        let method = message["method"]?.stringValue ?? ""
-        let id = message["id"]?.any
-        // Notifications (no id) are consumed silently.
-        guard let id, !(id is NSNull) else { continue }
-
-        switch method {
-        case "initialize":
-            // Pin the protocol revision this server actually implements — never
-            // echo the client's (claiming support for future revisions).
-            respond(id: id, result: [
-                "protocolVersion": "2024-11-05",
-                "capabilities": ["tools": [String: Any]()],
-                "serverInfo": [
-                    "name": "gmcc-cde",
-                    "version": "\(GmWireProtocol.version)",
-                ],
-                // Loaded at session start, ahead of any tool schema — the only
-                // place the pen gets to state its own contract.
-                "instructions": PenSheet.instructions,
-            ])
-        case "ping":
-            respond(id: id, result: [:])
-        case "tools/list":
-            respond(id: id, result: [
-                "tools": tools.map { tool in
-                    var entry: [String: Any] = [
-                        "name": tool.name,
-                        "description": tool.description,
-                        "inputSchema": tool.inputSchema,
-                    ]
-                    return entry
-                }
-            ])
-        case "tools/call":
-            let name = message["params"]?["name"]?.stringValue ?? ""
-            let arguments = Args(json: message["params"]?["arguments"] ?? .object([:]))
-            guard let tool = tools.first(where: { $0.name == name }) else {
-                respondError(id: id, code: -32602, message: "unknown tool '\(name)'")
-                continue
-            }
-            do {
-                let result = try tool.run(arguments, client)
-                respond(id: id, result: [
-                    "content": [["type": "text", "text": try renderResult(
-                        tool: tool, args: arguments, client: client, value: result)]],
-                    "isError": false,
-                ])
-            } catch {
-                let text: String
-                switch error {
-                case let toolError as ToolError:
-                    text = toolError.message
-                case let clientError as DaemonClientError:
-                    text = "\(clientError)"
-                default:
-                    text = "\(error)"
-                }
-                // Tool-level failures ride the result envelope (isError), never
-                // a protocol error — the agent should read and react to them.
-                respond(id: id, result: [
-                    "content": [["type": "text", "text": "ERROR: \(text)"]],
-                    "isError": true,
-                ])
-            }
-        default:
-            respondError(id: id, code: -32601, message: "method '\(method)' not supported")
+        // Servers spawn with the project dir as cwd; CLAUDE_PROJECT_DIR is the
+        // stable root — chdir so GitContext.detect() resolves the right repo even
+        // if the harness launched us elsewhere.
+        if let projectDir = ProcessInfo.processInfo.environment["CLAUDE_PROJECT_DIR"],
+            !projectDir.isEmpty
+        {
+            FileManager.default.changeCurrentDirectoryPath(projectDir)
         }
-    }
+
+        // ONE CLIENT, ONE SOCKET. Every pen tool is served by the same connection —
+        // there is no caller role on the wire and nothing for the daemon to decide
+        // about who is on the other end.
+        let client = DaemonClient()
+        defer { client.close() }
+
+        validateRosterAgainstRegistry()
+
+        while let line = readLine(strippingNewline: true) {
+            guard !line.isEmpty, let message = JSON.parse(Data(line.utf8)) else { continue }
+            let method = message["method"]?.stringValue ?? ""
+            let id = message["id"]?.any
+            // Notifications (no id) are consumed silently.
+            guard let id, !(id is NSNull) else { continue }
+
+            switch method {
+            case "initialize":
+                // Pin the protocol revision this server actually implements — never
+                // echo the client's (claiming support for future revisions).
+                respond(
+                    id: id,
+                    result: [
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": ["tools": [String: Any]()],
+                        "serverInfo": [
+                            "name": "gmcc-cde",
+                            "version": "\(GmWireProtocol.version)",
+                        ],
+                        // Loaded at session start, ahead of any tool schema — the only
+                        // place the pen gets to state its own contract.
+                        "instructions": PenSheet.instructions,
+                    ])
+            case "ping":
+                respond(id: id, result: [:])
+            case "tools/list":
+                respond(
+                    id: id,
+                    result: [
+                        "tools": tools.map { tool in
+                            var entry: [String: Any] = [
+                                "name": tool.name,
+                                "description": tool.description,
+                                "inputSchema": tool.inputSchema,
+                            ]
+                            return entry
+                        }
+                    ])
+            case "tools/call":
+                let name = message["params"]?["name"]?.stringValue ?? ""
+                let arguments = Args(json: message["params"]?["arguments"] ?? .object([:]))
+                guard let tool = tools.first(where: { $0.name == name }) else {
+                    respondError(id: id, code: -32602, message: "unknown tool '\(name)'")
+                    continue
+                }
+                do {
+                    let result = try tool.run(arguments, client)
+                    respond(
+                        id: id,
+                        result: [
+                            "content": [
+                                [
+                                    "type": "text",
+                                    "text": try renderResult(
+                                        tool: tool, args: arguments, client: client, value: result),
+                                ]
+                            ],
+                            "isError": false,
+                        ])
+                } catch {
+                    let text: String
+                    switch error {
+                    case let toolError as ToolError:
+                        text = toolError.message
+                    case let clientError as DaemonClientError:
+                        text = "\(clientError)"
+                    default:
+                        text = "\(error)"
+                    }
+                    // Tool-level failures ride the result envelope (isError), never
+                    // a protocol error — the agent should read and react to them.
+                    respond(
+                        id: id,
+                        result: [
+                            "content": [["type": "text", "text": "ERROR: \(text)"]],
+                            "isError": true,
+                        ])
+                }
+            default:
+                respondError(id: id, code: -32601, message: "method '\(method)' not supported")
+            }
+        }
     }
 }

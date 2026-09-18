@@ -69,17 +69,20 @@ struct CatalogFilter: Equatable {
 
                 var sessions = catalog.sessions(of: instance)
                 if excludeCheckedOut,
-                   let checkedOut = checkedOutCodeByInstance[instance.uuid] {
+                    let checkedOut = checkedOutCodeByInstance[instance.uuid]
+                {
                     sessions = sessions.filter { $0.code != checkedOut }
                 }
 
-                let matchingSessions = query.isActive
+                let matchingSessions =
+                    query.isActive
                     ? sessions.filter { $0.matches(query) }
                     : sessions
                 let sessionMatch = query.isActive && !matchingSessions.isEmpty
 
                 // Inclusion: self, ancestor, or descendant match.
-                let keepInstance = !query.isActive || projectMatched
+                let keepInstance =
+                    !query.isActive || projectMatched
                     || instanceMatched || sessionMatch
                 guard keepInstance else { continue }
 
@@ -87,7 +90,8 @@ struct CatalogFilter: Equatable {
                 var kept = (projectMatched || instanceMatched) ? sessions : matchingSessions
 
                 if hoistActive, let active = activeSessionByInstance[instance.uuid],
-                   let idx = kept.firstIndex(where: { $0.uuid == active }), idx != 0 {
+                    let idx = kept.firstIndex(where: { $0.uuid == active }), idx != 0
+                {
                     kept.insert(kept.remove(at: idx), at: 0)
                 }
                 totals[instance.uuid] = kept.count

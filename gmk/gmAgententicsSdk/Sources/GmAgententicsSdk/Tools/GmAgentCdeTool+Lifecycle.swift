@@ -72,10 +72,11 @@ public struct GmAgentLoadedPrompt: Sendable {
 @available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeLoadPromptArguments: Sendable {
-    @Guide(description: """
-        Which prompt: a number like 1, a code like p10, its exact name, a \
-        unique piece of its name, or its uuid.
-        """)
+    @Guide(
+        description: """
+            Which prompt: a number like 1, a code like p10, its exact name, a \
+            unique piece of its name, or its uuid.
+            """)
     public var selector: String
 
     public init(selector: String) {
@@ -106,10 +107,11 @@ public struct GmAgentCdeSetStatusArguments: Sendable {
     @Guide(description: "Version of the prompt you read, so two writers cannot clobber each other.")
     public var expectedVersion: Int
 
-    @Guide(description: """
-        Where to move it: 'initiated' to start, 'done' to finish, or 'draft' to \
-        send a finished prompt back for editing.
-        """, .anyOf(GM_TOOL_ANYOF_PROMPT_STATUS))
+    @Guide(
+        description: """
+            Where to move it: 'initiated' to start, 'done' to finish, or 'draft' to \
+            send a finished prompt back for editing.
+            """, .anyOf(GM_TOOL_ANYOF_PROMPT_STATUS))
     public var status: String
 
     public init(promptUuid: String, expectedVersion: Int, status: String) {

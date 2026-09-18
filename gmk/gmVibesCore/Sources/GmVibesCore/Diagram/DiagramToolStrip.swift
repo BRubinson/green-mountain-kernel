@@ -18,10 +18,13 @@ struct DiagramToolStrip: View {
     var body: some View {
         // Tool picker: only `select` can drag nodes; freehand draws on the
         // drawing layer (trackpad pan works in every tool via the bridge).
-        Picker("Tool", selection: Binding(
-            get: { viewState.tool },
-            set: { viewState.tool = $0 }
-        )) {
+        Picker(
+            "Tool",
+            selection: Binding(
+                get: { viewState.tool },
+                set: { viewState.tool = $0 }
+            )
+        ) {
             ForEach(DiagramTool.allCases) { tool in
                 Image(systemName: tool.symbol).tag(tool).help(tool.help)
             }
@@ -53,8 +56,9 @@ struct DiagramToolStrip: View {
 
         domainPills
 
-        DiagramSearchField(workspace: workspace, viewState: viewState,
-                           onCenter: onCenter)
+        DiagramSearchField(
+            workspace: workspace, viewState: viewState,
+            onCenter: onCenter)
 
         Button {
             onOrganize()
@@ -87,13 +91,15 @@ struct DiagramToolStrip: View {
             Menu {
                 ForEach(dope.tree.domains, id: \.identity.uuid) { domain in
                     let code = domain.body.code
-                    let active = workspace.domainFilter.isEmpty
+                    let active =
+                        workspace.domainFilter.isEmpty
                         || workspace.domainFilter.contains(code)
                     Button {
                         toggle(code, allCodes: dope.tree.domains.map(\.body.code))
                     } label: {
-                        Label(domain.body.name,
-                              systemImage: active ? "checkmark.circle.fill" : "circle")
+                        Label(
+                            domain.body.name,
+                            systemImage: active ? "checkmark.circle.fill" : "circle")
                     }
                 }
                 if !workspace.domainFilter.isEmpty {
@@ -101,10 +107,11 @@ struct DiagramToolStrip: View {
                     Button("Show All Domains") { workspace.setDomainFilter([]) }
                 }
             } label: {
-                Label(workspace.domainFilter.isEmpty
+                Label(
+                    workspace.domainFilter.isEmpty
                         ? "Domains"
                         : "Domains (\(workspace.domainFilter.count))",
-                      systemImage: "square.stack.3d.up")
+                    systemImage: "square.stack.3d.up")
             }
             .help("Filter the diagram to selected domains")
         }
@@ -133,7 +140,8 @@ struct DiagramToolStrip: View {
     }
 
     private func toggle(_ code: String, allCodes: [String]) {
-        var filter = workspace.domainFilter.isEmpty
+        var filter =
+            workspace.domainFilter.isEmpty
             ? Set(allCodes) : workspace.domainFilter
         if filter.contains(code) { filter.remove(code) } else { filter.insert(code) }
         // Everything selected == no filter.
@@ -158,10 +166,13 @@ private struct DiagramSearchField: View {
     }
 
     var body: some View {
-        TextField("Search entities & fields", text: Binding(
-            get: { viewState.searchText },
-            set: { viewState.searchText = $0 }
-        ))
+        TextField(
+            "Search entities & fields",
+            text: Binding(
+                get: { viewState.searchText },
+                set: { viewState.searchText = $0 }
+            )
+        )
         .textFieldStyle(.roundedBorder)
         .frame(width: 180)
         // Return jumps to the best hit; the menu offers the full list.
@@ -172,7 +183,8 @@ private struct DiagramSearchField: View {
         Menu {
             let hits = self.hits
             if hits.isEmpty {
-                Text(viewState.searchText.isEmpty
+                Text(
+                    viewState.searchText.isEmpty
                         ? "Type in the search field first" : "No matches")
             }
             ForEach(hits) { hit in
@@ -199,17 +211,21 @@ private struct DiagramSearchField: View {
             for entity in domain.entities {
                 let entityCode = "\(domain.body.code).\(entity.body.code)"
                 if matches(query, entity.body.name) || matches(query, entity.body.code) {
-                    result.append(Hit(entityCode: entityCode,
-                                      label: "\(entity.body.name)  ·  \(entityCode)",
-                                      rowIndex: nil))
+                    result.append(
+                        Hit(
+                            entityCode: entityCode,
+                            label: "\(entity.body.name)  ·  \(entityCode)",
+                            rowIndex: nil))
                 }
                 // rowIndex maps 1:1 to DRAWN rows for OWN properties (the
                 // composed-base union only appends after them).
                 for (index, property) in entity.properties.enumerated()
                 where matches(query, property.body.name) || matches(query, property.body.code) {
-                    result.append(Hit(entityCode: entityCode,
-                                      label: "\(property.body.code)  ·  \(entityCode)",
-                                      rowIndex: index))
+                    result.append(
+                        Hit(
+                            entityCode: entityCode,
+                            label: "\(property.body.code)  ·  \(entityCode)",
+                            rowIndex: index))
                 }
             }
             if result.count > 20 { break }
@@ -229,8 +245,9 @@ private struct DiagramSearchField: View {
             selectedElementUuid: element.uuid,
             highlightedElementUuids: [element.uuid])
         if let rowIndex = hit.rowIndex {
-            let y = element.rowCenterY(rowIndex,
-                                       environment: workspace.resolved.environment)
+            let y = element.rowCenterY(
+                rowIndex,
+                environment: workspace.resolved.environment)
             onCenter(CGPoint(x: element.frame.midX, y: y))
         } else {
             onCenter(CGPoint(x: element.frame.midX, y: element.frame.midY))
@@ -240,7 +257,8 @@ private struct DiagramSearchField: View {
     private func cardElement(entityCode: String) -> ResolvedElement? {
         func walk(_ element: ResolvedElement) -> ResolvedElement? {
             if case .entityCard(let model) = element.kind,
-               model.entityCode == entityCode {
+                model.entityCode == entityCode
+            {
                 return element
             }
             for child in element.children {

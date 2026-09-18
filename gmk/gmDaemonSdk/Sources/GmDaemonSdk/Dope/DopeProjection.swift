@@ -22,12 +22,14 @@ public enum DopeProjection {
         let main = DopeScopeDocument(
             version: tree.revision,
             scope: tree.body,
-            persistence: Dictionary(uniqueKeysWithValues: tree.domains.map {
-                ($0.body.code, DopeScopeDocument.expectedFile(forPersistenceCode: $0.body.code))
-            }),
-            cogs: Dictionary(uniqueKeysWithValues: liveCogs.map {
-                ($0.code, DopeScopeDocument.expectedCogFile(forCogCode: $0.code))
-            })
+            persistence: Dictionary(
+                uniqueKeysWithValues: tree.domains.map {
+                    ($0.body.code, DopeScopeDocument.expectedFile(forPersistenceCode: $0.body.code))
+                }),
+            cogs: Dictionary(
+                uniqueKeysWithValues: liveCogs.map {
+                    ($0.code, DopeScopeDocument.expectedCogFile(forCogCode: $0.code))
+                })
         )
         let files = tree.domains.map { domain in
             DopePersistenceFileDocument(

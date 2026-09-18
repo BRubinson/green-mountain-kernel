@@ -47,7 +47,8 @@ public enum KernelMenuBarIcon {
         // most likely to be looking at it. The COLOURED signal is the banner;
         // this one is a shape.
         image.isTemplate = true
-        image.accessibilityDescription = kind.isProduction
+        image.accessibilityDescription =
+            kind.isProduction
             ? "GM Kernel"
             : "GM Kernel — \(kind.displayName)"
         return image
@@ -69,8 +70,9 @@ public enum KernelMenuBarIcon {
         ]
         let textSize = text.size(withAttributes: attributes)
         text.draw(
-            at: NSPoint(x: rect.midX - textSize.width / 2,
-                        y: rect.midY - textSize.height / 2),
+            at: NSPoint(
+                x: rect.midX - textSize.width / 2,
+                y: rect.midY - textSize.height / 2),
             withAttributes: attributes)
     }
 
@@ -108,11 +110,11 @@ public enum KernelMenuBarIcon {
     // drawn with a 1.25pt pen.
 
     private static let silhouette: [NSPoint] = [
-        NSPoint(x: 2.2, y: 4.4),     // base left
-        NSPoint(x: 6.6, y: 11.4),    // shoulder peak
-        NSPoint(x: 8.2, y: 9.2),     // notch
-        NSPoint(x: 10.8, y: 15.4),   // SUMMIT
-        NSPoint(x: 15.8, y: 4.4),    // base right
+        NSPoint(x: 2.2, y: 4.4),  // base left
+        NSPoint(x: 6.6, y: 11.4),  // shoulder peak
+        NSPoint(x: 8.2, y: 9.2),  // notch
+        NSPoint(x: 10.8, y: 15.4),  // SUMMIT
+        NSPoint(x: 15.8, y: 4.4),  // base right
     ]
 
     /// An open zigzag across the summit's two flanks, its ends sitting ON them
@@ -134,8 +136,8 @@ public enum KernelMenuBarIcon {
     /// says "snow line" rather than "contour" because it dips where a gully
     /// would.
     private static let snowLine: [NSPoint] = [
-        NSPoint(x: 8.95, y: 11.0),   // on the left flank
-        NSPoint(x: 10.9, y: 9.9),    // the gully
+        NSPoint(x: 8.95, y: 11.0),  // on the left flank
+        NSPoint(x: 10.9, y: 9.9),  // the gully
         NSPoint(x: 12.80, y: 11.0),  // on the right flank
     ]
 

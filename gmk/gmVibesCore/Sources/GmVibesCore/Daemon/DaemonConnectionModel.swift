@@ -135,7 +135,7 @@ final class DaemonConnectionModel {
                     await self.probe()
                 }
             }
-            await group.next()   // consumeEvents ended; the watchdog never returns
+            await group.next()  // consumeEvents ended; the watchdog never returns
             group.cancelAll()
         }
         if ContinuousClock.now - started < .seconds(2) {
@@ -171,14 +171,16 @@ final class DaemonConnectionModel {
             case .clientTooOld(let daemonVersion):
                 setHealth(.incompatible(daemonVersion: daemonVersion))
             default:
-                setHealth(.down(
-                    reason: intentionalStop ? "Daemon stopped" : error.userMessage,
-                    intentional: intentionalStop))
+                setHealth(
+                    .down(
+                        reason: intentionalStop ? "Daemon stopped" : error.userMessage,
+                        intentional: intentionalStop))
             }
         } catch {
-            setHealth(.down(
-                reason: intentionalStop ? "Daemon stopped" : String(describing: error),
-                intentional: intentionalStop))
+            setHealth(
+                .down(
+                    reason: intentionalStop ? "Daemon stopped" : String(describing: error),
+                    intentional: intentionalStop))
         }
     }
 
@@ -322,7 +324,7 @@ final class DaemonConnectionModel {
 
     private func route(_ event: EventNotification) {
         guard let kind = DaemonEventKind(rawValue: event.kind) else {
-            return // forward compat: unknown kinds bump nothing
+            return  // forward compat: unknown kinds bump nothing
         }
         switch kind {
         case .createProject, .createInstance, .createSession, .updateProject:
@@ -393,7 +395,7 @@ final class DaemonConnectionModel {
             if let uuid = event.subjectUuid { hub.invalidate(.memories(uuid.lowercased())) }
         case .checkoutChange:
             guard let payload = event.payload, let data = payload.data(using: .utf8),
-                  let decoded = try? WireCodec.decoder.decode(CheckoutChangePayload.self, from: data)
+                let decoded = try? WireCodec.decoder.decode(CheckoutChangePayload.self, from: data)
             else { break }
             checkoutSink?.applyCheckoutChange(
                 instanceUuid: decoded.instanceUuid.lowercased(),

@@ -22,14 +22,17 @@ typealias JSONValue = GmJsonValue
 /// silent key rewrite here would be a second dialect to learn.
 func runCall(_ argv: [String]) -> Int32 {
     guard let typeName = argv.first, !typeName.hasPrefix("-") else {
-        FileHandle.standardError.write(Data("[GMB] usage: gm_hook call <MESSAGE_TYPE> [--json '<payload>'] [--json-file <path>]\n".utf8))
+        FileHandle.standardError.write(
+            Data("[GMB] usage: gm_hook call <MESSAGE_TYPE> [--json '<payload>'] [--json-file <path>]\n".utf8))
         return 2
     }
     guard let type = MessageType(rawValue: typeName.uppercased()) else {
-        FileHandle.standardError.write(Data("""
-            [GMB] unknown message type '\(typeName)'. `gm_hook verbs --json` lists every type the daemon serves.
+        FileHandle.standardError.write(
+            Data(
+                """
+                [GMB] unknown message type '\(typeName)'. `gm_hook verbs --json` lists every type the daemon serves.
 
-            """.utf8))
+                """.utf8))
         return 2
     }
 
@@ -50,7 +53,7 @@ func runCall(_ argv: [String]) -> Int32 {
             // passed inline at all. This is the same reason the retired CLI grew
             // its --*-file flags.
             guard index + 1 < argv.count,
-                  let data = FileManager.default.contents(atPath: argv[index + 1])
+                let data = FileManager.default.contents(atPath: argv[index + 1])
             else {
                 FileHandle.standardError.write(Data("[GMB] --json-file needs a readable path\n".utf8))
                 return 2

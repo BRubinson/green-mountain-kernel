@@ -55,8 +55,11 @@ final class SocketConnection {
         }
 
         var timeout = timeval(tv_sec: 30, tv_usec: 0)
-        guard setsockopt(conn.fd, SOL_SOCKET, SO_RCVTIMEO,
-                         &timeout, socklen_t(MemoryLayout<timeval>.size)) == 0 else {
+        guard
+            setsockopt(
+                conn.fd, SOL_SOCKET, SO_RCVTIMEO,
+                &timeout, socklen_t(MemoryLayout<timeval>.size)) == 0
+        else {
             let code = errno
             let err = String(cString: strerror(code))
             Darwin.close(conn.fd)
@@ -129,12 +132,13 @@ final class SocketConnection {
             while received < count {
                 let n = Darwin.recv(fd, ptr + received, count - received, 0)
                 guard n > 0 else {
-                    failure = n == 0
+                    failure =
+                        n == 0
                         ? .transportFailed(reason: "Connection closed by iTerm2", errno: nil)
                         : .transportFailed(
                             reason: "Socket recv failed: \(String(cString: strerror(errno)))",
                             errno: errno
-                          )
+                        )
                     return
                 }
                 received += n
@@ -167,7 +171,8 @@ final class SocketConnection {
             }
             accumulated.append(chunk.prefix(n))
             if accumulated.count >= delimiter.count,
-               accumulated.suffix(delimiter.count) == delimiter {
+                accumulated.suffix(delimiter.count) == delimiter
+            {
                 return accumulated
             }
             if accumulated.count > 65_536 {
@@ -188,9 +193,10 @@ final class SocketConnection {
     }
 
     static func socketPath() -> String {
-        let appSupport = NSSearchPathForDirectoriesInDomains(
-            .applicationSupportDirectory, .userDomainMask, true
-        ).first ?? NSHomeDirectory() + "/Library/Application Support"
+        let appSupport =
+            NSSearchPathForDirectoriesInDomains(
+                .applicationSupportDirectory, .userDomainMask, true
+            ).first ?? NSHomeDirectory() + "/Library/Application Support"
         let suite = ProcessInfo.processInfo.environment["IT2_SUITE"] ?? "iTerm2"
         return "\(appSupport)/\(suite)/private/socket"
     }

@@ -39,10 +39,13 @@ enum DiagramDomainFilter {
     /// Drop entity cards outside the selection; every other kind survives
     /// (drawings and text belong to the user, not to a domain, and a ghost
     /// card has no domain to test).
-    private static func keep(_ element: ResolvedElement, domains: Set<String>,
-                             kept: inout Set<String>) -> ResolvedElement? {
+    private static func keep(
+        _ element: ResolvedElement, domains: Set<String>,
+        kept: inout Set<String>
+    ) -> ResolvedElement? {
         if case .entityCard(let model) = element.kind,
-           !domains.contains(model.domainCode) {
+            !domains.contains(model.domainCode)
+        {
             return nil
         }
         let children = element.children.compactMap { keep($0, domains: domains, kept: &kept) }
@@ -56,8 +59,10 @@ enum DiagramDomainFilter {
 
     /// The union of what is still drawn — the resolver's own contentBounds
     /// contract, recomputed over the survivors.
-    private static func bounds(topLevel: [ResolvedElement],
-                               edges: [ResolvedEdge]) -> CGRect? {
+    private static func bounds(
+        topLevel: [ResolvedElement],
+        edges: [ResolvedEdge]
+    ) -> CGRect? {
         var union: CGRect?
         func absorb(_ rect: CGRect) {
             union = union.map { $0.union(rect) } ?? rect

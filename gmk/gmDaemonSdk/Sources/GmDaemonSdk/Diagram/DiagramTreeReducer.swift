@@ -65,8 +65,9 @@ public enum DiagramTreeReducer {
             throw DiagramReducerError.badRequest(detail: "batch-apply carried no mutations")
         }
         if let expected = expectedRevision, expected != tree.revision {
-            throw DiagramReducerError.revisionConflict(expected: expected,
-                                                       actual: tree.revision)
+            throw DiagramReducerError.revisionConflict(
+                expected: expected,
+                actual: tree.revision)
         }
 
         var elements = tree.elements
@@ -87,10 +88,11 @@ public enum DiagramTreeReducer {
         }
 
         return DiagramTree(
-            identity: DopeNodeIdentity(uuid: tree.identity.uuid,
-                                       version: row.version,
-                                       createdAt: tree.identity.createdAt,
-                                       updatedAt: row.updatedAt),
+            identity: DopeNodeIdentity(
+                uuid: tree.identity.uuid,
+                version: row.version,
+                createdAt: tree.identity.createdAt,
+                updatedAt: row.updatedAt),
             tier: tree.tier, projectUuid: tree.projectUuid,
             instanceUuid: tree.instanceUuid, sessionUuid: tree.sessionUuid,
             promptUuid: tree.promptUuid, code: row.code, name: row.name,
@@ -133,8 +135,9 @@ public enum DiagramTreeReducer {
         var parentUuid = add.parentElementUuid
         if let ref = add.parentClientRef {
             guard let resolved = ledger[ref] else {
-                throw DiagramReducerError.badRequest(detail:
-                    "parentClientRef '\(ref)' does not name an earlier elementAdd in this batch")
+                throw DiagramReducerError.badRequest(
+                    detail:
+                        "parentClientRef '\(ref)' does not name an earlier elementAdd in this batch")
             }
             parentUuid = resolved
         }
@@ -159,8 +162,9 @@ public enum DiagramTreeReducer {
             var targetUuid = connector.targetElementUuid
             if let ref = add.targetClientRef {
                 guard let resolved = ledger[ref] else {
-                    throw DiagramReducerError.badRequest(detail:
-                        "targetClientRef '\(ref)' does not name an earlier elementAdd in this batch")
+                    throw DiagramReducerError.badRequest(
+                        detail:
+                            "targetClientRef '\(ref)' does not name an earlier elementAdd in this batch")
                 }
                 targetUuid = resolved
             }
@@ -171,15 +175,16 @@ public enum DiagramTreeReducer {
                 try validateConnectorTarget(
                     referrerUuid: "(new connector)", parentOfReferrer: parentUuid,
                     targetUuid: targetUuid, elements: elements)
-                payload = .connector(ConnectorPayload(
-                    targetElementUuid: targetUuid,
-                    strokeColor: connector.strokeColor,
-                    strokeWidth: connector.strokeWidth,
-                    lineStyle: connector.lineStyle,
-                    headKind: connector.headKind,
-                    routingKind: connector.routingKind,
-                    tailKind: connector.tailKind,
-                    label: connector.label))
+                payload = .connector(
+                    ConnectorPayload(
+                        targetElementUuid: targetUuid,
+                        strokeColor: connector.strokeColor,
+                        strokeWidth: connector.strokeWidth,
+                        lineStyle: connector.lineStyle,
+                        headKind: connector.headKind,
+                        routingKind: connector.routingKind,
+                        tailKind: connector.tailKind,
+                        label: connector.label))
             }
         } else if add.targetClientRef != nil {
             throw DiagramReducerError.badRequest(
@@ -199,16 +204,19 @@ public enum DiagramTreeReducer {
         if let scale = add.scale, scale <= 0 {
             throw DiagramReducerError.badRequest(detail: "scale must be > 0")
         }
-        let siblings = parentUuid.map { uuid in
-            findNode(uuid, in: elements)?.children ?? []
-        } ?? elements
-        let sortOrder = add.sortOrder
+        let siblings =
+            parentUuid.map { uuid in
+                findNode(uuid, in: elements)?.children ?? []
+            } ?? elements
+        let sortOrder =
+            add.sortOrder
             ?? ((siblings.map(\.base.sortOrder).max() ?? -1) + 1)
 
         let now = minting.now()
         let node = DiagramElementNode(
-            identity: DopeNodeIdentity(uuid: minting.mintUuid(), version: 0,
-                                       createdAt: now, updatedAt: now),
+            identity: DopeNodeIdentity(
+                uuid: minting.mintUuid(), version: 0,
+                createdAt: now, updatedAt: now),
             base: DiagramElementBase(
                 code: code, name: add.name ?? type.defaultName,
                 description: add.description ?? "", sortOrder: sortOrder,
@@ -253,7 +261,8 @@ public enum DiagramTreeReducer {
         if let newParent = update.parentElementUuid, newParent == update.elementUuid {
             throw DiagramReducerError.badRequest(detail: "an element cannot parent itself")
         }
-        let hasBasePatch = update.code != nil || update.name != nil
+        let hasBasePatch =
+            update.code != nil || update.name != nil
             || update.description != nil || update.sortOrder != nil
             || update.centerX != nil || update.centerY != nil
             || update.elementZ != nil || update.scale != nil
@@ -263,8 +272,10 @@ public enum DiagramTreeReducer {
         }
         if let payload = update.payload {
             guard payload.elementType == type else {
-                throw DiagramReducerError.badRequest(detail:
-                    "payload kind '\(payload.elementType.rawValue)' does not match element type '\(type.rawValue)' — type morphing is refused")
+                throw DiagramReducerError.badRequest(
+                    detail:
+                        "payload kind '\(payload.elementType.rawValue)' does not match element type '\(type.rawValue)' — type morphing is refused"
+                )
             }
         }
 
@@ -276,8 +287,9 @@ public enum DiagramTreeReducer {
             if update.parentElementUuid != nil, finalParentType == nil {
                 throw DiagramReducerError.notFound(elementUuid: update.parentElementUuid!)
             }
-            try validateShape(type: type, parentType: finalParentType,
-                              payload: update.payload ?? node.payload)
+            try validateShape(
+                type: type, parentType: finalParentType,
+                payload: update.payload ?? node.payload)
         }
 
         // Detach when reparenting, then rewrite in place.
@@ -303,10 +315,11 @@ public enum DiagramTreeReducer {
         minting: some DiagramIdentityMinting
     ) -> DiagramElementNode {
         DiagramElementNode(
-            identity: DopeNodeIdentity(uuid: node.identity.uuid,
-                                       version: node.identity.version + 1,
-                                       createdAt: node.identity.createdAt,
-                                       updatedAt: minting.now()),
+            identity: DopeNodeIdentity(
+                uuid: node.identity.uuid,
+                version: node.identity.version + 1,
+                createdAt: node.identity.createdAt,
+                updatedAt: minting.now()),
             base: DiagramElementBase(
                 code: update.code ?? node.base.code,
                 name: update.name ?? node.base.name,
@@ -377,18 +390,21 @@ public enum DiagramTreeReducer {
         let spec = DiagramElementTypeSpec.spec(for: type)
         if let allowed = spec.allowedParentTypes {
             guard let parentType else {
-                throw DiagramReducerError.badRequest(detail:
-                    "\(type.rawValue) elements need a parent element ("
-                    + allowed.map(\.rawValue).sorted().joined(separator: "/") + ")")
+                throw DiagramReducerError.badRequest(
+                    detail:
+                        "\(type.rawValue) elements need a parent element ("
+                        + allowed.map(\.rawValue).sorted().joined(separator: "/") + ")")
             }
             guard allowed.contains(parentType) else {
-                throw DiagramReducerError.badRequest(detail:
-                    "a \(type.rawValue) cannot live under a \(parentType.rawValue) (legal: "
-                    + allowed.map(\.rawValue).sorted().joined(separator: "/") + ")")
+                throw DiagramReducerError.badRequest(
+                    detail:
+                        "a \(type.rawValue) cannot live under a \(parentType.rawValue) (legal: "
+                        + allowed.map(\.rawValue).sorted().joined(separator: "/") + ")")
             }
         } else if parentType != nil {
-            throw DiagramReducerError.badRequest(detail:
-                "\(type.rawValue) is a top-level element type and cannot have a parent")
+            throw DiagramReducerError.badRequest(
+                detail:
+                    "\(type.rawValue) is a top-level element type and cannot have a parent")
         }
         switch payload {
         case .dopeScopePersistenceLayer(let p):
@@ -472,8 +488,9 @@ public enum DiagramTreeReducer {
             targetExists: targetExists
         ) {
             throw DiagramReducerError.badRequest(
-                detail: violation.message(role: "connector \(ref.role)",
-                                          referrer: referrerUuid, target: targetUuid))
+                detail: violation.message(
+                    role: "connector \(ref.role)",
+                    referrer: referrerUuid, target: targetUuid))
         }
     }
 
@@ -485,15 +502,18 @@ public enum DiagramTreeReducer {
 
     // MARK: - Code minting (mirrors mintElementCode)
 
-    private static func mintCode(type: DiagramElementType,
-                                 elements: [DiagramElementNode]) -> String {
+    private static func mintCode(
+        type: DiagramElementType,
+        elements: [DiagramElementNode]
+    ) -> String {
         let prefix = type.codePrefix + "_"
         var maxSuffix = 0
         func walk(_ nodes: [DiagramElementNode]) {
             for node in nodes {
                 if node.base.code.hasPrefix(prefix),
-                   let suffix = Int(node.base.code.dropFirst(prefix.count)),
-                   (0...maxMintedSuffix).contains(suffix) {
+                    let suffix = Int(node.base.code.dropFirst(prefix.count)),
+                    (0...maxMintedSuffix).contains(suffix)
+                {
                     maxSuffix = max(maxSuffix, suffix)
                 }
                 walk(node.children)
@@ -515,8 +535,10 @@ public enum DiagramTreeReducer {
         return nil
     }
 
-    private static func findParentUuid(of uuid: String,
-                                       in elements: [DiagramElementNode]) -> String? {
+    private static func findParentUuid(
+        of uuid: String,
+        in elements: [DiagramElementNode]
+    ) -> String? {
         func walk(_ nodes: [DiagramElementNode], parent: String?) -> String? {
             for node in nodes {
                 if node.identity.uuid == uuid { return parent }
@@ -528,8 +550,10 @@ public enum DiagramTreeReducer {
     }
 
     @discardableResult
-    private static func removeNode(_ uuid: String,
-                                   in elements: inout [DiagramElementNode]) -> DiagramElementNode? {
+    private static func removeNode(
+        _ uuid: String,
+        in elements: inout [DiagramElementNode]
+    ) -> DiagramElementNode? {
         if let index = elements.firstIndex(where: { $0.identity.uuid == uuid }) {
             return elements.remove(at: index)
         }
@@ -543,12 +567,15 @@ public enum DiagramTreeReducer {
         return nil
     }
 
-    private static func insertChild(_ node: DiagramElementNode, under parentUuid: String,
-                                    in elements: inout [DiagramElementNode]) -> Bool {
+    private static func insertChild(
+        _ node: DiagramElementNode, under parentUuid: String,
+        in elements: inout [DiagramElementNode]
+    ) -> Bool {
         for index in elements.indices {
             if elements[index].identity.uuid == parentUuid {
-                elements[index] = withChildren(elements[index],
-                                               elements[index].children + [node])
+                elements[index] = withChildren(
+                    elements[index],
+                    elements[index].children + [node])
                 return true
             }
             var children = elements[index].children
@@ -578,10 +605,13 @@ public enum DiagramTreeReducer {
         return false
     }
 
-    private static func withChildren(_ node: DiagramElementNode,
-                                     _ children: [DiagramElementNode]) -> DiagramElementNode {
-        DiagramElementNode(identity: node.identity, base: node.base,
-                           payload: node.payload, children: children)
+    private static func withChildren(
+        _ node: DiagramElementNode,
+        _ children: [DiagramElementNode]
+    ) -> DiagramElementNode {
+        DiagramElementNode(
+            identity: node.identity, base: node.base,
+            payload: node.payload, children: children)
     }
 
     /// The store reads children `ORDER BY element_z, sort_order, code` —

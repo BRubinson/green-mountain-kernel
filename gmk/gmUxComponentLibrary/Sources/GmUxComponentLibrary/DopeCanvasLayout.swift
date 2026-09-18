@@ -33,17 +33,22 @@ public enum DopeCanvasLayout {
         var mutations: [DiagramMutation] = []
 
         for element in existing {
-            mutations.append(.elementDelete(DiagramElementDelete(
-                elementUuid: element.identity.uuid,
-                expectedVersion: element.identity.version)))
+            mutations.append(
+                .elementDelete(
+                    DiagramElementDelete(
+                        elementUuid: element.identity.uuid,
+                        expectedVersion: element.identity.version)))
         }
 
-        mutations.append(.elementAdd(DiagramElementAdd(
-            clientRef: "scope",
-            code: "scope_\(tree.body.code)",
-            name: tree.body.name,
-            centerX: 0, centerY: 0, elementZ: 0,
-            payload: .dopeScopePersistenceLayer(DopeScopePersistenceLayerPayload(dopeScopeCode: tree.body.code)))))
+        mutations.append(
+            .elementAdd(
+                DiagramElementAdd(
+                    clientRef: "scope",
+                    code: "scope_\(tree.body.code)",
+                    name: tree.body.name,
+                    centerX: 0, centerY: 0, elementZ: 0,
+                    payload: .dopeScopePersistenceLayer(DopeScopePersistenceLayerPayload(dopeScopeCode: tree.body.code))
+                )))
 
         var xCursor = 0.0
         var sort = 0
@@ -60,15 +65,17 @@ public enum DopeCanvasLayout {
                     let rows = DiagramResolver.entityCard(entityCode, in: tree)?.rows.count ?? 1
                     let height = environment.cardHeight(rowCount: rows)
                     sort += 1
-                    mutations.append(.elementAdd(DiagramElementAdd(
-                        parentClientRef: "scope",
-                        code: "\(domain.body.code)_\(entity.body.code)",
-                        name: entity.body.name,
-                        sortOrder: sort,
-                        centerX: columnX,
-                        centerY: yCursor + height / 2,
-                        elementZ: Double(sort),
-                        payload: .dopeEntity(DopeEntityPayload(entityCode: entityCode)))))
+                    mutations.append(
+                        .elementAdd(
+                            DiagramElementAdd(
+                                parentClientRef: "scope",
+                                code: "\(domain.body.code)_\(entity.body.code)",
+                                name: entity.body.name,
+                                sortOrder: sort,
+                                centerX: columnX,
+                                centerY: yCursor + height / 2,
+                                elementZ: Double(sort),
+                                payload: .dopeEntity(DopeEntityPayload(entityCode: entityCode)))))
                     yCursor += height + metrics.yGap
                 }
             }

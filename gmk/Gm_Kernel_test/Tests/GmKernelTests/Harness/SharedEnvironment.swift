@@ -97,8 +97,9 @@ final class SharedEnvironment: NSObject, XCTestObservation {
     /// built", not a wall of assertion failures that look like regressions.
     var isAvailable: Bool {
         guard let client else { return false }
-        return (try? client.request(
-            type: .ping, payload: PingRequest(), responseType: PingResponse.self)) != nil
+        return
+            (try? client.request(
+                type: .ping, payload: PingRequest(), responseType: PingResponse.self)) != nil
     }
 
     /// Round-trip one verb. The suite's ONLY write path — every mutation goes
@@ -161,13 +162,15 @@ final class SharedEnvironment: NSObject, XCTestObservation {
     /// the working tree — green for code that does not exist here.
     private static func locateKernelBinary() -> URL? {
         if let explicit = ProcessInfo.processInfo.environment["GM_TEST_KERNEL_BIN"],
-           !explicit.isEmpty,
-           FileManager.default.isExecutableFile(atPath: explicit) {
+            !explicit.isEmpty,
+            FileManager.default.isExecutableFile(atPath: explicit)
+        {
             return URL(fileURLWithPath: explicit)
         }
         let repo = repoRoot()
         for config in ["debug", "release"] {
-            let candidate = repo
+            let candidate =
+                repo
                 .appendingPathComponent("gmk/gmKernel/.build/\(config)/gm_kernel")
             if FileManager.default.isExecutableFile(atPath: candidate.path) {
                 return candidate

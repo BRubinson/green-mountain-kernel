@@ -6,9 +6,11 @@ import SwiftUI
 // range-walk the old reader used, but keyed by per-occurrence ordinal rather than
 // by a structural anchor, so it can distinguish the Nth match within one string.
 enum FindHighlight {
-    static func attributed(_ source: String,
-                           query: SearchQuery,
-                           activeLocalOccurrence: Int?) -> AttributedString {
+    static func attributed(
+        _ source: String,
+        query: SearchQuery,
+        activeLocalOccurrence: Int?
+    ) -> AttributedString {
         var attr = AttributedString(source)
         let ranges = query.ranges(in: source)
         guard !ranges.isEmpty else { return attr }
@@ -35,10 +37,12 @@ struct HighlightedText: View {
     var font: Font = .system(.body, design: .monospaced)
 
     var body: some View {
-        Text(query.isActive
-             ? FindHighlight.attributed(source, query: query, activeLocalOccurrence: activeLocalOccurrence)
-             : AttributedString(source))
-            .font(font)
-            .textSelection(.enabled)
+        Text(
+            query.isActive
+                ? FindHighlight.attributed(source, query: query, activeLocalOccurrence: activeLocalOccurrence)
+                : AttributedString(source)
+        )
+        .font(font)
+        .textSelection(.enabled)
     }
 }

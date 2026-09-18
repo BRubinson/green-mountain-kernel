@@ -101,7 +101,7 @@
       "sort_order" : 30
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Persistence/Migrations/m0014_dopeCogElement.swift",
   "sort_order" : 8,
   "version" : 767
 }

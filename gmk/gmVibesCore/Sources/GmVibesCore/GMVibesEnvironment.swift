@@ -3,7 +3,7 @@ import Observation
 import GmDaemonSdk
 
 enum GMVibesEnvKey: String, CaseIterable, Hashable {
-    case gmFsRoot       = "GM_FS_ROOT"
+    case gmFsRoot = "GM_FS_ROOT"
     // The kbite roots survive only for the KBites browser's filesystem tabs;
     // they die when the daemon serves kbite tree listings (written goal).
     //
@@ -12,8 +12,8 @@ enum GMVibesEnvKey: String, CaseIterable, Hashable {
     // contract has listed this pair as retired for a while. They are a
     // best-effort probe over names nothing writes, which is why the rename is
     // free — but leaving them on the retired prefix would read as an oversight.
-    case kbiteDigested  = "GM_KBITE_DIGESTED"
-    case kbiteOpen      = "GM_KBITE_OPEN"
+    case kbiteDigested = "GM_KBITE_DIGESTED"
+    case kbiteOpen = "GM_KBITE_OPEN"
 }
 
 /// Locator for the filesystem roots (memory files, folder-open actions, KBites
@@ -107,8 +107,9 @@ final class GMVibesEnvironment {
             } catch {
                 // Probe keeps serving; log so a divergent-root situation
                 // (daemon root ≠ probed root) is at least diagnosable.
-                NSLog("GMVibes: PATHS_GET failed, keeping probed roots: %@",
-                      String(describing: error))
+                NSLog(
+                    "GMVibes: PATHS_GET failed, keeping probed roots: %@",
+                    String(describing: error))
             }
         }
         loadInFlight = task
@@ -143,6 +144,6 @@ final class GMVibesEnvironment {
 
     private func publish() {
         let merged = probed.merging(fromDaemon) { _, daemon in daemon }
-        if values != merged { values = merged }   // change-gated (house idiom)
+        if values != merged { values = merged }  // change-gated (house idiom)
     }
 }

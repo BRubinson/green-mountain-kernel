@@ -82,12 +82,15 @@ struct WorkflowStripModel: Equatable {
         // is still the truthful "this is where the run is" highlight.
         guard let variant = BotVariant(rawValue: response.workflow.variant) else {
             return WorkflowStripModel(
-                pills: [Pill(id: served,
-                             title: title(forPhaseCode: served),
-                             state: closed ? .done : .current,
-                             // No variant means no (variant, phase) pair to
-                             // look instructions up with.
-                             instructions: nil)],
+                pills: [
+                    Pill(
+                        id: served,
+                        title: title(forPhaseCode: served),
+                        state: closed ? .done : .current,
+                        // No variant means no (variant, phase) pair to
+                        // look instructions up with.
+                        instructions: nil)
+                ],
                 blockers: response.gateBlockers,
                 closed: closed,
                 variantLabel: nil)
@@ -101,10 +104,11 @@ struct WorkflowStripModel: Equatable {
         let servedIndex = graph.firstIndex { $0.rawValue == served }
 
         var pills = graph.enumerated().map { index, phase in
-            Pill(id: phase.rawValue,
-                 title: title(forPhaseCode: phase.rawValue),
-                 state: pillState(index: index, servedIndex: servedIndex, closed: closed),
-                 instructions: WorkflowSpec.instructions(variant: variant, phase: phase))
+            Pill(
+                id: phase.rawValue,
+                title: title(forPhaseCode: phase.rawValue),
+                state: pillState(index: index, servedIndex: servedIndex, closed: closed),
+                instructions: WorkflowSpec.instructions(variant: variant, phase: phase))
         }
 
         // Rule 2: keep the highlight rather than dropping it. An unknown
@@ -113,10 +117,12 @@ struct WorkflowStripModel: Equatable {
         // graph with no current pill. Under rule 3 it still renders `.done`
         // — closed wins everywhere.
         if servedIndex == nil, !served.isEmpty {
-            pills.append(Pill(id: served,
-                              title: title(forPhaseCode: served),
-                              state: closed ? .done : .unknown,
-                              instructions: nil))
+            pills.append(
+                Pill(
+                    id: served,
+                    title: title(forPhaseCode: served),
+                    state: closed ? .done : .unknown,
+                    instructions: nil))
         }
 
         return WorkflowStripModel(

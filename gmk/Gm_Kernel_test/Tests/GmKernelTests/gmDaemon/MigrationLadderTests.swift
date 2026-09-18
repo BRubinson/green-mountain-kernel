@@ -77,18 +77,22 @@ final class MigrationLadderTests: XCTestCase {
         try Migrations.migrator.migrate(queue)
 
         try queue.read { db in
-            let tables = try Set(String.fetchAll(
-                db, sql: "SELECT name FROM sqlite_master WHERE type = 'table'"))
+            let tables = try Set(
+                String.fetchAll(
+                    db, sql: "SELECT name FROM sqlite_master WHERE type = 'table'"))
             XCTAssertTrue(tables.contains("test_run"))
             XCTAssertTrue(tables.contains("project_test_lock"))
 
             // The autoindex SQLite creates to back an inline UNIQUE. Its
             // presence is the constraint's fingerprint.
-            let autoindexes = try Set(String.fetchAll(db, sql: """
-                SELECT name FROM sqlite_master
-                 WHERE type = 'index' AND tbl_name = 'project_test_lock'
-                   AND name LIKE 'sqlite_autoindex%'
-                """))
+            let autoindexes = try Set(
+                String.fetchAll(
+                    db,
+                    sql: """
+                        SELECT name FROM sqlite_master
+                         WHERE type = 'index' AND tbl_name = 'project_test_lock'
+                           AND name LIKE 'sqlite_autoindex%'
+                        """))
             XCTAssertFalse(
                 autoindexes.isEmpty,
                 "project_test_lock lost its inline UNIQUE — a lock table without "
@@ -97,9 +101,12 @@ final class MigrationLadderTests: XCTestCase {
             // No CHECK constraints on the enum columns: post-m0021 the
             // vocabulary lives in Swift, because an inline CHECK costs a
             // twelve-step rebuild the first time an arm is added.
-            let ddl = try String.fetchOne(db, sql: """
-                SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'test_run'
-                """) ?? ""
+            let ddl =
+                try String.fetchOne(
+                    db,
+                    sql: """
+                        SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'test_run'
+                        """) ?? ""
             XCTAssertFalse(
                 ddl.uppercased().contains("CHECK"),
                 "test_run must carry no CHECK — states live in TestRunState")
@@ -118,7 +125,8 @@ final class MigrationLadderTests: XCTestCase {
         let versions = try queue.read {
             try Int.fetchAll($0, sql: "SELECT version FROM schema_migrations ORDER BY version")
         }
-        XCTAssertEqual(versions, Array(1...Migrations.currentSchemaVersion),
-                       "the ledger must be dense and duplicate-free from 1 to head")
+        XCTAssertEqual(
+            versions, Array(1...Migrations.currentSchemaVersion),
+            "the ledger must be dense and duplicate-free from 1 to head")
     }
 }

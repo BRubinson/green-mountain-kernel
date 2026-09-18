@@ -1185,10 +1185,12 @@ public struct PromptQualifiedDiagramRow: Codable, Hashable, Sendable {
     public let createdAt: String
     public let updatedAt: String
 
-    public init(uuid: String, promptUuid: String, diagramUuid: String,
-                renderedPath: String, renderedRevision: Int64,
-                renderFingerprint: String, qualification: String,
-                version: Int64, createdAt: String, updatedAt: String) {
+    public init(
+        uuid: String, promptUuid: String, diagramUuid: String,
+        renderedPath: String, renderedRevision: Int64,
+        renderFingerprint: String, qualification: String,
+        version: Int64, createdAt: String, updatedAt: String
+    ) {
         self.uuid = uuid
         self.promptUuid = promptUuid
         self.diagramUuid = diagramUuid
@@ -1213,9 +1215,11 @@ public struct PromptDiagramQualifyRequest: Codable, Hashable, Sendable {
     public let renderFingerprint: String
     public let qualification: String
 
-    public init(promptUuid: String, diagramUuid: String, renderedPath: String,
-                renderedRevision: Int64, renderFingerprint: String,
-                qualification: String) {
+    public init(
+        promptUuid: String, diagramUuid: String, renderedPath: String,
+        renderedRevision: Int64, renderFingerprint: String,
+        qualification: String
+    ) {
         self.promptUuid = promptUuid
         self.diagramUuid = diagramUuid
         self.renderedPath = renderedPath
@@ -3536,7 +3540,9 @@ public struct SessionResolveResponse: Codable, Hashable, Sendable {
     /// stays slugged; the two are never interconverted client-side.
     public let currentBranch: String?
 
-    public init(session: SessionRow, checkedOut: Bool, headState: String, currentSessionCode: String?, currentBranch: String?) {
+    public init(
+        session: SessionRow, checkedOut: Bool, headState: String, currentSessionCode: String?, currentBranch: String?
+    ) {
         self.session = session
         self.checkedOut = checkedOut
         self.headState = headState
@@ -3933,8 +3939,10 @@ public struct DopeGetRequest: Codable, Hashable, Sendable {
     /// omits it means "unresolved", which is today's behavior.
     public let resolved: Bool?
 
-    public init(sessionUuid: String, promptUuid: String? = nil, code: String? = nil,
-                resolved: Bool? = nil, projectUuid: String? = nil) {
+    public init(
+        sessionUuid: String, promptUuid: String? = nil, code: String? = nil,
+        resolved: Bool? = nil, projectUuid: String? = nil
+    ) {
         self.sessionUuid = sessionUuid
         self.promptUuid = promptUuid
         self.code = code
@@ -3982,10 +3990,12 @@ public struct DopeGetResponse: Codable, Hashable, Sendable {
     /// remains the whole-tree counter and the sole CAS gate.
     public let areaVersions: [String: Int64]?
 
-    public init(tree: DopeScopeTree, resolvedVia: String,
-                resolutions: [DopeOverlay.Resolution]? = nil,
-                hidden: [String]? = nil, warnings: [String]? = nil,
-                areaVersions: [String: Int64]? = nil) {
+    public init(
+        tree: DopeScopeTree, resolvedVia: String,
+        resolutions: [DopeOverlay.Resolution]? = nil,
+        hidden: [String]? = nil, warnings: [String]? = nil,
+        areaVersions: [String: Int64]? = nil
+    ) {
         self.tree = tree
         self.resolvedVia = resolvedVia
         self.resolutions = resolutions
@@ -4028,10 +4038,12 @@ public struct DopeSearchRequest: Codable, Hashable, Sendable {
     public let sources: [DopeSearchSource]?
     public let limit: Int?
 
-    public init(query: String, scope: DopeSearchScope, sessionUuid: String? = nil,
-                promptUuid: String? = nil, projectUuid: String? = nil,
-                onlyMasks: Bool? = nil, sources: [DopeSearchSource]? = nil,
-                limit: Int? = nil) {
+    public init(
+        query: String, scope: DopeSearchScope, sessionUuid: String? = nil,
+        promptUuid: String? = nil, projectUuid: String? = nil,
+        onlyMasks: Bool? = nil, sources: [DopeSearchSource]? = nil,
+        limit: Int? = nil
+    ) {
         self.query = query; self.scope = scope; self.sessionUuid = sessionUuid
         self.promptUuid = promptUuid; self.projectUuid = projectUuid
         self.onlyMasks = onlyMasks; self.sources = sources; self.limit = limit
@@ -4052,9 +4064,11 @@ public struct DopeSearchHit: Codable, Hashable, Sendable {
     /// Resolver provenance; present only for an --only-masks search.
     public let origin: String?
 
-    public init(kind: String, subjectUuid: String, scopeUuid: String, scopeCode: String,
-                scopeType: String, path: String, title: String, excerpt: String,
-                score: Double, origin: String?) {
+    public init(
+        kind: String, subjectUuid: String, scopeUuid: String, scopeCode: String,
+        scopeType: String, path: String, title: String, excerpt: String,
+        score: Double, origin: String?
+    ) {
         self.kind = kind; self.subjectUuid = subjectUuid; self.scopeUuid = scopeUuid
         self.scopeCode = scopeCode; self.scopeType = scopeType; self.path = path
         self.title = title; self.excerpt = excerpt; self.score = score; self.origin = origin
@@ -4089,10 +4103,12 @@ public struct DopeCogElementNode: Codable, Hashable, Sendable {
     public let dopePersistenceCode: String?
     public let deletedOn: String?
 
-    public init(uuid: String, version: Int64, elementType: String, code: String, name: String,
-                description: String, sortOrder: Int, parentElementUuid: String?,
-                dopeScopeCode: String?, primaryPath: String?,
-                dopePersistenceCode: String? = nil, deletedOn: String?) {
+    public init(
+        uuid: String, version: Int64, elementType: String, code: String, name: String,
+        description: String, sortOrder: Int, parentElementUuid: String?,
+        dopeScopeCode: String?, primaryPath: String?,
+        dopePersistenceCode: String? = nil, deletedOn: String?
+    ) {
         self.uuid = uuid
         self.version = version
         self.elementType = elementType
@@ -4118,8 +4134,10 @@ public struct DopeCogNode: Codable, Hashable, Sendable {
     public let deletedOn: String?
     public let elements: [DopeCogElementNode]
 
-    public init(uuid: String, version: Int64, code: String, name: String, description: String,
-                sortOrder: Int, deletedOn: String?, elements: [DopeCogElementNode]) {
+    public init(
+        uuid: String, version: Int64, code: String, name: String, description: String,
+        sortOrder: Int, deletedOn: String?, elements: [DopeCogElementNode]
+    ) {
         self.uuid = uuid
         self.version = version
         self.code = code
@@ -4137,8 +4155,10 @@ public struct DopeCogAddRequest: Codable, Hashable, Sendable {
     public let name: String
     public let description: String?
     public let sortOrder: Int?
-    public init(scopeUuid: String, code: String, name: String,
-                description: String? = nil, sortOrder: Int? = nil) {
+    public init(
+        scopeUuid: String, code: String, name: String,
+        description: String? = nil, sortOrder: Int? = nil
+    ) {
         self.scopeUuid = scopeUuid; self.code = code; self.name = name
         self.description = description; self.sortOrder = sortOrder
     }
@@ -4151,8 +4171,10 @@ public struct DopeCogUpdateRequest: Codable, Hashable, Sendable {
     public let name: String?
     public let description: String?
     public let sortOrder: Int?
-    public init(uuid: String, expectedVersion: Int64, code: String? = nil, name: String? = nil,
-                description: String? = nil, sortOrder: Int? = nil) {
+    public init(
+        uuid: String, expectedVersion: Int64, code: String? = nil, name: String? = nil,
+        description: String? = nil, sortOrder: Int? = nil
+    ) {
         self.uuid = uuid; self.expectedVersion = expectedVersion; self.code = code
         self.name = name; self.description = description; self.sortOrder = sortOrder
     }
@@ -4180,10 +4202,12 @@ public struct DopeCogElementAddRequest: Codable, Hashable, Sendable {
     /// PersistenceOwner's owned domain CODE. Additive and OPTIONAL, so it
     /// decodes safely in both directions per the wire convention.
     public let dopePersistenceCode: String?
-    public init(cogUuid: String, elementType: String, code: String, name: String,
-                description: String? = nil, sortOrder: Int? = nil,
-                parentElementUuid: String? = nil, dopeScopeCode: String? = nil,
-                primaryPath: String? = nil, dopePersistenceCode: String? = nil) {
+    public init(
+        cogUuid: String, elementType: String, code: String, name: String,
+        description: String? = nil, sortOrder: Int? = nil,
+        parentElementUuid: String? = nil, dopeScopeCode: String? = nil,
+        primaryPath: String? = nil, dopePersistenceCode: String? = nil
+    ) {
         self.cogUuid = cogUuid; self.elementType = elementType; self.code = code
         self.name = name; self.description = description; self.sortOrder = sortOrder
         self.parentElementUuid = parentElementUuid; self.dopeScopeCode = dopeScopeCode
@@ -4201,9 +4225,11 @@ public struct DopeCogElementUpdateRequest: Codable, Hashable, Sendable {
     public let dopeScopeCode: String?
     public let clearDopeScopeCode: Bool?
     public let primaryPath: String?
-    public init(uuid: String, expectedVersion: Int64, code: String? = nil, name: String? = nil,
-                description: String? = nil, sortOrder: Int? = nil, dopeScopeCode: String? = nil,
-                clearDopeScopeCode: Bool? = nil, primaryPath: String? = nil) {
+    public init(
+        uuid: String, expectedVersion: Int64, code: String? = nil, name: String? = nil,
+        description: String? = nil, sortOrder: Int? = nil, dopeScopeCode: String? = nil,
+        clearDopeScopeCode: Bool? = nil, primaryPath: String? = nil
+    ) {
         self.uuid = uuid; self.expectedVersion = expectedVersion; self.code = code
         self.name = name; self.description = description; self.sortOrder = sortOrder
         self.dopeScopeCode = dopeScopeCode; self.clearDopeScopeCode = clearDopeScopeCode
@@ -4286,8 +4312,10 @@ public struct DopePromotedScope: Codable, Hashable, Sendable {
     public let toRevision: Int64
     public let counts: DopeTreeCounts
 
-    public init(code: String, baseScopeUuid: String, fromRevision: Int64,
-                toRevision: Int64, counts: DopeTreeCounts) {
+    public init(
+        code: String, baseScopeUuid: String, fromRevision: Int64,
+        toRevision: Int64, counts: DopeTreeCounts
+    ) {
         self.code = code
         self.baseScopeUuid = baseScopeUuid
         self.fromRevision = fromRevision
@@ -4706,8 +4734,10 @@ public struct DiagramGetResponse: Codable, Hashable, Sendable {
     /// resolving the owner.
     public let ownerStoragePath: String?
 
-    public init(tree: DiagramTree, bindings: [DiagramBindingResolution],
-                ownerStoragePath: String? = nil) {
+    public init(
+        tree: DiagramTree, bindings: [DiagramBindingResolution],
+        ownerStoragePath: String? = nil
+    ) {
         self.tree = tree
         self.bindings = bindings
         self.ownerStoragePath = ownerStoragePath
@@ -4835,9 +4865,11 @@ public struct DiagramSearchRequest: Codable, Hashable, Sendable {
     public let visibility: String?
     public let limit: Int?
 
-    public init(projectUuid: String, sessionUuid: String? = nil,
-                query: String? = nil, visibility: String? = nil,
-                limit: Int? = nil) {
+    public init(
+        projectUuid: String, sessionUuid: String? = nil,
+        query: String? = nil, visibility: String? = nil,
+        limit: Int? = nil
+    ) {
         self.projectUuid = projectUuid
         self.sessionUuid = sessionUuid
         self.query = query
@@ -4884,8 +4916,10 @@ public struct DiagramDeleteResponse: Codable, Hashable, Sendable {
     /// SAME path gm render wrote, not a guessed default.
     public let gmccDiagramPath: String?
 
-    public init(deletedUuid: String, code: String, cascadedElements: Int,
-                ownerStoragePath: String? = nil, gmccDiagramPath: String? = nil) {
+    public init(
+        deletedUuid: String, code: String, cascadedElements: Int,
+        ownerStoragePath: String? = nil, gmccDiagramPath: String? = nil
+    ) {
         self.deletedUuid = deletedUuid
         self.code = code
         self.cascadedElements = cascadedElements
@@ -4948,15 +4982,16 @@ public struct DiagramIngestResponse: Codable, Hashable, Sendable {
     /// The absolute .gmcc/diagrams directory read from.
     public let root: String
 
-    public init(ingested: [String], skipped: [String], warnings: [String] = [],
-                root: String) {
+    public init(
+        ingested: [String], skipped: [String], warnings: [String] = [],
+        root: String
+    ) {
         self.ingested = ingested
         self.skipped = skipped
         self.warnings = warnings
         self.root = root
     }
 }
-
 
 // MARK: - Dope merge / resolve
 
@@ -5139,11 +5174,13 @@ public enum PenResultBudget {
         let retryWith: String
         if isWrite {
             let readBack = narrowing?.retryWith ?? "the matching get tool"
-            retryWith = "the write COMPLETED and is recorded — do NOT retry it, "
+            retryWith =
+                "the write COMPLETED and is recorded — do NOT retry it, "
                 + "these verbs append and a second call writes a second row. "
                 + "Read the result back with \(readBack)."
         } else {
-            retryWith = narrowing?.retryWith
+            retryWith =
+                narrowing?.retryWith
                 ?? "this tool has no narrowing parameter — its result is one indivisible record; read it through a different tool or a narrower subject"
         }
         func stamp(_ base: String) -> String { isWrite ? "completed_\(base)" : base }

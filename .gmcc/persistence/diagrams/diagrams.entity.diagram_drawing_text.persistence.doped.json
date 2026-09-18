@@ -80,7 +80,7 @@
       "sort_order" : 8
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Persistence/Migrations/m0021_diagramVocabularyAndTierCollapse.swift",
   "sort_order" : 10,
   "version" : 767
 }

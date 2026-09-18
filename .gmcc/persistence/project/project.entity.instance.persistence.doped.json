@@ -62,7 +62,7 @@
       "sort_order" : 10
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Persistence/Migrations/m0001_baseSchema.swift",
   "sort_order" : 2,
   "version" : 767
 }

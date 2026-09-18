@@ -25,7 +25,7 @@ final class FindController {
 struct FindHit: Equatable {
     let segmentID: String
     let segmentIndex: Int
-    let localOccurrence: Int   // 0-based index of this match within its segment
+    let localOccurrence: Int  // 0-based index of this match within its segment
 }
 
 // Computed view over an ordered segment list for a given query. Pure value type —
@@ -103,13 +103,23 @@ struct FindBar: View {
                 .onSubmit { onStep(+1) }
                 .frame(minWidth: 160, maxWidth: 260)
             FindCountChip(current: find.activeIndex, total: total)
-            Button { onStep(-1) } label: { Image(systemName: "chevron.up") }
-                .buttonStyle(.borderless).disabled(total == 0)
-                .keyboardShortcut("g", modifiers: [.command, .shift])
-            Button { onStep(+1) } label: { Image(systemName: "chevron.down") }
-                .buttonStyle(.borderless).disabled(total == 0)
-                .keyboardShortcut("g", modifiers: .command)
-            Button { find.isPresented = false; find.query = "" } label: {
+            Button {
+                onStep(-1)
+            } label: {
+                Image(systemName: "chevron.up")
+            }
+            .buttonStyle(.borderless).disabled(total == 0)
+            .keyboardShortcut("g", modifiers: [.command, .shift])
+            Button {
+                onStep(+1)
+            } label: {
+                Image(systemName: "chevron.down")
+            }
+            .buttonStyle(.borderless).disabled(total == 0)
+            .keyboardShortcut("g", modifiers: .command)
+            Button {
+                find.isPresented = false; find.query = ""
+            } label: {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)

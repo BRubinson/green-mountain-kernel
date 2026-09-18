@@ -37,7 +37,8 @@ final class WindowNav {
     /// different route identity, so the screen re-seeds). No target ⇒ the
     /// session view. The route-equal repeat rides `pendingPromptTarget`.
     func open(_ windowID: SessionWindowID) {
-        let destination: Route = windowID.targetPromptUUID != nil
+        let destination: Route =
+            windowID.targetPromptUUID != nil
             ? .sessionPrompt(windowID) : .session(windowID)
         if destination == route, let target = windowID.targetPromptUUID {
             pendingPromptTarget = target

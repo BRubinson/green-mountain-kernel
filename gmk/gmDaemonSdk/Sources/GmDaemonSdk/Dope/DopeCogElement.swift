@@ -44,8 +44,8 @@ public enum DopeCogField: String, Codable, Hashable, CaseIterable, Sendable {
     /// The subtype table column this field lands in.
     public var dbColumn: String {
         switch self {
-        case .primaryPath:         return "primary_path"
-        case .dopeScopeCode:       return "dope_scope_code"
+        case .primaryPath: return "primary_path"
+        case .dopeScopeCode: return "dope_scope_code"
         case .dopePersistenceCode: return "dope_persistence_code"
         }
     }
@@ -91,7 +91,7 @@ public struct DopeCogElementSpec: Sendable {
         guard let type = DopeCogElementType(rawValue: raw), let spec = all[type] else {
             throw StoreError.badRequest(
                 detail: "unknown cog element_type '\(raw)' (known: "
-                      + DopeCogElementType.allCases.map(\.rawValue).joined(separator: ", ") + ")")
+                    + DopeCogElementType.allCases.map(\.rawValue).joined(separator: ", ") + ")")
         }
         return spec
     }

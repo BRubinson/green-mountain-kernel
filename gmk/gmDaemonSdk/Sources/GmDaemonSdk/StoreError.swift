@@ -155,7 +155,8 @@ public enum StoreError: Error, Sendable {
             var target = "session \(sessionUuid)"
             if let promptUuid { target += " / prompt \(promptUuid)" }
             if let code { target += " code '\(code)'" }
-            let initHint = "gm_hook call DOPE_INIT --json '{\"session_uuid\":\"\(sessionUuid)\""
+            let initHint =
+                "gm_hook call DOPE_INIT --json '{\"session_uuid\":\"\(sessionUuid)\""
                 + (promptUuid.map { ",\"prompt_uuid\":\"\($0)\"" } ?? "")
                 + ",\"code\":\"\(code ?? "<code>")\",\"name\":\"<name>\"}'"
             return ErrorPayload(
@@ -167,13 +168,14 @@ public enum StoreError: Error, Sendable {
             return ErrorPayload(
                 code: .summaryAbsent,
                 message: "\(target) has no project-tier dope scope yet — a project scope "
-                       + "arrives by promotion from a primary-branch session "
-                       + "(gm_hook call DOPE_PROMOTE --json '{\"session_uuid\":\"<U>\"}'), "
-                       + "not by DOPE_INIT")
+                    + "arrives by promotion from a primary-branch session "
+                    + "(gm_hook call DOPE_PROMOTE --json '{\"session_uuid\":\"<U>\"}'), "
+                    + "not by DOPE_INIT")
         case .diagramAbsent(let ownerKind, let ownerUuid, let code):
             var target = "\(ownerKind) \(ownerUuid)"
             if let code { target += " code '\(code)'" }
-            let initHint = "gm_hook call DIAGRAM_INIT --json "
+            let initHint =
+                "gm_hook call DIAGRAM_INIT --json "
                 + "'{\"\(ownerKind)_uuid\":\"\(ownerUuid)\",\"code\":\"\(code ?? "<code>")\","
                 + "\"name\":\"<name>\"}'"
             return ErrorPayload(
@@ -186,7 +188,8 @@ public enum StoreError: Error, Sendable {
                     + "\(scopeType). Only a SESSION_INSTANCE tree is read from or "
                     + "written to {instance_root}/.gmcc")
         case .hookUnbound(let claudeSessionId, let booted):
-            let repo = booted
+            let repo =
+                booted
                 ? "the daemon knows this repo, so this is dead capture"
                 : "the daemon knows no such repo"
             return ErrorPayload(

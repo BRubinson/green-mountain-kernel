@@ -113,8 +113,9 @@ final class DiagramWorkspace {
         let now = ISO8601DateFormatter().string(from: Date())
         let session = id.session?.sessionUUID.wireString
         return DiagramTree(
-            identity: DopeNodeIdentity(uuid: id.savedDiagramUuid ?? UUID().uuidString.lowercased(),
-                                       version: 0, createdAt: now, updatedAt: now),
+            identity: DopeNodeIdentity(
+                uuid: id.savedDiagramUuid ?? UUID().uuidString.lowercased(),
+                version: 0, createdAt: now, updatedAt: now),
             tier: session == nil ? "PROJECT" : "SESSION",
             projectUuid: id.projectUuid, instanceUuid: nil,
             sessionUuid: session, promptUuid: nil,
@@ -185,13 +186,15 @@ final class DiagramWorkspace {
         var entries: [String: DiagramDopeContext.Entry] = [:]
         var primary: DopeGetResponse?
         for code in Self.boundScopeCodes(in: response.tree.elements) {
-            guard let dope = try? await fetchDope(
-                sessionUuid: response.tree.sessionUuid,
-                promptUuid: response.tree.promptUuid,
-                // The TREE's project, not the route payload's: the row is
-                // authoritative about its own owner chain, and a promotion
-                // can have moved it since the route was built.
-                projectUuid: response.tree.projectUuid, code: code) else {
+            guard
+                let dope = try? await fetchDope(
+                    sessionUuid: response.tree.sessionUuid,
+                    promptUuid: response.tree.promptUuid,
+                    // The TREE's project, not the route payload's: the row is
+                    // authoritative about its own owner chain, and a promotion
+                    // can have moved it since the route was built.
+                    projectUuid: response.tree.projectUuid, code: code)
+            else {
                 // A code matching nothing is the LEGAL ghost state, not an
                 // error: the resolver renders an absent scope card.
                 continue
@@ -204,22 +207,27 @@ final class DiagramWorkspace {
         dope = primary
     }
 
-    private func fetchDope(sessionUuid: String?, promptUuid: String?,
-                           projectUuid: String? = nil,
-                           code: String?) async throws -> DopeGetResponse {
+    private func fetchDope(
+        sessionUuid: String?, promptUuid: String?,
+        projectUuid: String? = nil,
+        code: String?
+    ) async throws -> DopeGetResponse {
         if let sessionUuid {
-            return try await service.dopeGet(sessionUuid: sessionUuid,
-                                             promptUuid: promptUuid, code: code)
+            return try await service.dopeGet(
+                sessionUuid: sessionUuid,
+                promptUuid: promptUuid, code: code)
         }
-        return try await service.dopeGet(projectUuid: projectUuid ?? id.projectUuid,
-                                         code: code)
+        return try await service.dopeGet(
+            projectUuid: projectUuid ?? id.projectUuid,
+            code: code)
     }
 
     private static func boundScopeCodes(in elements: [DiagramElementNode]) -> [String] {
         var codes: [String] = []
         for element in elements {
             if case .dopeScopePersistenceLayer(let payload) = element.payload,
-               !codes.contains(payload.dopeScopeCode) {
+                !codes.contains(payload.dopeScopeCode)
+            {
                 codes.append(payload.dopeScopeCode)
             }
         }
@@ -237,8 +245,10 @@ final class DiagramWorkspace {
             let response = try await fetchDope(
                 sessionUuid: id.session?.sessionUUID.wireString,
                 promptUuid: nil, code: scopeCode)
-            dopeEntries = [response.tree.body.code: DiagramDopeContext.Entry(
-                tree: response.tree, resolvedVia: response.resolvedVia)]
+            dopeEntries = [
+                response.tree.body.code: DiagramDopeContext.Entry(
+                    tree: response.tree, resolvedVia: response.resolvedVia)
+            ]
             dope = response
             loadError = nil
             if !loaded || rescaffold {
@@ -264,14 +274,16 @@ final class DiagramWorkspace {
         // center across reloads.
         mutations = mutations.map { mutation in
             guard case .elementAdd(let add) = mutation,
-                  case .dopeEntity(let payload) = add.payload,
-                  let center = codeCenters[payload.entityCode] else { return mutation }
-            return .elementAdd(DiagramElementAdd(
-                clientRef: add.clientRef, parentElementUuid: add.parentElementUuid,
-                parentClientRef: add.parentClientRef, code: add.code, name: add.name,
-                description: add.description, sortOrder: add.sortOrder,
-                centerX: center.x, centerY: center.y,
-                elementZ: add.elementZ, scale: add.scale, payload: add.payload))
+                case .dopeEntity(let payload) = add.payload,
+                let center = codeCenters[payload.entityCode]
+            else { return mutation }
+            return .elementAdd(
+                DiagramElementAdd(
+                    clientRef: add.clientRef, parentElementUuid: add.parentElementUuid,
+                    parentClientRef: add.parentClientRef, code: add.code, name: add.name,
+                    description: add.description, sortOrder: add.sortOrder,
+                    centerX: center.x, centerY: center.y,
+                    elementZ: add.elementZ, scale: add.scale, payload: add.payload))
         }
         let fresh = Self.emptyTree(id: id)
         do {
@@ -329,8 +341,9 @@ final class DiagramWorkspace {
     private func adopt(_ newTree: DiagramTree) {
         tree = newTree
         editSession.rebase(revision: newTree.revision)
-        fullResolved = DiagramResolver.resolve(newTree, dope: dopeContext,
-                                               environment: environment)
+        fullResolved = DiagramResolver.resolve(
+            newTree, dope: dopeContext,
+            environment: environment)
         resolved = DiagramDomainFilter.apply(domainFilter, to: fullResolved)
         generation += 1
         if case .dopePreview = id.source { rememberCenters() }

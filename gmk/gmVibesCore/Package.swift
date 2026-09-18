@@ -102,7 +102,7 @@ let package = Package(
                 .product(name: "GmITerm2Client", package: "gmITerm2Client"),
             ],
             swiftSettings: appTargetSettings
-        ),
+        )
         // TEST TARGET REMOVED. The repository's tests live in ONE package now,
         // gmk/Gm_Kernel_test, which boots a shared environment and drives the
         // whole kit through its PUBLIC surface plus read-only SQL.

@@ -19,13 +19,15 @@ struct KBiteFileNode: Identifiable, Hashable {
             return KBiteFileNode(url: url, isDirectory: false, children: nil)
         }
 
-        let kids = (try? fm.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        )) ?? []
+        let kids =
+            (try? fm.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )) ?? []
 
-        let sorted = kids
+        let sorted =
+            kids
             .map { child -> KBiteFileNode in
                 let childIsDir = (try? child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
                 return KBiteFileNode(url: child, isDirectory: childIsDir, children: childIsDir ? [] : nil)

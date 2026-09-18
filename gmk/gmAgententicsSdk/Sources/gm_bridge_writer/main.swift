@@ -14,17 +14,19 @@ import GmAgententicsSdk
 // `rebuild_local.sh`, and never runs on a user's machine.
 
 func usage() -> Never {
-    FileHandle.standardError.write(Data("""
-        usage: gm_bridge_writer [--check] <plugin-dir>
+    FileHandle.standardError.write(
+        Data(
+            """
+            usage: gm_bridge_writer [--check] <plugin-dir>
 
-          --check   render everything and report, writing NOTHING. Use this to
-                    see what would change before letting it change.
+              --check   render everything and report, writing NOTHING. Use this to
+                        see what would change before letting it change.
 
-        With no --check the target directory is DELETED and rewritten from the
-        bridge values in gmAgententicsSdk. The write is staged beside the target
-        and swapped in, so a failure leaves the old tree intact.
+            With no --check the target directory is DELETED and rewritten from the
+            bridge values in gmAgententicsSdk. The write is staged beside the target
+            and swapped in, so a failure leaves the old tree intact.
 
-        """.utf8))
+            """.utf8))
     exit(2)
 }
 

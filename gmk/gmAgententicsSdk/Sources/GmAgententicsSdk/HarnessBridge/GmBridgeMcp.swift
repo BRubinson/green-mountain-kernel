@@ -31,13 +31,16 @@ extension GmBridgeMcp {
     /// because a silently absent pen looks to an agent like a pen with no tools.
     public static let launcher = "/bin/sh"
 
-    public static let launcherArgs = ["-c", #"""
+    public static let launcherArgs = [
+        "-c",
+        #"""
         GM_BIN="${GM_FS_ROOT:-$HOME/gmfs}/bin"; \
         if [ ! -x "$GM_BIN/gm_mcp" ]; then \
           echo "[GMB] gm_mcp missing at $GM_BIN/gm_mcp — run: bash \"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\"" >&2; \
           exit 1; \
         fi; exec "$GM_BIN/gm_mcp"
-        """#]
+        """#,
+    ]
 
     public static let current = File(
         mcpServers: [

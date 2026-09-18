@@ -8,9 +8,11 @@ public enum ITerm2App {
     public static var socketPath: String { SocketConnection.socketPath() }
 
     public static func appURL() throws(ITerm2Error) -> URL {
-        guard let url = NSWorkspace.shared.urlForApplication(
-            withBundleIdentifier: bundleIdentifier
-        ) else {
+        guard
+            let url = NSWorkspace.shared.urlForApplication(
+                withBundleIdentifier: bundleIdentifier
+            )
+        else {
             throw .appNotInstalled
         }
         return url
@@ -24,7 +26,8 @@ public enum ITerm2App {
         if SocketConnection.isServerListening(path: path) { return }
 
         let url = try appURL()
-        let wasRunning = !NSRunningApplication
+        let wasRunning =
+            !NSRunningApplication
             .runningApplications(withBundleIdentifier: bundleIdentifier).isEmpty
 
         if !wasRunning {

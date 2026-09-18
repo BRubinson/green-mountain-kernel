@@ -90,12 +90,13 @@ private enum PluginPreflight {
         case .present(let path): dir = path
         }
         let root = URL(fileURLWithPath: dir, isDirectory: true)
-        let manifest = root
+        let manifest =
+            root
             .appendingPathComponent(".claude-plugin", isDirectory: true)
             .appendingPathComponent("plugin.json")
         guard let data = try? Data(contentsOf: manifest),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let pluginVersion = object["version"] as? String
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let pluginVersion = object["version"] as? String
         else { return .manifestMissing(path: dir) }
 
         // `dir` is <repo>/plugins/gmcc, possibly spelled <repo>/gmk/../plugins/gmcc
@@ -104,9 +105,10 @@ private enum PluginPreflight {
         // resolve symlinks, only the dot segments.
         let repoRoot = root
             .standardizedFileURL
-            .deletingLastPathComponent()   // -> <repo>/plugins
-            .deletingLastPathComponent()   // -> <repo>
-        let versionFile = repoRoot
+            .deletingLastPathComponent()  // -> <repo>/plugins
+            .deletingLastPathComponent()  // -> <repo>
+        let versionFile =
+            repoRoot
             .appendingPathComponent("gmk", isDirectory: true)
             .appendingPathComponent("VERSION")
         guard let raw = try? String(contentsOf: versionFile, encoding: .utf8) else { return .ok }
@@ -262,16 +264,17 @@ struct PromptRunBar: View {
             Circle()
                 .fill(assigned.color)
                 .frame(width: 10, height: 10)
-                .help("""
-                This prompt's pane colour — the TAB hue tells prompts apart. \
-                The pane's BACKGROUND tint is a different signal: it tells you \
-                which ENVIRONMENT the pane is writing to, and production leaves \
-                it alone. iTerm2 exposes no window-border API: tab colour tints \
-                window chrome under the Minimal or Compact window styles and \
-                colours the tab alone under Regular, and nothing here can tell \
-                which style your profile uses — which is why the environment \
-                rides the background instead.
-                """)
+                .help(
+                    """
+                    This prompt's pane colour — the TAB hue tells prompts apart. \
+                    The pane's BACKGROUND tint is a different signal: it tells you \
+                    which ENVIRONMENT the pane is writing to, and production leaves \
+                    it alone. iTerm2 exposes no window-border API: tab colour tints \
+                    window chrome under the Minimal or Compact window styles and \
+                    colours the tab alone under Regular, and nothing here can tell \
+                    which style your profile uses — which is why the environment \
+                    rides the background instead.
+                    """)
         }
     }
 
@@ -288,16 +291,18 @@ struct PromptRunBar: View {
                 Text(stageCopy(stage)).font(.caption).foregroundStyle(.secondary)
             }
         case .launched(let session):
-            message("Running in iTerm2 (session \(session.sessionId))"
+            message(
+                "Running in iTerm2 (session \(session.sessionId))"
                     + (session.usedDefaultProfile
-                       ? " — the instance profile was rejected, so this pane uses the default profile and the wrong colours."
-                       : ""),
-                    symbol: "checkmark.circle.fill", tone: .green)
+                        ? " — the instance profile was rejected, so this pane uses the default profile and the wrong colours."
+                        : ""),
+                symbol: "checkmark.circle.fill", tone: .green)
         case .failed(let error):
             let copy = failureCopy(error)
             VStack(alignment: .leading, spacing: 4) {
-                message(copy.text, symbol: "xmark.octagon.fill", tone: .red,
-                        monospaced: copy.monospaced)
+                message(
+                    copy.text, symbol: "xmark.octagon.fill", tone: .red,
+                    monospaced: copy.monospaced)
                 if let affordance = copy.affordance {
                     affordanceButton(affordance)
                 }
@@ -305,8 +310,10 @@ struct PromptRunBar: View {
         }
     }
 
-    private func message(_ text: String, symbol: String, tone: Color,
-                         monospaced: Bool = false) -> some View {
+    private func message(
+        _ text: String, symbol: String, tone: Color,
+        monospaced: Bool = false
+    ) -> some View {
         Label {
             Text(text)
                 .font(monospaced ? .caption.monospaced() : .caption)
@@ -325,15 +332,18 @@ struct PromptRunBar: View {
         case .openITerm:
             Button("Open iTerm2") {
                 if let app = NSWorkspace.shared
-                    .urlForApplication(withBundleIdentifier: "com.googlecode.iterm2") {
+                    .urlForApplication(withBundleIdentifier: "com.googlecode.iterm2")
+                {
                     NSWorkspace.shared.open(app)
                 }
             }
             .controlSize(.small)
         case .openAutomationSettings:
             Button("Open Automation Settings") {
-                if let url = URL(string:
-                    "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation") {
+                if let url = URL(
+                    string:
+                        "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")
+                {
                     NSWorkspace.shared.open(url)
                 }
             }
@@ -361,11 +371,14 @@ struct PromptRunBar: View {
         case .noRepo:
             return "This instance has no resolved checkout on disk."
         case .pluginDirMissing(let path):
-            return "This build's plugin directory is gone: \(path). `claude --plugin-dir` REPLACES the installed plugin and there is no fallback, so launching without it would silently run the installed plugin instead of this tree's. Restore it with `bash gmk/scripts/generate_plugin.sh`, then relaunch GMVibes."
+            return
+                "This build's plugin directory is gone: \(path). `claude --plugin-dir` REPLACES the installed plugin and there is no fallback, so launching without it would silently run the installed plugin instead of this tree's. Restore it with `bash gmk/scripts/generate_plugin.sh`, then relaunch GMVibes."
         case .pluginManifestMissing(let path):
-            return "No plugin manifest at \(path)/.claude-plugin/plugin.json. `claude --plugin-dir` REPLACES the installed plugin with no fallback, so a pane launched now would load a plugin serving none of the tools its agents are granted. Run `bash gmk/scripts/generate_plugin.sh`, then relaunch GMVibes."
+            return
+                "No plugin manifest at \(path)/.claude-plugin/plugin.json. `claude --plugin-dir` REPLACES the installed plugin with no fallback, so a pane launched now would load a plugin serving none of the tools its agents are granted. Run `bash gmk/scripts/generate_plugin.sh`, then relaunch GMVibes."
         case .pluginVersionMismatch(let pluginVersion, let treeVersion):
-            return "The plugin at \(PluginPreflight.directory ?? "—") is \(pluginVersion); that tree's gmk/VERSION says \(treeVersion). Run `bash gmk/scripts/generate_plugin.sh`, then relaunch GMVibes."
+            return
+                "The plugin at \(PluginPreflight.directory ?? "—") is \(pluginVersion); that tree's gmk/VERSION says \(treeVersion). Run `bash gmk/scripts/generate_plugin.sh`, then relaunch GMVibes."
         }
     }
 
@@ -379,19 +392,24 @@ struct PromptRunBar: View {
     }
 
     private func failureCopy(_ error: ITerm2Error)
-        -> (text: String, affordance: Affordance?, monospaced: Bool) {
+        -> (text: String, affordance: Affordance?, monospaced: Bool)
+    {
         switch error {
         case .appNotInstalled:
             return ("iTerm2 isn't installed.", nil, false)
 
         case .apiDisabled, .apiServerUnavailable:
-            return ("iTerm2's Python API is off. Turn it on in iTerm2 > Settings > "
+            return (
+                "iTerm2's Python API is off. Turn it on in iTerm2 > Settings > "
                     + "General > Magic > Enable Python API, then press Play again.",
-                    .openITerm, false)
+                .openITerm, false
+            )
 
         case .automationDenied:
-            return ("macOS denied GMVibes permission to control iTerm2.",
-                    .openAutomationSettings, false)
+            return (
+                "macOS denied GMVibes permission to control iTerm2.",
+                .openAutomationSettings, false
+            )
 
         case .handshakeFailed(let status):
             return ("iTerm2 refused the connection: \(status)", .copyCommand, true)
@@ -403,9 +421,11 @@ struct PromptRunBar: View {
             let suffix = code.map { " (errno \($0))" } ?? ""
             return ("Transport failed: \(reason)\(suffix)", .copyCommand, true)
         case .responseLost(let reason):
-            return ("iTerm2 stopped answering after the launch was sent, so a window "
+            return (
+                "iTerm2 stopped answering after the launch was sent, so a window "
                     + "may already have opened — check iTerm2 before pressing Play "
-                    + "again. (\(reason))", .copyCommand, true)
+                    + "again. (\(reason))", .copyCommand, true
+            )
 
         case .unsafeCommandPath(let path):
             return ("Refused to launch: unusable path \(path)", .copyCommand, true)
@@ -426,13 +446,14 @@ struct PromptRunBar: View {
     @MainActor
     private func play() async {
         guard block == nil, let root = gmFsRoot, let repo = repoFolder else { return }
-        let script = paneLaunchScript(root: root,
-                                      repoPath: repo.path,
-                                      tabColorHex: launchColors.assign(promptUuid: stub.uuid).hex,
-                                      tierCommand: tierCommand,
-                                      pluginDir: PluginPreflight.directory,
-                                      badgeText: envBadgeText,
-                                      envBackgroundHex: EnvironmentKind.current.paneBackgroundHex)
+        let script = paneLaunchScript(
+            root: root,
+            repoPath: repo.path,
+            tabColorHex: launchColors.assign(promptUuid: stub.uuid).hex,
+            tierCommand: tierCommand,
+            pluginDir: PluginPreflight.directory,
+            badgeText: envBadgeText,
+            envBackgroundHex: EnvironmentKind.current.paneBackgroundHex)
         await launchPane(script: script, root: root, repo: repo)
     }
 
@@ -442,12 +463,13 @@ struct PromptRunBar: View {
     @MainActor
     private func openTerminal() async {
         guard let root = gmFsRoot, !root.isEmpty, let repo = repoFolder else { return }
-        let script = paneShellScript(root: root,
-                                     repoPath: repo.path,
-                                     tabColorHex: launchColors.assign(promptUuid: stub.uuid).hex,
-                                     badgeText: envBadgeText,
-                                     envBackgroundHex: EnvironmentKind.current.paneBackgroundHex,
-                                     shell: loginShellPath())
+        let script = paneShellScript(
+            root: root,
+            repoPath: repo.path,
+            tabColorHex: launchColors.assign(promptUuid: stub.uuid).hex,
+            badgeText: envBadgeText,
+            envBackgroundHex: EnvironmentKind.current.paneBackgroundHex,
+            shell: loginShellPath())
         await launchPane(script: script, root: root, repo: repo)
     }
 
@@ -464,15 +486,18 @@ struct PromptRunBar: View {
                 instanceName: instanceName,
                 workingDir: repo.path)
             scriptURL = try PaneScriptWriter.write(script: script, root: root)
-            let command = try paneCommandLine(shell: loginShellPath(),
-                                              scriptPath: scriptURL!.path)
-            let properties = ITerm.workingDirectoryProperties(repo.path) + [
-                .string("Custom Command", "Yes"),
-                .string("Command", command),
-            ]
+            let command = try paneCommandLine(
+                shell: loginShellPath(),
+                scriptPath: scriptURL!.path)
+            let properties =
+                ITerm.workingDirectoryProperties(repo.path) + [
+                    .string("Custom Command", "Yes"),
+                    .string("Command", command),
+                ]
             let session = try await ITerm2Launcher.launchPane(
-                PaneLaunchRequest(profileName: profileName,
-                                  profileProperties: properties),
+                PaneLaunchRequest(
+                    profileName: profileName,
+                    profileProperties: properties),
                 progress: { stage in
                     MainActor.assumeIsolated { phase = .launching(stage) }
                 })

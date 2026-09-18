@@ -31,10 +31,10 @@ public enum DiagramContainment {
                 return "\(role) \(referrer) cannot reference itself"
             case .targetIsOwnParent:
                 return "\(role) target \(target) is the referring element's own parent — "
-                     + "a connector joins its parent to a PEER of that parent, not to it"
+                    + "a connector joins its parent to a PEER of that parent, not to it"
             case .targetNotAPeerOfParent:
                 return "\(role) target \(target) is not a peer of \(referrer)'s parent — "
-                     + "both must share the same parent element"
+                    + "both must share the same parent element"
             case .referrerHasNoParent:
                 return "\(role) requires the referring element to have a parent"
             case .targetMissing(let uuid):

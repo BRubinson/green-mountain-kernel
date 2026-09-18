@@ -114,10 +114,13 @@ enum TxBatchHandler {
                     // around it and report success — the exact silent partial
                     // write the verb exists to prevent.
                     if let ok = try? NDJSON.decode(ResponseEnvelopeOK.self, from: result.line),
-                       ok.ok == false {
+                        ok.ok == false
+                    {
                         failed = i
                         throw StoreError.badRequest(
-                            detail: "TX_BATCH rolled back at request \(i): \(text.trimmingCharacters(in: .whitespacesAndNewlines))")
+                            detail:
+                                "TX_BATCH rolled back at request \(i): \(text.trimmingCharacters(in: .whitespacesAndNewlines))"
+                        )
                     }
                     buffered.append(text.trimmingCharacters(in: .whitespacesAndNewlines))
                 }

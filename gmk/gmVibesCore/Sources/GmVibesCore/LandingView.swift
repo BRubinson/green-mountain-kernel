@@ -133,7 +133,9 @@ private struct RecentSessionsStrip: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 14) {
                         ForEach(sessions) { session in
-                            Button { onOpen(session) } label: {
+                            Button {
+                                onOpen(session)
+                            } label: {
                                 RecentSessionCardView(session: session, active: isCheckedOut(session))
                             }
                             .buttonStyle(.plain)
@@ -231,9 +233,10 @@ private struct InstanceSearchSection: View {
                 ContentUnavailableView(
                     query.isEmpty ? "No instances" : "No matches",
                     systemImage: query.isEmpty ? "folder" : "magnifyingglass",
-                    description: Text(query.isEmpty
-                        ? "The daemon catalog has no instances yet."
-                        : "Nothing matches “\(query)”.")
+                    description: Text(
+                        query.isEmpty
+                            ? "The daemon catalog has no instances yet."
+                            : "Nothing matches “\(query)”.")
                 )
                 .frame(maxWidth: .infinity, minHeight: 140)
             } else {
@@ -308,7 +311,9 @@ private struct ProjectGroupCard: View {
                 .buttonStyle(.plain)
                 .help("Open the project page")
 
-                Button { showingSettings = true } label: {
+                Button {
+                    showingSettings = true
+                } label: {
                     Image(systemName: "gearshape")
                         .foregroundStyle(.secondary)
                         .contentShape(Rectangle())
@@ -404,12 +409,15 @@ private struct DaemonGateState: View {
     private var message: String {
         switch daemon.health {
         case .incompatible(let version):
-            return "The running daemon speaks protocol v\(version.map(String.init) ?? "?"), newer than this build of GMVibes. Rebuild the app against the updated daemon package."
+            return
+                "The running daemon speaks protocol v\(version.map(String.init) ?? "?"), newer than this build of GMVibes. Rebuild the app against the updated daemon package."
         case .notInstalled:
             if let env = Paths.declaredEnvironmentName, env != "prod" {
-                return "No daemon binary at \(Paths.binDaemon.path). This is the \(env) environment root — stage binaries into it from your checkout:"
+                return
+                    "No daemon binary at \(Paths.binDaemon.path). This is the \(env) environment root — stage binaries into it from your checkout:"
             }
-            return "No daemon binary at \(Paths.binDaemon.path). Build and install it from the green-mountain-kernel repo:"
+            return
+                "No daemon binary at \(Paths.binDaemon.path). Build and install it from the green-mountain-kernel repo:"
         case .down(let reason, let intentional):
             return intentional ? "The daemon was stopped." : reason
         default:
@@ -472,9 +480,11 @@ private struct EmptyDatabaseState: View {
 
     private static var message: String {
         guard let env = Paths.declaredEnvironmentName, env != "prod" else {
-            return "The daemon is healthy but holds no projects yet. Start a Claude Code session in a gmcc-enabled repo (the SessionStart hook registers it), or ensure the context manually:"
+            return
+                "The daemon is healthy but holds no projects yet. Start a Claude Code session in a gmcc-enabled repo (the SessionStart hook registers it), or ensure the context manually:"
         }
-        return "The kernel is healthy but this \(env) environment holds no projects yet. Seed it from your checkout (a Debug ⌘R runs this for test automatically):"
+        return
+            "The kernel is healthy but this \(env) environment holds no projects yet. Seed it from your checkout (a Debug ⌘R runs this for test automatically):"
     }
 }
 
@@ -495,11 +505,13 @@ private struct CatalogErrorState: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 520)
-            Text("If this appeared after a daemon rebuild (\"no such column\"), restart the daemon (gm_hook call SHUTDOWN --json '{}', then gm_hook ping to autostart) so migrations run. The database is append-only history — never delete it; take a snapshot first with gm_hook call BACKUP --json '{}' if you need to investigate.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 520)
+            Text(
+                "If this appeared after a daemon rebuild (\"no such column\"), restart the daemon (gm_hook call SHUTDOWN --json '{}', then gm_hook ping to autostart) so migrations run. The database is append-only history — never delete it; take a snapshot first with gm_hook call BACKUP --json '{}' if you need to investigate."
+            )
+            .font(.caption)
+            .foregroundStyle(.tertiary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: 520)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -515,9 +527,11 @@ private struct EnvWarningStrip: View {
         HStack(spacing: 8) {
             Image(systemName: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
-            Text("The gmfs root couldn't be resolved from the daemon or a conventional location — memory files and folder-open actions are unavailable.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Text(
+                "The gmfs root couldn't be resolved from the daemon or a conventional location — memory files and folder-open actions are unavailable."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
             Spacer()
             Button("Re-scan") { gmcc.refresh() }
                 .buttonStyle(.borderless)

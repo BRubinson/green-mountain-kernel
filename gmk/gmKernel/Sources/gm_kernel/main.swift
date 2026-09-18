@@ -36,34 +36,34 @@ import GmMcpServer
 // bottom, and only on the paths that printed it, so `--version` looked fine.
 
 let usage = """
-gm_kernel — the GM kernel binary. One Mach-O, three personalities.
+    gm_kernel — the GM kernel binary. One Mach-O, three personalities.
 
-USAGE
-  gm_kernel <personality> [args...]
-  <personality>                     (via the ~/gmfs/bin symlinks)
+    USAGE
+      gm_kernel <personality> [args...]
+      <personality>                     (via the ~/gmfs/bin symlinks)
 
-PERSONALITIES
-  daemon     the headless single-writer host. Also reached as `gm_daemon`.
-             The app bundle hosts the same server; this is the fallback that
-             `DaemonClient.autostart()` spawns from hooks, SSH and CI, where
-             LaunchServices cannot launch an application.
-  mcp        the pen server: JSON-RPC 2.0 over stdio, spawned per Claude
-             session by the harness. Also reached as `gm_mcp`.
-  hook       the shell-callable client and raw-wire passthrough. Also reached
-             as `gm_hook`.
+    PERSONALITIES
+      daemon     the headless single-writer host. Also reached as `gm_daemon`.
+                 The app bundle hosts the same server; this is the fallback that
+                 `DaemonClient.autostart()` spawns from hooks, SSH and CI, where
+                 LaunchServices cannot launch an application.
+      mcp        the pen server: JSON-RPC 2.0 over stdio, spawned per Claude
+                 session by the harness. Also reached as `gm_mcp`.
+      hook       the shell-callable client and raw-wire passthrough. Also reached
+                 as `gm_hook`.
 
-  --version  protocol version
-  --help     this text
+      --version  protocol version
+      --help     this text
 
-WHY argv[0] TAKES PRECEDENCE
-  `gm_hook call BACKUP` has "call" as its first argument. Dispatching on the
-  subcommand first would try to run `call` as a personality and break the
-  hook path, so the invoked NAME is consulted before any argument.
+    WHY argv[0] TAKES PRECEDENCE
+      `gm_hook call BACKUP` has "call" as its first argument. Dispatching on the
+      subcommand first would try to run `call` as a personality and break the
+      hook path, so the invoked NAME is consulted before any argument.
 
-A BARE `gm_kernel` EXITS 2 AND OPENS NOTHING
-  Defaulting to the daemon would let a typo or a script that lost an argument
-  silently become a process holding the database.
-"""
+    A BARE `gm_kernel` EXITS 2 AND OPENS NOTHING
+      Defaulting to the daemon would let a typo or a script that lost an argument
+      silently become a process holding the database.
+    """
 
 let arguments = CommandLine.arguments
 let invokedAs = URL(fileURLWithPath: arguments.first ?? "gm_kernel").lastPathComponent

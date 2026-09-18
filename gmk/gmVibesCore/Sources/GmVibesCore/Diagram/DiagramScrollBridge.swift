@@ -51,7 +51,7 @@ struct DiagramScrollBridge: NSViewRepresentable {
         /// key-view loop and steal arrow keys from the sidebar List. Flipping
         /// this to true and adding `keyDown` is the entire v1 tool-shortcut seam.
         override var acceptsFirstResponder: Bool { false }
-        override var isFlipped: Bool { true }   // match SwiftUI's top-left origin
+        override var isFlipped: Bool { true }  // match SwiftUI's top-left origin
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()

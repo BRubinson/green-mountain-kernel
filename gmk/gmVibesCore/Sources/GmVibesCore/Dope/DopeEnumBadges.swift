@@ -62,8 +62,9 @@ private struct DopeOptionBadge: View {
             .padding(.vertical, 1)
             .foregroundStyle(.secondary)
             .background(.quaternary, in: .capsule)
-            .help(option.body.description.isEmpty
-                  ? option.body.name
-                  : "\(option.body.name) — \(option.body.description)")
+            .help(
+                option.body.description.isEmpty
+                    ? option.body.name
+                    : "\(option.body.name) — \(option.body.description)")
     }
 }

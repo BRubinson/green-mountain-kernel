@@ -90,7 +90,7 @@
       "sort_order" : 13
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Persistence/Migrations/m0025_dynamicWorkflows.swift",
   "sort_order" : 37,
   "version" : 767
 }

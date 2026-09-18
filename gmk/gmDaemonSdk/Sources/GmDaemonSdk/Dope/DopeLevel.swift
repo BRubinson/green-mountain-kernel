@@ -48,28 +48,38 @@ public struct DopeLevelSpec: Sendable {
     public static let all: [DopeLevel: DopeLevelSpec] = {
         let common: Set<DopeField> = [.code, .name, .description, .sortOrder]
         let specs: [DopeLevelSpec] = [
-            DopeLevelSpec(level: .scope, table: "dope_scope",
-                          parentLevel: nil, parentColumn: nil,
-                          ownedFields: [.code, .name, .description]),
-            DopeLevelSpec(level: .persistence, table: "dope_persistence",
-                          parentLevel: .scope, parentColumn: "dope_scope_uuid",
-                          ownedFields: common),
-            DopeLevelSpec(level: .entity, table: "dope_persistence_entity",
-                          parentLevel: .persistence, parentColumn: "dope_persistence_uuid",
-                          ownedFields: common.union([.entityType, .repoRepresentativeFile,
-                                                     .baseComposableUuid])),
-            DopeLevelSpec(level: .property, table: "dope_persistence_entity_property",
-                          parentLevel: .entity, parentColumn: "dope_persistence_entity_uuid",
-                          ownedFields: common.union([.dataType, .nullable, .isUnique,
-                                                     .autoIncrement, .textCharLimit,
-                                                     .enumUuid, .relationshipTargetUuid,
-                                                     .baseOriginPropertyUuid])),
-            DopeLevelSpec(level: .enumeration, table: "dope_persistence_enum",
-                          parentLevel: .persistence, parentColumn: "dope_persistence_uuid",
-                          ownedFields: common.union([.repoRepresentativeFile])),
-            DopeLevelSpec(level: .option, table: "dope_persistence_enum_option",
-                          parentLevel: .enumeration, parentColumn: "dope_persistence_enum_uuid",
-                          ownedFields: common),
+            DopeLevelSpec(
+                level: .scope, table: "dope_scope",
+                parentLevel: nil, parentColumn: nil,
+                ownedFields: [.code, .name, .description]),
+            DopeLevelSpec(
+                level: .persistence, table: "dope_persistence",
+                parentLevel: .scope, parentColumn: "dope_scope_uuid",
+                ownedFields: common),
+            DopeLevelSpec(
+                level: .entity, table: "dope_persistence_entity",
+                parentLevel: .persistence, parentColumn: "dope_persistence_uuid",
+                ownedFields: common.union([
+                    .entityType, .repoRepresentativeFile,
+                    .baseComposableUuid,
+                ])),
+            DopeLevelSpec(
+                level: .property, table: "dope_persistence_entity_property",
+                parentLevel: .entity, parentColumn: "dope_persistence_entity_uuid",
+                ownedFields: common.union([
+                    .dataType, .nullable, .isUnique,
+                    .autoIncrement, .textCharLimit,
+                    .enumUuid, .relationshipTargetUuid,
+                    .baseOriginPropertyUuid,
+                ])),
+            DopeLevelSpec(
+                level: .enumeration, table: "dope_persistence_enum",
+                parentLevel: .persistence, parentColumn: "dope_persistence_uuid",
+                ownedFields: common.union([.repoRepresentativeFile])),
+            DopeLevelSpec(
+                level: .option, table: "dope_persistence_enum_option",
+                parentLevel: .enumeration, parentColumn: "dope_persistence_enum_uuid",
+                ownedFields: common),
         ]
         return Dictionary(uniqueKeysWithValues: specs.map { ($0.level, $0) })
     }()
@@ -104,8 +114,8 @@ public enum DopeScopeType: String, Codable, Hashable, CaseIterable, Sendable {
     public init?(fromWire raw: String) {
         switch raw {
         case "SESSION_BASE": self = .sessionInstance
-        case "PROMPT":       self = .sessionInstanceItem
-        default:             self.init(rawValue: raw)
+        case "PROMPT": self = .sessionInstanceItem
+        default: self.init(rawValue: raw)
         }
     }
 

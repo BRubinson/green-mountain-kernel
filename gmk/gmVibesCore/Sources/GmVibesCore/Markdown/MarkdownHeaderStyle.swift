@@ -48,12 +48,12 @@ enum MarkdownHeaderStyle {
     /// Point size for a heading level (1...6).
     static func pointSize(level: Int) -> CGFloat {
         switch level {
-        case 1:  return bodyPointSize + 9   // ~22
-        case 2:  return bodyPointSize + 6   // ~19
-        case 3:  return bodyPointSize + 4   // ~17
-        case 4:  return bodyPointSize + 2   // ~15
-        case 5:  return bodyPointSize + 1   // ~14
-        default: return bodyPointSize       // ~13 (h6 / clamps)
+        case 1: return bodyPointSize + 9  // ~22
+        case 2: return bodyPointSize + 6  // ~19
+        case 3: return bodyPointSize + 4  // ~17
+        case 4: return bodyPointSize + 2  // ~15
+        case 5: return bodyPointSize + 1  // ~14
+        default: return bodyPointSize  // ~13 (h6 / clamps)
         }
     }
 
@@ -101,7 +101,8 @@ enum MarkdownHeaderStyle {
     /// Monospaced font for a whole line at the given (optional) heading level — bold
     /// heading font, or the regular body font for a non-heading line.
     static func nsFont(forLevel level: Int?) -> NSFont {
-        NSFont.monospacedSystemFont(ofSize: size(forLevel: level),
-                                    weight: level != nil ? .bold : .regular)
+        NSFont.monospacedSystemFont(
+            ofSize: size(forLevel: level),
+            weight: level != nil ? .bold : .regular)
     }
 }

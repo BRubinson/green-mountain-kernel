@@ -81,7 +81,7 @@ public struct HookPayload: Equatable {
 
     public static func decode(_ data: Data) -> HookPayload? {
         guard !data.isEmpty,
-              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         else { return nil }
         let input = root["tool_input"] as? [String: Any] ?? [:]
         let response = root["tool_response"] as? [String: Any] ?? [:]
@@ -115,8 +115,8 @@ public struct HookPayload: Equatable {
     /// keys need. A malformed or absent patch is no ranges, never a failure.
     private static func hunks(_ value: Any?) -> [StructuredPatchHunk] {
         guard let array = value as? [Any],
-              let data = try? JSONSerialization.data(withJSONObject: array),
-              let decoded = try? JSONDecoder().decode([StructuredPatchHunk].self, from: data)
+            let data = try? JSONSerialization.data(withJSONObject: array),
+            let decoded = try? JSONDecoder().decode([StructuredPatchHunk].self, from: data)
         else { return [] }
         return decoded
     }
@@ -181,20 +181,23 @@ enum HookWriteTargets {
         payload: HookPayload, repoRoot: String
     ) -> [HookWriteTarget] {
         guard let absolute = payload.filePath ?? payload.notebookPath,
-              let relativePath = GitPathClassifier.repoRelative(absolute, repoRoot: repoRoot)
+            let relativePath = GitPathClassifier.repoRelative(absolute, repoRoot: repoRoot)
         else { return [] }
         // Edit and NotebookEdit cannot bring a file into existence, so their
         // kind is settled without asking git. Write can, and git is the only
         // thing that knows whether this path is new.
-        let changeKind: ChangeKind = payload.toolName == "Write"
+        let changeKind: ChangeKind =
+            payload.toolName == "Write"
             ? GitPathClassifier.classify(
                 relativePath: relativePath, repoRoot: repoRoot, declared: .write) ?? .create
             : .edit
-        return [HookWriteTarget(
-            relativePath: relativePath,
-            changeKind: changeKind,
-            origin: FileChangeOrigin.hook,
-            ranges: StructuredPatchExpander.expand(payload.structuredPatch))]
+        return [
+            HookWriteTarget(
+                relativePath: relativePath,
+                changeKind: changeKind,
+                origin: FileChangeOrigin.hook,
+                ranges: StructuredPatchExpander.expand(payload.structuredPatch))
+        ]
     }
 
     /// The inferred case: paths the command NAMED, classified by git. No
@@ -205,9 +208,10 @@ enum HookWriteTargets {
     ) -> [HookWriteTarget] {
         guard let command = payload.command, let cwd = payload.cwd else { return [] }
         return BashWritePaths.extract(command: command, cwd: cwd).compactMap { target in
-            guard let relativePath = GitPathClassifier.repoRelative(
+            guard
+                let relativePath = GitPathClassifier.repoRelative(
                     target.path, repoRoot: repoRoot),
-                  let changeKind = GitPathClassifier.classify(
+                let changeKind = GitPathClassifier.classify(
                     relativePath: relativePath, repoRoot: repoRoot, declared: target.intent)
             else { return nil }
             return HookWriteTarget(
@@ -340,14 +344,15 @@ enum BashWritePaths {
             let operands = operands(rest)
             guard operands.count >= 2, let destination = operands.last else { return [] }
             return destinations(
-                sources: operands.dropLast(), destination: destination, cwd: cwd)
-                .map { Target(path: $0, intent: .write) }
+                sources: operands.dropLast(), destination: destination, cwd: cwd
+            )
+            .map { Target(path: $0, intent: .write) }
         case "mv":
             let operands = operands(rest)
             guard operands.count >= 2, let destination = operands.last else { return [] }
             let sources = Array(operands.dropLast())
             return destinations(sources: sources, destination: destination, cwd: cwd)
-                    .map { Target(path: $0, intent: .write) }
+                .map { Target(path: $0, intent: .write) }
                 + sources.map { Target(path: $0, intent: .delete) }
         case "rm":
             return operands(rest).map { Target(path: $0, intent: .delete) }
@@ -387,7 +392,7 @@ enum BashWritePaths {
         let absolute = absolutePath(destination, cwd: cwd)
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: absolute, isDirectory: &isDirectory),
-              isDirectory.boolValue
+            isDirectory.boolValue
         else { return [destination] }
         return sources.map {
             URL(fileURLWithPath: absolute, isDirectory: true)
@@ -488,9 +493,9 @@ enum BashWritePaths {
         var intents: [String: Intent] = [:]
         for target in targets {
             guard !target.path.isEmpty,
-                  !target.path.contains("$"),
-                  !target.path.contains("*"),
-                  !target.path.contains("?")
+                !target.path.contains("$"),
+                !target.path.contains("*"),
+                !target.path.contains("?")
             else { continue }
             let absolute = absolutePath(target.path, cwd: cwd)
             guard !absolute.hasPrefix("/dev/"), !absolute.hasPrefix("/proc/") else { continue }
@@ -606,8 +611,7 @@ enum BashCommandScanner {
                 if c == "'" { hasCurrent = true; stack.append(.single); index += 1; continue }
                 if c == "\"" { hasCurrent = true; stack.append(.double); index += 1; continue }
                 if c == "`" {
-                    if stack[stack.count - 1] == .backtick { stack.removeLast() }
-                    else { stack.append(.backtick) }
+                    if stack[stack.count - 1] == .backtick { stack.removeLast() } else { stack.append(.backtick) }
                     breakSegment()
                     index += 1
                     continue
@@ -645,7 +649,8 @@ enum BashCommandScanner {
                     continue
                 }
                 if c == ";" || c == "&" || c == "|" || c == "(" || c == "{" || c == "}"
-                    || c == "\n" {
+                    || c == "\n"
+                {
                     breakSegment()
                     index += 1
                     continue
@@ -736,8 +741,9 @@ enum GitPathClassifier {
     /// The two status columns of the first reported line, or nil when git
     /// reports nothing (clean, unknown, or not a repo).
     private static func statusCode(relativePath: String, repoRoot: String) -> String? {
-        guard let output = runGit(
-            ["-C", repoRoot, "status", "--porcelain", "--", relativePath])
+        guard
+            let output = runGit(
+                ["-C", repoRoot, "status", "--porcelain", "--", relativePath])
         else { return nil }
         guard let line = output.split(separator: "\n").first, line.count >= 2 else { return nil }
         return String(line.prefix(2))

@@ -47,12 +47,12 @@ final class DaemonSearchModel {
                     query: trimmed, sessionUuid: sessionUuid, kinds: kindList, limit: limit
                 )
                 guard !Task.isCancelled else { return }
-                if hits != result { hits = result }   // change-gated publication
+                if hits != result { hits = result }  // change-gated publication
                 searched = true
                 errorText = nil
             } catch let error as DaemonError {
                 guard !Task.isCancelled else { return }
-                hits = []   // never strand stale hits behind an error view
+                hits = []  // never strand stale hits behind an error view
                 errorText = error.searchMessage
             } catch {
                 guard !Task.isCancelled else { return }

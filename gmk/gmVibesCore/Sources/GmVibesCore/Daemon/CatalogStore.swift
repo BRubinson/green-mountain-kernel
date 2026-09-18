@@ -53,13 +53,16 @@ final class CatalogStore {
             // order under equal timestamps would defeat the change-gated
             // publication below and thrash selection state.
             let newSessions = Dictionary(grouping: sessions, by: \.instanceUuid)
-                .mapValues { $0.sorted {
-                    $0.lastActivityAt == $1.lastActivityAt
-                        ? $0.code < $1.code
-                        : $0.lastActivityAt > $1.lastActivityAt
-                } }
+                .mapValues {
+                    $0.sorted {
+                        $0.lastActivityAt == $1.lastActivityAt
+                            ? $0.code < $1.code
+                            : $0.lastActivityAt > $1.lastActivityAt
+                    }
+                }
             let newSessionsByUuid = Dictionary(sessions.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
-            let newInstancesByUuid = Dictionary(instances.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
+            let newInstancesByUuid = Dictionary(
+                instances.map { ($0.uuid, $0) }, uniquingKeysWith: { first, _ in first })
 
             // Change-gated publication (the app's anti-thrash idiom).
             if self.projects != newProjects { self.projects = newProjects }
@@ -110,12 +113,15 @@ final class CatalogStore {
     /// invalidation — so the tree would refresh on its own. We refresh here
     /// anyway (the call is coalesced) so the sheet's own row is current the
     /// instant it dismisses, rather than a socket round trip later.
-    func setPrimaryBranch(projectUuid: String, expectedVersion: Int64,
-                          branch: String) async throws {
-        _ = try await service.updateProject(ProjectUpdateRequest(
-            projectUuid: projectUuid,
-            expectedVersion: expectedVersion,
-            primaryProjectBranch: branch))
+    func setPrimaryBranch(
+        projectUuid: String, expectedVersion: Int64,
+        branch: String
+    ) async throws {
+        _ = try await service.updateProject(
+            ProjectUpdateRequest(
+                projectUuid: projectUuid,
+                expectedVersion: expectedVersion,
+                primaryProjectBranch: branch))
         await refresh()
     }
 
@@ -129,8 +135,9 @@ final class CatalogStore {
         targetPromptUuid: String? = nil
     ) -> SessionWindowID? {
         guard let stub = session(uuid: sessionUuid),
-              let sessionUUID = UUID(uuidString: stub.uuid),
-              let instanceUUID = UUID(uuidString: stub.instanceUuid) else { return nil }
+            let sessionUUID = UUID(uuidString: stub.uuid),
+            let instanceUUID = UUID(uuidString: stub.instanceUuid)
+        else { return nil }
         return SessionWindowID(
             sessionUUID: sessionUUID,
             instanceUUID: instanceUUID,

@@ -83,7 +83,7 @@
       "sort_order" : 12
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Repositories/BotWorkflowRepository.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Persistence/Store/Repositories/BotWorkflowRepository.swift",
   "sort_order" : 30,
   "version" : 767
 }

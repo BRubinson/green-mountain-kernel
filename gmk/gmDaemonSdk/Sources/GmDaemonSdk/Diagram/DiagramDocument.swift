@@ -29,12 +29,14 @@ public struct DiagramDocument: Codable, Hashable, Sendable {
         public let targetCodePath: String?
         public let children: [ElementDoc]
 
-        public init(code: String, name: String, description: String,
-                    sortOrder: Int, centerX: Double, centerY: Double,
-                    elementZ: Double, scale: Double,
-                    payload: DiagramElementPayload,
-                    targetCodePath: String? = nil,
-                    children: [ElementDoc] = []) {
+        public init(
+            code: String, name: String, description: String,
+            sortOrder: Int, centerX: Double, centerY: Double,
+            elementZ: Double, scale: Double,
+            payload: DiagramElementPayload,
+            targetCodePath: String? = nil,
+            children: [ElementDoc] = []
+        ) {
             self.code = code
             self.name = name
             self.description = description
@@ -50,7 +52,7 @@ public struct DiagramDocument: Codable, Hashable, Sendable {
 
         private enum CodingKeys: String, CodingKey {
             case code, name, description, sortOrder, centerX, centerY,
-                 elementZ, scale, payload, targetCodePath, children
+                elementZ, scale, payload, targetCodePath, children
         }
 
         public init(from decoder: Decoder) throws {
@@ -77,8 +79,10 @@ public struct DiagramDocument: Codable, Hashable, Sendable {
     public let dopeScopeCode: String?
     public let elements: [ElementDoc]
 
-    public init(version: Int64, code: String, name: String, description: String,
-                dopeScopeCode: String?, elements: [ElementDoc]) {
+    public init(
+        version: Int64, code: String, name: String, description: String,
+        dopeScopeCode: String?, elements: [ElementDoc]
+    ) {
         self.version = version
         self.code = code
         self.name = name
@@ -130,8 +134,10 @@ public enum DiagramDocumentCodec {
     /// paths against the tree's own uuid index; a target uuid that no
     /// longer resolves inside the tree serializes as no target (the ghost
     /// travels as a ghost).
-    public static func document(from tree: DiagramTree,
-                                dopeScopeCode: String?) -> DiagramDocument {
+    public static func document(
+        from tree: DiagramTree,
+        dopeScopeCode: String?
+    ) -> DiagramDocument {
         var pathByUuid: [String: String] = [:]
         func index(_ node: DiagramElementNode, prefix: String) {
             let path = prefix.isEmpty ? node.base.code : "\(prefix)/\(node.base.code)"
@@ -145,12 +151,13 @@ public enum DiagramDocumentCodec {
             var targetCodePath: String?
             if case .connector(let p) = payload {
                 targetCodePath = p.targetElementUuid.flatMap { pathByUuid[$0] }
-                payload = .connector(ConnectorPayload(
-                    targetElementUuid: nil,
-                    strokeColor: p.strokeColor, strokeWidth: p.strokeWidth,
-                    lineStyle: p.lineStyle, headKind: p.headKind,
-                    routingKind: p.routingKind, tailKind: p.tailKind,
-                    label: p.label))
+                payload = .connector(
+                    ConnectorPayload(
+                        targetElementUuid: nil,
+                        strokeColor: p.strokeColor, strokeWidth: p.strokeWidth,
+                        lineStyle: p.lineStyle, headKind: p.headKind,
+                        routingKind: p.routingKind, tailKind: p.tailKind,
+                        label: p.label))
             }
             return ElementDocBuild(
                 doc: DiagramDocument.ElementDoc(

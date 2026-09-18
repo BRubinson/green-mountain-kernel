@@ -19,8 +19,9 @@ final class KernelLifecycleTests: KernelBackedTestCase {
     func testAFreshRootMigratesItselfToHead() throws {
         let db = try env.readOnlyDatabase()
         let head = try db.read { try Int.fetchOne($0, sql: "SELECT MAX(version) FROM schema_migrations") }
-        XCTAssertEqual(head, Migrations.currentSchemaVersion,
-                       "a booted kernel must leave its db at the schema its binary knows")
+        XCTAssertEqual(
+            head, Migrations.currentSchemaVersion,
+            "a booted kernel must leave its db at the schema its binary knows")
     }
 
     /// The kernel answers PING with its own identity, and the protocol version
@@ -58,7 +59,8 @@ final class KernelLifecycleTests: KernelBackedTestCase {
     func testTheKernelRecordsItsOwnStart() throws {
         let db = try env.readOnlyDatabase()
         let starts = try db.read {
-            try Int.fetchOne($0,
+            try Int.fetchOne(
+                $0,
                 sql: "SELECT COUNT(*) FROM daemon_event WHERE kind = ?",
                 arguments: [DaemonEventKind.daemonStart.rawValue])
         }

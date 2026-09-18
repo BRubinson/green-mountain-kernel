@@ -42,29 +42,37 @@ extension ResolvedDiagram {
     /// into the third pass — strokes by distance to their polyline inflated
     /// by half their line width, shapes by their frame. The default is
     /// byte-identical to the pre-m0024 behavior for every existing caller.
-    public func hitTest(at point: CGPoint, edgeTolerance: CGFloat = 6,
-                        includeInk: Bool = false) -> DiagramHit? {
+    public func hitTest(
+        at point: CGPoint, edgeTolerance: CGFloat = 6,
+        includeInk: Bool = false
+    ) -> DiagramHit? {
         for element in topLevel.reversed() {
-            if let hit = Self.hitElement(element, at: point, cardsOnly: true,
-                                         includeInk: false,
-                                         inkTolerance: edgeTolerance) {
+            if let hit = Self.hitElement(
+                element, at: point, cardsOnly: true,
+                includeInk: false,
+                inkTolerance: edgeTolerance)
+            {
                 return .element(hit)
             }
         }
         for edge in edges.reversed() {
-            let points = edge.routed && edge.points.count >= 2
+            let points =
+                edge.routed && edge.points.count >= 2
                 ? edge.points : [edge.from, edge.to]
             for index in 0..<(points.count - 1) {
                 if Self.distance(point, segment: points[index], points[index + 1])
-                    <= edgeTolerance {
+                    <= edgeTolerance
+                {
                     return .edge(edge)
                 }
             }
         }
         for element in topLevel.reversed() {
-            if let hit = Self.hitElement(element, at: point, cardsOnly: false,
-                                         includeInk: includeInk,
-                                         inkTolerance: edgeTolerance) {
+            if let hit = Self.hitElement(
+                element, at: point, cardsOnly: false,
+                includeInk: includeInk,
+                inkTolerance: edgeTolerance)
+            {
                 return .element(hit)
             }
         }
@@ -86,15 +94,21 @@ extension ResolvedDiagram {
         return nil
     }
 
-    private static func hitElement(_ element: ResolvedElement, at point: CGPoint,
-                                   cardsOnly: Bool, includeInk: Bool,
-                                   inkTolerance: CGFloat) -> ResolvedElement? {
+    private static func hitElement(
+        _ element: ResolvedElement, at point: CGPoint,
+        cardsOnly: Bool, includeInk: Bool,
+        inkTolerance: CGFloat
+    ) -> ResolvedElement? {
         // Children first, reversed — the last-painted sibling wins, and an
         // entity card beats its containing scope outline.
         for child in element.children.reversed() {
-            if let hit = hitElement(child, at: point, cardsOnly: cardsOnly,
-                                    includeInk: includeInk,
-                                    inkTolerance: inkTolerance) { return hit }
+            if let hit = hitElement(
+                child, at: point, cardsOnly: cardsOnly,
+                includeInk: includeInk,
+                inkTolerance: inkTolerance)
+            {
+                return hit
+            }
         }
         switch element.kind {
         case .layer, .connector:
@@ -106,8 +120,10 @@ extension ResolvedDiagram {
             guard includeInk, !cardsOnly, stroke.points.count >= 2 else { return nil }
             let tolerance = max(inkTolerance, stroke.lineWidth / 2 + 2)
             for index in 0..<(stroke.points.count - 1) {
-                if distance(point, segment: stroke.points[index],
-                            stroke.points[index + 1]) <= tolerance {
+                if distance(
+                    point, segment: stroke.points[index],
+                    stroke.points[index + 1]) <= tolerance
+                {
                     return element
                 }
             }

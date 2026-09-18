@@ -63,8 +63,9 @@ public enum KernelHostRole: ~Copyable {
             // Held by someone. Decide whether to take it.
             guard let holder = KernelOwnership.readHolder() else {
                 log("lock is held but the pidfile is unreadable — client mode")
-                return .client(holder: KernelOwnership.Holder(
-                    pid: 0, executablePath: "(unknown — pidfile unreadable)", bundlePath: nil))
+                return .client(
+                    holder: KernelOwnership.Holder(
+                        pid: 0, executablePath: "(unknown — pidfile unreadable)", bundlePath: nil))
             }
 
             if let bundle = holder.bundlePath {
@@ -122,7 +123,7 @@ public enum KernelHostRole: ~Copyable {
 
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
-            usleep(100_000)   // 100ms
+            usleep(100_000)  // 100ms
             if let role = acquireOnce(log: log) {
                 log("took over from headless pid \(holder.pid)")
                 return role

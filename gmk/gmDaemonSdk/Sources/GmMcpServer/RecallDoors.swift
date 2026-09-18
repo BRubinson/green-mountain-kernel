@@ -41,11 +41,12 @@ func makeRecallDoors() -> [Tool] {
                 parameters: ["limit", "session_uuid"],
                 retryWith: "\(name) with a smaller limit, or session_uuid set"),
             run: { args, client in
-                try client.search(SearchRequest(
-                    query: try args.string("query"),
-                    sessionUuid: args.optString("session_uuid"),
-                    kinds: kinds,
-                    limit: args.optInt("limit")))
+                try client.search(
+                    SearchRequest(
+                        query: try args.string("query"),
+                        sessionUuid: args.optString("session_uuid"),
+                        kinds: kinds,
+                        limit: args.optInt("limit")))
             })
     }
 
@@ -94,11 +95,12 @@ func makeRecallDoors() -> [Tool] {
                 // the daemon refused a nil project_uuid outright, so every call
                 // it ever made returned BAD_REQUEST. Stating the contract on
                 // both sides is what stops that recurring.
-                try client.dopeSearch(DopeSearchRequest(
-                    query: try args.string("query"),
-                    scope: .project,
-                    sessionUuid: nil,
-                    limit: args.optInt("limit")))
+                try client.dopeSearch(
+                    DopeSearchRequest(
+                        query: try args.string("query"),
+                        scope: .project,
+                        sessionUuid: nil,
+                        limit: args.optInt("limit")))
             }),
         Tool(
             name: "dope_update_session",
@@ -108,9 +110,10 @@ func makeRecallDoors() -> [Tool] {
                 ("force", "boolean", "Write even when the repo has diverged", false),
             ],
             run: { args, client in
-                try client.dopeWriteRepo(DopeWriteRepoRequest(
-                    scopeUuid: try args.string("scope_uuid"),
-                    force: args.optBool("force")))
+                try client.dopeWriteRepo(
+                    DopeWriteRepoRequest(
+                        scopeUuid: try args.string("scope_uuid"),
+                        force: args.optBool("force")))
             }),
         Tool(
             name: "projects_search",
@@ -124,10 +127,11 @@ func makeRecallDoors() -> [Tool] {
                 parameters: ["limit", "project_uuid"],
                 retryWith: "projects_search with a smaller limit, or project_uuid set"),
             run: { args, client in
-                try client.searchCatalog(CatalogSearchRequest(
-                    query: try args.string("query"),
-                    projectUuid: args.optString("project_uuid"),
-                    limit: args.optInt("limit")))
+                try client.searchCatalog(
+                    CatalogSearchRequest(
+                        query: try args.string("query"),
+                        projectUuid: args.optString("project_uuid"),
+                        limit: args.optInt("limit")))
             }),
         Tool(
             name: "projects_update_session",
@@ -140,12 +144,13 @@ func makeRecallDoors() -> [Tool] {
                 ("goal", "string", "New goal", false),
             ],
             run: { args, client in
-                try client.updateSession(SessionUpdateRequest(
-                    sessionUuid: try args.string("session_uuid"),
-                    expectedVersion: try args.int64("expected_version"),
-                    name: args.optString("name"),
-                    backstory: args.optString("backstory"),
-                    goal: args.optString("goal")))
+                try client.updateSession(
+                    SessionUpdateRequest(
+                        sessionUuid: try args.string("session_uuid"),
+                        expectedVersion: try args.int64("expected_version"),
+                        name: args.optString("name"),
+                        backstory: args.optString("backstory"),
+                        goal: args.optString("goal")))
             }),
     ]
 }

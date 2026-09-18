@@ -1,6 +1,6 @@
 {
   "code" : "gm_daemon",
-  "description" : "The single-writer daemon, GMCCDaemonKit and the gm CLI: the only writer of the gmcc db and the owner of every persistence domain",
+  "description" : "The single-writer daemon, GmDaemon (GmKernelHost) and the gm CLI: the only writer of the gmcc db and the owner of every persistence domain",
   "elements" : [
     {
       "code" : "gm_daemon",
@@ -16,7 +16,7 @@
         ]
       },
       "name" : "GM Daemon",
-      "primary_path" : "plugins/gmcc/daemon",
+      "primary_path" : "gmk/gmDaemon",
       "sort_order" : 0
     }
   ],

@@ -42,7 +42,8 @@ public enum GitHead {
         }
         // .git is a FILE: "gitdir: <path>". Follow one level.
         guard let content = readSmallFile(gitPath),
-              content.hasPrefix("gitdir:") else {
+            content.hasPrefix("gitdir:")
+        else {
             return nil
         }
         var gitdir = String(content.dropFirst("gitdir:".count))
@@ -59,7 +60,8 @@ public enum GitHead {
     /// containing directory).
     public static func resolve(repoRoot: String) -> State {
         guard let gitdir = gitDirectory(repoRoot: repoRoot),
-              let head = readSmallFile(gitdir + "/HEAD") else {
+            let head = readSmallFile(gitdir + "/HEAD")
+        else {
             return .unavailable
         }
         let line = head.trimmingCharacters(in: .whitespacesAndNewlines)

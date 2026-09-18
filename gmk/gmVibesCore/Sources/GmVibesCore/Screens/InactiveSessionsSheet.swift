@@ -53,17 +53,18 @@ struct InactiveSessionsSheet: View {
                 guard let instanceUUID = UUID(uuidString: instance.uuid) else { continue }
                 for stub in filtered.sessions(of: instance) {
                     guard let sessionUUID = UUID(uuidString: stub.uuid) else { continue }
-                    out.append(Row(
-                        windowID: SessionWindowID(
-                            sessionUUID: sessionUUID,
-                            instanceUUID: instanceUUID,
-                            sessionName: stub.name
-                        ),
-                        sessionName: stub.name,
-                        branch: stub.code,
-                        projectName: project.name,
-                        instanceName: instance.name
-                    ))
+                    out.append(
+                        Row(
+                            windowID: SessionWindowID(
+                                sessionUUID: sessionUUID,
+                                instanceUUID: instanceUUID,
+                                sessionName: stub.name
+                            ),
+                            sessionName: stub.name,
+                            branch: stub.code,
+                            projectName: project.name,
+                            instanceName: instance.name
+                        ))
                 }
             }
         }
@@ -87,9 +88,10 @@ struct InactiveSessionsSheet: View {
                 ContentUnavailableView(
                     query.isEmpty ? "No inactive sessions" : "No matches",
                     systemImage: query.isEmpty ? "archivebox" : "magnifyingglass",
-                    description: Text(query.isEmpty
-                        ? "Every session is currently checked out on its instance."
-                        : "No inactive session matches “\(query)”.")
+                    description: Text(
+                        query.isEmpty
+                            ? "Every session is currently checked out on its instance."
+                            : "No inactive session matches “\(query)”.")
                 )
                 .frame(maxWidth: .infinity, minHeight: 160)
             } else {
@@ -111,10 +113,12 @@ struct InactiveSessionsSheet: View {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(row.sessionName)
                                             .font(.subheadline.weight(.medium))
-                                        Text("\(row.projectName) · \(row.instanceName)\(row.branch.map { " · \($0)" } ?? "")")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(1)
+                                        Text(
+                                            "\(row.projectName) · \(row.instanceName)\(row.branch.map { " · \($0)" } ?? "")"
+                                        )
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(1)
                                     }
                                     Spacer()
                                     Image(systemName: "chevron.right")

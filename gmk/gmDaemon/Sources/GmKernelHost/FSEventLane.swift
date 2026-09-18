@@ -48,8 +48,10 @@ final class FSEventLane: @unchecked Sendable {
         queue.async {
             var next = Array(Set(paths)).sorted()
             if next.count > Self.maxPaths {
-                FileHandle.standardError.write(Data(
-                    "[gm_daemon] FSEventLane: \(next.count) paths exceeds cap \(Self.maxPaths) — truncating\n".utf8))
+                FileHandle.standardError.write(
+                    Data(
+                        "[gm_daemon] FSEventLane: \(next.count) paths exceeds cap \(Self.maxPaths) — truncating\n".utf8)
+                )
                 next = Array(next.prefix(Self.maxPaths))
             }
             guard next != self.current else { return }
@@ -63,25 +65,31 @@ final class FSEventLane: @unchecked Sendable {
             let callback: FSEventStreamCallback = { _, info, count, eventPaths, _, _ in
                 guard let info else { return }
                 let lane = Unmanaged<FSEventLane>.fromOpaque(info).takeUnretainedValue()
-                guard let paths = Unmanaged<CFArray>.fromOpaque(
-                    UnsafeRawPointer(eventPaths)).takeUnretainedValue() as? [String] else { return }
+                guard
+                    let paths = Unmanaged<CFArray>.fromOpaque(
+                        UnsafeRawPointer(eventPaths)
+                    ).takeUnretainedValue() as? [String]
+                else { return }
                 lane.handler?(Array(paths.prefix(count)))
             }
-            guard let stream = FSEventStreamCreate(
-                kCFAllocatorDefault,
-                callback,
-                &context,
-                next as CFArray,
-                FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-                self.latency, // the debounce window
-                // UseCFTypes is LOAD-BEARING: without it eventPaths is a
-                // char ** and the CFArray cast in the callback reads path
-                // bytes as an objc pointer — a SIGSEGV on the first event.
-                FSEventStreamCreateFlags(
-                    kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes)
-            ) else {
-                FileHandle.standardError.write(Data(
-                    "[gm_daemon] FSEventLane: FSEventStreamCreate failed for \(next)\n".utf8))
+            guard
+                let stream = FSEventStreamCreate(
+                    kCFAllocatorDefault,
+                    callback,
+                    &context,
+                    next as CFArray,
+                    FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
+                    self.latency,  // the debounce window
+                    // UseCFTypes is LOAD-BEARING: without it eventPaths is a
+                    // char ** and the CFArray cast in the callback reads path
+                    // bytes as an objc pointer — a SIGSEGV on the first event.
+                    FSEventStreamCreateFlags(
+                        kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes)
+                )
+            else {
+                FileHandle.standardError.write(
+                    Data(
+                        "[gm_daemon] FSEventLane: FSEventStreamCreate failed for \(next)\n".utf8))
                 self.current = []
                 return
             }

@@ -106,9 +106,10 @@ public enum DopeMerge {
                 guard let baseHash = known?.syncedContentHash else {
                     return Outcome(dotPath: path, kind: kind, decision: .conflict)
                 }
-                return Outcome(dotPath: path, kind: kind,
-                               decision: theirElement.contentHash == baseHash
-                                   ? .keepOurs : .conflict)
+                return Outcome(
+                    dotPath: path, kind: kind,
+                    decision: theirElement.contentHash == baseHash
+                        ? .keepOurs : .conflict)
 
             case (.some, .none):
                 // Only in the db. Something we added locally, or something
@@ -117,8 +118,9 @@ public enum DopeMerge {
                     // It came from a file before and the file is now gone.
                     // A local edit against an upstream delete is a conflict;
                     // otherwise the delete wins.
-                    return Outcome(dotPath: path, kind: kind,
-                                   decision: dirty ? .conflict : .takeTheirs)
+                    return Outcome(
+                        dotPath: path, kind: kind,
+                        decision: dirty ? .conflict : .takeTheirs)
                 }
                 return Outcome(dotPath: path, kind: kind, decision: .keepOursLocalAddition)
 
@@ -151,24 +153,32 @@ public enum DopeMerge {
         var out: [Element] = []
         for domain in bundle.domainFiles.sorted(by: { $0.body.code < $1.body.code }) {
             let d = domain.body.code
-            out.append(Element(dotPath: d, kind: "persistence",
-                               contentHash: hash(domain.body)))
+            out.append(
+                Element(
+                    dotPath: d, kind: "persistence",
+                    contentHash: hash(domain.body)))
             for entity in domain.entities.sorted(by: { $0.body.code < $1.body.code }) {
-                out.append(Element(dotPath: "\(d).\(entity.body.code)", kind: "entity",
-                                   contentHash: hash(entity)))
+                out.append(
+                    Element(
+                        dotPath: "\(d).\(entity.body.code)", kind: "entity",
+                        contentHash: hash(entity)))
                 for property in entity.properties.sorted(by: { $0.body.code < $1.body.code }) {
-                    out.append(Element(
-                        dotPath: "\(d).\(entity.body.code).\(property.body.code)",
-                        kind: "property", contentHash: hash(property)))
+                    out.append(
+                        Element(
+                            dotPath: "\(d).\(entity.body.code).\(property.body.code)",
+                            kind: "property", contentHash: hash(property)))
                 }
             }
             for en in domain.enums.sorted(by: { $0.body.code < $1.body.code }) {
-                out.append(Element(dotPath: "\(d).enums.\(en.body.code)", kind: "enum",
-                                   contentHash: hash(en)))
+                out.append(
+                    Element(
+                        dotPath: "\(d).enums.\(en.body.code)", kind: "enum",
+                        contentHash: hash(en)))
                 for option in en.options.sorted(by: { $0.body.code < $1.body.code }) {
-                    out.append(Element(
-                        dotPath: "\(d).enums.\(en.body.code).\(option.body.code)",
-                        kind: "option", contentHash: hash(option)))
+                    out.append(
+                        Element(
+                            dotPath: "\(d).enums.\(en.body.code).\(option.body.code)",
+                            kind: "option", contentHash: hash(option)))
                 }
             }
         }

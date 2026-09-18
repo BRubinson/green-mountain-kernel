@@ -32,16 +32,22 @@ struct DaemonStatusPopover: View {
                 // test/beta root is staged from a checkout by gm_env.sh;
                 // install_gm.sh would install a published release into ~/gmfs.
                 // "prod" routes to the installer — gm_env.sh refuses create prod.
-                Text(Paths.declaredEnvironmentName.flatMap { env in
-                    env == "prod" ? nil :
-                    "Daemon binary missing at \(Paths.binDaemon.path).\nStage binaries with bash gmk/scripts/gm_env.sh create \(env)."
-                } ?? "Daemon binary missing at \(Paths.binDaemon.path).\nRun plugins/gmcc/scripts/install_gm.sh, or bash gmk/scripts/rebuild_local.sh from a checkout.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    Paths.declaredEnvironmentName.flatMap { env in
+                        env == "prod"
+                            ? nil
+                            : "Daemon binary missing at \(Paths.binDaemon.path).\nStage binaries with bash gmk/scripts/gm_env.sh create \(env)."
+                    }
+                        ?? "Daemon binary missing at \(Paths.binDaemon.path).\nRun plugins/gmcc/scripts/install_gm.sh, or bash gmk/scripts/rebuild_local.sh from a checkout."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             case .incompatible(let daemonVersion):
-                Text("The running daemon speaks protocol v\(daemonVersion.map(String.init) ?? "?"), newer than this build of GMVibes (v\(GmWireProtocol.version)). Rebuild GMVibes against the updated daemon package.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(
+                    "The running daemon speaks protocol v\(daemonVersion.map(String.init) ?? "?"), newer than this build of GMVibes (v\(GmWireProtocol.version)). Rebuild GMVibes against the updated daemon package."
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             case .starting:
                 ProgressView().controlSize(.small)
             case .unknown:

@@ -113,11 +113,13 @@ extension GmPenTools {
     /// a real change gets lost in the noise of a reordering.
     @MainActor public static var descriptors: [GmPenToolDescriptor] {
         let writes = VerbRegistry.writePenTools
-        return tools
+        return
+            tools
             .sorted { $0.name < $1.name }
             .map { tool in
-                let schema = (try? JSONSerialization.data(
-                    withJSONObject: tool.inputSchema, options: [.sortedKeys])) ?? Data("{}".utf8)
+                let schema =
+                    (try? JSONSerialization.data(
+                        withJSONObject: tool.inputSchema, options: [.sortedKeys])) ?? Data("{}".utf8)
                 return GmPenToolDescriptor(
                     name: tool.name,
                     description: tool.description,

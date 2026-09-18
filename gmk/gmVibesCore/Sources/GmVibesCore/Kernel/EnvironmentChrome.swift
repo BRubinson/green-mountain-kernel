@@ -88,8 +88,8 @@ public enum EnvironmentKind: Sendable {
     public var paneBackgroundHex: String? {
         switch self {
         case .production: return nil
-        case .beta: return "3a2410"   // dark amber
-        case .test: return "3a1414"   // dark red
+        case .beta: return "3a2410"  // dark amber
+        case .test: return "3a1414"  // dark red
         }
     }
 }
@@ -151,7 +151,7 @@ public enum EnvironmentDockBadge {
 
     public static func apply(kind: EnvironmentKind = .current) {
         guard !kind.isProduction else {
-            NSApp.applicationIconImage = nil   // back to the bundle icon
+            NSApp.applicationIconImage = nil  // back to the bundle icon
             return
         }
         guard NSApp.activationPolicy() == .regular else { return }
@@ -172,7 +172,8 @@ public enum EnvironmentDockBadge {
         let circle = NSRect(
             x: size.width - diameter - inset, y: inset,
             width: diameter, height: diameter)
-        NSColor(cgColor: kind == .beta
+        NSColor(
+            cgColor: kind == .beta
                 ? NSColor.systemOrange.cgColor
                 : NSColor.systemRed.cgColor)?.setFill()
         NSBezierPath(ovalIn: circle).fill()

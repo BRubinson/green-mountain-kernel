@@ -55,19 +55,20 @@ final class RecentsModel {
                     // unparseable value falls back to created/updated.
                     let activity = parse(stub.lastActivityAt)
                     let fallback = max(parse(stub.createdAt), parse(stub.updatedAt))
-                    sessions.append(RecentSessionCard(
-                        windowID: SessionWindowID(
-                            sessionUUID: sessionUUID,
-                            instanceUUID: instanceUUID,
-                            sessionName: stub.name
-                        ),
-                        sessionName: stub.name,
-                        sessionCode: stub.code,
-                        projectName: project.name,
-                        instanceName: instance.name,
-                        instanceUuid: instance.uuid,
-                        activity: activity == .distantPast ? fallback : activity
-                    ))
+                    sessions.append(
+                        RecentSessionCard(
+                            windowID: SessionWindowID(
+                                sessionUUID: sessionUUID,
+                                instanceUUID: instanceUUID,
+                                sessionName: stub.name
+                            ),
+                            sessionName: stub.name,
+                            sessionCode: stub.code,
+                            projectName: project.name,
+                            instanceName: instance.name,
+                            instanceUuid: instance.uuid,
+                            activity: activity == .distantPast ? fallback : activity
+                        ))
                 }
             }
         }

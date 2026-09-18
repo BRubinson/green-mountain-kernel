@@ -28,26 +28,30 @@ struct FileTreeNode: Identifiable, Hashable {
             return FileTreeNode(url: url, isDirectory: isDir, modifiedAt: mtime, children: nil)
         }
 
-        let contents = (try? fm.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles]
-        )) ?? []
+        let contents =
+            (try? fm.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: keys,
+                options: [.skipsHiddenFiles]
+            )) ?? []
 
-        let children = contents
+        let children =
+            contents
             .map { child -> FileTreeNode in
                 let v = try? child.resourceValues(forKeys: Set(keys))
                 let childIsDir = v?.isDirectory ?? false
                 if childIsDir {
                     return walk(child, maxDepth: maxDepth - 1)
                 }
-                return FileTreeNode(url: child, isDirectory: false,
-                                    modifiedAt: v?.contentModificationDate ?? .distantPast,
-                                    children: nil)
+                return FileTreeNode(
+                    url: child, isDirectory: false,
+                    modifiedAt: v?.contentModificationDate ?? .distantPast,
+                    children: nil)
             }
             .sorted { lhs, rhs in
                 if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory }
-                return lhs.url.lastPathComponent.localizedCaseInsensitiveCompare(rhs.url.lastPathComponent) == .orderedAscending
+                return lhs.url.lastPathComponent.localizedCaseInsensitiveCompare(rhs.url.lastPathComponent)
+                    == .orderedAscending
             }
 
         return FileTreeNode(url: url, isDirectory: true, modifiedAt: mtime, children: children)

@@ -108,15 +108,17 @@ private struct KBiteSearchPane: View {
     @ViewBuilder
     private var hitList: some View {
         if let errorText {
-            ContentUnavailableView("Search Unavailable", systemImage: "bolt.slash",
-                                   description: Text(errorText))
+            ContentUnavailableView(
+                "Search Unavailable", systemImage: "bolt.slash",
+                description: Text(errorText))
         } else if hits.isEmpty {
             ContentUnavailableView(
                 searched ? "No Matches" : "Search KBites",
                 systemImage: "magnifyingglass",
-                description: Text(searched
-                    ? "No db-digested content matched. Kbites digested before the migration are browsable in the Digested tab."
-                    : "FTS5 search over kbite content digested into the GMCC database.")
+                description: Text(
+                    searched
+                        ? "No db-digested content matched. Kbites digested before the migration are browsable in the Digested tab."
+                        : "FTS5 search over kbite content digested into the GMCC database.")
             )
         } else {
             List(hits, id: \.fileUuid, selection: $selectedFileUuid) { hit in
@@ -200,10 +202,14 @@ private struct KBiteSearchPane: View {
                 searched = true
                 errorText = nil
             } catch let error as DaemonError {
-                hits = []   // never leave stale results behind an error view
-                if case .unreachable(let m) = error { errorText = m }
-                else if case .notInstalled = error { errorText = "Daemon not installed" }
-                else { errorText = String(describing: error) }
+                hits = []  // never leave stale results behind an error view
+                if case .unreachable(let m) = error {
+                    errorText = m
+                } else if case .notInstalled = error {
+                    errorText = "Daemon not installed"
+                } else {
+                    errorText = String(describing: error)
+                }
             } catch {
                 hits = []
                 errorText = String(describing: error)

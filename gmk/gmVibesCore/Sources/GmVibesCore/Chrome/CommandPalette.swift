@@ -11,7 +11,7 @@ struct CommandPalette: View {
 
     @State private var query = ""
     @State private var selection: String?
-    @State private var model = DaemonSearchModel(limit: 20)   // overlay: top hits only
+    @State private var model = DaemonSearchModel(limit: 20)  // overlay: top hits only
     @FocusState private var focused: Bool
 
     var body: some View {
@@ -28,7 +28,7 @@ struct CommandPalette: View {
                     focus: $focused
                 )
                 .onChange(of: query) { _, new in
-                    model.schedule(query: new)   // global scope: the palette is the fast jump
+                    model.schedule(query: new)  // global scope: the palette is the fast jump
                     selection = nil
                 }
                 .onSubmit { openSelectedOrFirst() }
@@ -59,8 +59,12 @@ struct CommandPalette: View {
             .glassEffect(.regular, in: .rect(cornerRadius: 18))
             // The field owns focus, so the List never sees arrow keys — drive
             // selection from the container instead of fighting for first responder.
-            .onKeyPress(.downArrow) { moveSelection(1); return .handled }
-            .onKeyPress(.upArrow) { moveSelection(-1); return .handled }
+            .onKeyPress(.downArrow) {
+                moveSelection(1); return .handled
+            }
+            .onKeyPress(.upArrow) {
+                moveSelection(-1); return .handled
+            }
 
             // Esc dismissal that needs no focus plumbing: .onExitCommand only
             // fires for a focused responder, which this overlay may not have.
@@ -80,9 +84,11 @@ struct CommandPalette: View {
     }
 
     private func open(_ hit: SearchHit) {
-        guard let windowID = catalog.sessionWindowID(
-            forSessionUuid: hit.sessionUuid, targetPromptUuid: hit.promptUuid
-        ) else { return }
+        guard
+            let windowID = catalog.sessionWindowID(
+                forSessionUuid: hit.sessionUuid, targetPromptUuid: hit.promptUuid
+            )
+        else { return }
         // Dismiss FIRST — nav.go flips the window's route .id, and mutating
         // both in one synchronous pass tears this overlay down mid-update.
         nav.paletteOpen = false

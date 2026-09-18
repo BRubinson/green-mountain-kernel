@@ -72,7 +72,7 @@ public struct GMVibesWindow: View {
         // CONFIG_SET (.paths). Coalescing is the env's own change-gate.
         .task(id: daemon.generation) {
             let paths = daemon.hub.stream(for: .paths)
-            await gmcc.loadFromDaemon()   // single-flight — N windows, 1 RPC
+            await gmcc.loadFromDaemon()  // single-flight — N windows, 1 RPC
             for await _ in paths {
                 await gmcc.loadFromDaemon()
             }
@@ -130,9 +130,9 @@ public struct GMVibesWindow: View {
         case .instance(let instanceUuid):
             InstanceScreen(instanceUuid: instanceUuid)
         case .projects:
-            ProjectsView()   // scaffold inside (owns the searchable binding)
+            ProjectsView()  // scaffold inside (owns the searchable binding)
         case .kbites:
-            KBitesScene()    // scaffold inside (owns the KBiteStore)
+            KBitesScene()  // scaffold inside (owns the KBiteStore)
         case .kbiteFile(let url):
             ScreenScaffold { KBiteMarkdownWindowView(url: url) }
         case .promptMemories(let windowID):
@@ -190,4 +190,3 @@ struct GlobalToolbarGroup: ToolbarContent {
         }
     }
 }
-

@@ -61,9 +61,10 @@ struct DopePane: View {
                     Label("No Dope Yet", systemImage: "cube.transparent")
                 } description: {
                     VStack(spacing: 6) {
-                        Text(promptUuid == nil
-                            ? "This session has no dope scope. Initialize one to start modeling."
-                            : "Neither this prompt nor the session has a dope scope yet.")
+                        Text(
+                            promptUuid == nil
+                                ? "This session has no dope scope. Initialize one to start modeling."
+                                : "Neither this prompt nor the session has a dope scope yet.")
                         if !knownCodes.isEmpty {
                             // Reached when a pinned code no longer resolves —
                             // name the codes that DO exist, not a blank.
@@ -85,9 +86,10 @@ struct DopePane: View {
                 ContentUnavailableView {
                     Label("Several Dope Scopes", systemImage: "square.stack.3d.up.trianglebadge.exclamationmark")
                 } description: {
-                    Text(showsPicker
-                        ? "More than one dope scope matches. Choose which to open."
-                        : daemonMessage)
+                    Text(
+                        showsPicker
+                            ? "More than one dope scope matches. Choose which to open."
+                            : daemonMessage)
                 } actions: {
                     if showsPicker { scopePicker }
                 }
@@ -105,11 +107,12 @@ struct DopePane: View {
             }
         }
         .sheet(isPresented: $showInit) {
-            DopeInitSheet(store: store, key: target, forPrompt: promptUuid != nil,
-                          siblingCodes: knownCodes,
-                          sameTypeCodes: (promptUuid == nil
-                              ? store.sessionCandidates(target)
-                              : promptRows).map(\.code))
+            DopeInitSheet(
+                store: store, key: target, forPrompt: promptUuid != nil,
+                siblingCodes: knownCodes,
+                sameTypeCodes: (promptUuid == nil
+                    ? store.sessionCandidates(target)
+                    : promptRows).map(\.code))
         }
         // Event-driven refresh on the dedicated dope domain (NOT .session —
         // see the DOPE_CHANGE arm). Stream hoisted before the first load so a
@@ -136,10 +139,13 @@ struct DopePane: View {
     /// sources. The `Automatic` tag restores daemon-side resolution.
     @ViewBuilder
     private var scopePicker: some View {
-        Picker("Dope scope", selection: Binding(
-            get: { store.selectedCodes[target] },
-            set: { newValue in Task { await store.select(newValue, for: target) } }
-        )) {
+        Picker(
+            "Dope scope",
+            selection: Binding(
+                get: { store.selectedCodes[target] },
+                set: { newValue in Task { await store.select(newValue, for: target) } }
+            )
+        ) {
             Text(promptUuid == nil ? "Automatic" : "Automatic (prompt → session base)")
                 .tag(String?.none)
             if !promptRows.isEmpty {
@@ -188,8 +194,9 @@ struct DopePane: View {
             if !response.tree.domains.isEmpty {
                 treeControls
             }
-            DopeTreeView(tree: response.tree, query: trimmedQuery, expansion: expansion,
-                         showBaseDomains: showBaseDomains)
+            DopeTreeView(
+                tree: response.tree, query: trimmedQuery, expansion: expansion,
+                showBaseDomains: showBaseDomains)
         }
     }
 
@@ -216,7 +223,9 @@ struct DopePane: View {
                 // the reachable path for the sibling-code hints: the sheet
                 // opens with the session-base codes visible for alignment.
                 Button("Initialize Prompt Scope…") { showInit = true }
-                    .help("Create a PROMPT-typed dope scope for this prompt (currently rendering the session-base fallback)")
+                    .help(
+                        "Create a PROMPT-typed dope scope for this prompt (currently rendering the session-base fallback)"
+                    )
             }
             if let onOpenDiagram, promptUuid == nil {
                 Button {
@@ -275,9 +284,10 @@ struct DopePane: View {
             }
             .buttonStyle(.bordered)
             .tint(showBaseDomains ? .accentColor : nil)
-            .help(showBaseDomains
-                ? "Hide base composable domains"
-                : "Show base composable domains (hidden by default; view state only)")
+            .help(
+                showBaseDomains
+                    ? "Hide base composable domains"
+                    : "Show base composable domains (hidden by default; view state only)")
             Button {
                 expansion.broadcast(expanded: true)
             } label: {
@@ -300,9 +310,11 @@ struct DopePane: View {
     private func repoResult(_ read: DopeReadRepoResponse) -> some View {
         let drifted = read.drift == true
         var lines: [String] {
-            var out = [drifted
-                ? "Repo drift: on-disk rev \(read.onDiskRevision) vs db rev \(read.dbRevision.map(String.init) ?? "—")."
-                : "Repo in sync — on-disk rev \(read.onDiskRevision)."]
+            var out = [
+                drifted
+                    ? "Repo drift: on-disk rev \(read.onDiskRevision) vs db rev \(read.dbRevision.map(String.init) ?? "—")."
+                    : "Repo in sync — on-disk rev \(read.onDiskRevision)."
+            ]
             out.append(contentsOf: read.warnings)
             return out
         }
@@ -396,7 +408,8 @@ struct DopeTreeView: View {
     /// filter runs within each partition and never force-reveals base content,
     /// so `renderedDomains` — not `visibleDomains` — drives the empty state.
     private var renderedDomains: [(domain: DopePersistenceNode, isBase: Bool)] {
-        let base = showBaseDomains
+        let base =
+            showBaseDomains
             ? visibleDomains.filter(DopeBaseCatalog.isBaseDomain) : []
         let model = visibleDomains.filter { !DopeBaseCatalog.isBaseDomain($0) }
         return base.map { ($0, true) } + model.map { ($0, false) }
@@ -410,31 +423,37 @@ struct DopeTreeView: View {
         }
         Group {
             if tree.domains.isEmpty {
-                Label("No domains yet — the bot models dope via the gm CLI.",
-                      systemImage: "hourglass")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Label(
+                    "No domains yet — the bot models dope via the gm CLI.",
+                    systemImage: "hourglass"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
             } else if renderedDomains.isEmpty {
-                Label(query.isEmpty
+                Label(
+                    query.isEmpty
                         ? "Only base domains here — reveal them with the layers toggle."
                         : "Nothing matches “\(query)”.",
-                      systemImage: query.isEmpty ? "square.3.layers.3d" : "magnifyingglass")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                    systemImage: query.isEmpty ? "square.3.layers.3d" : "magnifyingglass"
+                )
+                .font(.callout)
+                .foregroundStyle(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
                     ForEach(renderedDomains, id: \.domain.identity.uuid) { item in
-                        DomainCard(domain: item.domain, isBase: item.isBase,
-                                   query: query, expansion: expansion,
-                                   inspector: inspector, baseCatalog: baseCatalog)
+                        DomainCard(
+                            domain: item.domain, isBase: item.isBase,
+                            query: query, expansion: expansion,
+                            inspector: inspector, baseCatalog: baseCatalog)
                     }
                 }
             }
         }
         .sheet(item: $inspection) { selection in
             if let resolved = catalog.resolved(selection.ref) {
-                DopeEnumSheet(info: resolved,
-                              originPropertyUuid: selection.originPropertyUuid)
+                DopeEnumSheet(
+                    info: resolved,
+                    originPropertyUuid: selection.originPropertyUuid)
             } else {
                 DopeEnumMissingSheet(ref: selection.ref)
             }
@@ -473,10 +492,11 @@ private struct DomainCard: View {
                         .foregroundStyle(.secondary)
                 }
                 ForEach(visibleEntities, id: \.identity.uuid) { entity in
-                    EntityRow(entity: entity, domainCode: domain.body.code,
-                              query: query,
-                              expansion: expansion, inspector: inspector,
-                              baseCatalog: baseCatalog)
+                    EntityRow(
+                        entity: entity, domainCode: domain.body.code,
+                        query: query,
+                        expansion: expansion, inspector: inspector,
+                        baseCatalog: baseCatalog)
                 }
                 ForEach(visibleEnums, id: \.identity.uuid) { enumNode in
                     EnumRow(enumNode: enumNode, query: query, expansion: expansion)
@@ -563,8 +583,9 @@ private struct EntityRow: View {
     }
 
     private func propertyRef(_ property: DopePropertyNode) -> String {
-        DopeCode.formatPropertyRef(domain: domainCode, entity: entity.body.code,
-                                   property: property.body.code)
+        DopeCode.formatPropertyRef(
+            domain: domainCode, entity: entity.body.code,
+            property: property.body.code)
     }
 
     var body: some View {
@@ -572,21 +593,24 @@ private struct EntityRow: View {
             VStack(alignment: .leading, spacing: 3) {
                 ForEach(renderedProperties, id: \.identity.uuid) { property in
                     if let origin = property.body.baseOriginRef {
-                        PropertyRow(property: property, inspector: inspector,
-                                    ref: propertyRef(property),
-                                    mode: .materialized(origin: origin))
+                        PropertyRow(
+                            property: property, inspector: inspector,
+                            ref: propertyRef(property),
+                            mode: .materialized(origin: origin))
                     } else {
-                        PropertyRow(property: property, inspector: inspector,
-                                    ref: propertyRef(property))
+                        PropertyRow(
+                            property: property, inspector: inspector,
+                            ref: propertyRef(property))
                     }
                 }
                 ForEach(inheritedProperties) { inherited in
                     // An inherited row is synthetic here — the field is
                     // declared on the base entity, so the ORIGIN path is the
                     // one that actually resolves.
-                    PropertyRow(property: inherited.node, inspector: inspector,
-                                ref: inherited.originRef,
-                                mode: .inherited(origin: inherited.originRef))
+                    PropertyRow(
+                        property: inherited.node, inspector: inspector,
+                        ref: inherited.originRef,
+                        mode: .inherited(origin: inherited.originRef))
                 }
                 if entity.properties.isEmpty && inheritedProperties.isEmpty {
                     Text("No properties.")
@@ -597,14 +621,18 @@ private struct EntityRow: View {
                     Button {
                         revealBaseFields.toggle()
                     } label: {
-                        Label(revealBaseFields ? "Hide base fields" : "Show base fields",
-                              systemImage: revealBaseFields ? "eye.slash" : "eye")
-                            .font(.caption)
+                        Label(
+                            revealBaseFields ? "Hide base fields" : "Show base fields",
+                            systemImage: revealBaseFields ? "eye.slash" : "eye"
+                        )
+                        .font(.caption)
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .padding(.top, 2)
-                    .help("Base-composable fields: materialized rows tagged with their origin, inherited rows shown dimmed")
+                    .help(
+                        "Base-composable fields: materialized rows tagged with their origin, inherited rows shown dimmed"
+                    )
                 }
             }
             .padding(.top, 4)
@@ -759,8 +787,8 @@ private struct PropertyRow: View {
             if hovering {
                 RoundedRectangle(cornerRadius: 5)
                     .fill(.quaternary.opacity(0.4))
-                    .padding(.horizontal, -6)   // grows past the row's bounds
-                    .padding(.vertical, -2)     // so row metrics are unchanged
+                    .padding(.horizontal, -6)  // grows past the row's bounds
+                    .padding(.vertical, -2)  // so row metrics are unchanged
             }
         }
     }

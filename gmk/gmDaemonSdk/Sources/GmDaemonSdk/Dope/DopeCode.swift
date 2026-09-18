@@ -25,7 +25,8 @@ public enum DopeCode {
         guard !code.isEmpty else { throw bad("is empty") }
         guard code.utf8.count <= 64 else { throw bad("exceeds 64 bytes") }
         guard let first = code.unicodeScalars.first,
-              ("a"..."z").contains(Character(first)) else {
+            ("a"..."z").contains(Character(first))
+        else {
             throw bad("must start with a lowercase letter")
         }
         for ch in code.unicodeScalars {

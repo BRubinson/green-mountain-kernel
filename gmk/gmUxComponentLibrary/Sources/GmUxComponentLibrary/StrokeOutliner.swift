@@ -24,8 +24,10 @@ public enum StrokeOutliner {
         /// Derive pressure from velocity when the input carries none.
         public var simulatePressure: Bool
 
-        public init(size: Double, thinning: Double = 0.6,
-                    streamline: Double = 0.35, simulatePressure: Bool = true) {
+        public init(
+            size: Double, thinning: Double = 0.6,
+            streamline: Double = 0.35, simulatePressure: Bool = true
+        ) {
             self.size = size
             self.thinning = thinning
             self.streamline = streamline
@@ -36,8 +38,10 @@ public enum StrokeOutliner {
     /// The closed outline polygon (left side then reversed right side, with
     /// round caps). Returns [] for degenerate input (< 2 distinct points) —
     /// callers fall back to the plain stroked centerline.
-    public static func outline(points: [CGPoint], pressures: [Double?],
-                               options: Options) -> [CGPoint] {
+    public static func outline(
+        points: [CGPoint], pressures: [Double?],
+        options: Options
+    ) -> [CGPoint] {
         guard points.count >= 2, options.size > 0 else { return [] }
 
         // 1. Streamline: exponential moving average toward each raw point.
@@ -46,8 +50,9 @@ public enum StrokeOutliner {
         var smoothed: [CGPoint] = [points[0]]
         for point in points.dropFirst() {
             let previous = smoothed[smoothed.count - 1]
-            let next = CGPoint(x: previous.x + (point.x - previous.x) * t,
-                               y: previous.y + (point.y - previous.y) * t)
+            let next = CGPoint(
+                x: previous.x + (point.x - previous.x) * t,
+                y: previous.y + (point.y - previous.y) * t)
             if hypot(next.x - previous.x, next.y - previous.y) > 0.01 {
                 smoothed.append(next)
             }
@@ -60,8 +65,9 @@ public enum StrokeOutliner {
         if options.simulatePressure {
             var running = 0.5
             for index in 1..<smoothed.count {
-                let distance = hypot(smoothed[index].x - smoothed[index - 1].x,
-                                     smoothed[index].y - smoothed[index - 1].y)
+                let distance = hypot(
+                    smoothed[index].x - smoothed[index - 1].x,
+                    smoothed[index].y - smoothed[index - 1].y)
                 let speed = min(1, distance / options.size)
                 running = min(1, max(0.1, running + ((1 - speed) - running) * 0.275))
                 pressure[index] = running
@@ -117,13 +123,15 @@ public enum StrokeOutliner {
             let steps = 8
             return (1..<steps).map { step in
                 let angle = startAngle + (endAngle - startAngle) * Double(step) / Double(steps)
-                return CGPoint(x: center.x + cos(angle) * r,
-                               y: center.y + sin(angle) * r)
+                return CGPoint(
+                    x: center.x + cos(angle) * r,
+                    y: center.y + sin(angle) * r)
             }
         }
         let startCap = cap(center: smoothed[0], from: right[0], to: left[0])
-        let endCap = cap(center: smoothed[smoothed.count - 1],
-                         from: left[left.count - 1], to: right[right.count - 1])
+        let endCap = cap(
+            center: smoothed[smoothed.count - 1],
+            from: left[left.count - 1], to: right[right.count - 1])
 
         return left + endCap + right.reversed() + startCap
     }

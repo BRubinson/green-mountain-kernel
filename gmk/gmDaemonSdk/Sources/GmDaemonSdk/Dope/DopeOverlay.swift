@@ -57,8 +57,10 @@ public enum DopeOverlay {
         public let baseUuid: String?
         public let overlayUuid: String?
 
-        public init(path: String, origin: Origin, effectiveUuid: String,
-                    baseUuid: String?, overlayUuid: String?) {
+        public init(
+            path: String, origin: Origin, effectiveUuid: String,
+            baseUuid: String?, overlayUuid: String?
+        ) {
             self.path = path
             self.origin = origin
             self.effectiveUuid = effectiveUuid
@@ -77,8 +79,10 @@ public enum DopeOverlay {
         /// Non-fatal observations (orphaned masks, most often).
         public let warnings: [String]
 
-        public init(tree: DopeScopeTree, resolutions: [String: Resolution],
-                    hidden: [String], warnings: [String]) {
+        public init(
+            tree: DopeScopeTree, resolutions: [String: Resolution],
+            hidden: [String], warnings: [String]
+        ) {
             self.tree = tree
             self.resolutions = resolutions
             self.hidden = hidden
@@ -91,7 +95,6 @@ public enum DopeOverlay {
         /// five subsystems at once.
         public func flattened() -> DopeScopeTree { tree }
     }
-
 
     static func isTombstone(_ identity: DopeNodeIdentity) -> Bool {
         identity.deletedOn != nil
@@ -108,8 +111,9 @@ public enum DopeOverlay {
             return singleLayerResolve(someBase, origin: .base)
         case let (nil, someOverlay?):
             var r = singleLayerResolve(someOverlay, origin: .orphanedMask)
-            return Resolved(tree: r.tree, resolutions: r.resolutions, hidden: r.hidden,
-                            warnings: r.warnings + ["no base layer: every overlay node resolves alone"])
+            return Resolved(
+                tree: r.tree, resolutions: r.resolutions, hidden: r.hidden,
+                warnings: r.warnings + ["no base layer: every overlay node resolves alone"])
         case let (someBase?, someOverlay?):
             return merge(base: someBase, overlay: someOverlay)
         }
@@ -126,63 +130,74 @@ public enum DopeOverlay {
             let dPath = domain.body.code
             if isTombstone(domain.identity) {
                 hidden.append(dPath)
-                resolutions[dPath] = Resolution(path: dPath, origin: .tombstoned,
-                                                effectiveUuid: domain.identity.uuid,
-                                                baseUuid: nil, overlayUuid: domain.identity.uuid)
+                resolutions[dPath] = Resolution(
+                    path: dPath, origin: .tombstoned,
+                    effectiveUuid: domain.identity.uuid,
+                    baseUuid: nil, overlayUuid: domain.identity.uuid)
                 continue
             }
-            resolutions[dPath] = Resolution(path: dPath, origin: origin,
-                                            effectiveUuid: domain.identity.uuid,
-                                            baseUuid: origin == .base ? domain.identity.uuid : nil,
-                                            overlayUuid: origin == .base ? nil : domain.identity.uuid)
+            resolutions[dPath] = Resolution(
+                path: dPath, origin: origin,
+                effectiveUuid: domain.identity.uuid,
+                baseUuid: origin == .base ? domain.identity.uuid : nil,
+                overlayUuid: origin == .base ? nil : domain.identity.uuid)
             var entities = [DopeEntityNode]()
             for entity in domain.entities {
                 let ePath = "\(dPath).\(entity.body.code)"
                 if isTombstone(entity.identity) {
                     hidden.append(ePath); continue
                 }
-                resolutions[ePath] = Resolution(path: ePath, origin: origin,
-                                                effectiveUuid: entity.identity.uuid,
-                                                baseUuid: origin == .base ? entity.identity.uuid : nil,
-                                                overlayUuid: origin == .base ? nil : entity.identity.uuid)
+                resolutions[ePath] = Resolution(
+                    path: ePath, origin: origin,
+                    effectiveUuid: entity.identity.uuid,
+                    baseUuid: origin == .base ? entity.identity.uuid : nil,
+                    overlayUuid: origin == .base ? nil : entity.identity.uuid)
                 var props = [DopePropertyNode]()
                 for p in entity.properties {
                     let pPath = "\(ePath).\(p.body.code)"
                     if isTombstone(p.identity) { hidden.append(pPath); continue }
-                    resolutions[pPath] = Resolution(path: pPath, origin: origin,
-                                                    effectiveUuid: p.identity.uuid,
-                                                    baseUuid: origin == .base ? p.identity.uuid : nil,
-                                                    overlayUuid: origin == .base ? nil : p.identity.uuid)
+                    resolutions[pPath] = Resolution(
+                        path: pPath, origin: origin,
+                        effectiveUuid: p.identity.uuid,
+                        baseUuid: origin == .base ? p.identity.uuid : nil,
+                        overlayUuid: origin == .base ? nil : p.identity.uuid)
                     props.append(p)
                 }
-                entities.append(DopeEntityNode(identity: entity.identity, body: entity.body,
-                                               properties: props))
+                entities.append(
+                    DopeEntityNode(
+                        identity: entity.identity, body: entity.body,
+                        properties: props))
             }
             var enums = [DopeEnumNode]()
             for en in domain.enums {
                 let nPath = "\(dPath).enums.\(en.body.code)"
                 if isTombstone(en.identity) { hidden.append(nPath); continue }
-                resolutions[nPath] = Resolution(path: nPath, origin: origin,
-                                                effectiveUuid: en.identity.uuid,
-                                                baseUuid: origin == .base ? en.identity.uuid : nil,
-                                                overlayUuid: origin == .base ? nil : en.identity.uuid)
+                resolutions[nPath] = Resolution(
+                    path: nPath, origin: origin,
+                    effectiveUuid: en.identity.uuid,
+                    baseUuid: origin == .base ? en.identity.uuid : nil,
+                    overlayUuid: origin == .base ? nil : en.identity.uuid)
                 var options = [DopeOptionNode]()
                 for o in en.options {
                     let oPath = "\(nPath).\(o.body.code)"
                     if isTombstone(o.identity) { hidden.append(oPath); continue }
-                    resolutions[oPath] = Resolution(path: oPath, origin: origin,
-                                                    effectiveUuid: o.identity.uuid,
-                                                    baseUuid: origin == .base ? o.identity.uuid : nil,
-                                                    overlayUuid: origin == .base ? nil : o.identity.uuid)
+                    resolutions[oPath] = Resolution(
+                        path: oPath, origin: origin,
+                        effectiveUuid: o.identity.uuid,
+                        baseUuid: origin == .base ? o.identity.uuid : nil,
+                        overlayUuid: origin == .base ? nil : o.identity.uuid)
                     options.append(o)
                 }
                 enums.append(DopeEnumNode(identity: en.identity, body: en.body, options: options))
             }
-            domains.append(DopePersistenceNode(identity: domain.identity, body: domain.body,
-                                               entities: entities, enums: enums))
+            domains.append(
+                DopePersistenceNode(
+                    identity: domain.identity, body: domain.body,
+                    entities: entities, enums: enums))
         }
-        return Resolved(tree: tree.replacingDomains(domains), resolutions: resolutions,
-                        hidden: hidden, warnings: [])
+        return Resolved(
+            tree: tree.replacingDomains(domains), resolutions: resolutions,
+            hidden: hidden, warnings: [])
     }
 
     // MARK: - Two-layer merge
@@ -205,10 +220,11 @@ public enum DopeOverlay {
 
             if let ov, isTombstone(ov.identity) {
                 hidden.append(path)
-                resolutions[path] = Resolution(path: path, origin: .tombstoned,
-                                               effectiveUuid: ov.identity.uuid,
-                                               baseUuid: baseDomain.identity.uuid,
-                                               overlayUuid: ov.identity.uuid)
+                resolutions[path] = Resolution(
+                    path: path, origin: .tombstoned,
+                    effectiveUuid: ov.identity.uuid,
+                    baseUuid: baseDomain.identity.uuid,
+                    overlayUuid: ov.identity.uuid)
                 continue
             }
 
@@ -219,16 +235,19 @@ public enum DopeOverlay {
             let origin: Origin = ov == nil ? .base : .overridden
             let body = ov?.body ?? baseDomain.body
             let identity = ov?.identity ?? baseDomain.identity
-            resolutions[path] = Resolution(path: path, origin: origin,
-                                           effectiveUuid: identity.uuid,
-                                           baseUuid: baseDomain.identity.uuid,
-                                           overlayUuid: ov?.identity.uuid)
+            resolutions[path] = Resolution(
+                path: path, origin: origin,
+                effectiveUuid: identity.uuid,
+                baseUuid: baseDomain.identity.uuid,
+                overlayUuid: ov?.identity.uuid)
 
             let (entities, enums) = mergeDomainChildren(
                 basePath: path, base: baseDomain, overlay: ov,
                 resolutions: &resolutions, hidden: &hidden)
-            domains.append(DopePersistenceNode(identity: identity, body: body,
-                                               entities: entities, enums: enums))
+            domains.append(
+                DopePersistenceNode(
+                    identity: identity, body: body,
+                    entities: entities, enums: enums))
         }
 
         // Overlay-only domains: additions, or orphaned masks if they are
@@ -238,9 +257,10 @@ public enum DopeOverlay {
             if isTombstone(domain.identity) {
                 hidden.append(path)
                 warnings.append("orphaned mask: '\(path)' is a whiteout over a node the base no longer has")
-                resolutions[path] = Resolution(path: path, origin: .orphanedMask,
-                                               effectiveUuid: domain.identity.uuid,
-                                               baseUuid: nil, overlayUuid: domain.identity.uuid)
+                resolutions[path] = Resolution(
+                    path: path, origin: .orphanedMask,
+                    effectiveUuid: domain.identity.uuid,
+                    baseUuid: nil, overlayUuid: domain.identity.uuid)
                 continue
             }
             let sub = singleLayerResolve(
@@ -250,8 +270,9 @@ public enum DopeOverlay {
             domains.append(contentsOf: sub.tree.domains)
         }
 
-        return Resolved(tree: base.replacingDomains(domains), resolutions: resolutions,
-                        hidden: hidden, warnings: warnings)
+        return Resolved(
+            tree: base.replacingDomains(domains), resolutions: resolutions,
+            hidden: hidden, warnings: warnings)
     }
 
     private static func mergeDomainChildren(
@@ -271,10 +292,11 @@ public enum DopeOverlay {
             if ov != nil { consumedE.insert(be.body.code) }
             if let ov, isTombstone(ov.identity) {
                 hidden.append(path)
-                resolutions[path] = Resolution(path: path, origin: .tombstoned,
-                                               effectiveUuid: ov.identity.uuid,
-                                               baseUuid: be.identity.uuid,
-                                               overlayUuid: ov.identity.uuid)
+                resolutions[path] = Resolution(
+                    path: path, origin: .tombstoned,
+                    effectiveUuid: ov.identity.uuid,
+                    baseUuid: be.identity.uuid,
+                    overlayUuid: ov.identity.uuid)
                 continue
             }
             let use = ov ?? be
@@ -293,10 +315,11 @@ public enum DopeOverlay {
                 if op != nil { consumedP.insert(bp.body.code) }
                 if let op, isTombstone(op.identity) {
                     hidden.append(pPath)
-                    resolutions[pPath] = Resolution(path: pPath, origin: .tombstoned,
-                                                    effectiveUuid: op.identity.uuid,
-                                                    baseUuid: bp.identity.uuid,
-                                                    overlayUuid: op.identity.uuid)
+                    resolutions[pPath] = Resolution(
+                        path: pPath, origin: .tombstoned,
+                        effectiveUuid: op.identity.uuid,
+                        baseUuid: bp.identity.uuid,
+                        overlayUuid: op.identity.uuid)
                     continue
                 }
                 let useP = op ?? bp
@@ -309,20 +332,24 @@ public enum DopeOverlay {
             for op in (ov?.properties ?? []) where !consumedP.contains(op.body.code) {
                 let pPath = "\(path).\(op.body.code)"
                 if isTombstone(op.identity) { hidden.append(pPath); continue }
-                resolutions[pPath] = Resolution(path: pPath, origin: .added,
-                                                effectiveUuid: op.identity.uuid,
-                                                baseUuid: nil, overlayUuid: op.identity.uuid)
+                resolutions[pPath] = Resolution(
+                    path: pPath, origin: .added,
+                    effectiveUuid: op.identity.uuid,
+                    baseUuid: nil, overlayUuid: op.identity.uuid)
                 props.append(op)
             }
-            entities.append(DopeEntityNode(identity: use.identity, body: use.body,
-                                           properties: props))
+            entities.append(
+                DopeEntityNode(
+                    identity: use.identity, body: use.body,
+                    properties: props))
         }
         for oe in (overlay?.entities ?? []) where !consumedE.contains(oe.body.code) {
             let path = "\(basePath).\(oe.body.code)"
             if isTombstone(oe.identity) { hidden.append(path); continue }
-            resolutions[path] = Resolution(path: path, origin: .added,
-                                           effectiveUuid: oe.identity.uuid,
-                                           baseUuid: nil, overlayUuid: oe.identity.uuid)
+            resolutions[path] = Resolution(
+                path: path, origin: .added,
+                effectiveUuid: oe.identity.uuid,
+                baseUuid: nil, overlayUuid: oe.identity.uuid)
             entities.append(oe)
         }
 
@@ -332,10 +359,11 @@ public enum DopeOverlay {
             if ov != nil { consumedN.insert(bn.body.code) }
             if let ov, isTombstone(ov.identity) {
                 hidden.append(path)
-                resolutions[path] = Resolution(path: path, origin: .tombstoned,
-                                               effectiveUuid: ov.identity.uuid,
-                                               baseUuid: bn.identity.uuid,
-                                               overlayUuid: ov.identity.uuid)
+                resolutions[path] = Resolution(
+                    path: path, origin: .tombstoned,
+                    effectiveUuid: ov.identity.uuid,
+                    baseUuid: bn.identity.uuid,
+                    overlayUuid: ov.identity.uuid)
                 continue
             }
             let use = ov ?? bn
@@ -354,10 +382,11 @@ public enum DopeOverlay {
                 if oo != nil { consumedO.insert(bo.body.code) }
                 if let oo, isTombstone(oo.identity) {
                     hidden.append(oPath)
-                    resolutions[oPath] = Resolution(path: oPath, origin: .tombstoned,
-                                                    effectiveUuid: oo.identity.uuid,
-                                                    baseUuid: bo.identity.uuid,
-                                                    overlayUuid: oo.identity.uuid)
+                    resolutions[oPath] = Resolution(
+                        path: oPath, origin: .tombstoned,
+                        effectiveUuid: oo.identity.uuid,
+                        baseUuid: bo.identity.uuid,
+                        overlayUuid: oo.identity.uuid)
                     continue
                 }
                 let useO = oo ?? bo
@@ -370,9 +399,10 @@ public enum DopeOverlay {
             for oo in (ov?.options ?? []) where !consumedO.contains(oo.body.code) {
                 let oPath = "\(path).\(oo.body.code)"
                 if isTombstone(oo.identity) { hidden.append(oPath); continue }
-                resolutions[oPath] = Resolution(path: oPath, origin: .added,
-                                                effectiveUuid: oo.identity.uuid,
-                                                baseUuid: nil, overlayUuid: oo.identity.uuid)
+                resolutions[oPath] = Resolution(
+                    path: oPath, origin: .added,
+                    effectiveUuid: oo.identity.uuid,
+                    baseUuid: nil, overlayUuid: oo.identity.uuid)
                 options.append(oo)
             }
             enums.append(DopeEnumNode(identity: use.identity, body: use.body, options: options))
@@ -380,9 +410,10 @@ public enum DopeOverlay {
         for on in (overlay?.enums ?? []) where !consumedN.contains(on.body.code) {
             let path = "\(basePath).enums.\(on.body.code)"
             if isTombstone(on.identity) { hidden.append(path); continue }
-            resolutions[path] = Resolution(path: path, origin: .added,
-                                           effectiveUuid: on.identity.uuid,
-                                           baseUuid: nil, overlayUuid: on.identity.uuid)
+            resolutions[path] = Resolution(
+                path: path, origin: .added,
+                effectiveUuid: on.identity.uuid,
+                baseUuid: nil, overlayUuid: on.identity.uuid)
             enums.append(on)
         }
         return (entities, enums)

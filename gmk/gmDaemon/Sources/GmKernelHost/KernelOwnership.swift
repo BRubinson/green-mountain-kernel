@@ -81,19 +81,22 @@ public enum KernelOwnership {
             // is in this same file, and we still need to read it.
             let holder = readHolder(fd: fd)
             close(fd)
-            return .heldBy(holder ?? Holder(
-                pid: 0,
-                executablePath: "(unknown — pidfile unreadable)",
-                bundlePath: nil))
+            return .heldBy(
+                holder
+                    ?? Holder(
+                        pid: 0,
+                        executablePath: "(unknown — pidfile unreadable)",
+                        bundlePath: nil))
         }
 
         // Won it. Record WHO we are, so a loser can name us.
         ftruncate(fd, 0)
-        let record = [
-            "\(getpid())",
-            Bundle.main.executablePath ?? CommandLine.arguments.first ?? "(unknown)",
-            Self.ownBundlePath() ?? "",
-        ].joined(separator: "\n") + "\n"
+        let record =
+            [
+                "\(getpid())",
+                Bundle.main.executablePath ?? CommandLine.arguments.first ?? "(unknown)",
+                Self.ownBundlePath() ?? "",
+            ].joined(separator: "\n") + "\n"
         _ = record.withCString { write(fd, $0, strlen($0)) }
 
         return .acquired(Token(fd: fd))

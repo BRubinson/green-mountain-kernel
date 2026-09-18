@@ -13,7 +13,7 @@ struct SearchScreen: View {
     @Environment(WindowNav.self) private var nav
 
     @State private var query = ""
-    @State private var kinds: Set<SearchKind> = []   // empty = every kind
+    @State private var kinds: Set<SearchKind> = []  // empty = every kind
     @State private var scopeToSession = false
     @State private var selection: String?
     @State private var model = DaemonSearchModel(limit: 100)
@@ -58,7 +58,7 @@ struct SearchScreen: View {
                             }
                         }
                     }
-                    .padding(2)   // room for the chips' state borders
+                    .padding(2)  // room for the chips' state borders
                 }
                 if !kinds.isEmpty {
                     Button("Clear") {
@@ -87,7 +87,7 @@ struct SearchScreen: View {
         .navigationTitle("Search")
         .navigationSubtitle(scopeToSession ? (scopedSession?.name ?? "Session") : "All sessions")
         .task {
-            if !catalog.hasLoaded { await catalog.refresh() }   // the join needs a snapshot
+            if !catalog.hasLoaded { await catalog.refresh() }  // the join needs a snapshot
             scopeToSession = seed.sessionUuid != nil
             focused = true
             // Mutating query fires the field's own onChange, which schedules
@@ -108,9 +108,11 @@ struct SearchScreen: View {
     }
 
     private func open(_ hit: SearchHit) {
-        guard let windowID = catalog.sessionWindowID(
-            forSessionUuid: hit.sessionUuid, targetPromptUuid: hit.promptUuid
-        ) else { return }
-        nav.open(windowID)   // route swap, no presenter to tear down
+        guard
+            let windowID = catalog.sessionWindowID(
+                forSessionUuid: hit.sessionUuid, targetPromptUuid: hit.promptUuid
+            )
+        else { return }
+        nav.open(windowID)  // route swap, no presenter to tear down
     }
 }

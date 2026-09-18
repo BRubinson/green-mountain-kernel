@@ -279,6 +279,18 @@ swift test  --package-path gmk/Gm_Kernel_test
     **The app DOES now link this**, reversing what this file said for the whole
     life of the split — see the manifest's own header for why, and why the
     single-writer guarantee got STRONGER rather than weaker in the process.
+    Sources are laid out as `Sources/GmDaemon/Persistence/{Migrations,Entities,Store}/`,
+    with `Store/Repositories/` beneath the Store surface. **`Migrations/` is
+    one file per migration** (`m00NN_<name>.swift`, each an `extension
+    Migrations` with one `static func` registering exactly one id) plus
+    `Migrations.swift`, which holds `currentSchemaVersion`, `baseColumns` and
+    the ordered `ladder` array that IS the run order. Adding a migration is a
+    new file AND a new ladder entry; a file without an entry never runs, and
+    `testTheLedgerIsDenseAndUnique` is what catches it. Bodies were moved
+    byte-identically — the ledger INSERT still lives inside each body, and
+    m0001 is still frozen. `ChewedArtifact`, `WorkflowGates`, `DopeAreaTable`
+    and `PersistedEvent` deliberately stay at the target root: they are not
+    persistence.
   - `gmk/gmKernel/` — the multi-call binary: ONE Mach-O linking `GmKernelHost`,
     `GmMcpServer` and `GmHookCli`, dispatching on `basename(argv[0])` and then on
     a subcommand. **argv[0] must win**, because `gm_hook call BACKUP` has `call`

@@ -61,7 +61,8 @@ struct DiagramWindowID: Codable, Hashable, Identifiable {
     /// A saved diagram at any tier. The session is what the CALLER knows —
     /// a rail on the project page has none to give, and that is legal.
     static func saved(_ row: DiagramRow, session: SessionWindowID?) -> DiagramWindowID {
-        DiagramWindowID(source: .saved(diagramUuid: row.uuid), name: row.name,
-                        session: session, projectUuid: row.projectUuid)
+        DiagramWindowID(
+            source: .saved(diagramUuid: row.uuid), name: row.name,
+            session: session, projectUuid: row.projectUuid)
     }
 }

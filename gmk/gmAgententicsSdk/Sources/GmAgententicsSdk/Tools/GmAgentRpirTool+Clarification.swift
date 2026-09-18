@@ -33,10 +33,11 @@ public struct GmAgentClarificationQuestion: Sendable {
     @Guide(description: "The question, written so a human can answer it without reading code.")
     public var question: String
 
-    @Guide(description: """
-        The answers to offer, in order. Write real alternatives with their \
-        trade-offs, not yes/no.
-        """)
+    @Guide(
+        description: """
+            The answers to offer, in order. Write real alternatives with their \
+            trade-offs, not yes/no.
+            """)
     public var options: [String]
 
     public init(question: String, options: [String] = []) {
@@ -268,10 +269,11 @@ public struct GmAgentCareRef: Sendable {
     @Guide(description: "For an exploration ref: a title for the copied finding.")
     public var title: String
 
-    @Guide(description: """
-        For an exploration ref: the finding written out again with more intent. \
-        Copy and sharpen what was already found — do not go exploring again.
-        """)
+    @Guide(
+        description: """
+            For an exploration ref: the finding written out again with more intent. \
+            Copy and sharpen what was already found — do not go exploring again.
+            """)
     public var body: String
 
     public init(
@@ -322,10 +324,11 @@ public struct GmAgentRpirCloseCarePackageArguments: Sendable {
     @Guide(description: "Version of the box you read.")
     public var expectedVersion: Int
 
-    @Guide(description: """
-        What was decided, in full: what was chosen, and what was ruled out and \
-        why. This is the only place it is written down.
-        """)
+    @Guide(
+        description: """
+            What was decided, in full: what was chosen, and what was ruled out and \
+            why. This is the only place it is written down.
+            """)
     public var clarifiedIntent: String
 
     public init(packageUuid: String, expectedVersion: Int, clarifiedIntent: String) {
@@ -353,10 +356,11 @@ public struct GmAgentRpirGetClarificationArguments: Sendable {
     @Guide(description: promptUuidGuide("'s questions to read"))
     public var promptUuid: String
 
-    @Guide(description: """
-        Only return notes this important or better, 0 to 999. Use a small \
-        number to keep the answer short.
-        """, .range(0...999))
+    @Guide(
+        description: """
+            Only return notes this important or better, 0 to 999. Use a small \
+            number to keep the answer short.
+            """, .range(0...999))
     public var noteWeightMax: Int
 
     public init(promptUuid: String, noteWeightMax: Int = 100) {

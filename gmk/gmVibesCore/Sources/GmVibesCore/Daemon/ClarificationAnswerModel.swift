@@ -162,27 +162,31 @@ final class ClarificationAnswerModel {
         // in that state, so reaching here means a race — decline silently
         // rather than banner a server error the user cannot act on.
         guard !text.isEmpty || !draft.selected.isEmpty else { return }
-        await perform(questionUuid: questionUuid, request: ClarifyAnswerRequest(
+        await perform(
             questionUuid: questionUuid,
-            expectedVersion: draft.version,
-            answerText: text.isEmpty ? nil : text,
-            // ALWAYS sent, even when empty: an empty array is the real value
-            // "no options selected", and omitting it would leave the daemon's
-            // wholesale rewrite to decide — which it does by clearing anyway.
-            selectedOptionUuids: Array(draft.selected),
-            skip: false))
+            request: ClarifyAnswerRequest(
+                questionUuid: questionUuid,
+                expectedVersion: draft.version,
+                answerText: text.isEmpty ? nil : text,
+                // ALWAYS sent, even when empty: an empty array is the real value
+                // "no options selected", and omitting it would leave the daemon's
+                // wholesale rewrite to decide — which it does by clearing anyway.
+                selectedOptionUuids: Array(draft.selected),
+                skip: false))
     }
 
     /// `skip: true` clears BOTH axes daemon-side; adopting the returned row
     /// clears them locally, so the two can never disagree.
     func skip(questionUuid: String) async {
         guard let draft = drafts[questionUuid], !draft.inFlight else { return }
-        await perform(questionUuid: questionUuid, request: ClarifyAnswerRequest(
+        await perform(
             questionUuid: questionUuid,
-            expectedVersion: draft.version,
-            answerText: nil,
-            selectedOptionUuids: nil,
-            skip: true))
+            request: ClarifyAnswerRequest(
+                questionUuid: questionUuid,
+                expectedVersion: draft.version,
+                answerText: nil,
+                selectedOptionUuids: nil,
+                skip: true))
     }
 
     private func perform(questionUuid: String, request: ClarifyAnswerRequest) async {
@@ -194,17 +198,21 @@ final class ClarificationAnswerModel {
             // conflict against a version we already hold.
             applyServerRow(row)
         } catch DaemonError.versionConflict {
-            finish(questionUuid, conflict:
-                "Answered elsewhere while you were editing. Your text was kept and the "
-                + "question refreshed — review it, then save again.")
+            finish(
+                questionUuid,
+                conflict:
+                    "Answered elsewhere while you were editing. Your text was kept and the "
+                    + "question refreshed — review it, then save again.")
             // Without this the user would keep re-sending the same stale
             // expected version and conflict forever.
             await onNeedsRefresh?()
         } catch DaemonError.invalidTransition(let reason) {
             // The summary left `answering` under us (a bot sealed it). The UI
             // gate closes on the next refresh; say why in the meantime.
-            finish(questionUuid, conflict: reason
-                ?? "Clarification is no longer accepting answers.")
+            finish(
+                questionUuid,
+                conflict: reason
+                    ?? "Clarification is no longer accepting answers.")
             await onNeedsRefresh?()
         } catch let error as DaemonError {
             finish(questionUuid, conflict: error.userMessage)
@@ -216,9 +224,11 @@ final class ClarificationAnswerModel {
     // MARK: - Draft bookkeeping
 
     private func applyServerRow(_ row: ClarificationQuestionRow) {
-        var draft = drafts[row.uuid] ?? Draft(
-            text: "", selected: [], version: row.version,
-            dirty: false, inFlight: false, conflict: nil)
+        var draft =
+            drafts[row.uuid]
+            ?? Draft(
+                text: "", selected: [], version: row.version,
+                dirty: false, inFlight: false, conflict: nil)
         draft.version = row.version
         draft.text = row.answerText ?? ""
         draft.selected = Set(row.selectedOptionUuids)

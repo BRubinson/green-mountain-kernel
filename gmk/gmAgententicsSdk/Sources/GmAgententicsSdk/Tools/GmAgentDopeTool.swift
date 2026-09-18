@@ -10,10 +10,11 @@ public struct GmAgentDopeSearchArguments: Sendable {
     @Guide(description: GM_TOOL_GUIDE_SEARCH_QUERY)
     public var query: String
 
-    @Guide(description: """
-        Which kinds of dope rows to search. Leave empty to search all of them. \
-        Use this to ask for only persistence rows, or only cogs.
-        """)
+    @Guide(
+        description: """
+            Which kinds of dope rows to search. Leave empty to search all of them. \
+            Use this to ask for only persistence rows, or only cogs.
+            """)
     public var sources: [String]
 
     @Guide(description: GM_TOOL_GUIDE_SEARCH_LIMIT, .range(1...500))

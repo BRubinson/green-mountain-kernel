@@ -74,12 +74,15 @@ public enum Paths {
     /// levers and setting one does not move the other.
     public static let root: URL = {
         if let baked = Bundle.main.object(forInfoDictionaryKey: bakedRootInfoKey) as? String,
-           !baked.isEmpty {
-            return URL(fileURLWithPath: (baked as NSString).expandingTildeInPath,
-                       isDirectory: true)
+            !baked.isEmpty
+        {
+            return URL(
+                fileURLWithPath: (baked as NSString).expandingTildeInPath,
+                isDirectory: true)
         }
         if let override = ProcessInfo.processInfo.environment["GM_FS_ROOT"],
-           !override.isEmpty {
+            !override.isEmpty
+        {
             return URL(fileURLWithPath: override, isDirectory: true)
         }
         return defaultProductionRoot
@@ -246,7 +249,7 @@ public enum Paths {
         public let allowed: [String]
         public var description: String {
             "refusing to write outside the permitted roots: \(attempted) is under "
-            + "none of \(allowed.joined(separator: ", "))"
+                + "none of \(allowed.joined(separator: ", "))"
         }
     }
 

@@ -28,7 +28,8 @@ struct StampVersion: BuildToolPlugin {
         let versionFile = context.package.directoryURL
             .deletingLastPathComponent()
             .appending(path: "VERSION")
-        let version = (try? String(contentsOf: versionFile, encoding: .utf8))?
+        let version =
+            (try? String(contentsOf: versionFile, encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? "unknown"
 
         // WRITE ONLY WHEN THE CONTENT CHANGES. This is not a micro-optimisation;

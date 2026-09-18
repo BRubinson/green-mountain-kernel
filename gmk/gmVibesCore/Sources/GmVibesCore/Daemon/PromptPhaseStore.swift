@@ -117,13 +117,16 @@ final class PromptPhaseStore {
     /// `bot_workflow` row while the prompt is still `draft`, so gating the
     /// strip on the lifecycle axis would blind it on exactly the prompts that
     /// most need it.
-    func refresh(lifecyclePhases: Bool = true, reports: Bool = true,
-                 workflow: Bool = true) async {
+    func refresh(
+        lifecyclePhases: Bool = true, reports: Bool = true,
+        workflow: Bool = true
+    ) async {
         // Coalesce only with a run at least as wide on every axis.
         if let running = inFlight,
-           running.lifecyclePhases || !lifecyclePhases,
-           running.reports || !reports,
-           running.workflow || !workflow {
+            running.lifecyclePhases || !lifecyclePhases,
+            running.reports || !reports,
+            running.workflow || !workflow
+        {
             await running.task.value
             return
         }

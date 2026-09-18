@@ -42,11 +42,12 @@ public struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
     @Guide(description: "Your whole proposal, written out.")
     public var body: String
 
-    @Guide(description: """
-        Option this proposal REPLACES, by uuid. Leave empty for a new \
-        proposal. The old row stays as rejected history, and if it was the \
-        selected plan the new one takes the selection.
-        """)
+    @Guide(
+        description: """
+            Option this proposal REPLACES, by uuid. Leave empty for a new \
+            proposal. The old row stays as rejected history, and if it was the \
+            selected plan the new one takes the selection.
+            """)
     public var supersedesOptionUuid: String
 
     @Guide(description: "Version of the replaced option. Required with supersedesOptionUuid.")
@@ -206,10 +207,11 @@ public struct GmAgentGeneralChange: Sendable {
     @Guide(description: "How worked-out it is.", .anyOf(GM_TOOL_ANYOF_CHANGE_DEPTH))
     public var changeDepth: String
 
-    @Guide(description: """
-        The instruction whoever implements this will follow. Write it to them, \
-        not about them.
-        """)
+    @Guide(
+        description: """
+            The instruction whoever implements this will follow. Write it to them, \
+            not about them.
+            """)
     public var changeCode: String
 
     public init(
@@ -369,10 +371,11 @@ public struct GmAgentRpirDecideArchitectureArguments: Sendable {
     @Guide(description: "Version of the option you read.")
     public var expectedVersion: Int
 
-    @Guide(description: """
-        Why this plan won, and what the rejected ones still contribute. A \
-        decision with no reasoning gets argued again later.
-        """)
+    @Guide(
+        description: """
+            Why this plan won, and what the rejected ones still contribute. A \
+            decision with no reasoning gets argued again later.
+            """)
     public var rationale: String
 
     public init(optionUuid: String, expectedVersion: Int, rationale: String) {

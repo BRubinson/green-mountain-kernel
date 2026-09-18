@@ -55,11 +55,13 @@ struct DopeInitSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(forPrompt ? "Initialize Prompt Dope Scope" : "Initialize Session Dope Scope")
                 .font(.title3.weight(.semibold))
-            Text(forPrompt
-                ? "Creates a PROMPT-typed dope scope for this prompt."
-                : "Creates this session's SESSION_BASE dope scope.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Text(
+                forPrompt
+                    ? "Creates a PROMPT-typed dope scope for this prompt."
+                    : "Creates this session's SESSION_BASE dope scope."
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
 
             VStack(alignment: .leading, spacing: 4) {
                 TextField("Code (e.g. game_model)", text: $code)
@@ -76,17 +78,21 @@ struct DopeInitSheet: View {
                         .foregroundStyle(.secondary)
                 }
                 if collidesWithSibling {
-                    Label("A scope with this code already exists — Initialize will open it, never overwrite it.",
-                          systemImage: "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Label(
+                        "A scope with this code already exists — Initialize will open it, never overwrite it.",
+                        systemImage: "info.circle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 } else if shadowsOtherType {
-                    Label(forPrompt
-                        ? "A session-base scope uses this code — initializing here creates a separate prompt scope, not a link to it."
-                        : "A prompt scope uses this code — initializing here creates a separate session-base scope, not a link to it.",
-                          systemImage: "info.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Label(
+                        forPrompt
+                            ? "A session-base scope uses this code — initializing here creates a separate prompt scope, not a link to it."
+                            : "A prompt scope uses this code — initializing here creates a separate session-base scope, not a link to it.",
+                        systemImage: "info.circle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
             TextField("Name", text: $name)

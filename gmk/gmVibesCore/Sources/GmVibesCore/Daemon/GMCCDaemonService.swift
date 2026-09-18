@@ -150,9 +150,13 @@ actor GMCCDaemonService {
 
     // MARK: - Catalog search
 
-    func searchCatalog(query: String, projectUuid: String? = nil, limit: Int? = nil) async throws -> CatalogSearchResponse {
+    func searchCatalog(query: String, projectUuid: String? = nil, limit: Int? = nil) async throws
+        -> CatalogSearchResponse
+    {
         let uuid = Self.normalized(projectUuid)
-        return try await perform { try $0.searchCatalog(CatalogSearchRequest(query: query, projectUuid: uuid, limit: limit)) }
+        return try await perform {
+            try $0.searchCatalog(CatalogSearchRequest(query: query, projectUuid: uuid, limit: limit))
+        }
     }
 
     // MARK: - Full-text search (v8)
@@ -210,10 +214,12 @@ actor GMCCDaemonService {
     func listPrompts(sessionUuid: String, withReports: Bool = false) async throws -> [PromptStub] {
         let uuid = Self.normalized(sessionUuid)
         return try await perform {
-            try $0.listPrompts(PromptListRequest(
-                sessionUuid: uuid,
-                withReports: withReports ? true : nil
-            )).prompts
+            try $0.listPrompts(
+                PromptListRequest(
+                    sessionUuid: uuid,
+                    withReports: withReports ? true : nil
+                )
+            ).prompts
         }
     }
 
@@ -382,7 +388,9 @@ actor GMCCDaemonService {
         let uuid = Self.normalized(ownerUuid)
         // Server short-circuits scope resolution when all == true, so the
         // owner uuid is ignored in that mode.
-        return try await perform { try $0.listKbites(KbiteListRequest(scope: scope, ownerUuid: uuid, all: all ? true : nil)).kbites }
+        return try await perform {
+            try $0.listKbites(KbiteListRequest(scope: scope, ownerUuid: uuid, all: all ? true : nil)).kbites
+        }
     }
 
     func addKbite(scope: KbiteScope, ownerUuid: String, code: String) async throws -> KbiteAddResponse {
@@ -397,7 +405,9 @@ actor GMCCDaemonService {
 
     func searchKbites(query: String, kbiteUuids: [String]? = nil, limit: Int? = nil) async throws -> [KbiteSearchHit] {
         let uuids = kbiteUuids.map { $0.map(Self.normalized) }
-        return try await perform { try $0.searchKbites(KbiteSearchRequest(query: query, kbiteUuids: uuids, limit: limit)).hits }
+        return try await perform {
+            try $0.searchKbites(KbiteSearchRequest(query: query, kbiteUuids: uuids, limit: limit)).hits
+        }
     }
 
     func getKbiteFile(fileUuid: String) async throws -> KbiteResourceFileRow {
@@ -426,8 +436,10 @@ actor GMCCDaemonService {
         return try await perform { try $0.dopeList(req) }
     }
 
-    func dopeGet(sessionUuid: String, promptUuid: String? = nil,
-                 code: String? = nil) async throws -> DopeGetResponse {
+    func dopeGet(
+        sessionUuid: String, promptUuid: String? = nil,
+        code: String? = nil
+    ) async throws -> DopeGetResponse {
         let req = DopeGetRequest(
             sessionUuid: Self.normalized(sessionUuid),
             promptUuid: Self.normalized(promptUuid),
@@ -502,8 +514,10 @@ actor GMCCDaemonService {
     /// Cross-tier browse AND search for the galleries (v23). nil/empty query
     /// = the project's diagrams across tiers by recency; non-empty = FTS.
     /// Deliberately separate from diagramList's one-owner contract.
-    func diagramSearch(projectUuid: String, sessionUuid: String? = nil,
-                       query: String? = nil, limit: Int? = nil) async throws -> [DiagramRow] {
+    func diagramSearch(
+        projectUuid: String, sessionUuid: String? = nil,
+        query: String? = nil, limit: Int? = nil
+    ) async throws -> [DiagramRow] {
         let req = DiagramSearchRequest(
             projectUuid: Self.normalized(projectUuid),
             sessionUuid: Self.normalized(sessionUuid),
@@ -513,12 +527,15 @@ actor GMCCDaemonService {
 
     /// Row delete with an optional whole-diagram CAS gate; elements cascade
     /// server-side and DIAGRAM_CHANGE (action "deleted") wakes the galleries.
-    func diagramDelete(diagramUuid: String,
-                       expectedRevision: Int64? = nil) async throws -> DiagramDeleteResponse {
+    func diagramDelete(
+        diagramUuid: String,
+        expectedRevision: Int64? = nil
+    ) async throws -> DiagramDeleteResponse {
         let uuid = Self.normalized(diagramUuid)
         return try await perform {
-            try $0.diagramDelete(DiagramDeleteRequest(
-                diagramUuid: uuid, expectedRevision: expectedRevision))
+            try $0.diagramDelete(
+                DiagramDeleteRequest(
+                    diagramUuid: uuid, expectedRevision: expectedRevision))
         }
     }
 
@@ -526,8 +543,10 @@ actor GMCCDaemonService {
     /// DIAGRAM_CHANGE. Every editor mutation goes through here — the
     /// granular DIAGRAM_NODE_* verbs are deliberately not wrapped, since a
     /// one-mutation batch is the same call.
-    func diagramBatchApply(diagramUuid: String, expectedRevision: Int64?,
-                           mutations: [DiagramMutation]) async throws -> DiagramBatchApplyResponse {
+    func diagramBatchApply(
+        diagramUuid: String, expectedRevision: Int64?,
+        mutations: [DiagramMutation]
+    ) async throws -> DiagramBatchApplyResponse {
         let req = DiagramBatchApplyRequest(
             diagramUuid: Self.normalized(diagramUuid),
             expectedRevision: expectedRevision,

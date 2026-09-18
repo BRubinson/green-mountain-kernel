@@ -29,10 +29,12 @@ struct ClarificationPane: View {
             }
         case .absent:
             // Stays READ-ONLY: every clarify write is bot/CLI-side by design.
-            Label("Not opened yet — run the bot to start clarification.",
-                  systemImage: "questionmark.circle")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Label(
+                "Not opened yet — run the bot to start clarification.",
+                systemImage: "questionmark.circle"
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle")
                 .font(.callout)
@@ -55,8 +57,9 @@ struct ClarificationPane: View {
                 // staleness report is in hand — no second fetch for the
                 // expanded care package. INVARIANT: carePackageStaleness is
                 // non-nil IFF carePackage is (nil also on a pre-field daemon).
-                CarePackageSection(package: package,
-                                   staleness: response.carePackageStaleness)
+                CarePackageSection(
+                    package: package,
+                    staleness: response.carePackageStaleness)
             }
 
             if !response.questions.isEmpty {
@@ -114,12 +117,13 @@ struct ClarificationPane: View {
 
     @ViewBuilder
     private func statusChip(_ status: ClarificationStatus?) -> some View {
-        let (label, color): (String, Color) = switch status {
-        case .building: ("Building", .orange)
-        case .answering: ("Answering", .blue)
-        case .complete: ("Complete", .green)
-        case .none: ("—", .gray)
-        }
+        let (label, color): (String, Color) =
+            switch status {
+            case .building: ("Building", .orange)
+            case .answering: ("Answering", .blue)
+            case .complete: ("Complete", .green)
+            case .none: ("—", .gray)
+            }
         Text(label)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 7).padding(.vertical, 2)

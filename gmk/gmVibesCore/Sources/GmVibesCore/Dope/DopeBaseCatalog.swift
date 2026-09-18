@@ -55,13 +55,15 @@ struct DopeBaseCatalog: Equatable {
         var nextRef = entity.body.baseComposableRef
         var visited = Set<String>()
         while let ref = nextRef, visited.insert(ref).inserted,
-              let base = entitiesByRef[ref], let parsed = try? DopeCode.parseEntityRef(ref, field: "base_composable_ref"),
-              case .entity(let domain, let entityCode) = parsed {
+            let base = entitiesByRef[ref], let parsed = try? DopeCode.parseEntityRef(ref, field: "base_composable_ref"),
+            case .entity(let domain, let entityCode) = parsed
+        {
             for property in base.properties {
                 let fullPath = DopeCode.formatPropertyRef(
                     domain: domain, entity: entityCode, property: property.body.code)
                 guard !materializedOrigins.contains(fullPath),
-                      seenCodes.insert(property.body.code).inserted else { continue }
+                    seenCodes.insert(property.body.code).inserted
+                else { continue }
                 out.append(InheritedProperty(node: property, originRef: fullPath))
             }
             nextRef = base.body.baseComposableRef

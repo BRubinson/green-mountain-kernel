@@ -319,7 +319,7 @@ public struct ConnectorPayload: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case targetElementUuid, strokeColor, strokeWidth, lineStyle, headKind,
-             routingKind, tailKind, label
+            routingKind, tailKind, label
     }
 
     public init(from decoder: Decoder) throws {
@@ -327,16 +327,20 @@ public struct ConnectorPayload: Codable, Hashable, Sendable {
         targetElementUuid = try c.decodeIfPresent(String.self, forKey: .targetElementUuid)
         strokeColor = try c.decodeIfPresent(String.self, forKey: .strokeColor) ?? "#1a1a1a"
         strokeWidth = try c.decodeIfPresent(Double.self, forKey: .strokeWidth) ?? 2
-        lineStyle = try c.decodeIfPresent(
-            DiagramConnectorLineStyle.self, forKey: .lineStyle) ?? .solid
-        headKind = try c.decodeIfPresent(
-            DiagramConnectorHead.self, forKey: .headKind) ?? .arrow
+        lineStyle =
+            try c.decodeIfPresent(
+                DiagramConnectorLineStyle.self, forKey: .lineStyle) ?? .solid
+        headKind =
+            try c.decodeIfPresent(
+                DiagramConnectorHead.self, forKey: .headKind) ?? .arrow
         // Defaults reproduce the pre-v23 look: the router's polyline was the
         // only renderer, and no connector had a tail decoration.
-        routingKind = try c.decodeIfPresent(
-            DiagramConnectorRouting.self, forKey: .routingKind) ?? .orthogonalStep
-        tailKind = try c.decodeIfPresent(
-            DiagramConnectorHead.self, forKey: .tailKind) ?? .none
+        routingKind =
+            try c.decodeIfPresent(
+                DiagramConnectorRouting.self, forKey: .routingKind) ?? .orthogonalStep
+        tailKind =
+            try c.decodeIfPresent(
+                DiagramConnectorHead.self, forKey: .tailKind) ?? .none
         label = try c.decodeIfPresent(String.self, forKey: .label) ?? ""
     }
 }
@@ -377,7 +381,7 @@ public struct UmlNodePayload: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case nodeKind, width, height, markdown, fontSize, textColor,
-             strokeColor, strokeWidth, fillColor
+            strokeColor, strokeWidth, fillColor
     }
 
     public init(from decoder: Decoder) throws {

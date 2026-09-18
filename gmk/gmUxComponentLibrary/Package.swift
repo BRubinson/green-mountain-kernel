@@ -26,18 +26,18 @@ let package = Package(
     // exists is that more consumers are expected.
     platforms: [.macOS(.v14)],
     products: [
-        .library(name: "GmUxComponentLibrary", targets: ["GmUxComponentLibrary"]),
+        .library(name: "GmUxComponentLibrary", targets: ["GmUxComponentLibrary"])
     ],
     dependencies: [
-        .package(path: "../gmDaemonSdk"),
+        .package(path: "../gmDaemonSdk")
     ],
     targets: [
         .target(
             name: "GmUxComponentLibrary",
             dependencies: [
-                .product(name: "GmDaemonSdk", package: "gmDaemonSdk"),
+                .product(name: "GmDaemonSdk", package: "gmDaemonSdk")
             ]
-        ),
+        )
         // TEST TARGET REMOVED. The repository's tests live in ONE package now,
         // gmk/Gm_Kernel_test, which boots a shared environment and drives the
         // whole kit through its PUBLIC surface plus read-only SQL.

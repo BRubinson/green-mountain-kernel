@@ -126,11 +126,12 @@ public enum VerbRegistry {
     /// caller must not follow: these verbs append, so the retry writes a
     /// second row. Derived from `role`, never hand-listed, so it cannot drift.
     public static var writePenTools: Set<String> {
-        var names = Set(all.compactMap { spec -> String? in
-            guard let pen = spec.penTool else { return nil }
-            if case .record = spec.role { return pen }
-            return nil
-        })
+        var names = Set(
+            all.compactMap { spec -> String? in
+                guard let pen = spec.penTool else { return nil }
+                if case .record = spec.role { return pen }
+                return nil
+            })
         // The composites carry no VerbSpec of their own. Both of these open
         // rows (PROMPT_CREATE/PROMPT_RESUME, BRIEFING_OPEN), so both are writes.
         names.formUnion(["cde_init", "rpir_open_briefing", "rpir_close_brief"])
@@ -174,12 +175,12 @@ public enum VerbRegistry {
         // exist — which is why none of these needed a new MessageType, a
         // handler, or a migration.
         "cde_init": [
-            .contextEnsure,     // $PWD + git branch -> project/instance/session
-            .promptList,        // the candidate set the resolver folds over
-            .promptCreate,      // only with create:true AND name AND detail
-            .promptResume,      // fetch-or-create; its `created` flag is new-vs-resumed
-            .botNext,           // phase, instructions, gate blockers
-            .briefingGet,       // absent | building | ready
+            .contextEnsure,  // $PWD + git branch -> project/instance/session
+            .promptList,  // the candidate set the resolver folds over
+            .promptCreate,  // only with create:true AND name AND detail
+            .promptResume,  // fetch-or-create; its `created` flag is new-vs-resumed
+            .botNext,  // phase, instructions, gate blockers
+            .briefingGet,  // absent | building | ready
         ],
         "rpir_open_briefing": [.briefingOpen],
     ]
@@ -200,12 +201,14 @@ public enum VerbRegistry {
         VerbSpec(.ping, gm: "gm ping", role: .read),
         VerbSpec(.status, gm: "gm status", role: .read),
         // `gm daemon restart` runs Stop before Start — same SHUTDOWN.
-        VerbSpec(.shutdown, gm: "gm daemon stop", aliases: ["gm daemon restart"],
-                 role: .record(agentPhases: nil)),
+        VerbSpec(
+            .shutdown, gm: "gm daemon stop", aliases: ["gm daemon restart"],
+            role: .record(agentPhases: nil)),
         VerbSpec(.subscribe, gm: "gm events --follow", role: .read),
         // `gm sandbox refresh` takes the sanctioned Online Backup of prod.
-        VerbSpec(.backup, gm: "gm backup", aliases: ["gm sandbox refresh"],
-                 role: .record(agentPhases: nil)),
+        VerbSpec(
+            .backup, gm: "gm backup", aliases: ["gm sandbox refresh"],
+            role: .record(agentPhases: nil)),
         // `gm context env` emits the SessionStart env block from PATHS_GET and
         // nothing else — `Context.Env.run()` calls `pathsGet` alone, and the
         // provisioning write is the separate `gm context ensure`. Registering
@@ -265,25 +268,29 @@ public enum VerbRegistry {
         VerbSpec(.instanceCurrentSession, gm: "gm instance current-session", role: .read),
         VerbSpec(.sessionList, gm: "gm session list", role: .read),
         VerbSpec(.sessionGet, gm: "gm session get", role: .read),
-        VerbSpec(.sessionUpdate, gm: "gm session update", pen: "projects_update_session", role: .record(agentPhases: nil)),
+        VerbSpec(
+            .sessionUpdate, gm: "gm session update", pen: "projects_update_session", role: .record(agentPhases: nil)),
         VerbSpec(.sessionResolve, gm: "gm session resolve", role: .read),
 
         // ── Prompts ──────────────────────────────────────────────────────
         VerbSpec(.promptCreate, gm: "gm prompt create", role: .record(agentPhases: nil)),
         VerbSpec(.promptList, gm: "gm prompt list", role: .read),
         // `gm bot current_prompt` resolves the workflow, then sends this.
-        VerbSpec(.promptGet, gm: "gm prompt get", aliases: ["gm bot current_prompt"],
-                 role: .read),
+        VerbSpec(
+            .promptGet, gm: "gm prompt get", aliases: ["gm bot current_prompt"],
+            role: .read),
         VerbSpec(.promptUpdateContent, gm: "gm prompt update-content", role: .record(agentPhases: nil)),
         // THE ONLY THING THAT MOVES A PROMPT — the primary's call, by methodology.
-        VerbSpec(.promptSetStatus, gm: "gm prompt set-status", pen: "cde_set_status",
-                 role: .record(agentPhases: nil)),
+        VerbSpec(
+            .promptSetStatus, gm: "gm prompt set-status", pen: "cde_set_status",
+            role: .record(agentPhases: nil)),
         VerbSpec(.promptStart, gm: "gm prompt start", role: .record(agentPhases: nil)),
         VerbSpec(.promptResume, gm: "gm prompt resume", role: .record(agentPhases: nil)),
 
         // ── Bot workflow machine ─────────────────────────────────────────
-        VerbSpec(.botNext, gm: "gm bot next", aliases: ["gm bot status"],
-                 pen: "rpir_next", role: .read),
+        VerbSpec(
+            .botNext, gm: "gm bot next", aliases: ["gm bot status"],
+            pen: "rpir_next", role: .read),
         VerbSpec(.botGet, gm: "gm bot get", role: .read),
 
         // ── Agent registry ───────────────────────────────────────────────
@@ -294,13 +301,15 @@ public enum VerbRegistry {
         // never touch gm".
         // The alias is the SubagentStart half of the same row: the hook writes
         // identity, `gm agent register` writes authority, and both land here.
-        VerbSpec(.agentRegister, gm: "gm agent register",
-                 aliases: ["gm hook subagent-start"], role: .record(agentPhases: nil)),
+        VerbSpec(
+            .agentRegister, gm: "gm agent register",
+            aliases: ["gm hook subagent-start"], role: .record(agentPhases: nil)),
 
         // ── Artifacts / prompt-qualified diagrams ────────────────────────
         // `gm render` writes the rendered artifact row it just produced.
-        VerbSpec(.artifactAdd, gm: "gm artifact add", aliases: ["gm render"],
-                 role: .record(agentPhases: nil)),
+        VerbSpec(
+            .artifactAdd, gm: "gm artifact add", aliases: ["gm render"],
+            role: .record(agentPhases: nil)),
         VerbSpec(.artifactList, gm: "gm artifact list", role: .read),
         VerbSpec(.promptDiagramQualify, gm: "gm prompt-diagram qualify", role: .record(agentPhases: nil)),
         VerbSpec(.promptDiagramGet, gm: "gm prompt-diagram get", role: .read),
@@ -318,9 +327,10 @@ public enum VerbRegistry {
         // capture happens ONLY as the PostToolUse hook; a pen door here is the
         // forgery vector the paragraph above warns about, offered as a typed
         // tool. Do not "complete" this row in a coverage sweep.
-        VerbSpec(.fileChangeAdd, gm: "gm file-change add",
-                 aliases: ["gm hook post-tool-use"],
-                 role: .record(agentPhases: nil)),
+        VerbSpec(
+            .fileChangeAdd, gm: "gm file-change add",
+            aliases: ["gm hook post-tool-use"],
+            role: .record(agentPhases: nil)),
         VerbSpec(.fileChangeList, gm: "gm file-change list", pen: "cde_search_file_changes", role: .read),
 
         // ── Kbites ───────────────────────────────────────────────────────
@@ -342,43 +352,72 @@ public enum VerbRegistry {
         VerbSpec(.search, gm: "gm search", role: .read),
 
         // ── Clarification machine ────────────────────────────────────────
-        VerbSpec(.clarifyOpen, gm: "gm clarify open", pen: "rpir_open_clarification", role: .record(agentPhases: [.clarifyOpen])),
-        VerbSpec(.clarifyQuestionAdd, gm: "gm clarify question-add", pen: "rpir_write_clarification_questions",
-                 role: .record(agentPhases: [.clarifyOpen])),
-        VerbSpec(.clarifyNoteAdd, gm: "gm clarify note-add", pen: "rpir_write_clarification_notes",
-                 role: .record(agentPhases: [.clarifyOpen])),
-        VerbSpec(.clarifySeal, gm: "gm clarify seal", pen: "rpir_seal_clarification", role: .record(agentPhases: [.clarifyOpen])),
-        VerbSpec(.clarifyAnswer, gm: "gm clarify answer", pen: "rpir_answer_clarification_question", role: .record(agentPhases: [.clarifyUser])),
+        VerbSpec(
+            .clarifyOpen, gm: "gm clarify open", pen: "rpir_open_clarification",
+            role: .record(agentPhases: [.clarifyOpen])),
+        VerbSpec(
+            .clarifyQuestionAdd, gm: "gm clarify question-add", pen: "rpir_write_clarification_questions",
+            role: .record(agentPhases: [.clarifyOpen])),
+        VerbSpec(
+            .clarifyNoteAdd, gm: "gm clarify note-add", pen: "rpir_write_clarification_notes",
+            role: .record(agentPhases: [.clarifyOpen])),
+        VerbSpec(
+            .clarifySeal, gm: "gm clarify seal", pen: "rpir_seal_clarification",
+            role: .record(agentPhases: [.clarifyOpen])),
+        VerbSpec(
+            .clarifyAnswer, gm: "gm clarify answer", pen: "rpir_answer_clarification_question",
+            role: .record(agentPhases: [.clarifyUser])),
         VerbSpec(.clarifyReopen, gm: "gm clarify reopen", role: .record(agentPhases: nil)),
-        VerbSpec(.clarifyFinalize, gm: "gm clarify finalize", pen: "rpir_finalize_clarification", role: .record(agentPhases: [.clarifyUser])),
+        VerbSpec(
+            .clarifyFinalize, gm: "gm clarify finalize", pen: "rpir_finalize_clarification",
+            role: .record(agentPhases: [.clarifyUser])),
         VerbSpec(.clarifyGet, gm: "gm clarify get", pen: "rpir_get_clarification", role: .read),
 
         // ── Care package ─────────────────────────────────────────────────
-        VerbSpec(.carePackageOpen, gm: "gm clarify package-open", pen: "rpir_open_care_package",
-                 role: .record(agentPhases: [.carePackage])),
-        VerbSpec(.carePackageRefAdd, gm: "gm clarify package-add", pen: "rpir_write_care_package",
-                 role: .record(agentPhases: [.carePackage])),
+        VerbSpec(
+            .carePackageOpen, gm: "gm clarify package-open", pen: "rpir_open_care_package",
+            role: .record(agentPhases: [.carePackage])),
+        VerbSpec(
+            .carePackageRefAdd, gm: "gm clarify package-add", pen: "rpir_write_care_package",
+            role: .record(agentPhases: [.carePackage])),
         // The package SEAL: the clarified intent lives only here — the
         // primary's call, by methodology.
-        VerbSpec(.carePackageComplete, gm: "gm clarify package-complete",
-                 pen: "rpir_close_care_package", role: .record(agentPhases: [.carePackage])),
+        VerbSpec(
+            .carePackageComplete, gm: "gm clarify package-complete",
+            pen: "rpir_close_care_package", role: .record(agentPhases: [.carePackage])),
         VerbSpec(.carePackageGet, gm: "gm clarify package-get", role: .read),
 
         // ── Architecture machine ─────────────────────────────────────────
-        VerbSpec(.archOpen, gm: "gm arch open", pen: "rpir_open_architecture", role: .record(agentPhases: [.architecture])),
-        VerbSpec(.archSummarize, gm: "gm arch summarize", pen: "rpir_summarize_architecture", role: .record(agentPhases: [.architecture])),
-        VerbSpec(.archPersistAdd, gm: "gm arch persist-add", pen: "rpir_write_architecture_persistence_changes", role: .record(agentPhases: [.architecture])),
-        VerbSpec(.archFieldAdd, gm: "gm arch field-add", pen: "rpir_write_architecture_field_changes", role: .record(agentPhases: [.architecture])),
-        VerbSpec(.archGeneralAdd, gm: "gm arch general-add", pen: "rpir_write_architecture_general_changes", role: .record(agentPhases: [.architecture])),
-        VerbSpec(.archOptionAdd, gm: "gm arch option-add", pen: "rpir_open_architecture_option",
-                 role: .record(agentPhases: [.archOptions])),
+        VerbSpec(
+            .archOpen, gm: "gm arch open", pen: "rpir_open_architecture", role: .record(agentPhases: [.architecture])),
+        VerbSpec(
+            .archSummarize, gm: "gm arch summarize", pen: "rpir_summarize_architecture",
+            role: .record(agentPhases: [.architecture])),
+        VerbSpec(
+            .archPersistAdd, gm: "gm arch persist-add", pen: "rpir_write_architecture_persistence_changes",
+            role: .record(agentPhases: [.architecture])),
+        VerbSpec(
+            .archFieldAdd, gm: "gm arch field-add", pen: "rpir_write_architecture_field_changes",
+            role: .record(agentPhases: [.architecture])),
+        VerbSpec(
+            .archGeneralAdd, gm: "gm arch general-add", pen: "rpir_write_architecture_general_changes",
+            role: .record(agentPhases: [.architecture])),
+        VerbSpec(
+            .archOptionAdd, gm: "gm arch option-add", pen: "rpir_open_architecture_option",
+            role: .record(agentPhases: [.archOptions])),
         // DECIDE selects one option and rejects its siblings — the primary's
         // call, by methodology.
-        VerbSpec(.archDecide, gm: "gm arch decide", pen: "rpir_decide_architecture",
-                 role: .record(agentPhases: [.archOptions])),
-        VerbSpec(.archPropose, gm: "gm arch propose", pen: "rpir_propose_architecture", role: .record(agentPhases: [.architecture])),
-        VerbSpec(.archApprove, gm: "gm arch approve", pen: "rpir_approve_architecture", role: .record(agentPhases: [.planGate])),
-        VerbSpec(.archRevise, gm: "gm arch revise", pen: "rpir_revise_architecture", role: .record(agentPhases: [.planGate])),
+        VerbSpec(
+            .archDecide, gm: "gm arch decide", pen: "rpir_decide_architecture",
+            role: .record(agentPhases: [.archOptions])),
+        VerbSpec(
+            .archPropose, gm: "gm arch propose", pen: "rpir_propose_architecture",
+            role: .record(agentPhases: [.architecture])),
+        VerbSpec(
+            .archApprove, gm: "gm arch approve", pen: "rpir_approve_architecture",
+            role: .record(agentPhases: [.planGate])),
+        VerbSpec(
+            .archRevise, gm: "gm arch revise", pen: "rpir_revise_architecture", role: .record(agentPhases: [.planGate])),
         VerbSpec(.archGet, gm: "gm arch get", pen: "rpir_get_architecture", role: .read),
 
         // ── Exploration machine ──────────────────────────────────────────
@@ -389,41 +428,54 @@ public enum VerbRegistry {
         // `gm bot summary` is the OTHER CLI spelling of this same verb, and it
         // is the one the cheatsheet core hands to every spawned agent — so it
         // was the guard's single biggest blind spot until it was listed here.
-        VerbSpec(.exploreOpen, gm: "gm explore open", aliases: ["gm bot summary"],
-                 pen: "rpir_open_exploration",
-                 role: .record(agentPhases: [.explore, .clarifyOpen])),
-        VerbSpec(.exploreKeyFileAdd, gm: "gm explore key-file-add",
-                 role: .record(agentPhases: [.explore])),
-        VerbSpec(.exploreFindingAdd, gm: "gm explore finding-add", pen: "rpir_write_explorations",
-                 role: .record(agentPhases: [.explore])),
+        VerbSpec(
+            .exploreOpen, gm: "gm explore open", aliases: ["gm bot summary"],
+            pen: "rpir_open_exploration",
+            role: .record(agentPhases: [.explore, .clarifyOpen])),
+        VerbSpec(
+            .exploreKeyFileAdd, gm: "gm explore key-file-add",
+            role: .record(agentPhases: [.explore])),
+        VerbSpec(
+            .exploreFindingAdd, gm: "gm explore finding-add", pen: "rpir_write_explorations",
+            role: .record(agentPhases: [.explore])),
         // The rerank belongs to the merged clarifier, which runs in
         // clarify_open.
-        VerbSpec(.exploreRank, gm: "gm explore rank", pen: "rpir_rank_explorations",
-                 role: .record(agentPhases: [.explore, .clarifyOpen])),
+        VerbSpec(
+            .exploreRank, gm: "gm explore rank", pen: "rpir_rank_explorations",
+            role: .record(agentPhases: [.explore, .clarifyOpen])),
         // Any agent may seal synthesis once everything is ranked.
-        VerbSpec(.exploreComplete, gm: "gm explore complete", pen: "rpir_complete_exploration",
-                 role: .record(agentPhases: [.explore, .clarifyOpen])),
+        VerbSpec(
+            .exploreComplete, gm: "gm explore complete", pen: "rpir_complete_exploration",
+            role: .record(agentPhases: [.explore, .clarifyOpen])),
         VerbSpec(.exploreReopen, gm: "gm explore reopen", role: .record(agentPhases: nil)),
         VerbSpec(.exploreGet, gm: "gm explore get", pen: "rpir_get_exploration", role: .read),
 
         // ── Review machine ───────────────────────────────────────────────
         VerbSpec(.reviewOpen, gm: "gm review open", pen: "rpir_open_review", role: .record(agentPhases: [.review])),
-        VerbSpec(.reviewFindingAdd, gm: "gm review finding-add", pen: "rpir_write_reviews",
-                 role: .record(agentPhases: [.review, .reviewFix])),
+        VerbSpec(
+            .reviewFindingAdd, gm: "gm review finding-add", pen: "rpir_write_reviews",
+            role: .record(agentPhases: [.review, .reviewFix])),
         // Cross-agent calibration — one reader does it, by methodology.
-        VerbSpec(.reviewRank, gm: "gm review rank", pen: "rpir_rank_reviews",
-                 role: .record(agentPhases: [.review])),
-        VerbSpec(.reviewResolve, gm: "gm review resolve", pen: "rpir_resolve_review_finding", role: .record(agentPhases: [.reviewFix])),
-        VerbSpec(.reviewComplete, gm: "gm review complete", pen: "rpir_complete_review", role: .record(agentPhases: [.review])),
+        VerbSpec(
+            .reviewRank, gm: "gm review rank", pen: "rpir_rank_reviews",
+            role: .record(agentPhases: [.review])),
+        VerbSpec(
+            .reviewResolve, gm: "gm review resolve", pen: "rpir_resolve_review_finding",
+            role: .record(agentPhases: [.reviewFix])),
+        VerbSpec(
+            .reviewComplete, gm: "gm review complete", pen: "rpir_complete_review",
+            role: .record(agentPhases: [.review])),
         VerbSpec(.reviewReopen, gm: "gm review reopen", role: .record(agentPhases: nil)),
         VerbSpec(.reviewGet, gm: "gm review get", pen: "rpir_get_review", role: .read),
 
         // ── Agent briefing ───────────────────────────────────────────────
         VerbSpec(.briefingOpen, gm: "gm briefing open", role: .record(agentPhases: [.briefing])),
-        VerbSpec(.briefingComplete, gm: "gm briefing complete", pen: "rpir_write_brief",
-                 role: .record(agentPhases: [.briefing])),
-        VerbSpec(.briefingGet, gm: "gm briefing get", aliases: ["gm bot briefing"],
-                 pen: "rpir_load_exploration_brief", role: .read),
+        VerbSpec(
+            .briefingComplete, gm: "gm briefing complete", pen: "rpir_write_brief",
+            role: .record(agentPhases: [.briefing])),
+        VerbSpec(
+            .briefingGet, gm: "gm briefing get", aliases: ["gm bot briefing"],
+            pen: "rpir_load_exploration_brief", role: .read),
         VerbSpec(.briefingList, gm: "gm briefing list", role: .read),
         VerbSpec(.briefingStub, gm: "gm briefing stub", role: .read),
 
@@ -437,27 +489,30 @@ public enum VerbRegistry {
         // funnels into these three verbs (Dope.runAdd / runUpdate / runDelete),
         // so all of them are writes and all of them must be visible to the
         // deny set. Only the persistence spelling was registered.
-        VerbSpec(.dopeNodeAdd, gm: "gm dope persistence-add",
-                 aliases: [
-                    "gm dope domain-add", "gm dope entity-add",
-                    "gm dope property-add", "gm dope enum-add",
-                    "gm dope option-add",
-                 ],
-                 role: .record(agentPhases: nil)),
-        VerbSpec(.dopeNodeUpdate, gm: "gm dope persistence-update",
-                 aliases: [
-                    "gm dope domain-update", "gm dope scope-update",
-                    "gm dope entity-update", "gm dope property-update",
-                    "gm dope enum-update", "gm dope option-update",
-                 ],
-                 role: .record(agentPhases: nil)),
-        VerbSpec(.dopeNodeDelete, gm: "gm dope persistence-delete",
-                 aliases: [
-                    "gm dope domain-delete", "gm dope entity-delete",
-                    "gm dope property-delete", "gm dope enum-delete",
-                    "gm dope option-delete",
-                 ],
-                 role: .record(agentPhases: nil)),
+        VerbSpec(
+            .dopeNodeAdd, gm: "gm dope persistence-add",
+            aliases: [
+                "gm dope domain-add", "gm dope entity-add",
+                "gm dope property-add", "gm dope enum-add",
+                "gm dope option-add",
+            ],
+            role: .record(agentPhases: nil)),
+        VerbSpec(
+            .dopeNodeUpdate, gm: "gm dope persistence-update",
+            aliases: [
+                "gm dope domain-update", "gm dope scope-update",
+                "gm dope entity-update", "gm dope property-update",
+                "gm dope enum-update", "gm dope option-update",
+            ],
+            role: .record(agentPhases: nil)),
+        VerbSpec(
+            .dopeNodeDelete, gm: "gm dope persistence-delete",
+            aliases: [
+                "gm dope domain-delete", "gm dope entity-delete",
+                "gm dope property-delete", "gm dope enum-delete",
+                "gm dope option-delete",
+            ],
+            role: .record(agentPhases: nil)),
         VerbSpec(.dopePromote, gm: "gm dope promote", role: .record(agentPhases: nil)),
         VerbSpec(.dopeReadRepo, gm: "gm dope read-repo", role: .read),
         VerbSpec(.dopeMergePlan, gm: "gm dope merge-plan", role: .read),
@@ -465,8 +520,9 @@ public enum VerbRegistry {
         VerbSpec(.dopeWriteRepo, gm: "gm dope write-repo", pen: "dope_update_session", role: .record(agentPhases: nil)),
         // `gm dope sync` runs DopeBootSync, which sends DOPE_INIT and
         // DOPE_INGEST — a write, files → db, forward only.
-        VerbSpec(.dopeIngest, gm: "gm dope ingest", aliases: ["gm dope sync"],
-                 role: .record(agentPhases: nil)),
+        VerbSpec(
+            .dopeIngest, gm: "gm dope ingest", aliases: ["gm dope sync"],
+            role: .record(agentPhases: nil)),
         VerbSpec(.dopeCogAdd, gm: "gm cog add", role: .record(agentPhases: nil)),
         VerbSpec(.dopeCogUpdate, gm: "gm cog update", role: .record(agentPhases: nil)),
         VerbSpec(.dopeCogDelete, gm: "gm cog delete", role: .record(agentPhases: nil)),
@@ -478,8 +534,9 @@ public enum VerbRegistry {
         // ── Diagrams ─────────────────────────────────────────────────────
         // `gm diagram from-dope` regenerates a canvas: DIAGRAM_INIT, then one
         // atomic DIAGRAM_BATCH_APPLY.
-        VerbSpec(.diagramInit, gm: "gm diagram init", aliases: ["gm diagram from-dope"],
-                 role: .record(agentPhases: nil)),
+        VerbSpec(
+            .diagramInit, gm: "gm diagram init", aliases: ["gm diagram from-dope"],
+            role: .record(agentPhases: nil)),
         VerbSpec(.diagramList, gm: "gm diagram list", role: .read),
         VerbSpec(.diagramGet, gm: "gm diagram get", role: .read),
         VerbSpec(.diagramSearch, gm: "gm diagram search", role: .read),
@@ -487,8 +544,9 @@ public enum VerbRegistry {
         VerbSpec(.diagramNodeUpdate, gm: "gm diagram element-update", role: .record(agentPhases: nil)),
         VerbSpec(.diagramNodeDelete, gm: "gm diagram element-delete", role: .record(agentPhases: nil)),
         // `gm diagram update` is a one-mutation batch under the hood.
-        VerbSpec(.diagramBatchApply, gm: "gm diagram batch-apply",
-                 aliases: ["gm diagram update"], role: .record(agentPhases: nil)),
+        VerbSpec(
+            .diagramBatchApply, gm: "gm diagram batch-apply",
+            aliases: ["gm diagram update"], role: .record(agentPhases: nil)),
         VerbSpec(.diagramDelete, gm: "gm diagram delete", role: .record(agentPhases: nil)),
         VerbSpec(.diagramWriteRepo, gm: "gm diagram write-repo", role: .record(agentPhases: nil)),
         VerbSpec(.diagramIngest, gm: "gm diagram ingest", role: .record(agentPhases: nil)),

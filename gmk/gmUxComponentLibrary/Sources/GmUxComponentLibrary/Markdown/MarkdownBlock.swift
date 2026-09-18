@@ -20,14 +20,14 @@ public enum MarkdownBlock: Identifiable, Equatable, Sendable {
 
     public var id: String {
         switch self {
-        case .heading(let l, let t):     return "h\(l):\(t)"
-        case .paragraph(let t):          return "p:\(t)"
-        case .bulletList(let i):         return "ul:\(i.joined(separator: "\u{1}"))"
+        case .heading(let l, let t): return "h\(l):\(t)"
+        case .paragraph(let t): return "p:\(t)"
+        case .bulletList(let i): return "ul:\(i.joined(separator: "\u{1}"))"
         case .orderedList(let s, let i): return "ol:\(s):\(i.joined(separator: "\u{1}"))"
         case .codeBlock(let lang, let c): return "code:\(lang ?? ""):\(c)"
-        case .blockquote(let l):         return "quote:\(l.joined(separator: "\u{1}"))"
-        case .table(let h, let r):       return "table:\(h.joined(separator: "\u{1}")):\(r.count)"
-        case .rule:                      return "rule"
+        case .blockquote(let l): return "quote:\(l.joined(separator: "\u{1}"))"
+        case .table(let h, let r): return "table:\(h.joined(separator: "\u{1}")):\(r.count)"
+        case .rule: return "rule"
         }
     }
 }
@@ -40,7 +40,8 @@ public enum MarkdownDocument {
         var blocks: [MarkdownBlock] = []
         // Normalize CRLF/CR so per-line whitespace trimming (which excludes \r) and
         // line classifiers behave on files from Windows-y tooling.
-        let normalized = source
+        let normalized =
+            source
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
         let lines = normalized.components(separatedBy: "\n")
@@ -68,9 +69,11 @@ public enum MarkdownDocument {
                 while i < lines.count, !lines[i].trimmingCharacters(in: .whitespaces).hasPrefix("```") {
                     code.append(lines[i]); i += 1
                 }
-                if i < lines.count { i += 1 } // consume closing fence (if present)
-                blocks.append(.codeBlock(language: lang.isEmpty ? nil : lang,
-                                         code: code.joined(separator: "\n")))
+                if i < lines.count { i += 1 }  // consume closing fence (if present)
+                blocks.append(
+                    .codeBlock(
+                        language: lang.isEmpty ? nil : lang,
+                        code: code.joined(separator: "\n")))
                 continue
             }
 
@@ -99,7 +102,8 @@ public enum MarkdownDocument {
 
             // Pipe table: a header row followed by a |---|---| separator row.
             if trimmed.contains("|"), i + 1 < lines.count,
-               isTableSeparator(lines[i + 1].trimmingCharacters(in: .whitespaces)) {
+                isTableSeparator(lines[i + 1].trimmingCharacters(in: .whitespaces))
+            {
                 flushParagraph(&paragraph)
                 let headers = splitTableRow(trimmed)
                 var rows: [[String]] = []

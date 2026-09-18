@@ -10,10 +10,11 @@ public struct GmAgentKbiteSearchArguments: Sendable {
     @Guide(description: GM_TOOL_GUIDE_SEARCH_QUERY)
     public var query: String
 
-    @Guide(description: """
-        Only look inside these kbites, by uuid. Leave empty to search every \
-        digested kbite.
-        """)
+    @Guide(
+        description: """
+            Only look inside these kbites, by uuid. Leave empty to search every \
+            digested kbite.
+            """)
     public var kbiteUuids: [String]
 
     @Guide(description: GM_TOOL_GUIDE_SEARCH_LIMIT, .range(1...500))

@@ -93,8 +93,9 @@ public enum DiagramVertexStorage: Sendable, Hashable {
     case rows(table: String, parentColumn: String)
     /// Packed little-endian (f32 x, f32 y, u8 pressure) triples in a blob
     /// column, with the vertex rows as the fallback read when it is NULL.
-    case packedBlob(column: String, countColumn: String,
-                    fallback: (table: String, parentColumn: String))
+    case packedBlob(
+        column: String, countColumn: String,
+        fallback: (table: String, parentColumn: String))
 
     /// The vertex table this storage reads from, if any — the fallback for
     /// `.packedBlob`, the table itself for `.rows`.
@@ -256,8 +257,10 @@ public struct DiagramElementTypeSpec: Sendable {
                 type: .drawingStroke, subtypeTable: "diagram_drawing_stroke",
                 vertexStorage: .packedBlob(
                     column: "packed_vertices", countColumn: "vertex_count",
-                    fallback: (table: "diagram_stroke_vertex",
-                               parentColumn: "stroke_element_uuid")),
+                    fallback: (
+                        table: "diagram_stroke_vertex",
+                        parentColumn: "stroke_element_uuid"
+                    )),
                 allowedParentTypes: [.drawingLayer], isDopeBinding: false,
                 elementRefs: [], resolution: .immediate,
                 // Ink is not an obstacle: you draw over and around a canvas
@@ -265,8 +268,9 @@ public struct DiagramElementTypeSpec: Sendable {
                 participatesInRouting: false),
             DiagramElementTypeSpec(
                 type: .drawingShape, subtypeTable: "diagram_drawing_shape",
-                vertexStorage: .rows(table: "diagram_shape_vertex",
-                                     parentColumn: "shape_element_uuid"),
+                vertexStorage: .rows(
+                    table: "diagram_shape_vertex",
+                    parentColumn: "shape_element_uuid"),
                 allowedParentTypes: [.drawingLayer], isDopeBinding: false,
                 elementRefs: [], resolution: .immediate,
                 participatesInRouting: true),
@@ -294,12 +298,16 @@ public struct DiagramElementTypeSpec: Sendable {
                 // Rendered as a child of the element it connects FROM.
                 // umlNode joined in m0024 — without it nodes could not
                 // source an edge at all.
-                allowedParentTypes: [.dopeEntity, .drawingShape, .drawingText,
-                                     .umlNode],
+                allowedParentTypes: [
+                    .dopeEntity, .drawingShape, .drawingText,
+                    .umlNode,
+                ],
                 isDopeBinding: false,
-                elementRefs: [DiagramElementRefSpec(
-                    role: "target", column: "target_element_uuid",
-                    rule: .peerOfOwnParent)],
+                elementRefs: [
+                    DiagramElementRefSpec(
+                        role: "target", column: "target_element_uuid",
+                        rule: .peerOfOwnParent)
+                ],
                 // Defined in terms of another element's frame, so it cannot
                 // be placed until every immediate element has one.
                 resolution: .deferred,

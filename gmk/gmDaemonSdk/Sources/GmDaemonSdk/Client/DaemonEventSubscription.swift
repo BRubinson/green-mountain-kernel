@@ -50,8 +50,9 @@ public final class DaemonEventSubscription: @unchecked Sendable {
             // connection — exactly the interleaving this type exists to
             // prevent.
             guard !self.started else {
-                continuation.finish(throwing: DaemonClientError.wire(
-                    "DaemonEventSubscription.events() may only be consumed once — create a new subscription"))
+                continuation.finish(
+                    throwing: DaemonClientError.wire(
+                        "DaemonEventSubscription.events() may only be consumed once — create a new subscription"))
                 return
             }
             self.started = true

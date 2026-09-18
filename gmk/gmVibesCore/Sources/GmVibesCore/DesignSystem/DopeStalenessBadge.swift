@@ -28,7 +28,8 @@ struct DopeStalenessBadge<S: DopeScopeStalenessReporting>: View {
                 DisclosureGroup {
                     VStack(alignment: .leading, spacing: 4) {
                         if let stamped = staleness.stampedRevision,
-                           let current = staleness.currentRevision, staleness.drifted {
+                            let current = staleness.currentRevision, staleness.drifted
+                        {
                             Text("Dope scope moved: composed at r\(stamped), now r\(current).")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -42,12 +43,15 @@ struct DopeStalenessBadge<S: DopeScopeStalenessReporting>: View {
                     }
                     .padding(.top, 2)
                 } label: {
-                    Label(ghosts.isEmpty ? "dope drifted" : "dope drifted · \(ghosts.count) ghost\(ghosts.count == 1 ? "" : "s")",
-                          systemImage: "exclamationmark.triangle")
-                        .font(.caption2.weight(.medium))
-                        .padding(.horizontal, 7).padding(.vertical, 2)
-                        .background(.orange.opacity(0.18), in: .capsule)
-                        .foregroundStyle(.orange)
+                    Label(
+                        ghosts.isEmpty
+                            ? "dope drifted" : "dope drifted · \(ghosts.count) ghost\(ghosts.count == 1 ? "" : "s")",
+                        systemImage: "exclamationmark.triangle"
+                    )
+                    .font(.caption2.weight(.medium))
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(.orange.opacity(0.18), in: .capsule)
+                    .foregroundStyle(.orange)
                 }
                 .disclosureGroupStyle(.automatic)
             }

@@ -35,7 +35,7 @@
       "sort_order" : 3
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Migrations.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Persistence/Migrations/m0019_cogHullsAndPersistenceOwner.swift",
   "sort_order" : 12,
   "version" : 767
 }

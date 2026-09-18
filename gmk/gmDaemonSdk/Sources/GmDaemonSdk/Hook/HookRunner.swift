@@ -76,11 +76,12 @@ public enum HookRunner {
         }
 
         if dryRun {
-            return encodeJSON(HookDryRun(
-                event: payload.hookEventName ?? "PostToolUse",
-                repoRoot: git.repoRoot,
-                gmFsRoot: Paths.root.path,
-                changes: changes))
+            return encodeJSON(
+                HookDryRun(
+                    event: payload.hookEventName ?? "PostToolUse",
+                    repoRoot: git.repoRoot,
+                    gmFsRoot: Paths.root.path,
+                    changes: changes))
         }
         // Per-change `try?`: one refused path must not cost the others their
         // row, and a refusal is already durable daemon-side. A dead daemon loses
@@ -129,10 +130,11 @@ public enum HookRunner {
                 claudeTurnId: payload.claudeTurnId)
         }
         if dryRun {
-            return encodeJSON(SubagentStartDryRun(
-                event: payload.hookEventName ?? "SubagentStart",
-                gmFsRoot: Paths.root.path,
-                registration: registration))
+            return encodeJSON(
+                SubagentStartDryRun(
+                    event: payload.hookEventName ?? "SubagentStart",
+                    gmFsRoot: Paths.root.path,
+                    registration: registration))
         }
 
         // REGISTRATION FAILURE IS ANNOUNCED, NOT SWALLOWED. An agent whose
@@ -142,21 +144,26 @@ public enum HookRunner {
         var warning = ""
         var stub = ""
         if registration == nil {
-            warning = "[GMB] WARNING: this spawn carried no agent_id, so no agent_registration row exists for you. Your file changes cannot be attributed to you — report this rather than working around it."
+            warning =
+                "[GMB] WARNING: this spawn carried no agent_id, so no agent_registration row exists for you. Your file changes cannot be attributed to you — report this rather than working around it."
         }
         _ = try? withKitClient(caller) { client in
             if let registration {
                 if (try? client.agentRegister(registration)) == nil {
-                    warning = "[GMB] WARNING: your agent registration did not land. Your file changes will not be attributed to you — report this rather than working around it."
+                    warning =
+                        "[GMB] WARNING: your agent registration did not land. Your file changes will not be attributed to you — report this rather than working around it."
                 }
             }
             // cwd → session resolution is client-side; no session is a silent
             // empty stub, never an error.
             if let sessionUuid = try? ContextBuilder.resolveSessionUuid(client) {
-                stub = (try? client.briefingStub(BriefingStubRequest(
-                    agentType: payload.agentType,
-                    sessionUuid: sessionUuid,
-                    clientKey: ClientKey.resolve())).stub) ?? ""
+                stub =
+                    (try? client.briefingStub(
+                        BriefingStubRequest(
+                            agentType: payload.agentType,
+                            sessionUuid: sessionUuid,
+                            clientKey: ClientKey.resolve())
+                    ).stub) ?? ""
             }
         }
 
@@ -180,9 +187,9 @@ public enum HookRunner {
     ///   way — the hook contract holds.
     public static func preToolUse(stdin: Data) -> String? {
         guard let payload = HookPayload.decode(stdin),
-              payload.toolName == "Bash",
-              let command = payload.command, !command.isEmpty,
-              let spec = VerbRegistry.spec(for: .fileChangeAdd)
+            payload.toolName == "Bash",
+            let command = payload.command, !command.isEmpty,
+            let spec = VerbRegistry.spec(for: .fileChangeAdd)
         else { return nil }
         var patterns = [spec.messageType.rawValue]
         for invocation in spec.gmInvocations {
@@ -193,7 +200,8 @@ public enum HookRunner {
             }
         }
         guard patterns.contains(where: command.contains) else { return nil }
-        let warning = "[GMB] warning: file-change capture belongs to the PostToolUse hook "
+        let warning =
+            "[GMB] warning: file-change capture belongs to the PostToolUse hook "
             + "alone (Bash included) — a hand-invoked capture write forges the machine's "
             + "record. This command was allowed, but do not write capture rows yourself."
         let response: [String: Any] = [
@@ -224,7 +232,7 @@ public enum HookRunner {
             "hookSpecificOutput": [
                 "hookEventName": "SubagentStart",
                 "additionalContext": context,
-            ],
+            ]
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: response) else { return nil }
         return String(data: data, encoding: .utf8)

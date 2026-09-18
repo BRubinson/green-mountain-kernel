@@ -59,10 +59,12 @@ struct ProjectSettingsSheet: View {
                 // The project left the catalog under us (deleted, or the
                 // daemon went away mid-edit). Say so rather than showing an
                 // editable field that cannot save.
-                Label("This project is no longer in the catalog.",
-                      systemImage: "exclamationmark.triangle")
-                    .font(.callout)
-                    .foregroundStyle(.orange)
+                Label(
+                    "This project is no longer in the catalog.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.callout)
+                .foregroundStyle(.orange)
             }
 
             if let submitError {
@@ -123,21 +125,27 @@ struct ProjectSettingsSheet: View {
                 .disabled(submitting)
                 .onSubmit { if canSubmit { submit() } }
 
-            Text("The BASE_DOPED_BRANCH: the branch whose SESSION_INSTANCE dope scope may promote into this project's BASE_PROJECT scope. Applies across every instance of the project.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                "The BASE_DOPED_BRANCH: the branch whose SESSION_INSTANCE dope scope may promote into this project's BASE_PROJECT scope. Applies across every instance of the project."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
             if isBlank {
-                Label("A branch name cannot be blank.",
-                      systemImage: "exclamationmark.triangle")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+                Label(
+                    "A branch name cannot be blank.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
             } else if isUnchanged {
-                Label("Currently \(project.primaryProjectBranch).",
-                      systemImage: "info.circle")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Label(
+                    "Currently \(project.primaryProjectBranch).",
+                    systemImage: "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
     }

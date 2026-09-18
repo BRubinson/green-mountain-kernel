@@ -32,8 +32,8 @@ extension Array where Element: RatedFinding {
     /// ascending — the resume-queue contract) must survive to the screen.
     func visibleFindings(showLowPriority: Bool, showTombstones: Bool) -> [Element] {
         filter { finding in
-            guard let rating = finding.findingRating else { return true }   // unranked: ALWAYS
-            if rating >= FindingRatings.tombstone { return showTombstones } // 999 before 100
+            guard let rating = finding.findingRating else { return true }  // unranked: ALWAYS
+            if rating >= FindingRatings.tombstone { return showTombstones }  // 999 before 100
             if rating >= FindingRatings.readThreshold { return showLowPriority }
             return true
         }
@@ -140,13 +140,14 @@ struct ResolutionBadge: View {
     let rawStatus: String
 
     var body: some View {
-        let (icon, tint): (String, Color) = switch ReviewFindingStatus(rawValue: rawStatus) {
-        case .open: ("circle", .orange)
-        case .fixed: ("checkmark.circle.fill", .green)
-        case .accepted: ("checkmark.circle", .blue)
-        case .wontFix: ("minus.circle", .gray)
-        case .none: ("questionmark.circle", .gray)
-        }
+        let (icon, tint): (String, Color) =
+            switch ReviewFindingStatus(rawValue: rawStatus) {
+            case .open: ("circle", .orange)
+            case .fixed: ("checkmark.circle.fill", .green)
+            case .accepted: ("checkmark.circle", .blue)
+            case .wontFix: ("minus.circle", .gray)
+            case .none: ("questionmark.circle", .gray)
+            }
         Label(rawStatus.replacingOccurrences(of: "_", with: " "), systemImage: icon)
             .font(.caption2)
             .foregroundStyle(tint)
@@ -192,7 +193,8 @@ extension ReportBadgeItem {
     }
 
     static func review(_ response: ReviewGetResponse) -> [ReportBadgeItem] {
-        let openCount = response.findings.filter { $0.status == ReviewFindingStatus.open.rawValue }.count
+        let openCount =
+            response.findings.filter { $0.status == ReviewFindingStatus.open.rawValue }.count
             + response.findingStubs.filter { $0.status == ReviewFindingStatus.open.rawValue }.count
         return reviewItems(
             verdict: response.summary.verdict.flatMap(ReviewVerdict.init(rawValue:)),
@@ -203,17 +205,23 @@ extension ReportBadgeItem {
 
     private static func explorationItems(unranked: Int, findings: Int, keyFiles: Int) -> [ReportBadgeItem] {
         var items: [ReportBadgeItem] = []
-        if unranked > 0 {   // stalled-run signal
-            items.append(.init(id: "explore-unranked", text: "\(unranked) unranked",
-                               systemImage: "exclamationmark.circle", tint: .orange))
+        if unranked > 0 {  // stalled-run signal
+            items.append(
+                .init(
+                    id: "explore-unranked", text: "\(unranked) unranked",
+                    systemImage: "exclamationmark.circle", tint: .orange))
         }
         if findings > 0 {
-            items.append(.init(id: "explore-findings", text: "\(findings) findings",
-                               systemImage: "sparkle.magnifyingglass", tint: .secondary))
+            items.append(
+                .init(
+                    id: "explore-findings", text: "\(findings) findings",
+                    systemImage: "sparkle.magnifyingglass", tint: .secondary))
         }
         if keyFiles > 0 {
-            items.append(.init(id: "explore-keyfiles", text: "\(keyFiles) key files",
-                               systemImage: "doc.text.magnifyingglass", tint: .secondary))
+            items.append(
+                .init(
+                    id: "explore-keyfiles", text: "\(keyFiles) key files",
+                    systemImage: "doc.text.magnifyingglass", tint: .secondary))
         }
         return items
     }
@@ -222,16 +230,22 @@ extension ReportBadgeItem {
         var items: [ReportBadgeItem] = []
         if let verdict {
             let display = verdict.display
-            items.append(.init(id: "review-verdict", text: display.label,
-                               systemImage: "checkmark.seal", tint: display.tint))
+            items.append(
+                .init(
+                    id: "review-verdict", text: display.label,
+                    systemImage: "checkmark.seal", tint: display.tint))
         }
-        if open > 0 {   // fix-loop progress signal
-            items.append(.init(id: "review-open", text: "\(open) open",
-                               systemImage: "circle", tint: .orange))
+        if open > 0 {  // fix-loop progress signal
+            items.append(
+                .init(
+                    id: "review-open", text: "\(open) open",
+                    systemImage: "circle", tint: .orange))
         }
         if unranked > 0 {
-            items.append(.init(id: "review-unranked", text: "\(unranked) unranked",
-                               systemImage: "exclamationmark.circle", tint: .orange))
+            items.append(
+                .init(
+                    id: "review-unranked", text: "\(unranked) unranked",
+                    systemImage: "exclamationmark.circle", tint: .orange))
         }
         return items
     }

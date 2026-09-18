@@ -56,14 +56,15 @@ public enum VerbLedger {
             for (index, invocation) in spec.gmInvocations.enumerated() {
                 if isWrite, let pen = spec.penTool { replacements[invocation] = pen }
                 guard !writesOnly || isWrite else { continue }
-                rows.append(VerbRow(
-                    messageType: spec.messageType.rawValue,
-                    gm: invocation,
-                    penTool: spec.penTool,
-                    role: role,
-                    write: isWrite,
-                    alias: index > 0,
-                    canonicalGm: spec.gmInvocation))
+                rows.append(
+                    VerbRow(
+                        messageType: spec.messageType.rawValue,
+                        gm: invocation,
+                        penTool: spec.penTool,
+                        role: role,
+                        write: isWrite,
+                        alias: index > 0,
+                        canonicalGm: spec.gmInvocation))
             }
         }
         return Payload(

@@ -101,7 +101,8 @@ public enum GmEnvironment {
     /// install this session is actually running.
     public static func pathValue(current: String, bin: URL = Paths.bin) -> String {
         let mine = bin.path
-        let survivors = current
+        let survivors =
+            current
             .split(separator: ":", omittingEmptySubsequences: false)
             .map(String.init)
             .filter { $0 != mine }
@@ -129,13 +130,17 @@ public enum GmEnvironment {
     ) -> [Finding] {
         var findings: [Finding] = []
         if let claimed = env["GM_FS_ROOT"], !claimed.isEmpty,
-           URL(fileURLWithPath: claimed).standardizedFileURL.path
-               != URL(fileURLWithPath: paths.gmFsRoot).standardizedFileURL.path {
-            findings.append(Finding(code: "gmfs_root_mismatch", message:
-                "[GMB] WARN: gmfs_root disagreement — env \(claimed) vs daemon \(paths.gmFsRoot). "
-                + "Either the daemon answering this socket lives elsewhere, or the db "
-                + "disagrees with the session. Fix with: gm_hook call CONFIG_SET "
-                + "--json '{\"key\":\"gmfs_root\",\"value\":\"<correct>\"}'."))
+            URL(fileURLWithPath: claimed).standardizedFileURL.path
+                != URL(fileURLWithPath: paths.gmFsRoot).standardizedFileURL.path
+        {
+            findings.append(
+                Finding(
+                    code: "gmfs_root_mismatch",
+                    message:
+                        "[GMB] WARN: gmfs_root disagreement — env \(claimed) vs daemon \(paths.gmFsRoot). "
+                        + "Either the daemon answering this socket lives elsewhere, or the db "
+                        + "disagrees with the session. Fix with: gm_hook call CONFIG_SET "
+                        + "--json '{\"key\":\"gmfs_root\",\"value\":\"<correct>\"}'."))
         }
         return findings
     }

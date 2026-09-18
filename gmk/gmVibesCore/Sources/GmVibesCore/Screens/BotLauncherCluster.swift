@@ -31,7 +31,9 @@ struct BotLauncherCluster: View {
     var body: some View {
         ControlGroup {
             ForEach(BotTier.allCases) { tier in
-                Button { copyResume(tier) } label: {
+                Button {
+                    copyResume(tier)
+                } label: {
                     Label(tier.command, systemImage: symbol(tier))
                 }
                 // The highlight tracks the PERSISTED default, so it means the

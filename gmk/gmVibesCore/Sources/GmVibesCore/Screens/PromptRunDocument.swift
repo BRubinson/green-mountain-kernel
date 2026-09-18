@@ -59,33 +59,48 @@ struct PromptRunDocument: View {
                 Divider()
             }
             intentSection
-            phaseSection("Briefing", icon: "shippingbox",
-                         evidence(phases.briefings, stubEvidence: false,
-                                  hasContent: { !$0.isEmpty })) {
+            phaseSection(
+                "Briefing", icon: "shippingbox",
+                evidence(
+                    phases.briefings, stubEvidence: false,
+                    hasContent: { !$0.isEmpty })
+            ) {
                 BriefingPane(phase: phases.briefings)
             }
-            phaseSection("Exploration", icon: "binoculars",
-                         evidence(phases.exploration,
-                                  stubEvidence: stub.reports?.exploration != nil)) {
+            phaseSection(
+                "Exploration", icon: "binoculars",
+                evidence(
+                    phases.exploration,
+                    stubEvidence: stub.reports?.exploration != nil)
+            ) {
                 ExplorationPane(phase: phases.exploration) {
                     await phases.requestFullExploration()
                 }
             }
-            phaseSection("Clarification", icon: "questionmark.bubble",
-                         evidence(phases.clarification,
-                                  stubEvidence: stub.reports?.clarification != nil)) {
+            phaseSection(
+                "Clarification", icon: "questionmark.bubble",
+                evidence(
+                    phases.clarification,
+                    stubEvidence: stub.reports?.clarification != nil)
+            ) {
                 // `phases` rides along ONLY so the question cards reach
                 // `phases.answers` — answering stays live post-draft.
                 ClarificationPane(phase: phases.clarification, phases: phases)
             }
-            phaseSection("Plan", icon: "square.stack.3d.up",
-                         evidence(phases.architecture,
-                                  stubEvidence: stub.reports?.architecture != nil)) {
+            phaseSection(
+                "Plan", icon: "square.stack.3d.up",
+                evidence(
+                    phases.architecture,
+                    stubEvidence: stub.reports?.architecture != nil)
+            ) {
                 ArchitecturePane(phase: phases.architecture)
             }
-            phaseSection("Review", icon: "checkmark.seal",
-                         evidence(phases.review,
-                                  stubEvidence: stub.reports?.review != nil)) {
+            phaseSection(
+                "Review", icon: "checkmark.seal",
+                evidence(
+                    phases.review,
+                    stubEvidence: stub.reports?.review != nil)
+            ) {
                 ReviewPane(phase: phases.review) {
                     await phases.requestFullReview()
                 }
@@ -139,8 +154,10 @@ struct PromptRunDocument: View {
     /// The document's section chrome: an injected divider-and-header rather
     /// than a per-section card — one continuous container, generalized from
     /// the editor's refinedSection idiom.
-    private func documentSection(_ title: String, icon: String,
-                                 @ViewBuilder content: () -> some View) -> some View {
+    private func documentSection(
+        _ title: String, icon: String,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: icon)
                 .font(.headline)
@@ -151,9 +168,11 @@ struct PromptRunDocument: View {
     }
 
     @ViewBuilder
-    private func phaseSection(_ title: String, icon: String,
-                              _ evidence: SectionEvidence,
-                              @ViewBuilder content: () -> some View) -> some View {
+    private func phaseSection(
+        _ title: String, icon: String,
+        _ evidence: SectionEvidence,
+        @ViewBuilder content: () -> some View
+    ) -> some View {
         switch evidence {
         case .hidden:
             EmptyView()
@@ -176,11 +195,13 @@ struct PromptRunDocument: View {
     /// not the run's own record.
     private var backstorySection: some View {
         DisclosureGroup(isExpanded: $backstoryExpanded) {
-            HighlightedText(source: backstory, query: findQuery,
-                            activeLocalOccurrence: activeLocal("backstory"))
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .padding(.top, 6)
-                .id("backstory")
+            HighlightedText(
+                source: backstory, query: findQuery,
+                activeLocalOccurrence: activeLocal("backstory")
+            )
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .padding(.top, 6)
+            .id("backstory")
         } label: {
             Label("Backstory", systemImage: "text.book.closed")
                 .font(.subheadline.weight(.semibold))
@@ -233,17 +254,21 @@ struct PromptRunDocument: View {
             Text("Goal")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
-            HighlightedText(source: goal.isEmpty ? "—" : goal, query: findQuery,
-                            activeLocalOccurrence: activeLocal("goal"))
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .id("goal")
+            HighlightedText(
+                source: goal.isEmpty ? "—" : goal, query: findQuery,
+                activeLocalOccurrence: activeLocal("goal")
+            )
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .id("goal")
             Text("Detail")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
-            HighlightedText(source: detail.isEmpty ? "—" : detail, query: findQuery,
-                            activeLocalOccurrence: activeLocal("detail"))
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-                .id("detail")
+            HighlightedText(
+                source: detail.isEmpty ? "—" : detail, query: findQuery,
+                activeLocalOccurrence: activeLocal("detail")
+            )
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .id("detail")
         }
         .padding(.top, 4)
     }

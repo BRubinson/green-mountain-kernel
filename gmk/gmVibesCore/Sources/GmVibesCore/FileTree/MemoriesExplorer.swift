@@ -61,10 +61,14 @@ struct MemoriesExplorer: View {
         // FSEventStream on CONFIG_SET (which retired the 15s backstop poll)
         // and fixed the SIGSEGV that made the event undeliverable pre-v8
         // (which retired the 1s poll).
-        .task(id: RefreshKey(root: rootURL, generation: daemon.generation,
-                             daemonWatched: isDaemonWatched)) {
+        .task(
+            id: RefreshKey(
+                root: rootURL, generation: daemon.generation,
+                daemonWatched: isDaemonWatched)
+        ) {
             guard let promptUuid else { await refreshOnce(); return }
-            let domain: InvalidationHub.Domain = isDaemonWatched
+            let domain: InvalidationHub.Domain =
+                isDaemonWatched
                 ? .memories(promptUuid.lowercased())
                 : .prompt(promptUuid.lowercased())
             // Stream hoisted before the first await (house idiom).
@@ -134,15 +138,15 @@ struct PromptMemoriesWindow: View {
                     promptUuid: windowID.promptUuid,
                     isDaemonWatched: windowID.isDaemonWatched ?? false
                 )
-                    .navigationTitle("Memories — \(windowID.promptName)")
-                    .onAppear {
-                        guard !seeded else { return }
-                        model.selectedFile = windowID.selectedFile
-                        model.expanded = Set(windowID.expanded)
-                        // Respect handed-off expansion; only auto-expand if none came over.
-                        model.didSeedExpansion = !windowID.expanded.isEmpty
-                        seeded = true
-                    }
+                .navigationTitle("Memories — \(windowID.promptName)")
+                .onAppear {
+                    guard !seeded else { return }
+                    model.selectedFile = windowID.selectedFile
+                    model.expanded = Set(windowID.expanded)
+                    // Respect handed-off expansion; only auto-expand if none came over.
+                    model.didSeedExpansion = !windowID.expanded.isEmpty
+                    seeded = true
+                }
             } else {
                 ContentUnavailableView("No Memory Folder", systemImage: "folder")
             }
@@ -267,7 +271,9 @@ private struct MemoriesReader: View {
                     .lineLimit(2).truncationMode(.middle).textSelection(.enabled)
             }
             Spacer()
-            Button { openWindow(value: WindowSeed(.kbiteFile(url))) } label: {
+            Button {
+                openWindow(value: WindowSeed(.kbiteFile(url)))
+            } label: {
                 Label("Open in Window", systemImage: "macwindow.badge.plus")
             }
             .buttonStyle(.bordered)

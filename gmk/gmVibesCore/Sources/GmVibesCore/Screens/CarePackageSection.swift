@@ -85,8 +85,9 @@ struct CarePackageSection: View {
         VStack(alignment: .leading, spacing: 5) {
             ForEach(package.dopeRefs, id: \.uuid) { ref in
                 VStack(alignment: .leading, spacing: 2) {
-                    DopeDotPathChip(path: ref.dopeCode,
-                                    isGhost: ghosts.contains(ref.dopeCode))
+                    DopeDotPathChip(
+                        path: ref.dopeCode,
+                        isGhost: ghosts.contains(ref.dopeCode))
                     if let note = ref.note, !note.isEmpty {
                         Text(note)
                             .font(.caption)
@@ -169,7 +170,8 @@ struct CarePackageSection: View {
 
     @ViewBuilder
     private func packageChip(_ status: String) -> some View {
-        let (label, color): (String, Color) = status == "ready"
+        let (label, color): (String, Color) =
+            status == "ready"
             ? ("Ready", .green) : ("Building", .orange)
         Text(label)
             .font(.caption2.weight(.medium))

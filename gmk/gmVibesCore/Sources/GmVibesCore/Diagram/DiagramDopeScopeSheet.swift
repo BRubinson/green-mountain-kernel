@@ -48,13 +48,14 @@ struct DiagramDopeScopeSheet: View {
                         ForEach(domain.entities, id: \.identity.uuid) { entity in
                             let code = "\(domain.body.code).\(entity.body.code)"
                             let present = onCanvas.contains(code)
-                            Toggle(isOn: Binding(
-                                get: { present || selected.contains(code) },
-                                set: { on in
-                                    if on { selected.insert(code) }
-                                    else { selected.remove(code) }
-                                }
-                            )) {
+                            Toggle(
+                                isOn: Binding(
+                                    get: { present || selected.contains(code) },
+                                    set: { on in
+                                        if on { selected.insert(code) } else { selected.remove(code) }
+                                    }
+                                )
+                            ) {
                                 HStack(spacing: 6) {
                                     Text(entity.body.name)
                                     Text(code)
@@ -73,9 +74,10 @@ struct DiagramDopeScopeSheet: View {
             ContentUnavailableView(
                 "No Dope Scope Bound",
                 systemImage: "square.stack.3d.up.slash",
-                description: Text("This diagram has no resolvable dope scope "
-                    + "binding — create diagrams over a dope scope to add its "
-                    + "entities here."))
+                description: Text(
+                    "This diagram has no resolvable dope scope "
+                        + "binding — create diagrams over a dope scope to add its "
+                        + "entities here."))
         }
     }
 
@@ -100,7 +102,8 @@ struct DiagramDopeScopeSheet: View {
         var codes: Set<String> = []
         for element in workspace.tree.elements {
             guard case .dopeScopePersistenceLayer(let payload) = element.payload,
-                  payload.dopeScopeCode == scopeCode else { continue }
+                payload.dopeScopeCode == scopeCode
+            else { continue }
             for child in element.children {
                 if case .dopeEntity(let entity) = child.payload {
                     codes.insert(entity.entityCode)
@@ -137,13 +140,15 @@ struct DiagramDopeScopeSheet: View {
             parentUuid = existing.identity.uuid
             parentCenter = CGPoint(x: existing.base.centerX, y: existing.base.centerY)
         } else {
-            session.stage(.elementAdd(DiagramElementAdd(
-                clientRef: containerRef,
-                code: "scope_\(scopeCode)",
-                name: dope.tree.body.name,
-                centerX: 0, centerY: 0, elementZ: 0,
-                payload: .dopeScopePersistenceLayer(
-                    DopeScopePersistenceLayerPayload(dopeScopeCode: scopeCode)))))
+            session.stage(
+                .elementAdd(
+                    DiagramElementAdd(
+                        clientRef: containerRef,
+                        code: "scope_\(scopeCode)",
+                        name: dope.tree.body.name,
+                        centerX: 0, centerY: 0, elementZ: 0,
+                        payload: .dopeScopePersistenceLayer(
+                            DopeScopePersistenceLayerPayload(dopeScopeCode: scopeCode)))))
         }
 
         let bounds = workspace.resolved.contentBounds
@@ -154,12 +159,14 @@ struct DiagramDopeScopeSheet: View {
             // contract), so diagram-space targets shift by the container's
             // own center.
             let local = CGPoint(x: columnX - parentCenter.x, y: y - parentCenter.y)
-            session.stage(.elementAdd(DiagramElementAdd(
-                parentElementUuid: parentUuid,
-                parentClientRef: parentUuid == nil ? containerRef : nil,
-                name: code,
-                centerX: local.x, centerY: local.y,
-                payload: .dopeEntity(DopeEntityPayload(entityCode: code)))))
+            session.stage(
+                .elementAdd(
+                    DiagramElementAdd(
+                        parentElementUuid: parentUuid,
+                        parentClientRef: parentUuid == nil ? containerRef : nil,
+                        name: code,
+                        centerX: local.x, centerY: local.y,
+                        payload: .dopeEntity(DopeEntityPayload(entityCode: code)))))
             y += 180
         }
         Task { await workspace.flush() }

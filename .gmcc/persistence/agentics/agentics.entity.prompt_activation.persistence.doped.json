@@ -35,7 +35,7 @@
       "sort_order" : 3
     }
   ],
-  "repo_representative_file" : "plugins/gmcc/daemon/Sources/GMCCDaemonKit/Database/Store+Session.swift",
+  "repo_representative_file" : "gmk/gmDaemon/Sources/GmDaemon/Persistence/Migrations/m0023_agentBriefing.swift",
   "sort_order" : 22,
   "version" : 767
 }

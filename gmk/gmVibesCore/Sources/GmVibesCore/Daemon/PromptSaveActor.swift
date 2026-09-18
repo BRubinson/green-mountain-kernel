@@ -36,13 +36,14 @@ actor PromptSaveActor {
 
     func save(backstory: String, goal: String, detail: String) async -> Outcome {
         do {
-            let row = try await service.updatePromptContent(PromptUpdateContentRequest(
-                promptUuid: promptUuid,
-                expectedVersion: version,
-                backstory: backstory,
-                goal: goal,
-                detail: detail
-            ))
+            let row = try await service.updatePromptContent(
+                PromptUpdateContentRequest(
+                    promptUuid: promptUuid,
+                    expectedVersion: version,
+                    backstory: backstory,
+                    goal: goal,
+                    detail: detail
+                ))
             version = row.version
             lastWrittenVersion = row.version
             return .saved(row.version)

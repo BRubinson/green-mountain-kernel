@@ -22,10 +22,12 @@ struct ArchitecturePane: View {
             }
         case .absent:
             // Stays READ-ONLY: every arch write is bot/CLI-side by design.
-            Label("Not opened yet — run the bot to start architecture.",
-                  systemImage: "square.stack.3d.up.slash")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Label(
+                "Not opened yet — run the bot to start architecture.",
+                systemImage: "square.stack.3d.up.slash"
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle")
                 .font(.callout)
@@ -170,11 +172,12 @@ struct ArchitecturePane: View {
     }
 
     private func optionStatusChip(_ status: String) -> some View {
-        let color: Color = switch status {
-        case "selected": .green
-        case "rejected": .gray
-        default: .blue
-        }
+        let color: Color =
+            switch status {
+            case "selected": .green
+            case "rejected": .gray
+            default: .blue
+            }
         return Text(status)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 7).padding(.vertical, 2)
@@ -288,19 +291,21 @@ struct ArchitecturePane: View {
     private func progressLabel(_ response: ArchGetResponse) -> String? {
         let planned = response.persistenceChanges.count + response.generalChanges.count
         guard planned > 0 else { return nil }
-        let touched = response.persistenceChanges.filter { $0.implementation.fileChangeCount > 0 }.count
+        let touched =
+            response.persistenceChanges.filter { $0.implementation.fileChangeCount > 0 }.count
             + response.generalChanges.filter { $0.implementation.fileChangeCount > 0 }.count
         return "\(touched)/\(planned) implemented"
     }
 
     @ViewBuilder
     private func statusChip(_ status: ArchitectureStatus?) -> some View {
-        let (label, color): (String, Color) = switch status {
-        case .drafting: ("Drafting", .orange)
-        case .proposed: ("Proposed", .blue)
-        case .approved: ("Approved", .green)
-        case .none: ("—", .gray)
-        }
+        let (label, color): (String, Color) =
+            switch status {
+            case .drafting: ("Drafting", .orange)
+            case .proposed: ("Proposed", .blue)
+            case .approved: ("Approved", .green)
+            case .none: ("—", .gray)
+            }
         Text(label)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 7).padding(.vertical, 2)

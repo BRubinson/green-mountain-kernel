@@ -75,11 +75,12 @@ public enum DopeBootSync {
                 // The scope identity comes from scope.doped.json — the code IS
                 // identity to ingest; minting any other code guarantees a
                 // refusal on the next step.
-                let created = try client.dopeInit(DopeInitRequest(
-                    sessionUuid: sessionUuid,
-                    code: code,
-                    name: repo.bundle.main.scope.name,
-                    description: repo.bundle.main.scope.description))
+                let created = try client.dopeInit(
+                    DopeInitRequest(
+                        sessionUuid: sessionUuid,
+                        code: code,
+                        name: repo.bundle.main.scope.name,
+                        description: repo.bundle.main.scope.description))
                 scopeUuid = created.scope.uuid
                 dbRevision = created.scope.revision
                 minted = true
@@ -89,13 +90,15 @@ public enum DopeBootSync {
             if disk < dbRevision {
                 return .filesBehind(code: code, dbRevision: dbRevision, diskVersion: disk)
             }
-            let res = try client.dopeIngest(DopeIngestRequest(
-                scopeUuid: scopeUuid, dirPath: nil, adopt: true))
+            let res = try client.dopeIngest(
+                DopeIngestRequest(
+                    scopeUuid: scopeUuid, dirPath: nil, adopt: true))
             if minted || dbRevision == 0 {
                 return .seeded(code: code, revision: res.scope.revision, counts: res.counts)
             }
-            return .readopted(code: code, from: dbRevision, to: res.scope.revision,
-                              counts: res.counts)
+            return .readopted(
+                code: code, from: dbRevision, to: res.scope.revision,
+                counts: res.counts)
         } catch {
             return .unreadable(String(describing: error))
         }

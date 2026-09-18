@@ -55,17 +55,20 @@ enum WorkflowGates {
         var unmet: [String] = []
 
         // (1) planned persistence paths with no file_change row.
-        let untouchedPersistence = try Int.fetchOne(db, sql: """
-            SELECT COUNT(*)
-            FROM architecture_persistence_change pc
-            JOIN architecture_summary s ON s.uuid = pc.architecture_summary_uuid
-            WHERE s.prompt_uuid = ?
-              AND NOT EXISTS (
-                  SELECT 1 FROM file_change fc
-                  JOIN session_file sf ON sf.uuid = fc.session_file_uuid
-                  WHERE fc.prompt_uuid = s.prompt_uuid
-                    AND sf.relative_path = pc.file_path)
-            """, arguments: [promptUuid]) ?? 0
+        let untouchedPersistence =
+            try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT COUNT(*)
+                    FROM architecture_persistence_change pc
+                    JOIN architecture_summary s ON s.uuid = pc.architecture_summary_uuid
+                    WHERE s.prompt_uuid = ?
+                      AND NOT EXISTS (
+                          SELECT 1 FROM file_change fc
+                          JOIN session_file sf ON sf.uuid = fc.session_file_uuid
+                          WHERE fc.prompt_uuid = s.prompt_uuid
+                            AND sf.relative_path = pc.file_path)
+                    """, arguments: [promptUuid]) ?? 0
         if untouchedPersistence > 0 {
             unmet.append(
                 "\(untouchedPersistence) planned persistence change(s) have no recorded "
@@ -75,26 +78,31 @@ enum WorkflowGates {
         // (2) persistence-first ordering, same rule as ARCH_GET: the LAST
         // persistence path to be first touched must not be later than the
         // FIRST general path to be first touched. Either side empty ⇒ vacuous.
-        let persistenceLatestFirstTouch = try String.fetchOne(db, sql: """
-            SELECT MAX(first_touch) FROM (
-                SELECT MIN(fc.created_at) AS first_touch
-                FROM architecture_persistence_change pc
-                JOIN architecture_summary s ON s.uuid = pc.architecture_summary_uuid
-                JOIN session_file sf ON sf.relative_path = pc.file_path
+        let persistenceLatestFirstTouch = try String.fetchOne(
+            db,
+            sql: """
+                SELECT MAX(first_touch) FROM (
+                    SELECT MIN(fc.created_at) AS first_touch
+                    FROM architecture_persistence_change pc
+                    JOIN architecture_summary s ON s.uuid = pc.architecture_summary_uuid
+                    JOIN session_file sf ON sf.relative_path = pc.file_path
+                    JOIN file_change fc ON fc.session_file_uuid = sf.uuid
+                    WHERE s.prompt_uuid = ? AND fc.prompt_uuid = s.prompt_uuid
+                    GROUP BY pc.file_path)
+                """, arguments: [promptUuid])
+        let generalEarliestFirstTouch = try String.fetchOne(
+            db,
+            sql: """
+                SELECT MIN(fc.created_at)
+                FROM architecture_general_change gc
+                JOIN architecture_summary s ON s.uuid = gc.architecture_summary_uuid
+                JOIN session_file sf ON sf.relative_path = gc.file_path
                 JOIN file_change fc ON fc.session_file_uuid = sf.uuid
                 WHERE s.prompt_uuid = ? AND fc.prompt_uuid = s.prompt_uuid
-                GROUP BY pc.file_path)
-            """, arguments: [promptUuid])
-        let generalEarliestFirstTouch = try String.fetchOne(db, sql: """
-            SELECT MIN(fc.created_at)
-            FROM architecture_general_change gc
-            JOIN architecture_summary s ON s.uuid = gc.architecture_summary_uuid
-            JOIN session_file sf ON sf.relative_path = gc.file_path
-            JOIN file_change fc ON fc.session_file_uuid = sf.uuid
-            WHERE s.prompt_uuid = ? AND fc.prompt_uuid = s.prompt_uuid
-            """, arguments: [promptUuid])
+                """, arguments: [promptUuid])
         if let persistenceLatestFirstTouch, let generalEarliestFirstTouch,
-           persistenceLatestFirstTouch > generalEarliestFirstTouch {
+            persistenceLatestFirstTouch > generalEarliestFirstTouch
+        {
             unmet.append(
                 "persistence-first ordering not respected (a general change landed "
                     + "\(generalEarliestFirstTouch), a persistence change only "
@@ -102,16 +110,20 @@ enum WorkflowGates {
         }
 
         // (3) a plan with general rows and not one recorded change.
-        let generalPlanned = try Int.fetchOne(db, sql: """
-            SELECT COUNT(*)
-            FROM architecture_general_change gc
-            JOIN architecture_summary s ON s.uuid = gc.architecture_summary_uuid
-            WHERE s.prompt_uuid = ?
-            """, arguments: [promptUuid]) ?? 0
+        let generalPlanned =
+            try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT COUNT(*)
+                    FROM architecture_general_change gc
+                    JOIN architecture_summary s ON s.uuid = gc.architecture_summary_uuid
+                    WHERE s.prompt_uuid = ?
+                    """, arguments: [promptUuid]) ?? 0
         if generalPlanned > 0 {
-            let recorded = try Int.fetchOne(
-                db, sql: "SELECT COUNT(*) FROM file_change WHERE prompt_uuid = ?",
-                arguments: [promptUuid]) ?? 0
+            let recorded =
+                try Int.fetchOne(
+                    db, sql: "SELECT COUNT(*) FROM file_change WHERE prompt_uuid = ?",
+                    arguments: [promptUuid]) ?? 0
             if recorded == 0 {
                 unmet.append(
                     "\(generalPlanned) planned general change(s) and ZERO recorded file "
@@ -131,15 +143,18 @@ enum WorkflowGates {
     ///
     /// Empty = nothing to say.
     static func reviewFixExitUnmet(_ db: Database, promptUuid: String) throws -> [String] {
-        let open = try Int.fetchOne(db, sql: """
-            SELECT COUNT(*)
-            FROM review_finding f
-            JOIN review_summary s ON s.uuid = f.review_summary_uuid
-            WHERE s.prompt_uuid = ?
-              AND f.finding_rating IS NOT NULL
-              AND f.finding_rating < 100
-              AND f.status = 'open'
-            """, arguments: [promptUuid]) ?? 0
+        let open =
+            try Int.fetchOne(
+                db,
+                sql: """
+                    SELECT COUNT(*)
+                    FROM review_finding f
+                    JOIN review_summary s ON s.uuid = f.review_summary_uuid
+                    WHERE s.prompt_uuid = ?
+                      AND f.finding_rating IS NOT NULL
+                      AND f.finding_rating < 100
+                      AND f.status = 'open'
+                    """, arguments: [promptUuid]) ?? 0
         guard open > 0 else { return [] }
         return [
             "\(open) open finding(s) rated below 100 — resolve them (REVIEW_RESOLVE) "

@@ -23,10 +23,12 @@ struct ReviewPane: View {
                 Text("Loading review…").font(.callout).foregroundStyle(.secondary)
             }
         case .absent:
-            Label("Not opened yet — run the bot to start review.",
-                  systemImage: "checkmark.seal")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Label(
+                "Not opened yet — run the bot to start review.",
+                systemImage: "checkmark.seal"
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
         case .failed(let message):
             Label(message, systemImage: "exclamationmark.triangle")
                 .font(.callout)
@@ -93,11 +95,13 @@ struct ReviewPane: View {
             }
 
             if showLowPriority, response.findings.tombstoneCount > 0 {
-                Toggle("Show \(response.findings.tombstoneCount) false-positive tombstones",
-                       isOn: $showTombstones)
-                    .font(.caption)
-                    .toggleStyle(.checkbox)
-                    .controlSize(.mini)
+                Toggle(
+                    "Show \(response.findings.tombstoneCount) false-positive tombstones",
+                    isOn: $showTombstones
+                )
+                .font(.caption)
+                .toggleStyle(.checkbox)
+                .controlSize(.mini)
             }
         }
     }
@@ -153,11 +157,12 @@ struct ReviewPane: View {
 
     @ViewBuilder
     private func statusChip(_ status: ReviewSummaryStatus?) -> some View {
-        let (label, color): (String, Color) = switch status {
-        case .reviewing: ("Reviewing", .orange)
-        case .complete: ("Complete", .green)
-        case .none: ("—", .gray)
-        }
+        let (label, color): (String, Color) =
+            switch status {
+            case .reviewing: ("Reviewing", .orange)
+            case .complete: ("Complete", .green)
+            case .none: ("—", .gray)
+            }
         Text(label)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 7).padding(.vertical, 2)

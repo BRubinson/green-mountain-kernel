@@ -63,10 +63,11 @@ struct MarkdownSourceEditor: NSViewRepresentable {
         textView.textColor = MarkdownHeaderStyle.nsBodyColor
         textView.font = MarkdownHeaderStyle.nsFont(forLevel: nil)
         textView.textContainerInset = NSSize(width: 0, height: MarkdownHeaderStyle.editorInsetV)
-        textView.typingAttributes = [
-            .font: MarkdownHeaderStyle.nsFont(forLevel: nil),
-            .foregroundColor: MarkdownHeaderStyle.nsBodyColor,
-        ] as [NSAttributedString.Key: Any]
+        textView.typingAttributes =
+            [
+                .font: MarkdownHeaderStyle.nsFont(forLevel: nil),
+                .foregroundColor: MarkdownHeaderStyle.nsBodyColor,
+            ] as [NSAttributedString.Key: Any]
 
         scrollView.documentView = textView
 
@@ -91,8 +92,10 @@ struct MarkdownSourceEditor: NSViewRepresentable {
 
     // Self-size: lay the text out at the proposed content width and report the used
     // height, so the editor grows to fit inside the host's vertical ScrollView.
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView scrollView: NSScrollView,
-                      context: Context) -> CGSize? {
+    func sizeThatFits(
+        _ proposal: ProposedViewSize, nsView scrollView: NSScrollView,
+        context: Context
+    ) -> CGSize? {
         let width = proposal.width ?? scrollView.bounds.width
         guard width > 0 else { return nil }
         let h = context.coordinator.height(forWidth: width)
@@ -166,9 +169,10 @@ struct MarkdownSourceEditor: NSViewRepresentable {
                 }
                 let level = MarkdownHeaderStyle.headingLevel(of: nsString.substring(with: contentRange))
                 ts.addAttribute(.font, value: MarkdownHeaderStyle.nsFont(forLevel: level), range: lineRange)
-                ts.addAttribute(.foregroundColor,
-                                value: level != nil ? MarkdownHeaderStyle.nsHeaderColor : MarkdownHeaderStyle.nsBodyColor,
-                                range: lineRange)
+                ts.addAttribute(
+                    .foregroundColor,
+                    value: level != nil ? MarkdownHeaderStyle.nsHeaderColor : MarkdownHeaderStyle.nsBodyColor,
+                    range: lineRange)
                 idx = NSMaxRange(lineRange)
             }
             ts.endEditing()
@@ -250,7 +254,8 @@ final class LineNumberRuler: NSRulerView {
 
     override func drawHashMarksAndLabels(in rect: NSRect) {
         guard let tv = clientView as? NSTextView,
-              let lm = tv.layoutManager, let tc = tv.textContainer else { return }
+            let lm = tv.layoutManager, let tc = tv.textContainer
+        else { return }
         let nsString = tv.string as NSString
         let len = nsString.length
         let inset = tv.textContainerInset.height
@@ -263,8 +268,9 @@ final class LineNumberRuler: NSRulerView {
         func drawNumber(_ n: Int, fragMinY: CGFloat) {
             let str = "\(n)" as NSString
             let size = str.size(withAttributes: attrs)
-            str.draw(at: NSPoint(x: ruleThickness - size.width - 6, y: fragMinY + relativeY + inset),
-                     withAttributes: attrs)
+            str.draw(
+                at: NSPoint(x: ruleThickness - size.width - 6, y: fragMinY + relativeY + inset),
+                withAttributes: attrs)
         }
 
         var idx = 0

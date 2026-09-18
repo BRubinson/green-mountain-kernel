@@ -42,10 +42,12 @@ struct BriefingPane: View {
     }
 
     private var notOpened: some View {
-        Label("No briefings yet — the briefer writes one at each phase boundary.",
-              systemImage: "shippingbox")
-            .font(.callout)
-            .foregroundStyle(.secondary)
+        Label(
+            "No briefings yet — the briefer writes one at each phase boundary.",
+            systemImage: "shippingbox"
+        )
+        .font(.callout)
+        .foregroundStyle(.secondary)
     }
 
     @ViewBuilder
@@ -109,11 +111,12 @@ struct BriefingPane: View {
 
     @ViewBuilder
     private func statusChip(_ status: String) -> some View {
-        let (label, color): (String, Color) = switch status {
-        case "ready": ("Ready", .green)
-        case "building": ("Building", .orange)
-        default: (status, .gray)
-        }
+        let (label, color): (String, Color) =
+            switch status {
+            case "ready": ("Ready", .green)
+            case "building": ("Building", .orange)
+            default: (status, .gray)
+            }
         Text(label)
             .font(.caption2.weight(.medium))
             .padding(.horizontal, 7).padding(.vertical, 2)

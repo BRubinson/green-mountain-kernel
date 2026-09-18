@@ -45,15 +45,17 @@ struct ScreenScaffold<Sidebar: View, Content: View>: View {
                 .navigationTitle(title)
                 .navigationSubtitle(subtitle ?? "")
         } else {
-            content()   // the screen declares its own title/subtitle inside
+            content()  // the screen declares its own title/subtitle inside
         }
     }
 }
 
 extension ScreenScaffold where Sidebar == EmptyView {
     /// Plain shape: a `NavigationStack` hosting the content.
-    init(title: String? = nil, subtitle: String? = nil,
-         @ViewBuilder content: @escaping () -> Content) {
+    init(
+        title: String? = nil, subtitle: String? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
         self.title = title
         self.subtitle = subtitle
         self.sidebar = { EmptyView() }

@@ -56,12 +56,15 @@ public enum DiagramOrganizer {
         func collect(_ element: ResolvedElement) {
             switch element.kind {
             case .entityCard, .absentEntity:
-                cards.append(Card(uuid: element.uuid,
-                                  center: CGPoint(x: element.frame.midX,
-                                                  y: element.frame.midY),
-                                  size: element.frame.size))
+                cards.append(
+                    Card(
+                        uuid: element.uuid,
+                        center: CGPoint(
+                            x: element.frame.midX,
+                            y: element.frame.midY),
+                        size: element.frame.size))
             case .layer, .stroke, .shape, .text, .connector, .umlNode,
-                 .scopeCard, .absentScope:
+                .scopeCard, .absentScope:
                 // Organize lays out ENTITY CARDS. Hand-placed drawing
                 // content (UML nodes included) keeps the position it was
                 // drawn at, and a connector has no position of its own at
@@ -83,7 +86,8 @@ public enum DiagramOrganizer {
         var seen: Set<String> = []
         for edge in resolved.edges {
             guard let a = index[edge.fromElementUuid],
-                  let b = index[edge.toElementUuid], a != b else { continue }
+                let b = index[edge.toElementUuid], a != b
+            else { continue }
             let key = a < b ? "\(a)|\(b)" : "\(b)|\(a)"
             if seen.insert(key).inserted { springs.append((min(a, b), max(a, b))) }
         }
@@ -103,7 +107,8 @@ public enum DiagramOrganizer {
         for _ in 0..<forceIterations {
             var force = [CGVector](repeating: .zero, count: cards.count)
             for (a, b) in springs {
-                let ideal = (cards[a].size.width + cards[b].size.width) / 2
+                let ideal =
+                    (cards[a].size.width + cards[b].size.width) / 2
                     + minSeparation + 40
                 let dx = cards[b].center.x - cards[a].center.x
                 let dy = cards[b].center.y - cards[a].center.y
@@ -186,20 +191,24 @@ public enum DiagramOrganizer {
     /// The organize batch: one `elementUpdate` per moved card, diagram-space
     /// deltas converted to parent-space writes via the same divisor rule as
     /// `DiagramDrag.moveMutation`.
-    public static func organize(_ resolved: ResolvedDiagram,
-                                tree: DiagramTree) -> [DiagramMutation] {
+    public static func organize(
+        _ resolved: ResolvedDiagram,
+        tree: DiagramTree
+    ) -> [DiagramMutation] {
         let centers = newCenters(for: resolved)
         guard !centers.isEmpty else { return [] }
         var mutations: [DiagramMutation] = []
         for (uuid, newCenter) in centers.sorted(by: { $0.key < $1.key }) {
             guard let element = resolved.element(uuid: uuid),
-                  let node = DiagramTreeReducer.findNode(uuid, in: tree.elements)
+                let node = DiagramTreeReducer.findNode(uuid, in: tree.elements)
             else { continue }
             let delta = CGSize(
                 width: newCenter.x - element.frame.midX,
                 height: newCenter.y - element.frame.midY)
-            mutations.append(DiagramDrag.moveMutation(node: node, resolved: element,
-                                                      by: delta))
+            mutations.append(
+                DiagramDrag.moveMutation(
+                    node: node, resolved: element,
+                    by: delta))
         }
         return mutations
     }

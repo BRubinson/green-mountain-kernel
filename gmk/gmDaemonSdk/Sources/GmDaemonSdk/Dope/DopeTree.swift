@@ -38,7 +38,8 @@ public struct DopePersistenceBody: Codable, Hashable, Sendable {
     public let description: String
     public let sortOrder: Int
 
-    public init(code: String, name: String, description: String, sortOrder: Int
+    public init(
+        code: String, name: String, description: String, sortOrder: Int
     ) {
         self.code = code
         self.name = name
@@ -139,7 +140,8 @@ public struct DopeOptionBody: Codable, Hashable, Sendable {
     public let description: String
     public let sortOrder: Int
 
-    public init(code: String, name: String, description: String, sortOrder: Int
+    public init(
+        code: String, name: String, description: String, sortOrder: Int
     ) {
         self.code = code
         self.name = name
@@ -191,9 +193,10 @@ public extension DopeScopeTree {
     /// The same scope with a different domain list — the resolver rebuilds
     /// the tree structurally and must not invent scope identity.
     func replacingDomains(_ domains: [DopePersistenceNode]) -> DopeScopeTree {
-        DopeScopeTree(identity: identity, body: body, sessionUuid: sessionUuid,
-                      promptUuid: promptUuid, scopeType: scopeType,
-                      revision: revision, domains: domains)
+        DopeScopeTree(
+            identity: identity, body: body, sessionUuid: sessionUuid,
+            promptUuid: promptUuid, scopeType: scopeType,
+            revision: revision, domains: domains)
     }
 
     /// A structurally valid empty tree, for the both-layers-absent case.

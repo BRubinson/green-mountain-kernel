@@ -15,15 +15,21 @@ enum AgentGmkMission: String, Sendable, Hashable, Codable, CaseIterable {
         case .task:
             return GmCdeRpirWorkflowPhase.allCases
         case .bot:
-            return [.briefing, .explore, .clarifyOpen, .clarifyUser,
-                    .architecture, .planGate, .implement, .review, .reviewFix, .done]
+            return [
+                .briefing, .explore, .clarifyOpen, .clarifyUser,
+                .architecture, .planGate, .implement, .review, .reviewFix, .done,
+            ]
         case .rpi:
-            return [.briefing, .explore, .clarifyOpen, .clarifyUser, .carePackage,
-                    .architecture, .planGate, .implement, .review, .reviewFix, .done]
+            return [
+                .briefing, .explore, .clarifyOpen, .clarifyUser, .carePackage,
+                .architecture, .planGate, .implement, .review, .reviewFix, .done,
+            ]
         case .team:
-            return [.briefing, .explore, .clarifyOpen, .clarifyUser, .carePackage,
-                    .archOptions, .architecture, .planGate, .implement, .review,
-                    .reviewFix, .done]
+            return [
+                .briefing, .explore, .clarifyOpen, .clarifyUser, .carePackage,
+                .archOptions, .architecture, .planGate, .implement, .review,
+                .reviewFix, .done,
+            ]
         }
     }
 

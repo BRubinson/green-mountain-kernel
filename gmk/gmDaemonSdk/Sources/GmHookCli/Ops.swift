@@ -2,32 +2,33 @@ import Foundation
 import GmDaemonSdk
 
 let usage = """
-gm_hook — the shell-callable GMCC client.
+    gm_hook — the shell-callable GMCC client.
 
-Claude records through the pen (the MCP server). This binary exists for the two
-callers that cannot: a shell hook, and a person at a terminal.
+    Claude records through the pen (the MCP server). This binary exists for the two
+    callers that cannot: a shell hook, and a person at a terminal.
 
-  hook post-tool-use [--dry-run]     record what one tool call wrote
-  hook subagent-start [--dry-run]    register a spawned agent, emit its context
+      hook post-tool-use [--dry-run]     record what one tool call wrote
+      hook subagent-start [--dry-run]    register a spawned agent, emit its context
 
-  context ensure [--hook-payload]    provision project/instance/session from $PWD + branch
-  context env [--plugin-root P]      emit the session env block
-  daemon start|stop|restart|status   lifecycle. THE ONLY THINGS THAT INSTALL are
-                                     scripts/install_gm.sh (fetch) and
-                                     rebuild_local.sh (compile) — never a connect path.
-  paths [--json]                     resolved runtime roots
-  status | ping | doctor | backup    health and safety
-  verbs [--json] [--writes-only]     the verb catalogue: MessageType, pen tool, read/write
+      context ensure [--hook-payload]    provision project/instance/session from $PWD + branch
+      context env [--plugin-root P]      emit the session env block
+      daemon start|stop|restart|status   lifecycle. THE ONLY THINGS THAT INSTALL are
+                                         scripts/install_gm.sh (fetch) and
+                                         rebuild_local.sh (compile) — never a connect path.
+      paths [--json]                     resolved runtime roots
+      status | ping | doctor | backup    health and safety
+      verbs [--json] [--writes-only]     the verb catalogue: MessageType, pen tool, read/write
 
-  call <MESSAGE_TYPE> [--json '<payload>' | --json-file <path>]
-                                     the raw wire. Every verb the daemon serves,
-                                     including those with no named command here.
+      call <MESSAGE_TYPE> [--json '<payload>' | --json-file <path>]
+                                         the raw wire. Every verb the daemon serves,
+                                         including those with no named command here.
 
-"""
+    """
 
 private func emit<T: Encodable>(_ value: T) {
     guard let data = try? WireCodec.prettyEncoder.encode(value),
-          let text = String(data: data, encoding: .utf8) else { return }
+        let text = String(data: data, encoding: .utf8)
+    else { return }
     print(text)
 }
 
@@ -57,7 +58,8 @@ func runOps(_ argv: [String]) -> Int32 {
             defer { client.close() }
             do { emit(try client.ping()); return 0 } catch { return fail("daemon unreachable: \(error)") }
         default:
-            return fail("""
+            return fail(
+                """
                 daemon \(action) is not served here. Lifecycle is scripts/install_gm.sh \
                 (fetch + install), scripts/rebuild_local.sh (compile from source) and the \
                 launchd job; this binary never installs or builds.

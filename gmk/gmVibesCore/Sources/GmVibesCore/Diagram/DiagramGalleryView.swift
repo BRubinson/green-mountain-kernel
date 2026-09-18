@@ -61,25 +61,32 @@ struct DiagramGalleryView<CardMenu: View>: View {
     @ViewBuilder
     private var content: some View {
         if let error = diagrams.galleryErrors[scope] {
-            ContentUnavailableView("Diagrams Unavailable", systemImage: "bolt.slash",
-                                   description: Text(error))
+            ContentUnavailableView(
+                "Diagrams Unavailable", systemImage: "bolt.slash",
+                description: Text(error))
         } else if rows.isEmpty {
             if diagrams.galleryLoaded(scope) {
                 ContentUnavailableView(
                     query.isEmpty ? "No Diagrams Yet" : "No Matches",
                     systemImage: query.isEmpty
                         ? "point.3.connected.trianglepath.dotted" : "magnifyingglass",
-                    description: Text(query.isEmpty
-                        ? "Diagrams you create appear here."
-                        : "Nothing matches “\(query)”."))
+                    description: Text(
+                        query.isEmpty
+                            ? "Diagrams you create appear here."
+                            : "Nothing matches “\(query)”."))
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         } else {
             ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 280),
-                                             spacing: 12)],
-                          spacing: 12) {
+                LazyVGrid(
+                    columns: [
+                        GridItem(
+                            .adaptive(minimum: 200, maximum: 280),
+                            spacing: 12)
+                    ],
+                    spacing: 12
+                ) {
                     ForEach(rows, id: \.uuid) { row in
                         DiagramGalleryCard(row: row, onOpen: { onOpen(row) }) {
                             cardMenu(row)
@@ -120,8 +127,10 @@ private struct DiagramGalleryCard<Menu: View>: View {
             }
             .padding(8)
             .background(.background.secondary, in: RoundedRectangle(cornerRadius: 10))
-            .overlay(RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(.separator, lineWidth: 1))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(.separator, lineWidth: 1)
+            )
             .contentShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
@@ -145,8 +154,9 @@ private struct DiagramGalleryCard<Menu: View>: View {
         }
         .frame(height: 120)
         .clipShape(RoundedRectangle(cornerRadius: 6))
-        .overlay(RoundedRectangle(cornerRadius: 6)
-            .strokeBorder(.separator.opacity(0.5), lineWidth: 1))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(.separator.opacity(0.5), lineWidth: 1))
     }
 
     private var tierBadge: some View {
@@ -172,8 +182,9 @@ private struct DiagramThumbnailView: View {
         GeometryReader { proxy in
             let canvas = DiagramCanvasView(resolved: resolved)
             let size = canvas.totalSize
-            let scale = min(proxy.size.width / max(size.width, 1),
-                            proxy.size.height / max(size.height, 1), 1)
+            let scale = min(
+                proxy.size.width / max(size.width, 1),
+                proxy.size.height / max(size.height, 1), 1)
             canvas
                 .frame(width: size.width, height: size.height)
                 .scaleEffect(scale, anchor: .center)

@@ -36,10 +36,11 @@ public struct GmAgentReviewFinding: Sendable {
     @Guide(description: "Short title for the problem.")
     public var title: String
 
-    @Guide(description: """
-        The problem itself: what breaks, and the inputs or state that make it \
-        break. A claim with no failure case is an opinion.
-        """)
+    @Guide(
+        description: """
+            The problem itself: what breaks, and the inputs or state that make it \
+            break. A claim with no failure case is an opinion.
+            """)
     public var body: String
 
     @Guide(description: "Repo-relative file it is in, or empty.")
@@ -200,10 +201,11 @@ public struct GmAgentRpirGetReviewArguments: Sendable {
     @Guide(description: promptUuidGuide("'s review to read"))
     public var promptUuid: String
 
-    @Guide(description: """
-        Only return problems this bad or worse, 0 to 999. Use a small number to \
-        keep the answer short.
-        """, .range(0...999))
+    @Guide(
+        description: """
+            Only return problems this bad or worse, 0 to 999. Use a small number to \
+            keep the answer short.
+            """, .range(0...999))
     public var maxRating: Int
 
     public init(promptUuid: String, maxRating: Int = 100) {

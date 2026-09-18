@@ -98,8 +98,9 @@ public enum ChewedArtifactParser {
                         !cell.isEmpty && cell.allSatisfy { $0 == "-" || $0 == ":" }
                     }
                     if !isHeader && !isSeparator {
-                        entries.append(ChewedFileEntry(
-                            name: cells[0], type: cells[1], description: cells[2], fullPath: nil))
+                        entries.append(
+                            ChewedFileEntry(
+                                name: cells[0], type: cells[1], description: cells[2], fullPath: nil))
                     }
                 }
 
@@ -154,7 +155,8 @@ public enum ChewedArtifactParser {
     /// Split a `| a | b | c |` line into trimmed cells; nil when not a table row.
     private static func tableRowCells(_ trimmed: String) -> [String]? {
         guard trimmed.hasPrefix("|") else { return nil }
-        let cells = trimmed
+        let cells =
+            trimmed
             .trimmingCharacters(in: CharacterSet(charactersIn: "|"))
             .split(separator: "|", omittingEmptySubsequences: false)
             .map { $0.trimmingCharacters(in: cellTrim) }

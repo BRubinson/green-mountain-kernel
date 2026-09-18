@@ -33,7 +33,7 @@ func emitSessionEnv(pluginRoot: String?) -> Int32 {
     } else {
         warnings.append(
             "[GMB] daemon unavailable — env derived from defaults; run "
-            + "'bash $GM_PLUGIN_ROOT/scripts/install_gm.sh' then restart the session")
+                + "'bash $GM_PLUGIN_ROOT/scripts/install_gm.sh' then restart the session")
     }
     for warning in warnings {
         FileHandle.standardError.write(Data((warning + "\n").utf8))

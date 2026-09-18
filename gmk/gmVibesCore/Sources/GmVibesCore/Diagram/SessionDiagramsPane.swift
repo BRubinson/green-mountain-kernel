@@ -45,8 +45,10 @@ struct SessionDiagramsPane: View {
                 await diagrams.refresh(owner)
             }
         }
-        .alert("Diagram action failed", isPresented: Binding(
-            get: { actionError != nil }, set: { if !$0 { actionError = nil } })
+        .alert(
+            "Diagram action failed",
+            isPresented: Binding(
+                get: { actionError != nil }, set: { if !$0 { actionError = nil } })
         ) {
             Button("OK", role: .cancel) { actionError = nil }
         } message: {
@@ -70,8 +72,9 @@ struct SessionDiagramsPane: View {
                 Label("New Diagram", systemImage: "plus")
             }
             .disabled(busy)
-            .help("Create a session diagram over one dope scope — the canvas is "
-                  + "scaffolded from that scope once, at creation")
+            .help(
+                "Create a session diagram over one dope scope — the canvas is "
+                    + "scaffolded from that scope once, at creation")
 
             Menu {
                 if projectRows.isEmpty {
@@ -98,9 +101,12 @@ struct SessionDiagramsPane: View {
     /// DIAGRAM_SEARCH — a wider net than the session-owner list the header
     /// actions still run on (uniqueCode needs exactly the owner's codes).
     private var content: some View {
-        DiagramGalleryView(scope: galleryScope, onOpen: { row in
-            onOpen(DiagramWindowID.saved(row, session: windowID))
-        }) { row in
+        DiagramGalleryView(
+            scope: galleryScope,
+            onOpen: { row in
+                onOpen(DiagramWindowID.saved(row, session: windowID))
+            }
+        ) { row in
             cardMenu(row)
         }
     }
@@ -117,8 +123,9 @@ struct SessionDiagramsPane: View {
             Button("Make Private") { setVisibility(row, .private) }
         } else {
             Button("Make Public") { setVisibility(row, .public) }
-                .help("PUBLIC session diagrams can serialize into the repo's "
-                      + "committed .gmcc tree via DIAGRAM_WRITE_REPO")
+                .help(
+                    "PUBLIC session diagrams can serialize into the repo's "
+                        + "committed .gmcc tree via DIAGRAM_WRITE_REPO")
         }
         Divider()
         Button("Delete Diagram", role: .destructive) { delete(row) }
@@ -128,8 +135,9 @@ struct SessionDiagramsPane: View {
 
     private func create(from scopeRow: DopeScopeRow) {
         run {
-            let code = Self.uniqueCode(base: "\(scopeRow.code)_canvas",
-                                       taken: Set(rows.map(\.code)))
+            let code = Self.uniqueCode(
+                base: "\(scopeRow.code)_canvas",
+                taken: Set(rows.map(\.code)))
             _ = try await diagrams.create(
                 owner: owner, code: code, name: scopeRow.name,
                 dopeScopeCode: scopeRow.code, projectUuid: projectUuid,
@@ -140,15 +148,17 @@ struct SessionDiagramsPane: View {
     private func importProjectDiagram(_ row: DiagramRow) {
         run {
             let code = Self.uniqueCode(base: row.code, taken: Set(rows.map(\.code)))
-            _ = try await diagrams.copy(row, to: owner, code: code, name: row.name,
-                                        projectUuid: projectUuid)
+            _ = try await diagrams.copy(
+                row, to: owner, code: code, name: row.name,
+                projectUuid: projectUuid)
         }
     }
 
     private func promote(_ row: DiagramRow) {
         run {
-            try await diagrams.promote(row, to: .project, ownerUuid: projectUuid,
-                                       from: owner)
+            try await diagrams.promote(
+                row, to: .project, ownerUuid: projectUuid,
+                from: owner)
             await diagrams.refreshGallery(galleryScope)
         }
     }
@@ -192,4 +202,3 @@ struct SessionDiagramsPane: View {
         return "\(base)_\(index)"
     }
 }
-

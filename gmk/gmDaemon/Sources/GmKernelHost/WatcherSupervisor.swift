@@ -30,8 +30,10 @@ final class WatcherSupervisor: @unchecked Sendable {
         }
         memory.setRoot(watchableGmfs)
 
-        let instances = (try? store.listInstances(
-            InstanceListRequest(projectUuid: nil)).instances) ?? []
+        let instances =
+            (try? store.listInstances(
+                InstanceListRequest(projectUuid: nil)
+            ).instances) ?? []
         // Instances whose path no longer exists drop out; they rejoin on the
         // next rebuild if the repo reappears. KNOWN LIMIT: a repo cloned back
         // between rebuilds is not re-watched until the next instance creation
@@ -45,9 +47,10 @@ final class WatcherSupervisor: @unchecked Sendable {
 
         if !bootLogged {
             bootLogged = true
-            print("[\(Store.isoNow())] watchers: memory "
-                + (watchableGmfs.map { "on \($0)" } ?? "disabled (no gmfs_root configured or path missing)")
-                + ", checkout on \(roots.count) instance repo(s)")
+            print(
+                "[\(Store.isoNow())] watchers: memory "
+                    + (watchableGmfs.map { "on \($0)" } ?? "disabled (no gmfs_root configured or path missing)")
+                    + ", checkout on \(roots.count) instance repo(s)")
             fflush(stdout)
         }
     }

@@ -27,74 +27,91 @@ func makePhaseDoorTools() -> [Tool] {
         // ── Clarification ────────────────────────────────────────────────
         Tool(
             name: "rpir_open_clarification",
-            description: "Open the prompt's clarification summary. No status move — the prompt is already initiated; summaries are opened explicitly since the lifecycle collapsed to three states.",
+            description:
+                "Open the prompt's clarification summary. No status move — the prompt is already initiated; summaries are opened explicitly since the lifecycle collapsed to three states.",
             params: [
-                ("prompt_uuid", "string", "The prompt to open a clarification summary for", true),
+                ("prompt_uuid", "string", "The prompt to open a clarification summary for", true)
             ],
             run: { args, client in
-                try client.clarifyOpen(ClarifyOpenRequest(
-                    promptUuid: try args.string("prompt_uuid")))
+                try client.clarifyOpen(
+                    ClarifyOpenRequest(
+                        promptUuid: try args.string("prompt_uuid")))
             }),
         Tool(
             name: "rpir_answer_clarification_question",
-            description: "Record the user's answer to ONE clarification question. `skip` marks a question deliberately not asked — the append-only record keeps it either way.",
+            description:
+                "Record the user's answer to ONE clarification question. `skip` marks a question deliberately not asked — the append-only record keeps it either way.",
             params: [
                 ("question_uuid", "string", "The question being answered", true),
                 ("expected_version", "number", "That question's version", true),
-                ("answer_text", "string", "The answer, in full — including WHY, since a bare option pick loses the reasoning", false),
+                (
+                    "answer_text", "string",
+                    "The answer, in full — including WHY, since a bare option pick loses the reasoning", false
+                ),
                 ("selected_option_uuids", "array", "Option rows the user chose", false),
                 ("skip", "boolean", "true = deliberately not asked (malformed row, superseded, or moot)", false),
             ],
             run: { args, client in
-                try client.clarifyAnswer(ClarifyAnswerRequest(
-                    questionUuid: try args.string("question_uuid"),
-                    expectedVersion: try args.int64("expected_version"),
-                    answerText: args.optString("answer_text"),
-                    selectedOptionUuids: args.optStrings("selected_option_uuids"),
-                    skip: args.optBool("skip") ?? false))
+                try client.clarifyAnswer(
+                    ClarifyAnswerRequest(
+                        questionUuid: try args.string("question_uuid"),
+                        expectedVersion: try args.int64("expected_version"),
+                        answerText: args.optString("answer_text"),
+                        selectedOptionUuids: args.optStrings("selected_option_uuids"),
+                        skip: args.optBool("skip") ?? false))
             }),
         Tool(
             name: "rpir_seal_clarification",
-            description: "Seal the question suite building → answering. Answers are writable only after this seal; rpir_finalize_clarification is the LATER move (answering → complete). The primary's call, like every seal.",
+            description:
+                "Seal the question suite building → answering. Answers are writable only after this seal; rpir_finalize_clarification is the LATER move (answering → complete). The primary's call, like every seal.",
             params: [
                 ("summary_uuid", "string", "The clarification summary uuid", true),
                 ("expected_version", "number", "The summary version this write is based on", true),
             ],
             run: { args, client in
-                try client.clarifySeal(ClarifySealRequest(
-                    summaryUuid: try args.string("summary_uuid"),
-                    expectedVersion: try args.int64("expected_version")))
+                try client.clarifySeal(
+                    ClarifySealRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        expectedVersion: try args.int64("expected_version")))
             }),
         Tool(
             name: "rpir_finalize_clarification",
-            description: "answering → complete. Every question is answered or skipped; the care package carries the decided intent forward.",
+            description:
+                "answering → complete. Every question is answered or skipped; the care package carries the decided intent forward.",
             params: [
                 ("summary_uuid", "string", "The clarification summary uuid", true),
                 ("expected_version", "number", "The summary version this write is based on", true),
             ],
             run: { args, client in
-                try client.clarifyFinalize(ClarifyFinalizeRequest(
-                    summaryUuid: try args.string("summary_uuid"),
-                    expectedVersion: try args.int64("expected_version")))
+                try client.clarifyFinalize(
+                    ClarifyFinalizeRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        expectedVersion: try args.int64("expected_version")))
             }),
         Tool(
             name: "rpir_open_care_package",
-            description: "Open the care package on a clarification summary. Note the selector is the CLARIFICATION SUMMARY uuid, not the prompt uuid — the package hangs off the summary that produced it.",
+            description:
+                "Open the care package on a clarification summary. Note the selector is the CLARIFICATION SUMMARY uuid, not the prompt uuid — the package hangs off the summary that produced it.",
             params: [
-                ("summary_uuid", "string", "The clarification summary uuid", true),
+                ("summary_uuid", "string", "The clarification summary uuid", true)
             ],
             run: { args, client in
-                try client.carePackageOpen(CarePackageOpenRequest(
-                    summaryUuid: try args.string("summary_uuid")))
+                try client.carePackageOpen(
+                    CarePackageOpenRequest(
+                        summaryUuid: try args.string("summary_uuid")))
             }),
 
         Tool(
             name: "rpir_close_brief",
-            description: "Seal the briefing — the briefer's page is done and the agent can go away. Same verb as rpir_write_brief: BRIEFING_COMPLETE both writes the ref set and moves building → ready.",
+            description:
+                "Seal the briefing — the briefer's page is done and the agent can go away. Same verb as rpir_write_brief: BRIEFING_COMPLETE both writes the ref set and moves building → ready.",
             params: [
                 ("briefing_uuid", "string", "The briefing to complete", true),
                 ("expected_version", "number", "The briefing version this write is based on", true),
-                ("dope_refs", "array", "Dope dot-path CODES. Pass [] if you searched and found none — omitting is refused", true),
+                (
+                    "dope_refs", "array",
+                    "Dope dot-path CODES. Pass [] if you searched and found none — omitting is refused", true
+                ),
                 ("kbite_refs", "array", "Kbite file uuids. Pass [] if you searched and found none", true),
                 ("file_change_refs", "array", "file_change uuids. Pass [] if there are none", true),
                 ("agent_id", "string", "Self-reported agent id", false),
@@ -107,29 +124,33 @@ func makePhaseDoorTools() -> [Tool] {
                 // generated `allowed-tools` grant resolves whichever the author
                 // reached for. If one of them ever stops being used, delete the
                 // NAME — do not split the verb to justify it.
-                try client.briefingComplete(BriefingCompleteRequest(
-                    briefingUuid: try args.string("briefing_uuid"),
-                    expectedVersion: try args.int64("expected_version"),
-                    dopeRefs: args.optStrings("dope_refs") ?? [],
-                    kbiteRefs: args.optStrings("kbite_refs") ?? [],
-                    fileChangeRefs: args.optStrings("file_change_refs") ?? [],
-                    agentId: args.optString("agent_id")))
+                try client.briefingComplete(
+                    BriefingCompleteRequest(
+                        briefingUuid: try args.string("briefing_uuid"),
+                        expectedVersion: try args.int64("expected_version"),
+                        dopeRefs: args.optStrings("dope_refs") ?? [],
+                        kbiteRefs: args.optStrings("kbite_refs") ?? [],
+                        fileChangeRefs: args.optStrings("file_change_refs") ?? [],
+                        agentId: args.optString("agent_id")))
             }),
 
         // ── Review ───────────────────────────────────────────────────────
         Tool(
             name: "rpir_open_review",
-            description: "Open the prompt's review summary. Like the other summaries, opened explicitly rather than as a side effect of a status move.",
+            description:
+                "Open the prompt's review summary. Like the other summaries, opened explicitly rather than as a side effect of a status move.",
             params: [
-                ("prompt_uuid", "string", "The prompt to open a review summary for", true),
+                ("prompt_uuid", "string", "The prompt to open a review summary for", true)
             ],
             run: { args, client in
-                try client.reviewOpen(ReviewOpenRequest(
-                    promptUuid: try args.string("prompt_uuid")))
+                try client.reviewOpen(
+                    ReviewOpenRequest(
+                        promptUuid: try args.string("prompt_uuid")))
             }),
         Tool(
             name: "rpir_resolve_review_finding",
-            description: "Resolve ONE review finding during the fix loop. `open` is deliberately not accepted — it is the initial state, not a resolution, so resolving TO it would be a move backwards through an append-only record.",
+            description:
+                "Resolve ONE review finding during the fix loop. `open` is deliberately not accepted — it is the initial state, not a resolution, so resolving TO it would be a move backwards through an append-only record.",
             params: [
                 ("finding_uuid", "string", "The finding being resolved", true),
                 ("expected_version", "number", "That finding's version", true),
@@ -138,12 +159,14 @@ func makePhaseDoorTools() -> [Tool] {
             run: { args, client in
                 let raw = try args.string("status")
                 guard let status = ReviewFindingStatus(rawValue: raw), status != .open else {
-                    throw ToolError(message: "status must be fixed, accepted or wont_fix — '\(raw)' is not a resolution")
+                    throw ToolError(
+                        message: "status must be fixed, accepted or wont_fix — '\(raw)' is not a resolution")
                 }
-                return try client.reviewResolve(ReviewResolveRequest(
-                    findingUuid: try args.string("finding_uuid"),
-                    expectedVersion: try args.int64("expected_version"),
-                    status: status))
+                return try client.reviewResolve(
+                    ReviewResolveRequest(
+                        findingUuid: try args.string("finding_uuid"),
+                        expectedVersion: try args.int64("expected_version"),
+                        status: status))
             }),
         Tool(
             name: "rpir_complete_review",
@@ -157,29 +180,34 @@ func makePhaseDoorTools() -> [Tool] {
             run: { args, client in
                 let raw = try args.string("verdict")
                 guard let verdict = ReviewVerdict(rawValue: raw) else {
-                    throw ToolError(message: "verdict must be approved, approved_with_nits or changes_requested — got '\(raw)'")
+                    throw ToolError(
+                        message: "verdict must be approved, approved_with_nits or changes_requested — got '\(raw)'")
                 }
-                return try client.reviewComplete(ReviewCompleteRequest(
-                    summaryUuid: try args.string("summary_uuid"),
-                    expectedVersion: try args.int64("expected_version"),
-                    overview: try args.string("overview"),
-                    verdict: verdict))
+                return try client.reviewComplete(
+                    ReviewCompleteRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        expectedVersion: try args.int64("expected_version"),
+                        overview: try args.string("overview"),
+                        verdict: verdict))
             }),
 
         // ── Architecture ─────────────────────────────────────────────────
         Tool(
             name: "rpir_open_architecture",
-            description: "Open the prompt's architecture summary page — fetch-or-open, idempotent. Opened explicitly like every summary; nothing opens it as a side effect.",
+            description:
+                "Open the prompt's architecture summary page — fetch-or-open, idempotent. Opened explicitly like every summary; nothing opens it as a side effect.",
             params: [
-                ("prompt_uuid", "string", "The prompt to open an architecture summary for", true),
+                ("prompt_uuid", "string", "The prompt to open an architecture summary for", true)
             ],
             run: { args, client in
-                try client.archOpen(ArchOpenRequest(
-                    promptUuid: try args.string("prompt_uuid")))
+                try client.archOpen(
+                    ArchOpenRequest(
+                        promptUuid: try args.string("prompt_uuid")))
             }),
         Tool(
             name: "rpir_write_architecture_persistence_changes",
-            description: "Record ONE persistence-tier change. Persistence rows come before general rows because a schema or wire delta is what the plan gate is signed off against.",
+            description:
+                "Record ONE persistence-tier change. Persistence rows come before general rows because a schema or wire delta is what the plan gate is signed off against.",
             params: [
                 ("summary_uuid", "string", "The architecture summary uuid", true),
                 ("class_name", "string", "The type or table being changed", true),
@@ -189,17 +217,19 @@ func makePhaseDoorTools() -> [Tool] {
                 ("dope_ref", "string", "Dope dot-path CODE, never a uuid", false),
             ],
             run: { args, client in
-                try client.archPersistAdd(ArchPersistAddRequest(
-                    summaryUuid: try args.string("summary_uuid"),
-                    className: try args.string("class_name"),
-                    filePath: try args.string("file_path"),
-                    reasonBrief: try args.string("reason_brief"),
-                    changeKind: args.optString("change_kind"),
-                    dopeRef: args.optString("dope_ref")))
+                try client.archPersistAdd(
+                    ArchPersistAddRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        className: try args.string("class_name"),
+                        filePath: try args.string("file_path"),
+                        reasonBrief: try args.string("reason_brief"),
+                        changeKind: args.optString("change_kind"),
+                        dopeRef: args.optString("dope_ref")))
             }),
         Tool(
             name: "rpir_write_architecture_general_changes",
-            description: "Record ONE general (non-persistence) change. change_depth is pseudo|draft|actual — draft is a planned change not yet written.",
+            description:
+                "Record ONE general (non-persistence) change. change_depth is pseudo|draft|actual — draft is a planned change not yet written.",
             params: [
                 ("summary_uuid", "string", "The architecture summary uuid", true),
                 ("file_path", "string", "Repo-relative path", true),
@@ -213,17 +243,19 @@ func makePhaseDoorTools() -> [Tool] {
                 guard let depth = ChangeDepth(rawValue: raw) else {
                     throw ToolError(message: "change_depth must be pseudo, draft or actual — got '\(raw)'")
                 }
-                return try client.archGeneralAdd(ArchGeneralAddRequest(
-                    summaryUuid: try args.string("summary_uuid"),
-                    filePath: try args.string("file_path"),
-                    className: args.optString("class_name"),
-                    reasonBrief: try args.string("reason_brief"),
-                    changeDepth: depth,
-                    changeCode: try args.string("change_code")))
+                return try client.archGeneralAdd(
+                    ArchGeneralAddRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        filePath: try args.string("file_path"),
+                        className: args.optString("class_name"),
+                        reasonBrief: try args.string("reason_brief"),
+                        changeDepth: depth,
+                        changeCode: try args.string("change_code")))
             }),
         Tool(
             name: "rpir_write_architecture_field_changes",
-            description: "Record ONE field-level change under a persistence change row (m0025 grain: add|modify|rename|delete per field).",
+            description:
+                "Record ONE field-level change under a persistence change row (m0025 grain: add|modify|rename|delete per field).",
             params: [
                 ("persistence_change_uuid", "string", "The parent persistence change row", true),
                 ("field_name", "string", "The field being changed", true),
@@ -239,19 +271,20 @@ func makePhaseDoorTools() -> [Tool] {
                 ("dope_property_ref", "string", "domain.entity.property dot-path CODE, ghost-legal", false),
             ],
             run: { args, client in
-                try client.archFieldAdd(ArchFieldAddRequest(
-                    persistenceChangeUuid: try args.string("persistence_change_uuid"),
-                    fieldName: try args.string("field_name"),
-                    dataType: try args.string("data_type"),
-                    changeReason: try args.string("change_reason"),
-                    changePurpose: try args.string("change_purpose"),
-                    nullable: args.optBool("nullable") ?? false,
-                    isForeignKey: args.optBool("is_foreign_key") ?? false,
-                    fkTarget: args.optString("fk_target"),
-                    isIndexed: args.optBool("is_indexed") ?? false,
-                    changeKind: args.optString("change_kind"),
-                    renamedFrom: args.optString("renamed_from"),
-                    dopePropertyRef: args.optString("dope_property_ref")))
+                try client.archFieldAdd(
+                    ArchFieldAddRequest(
+                        persistenceChangeUuid: try args.string("persistence_change_uuid"),
+                        fieldName: try args.string("field_name"),
+                        dataType: try args.string("data_type"),
+                        changeReason: try args.string("change_reason"),
+                        changePurpose: try args.string("change_purpose"),
+                        nullable: args.optBool("nullable") ?? false,
+                        isForeignKey: args.optBool("is_foreign_key") ?? false,
+                        fkTarget: args.optString("fk_target"),
+                        isIndexed: args.optBool("is_indexed") ?? false,
+                        changeKind: args.optString("change_kind"),
+                        renamedFrom: args.optString("renamed_from"),
+                        dopePropertyRef: args.optString("dope_property_ref")))
             }),
         Tool(
             name: "rpir_summarize_architecture",
@@ -262,10 +295,11 @@ func makePhaseDoorTools() -> [Tool] {
                 ("body", "string", "The summary narrative (markdown)", true),
             ],
             run: { args, client in
-                try client.archSummarize(ArchSummarizeRequest(
-                    summaryUuid: try args.string("summary_uuid"),
-                    expectedVersion: try args.int64("expected_version"),
-                    body: try args.string("body")))
+                try client.archSummarize(
+                    ArchSummarizeRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        expectedVersion: try args.int64("expected_version"),
+                        body: try args.string("body")))
             }),
         Tool(
             name: "rpir_propose_architecture",
@@ -275,45 +309,52 @@ func makePhaseDoorTools() -> [Tool] {
                 ("expected_version", "number", "The summary version this write is based on", true),
             ],
             run: { args, client in
-                try client.archPropose(ArchProposeRequest(
-                    summaryUuid: try args.string("summary_uuid"),
-                    expectedVersion: try args.int64("expected_version")))
+                try client.archPropose(
+                    ArchProposeRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        expectedVersion: try args.int64("expected_version")))
             }),
         Tool(
             name: "rpir_approve_architecture",
-            description: "proposed → approved (terminal; unlocks implementation). The user's sign-off at the plan gate is what authorizes this call.",
+            description:
+                "proposed → approved (terminal; unlocks implementation). The user's sign-off at the plan gate is what authorizes this call.",
             params: [
                 ("summary_uuid", "string", "The architecture summary uuid", true),
                 ("expected_version", "number", "The summary version this write is based on", true),
             ],
             run: { args, client in
-                try client.archApprove(ArchApproveRequest(
-                    summaryUuid: try args.string("summary_uuid"),
-                    expectedVersion: try args.int64("expected_version")))
+                try client.archApprove(
+                    ArchApproveRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        expectedVersion: try args.int64("expected_version")))
             }),
         Tool(
             name: "rpir_revise_architecture",
-            description: "proposed → drafting: the revision edge. Reopens the summary so options and rows can change; compose with rpir_open_architecture_option's supersede form to replace a proposal.",
+            description:
+                "proposed → drafting: the revision edge. Reopens the summary so options and rows can change; compose with rpir_open_architecture_option's supersede form to replace a proposal.",
             params: [
                 ("summary_uuid", "string", "The architecture summary uuid", true),
                 ("expected_version", "number", "The summary version this write is based on", true),
             ],
             run: { args, client in
-                try client.archRevise(ArchReviseRequest(
-                    summaryUuid: try args.string("summary_uuid"),
-                    expectedVersion: try args.int64("expected_version")))
+                try client.archRevise(
+                    ArchReviseRequest(
+                        summaryUuid: try args.string("summary_uuid"),
+                        expectedVersion: try args.int64("expected_version")))
             }),
         Tool(
             name: "kbite_open_maw",
-            description: "Open a maw — the staging directory a kbite's raw sources are collected into before they are chewed and digested.",
+            description:
+                "Open a maw — the staging directory a kbite's raw sources are collected into before they are chewed and digested.",
             params: [
                 ("kbite_name", "string", "The kbite this maw feeds", true),
                 ("maw_path", "string", "Where the maw lives on disk", true),
             ],
             run: { args, client in
-                try client.openKbiteMaw(KbiteMawOpenRequest(
-                    kbiteName: try args.string("kbite_name"),
-                    mawPath: try args.string("maw_path")))
+                try client.openKbiteMaw(
+                    KbiteMawOpenRequest(
+                        kbiteName: try args.string("kbite_name"),
+                        mawPath: try args.string("maw_path")))
             }),
         Tool(
             name: "kbite_digest",
@@ -323,9 +364,10 @@ func makePhaseDoorTools() -> [Tool] {
                 ("kbite_open_path", "string", "The opened maw's path", true),
             ],
             run: { args, client in
-                try client.digestKbite(KbiteDigestRequest(
-                    code: try args.string("code"),
-                    kbiteOpenPath: try args.string("kbite_open_path")))
+                try client.digestKbite(
+                    KbiteDigestRequest(
+                        code: try args.string("code"),
+                        kbiteOpenPath: try args.string("kbite_open_path")))
             }),
     ]
 }

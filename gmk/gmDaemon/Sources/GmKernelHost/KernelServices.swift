@@ -74,8 +74,9 @@ public final class KernelServices {
         // Only a process that actually took the lock says "writer". A client
         // never reaches this function, so this assignment cannot lie.
         KernelVitalsSource.writerRole = "writer"
-        log("kernel pid \(getpid()) protocol v\(GmWireProtocol.version) "
-            + "listening at \(Paths.socket.path) [\(personality)]")
+        log(
+            "kernel pid \(getpid()) protocol v\(GmWireProtocol.version) "
+                + "listening at \(Paths.socket.path) [\(personality)]")
         return KernelServices(writer: writer, server: server)
     }
 

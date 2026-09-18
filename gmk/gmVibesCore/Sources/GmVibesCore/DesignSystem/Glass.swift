@@ -65,7 +65,9 @@ struct CapsuleSearchField: View {
                 field
             }
             if !text.isEmpty {
-                Button { text = "" } label: {
+                Button {
+                    text = ""
+                } label: {
                     Image(systemName: "xmark.circle.fill")
                 }
                 .buttonStyle(.plain)

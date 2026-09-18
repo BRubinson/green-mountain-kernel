@@ -1712,7 +1712,7 @@ public struct DopeScopeRow: Codable, Hashable, Sendable {
         guard let sessionUuid else {
             throw StoreError.badRequest(
                 detail: "scope \(uuid) is tier \(scopeType), which has no session; "
-                      + "this operation is session-tier only")
+                    + "this operation is session-tier only")
         }
         return sessionUuid
     }
@@ -1785,8 +1785,8 @@ public struct DiagramRow: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case uuid, version, tier, projectUuid, instanceUuid, sessionUuid,
-             promptUuid, code, name, description, gmccDiagramPath,
-             dopeScopeCode, revision, visibility, createdAt, updatedAt
+            promptUuid, code, name, description, gmccDiagramPath,
+            dopeScopeCode, revision, visibility, createdAt, updatedAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -1804,7 +1804,8 @@ public struct DiagramRow: Codable, Hashable, Sendable {
         gmccDiagramPath = try c.decodeIfPresent(String.self, forKey: .gmccDiagramPath)
         dopeScopeCode = try c.decodeIfPresent(String.self, forKey: .dopeScopeCode)
         revision = try c.decode(Int64.self, forKey: .revision)
-        visibility = try c.decodeIfPresent(String.self, forKey: .visibility)
+        visibility =
+            try c.decodeIfPresent(String.self, forKey: .visibility)
             ?? DiagramVisibility.private.rawValue
         createdAt = try c.decode(String.self, forKey: .createdAt)
         updatedAt = try c.decode(String.self, forKey: .updatedAt)

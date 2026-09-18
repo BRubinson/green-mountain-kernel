@@ -121,22 +121,25 @@ extension GmVerbCaller {
     public func promptDiagramQualify(
         _ req: PromptDiagramQualifyRequest
     ) throws -> PromptQualifiedDiagramRow {
-        try request(type: .promptDiagramQualify, payload: req,
-                    responseType: PromptQualifiedDiagramRow.self)
+        try request(
+            type: .promptDiagramQualify, payload: req,
+            responseType: PromptQualifiedDiagramRow.self)
     }
 
     public func promptDiagramGet(
         _ req: PromptDiagramGetRequest
     ) throws -> PromptQualifiedDiagramRow {
-        try request(type: .promptDiagramGet, payload: req,
-                    responseType: PromptQualifiedDiagramRow.self)
+        try request(
+            type: .promptDiagramGet, payload: req,
+            responseType: PromptQualifiedDiagramRow.self)
     }
 
     public func promptDiagramList(
         _ req: PromptDiagramListRequest
     ) throws -> PromptDiagramListResponse {
-        try request(type: .promptDiagramList, payload: req,
-                    responseType: PromptDiagramListResponse.self)
+        try request(
+            type: .promptDiagramList, payload: req,
+            responseType: PromptDiagramListResponse.self)
     }
 
     // MARK: - File change
@@ -480,15 +483,17 @@ extension GmVerbCaller {
     public func dopeCogElementUpdate(
         _ r: DopeCogElementUpdateRequest
     ) throws -> DopeCogElementResponse {
-        try request(type: .dopeCogElementUpdate, payload: r,
-                    responseType: DopeCogElementResponse.self)
+        try request(
+            type: .dopeCogElementUpdate, payload: r,
+            responseType: DopeCogElementResponse.self)
     }
 
     public func dopeCogElementDelete(
         _ r: DopeCogElementDeleteRequest
     ) throws -> DopeCogDeleteResponse {
-        try request(type: .dopeCogElementDelete, payload: r,
-                    responseType: DopeCogDeleteResponse.self)
+        try request(
+            type: .dopeCogElementDelete, payload: r,
+            responseType: DopeCogDeleteResponse.self)
     }
 
     public func dopeSearch(_ req: DopeSearchRequest) throws -> DopeSearchResponse {

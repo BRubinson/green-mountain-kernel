@@ -46,11 +46,14 @@ struct ProjectDiagramRail: View {
                     .padding(.horizontal, 12)
             }
             Divider()
-            DiagramGalleryView(scope: galleryScope, onOpen: { row in
-                // The rail has no session window to hand a SESSION/PROMPT
-                // row — nil is the legal "caller doesn't know" state.
-                onOpen(DiagramWindowID.saved(row, session: nil))
-            }) { row in
+            DiagramGalleryView(
+                scope: galleryScope,
+                onOpen: { row in
+                    // The rail has no session window to hand a SESSION/PROMPT
+                    // row — nil is the legal "caller doesn't know" state.
+                    onOpen(DiagramWindowID.saved(row, session: nil))
+                }
+            ) { row in
                 cardMenu(row)
             }
         }
@@ -65,8 +68,10 @@ struct ProjectDiagramRail: View {
                 await diagrams.refresh(owner)
             }
         }
-        .alert("Diagram action failed", isPresented: Binding(
-            get: { actionError != nil }, set: { if !$0 { actionError = nil } })
+        .alert(
+            "Diagram action failed",
+            isPresented: Binding(
+                get: { actionError != nil }, set: { if !$0 { actionError = nil } })
         ) {
             Button("OK", role: .cancel) { actionError = nil }
         } message: {
@@ -99,9 +104,11 @@ struct ProjectDiagramRail: View {
     /// persists it.
     private var computedRow: some View {
         Button {
-            onOpen(DiagramWindowID(source: .dopePreview(scopeCode: dopeScopeCode),
-                                   name: "Project Persistence",
-                                   session: nil, projectUuid: projectUuid))
+            onOpen(
+                DiagramWindowID(
+                    source: .dopePreview(scopeCode: dopeScopeCode),
+                    name: "Project Persistence",
+                    session: nil, projectUuid: projectUuid))
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "sparkles.rectangle.stack")
@@ -153,16 +160,19 @@ struct ProjectDiagramRail: View {
     private func loadDopeCode() async {
         // A project with no dope scope yet is normal — the row then just says
         // "computed from dope" and the create path binds nothing.
-        guard let response = try? await GMCCDaemonService.shared.dopeGet(
-            projectUuid: projectUuid) else { return }
+        guard
+            let response = try? await GMCCDaemonService.shared.dopeGet(
+                projectUuid: projectUuid)
+        else { return }
         dopeScopeCode = response.tree.body.code
     }
 
     private func create() {
         run {
             let base = dopeScopeCode.map { "\($0)_canvas" } ?? "project_canvas"
-            let code = SessionDiagramsPane.uniqueCode(base: base,
-                                                      taken: Set(rows.map(\.code)))
+            let code = SessionDiagramsPane.uniqueCode(
+                base: base,
+                taken: Set(rows.map(\.code)))
             _ = try await diagrams.create(
                 owner: owner, code: code,
                 name: dopeScopeCode.map { "\($0) canvas" } ?? "Project Diagram",
@@ -172,8 +182,9 @@ struct ProjectDiagramRail: View {
 
     private func move(_ row: DiagramRow, to sessionUuid: String) {
         run {
-            try await diagrams.promote(row, to: .session, ownerUuid: sessionUuid,
-                                       from: owner)
+            try await diagrams.promote(
+                row, to: .session, ownerUuid: sessionUuid,
+                from: owner)
             await diagrams.refreshGallery(galleryScope)
         }
     }

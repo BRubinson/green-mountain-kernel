@@ -2,8 +2,11 @@
 
 // gmDaemon — persistence and the single-writer server. MIDDLE layer.
 //
-// Holds `Database/` (the Store, its repositories, and the append-only
-// migration ledger) plus `gm_daemon`, the server that owns the database file.
+// Holds `Sources/GmDaemon/Persistence/` — `Migrations/` (one file per
+// migration plus the ordering collector), `Entities/`, and `Store/` with its
+// `Repositories/` beneath it: the Store surface, its repository bodies, and the
+// append-only migration ledger — plus `gm_daemon`, the server that owns the
+// database file.
 //
 // Products:
 //   - GmDaemon      (library)    the Store surface
@@ -48,7 +51,7 @@ let package = Package(
         .package(path: "../gmDaemonSdk"),
         // THE SOLE GRDB PIN, and the only manifest in this repo permitted to
         // name it. Measured: GRDB is imported by 96 of the 100 files in
-        // `Database/` and by nothing anywhere else. A pin in any other manifest
+        // `Persistence/` and by nothing anywhere else. A pin in any other manifest
         // would be a sign that persistence had leaked upward.
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
         // TEST TARGET ONLY — see GmDaemonTests below. SwiftPM has no

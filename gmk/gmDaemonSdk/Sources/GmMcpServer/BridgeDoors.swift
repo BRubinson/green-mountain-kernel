@@ -28,18 +28,22 @@ func makeBridgeDoorTools() -> [Tool] {
         // implementations, and this file holds only what nothing else covers.
 
         // ── The refusals ─────────────────────────────────────────────────
-        refusal("diagram_not_supported",
-                "The diagram family is not served on this surface.",
-                "Diagrams are authored in GMVibes and read through the DIAGRAM verbs; no agent-facing door is offered."),
-        refusal("fs_not_supported",
-                "The filesystem family is not served on this surface.",
-                "File access belongs to the harness's own Read/Write/Edit tools, which are subject to its permission system. A second path around that is not a capability, it is a hole."),
-        refusal("system_not_supported",
-                "The system family is not served on this surface.",
-                "Process and shell access belongs to the harness's Bash tool, where it is visible to the permission prompt and the PostToolUse capture."),
+        refusal(
+            "diagram_not_supported",
+            "The diagram family is not served on this surface.",
+            "Diagrams are authored in GMVibes and read through the DIAGRAM verbs; no agent-facing door is offered."),
+        refusal(
+            "fs_not_supported",
+            "The filesystem family is not served on this surface.",
+            "File access belongs to the harness's own Read/Write/Edit tools, which are subject to its permission system. A second path around that is not a capability, it is a hole."
+        ),
+        refusal(
+            "system_not_supported",
+            "The system family is not served on this surface.",
+            "Process and shell access belongs to the harness's Bash tool, where it is visible to the permission prompt and the PostToolUse capture."
+        ),
     ]
 }
-
 
 /// A tool that exists to say no, and to say WHY.
 ///

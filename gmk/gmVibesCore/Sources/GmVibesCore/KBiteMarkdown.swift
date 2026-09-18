@@ -15,7 +15,8 @@ enum KBiteMarkdown {
         let fm = FileManager.default
         let attrs = (try? fm.attributesOfItem(atPath: url.path)) ?? [:]
         if let size = attrs[.size] as? NSNumber, size.intValue > maxBytes {
-            return .unavailable("Preview unavailable (file is \(size.intValue / 1024) KB; cap is \(maxBytes / 1024) KB).")
+            return .unavailable(
+                "Preview unavailable (file is \(size.intValue / 1024) KB; cap is \(maxBytes / 1024) KB).")
         }
 
         guard let data = try? Data(contentsOf: url) else {

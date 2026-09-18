@@ -14,14 +14,14 @@ public struct PaneProfileProperty: Sendable, Equatable {
         escaped.reserveCapacity(value.count + 2)
         for scalar in value.unicodeScalars {
             switch scalar {
-            case "\"":      escaped += "\\\""
-            case "\\":      escaped += "\\\\"
-            case "\n":      escaped += "\\n"
-            case "\r":      escaped += "\\r"
-            case "\t":      escaped += "\\t"
+            case "\"": escaped += "\\\""
+            case "\\": escaped += "\\\\"
+            case "\n": escaped += "\\n"
+            case "\r": escaped += "\\r"
+            case "\t": escaped += "\\t"
             case let s where s.value < 0x20:
                 escaped += String(format: "\\u%04x", s.value)
-            default:        escaped.unicodeScalars.append(scalar)
+            default: escaped.unicodeScalars.append(scalar)
             }
         }
         return PaneProfileProperty(key: key, jsonValue: "\"\(escaped)\"")

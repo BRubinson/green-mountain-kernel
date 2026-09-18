@@ -52,54 +52,61 @@ nonisolated func shellSingleQuoted(_ s: String) -> String {
 /// printable. A nil badge emits no CALL, like the other nil channels — the
 /// setbadge helper itself is always defined, so a production script carries
 /// the (inert) definition; only the call is conditional.
-private nonisolated func paneScriptPreamble(root: String,
-                                            repoPath: String,
-                                            tabColorHex: String,
-                                            badgeText: String?,
-                                            envBackgroundHex: String?) -> String {
+private nonisolated func paneScriptPreamble(
+    root: String,
+    repoPath: String,
+    tabColorHex: String,
+    badgeText: String?,
+    envBackgroundHex: String?
+) -> String {
     let envbgAssign = envBackgroundHex.map { "envbg=\(shellSingleQuoted($0))\n" } ?? ""
-    let envbgCall = envBackgroundHex == nil
+    let envbgCall =
+        envBackgroundHex == nil
         ? ""
         : "[ -n \"$envbg\"    ] && setcolor bg  \"$envbg\"\n"
-    let badgeCall = badgeText.map {
-        "setbadge \"$(printf %s \(shellSingleQuoted($0)) | base64)\"\n"
-    } ?? ""
+    let badgeCall =
+        badgeText.map {
+            "setbadge \"$(printf %s \(shellSingleQuoted($0)) | base64)\"\n"
+        } ?? ""
     return """
-    #!/bin/zsh
-    rm -f "$0"
-    cd \(shellSingleQuoted(repoPath)) || exit 1
-    export GM_FS_ROOT=\(shellSingleQuoted(root))
-    tabcolor=\(shellSingleQuoted(tabColorHex))
-    \(envbgAssign)setcolor() {   # $1=key  $2=hex
-      case $TERM in
-        screen*|tmux*) printf '\\033Ptmux;\\033\\033]1337;SetColors=%s=%s\\a\\033\\\\' "$1" "$2" ;;
-        *)             printf '\\033]1337;SetColors=%s=%s\\a' "$1" "$2" ;;
-      esac
-    }
-    setbadge() {   # $1=base64 text
-      case $TERM in
-        screen*|tmux*) printf '\\033Ptmux;\\033\\033]1337;SetBadgeFormat=%s\\a\\033\\\\' "$1" ;;
-        *)             printf '\\033]1337;SetBadgeFormat=%s\\a' "$1" ;;
-      esac
-    }
-    [ -n "$tabcolor" ] && setcolor tab "$tabcolor"
-    \(envbgCall)\(badgeCall)
-    """
+        #!/bin/zsh
+        rm -f "$0"
+        cd \(shellSingleQuoted(repoPath)) || exit 1
+        export GM_FS_ROOT=\(shellSingleQuoted(root))
+        tabcolor=\(shellSingleQuoted(tabColorHex))
+        \(envbgAssign)setcolor() {   # $1=key  $2=hex
+          case $TERM in
+            screen*|tmux*) printf '\\033Ptmux;\\033\\033]1337;SetColors=%s=%s\\a\\033\\\\' "$1" "$2" ;;
+            *)             printf '\\033]1337;SetColors=%s=%s\\a' "$1" "$2" ;;
+          esac
+        }
+        setbadge() {   # $1=base64 text
+          case $TERM in
+            screen*|tmux*) printf '\\033Ptmux;\\033\\033]1337;SetBadgeFormat=%s\\a\\033\\\\' "$1" ;;
+            *)             printf '\\033]1337;SetBadgeFormat=%s\\a' "$1" ;;
+          esac
+        }
+        [ -n "$tabcolor" ] && setcolor tab "$tabcolor"
+        \(envbgCall)\(badgeCall)
+        """
 }
 
-nonisolated func paneLaunchScript(root: String,
-                                  repoPath: String,
-                                  tabColorHex: String,
-                                  tierCommand: String,
-                                  pluginDir: String? = nil,
-                                  badgeText: String? = nil,
-                                  envBackgroundHex: String? = nil) -> String {
+nonisolated func paneLaunchScript(
+    root: String,
+    repoPath: String,
+    tabColorHex: String,
+    tierCommand: String,
+    pluginDir: String? = nil,
+    badgeText: String? = nil,
+    envBackgroundHex: String? = nil
+) -> String {
     let pluginFlag = pluginDir.map { "--plugin-dir \(shellSingleQuoted($0)) " } ?? ""
-    return paneScriptPreamble(root: root,
-                              repoPath: repoPath,
-                              tabColorHex: tabColorHex,
-                              badgeText: badgeText,
-                              envBackgroundHex: envBackgroundHex)
+    return paneScriptPreamble(
+        root: root,
+        repoPath: repoPath,
+        tabColorHex: tabColorHex,
+        badgeText: badgeText,
+        envBackgroundHex: envBackgroundHex)
         + "exec claude \(pluginFlag)\(shellSingleQuoted(tierCommand))\n"
 }
 
@@ -108,17 +115,20 @@ nonisolated func paneLaunchScript(root: String,
 /// (and a hand-typed `claude`) resolve against this root's staged binaries —
 /// a zshrc that RESETS PATH can shadow the prepend, which is cosmetic;
 /// GM_FS_ROOT itself survives any rc file.
-nonisolated func paneShellScript(root: String,
-                                 repoPath: String,
-                                 tabColorHex: String,
-                                 badgeText: String? = nil,
-                                 envBackgroundHex: String? = nil,
-                                 shell: String) -> String {
-    paneScriptPreamble(root: root,
-                       repoPath: repoPath,
-                       tabColorHex: tabColorHex,
-                       badgeText: badgeText,
-                       envBackgroundHex: envBackgroundHex)
+nonisolated func paneShellScript(
+    root: String,
+    repoPath: String,
+    tabColorHex: String,
+    badgeText: String? = nil,
+    envBackgroundHex: String? = nil,
+    shell: String
+) -> String {
+    paneScriptPreamble(
+        root: root,
+        repoPath: repoPath,
+        tabColorHex: tabColorHex,
+        badgeText: badgeText,
+        envBackgroundHex: envBackgroundHex)
         + "export PATH=\"$GM_FS_ROOT/bin:$PATH\"\n"
         + "exec \(shellSingleQuoted(shell)) -i\n"
 }
@@ -157,8 +167,9 @@ enum PaneScriptWriter {
         do {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             try Data(script.utf8).write(to: url, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o700],
-                                                  ofItemAtPath: url.path)
+            try FileManager.default.setAttributes(
+                [.posixPermissions: 0o700],
+                ofItemAtPath: url.path)
         } catch {
             throw ITerm2Error.transportFailed(
                 reason: "Could not write the launch script: \(error.localizedDescription)",

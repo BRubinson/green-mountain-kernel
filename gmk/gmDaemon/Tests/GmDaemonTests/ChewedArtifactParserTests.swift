@@ -14,33 +14,37 @@ final class ChewedArtifactParserTests: XCTestCase {
     // MARK: - File cell is a real path
 
     func testBacktickQuotedFileCellYieldsBarePath() {
-        let artifact = ChewedArtifactParser.parse(text: """
-        # Chewed: demo
+        let artifact = ChewedArtifactParser.parse(
+            text: """
+                # Chewed: demo
 
-        ## 1. Contents Overview
+                ## 1. Contents Overview
 
-        | File | Type | Description |
-        |------|------|-------------|
-        | `sources/VT100/VT100Parser.m` | m | byte-stream parser |
-        | sources/VT100/VT100Token.h | h | token IR |
-        """, fallbackName: "fallback")
+                | File | Type | Description |
+                |------|------|-------------|
+                | `sources/VT100/VT100Parser.m` | m | byte-stream parser |
+                | sources/VT100/VT100Token.h | h | token IR |
+                """, fallbackName: "fallback")
 
-        XCTAssertEqual(artifact.files.map(\.name), [
-            "sources/VT100/VT100Parser.m",
-            "sources/VT100/VT100Token.h",
-        ], "a code-quoted File cell must resolve to the same path as a bare one")
+        XCTAssertEqual(
+            artifact.files.map(\.name),
+            [
+                "sources/VT100/VT100Parser.m",
+                "sources/VT100/VT100Token.h",
+            ], "a code-quoted File cell must resolve to the same path as a bare one")
     }
 
     func testBacktickedCellStillClassifiesAsTextType() {
         // The end-to-end symptom: backticks made pathExtension come back as
         // "m`", which matched no allowlist entry, so content inlined as nil.
-        let artifact = ChewedArtifactParser.parse(text: """
-        ## Contents Overview
+        let artifact = ChewedArtifactParser.parse(
+            text: """
+                ## Contents Overview
 
-        | File | Type | Description |
-        |------|------|-------------|
-        | `Trigger.m` | m | base trigger |
-        """, fallbackName: "demo")
+                | File | Type | Description |
+                |------|------|-------------|
+                | `Trigger.m` | m | base trigger |
+                """, fallbackName: "demo")
 
         let name = try! XCTUnwrap(artifact.files.first).name
         XCTAssertTrue(
@@ -49,13 +53,14 @@ final class ChewedArtifactParserTests: XCTestCase {
     }
 
     func testHeaderAndSeparatorRowsAreNotIngestedAsFiles() {
-        let artifact = ChewedArtifactParser.parse(text: """
-        ## 1. Contents Overview
+        let artifact = ChewedArtifactParser.parse(
+            text: """
+                ## 1. Contents Overview
 
-        | File | Type | Description |
-        |------|------|-------------|
-        | real.swift | swift | the only file |
-        """, fallbackName: "demo")
+                | File | Type | Description |
+                |------|------|-------------|
+                | real.swift | swift | the only file |
+                """, fallbackName: "demo")
 
         XCTAssertEqual(artifact.files.map(\.name), ["real.swift"])
     }
@@ -116,35 +121,38 @@ final class ChewedArtifactParserTests: XCTestCase {
     }
 
     func testContentsSectionClosesAtNextHeading() {
-        let artifact = ChewedArtifactParser.parse(text: """
-        ## 1. Contents Overview
+        let artifact = ChewedArtifactParser.parse(
+            text: """
+                ## 1. Contents Overview
 
-        | File | Type | Description |
-        |------|------|-------------|
-        | real.swift | swift | counted |
+                | File | Type | Description |
+                |------|------|-------------|
+                | real.swift | swift | counted |
 
-        ## 3. Detailed Analysis
+                ## 3. Detailed Analysis
 
-        | Location | Importance | Confidence |
-        |----------|------------|------------|
-        | not-a-file | 90 | 80 |
-        """, fallbackName: "demo")
+                | Location | Importance | Confidence |
+                |----------|------------|------------|
+                | not-a-file | 90 | 80 |
+                """, fallbackName: "demo")
 
-        XCTAssertEqual(artifact.files.map(\.name), ["real.swift"],
-                       "a later table must not contribute file rows")
+        XCTAssertEqual(
+            artifact.files.map(\.name), ["real.swift"],
+            "a later table must not contribute file rows")
     }
 
     func testFullPathsBackfillMatchesByBasename() {
-        let artifact = ChewedArtifactParser.parse(text: """
-        ## 1. Contents Overview
+        let artifact = ChewedArtifactParser.parse(
+            text: """
+                ## 1. Contents Overview
 
-        | File | Type | Description |
-        |------|------|-------------|
-        | VT100Parser.m | m | parser |
+                | File | Type | Description |
+                |------|------|-------------|
+                | VT100Parser.m | m | parser |
 
-        **Full Paths**:
-        - `/tmp/iterm/VT100Parser.m`
-        """, fallbackName: "demo")
+                **Full Paths**:
+                - `/tmp/iterm/VT100Parser.m`
+                """, fallbackName: "demo")
 
         XCTAssertEqual(artifact.files.count, 1, "back-fill must not duplicate the row")
         XCTAssertEqual(artifact.files.first?.fullPath, "/tmp/iterm/VT100Parser.m")
@@ -156,11 +164,12 @@ final class ChewedArtifactParserTests: XCTestCase {
     }
 
     func testKeywordsAreNormalizedAndDeduped() {
-        let artifact = ChewedArtifactParser.parse(text: """
-        ## 4. Keywords
+        let artifact = ChewedArtifactParser.parse(
+            text: """
+                ## 4. Keywords
 
-        VT100 Parser, escape-codes, VT100 Parser, OSC 133
-        """, fallbackName: "demo")
+                VT100 Parser, escape-codes, VT100 Parser, OSC 133
+                """, fallbackName: "demo")
 
         XCTAssertEqual(artifact.keywords, ["vt100_parser", "escape_codes", "osc_133"])
     }

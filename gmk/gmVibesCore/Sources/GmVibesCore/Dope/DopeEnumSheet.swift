@@ -23,7 +23,7 @@ struct DopeEnumSheet: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxHeight: 420)          // short enums get a compact sheet
+            .frame(maxHeight: 420)  // short enums get a compact sheet
             Divider()
             HStack {
                 Spacer()
@@ -85,9 +85,11 @@ struct DopeEnumSheet: View {
                                 .font(.callout)
                             Text(option.body.description.isEmpty ? "—" : option.body.description)
                                 .font(.callout)
-                                .foregroundStyle(option.body.description.isEmpty
-                                                 ? AnyShapeStyle(.tertiary)
-                                                 : AnyShapeStyle(.secondary))
+                                .foregroundStyle(
+                                    option.body.description.isEmpty
+                                        ? AnyShapeStyle(.tertiary)
+                                        : AnyShapeStyle(.secondary)
+                                )
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }

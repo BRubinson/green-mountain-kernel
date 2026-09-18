@@ -41,8 +41,9 @@ public enum StructuredPatchExpander {
             ChangeRange(
                 lineStart: hunk.newStart,
                 lineEnd: hunk.newStart + max(hunk.newLines, 1) - 1,
-                changedContent: String(hunk.lines.joined(separator: "\n")
-                    .prefix(maxHunkBodyCharacters)))
+                changedContent: String(
+                    hunk.lines.joined(separator: "\n")
+                        .prefix(maxHunkBodyCharacters)))
         }
     }
 }
