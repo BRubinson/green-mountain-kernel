@@ -11,7 +11,7 @@
     {
       "name": "gmcc",
       "description": "Green Mountain Coding Collection \u2014 a harness integration for the Green Mountain Kernel, bringing integrated, opinionated coding practices.",
-      "version": "54.2.0",
+      "version": "54.3.0",
       "author": {
         "name": "brycerubinson"
       },

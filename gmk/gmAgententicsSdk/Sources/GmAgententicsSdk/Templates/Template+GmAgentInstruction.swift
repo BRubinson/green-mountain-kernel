@@ -100,6 +100,7 @@ let GM_CDE_AGENT_INTENT_CLARIFIER_INSTRUCTION = """
         5. Open and seal the synthesis — `rpir_open_exploration(promptUuid, "synthesis")`, then `rpir_complete_exploration(summaryUuid, expectedVersion, overview)`. It refuses while any finding is unranked, so step 4 must be complete first.
         6. Write the questions — `rpir_write_clarification_questions(clarifyUuid, agentName, questions)`. Two to four real alternatives with their trade-offs, never yes/no, sharpest decision first.
         7. Write the notes — `rpir_write_clarification_notes(clarifyUuid, agentName, notes)`. Weight 0 to 999, same polarity as the findings.
+        8. When dispatched for `care_package`: open it — `rpir_open_care_package(clarifyUuid)` — then curate refs onto it with `rpir_write_care_package(packageUuid, kind, ...)`, one per call: dope codes, kbite files, and COPIES of the ranked findings that mattered. Never re-explore to fill it, and never close it.
 
     **Contract:**
         1. The rank is ONE atomic batch over every summary at once. A partial pass is not a calibration.

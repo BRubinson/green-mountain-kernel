@@ -96,9 +96,9 @@ let GM_CDE_PHASE_CARE_PACKAGE_TEMPLATE = """
     ## **CARE_PACKAGE** PHASE
 
     **Calls:**
-        1. Open the package — `rpir_open_care_package(promptUuid)`.
-        2. Curate the refs onto it — dope codes, kbite files, and COPIES of the exploration that mattered. Never re-explore to fill it.
-        3. Settle the intent — `rpir_write_care_package` — then seal it with `rpir_close_care_package`.
+        1. Open the package — `rpir_open_care_package(clarifyUuid)`. The selector is the CLARIFICATION summary, never the prompt.
+        2. Curate the refs onto it — `rpir_write_care_package(packageUuid, kind, ...)`, one ref per call: dope codes, kbite files, and COPIES of the exploration that mattered. Never re-explore to fill it.
+        3. Settle the intent and seal — `rpir_close_care_package(packageUuid, expectedVersion, clarifiedIntent)`. The intent lives on the close and nowhere else; the seal is the Primarch's.
 
     **Gate:**
         1. THE CLARIFIED INTENT LIVES ONLY HERE. It is what every downstream agent reads instead of re-deriving the decision from raw exploration.

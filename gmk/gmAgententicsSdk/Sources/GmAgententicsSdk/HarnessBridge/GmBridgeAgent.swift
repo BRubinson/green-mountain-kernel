@@ -114,6 +114,8 @@ extension GmBridgeAgent {
                 GmAgentTools.Rpir.openClarification,
                 GmAgentTools.Rpir.writeClarificationQuestions,
                 GmAgentTools.Rpir.writeClarificationNotes,
+                GmAgentTools.Rpir.openCarePackage,
+                GmAgentTools.Rpir.writeCarePackage,
                 GmAgentTools.Dope.searchSession,
             ]
         ),
