@@ -677,12 +677,16 @@ Two things about its shape are deliberate and easy to re-derive wrongly:
 
 - **The in-process subjects are compiled INTO the bundle, not imported.** The
   few tests that touch types directly (`ChewedArtifact`, the migration ladder,
-  `CdePaging`) need the `GmDaemonSdk` and `GmDaemon` folders, so those two
-  folders are members of BOTH targets through membership exceptions on the
+  `CdePaging`) need every file under `GmDaemonSdk` and `GmDaemon`, so those
+  files are members of BOTH targets through a membership-exception set on the
   `Sources` synced group, and the test target carries its own GRDB product
   dependency. The closure is the two FOLDERS, not three files: the migration
-  ladder pulls the store, the store pulls the SDK. If Xcode expands the
-  exception set to per-file entries, accept what it writes.
+  ladder pulls the store, the store pulls the SDK. **The exception set lists
+  the 183 files ONE BY ONE.** A folder-level entry was tried first and is
+  inert in both directions (an include yielded 8 files, an exclude yielded all
+  517), so a NEW file under either folder must be added to that list by hand
+  or the test bundle fails to link on the symbol it defines. The app target
+  needs nothing: its synced group takes the whole tree.
 - **`TEST_HOST` was ruled out**, because hosting the tests in `gm_kernel.app`
   launches the app, and a launched app arbitrates for the `flock` and boots a
   WRITER — inside the suite whose whole design is that the booted kernel is the
