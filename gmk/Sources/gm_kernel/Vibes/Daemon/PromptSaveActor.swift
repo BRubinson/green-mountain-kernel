@@ -131,8 +131,8 @@ final class PromptFlushRegistry {
     }
 }
 
-public final class GMVibesAppDelegate: NSObject, NSApplicationDelegate {
-    public override init() { super.init() }
+final class GMVibesAppDelegate: NSObject, NSApplicationDelegate {
+    override init() { super.init() }
 
     /// The kernel this process hosts, if it does. Assigned once by
     /// `GMVibesApp.init` — the delegate is constructed by
@@ -142,7 +142,7 @@ public final class GMVibesAppDelegate: NSObject, NSApplicationDelegate {
     /// WEAK IS WRONG HERE and strong is deliberate: the whole job is to run
     /// during termination, which is exactly when other references are going
     /// away.
-    public var services: GMVibesServices?
+    var services: GMVibesServices?
 
     /// Termination is ordered: flush dirty prompt drafts on a bounded deadline, THEN stop the
     /// kernel (listener down, DAEMON_STOP, WAL checkpointed, database closed, socket and
@@ -152,7 +152,7 @@ public final class GMVibesAppDelegate: NSObject, NSApplicationDelegate {
     /// blocking I/O and a quit must never be hostage to it. Kernel shutdown runs on BOTH
     /// completion paths: a flush that timed out must still close the database, or the WAL is
     /// left for the next boot to recover.
-    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let registry = PromptFlushRegistry.shared
         guard registry.hasDirtyDrafts else {
             services?.shutdownKernel()

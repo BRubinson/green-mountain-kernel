@@ -13,19 +13,19 @@ extension Store {
 
     // MARK: - Verbs (bodies in DiagramRepository; these wrappers own the transaction)
 
-    public func diagramInit(_ req: DiagramInitRequest) throws -> DiagramResponse {
+    func diagramInit(_ req: DiagramInitRequest) throws -> DiagramResponse {
         try boundary { db in try DiagramRepository(db: db, core: core).diagramInit(req) }
     }
 
-    public func diagramList(_ req: DiagramListRequest) throws -> DiagramListResponse {
+    func diagramList(_ req: DiagramListRequest) throws -> DiagramListResponse {
         try boundaryRead { db in try DiagramRepository(db: db, core: core).diagramList(req) }
     }
 
-    public func diagramGet(_ req: DiagramGetRequest) throws -> DiagramGetResponse {
+    func diagramGet(_ req: DiagramGetRequest) throws -> DiagramGetResponse {
         try boundaryRead { db in try DiagramRepository(db: db, core: core).diagramGet(req) }
     }
 
-    public func diagramBatchApply(_ req: DiagramBatchApplyRequest) throws -> DiagramBatchApplyResponse {
+    func diagramBatchApply(_ req: DiagramBatchApplyRequest) throws -> DiagramBatchApplyResponse {
         guard !req.mutations.isEmpty else {
             throw StoreError.badRequest(detail: "batch-apply carried no mutations")
         }
@@ -152,7 +152,7 @@ extension Store {
 
     // MARK: - Granular verbs (one-mutation batches; there is no second body)
 
-    public func diagramNodeAdd(_ req: DiagramNodeAddRequest) throws -> DiagramNodeResponse {
+    func diagramNodeAdd(_ req: DiagramNodeAddRequest) throws -> DiagramNodeResponse {
         let batch = try diagramBatchApply(
             DiagramBatchApplyRequest(
                 diagramUuid: req.diagramUuid,
@@ -168,7 +168,7 @@ extension Store {
         )
     }
 
-    public func diagramNodeUpdate(_ req: DiagramNodeUpdateRequest) throws -> DiagramNodeResponse {
+    func diagramNodeUpdate(_ req: DiagramNodeUpdateRequest) throws -> DiagramNodeResponse {
         let diagramUuid = try owningDiagramUuid(elementUuid: req.update.elementUuid)
         let batch = try diagramBatchApply(
             DiagramBatchApplyRequest(
@@ -185,7 +185,7 @@ extension Store {
         )
     }
 
-    public func diagramNodeDelete(_ req: DiagramNodeDeleteRequest) throws -> DiagramNodeDeleteResponse {
+    func diagramNodeDelete(_ req: DiagramNodeDeleteRequest) throws -> DiagramNodeDeleteResponse {
         let diagramUuid = try owningDiagramUuid(elementUuid: req.delete.elementUuid)
         let batch = try diagramBatchApply(
             DiagramBatchApplyRequest(

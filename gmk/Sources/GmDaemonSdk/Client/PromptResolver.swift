@@ -8,18 +8,18 @@ import Foundation
 /// A RESULT, NEVER A GUESS: a substring matching three prompts returns all
 /// three, because picking the first would file work against the wrong prompt
 /// and the append-only db makes that permanent.
-public enum PromptResolver {
+enum PromptResolver {
 
     /// How a selector matched — surfaced so a caller can tell an exact hit from
     /// a fuzzy one and say so.
-    public enum MatchKind: String, Sendable {
+    enum MatchKind: String, Sendable {
         case seq
         case code
         case name
         case nameSubstring
     }
 
-    public enum Resolution: Sendable {
+    enum Resolution: Sendable {
         case matched(stub: PromptStub, by: MatchKind)
         /// More than one candidate. Ordered by seq so the caller can present
         /// them the way the user thinks about them.
@@ -32,7 +32,7 @@ public enum PromptResolver {
     /// Precedence is most-specific-first, and each tier is tried to exhaustion
     /// before the next: an exact name must never lose to a substring hit on a
     /// different prompt.
-    public static func resolve(_ selector: String, in stubs: [PromptStub]) -> Resolution {
+    static func resolve(_ selector: String, in stubs: [PromptStub]) -> Resolution {
         let needle = selector.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return .notFound }
 

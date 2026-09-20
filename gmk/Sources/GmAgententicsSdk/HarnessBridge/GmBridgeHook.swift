@@ -2,7 +2,7 @@ import Foundation
 
 extension GmBridgeHook {
 
-    public static let pluginRoot = GmBridgeClaudeTypePath.pluginRoot
+    static let pluginRoot = GmBridgeClaudeTypePath.pluginRoot
 
     /// Where the binaries live, resolved at hook time rather than at generate time.
     ///
@@ -36,7 +36,7 @@ extension GmBridgeHook {
         fi; exit 0
         """#
 
-    public static let current = File(
+    static let current = File(
         hooks: [
             Lifecycle.sessionStart.code: [
                 MatcherGroup(

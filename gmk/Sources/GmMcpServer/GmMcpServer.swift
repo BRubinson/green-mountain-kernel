@@ -939,7 +939,7 @@ extension GmCdeTools {
     /// no role decision behind it. A MISSING — declared, unserved — is a
     /// capability the pen advertises and cannot deliver, and a one-directional
     /// gate passes that cleanly.
-    @MainActor public static func rosterProblems() -> [String] {
+    @MainActor static func rosterProblems() -> [String] {
         // Refusals are excluded from the ORPHAN direction only. They have no
         // verb by construction, so "served with no VerbSpec" is their normal
         // state — but they must still be DECLARED by the bridge, which the
@@ -999,7 +999,7 @@ func respondError(id: Any, code: Int, message: String) {
 // is legal solely in an executable target's `main.swift`, which is why these
 // statements are a function body.
 
-public enum GmMcpServer {
+enum GmMcpServer {
 
     /// The `gm_mcp` personality: a JSON-RPC 2.0 server on newline-delimited
     /// stdio, relaying every `tools/call` to the daemon over the unix socket.
@@ -1010,7 +1010,7 @@ public enum GmMcpServer {
     /// the implicit isolation of top-level code, which is what lets
     /// `validateRosterAgainstRegistry()` be called plainly.
     @MainActor
-    public static func main() {
+    static func main() {
         // Servers spawn with the project dir as cwd; CLAUDE_PROJECT_DIR is the
         // stable root — chdir so GitContext.detect() resolves the right repo even
         // if the harness launched us elsewhere.

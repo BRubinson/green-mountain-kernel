@@ -9,12 +9,12 @@ import GRDB
 ///
 /// Each migration is one `m00NN_<name>.swift` registering exactly one id; this
 /// file only ORDERS them, and a file missing from `ladder` never runs.
-public enum Migrations {
+enum Migrations {
     /// Bump alongside new registerMigration calls.
     /// Shipped migration bodies are frozen: the migrator keys on the migration
     /// id and silently skips a changed body on an existing db, so every schema
     /// change lands as a new registerMigration.
-    public static let currentSchemaVersion = 30
+    static let currentSchemaVersion = 30
 
     /// The five BaseEntity columns wrapped into every domain table.
     /// `id` is the internal rowid; `uuid` is the external join key — all FKs
@@ -62,7 +62,7 @@ public enum Migrations {
         m0030_retiredRootConfigValues,
     ]
 
-    public static var migrator: DatabaseMigrator {
+    static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
         for step in ladder { step(&migrator) }
         return migrator

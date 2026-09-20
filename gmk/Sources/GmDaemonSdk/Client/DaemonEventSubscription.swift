@@ -8,7 +8,7 @@ import Foundation
 /// next subscription; the daemon replays every missed event before going
 /// live. Replay is capped (see `replayCapped`): after a capped replay,
 /// re-subscribe from the new `lastEventId` to drain the remainder.
-public final class DaemonEventSubscription: @unchecked Sendable {
+final class DaemonEventSubscription: @unchecked Sendable {
     private let client: DaemonClient
     private let sinceId: Int64?
     private var started = false
@@ -17,14 +17,14 @@ public final class DaemonEventSubscription: @unchecked Sendable {
     /// quiet since_id reconnect that drops never regresses it to 0 (which
     /// would replay the entire event log next time); the ack horizon covers
     /// the fresh-subscription case, and each event advances it.
-    public private(set) var lastEventId: Int64
+    private(set) var lastEventId: Int64
 
     /// True when the subscribe ack indicates the replay hit the daemon's row
     /// cap — events between the last replayed id and the ack horizon were NOT
     /// replayed; re-subscribe from `lastEventId` after draining.
-    public private(set) var replayCapped = false
+    private(set) var replayCapped = false
 
-    public init(
+    init(
         sinceId: Int64? = nil,
         socketPath: String = Paths.socket.path,
         daemonBinaryPath: String = Paths.binDaemon.path,
@@ -44,7 +44,7 @@ public final class DaemonEventSubscription: @unchecked Sendable {
     /// Subscribe and yield replayed + live events until the connection drops.
     /// A DAEMON_STOP event immediately before the stream ends means the drop
     /// was an intentional daemon shutdown, not a failure.
-    public func events() -> AsyncThrowingStream<EventNotification, Error> {
+    func events() -> AsyncThrowingStream<EventNotification, Error> {
         AsyncThrowingStream { continuation in
             // One-shot: a second events() call would put two readers on one
             // connection — exactly the interleaving this type exists to

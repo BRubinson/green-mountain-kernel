@@ -8,13 +8,13 @@ import Foundation
 /// exactly once and emits exactly one DIAGRAM_CHANGE event. Encoding is
 /// `{"kind": "<case>", "fields": {...}}` — single-word tag keys, camelCase
 /// case-struct keys.
-public enum DiagramMutation: Codable, Hashable, Sendable {
+enum DiagramMutation: Codable, Hashable, Sendable {
     case elementAdd(DiagramElementAdd)
     case elementUpdate(DiagramElementUpdate)
     case elementDelete(DiagramElementDelete)
     case diagramUpdate(DiagramRowUpdate)
 
-    public var kind: String {
+    var kind: String {
         switch self {
         case .elementAdd: return "element_add"
         case .elementUpdate: return "element_update"
@@ -25,7 +25,7 @@ public enum DiagramMutation: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case kind, fields }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let kind = try c.decode(String.self, forKey: .kind)
         switch kind {
@@ -46,7 +46,7 @@ public enum DiagramMutation: Codable, Hashable, Sendable {
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(kind, forKey: .kind)
         switch self {
@@ -64,29 +64,29 @@ public enum DiagramMutation: Codable, Hashable, Sendable {
 /// `parentClientRef`, so one gesture can create a layer and its strokes
 /// atomically. Omitted code/name are minted by the store (`stroke_0007`
 /// style / the type's default name).
-public struct DiagramElementAdd: Codable, Hashable, Sendable {
-    public let clientRef: String?
+struct DiagramElementAdd: Codable, Hashable, Sendable {
+    let clientRef: String?
     /// Exactly one of these for child types; both nil for top-level types.
-    public let parentElementUuid: String?
-    public let parentClientRef: String?
+    let parentElementUuid: String?
+    let parentClientRef: String?
     /// In-batch temp id for a connector's TARGET, the exact parallel of
     /// `parentClientRef`: a connector can point at an element created
     /// earlier in the same batch, before that element has a real uuid.
     /// Resolution is a batch concern, which is why it rides on the mutation
     /// and not inside ConnectorPayload. Setting both this and the payload's
     /// `targetElementUuid` is refused.
-    public let targetClientRef: String?
-    public let code: String?
-    public let name: String?
-    public let description: String?
-    public let sortOrder: Int?
-    public let centerX: Double?
-    public let centerY: Double?
-    public let elementZ: Double?
-    public let scale: Double?
-    public let payload: DiagramElementPayload
+    let targetClientRef: String?
+    let code: String?
+    let name: String?
+    let description: String?
+    let sortOrder: Int?
+    let centerX: Double?
+    let centerY: Double?
+    let elementZ: Double?
+    let scale: Double?
+    let payload: DiagramElementPayload
 
-    public init(
+    init(
         clientRef: String? = nil,
         parentElementUuid: String? = nil,
         parentClientRef: String? = nil,
@@ -124,30 +124,30 @@ public struct DiagramElementAdd: Codable, Hashable, Sendable {
 /// reparents a child element — unambiguous as a plain optional because a
 /// child type's parent can never be NULL and a top-level type can never
 /// have one.
-public struct DiagramElementUpdate: Codable, Hashable, Sendable {
-    public let elementUuid: String
+struct DiagramElementUpdate: Codable, Hashable, Sendable {
+    let elementUuid: String
     /// The element row's optimistic lock — THE aggregate lock for the whole
     /// element (subtype + vertices are owned value rows).
-    public let expectedVersion: Int64
-    public let code: String?
-    public let name: String?
-    public let description: String?
-    public let sortOrder: Int?
-    public let centerX: Double?
-    public let centerY: Double?
-    public let elementZ: Double?
-    public let scale: Double?
-    public let parentElementUuid: String?
+    let expectedVersion: Int64
+    let code: String?
+    let name: String?
+    let description: String?
+    let sortOrder: Int?
+    let centerX: Double?
+    let centerY: Double?
+    let elementZ: Double?
+    let scale: Double?
+    let parentElementUuid: String?
     /// In-batch temp id for a connector's TARGET, the exact parallel of
     /// `parentClientRef`: a connector can point at an element created
     /// earlier in the same batch, before that element has a real uuid.
     /// Resolution is a batch concern, which is why it rides on the mutation
     /// and not inside ConnectorPayload. Setting both this and the payload's
     /// `targetElementUuid` is refused.
-    public let targetClientRef: String?
-    public let payload: DiagramElementPayload?
+    let targetClientRef: String?
+    let payload: DiagramElementPayload?
 
-    public init(
+    init(
         elementUuid: String,
         expectedVersion: Int64,
         code: String? = nil,
@@ -180,11 +180,11 @@ public struct DiagramElementUpdate: Codable, Hashable, Sendable {
 
 /// Delete one element and its subtree (plain CASCADE — the family has no
 /// RESTRICT FKs and no external referrers).
-public struct DiagramElementDelete: Codable, Hashable, Sendable {
-    public let elementUuid: String
-    public let expectedVersion: Int64
+struct DiagramElementDelete: Codable, Hashable, Sendable {
+    let elementUuid: String
+    let expectedVersion: Int64
 
-    public init(elementUuid: String, expectedVersion: Int64) {
+    init(elementUuid: String, expectedVersion: Int64) {
         self.elementUuid = elementUuid
         self.expectedVersion = expectedVersion
     }
@@ -194,18 +194,18 @@ public struct DiagramElementDelete: Codable, Hashable, Sendable {
 /// column via FieldPatch, and tier promotion (an UPDATE that re-derives the
 /// owner chain and NULLs the FKs below the new tier — the new owner must
 /// resolve to the diagram's own project).
-public struct DiagramRowUpdate: Codable, Hashable, Sendable {
-    public let expectedVersion: Int64
-    public let code: String?
-    public let name: String?
-    public let description: String?
-    public let gmccDiagramPath: FieldPatch<String>?
-    public let promotion: DiagramPromotion?
+struct DiagramRowUpdate: Codable, Hashable, Sendable {
+    let expectedVersion: Int64
+    let code: String?
+    let name: String?
+    let description: String?
+    let gmccDiagramPath: FieldPatch<String>?
+    let promotion: DiagramPromotion?
     /// v23: the visibility axis. PUBLIC is store-guarded to SESSION tier —
     /// the same session→instance-root gate dope write-repo uses.
-    public let visibility: DiagramVisibility?
+    let visibility: DiagramVisibility?
 
-    public init(
+    init(
         expectedVersion: Int64,
         code: String? = nil,
         name: String? = nil,
@@ -224,33 +224,33 @@ public struct DiagramRowUpdate: Codable, Hashable, Sendable {
     }
 }
 
-public struct DiagramPromotion: Codable, Hashable, Sendable {
-    public let tier: DiagramTier
+struct DiagramPromotion: Codable, Hashable, Sendable {
+    let tier: DiagramTier
     /// The uuid of the row at the NEW tier that owns the diagram afterwards.
-    public let ownerUuid: String
+    let ownerUuid: String
 
-    public init(tier: DiagramTier, ownerUuid: String) {
+    init(tier: DiagramTier, ownerUuid: String) {
         self.tier = tier
         self.ownerUuid = ownerUuid
     }
 }
 
 /// Per-mutation outcome, index-aligned with the request's mutations array.
-public struct DiagramMutationResult: Codable, Hashable, Sendable {
-    public let index: Int
-    public let kind: String
+struct DiagramMutationResult: Codable, Hashable, Sendable {
+    let index: Int
+    let kind: String
     /// Echoed from an elementAdd so the client can map temp ids to real ones.
-    public let clientRef: String?
+    let clientRef: String?
     /// The affected row's uuid (the new element on add; absent for
     /// diagram_update, which the response's diagramUuid already names).
-    public let uuid: String?
+    let uuid: String?
     /// The affected row's post-mutation optimistic-lock version.
-    public let version: Int64?
+    let version: Int64?
     /// elementDelete only: how many element rows the subtree delete removed
     /// (including the target itself).
-    public let cascadedElements: Int?
+    let cascadedElements: Int?
 
-    public init(
+    init(
         index: Int,
         kind: String,
         clientRef: String? = nil,

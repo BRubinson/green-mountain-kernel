@@ -4,7 +4,7 @@ import Foundation
 /// nothing in this file refuses anybody. It exists so the pen sheet can put
 /// reads before writes, and so `gm_hook verbs` can say which side of the
 /// line a MessageType falls on.
-public enum VerbRole: Hashable, Sendable {
+enum VerbRole: Hashable, Sendable {
     /// A write. `agentPhases` is DECLARATIVE metadata: the workflow phases in
     /// which this write normally happens. `nil` means "every phase".
     case record(agentPhases: [WorkflowSpec.Phase]?)
@@ -15,27 +15,27 @@ public enum VerbRole: Hashable, Sendable {
 
 /// One row per daemon verb: the message, how a human invokes it, the pen tool
 /// that replaces that invocation for an agent, and who may call it.
-public struct VerbSpec: Hashable, Sendable {
-    public let messageType: MessageType
+struct VerbSpec: Hashable, Sendable {
+    let messageType: MessageType
     /// The canonical `gm` invocation, or "" for transport-internal verbs that
     /// have no CLI surface (HELLO, SUBSCRIBE, EVENT, ERROR).
-    public let gmInvocation: String
+    let gmInvocation: String
     /// EVERY OTHER `gm` SPELLING THAT SENDS THIS SAME MessageType. Wrappers
     /// over a single verb — `gm bot summary` IS EXPLORE_OPEN — mean one
     /// canonical invocation does not cover the CLI, and a spelling absent from
     /// this list is a write the deny set does not see.
-    public let gmAliases: [String]
+    let gmAliases: [String]
     /// The MCP pen tool an agent uses instead of `gmInvocation`, when one
     /// exists. `nil` means this verb is not on the pen surface.
-    public let cdeTool: String?
-    public let role: VerbRole
+    let cdeTool: String?
+    let role: VerbRole
 
     /// Canonical first, then every alias. Empty for transport-internal verbs.
-    public var gmInvocations: [String] {
+    var gmInvocations: [String] {
         gmInvocation.isEmpty ? [] : [gmInvocation] + gmAliases
     }
 
-    public init(
+    init(
         _ messageType: MessageType,
         gm gmInvocation: String,
         aliases gmAliases: [String] = [],
@@ -58,7 +58,7 @@ public struct VerbSpec: Hashable, Sendable {
 /// IT AUTHORIZES NOTHING. The workflow's methodology — one reader calibrates
 /// the cross-agent rank, decides among options, and seals — is GUIDANCE
 /// carried by `primaryPenTools` and each agent's tool list, never a refusal.
-public enum VerbRegistry {
+enum VerbRegistry {
 
     // MARK: - Methodology (guidance, never a gate)
 
@@ -66,7 +66,7 @@ public enum VerbRegistry {
     /// tell a persona which calls belong to the reader who calibrates and
     /// seals — a statement about how good work gets produced, not a permission
     /// check. Nothing refuses a caller for using one.
-    public static let primaryPenTools: Set<String> = [
+    static let primaryPenTools: Set<String> = [
         "cde_set_status", "rpir_decide_architecture", "rpir_rank_reviews", "rpir_close_care_package",
     ]
 
@@ -78,19 +78,19 @@ public enum VerbRegistry {
         return map
     }()
 
-    public static func spec(for type: MessageType) -> VerbSpec? {
+    static func spec(for type: MessageType) -> VerbSpec? {
         byMessageType[type]
     }
 
     /// Every `gm` spelling the registry knows, canonical and alias alike. This
     /// is the set the PreToolUse guard's deny list is generated from and the
     /// set the CLI-coverage test checks `gm`'s command tree against.
-    public static var gmInvocations: Set<String> {
+    static var gmInvocations: Set<String> {
         Set(all.flatMap(\.gmInvocations))
     }
 
     /// The row a `gm` command path belongs to, whatever spelling it uses.
-    public static func spec(forInvocation invocation: String) -> VerbSpec? {
+    static func spec(forInvocation invocation: String) -> VerbSpec? {
         byInvocation[invocation]
     }
 
@@ -108,7 +108,7 @@ public enum VerbRegistry {
     /// already landed, which makes "call it again, narrower" the one advice a
     /// caller must not follow: these verbs append, so the retry writes a
     /// second row. Derived from `role`, never hand-listed, so it cannot drift.
-    public static var writeCdeTools: Set<String> {
+    static var writeCdeTools: Set<String> {
         var names = Set(
             all.compactMap { spec -> String? in
                 guard let pen = spec.cdeTool else { return nil }
@@ -122,13 +122,13 @@ public enum VerbRegistry {
         return names
     }
 
-    public static var cdeToolNames: Set<String> {
+    static var cdeToolNames: Set<String> {
         Set(all.compactMap(\.cdeTool)).union(compositeCdeTools.keys)
     }
 
     /// Pen tools that are NOT 1:1 with a MessageType — a convenience the pen
     /// composes out of several verbs, so they carry no VerbSpec of their own.
-    public static let compositeCdeTools: [String: [MessageType]] = [
+    static let compositeCdeTools: [String: [MessageType]] = [
         // FIVE NAMED DOORS OVER ONE VERB (v30). `SEARCH` is full-text across the
         // whole record and takes a `kinds` filter; the bridge names one door per
         // record type because a caller hunting an old finding does not want
@@ -171,14 +171,14 @@ public enum VerbRegistry {
 
     /// MessageTypes deliberately left out of `all`. Daemon → client only: they
     /// are never dispatched, so they have no caller and no role.
-    public static let unroledMessageTypes: Set<MessageType> = [.event, .error]
+    static let unroledMessageTypes: Set<MessageType> = [.event, .error]
 
     // MARK: - The table
     //
     // ONE ROW PER MessageType. Adding a case to MessageType without adding a
     // row here (or to `unroledMessageTypes`) fails VerbRegistryTests.
 
-    public static let all: [VerbSpec] = [
+    static let all: [VerbSpec] = [
 
         // ── Infra ────────────────────────────────────────────────────────
         VerbSpec(.hello, gm: "", role: .read),

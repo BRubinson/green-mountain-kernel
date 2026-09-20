@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol GmBridgeFile {
+protocol GmBridgeFile {
 
     var relativePath: String { get }
 
@@ -13,16 +13,16 @@ public protocol GmBridgeFile {
 
 extension GmBridgeFile {
 
-    public var isEmpty: Bool { false }
+    var isEmpty: Bool { false }
 
-    public var isExecutable: Bool { false }
+    var isExecutable: Bool { false }
 }
 
-public protocol GmBridgeJsonFile: GmBridgeFile, Encodable {}
+protocol GmBridgeJsonFile: GmBridgeFile, Encodable {}
 
 extension GmBridgeJsonFile {
 
-    public func contents() throws -> String? {
+    func contents() throws -> String? {
         guard !isEmpty else { return nil }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]

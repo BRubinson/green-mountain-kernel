@@ -3,7 +3,7 @@
 import Foundation
 import FoundationModels
 
-public enum GmAgentToolFamily: String, Sendable, CaseIterable {
+enum GmAgentToolFamily: String, Sendable, CaseIterable {
 
     case dope
 
@@ -22,54 +22,54 @@ public enum GmAgentToolFamily: String, Sendable, CaseIterable {
     case fs
 }
 
-public protocol GmAgentTool: Tool {
+protocol GmAgentTool: Tool {
     var family: GmAgentToolFamily { get }
 }
 
-public protocol GmAgentDopeTool: GmAgentTool {}
+protocol GmAgentDopeTool: GmAgentTool {}
 
 extension GmAgentDopeTool {
-    public var family: GmAgentToolFamily { .dope }
+    var family: GmAgentToolFamily { .dope }
 }
 
-public protocol GmAgentKbiteTool: GmAgentTool {}
+protocol GmAgentKbiteTool: GmAgentTool {}
 
 extension GmAgentKbiteTool {
-    public var family: GmAgentToolFamily { .kbite }
+    var family: GmAgentToolFamily { .kbite }
 }
 
-public protocol GmAgentDiagramTool: GmAgentTool {}
+protocol GmAgentDiagramTool: GmAgentTool {}
 
 extension GmAgentDiagramTool {
-    public var family: GmAgentToolFamily { .diagram }
+    var family: GmAgentToolFamily { .diagram }
 }
 
-public protocol GmAgentCdeTool: GmAgentTool {}
+protocol GmAgentCdeTool: GmAgentTool {}
 
 extension GmAgentCdeTool {
-    public var family: GmAgentToolFamily { .cde }
+    var family: GmAgentToolFamily { .cde }
 }
 
-public protocol GmAgentRpirTool: GmAgentTool {}
+protocol GmAgentRpirTool: GmAgentTool {}
 
 extension GmAgentRpirTool {
-    public var family: GmAgentToolFamily { .rpir }
+    var family: GmAgentToolFamily { .rpir }
 }
 
-public protocol GmAgentProjectsTool: GmAgentTool {}
+protocol GmAgentProjectsTool: GmAgentTool {}
 
 extension GmAgentProjectsTool {
-    public var family: GmAgentToolFamily { .projects }
+    var family: GmAgentToolFamily { .projects }
 }
 
-public protocol GmAgentSystemTool: GmAgentTool {}
+protocol GmAgentSystemTool: GmAgentTool {}
 
 extension GmAgentSystemTool {
-    public var family: GmAgentToolFamily { .system }
+    var family: GmAgentToolFamily { .system }
 }
 
-public protocol GmAgentFsTool: GmAgentTool {}
+protocol GmAgentFsTool: GmAgentTool {}
 
 extension GmAgentFsTool {
-    public var family: GmAgentToolFamily { .fs }
+    var family: GmAgentToolFamily { .fs }
 }

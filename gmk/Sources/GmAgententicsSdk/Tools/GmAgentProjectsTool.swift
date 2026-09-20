@@ -4,30 +4,30 @@ import Foundation
 import FoundationModels
 
 @Generable
-public struct GmAgentProjectsSearchArguments: Sendable {
+struct GmAgentProjectsSearchArguments: Sendable {
     @Guide(description: "Name or id to look for.")
-    public var query: String
+    var query: String
 
     @Guide(description: "Only look inside this project, by uuid. Leave empty to look everywhere.")
-    public var projectUuid: String
+    var projectUuid: String
 
     @Guide(description: GM_TOOL_GUIDE_SEARCH_LIMIT, .range(1...500))
-    public var limit: Int
+    var limit: Int
 
-    public init(query: String, projectUuid: String = "", limit: Int = 50) {
+    init(query: String, projectUuid: String = "", limit: Int = 50) {
         self.query = query
         self.projectUuid = projectUuid
         self.limit = limit
     }
 }
 
-public struct GmAgentProjectsSearchTool: GmAgentProjectsTool {
-    public let name = "projects_search"
-    public let description = "Find projects, sessions, and instances by name or id."
+struct GmAgentProjectsSearchTool: GmAgentProjectsTool {
+    let name = "projects_search"
+    let description = "Find projects, sessions, and instances by name or id."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentProjectsSearchArguments) throws -> String {
+    func call(arguments _: GmAgentProjectsSearchArguments) throws -> String {
         throw GmAgentToolError.notSupported(
             tool: name,
             detail: """
@@ -41,26 +41,26 @@ public struct GmAgentProjectsSearchTool: GmAgentProjectsTool {
 }
 
 @Generable
-public struct GmAgentProjectsUpdateSessionArguments: Sendable {
+struct GmAgentProjectsUpdateSessionArguments: Sendable {
     @Guide(description: "Which session to change, by uuid.")
-    public var sessionUuid: String
+    var sessionUuid: String
 
     @Guide(description: "Version of the session you read, so two writers cannot clobber each other.")
-    public var expectedVersion: Int
+    var expectedVersion: Int
 
     @Guide(description: "New backstory for the session, or empty to leave it alone.")
-    public var backstory: String
+    var backstory: String
 
     @Guide(description: "New goal for the session, or empty to leave it alone.")
-    public var goal: String
+    var goal: String
 
     @Guide(description: "Kbite codes to switch ON for this session.")
-    public var addKbiteCodes: [String]
+    var addKbiteCodes: [String]
 
     @Guide(description: "Kbite codes to switch OFF for this session.")
-    public var removeKbiteCodes: [String]
+    var removeKbiteCodes: [String]
 
-    public init(
+    init(
         sessionUuid: String,
         expectedVersion: Int,
         backstory: String = "",
@@ -77,13 +77,13 @@ public struct GmAgentProjectsUpdateSessionArguments: Sendable {
     }
 }
 
-public struct GmAgentProjectsUpdateSessionTool: GmAgentProjectsTool {
-    public let name = "projects_update_session"
-    public let description = "Change session kbites and backstory."
+struct GmAgentProjectsUpdateSessionTool: GmAgentProjectsTool {
+    let name = "projects_update_session"
+    let description = "Change session kbites and backstory."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentProjectsUpdateSessionArguments) throws -> String {
+    func call(arguments _: GmAgentProjectsUpdateSessionArguments) throws -> String {
         throw GmAgentToolError.notWired(
             tool: name,
             verb: "SESSION_UPDATE + KBITE_ADD/KBITE_REMOVE"

@@ -2,5 +2,5 @@ import Foundation
 
 extension GmBridgeTheme {
 
-    public static let all: [File] = []
+    static let all: [File] = []
 }

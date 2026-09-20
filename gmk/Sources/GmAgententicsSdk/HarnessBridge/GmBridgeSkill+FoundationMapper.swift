@@ -3,7 +3,7 @@ import FoundationModels
 
 extension GmConcept {
 
-    public var toolFamilies: [GmAgentToolFamily] {
+    var toolFamilies: [GmAgentToolFamily] {
         switch self {
         // `gmcc` grants nothing of its own now that dope has its own concept:
         // `.diagram` is a refusal-only family (see `bridgeMcpTools`), and the
@@ -26,20 +26,20 @@ extension GmConcept {
     /// to throw. Keyed on the suffix, which names the three families unavailable in
     /// full, so a `notSupported` tool naming a real capability stays grantable and
     /// its specific refusal stays reachable.
-    public var bridgeMcpTools: [GmBridgeMcpTool] {
+    var bridgeMcpTools: [GmBridgeMcpTool] {
         toolFamilies
             .flatMap(GmBridgeMcpTool.tools(in:))
             .filter { !$0.name.hasSuffix("_not_supported") }
     }
 
-    public var bridgeSkill: GmBridgeSkill.File {
+    var bridgeSkill: GmBridgeSkill.File {
         GmBridgeSkill.File(self)
     }
 }
 
 extension GmBridgeSkill.File {
 
-    public init(_ concept: GmConcept) {
+    init(_ concept: GmConcept) {
         self.init(
             name: concept.code,
             description: concept.brief,

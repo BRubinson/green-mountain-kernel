@@ -23,7 +23,7 @@ extension Store {
 
     // MARK: - write-repo
 
-    public func diagramWriteRepo(_ req: DiagramWriteRepoRequest) throws -> DiagramWriteRepoResponse {
+    func diagramWriteRepo(_ req: DiagramWriteRepoRequest) throws -> DiagramWriteRepoResponse {
         // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
         // Phase 3 does filesystem work while holding NO db lock, by design.
         // Composing this would pin the single writer across file I/O and block
@@ -172,7 +172,7 @@ extension Store {
 
     // MARK: - ingest (files → db, strictly forward-only)
 
-    public func diagramIngest(_ req: DiagramIngestRequest) throws -> DiagramIngestResponse {
+    func diagramIngest(_ req: DiagramIngestRequest) throws -> DiagramIngestResponse {
         // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
         // Phase 3 does filesystem work while holding NO db lock, by design.
         // Composing this would pin the single writer across file I/O and block

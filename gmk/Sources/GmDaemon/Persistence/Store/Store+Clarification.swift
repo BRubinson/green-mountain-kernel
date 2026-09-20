@@ -12,35 +12,35 @@ extension Store {
 
     // MARK: - Verbs
 
-    public func clarifyOpen(_ req: ClarifyOpenRequest) throws -> ClarifySummaryResponse {
+    func clarifyOpen(_ req: ClarifyOpenRequest) throws -> ClarifySummaryResponse {
         try boundary { db in try ClarificationRepository(db: db, core: core).open(req) }
     }
 
-    public func clarifyQuestionAdd(_ req: ClarifyQuestionAddRequest) throws -> ClarifyQuestionRowResponse {
+    func clarifyQuestionAdd(_ req: ClarifyQuestionAddRequest) throws -> ClarifyQuestionRowResponse {
         try boundary { db in try ClarificationRepository(db: db, core: core).questionAdd(req) }
     }
 
-    public func clarifyNoteAdd(_ req: ClarifyNoteAddRequest) throws -> ClarifyNoteRowResponse {
+    func clarifyNoteAdd(_ req: ClarifyNoteAddRequest) throws -> ClarifyNoteRowResponse {
         try boundary { db in try ClarificationRepository(db: db, core: core).noteAdd(req) }
     }
 
-    public func carePackageOpen(_ req: CarePackageOpenRequest) throws -> CarePackageResponse {
+    func carePackageOpen(_ req: CarePackageOpenRequest) throws -> CarePackageResponse {
         try boundary { db in try ClarificationRepository(db: db, core: core).packageOpen(req) }
     }
 
-    public func carePackageRefAdd(_ req: CarePackageRefAddRequest) throws -> CarePackageResponse {
+    func carePackageRefAdd(_ req: CarePackageRefAddRequest) throws -> CarePackageResponse {
         try boundary { db in try ClarificationRepository(db: db, core: core).packageRefAdd(req) }
     }
 
-    public func carePackageComplete(_ req: CarePackageCompleteRequest) throws -> CarePackageResponse {
+    func carePackageComplete(_ req: CarePackageCompleteRequest) throws -> CarePackageResponse {
         try boundary { db in try ClarificationRepository(db: db, core: core).packageComplete(req) }
     }
 
-    public func carePackageGet(_ req: CarePackageGetRequest) throws -> CarePackageResponse {
+    func carePackageGet(_ req: CarePackageGetRequest) throws -> CarePackageResponse {
         try boundaryRead { db in try ClarificationRepository(db: db, core: core).packageGet(req) }
     }
 
-    public func clarifySeal(_ req: ClarifySealRequest) throws -> ClarifySummaryResponse {
+    func clarifySeal(_ req: ClarifySealRequest) throws -> ClarifySummaryResponse {
         try boundary { db in
             try ClarificationRepository(db: db, core: core)
                 .transition(
@@ -53,7 +53,7 @@ extension Store {
         }
     }
 
-    public func clarifyReopen(_ req: ClarifyReopenRequest) throws -> ClarifySummaryResponse {
+    func clarifyReopen(_ req: ClarifyReopenRequest) throws -> ClarifySummaryResponse {
         try boundary { db in
             try ClarificationRepository(db: db, core: core)
                 .transition(
@@ -66,15 +66,15 @@ extension Store {
         }
     }
 
-    public func clarifyAnswer(_ req: ClarifyAnswerRequest) throws -> ClarifyQuestionRowResponse {
+    func clarifyAnswer(_ req: ClarifyAnswerRequest) throws -> ClarifyQuestionRowResponse {
         try boundary { db in try ClarificationRepository(db: db, core: core).answer(req) }
     }
 
-    public func clarifyFinalize(_ req: ClarifyFinalizeRequest) throws -> ClarifyFinalizeResponse {
+    func clarifyFinalize(_ req: ClarifyFinalizeRequest) throws -> ClarifyFinalizeResponse {
         try boundary { db in try ClarificationRepository(db: db, core: core).finalize(req) }
     }
 
-    public func clarifyGet(_ req: ClarifyGetRequest) throws -> ClarifyGetResponse {
+    func clarifyGet(_ req: ClarifyGetRequest) throws -> ClarifyGetResponse {
         try boundaryRead { db in try ClarificationRepository(db: db, core: core).get(req) }
     }
 

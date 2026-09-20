@@ -9,7 +9,7 @@ import Foundation
 ///
 /// Deliberately outside any `#if canImport(SwiftUI)` guard so the tests run
 /// in plain XCTest.
-public enum DiagramHit: Sendable {
+enum DiagramHit: Sendable {
     case element(ResolvedElement)
     case edge(ResolvedEdge)
 }
@@ -23,7 +23,7 @@ extension ResolvedDiagram {
     /// it. `point` is DIAGRAM space, and a `.layer` is descended into but NEVER
     /// returned. `includeInk` opts strokes and shapes into the third pass, strokes
     /// by distance to their polyline inflated by half their line width.
-    public func hitTest(
+    func hitTest(
         at point: CGPoint,
         edgeTolerance: CGFloat = 6,
         includeInk: Bool = false
@@ -66,7 +66,7 @@ extension ResolvedDiagram {
     }
 
     /// Depth-first lookup by uuid (paint order, first match).
-    public func element(uuid: String) -> ResolvedElement? {
+    func element(uuid: String) -> ResolvedElement? {
         func find(_ element: ResolvedElement) -> ResolvedElement? {
             if element.uuid == uuid { return element }
             for child in element.children {

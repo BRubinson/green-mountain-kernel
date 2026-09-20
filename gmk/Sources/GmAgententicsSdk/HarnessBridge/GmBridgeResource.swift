@@ -8,28 +8,28 @@ import Foundation
 /// contract, while a reference is loaded by being READ, and modelling these as
 /// skills spends entries in the character-budgeted skill listing on files nothing
 /// invokes.
-public struct GmBridgeResource: Equatable, Sendable, GmBridgeFile {
+struct GmBridgeResource: Equatable, Sendable, GmBridgeFile {
 
     /// The skill directory this belongs to (`gmcc`), not a path.
-    public var skill: String
+    var skill: String
 
     /// One line: WHEN a reader should open this, not what it contains.
     ///
     /// It exists so the skill can carry an INDEX of its reference documents rather
     /// than leaving them orphaned on disk. A file the skill never names is a file
     /// the model never learns exists.
-    public var summary: String
+    var summary: String
 
     /// The path BENEATH the skill directory (`ref/bot_workflows.md`).
     ///
     /// Carries its own subdirectory rather than assuming `ref/`, because the
     /// harness places no constraint on the layout inside a skill and the next
     /// one may not be a reference document.
-    public var path: String
+    var path: String
 
-    public var body: String
+    var body: String
 
-    public init(skill: String, path: String, summary: String = "", body: String) {
+    init(skill: String, path: String, summary: String = "", body: String) {
         self.skill = skill
         self.path = path
         self.summary = summary
@@ -38,15 +38,15 @@ public struct GmBridgeResource: Equatable, Sendable, GmBridgeFile {
 
     /// `ref/bot_workflows.md` — the path a skill body cites, relative to the
     /// skill's own directory, which is how the harness resolves a sibling file.
-    public var citedPath: String { path }
+    var citedPath: String { path }
 
-    public var relativePath: String {
+    var relativePath: String {
         "skills/\(skill)/\(path)"
     }
 
-    public var isEmpty: Bool { body.isEmpty }
+    var isEmpty: Bool { body.isEmpty }
 
-    public func contents() -> String? {
+    func contents() -> String? {
         guard !isEmpty else { return nil }
         // Verbatim, with a guaranteed trailing newline. NO frontmatter is
         // synthesised: these are documents a skill points at, and inventing

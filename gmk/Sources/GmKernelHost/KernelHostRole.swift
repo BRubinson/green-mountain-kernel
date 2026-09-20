@@ -8,7 +8,7 @@ import Foundation
 /// which a person's freshly launched app outranks, so take it over; a bundle
 /// path means another APP COPY, and two GUIs trading a lock is worse than one
 /// being read-only. Client mode is a DEGRADATION, never a refusal.
-public enum KernelHostRole: ~Copyable {
+enum KernelHostRole: ~Copyable {
 
     /// This process owns the database and is serving.
     case writer(KernelServices)
@@ -24,7 +24,7 @@ public enum KernelHostRole: ~Copyable {
 
     /// Arbitrate. Call ONCE, before anything else can touch the database;
     /// `takeoverTimeout` bounds the wait for a headless writer to yield.
-    public static func arbitrate(
+    static func arbitrate(
         takeoverTimeout: TimeInterval = 5,
         log: @escaping (String) -> Void = { _ in }
     ) -> KernelHostRole {

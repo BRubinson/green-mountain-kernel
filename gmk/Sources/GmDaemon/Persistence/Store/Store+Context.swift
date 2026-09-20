@@ -10,12 +10,12 @@ extension Store {
     /// Upsert project → instance → session from repo identity, seeding kbite
     /// inheritance down the chain at CREATE time only. Idempotent; one
     /// transaction; returns all three uuids plus created flags.
-    public func ensureContext(_ req: ContextEnsureRequest) throws -> ContextEnsureResponse {
+    func ensureContext(_ req: ContextEnsureRequest) throws -> ContextEnsureResponse {
         try boundary { db in try ContextRepository(db: db, core: core).ensureContext(req) }
     }
 
     /// Read-only resolution — never creates rows.
-    public func getContext(_ req: ContextGetRequest) throws -> ContextGetResponse {
+    func getContext(_ req: ContextGetRequest) throws -> ContextGetResponse {
         try boundaryRead { db in try ContextRepository(db: db, core: core).getContext(req) }
     }
 

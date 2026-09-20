@@ -8,19 +8,19 @@ import Foundation
 /// Derivation happens at RESOLVE time over the persisted vertices, so a change
 /// here needs no migration and no wire change; bumping `renderAlgoVersion` is the
 /// only contract, since it is the fingerprint's representative of render code.
-public enum StrokeOutliner {
+enum StrokeOutliner {
 
-    public struct Options {
+    struct Options {
         /// Full stroke diameter at pressure 1.
-        public var size: Double
+        var size: Double
         /// 0 = constant width, 1 = full pressure thinning.
-        public var thinning: Double
+        var thinning: Double
         /// Input smoothing (streamline): 0 = raw points, 1 = heavy lag.
-        public var streamline: Double
+        var streamline: Double
         /// Derive pressure from velocity when the input carries none.
-        public var simulatePressure: Bool
+        var simulatePressure: Bool
 
-        public init(
+        init(
             size: Double,
             thinning: Double = 0.6,
             streamline: Double = 0.35,
@@ -36,7 +36,7 @@ public enum StrokeOutliner {
     /// The closed outline polygon (left side then reversed right side, with
     /// round caps). Returns [] for degenerate input (< 2 distinct points) —
     /// callers fall back to the plain stroked centerline.
-    public static func outline(
+    static func outline(
         points: [CGPoint],
         pressures: [Double?],
         options: Options

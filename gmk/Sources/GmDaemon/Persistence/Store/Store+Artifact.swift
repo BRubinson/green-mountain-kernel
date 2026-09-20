@@ -6,11 +6,11 @@ import GRDB
 // Bodies live in ArtifactRepository; these wrappers own the transaction.
 
 extension Store {
-    public func addArtifact(_ req: ArtifactAddRequest) throws -> ArtifactRow {
+    func addArtifact(_ req: ArtifactAddRequest) throws -> ArtifactRow {
         try boundary { db in try ArtifactRepository(db: db, core: core).add(req) }
     }
 
-    public func listArtifacts(_ req: ArtifactListRequest) throws -> ArtifactListResponse {
+    func listArtifacts(_ req: ArtifactListRequest) throws -> ArtifactListResponse {
         try boundaryRead { db in
             ArtifactListResponse(
                 artifacts: try ArtifactRepository(db: db, core: core).fetchRows(promptUuid: req.promptUuid)

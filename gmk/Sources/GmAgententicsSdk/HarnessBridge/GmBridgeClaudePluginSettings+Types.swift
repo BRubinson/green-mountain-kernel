@@ -1,28 +1,28 @@
 import Foundation
 
-public enum GmBridgeClaudePluginSettings {
+enum GmBridgeClaudePluginSettings {
 
-    public struct SubagentStatusLine: Codable, Equatable, Sendable {
+    struct SubagentStatusLine: Codable, Equatable, Sendable {
 
-        public var type: String
+        var type: String
 
-        public var command: String
+        var command: String
 
-        public init(command: String) {
+        init(command: String) {
             self.type = "command"
             self.command = command
         }
     }
 
-    public struct File: Codable, Equatable, Sendable, GmBridgeJsonFile {
+    struct File: Codable, Equatable, Sendable, GmBridgeJsonFile {
 
-        public var relativePath: String { "settings.json" }
+        var relativePath: String { "settings.json" }
 
-        public var agent: String?
+        var agent: String?
 
-        public var subagentStatusLine: SubagentStatusLine?
+        var subagentStatusLine: SubagentStatusLine?
 
-        public init(
+        init(
             agent: String? = nil,
             subagentStatusLine: SubagentStatusLine? = nil
         ) {
@@ -30,7 +30,7 @@ public enum GmBridgeClaudePluginSettings {
             self.subagentStatusLine = subagentStatusLine
         }
 
-        public var isEmpty: Bool {
+        var isEmpty: Bool {
             agent == nil && subagentStatusLine == nil
         }
     }

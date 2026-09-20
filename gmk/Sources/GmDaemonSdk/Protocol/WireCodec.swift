@@ -8,14 +8,14 @@ import Foundation
 /// matching and an Optional field silently decodes to nil. Every coder site
 /// routes through here; a bare `JSONEncoder()` elsewhere silently emits
 /// camelCase.
-public enum WireCodec {
-    public static let encoder: JSONEncoder = {
+enum WireCodec {
+    static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         return encoder
     }()
 
-    public static let decoder: JSONDecoder = {
+    static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
@@ -29,7 +29,7 @@ public enum WireCodec {
     /// shoulder and pure noise in an agent's context. It never reaches the
     /// wire: `encoder` above is the only coder NDJSON touches, and this one
     /// has exactly one caller (gm's printJSON).
-    public static let prettyEncoder: JSONEncoder = {
+    static let prettyEncoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]

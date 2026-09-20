@@ -14,11 +14,11 @@ import Foundation
 /// side, so card gaps below `2 × padding + 2` close the A* corridors entirely;
 /// `minSeparation` is DERIVED from that value, never a hand-copied number.
 /// Determinism is required: fixed iteration counts, uuid-sorted traversal, no RNG.
-public enum DiagramOrganizer {
+enum DiagramOrganizer {
 
     /// The corridor floor: below this gap the router's per-side inflation
     /// leaves no corridor between two cards.
-    public static var minSeparation: CGFloat {
+    static var minSeparation: CGFloat {
         CGFloat(DiagramResolver.edgeRoutingPadding) * 2 + 2
     }
 
@@ -27,7 +27,7 @@ public enum DiagramOrganizer {
 
     /// New diagram-space centers for every entity card (present or ghost),
     /// keyed by element uuid. Only cards that moved appear.
-    public static func newCenters(for resolved: ResolvedDiagram) -> [String: CGPoint] {
+    static func newCenters(for resolved: ResolvedDiagram) -> [String: CGPoint] {
         struct Card {
             let uuid: String
             var center: CGPoint
@@ -175,7 +175,7 @@ public enum DiagramOrganizer {
     /// The organize batch: one `elementUpdate` per moved card, diagram-space
     /// deltas converted to parent-space writes via the same divisor rule as
     /// `DiagramDrag.moveMutation`.
-    public static func organize(
+    static func organize(
         _ resolved: ResolvedDiagram,
         tree: DiagramTree
     ) -> [DiagramMutation] {

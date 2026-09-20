@@ -8,10 +8,10 @@ import Foundation
 /// `initialize` response and is capped at 2048 bytes, asserted at startup.
 /// `text` is what a spawning agent receives as SubagentStart context, where
 /// there is room for invariants a tool schema cannot carry.
-public enum CdeSheet {
+enum CdeSheet {
 
     /// Compact orientation for the MCP `initialize` response.
-    public static var instructions: String {
+    static var instructions: String {
         let roster = self.roster
         return """
             The GMCC cde server: the GM-CDE workflow machine's record, as tools.
@@ -39,7 +39,7 @@ public enum CdeSheet {
     /// parameter list and nothing else — it cannot tell an agent that the db is
     /// append-only, that a VERSION_CONFLICT is re-read-and-retry rather than a
     /// failure, or that a dope ref is a dot-path code and never a uuid.
-    public static var text: String {
+    static var text: String {
         """
         \(instructions)
 

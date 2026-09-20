@@ -7,11 +7,11 @@ import Foundation
 /// structure: drop identity going out, and there is deliberately no inverse
 /// that fabricates identity (ingest mints fresh rows; every child uuid
 /// changes on every ingest, the locked no-smart-diff consequence).
-public enum DopeProjection {
+enum DopeProjection {
 
     /// Project one tree into its document bundle. `cogs` is defaulted because
     /// only the repo write path has the scope's cog rows to pass.
-    public static func documents(
+    static func documents(
         from tree: DopeScopeTree,
         cogs: [DopeCogNode] = []
     ) -> DopeDocumentBundle {

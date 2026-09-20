@@ -1,6 +1,6 @@
 import Foundation
 
-public enum GmBridgeJsonValue: Codable, Equatable, Hashable, Sendable {
+enum GmBridgeJsonValue: Codable, Equatable, Hashable, Sendable {
 
     case null
 
@@ -16,12 +16,12 @@ public enum GmBridgeJsonValue: Codable, Equatable, Hashable, Sendable {
 
     case object([String: GmBridgeJsonValue])
 
-    public static let emptyObjectSchema = GmBridgeJsonValue.object([
+    static let emptyObjectSchema = GmBridgeJsonValue.object([
         "type": .string("object"),
         "additionalProperties": .bool(false),
     ])
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() {
             self = .null
@@ -40,7 +40,7 @@ public enum GmBridgeJsonValue: Codable, Equatable, Hashable, Sendable {
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
         case .null: try container.encodeNil()

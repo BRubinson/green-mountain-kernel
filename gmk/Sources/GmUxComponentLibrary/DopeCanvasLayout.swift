@@ -8,18 +8,18 @@ import Foundation
 ///
 /// With `replacing`, element_delete mutations for every current top-level element
 /// precede the adds, so one batch-apply swaps the canvas atomically under the CAS.
-public enum DopeCanvasLayout {
+enum DopeCanvasLayout {
 
     /// Layout-only knobs the renderer does not own (points, pre-scale).
-    public struct Metrics {
-        public var xPitch: Double = 310
-        public var domainGap: Double = 40
-        public var yGap: Double = 48
-        public var maxCardsPerColumn: Int = 5
-        public init() {}
+    struct Metrics {
+        var xPitch: Double = 310
+        var domainGap: Double = 40
+        var yGap: Double = 48
+        var maxCardsPerColumn: Int = 5
+        init() {}
     }
 
-    public static func mutations(
+    static func mutations(
         for tree: DopeScopeTree,
         replacing existing: [DiagramElementNode] = [],
         environment: DiagramRenderEnvironment = .init(),

@@ -7,22 +7,22 @@ import Foundation
 /// explicit snake_case raw value would silently decode to nil.
 
 /// The shared, always-present element columns.
-public struct DiagramElementBase: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let description: String
-    public let sortOrder: Int
+struct DiagramElementBase: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let description: String
+    let sortOrder: Int
     /// Position relative to the parent element's space (diagram space for
     /// top-level elements).
-    public let centerX: Double
-    public let centerY: Double
+    let centerX: Double
+    let centerY: Double
     /// Relative z among SIBLINGS only; global paint order is depth-first
     /// with an (elementZ, code) tie-break.
-    public let elementZ: Double
+    let elementZ: Double
     /// Composes multiplicatively down the tree.
-    public let scale: Double
+    let scale: Double
 
-    public init(
+    init(
         code: String,
         name: String,
         description: String,
@@ -43,15 +43,15 @@ public struct DiagramElementBase: Codable, Hashable, Sendable {
     }
 }
 
-public struct DiagramElementNode: Codable, Hashable, Sendable {
-    public let identity: DopeNodeIdentity
-    public let base: DiagramElementBase
-    public let payload: DiagramElementPayload
-    public let children: [DiagramElementNode]
+struct DiagramElementNode: Codable, Hashable, Sendable {
+    let identity: DopeNodeIdentity
+    let base: DiagramElementBase
+    let payload: DiagramElementPayload
+    let children: [DiagramElementNode]
 
     private enum CodingKeys: String, CodingKey { case payload, children }
 
-    public init(
+    init(
         identity: DopeNodeIdentity,
         base: DiagramElementBase,
         payload: DiagramElementPayload,
@@ -63,7 +63,7 @@ public struct DiagramElementNode: Codable, Hashable, Sendable {
         self.children = children
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         base = try DiagramElementBase(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -71,7 +71,7 @@ public struct DiagramElementNode: Codable, Hashable, Sendable {
         children = try c.decode([DiagramElementNode].self, forKey: .children)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try base.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -83,27 +83,27 @@ public struct DiagramElementNode: Codable, Hashable, Sendable {
 /// The full read tree of one diagram: the row's fields + the nested
 /// top-level elements (only dope_scope / drawing_layer may appear at the
 /// top — validateDiagramElementShape's invariant, backstopped by schema).
-public struct DiagramTree: Codable, Hashable, Sendable {
-    public let identity: DopeNodeIdentity
-    public let tier: String
-    public let projectUuid: String
-    public let instanceUuid: String?
-    public let sessionUuid: String?
-    public let promptUuid: String?
-    public let code: String
-    public let name: String
-    public let description: String
-    public let gmccDiagramPath: String?
+struct DiagramTree: Codable, Hashable, Sendable {
+    let identity: DopeNodeIdentity
+    let tier: String
+    let projectUuid: String
+    let instanceUuid: String?
+    let sessionUuid: String?
+    let promptUuid: String?
+    let code: String
+    let name: String
+    let description: String
+    let gmccDiagramPath: String?
     /// The whole-tree content counter.
-    public let revision: Int64
-    public let elements: [DiagramElementNode]
+    let revision: Int64
+    let elements: [DiagramElementNode]
 
     private enum CodingKeys: String, CodingKey {
         case tier, projectUuid, instanceUuid, sessionUuid, promptUuid
         case code, name, description, gmccDiagramPath, revision, elements
     }
 
-    public init(
+    init(
         identity: DopeNodeIdentity,
         tier: String,
         projectUuid: String,
@@ -131,7 +131,7 @@ public struct DiagramTree: Codable, Hashable, Sendable {
         self.elements = elements
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
         tier = try c.decode(String.self, forKey: .tier)
@@ -147,7 +147,7 @@ public struct DiagramTree: Codable, Hashable, Sendable {
         elements = try c.decode([DiagramElementNode].self, forKey: .elements)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(tier, forKey: .tier)
@@ -170,15 +170,15 @@ public struct DiagramTree: Codable, Hashable, Sendable {
 /// (always the case for PROJECT/INSTANCE-tier diagrams, which carry no
 /// session context). Entity-level presence is the render pass's job — it
 /// holds the hydrated dope tree this row points at.
-public struct DiagramBindingResolution: Codable, Hashable, Sendable {
-    public let elementUuid: String
-    public let dopeScopeCode: String
+struct DiagramBindingResolution: Codable, Hashable, Sendable {
+    let elementUuid: String
+    let dopeScopeCode: String
     /// "prompt" | "session_base" | nil (absent).
-    public let resolvedVia: String?
-    public let scopeUuid: String?
-    public let dopeRevision: Int64?
+    let resolvedVia: String?
+    let scopeUuid: String?
+    let dopeRevision: Int64?
 
-    public init(
+    init(
         elementUuid: String,
         dopeScopeCode: String,
         resolvedVia: String?,
@@ -196,7 +196,7 @@ public struct DiagramBindingResolution: Codable, Hashable, Sendable {
         case elementUuid, dopeScopeCode, resolvedVia, scopeUuid, dopeRevision
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         elementUuid = try c.decode(String.self, forKey: .elementUuid)
         dopeScopeCode = try c.decode(String.self, forKey: .dopeScopeCode)

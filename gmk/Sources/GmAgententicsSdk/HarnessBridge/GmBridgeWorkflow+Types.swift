@@ -1,16 +1,16 @@
 import Foundation
 
-public enum GmBridgeWorkflow {
+enum GmBridgeWorkflow {
 
-    public struct Phase: Equatable, Sendable {
+    struct Phase: Equatable, Sendable {
 
-        public var title: String
+        var title: String
 
-        public var detail: String?
+        var detail: String?
 
-        public var model: GmBridgeClaudeTypeModel?
+        var model: GmBridgeClaudeTypeModel?
 
-        public init(
+        init(
             title: String,
             detail: String? = nil,
             model: GmBridgeClaudeTypeModel? = nil
@@ -21,19 +21,19 @@ public enum GmBridgeWorkflow {
         }
     }
 
-    public struct File: Equatable, Sendable, GmBridgeFile {
+    struct File: Equatable, Sendable, GmBridgeFile {
 
-        public var name: String
+        var name: String
 
-        public var description: String
+        var description: String
 
-        public var whenToUse: String?
+        var whenToUse: String?
 
-        public var phases: [Phase]
+        var phases: [Phase]
 
-        public var body: String
+        var body: String
 
-        public init(
+        init(
             name: String,
             description: String,
             whenToUse: String? = nil,
@@ -47,15 +47,15 @@ public enum GmBridgeWorkflow {
             self.body = body
         }
 
-        public var relativePath: String {
+        var relativePath: String {
             "workflows/\(name).js"
         }
 
-        public var isEmpty: Bool {
+        var isEmpty: Bool {
             body.isEmpty
         }
 
-        public func contents() throws -> String? {
+        func contents() throws -> String? {
             guard !isEmpty else { return nil }
 
             var lines = ["export const meta = {"]

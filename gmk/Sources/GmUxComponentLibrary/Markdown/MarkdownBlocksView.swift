@@ -5,21 +5,21 @@ import SwiftUI
 // lists, fenced code in a monospaced filled block, bordered blockquotes, and pipe
 // tables in a Grid. Inline emphasis / links / code-spans within a block are handled
 // by AttributedString's inline markdown parsing.
-public struct MarkdownBlocksView: View {
-    public let blocks: [MarkdownBlock]
+struct MarkdownBlocksView: View {
+    let blocks: [MarkdownBlock]
     /// Non-nil scales every block font off this size instead of the
     /// semantic .body/.title ramp. Diagram text surfaces MUST pass their
     /// persisted font_size through here: the semantic fonts are absolute
     /// and silently override any outer .font() modifier, which is exactly
     /// how the old inline renderer's working font_size column died in the
     /// first block-renderer port.
-    public let baseFontSize: Double?
+    let baseFontSize: Double?
 
-    public init(_ blocks: [MarkdownBlock], baseFontSize: Double? = nil) {
+    init(_ blocks: [MarkdownBlock], baseFontSize: Double? = nil) {
         self.blocks = blocks
         self.baseFontSize = baseFontSize
     }
-    public init(source: String, baseFontSize: Double? = nil) {
+    init(source: String, baseFontSize: Double? = nil) {
         self.blocks = MarkdownDocument.parse(source)
         self.baseFontSize = baseFontSize
     }
@@ -36,7 +36,7 @@ public struct MarkdownBlocksView: View {
         )
     }
 
-    public var body: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(blocks) { block in
                 view(for: block)

@@ -7,7 +7,7 @@ import SwiftUI
 /// churn. Views keep their existing granular @Environment bindings
 /// (GMVibesEnvironment / FileTreeStore / DaemonConnectionModel / CatalogStore).
 @Observable @MainActor
-public final class GMVibesServices {
+final class GMVibesServices {
     let env: GMVibesEnvironment
     let fileTrees: FileTreeStore
     let daemon: DaemonConnectionModel
@@ -41,7 +41,7 @@ public final class GMVibesServices {
     /// shutdown. Writer mode only.
     private var kernelEventToken: UUID?
 
-    public init() {
+    init() {
         // ARBITRATION IS THE FIRST THING THAT HAPPENS, before any stored
         // property that could reach the database. `KernelOwnership.acquire`
         // takes the flock before anything can open the store, and a losing
@@ -103,7 +103,7 @@ public final class GMVibesServices {
 
     /// Vitals as the answering kernel last reported them, or nil before the
     /// first ping. Shaped for `KernelVitals(report:)`.
-    public var vitalsReport: KernelVitalsReport? {
+    var vitalsReport: KernelVitalsReport? {
         guard let ping = daemon.ping else { return nil }
         return KernelVitalsReport(
             uptimeSeconds: ping.uptimeSeconds,
@@ -119,7 +119,7 @@ public final class GMVibesServices {
     /// itself. `writerRole` and `writerBundlePath` are additive optionals, so a kernel
     /// without them answers nil and this reads `.unknown`. No extra connection and no
     /// polling: `DaemonConnectionModel` still runs the single health watchdog.
-    public var kernelRole: KernelRole {
+    var kernelRole: KernelRole {
         if kernel != nil { return .writer }
         if let kernelHolder {
             return .client(
@@ -142,7 +142,7 @@ public final class GMVibesServices {
     /// holder has no window to raise. `KernelMenuBarContent` renders the row
     /// only when this is non-nil, so the absent case is already handled there
     /// as an absent row rather than a disabled one.
-    public var activateHolder: (() -> Void)? {
+    var activateHolder: (() -> Void)? {
         guard let kernelHolder, let bundlePath = kernelHolder.bundlePath else { return nil }
         let pid = kernelHolder.pid
         return {
@@ -160,7 +160,7 @@ public final class GMVibesServices {
 
     /// True when this process owns the database. The termination path needs to
     /// know whether there is a kernel to stop at all.
-    public var isKernelWriter: Bool { kernel != nil }
+    var isKernelWriter: Bool { kernel != nil }
 
     /// Stop the kernel, in order, before the process goes away.
     ///
@@ -170,7 +170,7 @@ public final class GMVibesServices {
     /// The dirty-draft flush is NOT passed in here. The ordering is flush (awaited, bounded)
     /// and THEN stop the kernel, and `GMVibesAppDelegate.applicationShouldTerminate` owns
     /// that deadline — a synchronous closure here could not have awaited it.
-    public func shutdownKernel() {
+    func shutdownKernel() {
         guard let kernel else { return }
         if let token = kernelEventToken {
             kernel.store.unsubscribeFromEvents(token)
@@ -179,13 +179,13 @@ public final class GMVibesServices {
         kernel.shutdown()
     }
 
-    public var protocolVersion: Int? { daemon.ping?.protocolVersion }
-    public var buildSha: String? { daemon.ping?.buildSha }
+    var protocolVersion: Int? { daemon.ping?.protocolVersion }
+    var buildSha: String? { daemon.ping?.buildSha }
 }
 
 extension View {
     /// Inject the shared GMCC services into a scene's root view in one call.
-    public func gmEnv(_ services: GMVibesServices) -> some View {
+    func gmEnv(_ services: GMVibesServices) -> some View {
         self
             .environment(services.env)
             .environment(services.fileTrees)

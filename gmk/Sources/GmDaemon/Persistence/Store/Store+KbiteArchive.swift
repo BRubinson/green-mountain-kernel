@@ -12,7 +12,7 @@ import GRDB
 extension Store {
     /// Assemble the scrubbed export document and write it at
     /// `req.dbExportPath`. Read-only against the db — no event.
-    public func exportKbite(_ req: KbiteExportRequest) throws -> KbiteExportResponse {
+    func exportKbite(_ req: KbiteExportRequest) throws -> KbiteExportResponse {
         // FOUR-PHASE VERB — see StoreError.notComposable. Filesystem work
         // between the read and the write must not hold the single writer.
         guard !isInTransaction else {
@@ -50,7 +50,7 @@ extension Store {
 
     /// One-transaction import of a db_export.json (decode + rehydrate happen
     /// outside the write lock; the apply body lives in the repository).
-    public func importKbite(_ req: KbiteImportRequest) throws -> KbiteImportResponse {
+    func importKbite(_ req: KbiteImportRequest) throws -> KbiteImportResponse {
         // FOUR-PHASE VERB — see StoreError.notComposable. Filesystem work
         // between the read and the write must not hold the single writer.
         guard !isInTransaction else {
@@ -82,7 +82,7 @@ extension Store {
         }
     }
 
-    public func deleteKbite(_ req: KbiteDeleteRequest) throws -> KbiteDeleteResponse {
+    func deleteKbite(_ req: KbiteDeleteRequest) throws -> KbiteDeleteResponse {
         try boundary { db in
             try KbiteArchiveRepository(db: db, core: core).deleteKbite(req)
         }

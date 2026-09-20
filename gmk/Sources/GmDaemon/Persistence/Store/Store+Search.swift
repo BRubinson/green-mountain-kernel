@@ -11,7 +11,7 @@ import GRDB
 // score rather than selling a unified relevance number.
 
 extension Store {
-    public func search(_ req: SearchRequest) throws -> SearchResponse {
+    func search(_ req: SearchRequest) throws -> SearchResponse {
         // Deliberate divergence from the kbite precedent: a whitespace-only
         // query is BAD_REQUEST rather than an empty hit list — a silent empty
         // result for a nonsense query is the antipattern the listing

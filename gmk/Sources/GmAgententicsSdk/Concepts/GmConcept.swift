@@ -6,7 +6,7 @@ import Foundation
 /// `allCases` in this sequence into every agent body and the output style, so
 /// the list reads spine → work → self-model → knowledge → runtime → lenses →
 /// umbrella. Reorder here, nowhere else.
-public enum GmConcept: String, Sendable, Hashable, Codable, CaseIterable {
+enum GmConcept: String, Sendable, Hashable, Codable, CaseIterable {
 
     case project
 
@@ -22,9 +22,9 @@ public enum GmConcept: String, Sendable, Hashable, Codable, CaseIterable {
 
     case gmcc
 
-    public var code: String { rawValue }
+    var code: String { rawValue }
 
-    public var brief: String {
+    var brief: String {
         switch self {
         case .gmcc: return "The coding collection to support gmk"
         case .dope: return "Domain Optimized Project Essence: the project's model of itself"
@@ -36,7 +36,7 @@ public enum GmConcept: String, Sendable, Hashable, Codable, CaseIterable {
         }
     }
 
-    public var text: String {
+    var text: String {
         switch self {
         case .gmcc: return GM_CONCEPT_GMCC
         case .dope: return GM_CONCEPT_DOPE

@@ -1,14 +1,14 @@
 import Foundation
 
-public enum GmBridgeMonitor {
+enum GmBridgeMonitor {
 
-    public enum When: Equatable, Hashable, Sendable {
+    enum When: Equatable, Hashable, Sendable {
 
         case always
 
         case onSkillInvoke(String)
 
-        public var wireValue: String {
+        var wireValue: String {
             switch self {
             case .always: return "always"
             case .onSkillInvoke(let skill): return "on-skill-invoke:\(skill)"
@@ -16,17 +16,17 @@ public enum GmBridgeMonitor {
         }
     }
 
-    public struct Entry: Encodable, Equatable, Sendable {
+    struct Entry: Encodable, Equatable, Sendable {
 
-        public var name: String
+        var name: String
 
-        public var command: String
+        var command: String
 
-        public var description: String
+        var description: String
 
-        public var when: When?
+        var when: When?
 
-        public init(
+        init(
             name: String,
             command: String,
             description: String,
@@ -45,7 +45,7 @@ public enum GmBridgeMonitor {
             case when
         }
 
-        public func encode(to encoder: Encoder) throws {
+        func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(name, forKey: .name)
             try container.encode(command, forKey: .command)
@@ -54,21 +54,21 @@ public enum GmBridgeMonitor {
         }
     }
 
-    public struct File: Encodable, Equatable, Sendable, GmBridgeJsonFile {
+    struct File: Encodable, Equatable, Sendable, GmBridgeJsonFile {
 
-        public var relativePath: String { "monitors/monitors.json" }
+        var relativePath: String { "monitors/monitors.json" }
 
-        public var monitors: [Entry]
+        var monitors: [Entry]
 
-        public init(monitors: [Entry]) {
+        init(monitors: [Entry]) {
             self.monitors = monitors
         }
 
-        public var isEmpty: Bool {
+        var isEmpty: Bool {
             monitors.isEmpty
         }
 
-        public func encode(to encoder: Encoder) throws {
+        func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
             try container.encode(monitors)
         }

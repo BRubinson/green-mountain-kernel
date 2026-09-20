@@ -6,18 +6,18 @@ import Foundation
 /// tree; sharing the PREDICATE is what keeps the rule from drifting between
 /// them. It is a Swift guard rather than a SQL CHECK because a CHECK cannot
 /// reference another table.
-public enum DiagramContainment {
+enum DiagramContainment {
 
     /// What a reference violated, so both implementations produce the same
     /// error text for the same violation.
-    public enum Violation: Equatable, Sendable {
+    enum Violation: Equatable, Sendable {
         case targetIsSelf
         case targetIsOwnParent
         case targetNotAPeerOfParent
         case referrerHasNoParent
         case targetMissing(uuid: String)
 
-        public func message(role: String, referrer: String, target: String) -> String {
+        func message(role: String, referrer: String, target: String) -> String {
             switch self {
             case .targetIsSelf:
                 return "\(role) \(referrer) cannot reference itself"
@@ -42,7 +42,7 @@ public enum DiagramContainment {
     /// predicate serve both implementations. `grandparentOfReferrer` is the
     /// parent the target must also have; nil means the referrer's parent is
     /// top-level, so a legal target is top-level too.
-    public static func validateReference(
+    static func validateReference(
         rule: DiagramElementRefSpec.ContainmentRule,
         referrerUuid: String,
         parentOfReferrer: String?,

@@ -20,7 +20,7 @@ import Foundation
 // legal only in an executable target's `main.swift`, which is why this is a
 // function rather than statements.
 
-public enum GmHookCli {
+enum GmHookCli {
 
     /// The `gm_hook` personality. Takes argv WITHOUT the program name, so the
     /// multi-call dispatcher can hand through exactly what the shell passed —
@@ -29,7 +29,7 @@ public enum GmHookCli {
     ///
     /// Never returns: every arm exits, and that is part of the hook contract —
     /// a hook must not fall through to a caller that might print something.
-    public static func main(_ arguments: [String] = Array(CommandLine.arguments.dropFirst())) -> Never {
+    static func main(_ arguments: [String] = Array(CommandLine.arguments.dropFirst())) -> Never {
         let argv = arguments
 
         guard let command = argv.first else {

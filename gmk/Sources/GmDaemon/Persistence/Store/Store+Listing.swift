@@ -8,15 +8,15 @@ import GRDB
 // Bodies live in ListingRepository; these wrappers own the transaction.
 
 extension Store {
-    public func listProjects() throws -> ProjectListResponse {
+    func listProjects() throws -> ProjectListResponse {
         try boundaryRead { db in try ListingRepository(db: db, core: core).listProjects() }
     }
 
-    public func listInstances(_ req: InstanceListRequest) throws -> InstanceListResponse {
+    func listInstances(_ req: InstanceListRequest) throws -> InstanceListResponse {
         try boundaryRead { db in try ListingRepository(db: db, core: core).listInstances(req) }
     }
 
-    public func listSessions(_ req: SessionListRequest) throws -> SessionListResponse {
+    func listSessions(_ req: SessionListRequest) throws -> SessionListResponse {
         try boundaryRead { db in try ListingRepository(db: db, core: core).listSessions(req) }
     }
 

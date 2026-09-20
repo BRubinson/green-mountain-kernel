@@ -7,7 +7,7 @@ import Foundation
 /// typed-nil SET-dictionary idiom is structurally impossible here. Encoding
 /// is `{"kind": "<element_type raw>", "fields": {...}}`; `kind` and `fields`
 /// are single-word keys, fixed points of the snake_case strategies.
-public enum DiagramElementPayload: Codable, Hashable, Sendable {
+enum DiagramElementPayload: Codable, Hashable, Sendable {
     case drawingLayer(DrawingLayerPayload)
     case drawingStroke(DrawingStrokePayload)
     case drawingShape(DrawingShapePayload)
@@ -19,7 +19,7 @@ public enum DiagramElementPayload: Codable, Hashable, Sendable {
 
     /// The tag IS the element type — payload/element_type agreement is
     /// definitional on add and validated on update (type morphing refused).
-    public var elementType: DiagramElementType {
+    var elementType: DiagramElementType {
         switch self {
         case .drawingLayer: return .drawingLayer
         case .drawingStroke: return .drawingStroke
@@ -34,7 +34,7 @@ public enum DiagramElementPayload: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case kind, fields }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let kind = try c.decode(String.self, forKey: .kind)
         guard let type = DiagramElementType(rawValue: kind) else {
@@ -64,7 +64,7 @@ public enum DiagramElementPayload: Codable, Hashable, Sendable {
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(elementType.rawValue, forKey: .kind)
         switch self {
@@ -85,12 +85,12 @@ public enum DiagramElementPayload: Codable, Hashable, Sendable {
 /// decision); written as whole-set replacement, so vertex row uuids are not
 /// stable across edits (vertices are not elements).
 /// Coordinates are ELEMENT-LOCAL (relative to the element's center).
-public struct DiagramVertex: Codable, Hashable, Sendable {
-    public let x: Double
-    public let y: Double
-    public let pressure: Double?
+struct DiagramVertex: Codable, Hashable, Sendable {
+    let x: Double
+    let y: Double
+    let pressure: Double?
 
-    public init(x: Double, y: Double, pressure: Double? = nil) {
+    init(x: Double, y: Double, pressure: Double? = nil) {
         self.x = x
         self.y = y
         self.pressure = pressure
@@ -98,7 +98,7 @@ public struct DiagramVertex: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case x, y, pressure }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         x = try c.decode(Double.self, forKey: .x)
         y = try c.decode(Double.self, forKey: .y)
@@ -110,12 +110,12 @@ public struct DiagramVertex: Codable, Hashable, Sendable {
 /// JSON should not have to spell every column), so each payload struct
 /// hand-writes its decode with decodeIfPresent + default.
 
-public struct DrawingLayerPayload: Codable, Hashable, Sendable {
-    public let opacity: Double
-    public let visible: Bool
-    public let locked: Bool
+struct DrawingLayerPayload: Codable, Hashable, Sendable {
+    let opacity: Double
+    let visible: Bool
+    let locked: Bool
 
-    public init(opacity: Double = 1, visible: Bool = true, locked: Bool = false) {
+    init(opacity: Double = 1, visible: Bool = true, locked: Bool = false) {
         self.opacity = opacity
         self.visible = visible
         self.locked = locked
@@ -123,7 +123,7 @@ public struct DrawingLayerPayload: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case opacity, visible, locked }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         opacity = try c.decodeIfPresent(Double.self, forKey: .opacity) ?? 1
         visible = try c.decodeIfPresent(Bool.self, forKey: .visible) ?? true
@@ -131,13 +131,13 @@ public struct DrawingLayerPayload: Codable, Hashable, Sendable {
     }
 }
 
-public struct DrawingStrokePayload: Codable, Hashable, Sendable {
-    public let tool: DiagramStrokeTool
-    public let strokeColor: String
-    public let strokeWidth: Double
-    public let vertices: [DiagramVertex]
+struct DrawingStrokePayload: Codable, Hashable, Sendable {
+    let tool: DiagramStrokeTool
+    let strokeColor: String
+    let strokeWidth: Double
+    let vertices: [DiagramVertex]
 
-    public init(
+    init(
         tool: DiagramStrokeTool = .pencil,
         strokeColor: String = "#1a1a1a",
         strokeWidth: Double = 2,
@@ -153,7 +153,7 @@ public struct DrawingStrokePayload: Codable, Hashable, Sendable {
         case tool, strokeColor, strokeWidth, vertices
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         tool = try c.decodeIfPresent(DiagramStrokeTool.self, forKey: .tool) ?? .pencil
         strokeColor = try c.decodeIfPresent(String.self, forKey: .strokeColor) ?? "#1a1a1a"
@@ -162,15 +162,15 @@ public struct DrawingStrokePayload: Codable, Hashable, Sendable {
     }
 }
 
-public struct DrawingShapePayload: Codable, Hashable, Sendable {
-    public let shapeKind: DiagramShapeKind
-    public let strokeColor: String
-    public let strokeWidth: Double
-    public let fillColor: String?
-    public let cornerRadius: Double?
-    public let vertices: [DiagramVertex]
+struct DrawingShapePayload: Codable, Hashable, Sendable {
+    let shapeKind: DiagramShapeKind
+    let strokeColor: String
+    let strokeWidth: Double
+    let fillColor: String?
+    let cornerRadius: Double?
+    let vertices: [DiagramVertex]
 
-    public init(
+    init(
         shapeKind: DiagramShapeKind,
         strokeColor: String = "#1a1a1a",
         strokeWidth: Double = 2,
@@ -190,7 +190,7 @@ public struct DrawingShapePayload: Codable, Hashable, Sendable {
         case shapeKind, strokeColor, strokeWidth, fillColor, cornerRadius, vertices
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         shapeKind = try c.decode(DiagramShapeKind.self, forKey: .shapeKind)
         strokeColor = try c.decodeIfPresent(String.self, forKey: .strokeColor) ?? "#1a1a1a"
@@ -208,15 +208,15 @@ public struct DrawingShapePayload: Codable, Hashable, Sendable {
 /// vertex extent is circular, since the wrapped height depends on the width.
 /// The size lives on this subtype rather than on diagram_element, so no other
 /// type is affected and the tree-composing `scale` still applies on top.
-public struct DrawingTextPayload: Codable, Hashable, Sendable {
-    public let markdown: String
-    public let width: Double
-    public let height: Double
-    public let fontSize: Double
-    public let textColor: String
-    public let backgroundColor: String?
+struct DrawingTextPayload: Codable, Hashable, Sendable {
+    let markdown: String
+    let width: Double
+    let height: Double
+    let fontSize: Double
+    let textColor: String
+    let backgroundColor: String?
 
-    public init(
+    init(
         markdown: String = "",
         width: Double = 180,
         height: Double = 60,
@@ -236,7 +236,7 @@ public struct DrawingTextPayload: Codable, Hashable, Sendable {
         case markdown, width, height, fontSize, textColor, backgroundColor
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         markdown = try c.decodeIfPresent(String.self, forKey: .markdown) ?? ""
         width = try c.decodeIfPresent(Double.self, forKey: .width) ?? 180
@@ -248,7 +248,7 @@ public struct DrawingTextPayload: Codable, Hashable, Sendable {
 }
 
 /// Connector line style.
-public enum DiagramConnectorLineStyle: String, Codable, Hashable, CaseIterable, Sendable {
+enum DiagramConnectorLineStyle: String, Codable, Hashable, CaseIterable, Sendable {
     case solid
     case dashed
 }
@@ -258,7 +258,7 @@ public enum DiagramConnectorLineStyle: String, Codable, Hashable, CaseIterable, 
 /// it); `circle` is the OPEN (stroked) ring. New cases ride the v23 bump:
 /// the envelope handshake fences them from pre-v23 decoders, for which an
 /// unknown rawValue is dataCorrupted, not a skippable field.
-public enum DiagramConnectorHead: String, Codable, Hashable, CaseIterable, Sendable {
+enum DiagramConnectorHead: String, Codable, Hashable, CaseIterable, Sendable {
     case none
     case arrow
     case dot
@@ -274,7 +274,7 @@ public enum DiagramConnectorHead: String, Codable, Hashable, CaseIterable, Senda
 /// chord, `curved` is the legacy cubic promoted from routing-declined
 /// fallback to a first-class choice. DiagramEdgeRouter internals are not a
 /// function of this enum.
-public enum DiagramConnectorRouting: String, Codable, Hashable, CaseIterable, Sendable {
+enum DiagramConnectorRouting: String, Codable, Hashable, CaseIterable, Sendable {
     case orthogonalStep = "orthogonal_step"
     case straight
     case curved
@@ -288,17 +288,17 @@ public enum DiagramConnectorRouting: String, Codable, Hashable, CaseIterable, Se
 /// diagram. A deleted target degrades to a renderable ghost. In a batch a
 /// connector may instead name its target by `targetClientRef` on the
 /// mutation; temp-id resolution is a batch concern a payload is blind to.
-public struct ConnectorPayload: Codable, Hashable, Sendable {
-    public let targetElementUuid: String?
-    public let strokeColor: String
-    public let strokeWidth: Double
-    public let lineStyle: DiagramConnectorLineStyle
-    public let headKind: DiagramConnectorHead
-    public let routingKind: DiagramConnectorRouting
-    public let tailKind: DiagramConnectorHead
-    public let label: String
+struct ConnectorPayload: Codable, Hashable, Sendable {
+    let targetElementUuid: String?
+    let strokeColor: String
+    let strokeWidth: Double
+    let lineStyle: DiagramConnectorLineStyle
+    let headKind: DiagramConnectorHead
+    let routingKind: DiagramConnectorRouting
+    let tailKind: DiagramConnectorHead
+    let label: String
 
-    public init(
+    init(
         targetElementUuid: String? = nil,
         strokeColor: String = "#1a1a1a",
         strokeWidth: Double = 2,
@@ -323,7 +323,7 @@ public struct ConnectorPayload: Codable, Hashable, Sendable {
             routingKind, tailKind, label
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         targetElementUuid = try c.decodeIfPresent(String.self, forKey: .targetElementUuid)
         strokeColor = try c.decodeIfPresent(String.self, forKey: .strokeColor) ?? "#1a1a1a"
@@ -360,18 +360,18 @@ public struct ConnectorPayload: Codable, Hashable, Sendable {
 /// block-markdown interior rendered by the kit's own renderer so rendering
 /// and every host draw the same thing. Chrome fields are nil-means-theme-
 /// default so an unstyled node is legible in both schemes.
-public struct UmlNodePayload: Codable, Hashable, Sendable {
-    public let nodeKind: DiagramNodeKind
-    public let width: Double
-    public let height: Double
-    public let markdown: String
-    public let fontSize: Double?
-    public let textColor: String?
-    public let strokeColor: String?
-    public let strokeWidth: Double?
-    public let fillColor: String?
+struct UmlNodePayload: Codable, Hashable, Sendable {
+    let nodeKind: DiagramNodeKind
+    let width: Double
+    let height: Double
+    let markdown: String
+    let fontSize: Double?
+    let textColor: String?
+    let strokeColor: String?
+    let strokeWidth: Double?
+    let fillColor: String?
 
-    public init(
+    init(
         nodeKind: DiagramNodeKind,
         width: Double = 160,
         height: Double = 90,
@@ -398,7 +398,7 @@ public struct UmlNodePayload: Codable, Hashable, Sendable {
             strokeColor, strokeWidth, fillColor
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         nodeKind = try c.decode(DiagramNodeKind.self, forKey: .nodeKind)
         width = try c.decodeIfPresent(Double.self, forKey: .width) ?? 160
@@ -415,20 +415,20 @@ public struct UmlNodePayload: Codable, Hashable, Sendable {
 /// fk-by-code binding to a dope scope. Resolution runs at READ time through
 /// the diagram row's own session/prompt context (the dopeGet ladder), never
 /// at write time — a dangling code is a legal, renderable ghost state.
-public struct DopeScopePersistenceLayerPayload: Codable, Hashable, Sendable {
-    public let dopeScopeCode: String
+struct DopeScopePersistenceLayerPayload: Codable, Hashable, Sendable {
+    let dopeScopeCode: String
 
-    public init(dopeScopeCode: String) {
+    init(dopeScopeCode: String) {
         self.dopeScopeCode = dopeScopeCode
     }
 }
 
 /// fk-by-code binding to a dope domain entity — 2-segment `domain.entity`
 /// (DopeCode.parseEntityRef-validated on write; existence NOT checked).
-public struct DopeEntityPayload: Codable, Hashable, Sendable {
-    public let entityCode: String
+struct DopeEntityPayload: Codable, Hashable, Sendable {
+    let entityCode: String
 
-    public init(entityCode: String) {
+    init(entityCode: String) {
         self.entityCode = entityCode
     }
 }
@@ -437,13 +437,13 @@ public struct DopeEntityPayload: Codable, Hashable, Sendable {
 /// `{"op": "set", "value": …}` = write, `{"op": "clear"}` = NULL. The typed
 /// replacement for dope's clear* flag pairs; one use site this pass
 /// (diagram.gmcc_diagram_path), available to future surfaces.
-public enum FieldPatch<T: Codable & Hashable & Sendable>: Codable, Hashable, Sendable {
+enum FieldPatch<T: Codable & Hashable & Sendable>: Codable, Hashable, Sendable {
     case set(T)
     case clear
 
     private enum CodingKeys: String, CodingKey { case op, value }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let op = try c.decode(String.self, forKey: .op)
         switch op {
@@ -460,7 +460,7 @@ public enum FieldPatch<T: Codable & Hashable & Sendable>: Codable, Hashable, Sen
         }
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
         case .set(let value):

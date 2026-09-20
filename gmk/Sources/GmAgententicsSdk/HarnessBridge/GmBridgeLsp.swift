@@ -2,10 +2,10 @@ import Foundation
 
 extension GmBridgeLsp {
 
-    public static let sourcekit = Server(
+    static let sourcekit = Server(
         command: "sourcekit-lsp",
         extensionToLanguage: [".swift": "swift"]
     )
 
-    public static let current = File(servers: [:])
+    static let current = File(servers: [:])
 }

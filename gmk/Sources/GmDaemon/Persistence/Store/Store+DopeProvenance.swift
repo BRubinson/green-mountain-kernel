@@ -59,7 +59,7 @@ extension Store {
     /// writes files, and never mutates provenance. Boot sync calls it to
     /// report rather than to decide, which is what keeps the documented
     /// "boot must never block on a domain model" contract true.
-    public func dopeMergePlan(scopeUuid: String) throws -> [DopeMerge.Outcome] {
+    func dopeMergePlan(scopeUuid: String) throws -> [DopeMerge.Outcome] {
         let (scope, root) = try boundaryRead { db -> (DopeScopeRow, String) in
             guard let scope = try self.fetchDopeScope(db, uuid: scopeUuid) else {
                 throw StoreError.notFound(entity: "dope_scope", key: scopeUuid)
@@ -93,7 +93,7 @@ extension Store {
     /// hash while staying dirty, so the local edit is kept and the file is not
     /// treated as having moved. Either way the conflict is gone on the next plan.
     @discardableResult
-    public func dopeResolve(
+    func dopeResolve(
         scopeUuid: String,
         dotPath: String?,
         takeOurs: Bool

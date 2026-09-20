@@ -7,7 +7,7 @@ extension GmBridgeScript {
     /// `mcp_tool` handler there is documented to expect a "not connected" error
     /// on first run, and SessionStart is precisely where the claude-session
     /// binding every later write depends on gets created.
-    public static let sessionStartup = File(
+    static let sessionStartup = File(
         name: "gm_session_startup.sh",
         interpreter: .bash,
         body: sessionStartupBody
@@ -16,7 +16,7 @@ extension GmBridgeScript {
     /// The marketplace installer. Cannot become a kernel subcommand for the
     /// obvious reason: it is what PUTS the kernel on the machine. It runs before
     /// any binary exists.
-    public static let install = File(
+    static let install = File(
         name: "install_gm.sh",
         interpreter: .bash,
         body: installBody
@@ -24,7 +24,7 @@ extension GmBridgeScript {
 
     /// The release-store contract, emitted from ONE constant so the plugin's copy
     /// cannot drift from the authored one. See `GmBridgeScript+Bodies.swift`.
-    public static let releaseStore = File(
+    static let releaseStore = File(
         name: "gm_releases.sh",
         interpreter: .bash,
         body: releaseStoreBody
@@ -38,7 +38,7 @@ extension GmBridgeScript {
     /// - `run_mcp.sh` — the `.mcp.json` launcher runs `/bin/sh -c`, since stdio
     ///   `command`/`args` substitute only the three `CLAUDE_*` placeholders.
     /// - `check_gm_stale.sh` — an inline `[ -x ]` test, needing no binary at all.
-    public static let all: [File] = [
+    static let all: [File] = [
         sessionStartup, install, releaseStore,
     ]
 }

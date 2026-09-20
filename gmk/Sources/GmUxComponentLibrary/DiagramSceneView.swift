@@ -9,13 +9,13 @@ import SwiftUI
 /// never as a `.offset` modifier) and applies zoom as an outer `.scaleEffect`, so
 /// the components stay zoom-unaware. The `underlay`/`overlay` slots default to
 /// `EmptyView`.
-public struct DiagramSceneView<Underlay: View, Overlay: View>: View {
-    public let resolved: ResolvedDiagram
-    public let offset: CGSize
+struct DiagramSceneView<Underlay: View, Overlay: View>: View {
+    let resolved: ResolvedDiagram
+    let offset: CGSize
     private let underlay: Underlay
     private let overlay: Overlay
 
-    public init(
+    init(
         resolved: ResolvedDiagram,
         offset: CGSize,
         @ViewBuilder underlay: () -> Underlay = { EmptyView() },
@@ -27,7 +27,7 @@ public struct DiagramSceneView<Underlay: View, Overlay: View>: View {
         self.overlay = overlay()
     }
 
-    public var body: some View {
+    var body: some View {
         ZStack(alignment: .topLeading) {
             underlay
             // Depth-first painter order; siblings arrive pre-sorted by

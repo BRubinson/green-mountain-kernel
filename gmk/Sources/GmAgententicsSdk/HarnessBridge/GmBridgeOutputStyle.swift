@@ -10,7 +10,7 @@ extension GmBridgeOutputStyle {
     /// it, since no `settings.json` is emitted to select it. No `displayName` — it
     /// would emit a frontmatter `name:` disagreeing with the file stem. The body is
     /// `instruction.text`, so style, agent file and native session cannot drift.
-    public static let all: [File] = [
+    static let all: [File] = [
         File(
             name: "primarch",
             description:

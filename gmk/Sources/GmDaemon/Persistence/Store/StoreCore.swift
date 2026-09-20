@@ -65,7 +65,7 @@ final class StoreCore: @unchecked Sendable {
     // silences Swift 6's conservative Sendable check.
     nonisolated(unsafe) private static let isoFormatter = ISO8601DateFormatter()
 
-    public static func isoNow() -> String {
+    static func isoNow() -> String {
         isoFormatter.string(from: Date())
     }
 
@@ -131,7 +131,7 @@ final class StoreCore: @unchecked Sendable {
     /// daemon_event.payload is documented as JSON — always build it with a
     /// real serializer so embedded quotes/backslashes in values (file paths!)
     /// can't produce malformed rows.
-    public static func jsonPayload(_ object: [String: Any]) -> String? {
+    static func jsonPayload(_ object: [String: Any]) -> String? {
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else {
             return nil
         }

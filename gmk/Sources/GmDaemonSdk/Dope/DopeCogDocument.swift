@@ -8,24 +8,24 @@ import Foundation
 /// and description, so `expand(collapse(x)) == x` holds only where owners are
 /// synthesized from the code — seeding must go through the same synthesis the
 /// reader uses.
-public struct DopeCogDocument: Codable, Hashable, Sendable {
-    public let body: DopeCogBody
-    public let elements: [DopeCogElementDocument]
+struct DopeCogDocument: Codable, Hashable, Sendable {
+    let body: DopeCogBody
+    let elements: [DopeCogElementDocument]
 
     private enum CodingKeys: String, CodingKey { case elements }
 
-    public init(body: DopeCogBody, elements: [DopeCogElementDocument]) {
+    init(body: DopeCogBody, elements: [DopeCogElementDocument]) {
         self.body = body
         self.elements = elements
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         body = try DopeCogBody(from: decoder)
         elements = try decoder.container(keyedBy: CodingKeys.self)
             .decode([DopeCogElementDocument].self, forKey: .elements)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(elements, forKey: .elements)
@@ -33,13 +33,13 @@ public struct DopeCogDocument: Codable, Hashable, Sendable {
 }
 
 /// A cog's identity fields, uuid-free like every other `*Body`.
-public struct DopeCogBody: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let description: String
-    public let sortOrder: Int
+struct DopeCogBody: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let description: String
+    let sortOrder: Int
 
-    public init(code: String, name: String, description: String, sortOrder: Int) {
+    init(code: String, name: String, description: String, sortOrder: Int) {
         self.code = code
         self.name = name
         self.description = description
@@ -48,17 +48,17 @@ public struct DopeCogBody: Codable, Hashable, Sendable {
 }
 
 /// One top-level element (today: always a Hull) plus its collapsed links.
-public struct DopeCogElementDocument: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let description: String
-    public let sortOrder: Int
-    public let elementType: String
-    public let primaryPath: String?
-    public let dopeScopeCode: String?
-    public let links: DopeCogLinks?
+struct DopeCogElementDocument: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let description: String
+    let sortOrder: Int
+    let elementType: String
+    let primaryPath: String?
+    let dopeScopeCode: String?
+    let links: DopeCogLinks?
 
-    public init(
+    init(
         code: String,
         name: String,
         description: String,
@@ -83,10 +83,10 @@ public struct DopeCogElementDocument: Codable, Hashable, Sendable {
 /// domain CODES — ghost-tolerant, resolved at read time: a code naming no
 /// domain is a warning, never an error, matching the dope_scope_code
 /// precedent.
-public struct DopeCogLinks: Codable, Hashable, Sendable {
-    public let persistenceOwners: [String]
+struct DopeCogLinks: Codable, Hashable, Sendable {
+    let persistenceOwners: [String]
 
-    public init(persistenceOwners: [String]) {
+    init(persistenceOwners: [String]) {
         self.persistenceOwners = persistenceOwners
     }
 }

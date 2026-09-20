@@ -7,7 +7,7 @@ import Foundation
 // (MarkdownBlocksView). Inline emphasis/links/code-spans WITHIN a block are still
 // handled by AttributedString at render time.
 
-public enum MarkdownBlock: Identifiable, Equatable, Sendable {
+enum MarkdownBlock: Identifiable, Equatable, Sendable {
     case heading(level: Int, text: String)
     case paragraph(String)
     case bulletList(items: [String])
@@ -17,7 +17,7 @@ public enum MarkdownBlock: Identifiable, Equatable, Sendable {
     case table(headers: [String], rows: [[String]])
     case rule
 
-    public var id: String {
+    var id: String {
         switch self {
         case .heading(let l, let t): return "h\(l):\(t)"
         case .paragraph(let t): return "p:\(t)"
@@ -31,11 +31,11 @@ public enum MarkdownBlock: Identifiable, Equatable, Sendable {
     }
 }
 
-public enum MarkdownDocument {
+enum MarkdownDocument {
     // Parse a markdown string into ordered blocks. Deliberately small but covers the
     // shapes architect-agent output uses: ATX headings, fenced code, bullet/ordered
     // lists, blockquotes, pipe tables, thematic breaks, and paragraphs.
-    public static func parse(_ source: String) -> [MarkdownBlock] {
+    static func parse(_ source: String) -> [MarkdownBlock] {
         var blocks: [MarkdownBlock] = []
         // Normalize CRLF/CR so per-line whitespace trimming (which excludes \r) and
         // line classifiers behave on files from Windows-y tooling.
@@ -194,7 +194,7 @@ public enum MarkdownDocument {
     /// The ATX heading level (1...6) for a line, or nil if it isn't a heading.
     /// Shared by the block parser and the in-editor highlighter so both agree on the
     /// exact rule: 1–6 leading `#` (after optional leading spaces) followed by a space.
-    public static func headingLevel(of line: String) -> Int? {
+    static func headingLevel(of line: String) -> Int? {
         let s = line.drop(while: { $0 == " " })
         guard s.first == "#" else { return nil }
         var level = 0

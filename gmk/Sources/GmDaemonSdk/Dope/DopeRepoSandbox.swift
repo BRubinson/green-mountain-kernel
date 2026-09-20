@@ -8,18 +8,18 @@ import Foundation
 /// write swaps the dope-owned SUBTREES individually and writes
 /// `scope.doped.json` LAST — a crash then leaves an OLDER index over newer
 /// subtrees, which `peekRevision` reports as behind and a re-run repairs.
-public struct DopeRepoSandbox: Sendable {
-    public let instanceRoot: URL
-    public let dopeRoot: URL
+struct DopeRepoSandbox: Sendable {
+    let instanceRoot: URL
+    let dopeRoot: URL
 
-    public struct SandboxError: Error, CustomStringConvertible, Sendable {
-        public let description: String
-        public init(_ description: String) { self.description = description }
+    struct SandboxError: Error, CustomStringConvertible, Sendable {
+        let description: String
+        init(_ description: String) { self.description = description }
     }
 
     // MARK: - Resolution
 
-    public static func resolve(instanceRoot raw: String) throws -> DopeRepoSandbox {
+    static func resolve(instanceRoot raw: String) throws -> DopeRepoSandbox {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             throw SandboxError("instance root is empty — the session's instance row has no path")
@@ -55,36 +55,36 @@ public struct DopeRepoSandbox: Sendable {
 
     // MARK: - Contained paths
 
-    public var mainFile: URL {
+    var mainFile: URL {
         dopeRoot.appendingPathComponent(DopeDocumentCodec.scopeFileName)
     }
 
-    public var persistenceDirectory: URL {
+    var persistenceDirectory: URL {
         dopeRoot.appendingPathComponent(
             DopeDocumentCodec.persistenceDirectoryName,
             isDirectory: true
         )
     }
 
-    public var cogsDirectory: URL {
+    var cogsDirectory: URL {
         dopeRoot.appendingPathComponent(DopeDocumentCodec.cogsDirectoryName, isDirectory: true)
     }
 
     /// The retired `.gmcc/dope` tree. Named ONLY so callers can detect and
     /// report a stale checkout; nothing reads or writes through it.
-    public var legacyDopeRoot: URL {
+    var legacyDopeRoot: URL {
         dopeRoot.appendingPathComponent(
             DopeDocumentCodec.legacyDopeDirectoryName,
             isDirectory: true
         )
     }
 
-    public func cogDirectory(code: String) throws -> URL {
+    func cogDirectory(code: String) throws -> URL {
         try DopeCode.validateCode(code, field: "cog code")
         return try contained(cogsDirectory.appendingPathComponent(code, isDirectory: true))
     }
 
-    public func cogIndexFile(code: String) throws -> URL {
+    func cogIndexFile(code: String) throws -> URL {
         let dir = try cogDirectory(code: code)
         return try contained(
             dir.appendingPathComponent(
@@ -96,12 +96,12 @@ public struct DopeRepoSandbox: Sendable {
     /// One domain's directory. The layout gained a level, and the old
     /// single-flat-segment helper did not generalise — every segment below
     /// is validated here rather than assumed.
-    public func domainDirectory(code: String) throws -> URL {
+    func domainDirectory(code: String) throws -> URL {
         try DopeCode.validateCode(code, field: "domain code")
         return try contained(persistenceDirectory.appendingPathComponent(code, isDirectory: true))
     }
 
-    public func domainIndexFile(code: String) throws -> URL {
+    func domainIndexFile(code: String) throws -> URL {
         let dir = try domainDirectory(code: code)
         return try contained(
             dir.appendingPathComponent(
@@ -110,7 +110,7 @@ public struct DopeRepoSandbox: Sendable {
         )
     }
 
-    public func domainEntityFile(domain: String, entity: String) throws -> URL {
+    func domainEntityFile(domain: String, entity: String) throws -> URL {
         try DopeCode.validateCode(entity, field: "entity code")
         let dir = try domainDirectory(code: domain)
         return try contained(
@@ -120,7 +120,7 @@ public struct DopeRepoSandbox: Sendable {
         )
     }
 
-    public func domainEnumFile(domain: String, enumCode: String) throws -> URL {
+    func domainEnumFile(domain: String, enumCode: String) throws -> URL {
         try DopeCode.validateCode(enumCode, field: "enum code")
         let dir = try domainDirectory(code: domain)
         return try contained(
@@ -145,16 +145,16 @@ public struct DopeRepoSandbox: Sendable {
 
     // MARK: - Read
 
-    public struct RepoBundle: Sendable {
-        public let bundle: DopeDocumentBundle
-        public let warnings: [String]
+    struct RepoBundle: Sendable {
+        let bundle: DopeDocumentBundle
+        let warnings: [String]
     }
 
     /// Reads `scope.doped.json`, then ONLY the files its map names — after
     /// re-deriving each value from its key — and for each domain, only the
     /// entity/enum files ITS index names, re-derived the same way. Never
     /// globs. The map is data at BOTH levels, never followed.
-    public func readBundle() throws -> RepoBundle {
+    func readBundle() throws -> RepoBundle {
         let mainURL = mainFile
         guard FileManager.default.fileExists(atPath: mainURL.path) else {
             throw SandboxError("no dope tree on disk: \(mainURL.path) does not exist")
@@ -331,7 +331,7 @@ public struct DopeRepoSandbox: Sendable {
 
     /// Peek at the on-disk revision without a full parse. Nil when no tree
     /// exists on disk.
-    public func peekRevision() -> Int64? {
+    func peekRevision() -> Int64? {
         guard let data = try? Data(contentsOf: mainFile),
             let main = try? DopeDocumentCodec.decoder.decode(DopeScopeDocument.self, from: data)
         else { return nil }
@@ -340,9 +340,9 @@ public struct DopeRepoSandbox: Sendable {
 
     // MARK: - Write
 
-    public struct WriteResult: Sendable {
-        public let written: [String]
-        public let pruned: [String]
+    struct WriteResult: Sendable {
+        let written: [String]
+        let pruned: [String]
     }
 
     /// Subtree-atomic write; returned paths are instance-root-relative.
@@ -352,7 +352,7 @@ public struct DopeRepoSandbox: Sendable {
     /// leaves the previous subtree byte-intact. `scope.doped.json` is the
     /// version authority and is written LAST: a crash then leaves an index
     /// reporting a revision BEHIND the files, which is the benign direction.
-    public func writeAtomically(_ bundle: DopeDocumentBundle) throws -> WriteResult {
+    func writeAtomically(_ bundle: DopeDocumentBundle) throws -> WriteResult {
         let fm = FileManager.default
         let staging = dopeRoot.appendingPathComponent(
             ".dope-staging-\(UUID().uuidString.lowercased())",

@@ -26,10 +26,10 @@ import Foundation
 /// CDE workflow work is pen-only: a tool an agent cannot see is a missing
 /// GRANT to report, never a cue to shell to the wire, whose unbudgeted output
 /// the harness silently truncates.
-public enum WorkflowSpec {
+enum WorkflowSpec {
 
     /// Phase codes, in canonical order of appearance across variants.
-    public enum Phase: String, CaseIterable, Sendable {
+    enum Phase: String, CaseIterable, Sendable {
         case briefing
         case explore
         case clarifyOpen = "clarify_open"
@@ -46,7 +46,7 @@ public enum WorkflowSpec {
 
     /// The ordered phase graph per variant. `task` is deliberately absent —
     /// its write-nothing contract means no workflow row exists to walk.
-    public static func phases(for variant: BotVariant) -> [Phase] {
+    static func phases(for variant: BotVariant) -> [Phase] {
         switch variant {
         case .bot:
             return [
@@ -70,7 +70,7 @@ public enum WorkflowSpec {
     /// The exploration agent set each variant must complete before leaving
     /// the explore phase (the synthesis row is gated separately — its
     /// complete IS the prompt-level seal).
-    public static func expectedExplorationAgents(for variant: BotVariant) -> [ExplorationAgentType] {
+    static func expectedExplorationAgents(for variant: BotVariant) -> [ExplorationAgentType] {
         switch variant {
         case .bot, .rpi:
             return [.general]
@@ -85,7 +85,7 @@ public enum WorkflowSpec {
     /// are conventions nothing enforces, so check by hand when adding a phase.
     /// `gmAgententicsSdk` is a second consumer and reads this live, so the text
     /// reaches a model directly rather than only a harness.
-    public static func instructions(variant: BotVariant, phase: Phase) -> String {
+    static func instructions(variant: BotVariant, phase: Phase) -> String {
         switch phase {
         case .briefing:
             return """

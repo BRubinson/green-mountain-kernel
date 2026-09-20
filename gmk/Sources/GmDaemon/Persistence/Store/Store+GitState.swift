@@ -11,11 +11,11 @@ import GRDB
 // Bodies live in GitStateRepository; these wrappers own the transaction.
 
 extension Store {
-    public func sessionResolve(_ req: SessionResolveRequest) throws -> SessionResolveResponse {
+    func sessionResolve(_ req: SessionResolveRequest) throws -> SessionResolveResponse {
         try boundaryRead { db in try GitStateRepository(db: db, core: core).sessionResolve(req) }
     }
 
-    public func instanceCurrentSession(
+    func instanceCurrentSession(
         _ req: InstanceCurrentSessionRequest
     ) throws -> InstanceCurrentSessionResponse {
         try boundaryRead { db in
@@ -27,7 +27,7 @@ extension Store {
     /// CHECKOUT_CHANGE broadcast path (server module), so the push event and
     /// the poll responses can never disagree about what is checked out.
     /// `branch` is the RAW branch name, nil unless state == "branch".
-    public static func headSummary(repoRoot: String) -> (state: String, code: String?, branch: String?) {
+    static func headSummary(repoRoot: String) -> (state: String, code: String?, branch: String?) {
         guard !repoRoot.isEmpty else { return ("unavailable", nil, nil) }
         switch GitHead.resolve(repoRoot: repoRoot) {
         case .branch(let branch):

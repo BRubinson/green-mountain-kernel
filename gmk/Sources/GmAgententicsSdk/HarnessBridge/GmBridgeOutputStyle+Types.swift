@@ -1,16 +1,16 @@
 import Foundation
 
-public enum GmBridgeOutputStyle {
+enum GmBridgeOutputStyle {
 
-    public struct File: Equatable, Sendable, GmBridgeFile {
+    struct File: Equatable, Sendable, GmBridgeFile {
 
-        public var name: String
+        var name: String
 
-        public var displayName: String?
+        var displayName: String?
 
-        public var description: String?
+        var description: String?
 
-        public var keepCodingInstructions: Bool?
+        var keepCodingInstructions: Bool?
 
         /// Plugin output styles only: apply this style automatically whenever
         /// the plugin is enabled, overriding the user's `outputStyle` setting.
@@ -19,11 +19,11 @@ public enum GmBridgeOutputStyle {
         /// non-optional `Bool` would write `force-for-plugin: false` into every
         /// style that simply had no opinion, which is a different statement from
         /// omitting the key.
-        public var forceForPlugin: Bool?
+        var forceForPlugin: Bool?
 
-        public var body: String
+        var body: String
 
-        public init(
+        init(
             name: String,
             displayName: String? = nil,
             description: String? = nil,
@@ -39,15 +39,15 @@ public enum GmBridgeOutputStyle {
             self.body = body
         }
 
-        public var relativePath: String {
+        var relativePath: String {
             "output-styles/\(name).md"
         }
 
-        public var isEmpty: Bool {
+        var isEmpty: Bool {
             body.isEmpty
         }
 
-        public func contents() -> String? {
+        func contents() -> String? {
             guard !isEmpty else { return nil }
 
             var lines = ["---"]

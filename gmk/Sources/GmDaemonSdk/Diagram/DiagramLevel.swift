@@ -13,7 +13,7 @@ import Foundation
 /// storage, which every remaining tier carries, so the rung had nothing left
 /// to do. A session or prompt diagram still reaches an instance transitively
 /// via session -> instance wherever one is genuinely needed.
-public enum DiagramTier: String, Codable, Hashable, CaseIterable, Sendable {
+enum DiagramTier: String, Codable, Hashable, CaseIterable, Sendable {
     case project = "PROJECT"
     case session = "SESSION"
     case prompt = "PROMPT"
@@ -25,7 +25,7 @@ public enum DiagramTier: String, Codable, Hashable, CaseIterable, Sendable {
 /// PUBLIC is legal ONLY on SESSION-tier rows — the same
 /// session→instance-root gate DOPE_WRITE_REPO uses — enforced by a Swift
 /// store guard, not a CHECK (the rule crosses tables).
-public enum DiagramVisibility: String, Codable, Hashable, CaseIterable, Sendable {
+enum DiagramVisibility: String, Codable, Hashable, CaseIterable, Sendable {
     case `private` = "PRIVATE"
     case `public` = "PUBLIC"
 }
@@ -37,7 +37,7 @@ public enum DiagramVisibility: String, Codable, Hashable, CaseIterable, Sendable
 /// DiagramElementTypeSpec, enforced on both write paths and thrown on at read.
 /// Adding a type is one case here, one registry entry below, and one subtype
 /// table — never a migration.
-public enum DiagramElementType: String, Codable, Hashable, CaseIterable, Sendable {
+enum DiagramElementType: String, Codable, Hashable, CaseIterable, Sendable {
     case drawingLayer = "drawing_layer"
     case drawingStroke = "drawing_stroke"
     case drawingShape = "drawing_shape"
@@ -49,7 +49,7 @@ public enum DiagramElementType: String, Codable, Hashable, CaseIterable, Sendabl
 
     /// Auto-mint prefix for elements added without a code (hand-naming
     /// hundreds of freedraw strokes would be hostile).
-    public var codePrefix: String {
+    var codePrefix: String {
         switch self {
         case .drawingLayer: return "layer"
         case .drawingStroke: return "stroke"
@@ -63,7 +63,7 @@ public enum DiagramElementType: String, Codable, Hashable, CaseIterable, Sendabl
     }
 
     /// Default display name for elements added without one.
-    public var defaultName: String {
+    var defaultName: String {
         switch self {
         case .drawingLayer: return "Layer 1"
         case .drawingStroke: return "Stroke"
@@ -84,7 +84,7 @@ public enum DiagramElementType: String, Codable, Hashable, CaseIterable, Sendabl
 /// coordinate. Low-cardinality shapes keep vertex rows, where the row form
 /// is queryable and the overhead is irrelevant. Both representations coexist
 /// permanently; this is the axis that picks between them.
-public enum DiagramVertexStorage: Sendable, Hashable {
+enum DiagramVertexStorage: Sendable, Hashable {
     /// No geometry beyond the element's own center/scale.
     case none
     /// One row per vertex in `table`, joined by `parentColumn`.
@@ -99,7 +99,7 @@ public enum DiagramVertexStorage: Sendable, Hashable {
 
     /// The vertex table this storage reads from, if any — the fallback for
     /// `.packedBlob`, the table itself for `.rows`.
-    public var vertexTable: String? {
+    var vertexTable: String? {
         switch self {
         case .none: return nil
         case .rows(let table, _): return table
@@ -107,7 +107,7 @@ public enum DiagramVertexStorage: Sendable, Hashable {
         }
     }
 
-    public var vertexParentColumn: String? {
+    var vertexParentColumn: String? {
         switch self {
         case .none: return nil
         case .rows(_, let column): return column
@@ -115,7 +115,7 @@ public enum DiagramVertexStorage: Sendable, Hashable {
         }
     }
 
-    public static func == (lhs: DiagramVertexStorage, rhs: DiagramVertexStorage) -> Bool {
+    static func == (lhs: DiagramVertexStorage, rhs: DiagramVertexStorage) -> Bool {
         switch (lhs, rhs) {
         case (.none, .none): return true
         case (.rows(let lt, let lc), .rows(let rt, let rc)): return lt == rt && lc == rc
@@ -125,7 +125,7 @@ public enum DiagramVertexStorage: Sendable, Hashable {
         }
     }
 
-    public func hash(into hasher: inout Hasher) {
+    func hash(into hasher: inout Hasher) {
         switch self {
         case .none: hasher.combine(0)
         case .rows(let t, let c): hasher.combine(1); hasher.combine(t); hasher.combine(c)
@@ -143,13 +143,13 @@ public enum DiagramVertexStorage: Sendable, Hashable {
 /// because they are defined in terms of OTHER elements' geometry, which does
 /// not exist yet during the main walk. Connector is the first such type; the
 /// pass is general so it is not the last.
-public enum DiagramResolutionPhase: Sendable, Hashable {
+enum DiagramResolutionPhase: Sendable, Hashable {
     case immediate
     case deferred
 }
 
 /// diagram_drawing_shape.shape_kind values.
-public enum DiagramShapeKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum DiagramShapeKind: String, Codable, Hashable, CaseIterable, Sendable {
     case rectangle
     case ellipse
     case line
@@ -158,7 +158,7 @@ public enum DiagramShapeKind: String, Codable, Hashable, CaseIterable, Sendable 
 }
 
 /// diagram_drawing_stroke.tool values.
-public enum DiagramStrokeTool: String, Codable, Hashable, CaseIterable, Sendable {
+enum DiagramStrokeTool: String, Codable, Hashable, CaseIterable, Sendable {
     case pencil
     case marker
     case highlighter
@@ -169,7 +169,7 @@ public enum DiagramStrokeTool: String, Codable, Hashable, CaseIterable, Sendable
 /// node-types-are-data model). Reshaping a node is an ordinary wholesale
 /// payload update; a type-per-shape design would make it delete+recreate,
 /// ghosting every incoming connector.
-public enum DiagramNodeKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum DiagramNodeKind: String, Codable, Hashable, CaseIterable, Sendable {
     case dbCylinder = "db_cylinder"
     case roundedRect = "rounded_rect"
     case triangle
@@ -185,14 +185,14 @@ public enum DiagramNodeKind: String, Codable, Hashable, CaseIterable, Sendable {
 /// containment. Every other element relationship is either
 /// `parent_element_uuid` (validated purely by type membership) or a
 /// ghost-tolerant CODE lookup into the external dope tree.
-public struct DiagramElementRefSpec: Sendable, Hashable {
+struct DiagramElementRefSpec: Sendable, Hashable {
     /// Names the reference in errors: "connector target ...".
-    public let role: String
+    let role: String
     /// The subtype-table column holding the referenced element's uuid.
-    public let column: String
-    public let rule: ContainmentRule
+    let column: String
+    let rule: ContainmentRule
 
-    public enum ContainmentRule: Sendable, Hashable {
+    enum ContainmentRule: Sendable, Hashable {
         /// The target must be a PEER OF THE REFERRER'S OWN PARENT — it shares
         /// the referrer's grandparent — and may be neither the referrer's
         /// parent nor the referrer itself. A connector is rendered as a child
@@ -201,7 +201,7 @@ public struct DiagramElementRefSpec: Sendable, Hashable {
         case peerOfOwnParent
     }
 
-    public init(role: String, column: String, rule: ContainmentRule) {
+    init(role: String, column: String, rule: ContainmentRule) {
         self.role = role
         self.column = column
         self.rule = rule
@@ -212,36 +212,36 @@ public struct DiagramElementRefSpec: Sendable, Hashable {
 /// element references, resolution phase, routing participation,
 /// binding-ness — the single truth consumed by store dispatch, containment
 /// validation, hydration, the resolver, and the CLI's help text.
-public struct DiagramElementTypeSpec: Sendable {
-    public let type: DiagramElementType
-    public let subtypeTable: String
+struct DiagramElementTypeSpec: Sendable {
+    let type: DiagramElementType
+    let subtypeTable: String
     /// Where this type's geometry lives. `.rows` is the classic vertex
     /// table; `.packedBlob` packs to a blob and falls back to those rows.
-    public let vertexStorage: DiagramVertexStorage
+    let vertexStorage: DiagramVertexStorage
     /// nil = a top-level type (parent_element_uuid must be NULL). Since
     /// m0021 there is NO schema CHECK behind this — the registry IS the
     /// rule, enforced by both write paths.
-    public let allowedParentTypes: Set<DiagramElementType>?
+    let allowedParentTypes: Set<DiagramElementType>?
     /// Whether this type binds into the dope tree by code.
-    public let isDopeBinding: Bool
+    let isDopeBinding: Bool
     /// Typed references this type makes to OTHER elements, beyond parent
     /// containment. Empty for every type except connector.
-    public let elementRefs: [DiagramElementRefSpec]
+    let elementRefs: [DiagramElementRefSpec]
     /// Immediate placement, or a second pass against completed frames.
-    public let resolution: DiagramResolutionPhase
+    let resolution: DiagramResolutionPhase
     /// Whether this type's frame becomes an obstacle the edge router steers
     /// around. Structural content (entity cards, shapes, text) blocks;
     /// freehand ink and layers deliberately do not, so edges cross drawings
     /// by design and a dense stroke corpus never chokes the router.
-    public let participatesInRouting: Bool
+    let participatesInRouting: Bool
 
     /// Non-nil only for vertex-bearing types — derived from `vertexStorage`
     /// so call sites that only care about the table keep working.
-    public var vertexTable: String? { vertexStorage.vertexTable }
+    var vertexTable: String? { vertexStorage.vertexTable }
     /// The subtype-table FK column the vertex table uses.
-    public var vertexParentColumn: String? { vertexStorage.vertexParentColumn }
+    var vertexParentColumn: String? { vertexStorage.vertexParentColumn }
 
-    public static let all: [DiagramElementType: DiagramElementTypeSpec] = {
+    static let all: [DiagramElementType: DiagramElementTypeSpec] = {
         let specs: [DiagramElementTypeSpec] = [
             DiagramElementTypeSpec(
                 type: .drawingLayer,
@@ -361,11 +361,11 @@ public struct DiagramElementTypeSpec: Sendable {
     }()
 
     /// Every type whose frame the edge router must steer around.
-    public static var routingParticipants: Set<DiagramElementType> {
+    static var routingParticipants: Set<DiagramElementType> {
         Set(all.values.filter(\.participatesInRouting).map(\.type))
     }
 
-    public static func spec(for type: DiagramElementType) -> DiagramElementTypeSpec {
+    static func spec(for type: DiagramElementType) -> DiagramElementTypeSpec {
         // Total over DiagramElementType by construction.
         all[type]!
     }

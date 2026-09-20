@@ -1,12 +1,12 @@
 import Foundation
 
 /// Cog rows ↔ cog documents. The mirror of DopeProjection for the cogs area.
-public enum DopeCogProjection {
+enum DopeCogProjection {
 
     /// db → file. Top-level elements become documents; their PersistenceOwner
     /// children collapse into the parent's `links.persistence_owners`.
     /// Tombstoned rows are dropped, matching the persistence projection.
-    public static func document(from cog: DopeCogNode) -> DopeCogDocument {
+    static func document(from cog: DopeCogNode) -> DopeCogDocument {
         let live = cog.elements.filter { $0.deletedOn == nil }
         let byParent = Dictionary(grouping: live.filter { $0.parentElementUuid != nil }) {
             $0.parentElementUuid!
@@ -44,7 +44,7 @@ public enum DopeCogProjection {
     /// seeder must mint it. Centralised so the two cannot drift — drift here
     /// would make every publish/ingest cycle produce a different tree and
     /// report phantom conflicts forever.
-    public static func ownerElement(
+    static func ownerElement(
         parentCode: String,
         persistenceCode: String,
         sortOrder: Int

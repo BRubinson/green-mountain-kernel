@@ -11,31 +11,31 @@ import Foundation
 
 /// Uuid/timestamp injection so tests are deterministic and the app supplies
 /// real `UUID()`s.
-public protocol DiagramIdentityMinting {
+protocol DiagramIdentityMinting {
     func mintUuid() -> String
     func now() -> String
 }
 
 /// Counter-based deterministic minting (tests, previews).
-public final class SequentialDiagramMinting: DiagramIdentityMinting {
+final class SequentialDiagramMinting: DiagramIdentityMinting {
     private var counter = 0
     private let prefix: String
     private let timestamp: String
 
-    public init(prefix: String = "local", timestamp: String = "t") {
+    init(prefix: String = "local", timestamp: String = "t") {
         self.prefix = prefix
         self.timestamp = timestamp
     }
 
-    public func mintUuid() -> String {
+    func mintUuid() -> String {
         counter += 1
         return "\(prefix)-\(counter)"
     }
 
-    public func now() -> String { timestamp }
+    func now() -> String { timestamp }
 }
 
-public enum DiagramReducerError: Error, Equatable, Sendable {
+enum DiagramReducerError: Error, Equatable, Sendable {
     case revisionConflict(expected: Int64, actual: Int64)
     case versionConflict(elementUuid: String, expected: Int64, actual: Int64)
     case notFound(elementUuid: String)
@@ -43,11 +43,11 @@ public enum DiagramReducerError: Error, Equatable, Sendable {
     case emptyUpdate(elementUuid: String)
 }
 
-public enum DiagramTreeReducer {
+enum DiagramTreeReducer {
 
     static let maxMintedSuffix = 999_999
 
-    public static func apply(
+    static func apply(
         _ mutations: [DiagramMutation],
         to tree: DiagramTree,
         expectedRevision: Int64? = nil,
@@ -582,7 +582,7 @@ public enum DiagramTreeReducer {
 
     /// Depth-first lookup — public because hosts resolve hit uuids back to
     /// tree nodes with it (the drag path's node snapshot).
-    public static func findNode(_ uuid: String, in elements: [DiagramElementNode]) -> DiagramElementNode? {
+    static func findNode(_ uuid: String, in elements: [DiagramElementNode]) -> DiagramElementNode? {
         for node in elements {
             if node.identity.uuid == uuid { return node }
             if let found = findNode(uuid, in: node.children) { return found }

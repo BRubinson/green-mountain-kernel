@@ -6,8 +6,8 @@ import Foundation
 /// never block on a domain model. Runs immediately after DopeBootSync.run
 /// inside CONTEXT_ENSURE, so the files → db reconcile settles first and
 /// promotion publishes its result.
-public enum DopePromotion {
-    public enum Outcome {
+enum DopePromotion {
+    enum Outcome {
         /// The session is not on the project's primary branch — the common,
         /// silent case.
         case notPrimaryBranch(detail: String)
@@ -18,7 +18,7 @@ public enum DopePromotion {
         case unreachable(String)
     }
 
-    public static func run(client: DaemonClient, sessionUuid: String) -> Outcome {
+    static func run(client: DaemonClient, sessionUuid: String) -> Outcome {
         do {
             let response = try client.dopePromote(DopePromoteRequest(sessionUuid: sessionUuid))
             if !response.promoted.isEmpty { return .promoted(response.promoted) }
@@ -33,7 +33,7 @@ public enum DopePromotion {
     }
 
     /// One human line for hook output; nil for the silent outcomes.
-    public static func notice(for outcome: Outcome) -> String? {
+    static func notice(for outcome: Outcome) -> String? {
         switch outcome {
         case .notPrimaryBranch, .nothingToPublish, .upToDate:
             return nil

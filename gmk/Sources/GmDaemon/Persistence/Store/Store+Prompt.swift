@@ -8,23 +8,23 @@ import GRDB
 // Bodies live in PromptRepository; these wrappers own the transaction.
 
 extension Store {
-    public func createPrompt(_ req: PromptCreateRequest) throws -> PromptRow {
+    func createPrompt(_ req: PromptCreateRequest) throws -> PromptRow {
         try boundary { db in try PromptRepository(db: db, core: core).create(req) }
     }
 
-    public func listPrompts(_ req: PromptListRequest) throws -> PromptListResponse {
+    func listPrompts(_ req: PromptListRequest) throws -> PromptListResponse {
         try boundaryRead { db in try PromptRepository(db: db, core: core).list(req) }
     }
 
-    public func getPrompt(_ req: PromptGetRequest) throws -> PromptGetResponse {
+    func getPrompt(_ req: PromptGetRequest) throws -> PromptGetResponse {
         try boundaryRead { db in try PromptRepository(db: db, core: core).get(req) }
     }
 
-    public func updatePromptContent(_ req: PromptUpdateContentRequest) throws -> PromptRow {
+    func updatePromptContent(_ req: PromptUpdateContentRequest) throws -> PromptRow {
         try boundary { db in try PromptRepository(db: db, core: core).updateContent(req) }
     }
 
-    public func setPromptStatus(_ req: PromptSetStatusRequest) throws -> PromptRow {
+    func setPromptStatus(_ req: PromptSetStatusRequest) throws -> PromptRow {
         try boundary { db in try PromptRepository(db: db, core: core).setStatus(req) }
     }
 

@@ -13,20 +13,20 @@ import Foundation
 /// be written to a repo, so storing it would record a constant and invite a
 /// file that contradicts it.
 
-public struct DopeScopeDocument: Codable, Hashable, Sendable {
-    public let version: Int64
-    public let scope: DopeScopeBody
+struct DopeScopeDocument: Codable, Hashable, Sendable {
+    let version: Int64
+    let scope: DopeScopeBody
     /// persistence_code → repo-relative index path. Read as DATA, never
     /// followed: the reader re-derives each value from its key and refuses a
     /// mismatched, absolute, or `..`-bearing entry.
-    public let persistence: [String: String]
+    let persistence: [String: String]
     /// cog_code → repo-relative cog index path. Same data-never-followed
     /// rule. Defaulted so a tree written before cogs existed still decodes.
-    public let cogs: [String: String]
+    let cogs: [String: String]
 
     private enum CodingKeys: String, CodingKey { case version, scope, persistence, cogs }
 
-    public init(
+    init(
         version: Int64,
         scope: DopeScopeBody,
         persistence: [String: String],
@@ -38,7 +38,7 @@ public struct DopeScopeDocument: Codable, Hashable, Sendable {
         self.cogs = cogs
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         version = try c.decode(Int64.self, forKey: .version)
         scope = try c.decode(DopeScopeBody.self, forKey: .scope)
@@ -47,19 +47,19 @@ public struct DopeScopeDocument: Codable, Hashable, Sendable {
     }
 
     /// The domain's own directory, relative to `.gmcc/`.
-    public static func expectedDirectory(forPersistenceCode code: String) -> String {
+    static func expectedDirectory(forPersistenceCode code: String) -> String {
         "\(DopeDocumentCodec.persistenceDirectoryName)/\(code)"
     }
 
-    public static func expectedFile(forPersistenceCode code: String) -> String {
+    static func expectedFile(forPersistenceCode code: String) -> String {
         "\(expectedDirectory(forPersistenceCode: code))/\(code).index.persistence.doped.json"
     }
 
-    public static func expectedCogDirectory(forCogCode code: String) -> String {
+    static func expectedCogDirectory(forCogCode code: String) -> String {
         "\(DopeDocumentCodec.cogsDirectoryName)/\(code)"
     }
 
-    public static func expectedCogFile(forCogCode code: String) -> String {
+    static func expectedCogFile(forCogCode code: String) -> String {
         "\(expectedCogDirectory(forCogCode: code))/\(code).index.cog.doped.json"
     }
 }
@@ -70,17 +70,17 @@ public struct DopeScopeDocument: Codable, Hashable, Sendable {
 /// disagrees is refused rather than followed, which is what stops a
 /// hand-edited index from redirecting a read — or a prune — outside its own
 /// directory.
-public struct DopePersistenceIndexDocument: Codable, Hashable, Sendable {
-    public let version: Int64
-    public let body: DopePersistenceBody
+struct DopePersistenceIndexDocument: Codable, Hashable, Sendable {
+    let version: Int64
+    let body: DopePersistenceBody
     /// entity_code → file name (basename, within this domain's directory).
-    public let entities: [String: String]
+    let entities: [String: String]
     /// enum_code → file name.
-    public let enums: [String: String]
+    let enums: [String: String]
 
     private enum CodingKeys: String, CodingKey { case version, entities, enums }
 
-    public init(
+    init(
         version: Int64,
         body: DopePersistenceBody,
         entities: [String: String],
@@ -92,7 +92,7 @@ public struct DopePersistenceIndexDocument: Codable, Hashable, Sendable {
         self.enums = enums
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         body = try DopePersistenceBody(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
         version = try c.decode(Int64.self, forKey: .version)
@@ -100,7 +100,7 @@ public struct DopePersistenceIndexDocument: Codable, Hashable, Sendable {
         enums = try c.decode([String: String].self, forKey: .enums)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(version, forKey: .version)
@@ -112,73 +112,73 @@ public struct DopePersistenceIndexDocument: Codable, Hashable, Sendable {
     /// dot-path refs resolve against, they survive a rename of the display
     /// name, and they cannot collide on a case-insensitive filesystem the
     /// way two differently-cased names would.
-    public static func expectedEntityFile(domain: String, entity: String) -> String {
+    static func expectedEntityFile(domain: String, entity: String) -> String {
         "\(domain).entity.\(entity)\(DopeDocumentCodec.persistenceFileSuffix)"
     }
 
-    public static func expectedEnumFile(domain: String, enumCode: String) -> String {
+    static func expectedEnumFile(domain: String, enumCode: String) -> String {
         "\(domain).enum.\(enumCode)\(DopeDocumentCodec.persistenceFileSuffix)"
     }
 }
 
-public struct DopeOptionDocument: Codable, Hashable, Sendable {
-    public let body: DopeOptionBody
+struct DopeOptionDocument: Codable, Hashable, Sendable {
+    let body: DopeOptionBody
 
-    public init(body: DopeOptionBody) { self.body = body }
-    public init(from decoder: Decoder) throws { body = try DopeOptionBody(from: decoder) }
-    public func encode(to encoder: Encoder) throws { try body.encode(to: encoder) }
+    init(body: DopeOptionBody) { self.body = body }
+    init(from decoder: Decoder) throws { body = try DopeOptionBody(from: decoder) }
+    func encode(to encoder: Encoder) throws { try body.encode(to: encoder) }
 }
 
-public struct DopeEnumDocument: Codable, Hashable, Sendable {
-    public let body: DopeEnumBody
-    public let options: [DopeOptionDocument]
+struct DopeEnumDocument: Codable, Hashable, Sendable {
+    let body: DopeEnumBody
+    let options: [DopeOptionDocument]
 
     private enum CodingKeys: String, CodingKey { case options }
 
-    public init(body: DopeEnumBody, options: [DopeOptionDocument]) {
+    init(body: DopeEnumBody, options: [DopeOptionDocument]) {
         self.body = body
         self.options = options
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         body = try DopeEnumBody(from: decoder)
         options = try decoder.container(keyedBy: CodingKeys.self)
             .decode([DopeOptionDocument].self, forKey: .options)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(options, forKey: .options)
     }
 }
 
-public struct DopePropertyDocument: Codable, Hashable, Sendable {
-    public let body: DopePropertyBody
+struct DopePropertyDocument: Codable, Hashable, Sendable {
+    let body: DopePropertyBody
 
-    public init(body: DopePropertyBody) { self.body = body }
-    public init(from decoder: Decoder) throws { body = try DopePropertyBody(from: decoder) }
-    public func encode(to encoder: Encoder) throws { try body.encode(to: encoder) }
+    init(body: DopePropertyBody) { self.body = body }
+    init(from decoder: Decoder) throws { body = try DopePropertyBody(from: decoder) }
+    func encode(to encoder: Encoder) throws { try body.encode(to: encoder) }
 }
 
-public struct DopeEntityDocument: Codable, Hashable, Sendable {
-    public let body: DopeEntityBody
-    public let properties: [DopePropertyDocument]
+struct DopeEntityDocument: Codable, Hashable, Sendable {
+    let body: DopeEntityBody
+    let properties: [DopePropertyDocument]
 
     private enum CodingKeys: String, CodingKey { case properties }
 
-    public init(body: DopeEntityBody, properties: [DopePropertyDocument]) {
+    init(body: DopeEntityBody, properties: [DopePropertyDocument]) {
         self.body = body
         self.properties = properties
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         body = try DopeEntityBody(from: decoder)
         properties = try decoder.container(keyedBy: CodingKeys.self)
             .decode([DopePropertyDocument].self, forKey: .properties)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(properties, forKey: .properties)
@@ -187,27 +187,27 @@ public struct DopeEntityDocument: Codable, Hashable, Sendable {
 
 /// One `{domain}.entity.{code}.persistence.doped.json` file: a single entity
 /// with its properties, plus the tree-wide version stamp.
-public struct DopeEntityFileDocument: Codable, Hashable, Sendable {
-    public let version: Int64
-    public let body: DopeEntityBody
-    public let properties: [DopePropertyDocument]
+struct DopeEntityFileDocument: Codable, Hashable, Sendable {
+    let version: Int64
+    let body: DopeEntityBody
+    let properties: [DopePropertyDocument]
 
     private enum CodingKeys: String, CodingKey { case version, properties }
 
-    public init(version: Int64, body: DopeEntityBody, properties: [DopePropertyDocument]) {
+    init(version: Int64, body: DopeEntityBody, properties: [DopePropertyDocument]) {
         self.version = version
         self.body = body
         self.properties = properties
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         body = try DopeEntityBody(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
         version = try c.decode(Int64.self, forKey: .version)
         properties = try c.decode([DopePropertyDocument].self, forKey: .properties)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(version, forKey: .version)
@@ -216,27 +216,27 @@ public struct DopeEntityFileDocument: Codable, Hashable, Sendable {
 }
 
 /// One `{domain}.enum.{code}.persistence.doped.json` file.
-public struct DopeEnumFileDocument: Codable, Hashable, Sendable {
-    public let version: Int64
-    public let body: DopeEnumBody
-    public let options: [DopeOptionDocument]
+struct DopeEnumFileDocument: Codable, Hashable, Sendable {
+    let version: Int64
+    let body: DopeEnumBody
+    let options: [DopeOptionDocument]
 
     private enum CodingKeys: String, CodingKey { case version, options }
 
-    public init(version: Int64, body: DopeEnumBody, options: [DopeOptionDocument]) {
+    init(version: Int64, body: DopeEnumBody, options: [DopeOptionDocument]) {
         self.version = version
         self.body = body
         self.options = options
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         body = try DopeEnumBody(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
         version = try c.decode(Int64.self, forKey: .version)
         options = try c.decode([DopeOptionDocument].self, forKey: .options)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(version, forKey: .version)
@@ -249,15 +249,15 @@ public struct DopeEnumFileDocument: Codable, Hashable, Sendable {
 /// Deliberately unchanged in shape: DopeValidator, dopeIngest and the
 /// overlay resolver all consume this and never learn that a domain is now a
 /// directory rather than a file.
-public struct DopePersistenceFileDocument: Codable, Hashable, Sendable {
-    public let version: Int64
-    public let body: DopePersistenceBody
-    public let entities: [DopeEntityDocument]
-    public let enums: [DopeEnumDocument]
+struct DopePersistenceFileDocument: Codable, Hashable, Sendable {
+    let version: Int64
+    let body: DopePersistenceBody
+    let entities: [DopeEntityDocument]
+    let enums: [DopeEnumDocument]
 
     private enum CodingKeys: String, CodingKey { case version, entities, enums }
 
-    public init(
+    init(
         version: Int64,
         body: DopePersistenceBody,
         entities: [DopeEntityDocument],
@@ -269,7 +269,7 @@ public struct DopePersistenceFileDocument: Codable, Hashable, Sendable {
         self.enums = enums
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         body = try DopePersistenceBody(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
         version = try c.decode(Int64.self, forKey: .version)
@@ -277,7 +277,7 @@ public struct DopePersistenceFileDocument: Codable, Hashable, Sendable {
         enums = try c.decode([DopeEnumDocument].self, forKey: .enums)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(version, forKey: .version)
@@ -289,16 +289,16 @@ public struct DopePersistenceFileDocument: Codable, Hashable, Sendable {
 /// The complete parsed on-disk representation of one scope. `main` is the
 /// scope index document (`scope.doped.json`); `domainFiles` are the assembled
 /// domains, each gathered from its own directory.
-public struct DopeDocumentBundle: Codable, Hashable, Sendable {
-    public let main: DopeScopeDocument
-    public let domainFiles: [DopePersistenceFileDocument]
+struct DopeDocumentBundle: Codable, Hashable, Sendable {
+    let main: DopeScopeDocument
+    let domainFiles: [DopePersistenceFileDocument]
     /// The cogs area. Defaulted and decoded with decodeIfPresent so a tree
     /// written before cogs had a file layer still parses.
-    public let cogFiles: [DopeCogDocument]
+    let cogFiles: [DopeCogDocument]
 
     private enum CodingKeys: String, CodingKey { case main, domainFiles, cogFiles }
 
-    public init(
+    init(
         main: DopeScopeDocument,
         domainFiles: [DopePersistenceFileDocument],
         cogFiles: [DopeCogDocument] = []
@@ -308,7 +308,7 @@ public struct DopeDocumentBundle: Codable, Hashable, Sendable {
         self.cogFiles = cogFiles
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         main = try c.decode(DopeScopeDocument.self, forKey: .main)
         domainFiles = try c.decode([DopePersistenceFileDocument].self, forKey: .domainFiles)
@@ -320,30 +320,30 @@ public struct DopeDocumentBundle: Codable, Hashable, Sendable {
 /// WireCodec — the file format and the socket format must be free to diverge.
 /// `.sortedKeys` + `.prettyPrinted` make the writer byte-deterministic, so an
 /// unchanged tree re-written by write-repo leaves `git status` clean.
-public enum DopeDocumentCodec {
-    public static let encoder: JSONEncoder = {
+enum DopeDocumentCodec {
+    static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         return encoder
     }()
 
-    public static let decoder: JSONDecoder = {
+    static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         return decoder
     }()
 
     /// The scope index, directly under `.gmcc/`.
-    public static let scopeFileName = "scope.doped.json"
-    public static let persistenceDirectoryName = "persistence"
-    public static let cogsDirectoryName = "cogs"
+    static let scopeFileName = "scope.doped.json"
+    static let persistenceDirectoryName = "persistence"
+    static let cogsDirectoryName = "cogs"
     /// Shared suffix of every per-entity/per-enum file.
-    public static let persistenceFileSuffix = ".persistence.doped.json"
-    public static let cogFileSuffix = ".cog.doped.json"
+    static let persistenceFileSuffix = ".persistence.doped.json"
+    static let cogFileSuffix = ".cog.doped.json"
     /// The retired layout, kept ONLY so boot sync and the health check can
     /// recognise a stale tree and say so out loud instead of silently
     /// reporting "no dope here".
-    public static let legacyDopeDirectoryName = "dope"
-    public static let legacyMainFileName = "main.doped.json"
+    static let legacyDopeDirectoryName = "dope"
+    static let legacyMainFileName = "main.doped.json"
 }

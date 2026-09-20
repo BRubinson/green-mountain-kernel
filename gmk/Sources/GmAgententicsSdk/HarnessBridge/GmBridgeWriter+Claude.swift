@@ -15,27 +15,27 @@ import Foundation
 /// its own `contents()`, leaving the writer a loop. Output is sorted by path and
 /// JSON is `.sortedKeys` + `.withoutEscapingSlashes`: a delete-and-rewrite plugin
 /// is reviewable only while its regeneration stays diffable.
-public enum GmBridgeWriter {
+enum GmBridgeWriter {
 
     /// What one run did, so a caller can report it without re-reading the tree.
-    public struct Report: Sendable {
-        public var written: [String] = []
+    struct Report: Sendable {
+        var written: [String] = []
         /// Declared, but rendered nothing — `contents()` returned nil.
         ///
         /// Never silent. A quietly skipped script leaves `hooks.json` and
         /// `.mcp.json` pointing at files that do not exist — a plugin that
         /// installs, boots and records nothing. Every omission is reported, and
         /// `verify` turns the boot-critical ones into a refusal.
-        public var omitted: [String] = []
-        public var bytes: Int = 0
+        var omitted: [String] = []
+        var bytes: Int = 0
     }
 
-    public enum WriteError: Error, CustomStringConvertible {
+    enum WriteError: Error, CustomStringConvertible {
         case notAbsolute(String)
         case missingBootCritical([String])
         case refusedOutsideRepo(String)
 
-        public var description: String {
+        var description: String {
             switch self {
             case .notAbsolute(let path):
                 return "output directory must be an absolute path, got '\(path)'"
@@ -58,7 +58,7 @@ public enum GmBridgeWriter {
     /// and the scripts are not, every hook is a dangling exec and the pen never
     /// starts — and nothing says so, because `gm_hook.sh`'s own contract is to
     /// exit 0 when its binary is missing.
-    public static let bootCritical: Set<String> = [
+    static let bootCritical: Set<String> = [
         ".claude-plugin/plugin.json",
         "hooks/hooks.json",
         ".mcp.json",
@@ -72,7 +72,7 @@ public enum GmBridgeWriter {
     /// Ordering is by `relativePath` rather than by declaration order so two
     /// runs of the same bridge produce byte-identical trees regardless of how
     /// the `all` arrays happen to be written.
-    public static var files: [any GmBridgeFile] {
+    static var files: [any GmBridgeFile] {
         var all: [any GmBridgeFile] = [
             GmBridgeClaudePlugin.current,
             GmBridgeClaudePluginSettings.current,
@@ -97,7 +97,7 @@ public enum GmBridgeWriter {
     ///
     /// The half that `--check` runs and the half `write` reuses, so the thing
     /// inspected and the thing written cannot differ.
-    public static func render() -> (rendered: [(path: String, body: String, executable: Bool)], omitted: [String]) {
+    static func render() -> (rendered: [(path: String, body: String, executable: Bool)], omitted: [String]) {
         var rendered: [(String, String, Bool)] = []
         var omitted: [String] = []
         for file in files {
@@ -115,7 +115,7 @@ public enum GmBridgeWriter {
     /// SEPARATE FROM `write` ON PURPOSE. The check has to be runnable without
     /// the destructive step — that is what makes `--check` a real answer rather
     /// than a rehearsal of a different code path.
-    public static func verify() throws -> Report {
+    static func verify() throws -> Report {
         let (rendered, omitted) = render()
         let fatal = Set(omitted).intersection(bootCritical)
         if !fatal.isEmpty { throw WriteError.missingBootCritical(Array(fatal)) }
@@ -134,7 +134,7 @@ public enum GmBridgeWriter {
     /// installed. `verify()` runs first, so a bridge that cannot render a bootable
     /// plugin never reaches the delete.
     @discardableResult
-    public static func write(to directory: URL) throws -> Report {
+    static func write(to directory: URL) throws -> Report {
         guard directory.path.hasPrefix("/") else {
             throw WriteError.notAbsolute(directory.path)
         }

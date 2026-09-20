@@ -11,7 +11,7 @@ extension GmBridgeScript {
     // ever contains the terminator. `gm_releases.sh` is the authored `gmk/scripts/`
     // copy; emitting the plugin's from this constant makes drift unrepresentable.
 
-    public static let sessionStartupBody = #"""
+    static let sessionStartupBody = #"""
         #!/bin/bash
 
         # GM-CDE SessionStart bootstrap. Four jobs only: confirm we're in a git repo,
@@ -87,7 +87,7 @@ extension GmBridgeScript {
         exit 0
         """#
 
-    public static let installBody = #"""
+    static let installBody = #"""
         #!/bin/bash
         #
         # install_gm.sh — THE FRONT DOOR for everyone who is not editing the sources.
@@ -551,7 +551,7 @@ extension GmBridgeScript {
         fi
         """#
 
-    public static let releaseStoreBody = #"""
+    static let releaseStoreBody = #"""
         #!/bin/bash
         #
         # gm_releases.sh — the RELEASE STORE contract, in one file.

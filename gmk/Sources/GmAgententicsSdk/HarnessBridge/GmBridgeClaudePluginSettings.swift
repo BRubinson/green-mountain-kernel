@@ -10,5 +10,5 @@ extension GmBridgeClaudePluginSettings {
     /// prompt and restricting the session to that agent file's `tools:` list, so
     /// the identity arrives as an appending output style instead. Empty means no
     /// `settings.json` is emitted, hence the style's `force-for-plugin: true`.
-    public static let current = File()
+    static let current = File()
 }

@@ -7,14 +7,14 @@ import Foundation
 /// frontmatter, while a prompt is HANDED TO an agent as text. Collapsing them
 /// would put files in the slash-command listing that nobody can usefully type,
 /// and that listing has a character budget.
-public struct GmBridgePrompt: Equatable, Sendable, GmBridgeFile {
+struct GmBridgePrompt: Equatable, Sendable, GmBridgeFile {
 
     /// The prompt's name WITHOUT the `.prompt.md` suffix.
-    public var name: String
+    var name: String
 
-    public var body: String
+    var body: String
 
-    public init(name: String, body: String) {
+    init(name: String, body: String) {
         self.name = name
         self.body = body
     }
@@ -22,13 +22,13 @@ public struct GmBridgePrompt: Equatable, Sendable, GmBridgeFile {
     /// The DOUBLE extension is the convention, not a mistake: the harness reads
     /// `prompts/<name>.prompt.md`, and a bare `.md` here would be a file nothing
     /// looks for.
-    public var relativePath: String {
+    var relativePath: String {
         "prompts/\(name).prompt.md"
     }
 
-    public var isEmpty: Bool { body.isEmpty }
+    var isEmpty: Bool { body.isEmpty }
 
-    public func contents() -> String? {
+    func contents() -> String? {
         guard !isEmpty else { return nil }
         return body.hasSuffix("\n") ? body : body + "\n"
     }

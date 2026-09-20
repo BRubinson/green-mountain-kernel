@@ -2,7 +2,7 @@ import Foundation
 
 extension GmBridgeCommand {
 
-    public static let all: [File] = [
+    static let all: [File] = [
         file(
             name: "ask",
             description: """

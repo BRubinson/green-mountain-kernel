@@ -22,7 +22,7 @@ extension Store {
     /// never destroys the artifacts). The maw's raw sources are then moved to
     /// `{digested}/{code}/` and the open maw is dropped; an archive failure is
     /// reported on the response, never thrown, because the commit already stands.
-    public func digestKbite(_ req: KbiteDigestRequest) throws -> KbiteDigestResponse {
+    func digestKbite(_ req: KbiteDigestRequest) throws -> KbiteDigestResponse {
         // FOUR-PHASE VERB — see StoreError.notComposable. Filesystem work
         // between the read and the write must not hold the single writer.
         guard !isInTransaction else {
@@ -170,16 +170,16 @@ extension Store {
         return try? String(contentsOfFile: path, encoding: .utf8)
     }
 
-    public func getKbite(_ req: KbiteGetRequest) throws -> KbiteGetResponse {
+    func getKbite(_ req: KbiteGetRequest) throws -> KbiteGetResponse {
         try boundaryRead { db in try KbiteResourceRepository(db: db, core: core).getKbite(req) }
     }
 
     /// The targeted load replacing "cat the chewed file".
-    public func getKbiteFile(_ req: KbiteFileGetRequest) throws -> KbiteFileGetResponse {
+    func getKbiteFile(_ req: KbiteFileGetRequest) throws -> KbiteFileGetResponse {
         try boundaryRead { db in try KbiteResourceRepository(db: db, core: core).getKbiteFile(req) }
     }
 
-    public func searchKbites(_ req: KbiteSearchRequest) throws -> KbiteSearchResponse {
+    func searchKbites(_ req: KbiteSearchRequest) throws -> KbiteSearchResponse {
         // ORs the query tokens (see Store+DopeSearch for why AND was wrong).
         // The empty-hit-list answer to an untokenizable query is a DELIBERATE
         // divergence from DOPE_SEARCH and SEARCH, which throw badRequest; it
@@ -193,7 +193,7 @@ extension Store {
     }
 
     /// Attach/detach normalized keywords at kbite or resource-file level.
-    public func tagKeyword(_ req: KbiteKeywordTagRequest) throws -> KbiteKeywordTagResponse {
+    func tagKeyword(_ req: KbiteKeywordTagRequest) throws -> KbiteKeywordTagResponse {
         try boundary { db in try KbiteResourceRepository(db: db, core: core).tagKeyword(req) }
     }
 

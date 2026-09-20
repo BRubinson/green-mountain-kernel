@@ -7,7 +7,7 @@ import Foundation
 /// rather than of whichever binary the shim exec'd. NEITHER FUNCTION THROWS:
 /// a throw prints and exits non-zero, which is exactly the noise a hook may
 /// not produce, so every failure path returns quietly.
-public enum HookRunner {
+enum HookRunner {
 
     /// Record the file changes one tool call made.
     ///
@@ -22,7 +22,7 @@ public enum HookRunner {
     /// service it is a deadlock, not a slow path.
     ///
     /// - Returns: the dry-run report when `dryRun` is set, otherwise nil.
-    public static func postToolUse(
+    static func postToolUse(
         stdin: Data,
         dryRun: Bool,
         caller: (any GmVerbCaller)? = nil
@@ -104,7 +104,7 @@ public enum HookRunner {
     ///
     /// - Returns: the JSON line to print on stdout — the dry-run report under
     ///   `dryRun`, otherwise the SubagentStart `additionalContext` response.
-    public static func subagentStart(
+    static func subagentStart(
         stdin: Data,
         dryRun: Bool,
         sheetText: String,
@@ -197,7 +197,7 @@ public enum HookRunner {
     /// - Returns: the PreToolUse hook response line (deny + reason) when the
     ///   command invokes the binary, otherwise nil for silence. Exit is always 0
     ///   either way — the hook contract holds; the DECISION is in the JSON.
-    public static func preToolUse(stdin: Data) -> String? {
+    static func preToolUse(stdin: Data) -> String? {
         guard let payload = HookPayload.decode(stdin),
             payload.toolName == "Bash",
             let command = payload.command, !command.isEmpty,
@@ -225,7 +225,7 @@ public enum HookRunner {
     ///
     /// Public so the suite can pin the boundary without a hook payload: the
     /// cases that MUST match and the cases that MUST NOT are both load-bearing.
-    public static func invokesGmHook(_ command: String) -> Bool {
+    static func invokesGmHook(_ command: String) -> Bool {
         // (start | ; & | ( `  | exec) [spaces] [path/]gm_hook [quote] (space | end)
         // The optional quote is the hook launcher's own spelling —
         // `"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook" hook …` — pasted back.
@@ -237,7 +237,7 @@ public enum HookRunner {
 
     /// Read the whole raw payload from stdin. Front-ends call this rather than
     /// each rolling their own read loop.
-    public static func readStdin() -> Data {
+    static func readStdin() -> Data {
         FileHandle.standardInput.readDataToEndOfFile()
     }
 

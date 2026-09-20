@@ -9,7 +9,7 @@ extension GmBridgeAgent {
     /// documentation. Every tool an agent's instruction set names must be granted
     /// here — a withheld one yields no visible refusal, and the agent falls back
     /// to guessing a wire verb through BASH or goes idle holding none.
-    public static let all: [File] = [
+    static let all: [File] = [
         file(
             .primarch,
             name: "primarch",

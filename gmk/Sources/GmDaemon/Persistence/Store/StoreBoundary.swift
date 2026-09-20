@@ -103,7 +103,7 @@ extension Store {
     /// `checkpointTruncate`, since a WAL checkpoint inside a transaction is
     /// illegal in SQLite, and the four-phase repo verbs, which would hold the
     /// single writer across filesystem work.
-    public func inTransaction<T>(_ body: () throws -> T) throws -> T {
+    func inTransaction<T>(_ body: () throws -> T) throws -> T {
         try boundary { _ in try body() }
     }
 }

@@ -11,37 +11,37 @@ import GRDB
 // Bodies live in DopeCogRepository; these wrappers own the transaction.
 
 extension Store {
-    public func dopeCogAdd(_ req: DopeCogAddRequest) throws -> DopeCogResponse {
+    func dopeCogAdd(_ req: DopeCogAddRequest) throws -> DopeCogResponse {
         try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogAdd(req) }
     }
 
-    public func dopeCogUpdate(_ req: DopeCogUpdateRequest) throws -> DopeCogResponse {
+    func dopeCogUpdate(_ req: DopeCogUpdateRequest) throws -> DopeCogResponse {
         try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogUpdate(req) }
     }
 
-    public func dopeCogDelete(_ req: DopeCogDeleteRequest) throws -> DopeCogDeleteResponse {
+    func dopeCogDelete(_ req: DopeCogDeleteRequest) throws -> DopeCogDeleteResponse {
         try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogDelete(req) }
     }
 
-    public func dopeCogElementAdd(
+    func dopeCogElementAdd(
         _ req: DopeCogElementAddRequest
     ) throws -> DopeCogElementResponse {
         try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogElementAdd(req) }
     }
 
-    public func dopeCogElementUpdate(
+    func dopeCogElementUpdate(
         _ req: DopeCogElementUpdateRequest
     ) throws -> DopeCogElementResponse {
         try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogElementUpdate(req) }
     }
 
-    public func dopeCogElementDelete(
+    func dopeCogElementDelete(
         _ req: DopeCogElementDeleteRequest
     ) throws -> DopeCogDeleteResponse {
         try boundary { db in try DopeCogRepository(db: db, core: core).dopeCogElementDelete(req) }
     }
 
-    public func dopeCogGet(_ req: DopeCogGetRequest) throws -> DopeCogGetResponse {
+    func dopeCogGet(_ req: DopeCogGetRequest) throws -> DopeCogGetResponse {
         try boundaryRead { db in try DopeCogRepository(db: db, core: core).dopeCogGet(req) }
     }
 

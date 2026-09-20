@@ -1,7 +1,7 @@
 import Foundation
 
 /// Outcome of one briefing-readiness poll session.
-public enum BriefingWaitOutcome {
+enum BriefingWaitOutcome {
     case ready(BriefingGetResponse)
     /// Deadline hit; `lastSeen` is the most recent row observed (nil when
     /// every poll came back absent — i.e. the briefing was never opened).
@@ -16,7 +16,7 @@ public enum BriefingWaitOutcome {
 /// runs past ~2 minutes is moved to a background task and silently returns
 /// control. An MCP-facing wrapper must cap `timeoutSeconds` well under that
 /// and report a timeout as a RESULT the caller loops on, never as an error.
-public func awaitBriefingReady(
+func awaitBriefingReady(
     timeoutSeconds: Int,
     pollIntervalMicros: UInt32 = 1_000_000,
     sleeper: (UInt32) -> Void = { usleep($0) },

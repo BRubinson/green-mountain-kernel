@@ -12,7 +12,7 @@ extension Store {
     /// worse succeed against a shape it was not written for. The snapshot's value
     /// is the FILE; the audit row waits for the BACKUP verb, which runs on a
     /// migrated database.
-    public func backup(recordEvent: Bool = true) throws -> BackupResponse {
+    func backup(recordEvent: Bool = true) throws -> BackupResponse {
         // GRDB's `backup(to:)` runs on the queue itself, outside any transaction
         // by construction — so calling it from inside one re-enters and TRAPS,
         // killing the process rather than throwing. `checkpointTruncate` got this
@@ -77,7 +77,7 @@ extension Store {
     /// every fresh install would copy an empty database for no reason. So
     /// "pending" here means *there is existing history AND it is behind*, which
     /// is exactly the case where a migration rewrites rather than creates.
-    public func hasPendingMigrations() throws -> Bool {
+    func hasPendingMigrations() throws -> Bool {
         try boundaryRead { db in
             let applied = try Migrations.migrator.appliedMigrations(db)
             guard !applied.isEmpty else { return false }
@@ -93,7 +93,7 @@ extension Store {
     /// binary proceeds straight into reading a schema whose shape it does not
     /// know. With several environments that is reachable on an ordinary day, and
     /// writing rows through a mismatched model corrupts an append-only db quietly.
-    public func hasBeenSuperseded() throws -> Bool {
+    func hasBeenSuperseded() throws -> Bool {
         try boundaryRead { db in
             try Migrations.migrator.hasBeenSuperseded(db)
         }
@@ -106,7 +106,7 @@ extension Store {
     /// a `cp`: a raw copy of a WAL-mode database under a live writer can capture
     /// a torn page or miss committed rows.
     @discardableResult
-    public func backupBeforeMigration() throws -> String {
+    func backupBeforeMigration() throws -> String {
         try backup(recordEvent: false).backupPath
     }
 }

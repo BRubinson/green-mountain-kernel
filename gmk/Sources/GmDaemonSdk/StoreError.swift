@@ -7,7 +7,7 @@ import Foundation
 /// base-layer code throws this, and base-depending-on-middle is a cycle once
 /// the modules separate. It is Foundation-only, so the placement costs
 /// nothing.
-public enum StoreError: Error, Sendable {
+enum StoreError: Error, Sendable {
     case notFound(entity: String, key: String)
     case versionConflict(entity: String, uuid: String, expected: Int64, actual: Int64)
     case invalidTransition(from: PromptStatus, to: PromptStatus, reason: String?)
@@ -77,7 +77,7 @@ public enum StoreError: Error, Sendable {
     /// new ErrorCode and no stale-client decode problem.
     case notComposable(verb: String)
 
-    public var errorPayload: ErrorPayload {
+    var errorPayload: ErrorPayload {
         switch self {
         case .notFound(let entity, let key):
             return ErrorPayload(code: .notFound, message: "\(entity) not found: \(key)")

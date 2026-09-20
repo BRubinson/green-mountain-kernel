@@ -6,37 +6,37 @@ import Foundation
 /// It lives in the kit so a front-end can print it with no Store and no
 /// socket, answering even when the daemon is down. It classifies; it does not
 /// authorize, and nothing consults it to refuse a caller.
-public enum VerbLedger {
+enum VerbLedger {
 
     /// ONE ROW PER INVOCATION SPELLING, not per MessageType. A verb with aliases
     /// emits one row each, all carrying the same message type, role and pen
     /// tool — which is what lets the guard match on a flat list and still see
     /// every spelling.
-    public struct VerbRow: Encodable, Sendable {
-        public let messageType: String
-        public let gm: String
-        public let cdeTool: String?
+    struct VerbRow: Encodable, Sendable {
+        let messageType: String
+        let gm: String
+        let cdeTool: String?
         /// record | read
-        public let role: String
+        let role: String
         /// Is this a write?
-        public let write: Bool
+        let write: Bool
         /// False for the canonical spelling, true for an alias of it.
-        public let alias: Bool
+        let alias: Bool
         /// The canonical spelling this row belongs to (== `gm` when canonical).
-        public let canonicalGm: String
+        let canonicalGm: String
     }
 
-    public struct Payload: Encodable, Sendable {
-        public let verbs: [VerbRow]
+    struct Payload: Encodable, Sendable {
+        let verbs: [VerbRow]
         /// invocation -> pen tool, for every write that HAS one, aliases
         /// included.
-        public let cdeReplacements: [String: String]
+        let cdeReplacements: [String: String]
         /// The four pen tools the workflow's methodology reserves for the
         /// primary — guidance, never a refusal.
-        public let primaryPenTools: [String]
+        let primaryPenTools: [String]
     }
 
-    public static func build(writesOnly: Bool = false) -> Payload {
+    static func build(writesOnly: Bool = false) -> Payload {
         var rows: [VerbRow] = []
         var replacements: [String: String] = [:]
         for spec in VerbRegistry.all {

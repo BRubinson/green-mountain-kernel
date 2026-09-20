@@ -2,11 +2,11 @@ import Foundation
 
 extension GmBridgeMcp {
 
-    public static let serverKey = "cde"
+    static let serverKey = "cde"
 
-    public static let pluginName = GmBridgeClaudePlugin.current.name
+    static let pluginName = GmBridgeClaudePlugin.current.name
 
-    public static let qualifiedServer = "plugin_\(pluginName)_\(serverKey)"
+    static let qualifiedServer = "plugin_\(pluginName)_\(serverKey)"
 
     /// The pen launcher, as an inline shell command rather than a script file.
     ///
@@ -16,9 +16,9 @@ extension GmBridgeMcp {
     /// a literal and `[ -x ]` could not be tested. Hence `/bin/sh` with the script
     /// as an argument. The `exit 1` on a missing binary is the opposite of the hook
     /// contract: a silently absent pen looks to an agent like a pen with no tools.
-    public static let launcher = "/bin/sh"
+    static let launcher = "/bin/sh"
 
-    public static let launcherArgs = [
+    static let launcherArgs = [
         "-c",
         #"""
         GM_BIN="${GM_FS_ROOT:-$HOME/gmfs}/bin"; \
@@ -29,7 +29,7 @@ extension GmBridgeMcp {
         """#,
     ]
 
-    public static let current = File(
+    static let current = File(
         mcpServers: [
             serverKey: Server.stdio(command: launcher, args: launcherArgs, alwaysLoad: true)
         ]

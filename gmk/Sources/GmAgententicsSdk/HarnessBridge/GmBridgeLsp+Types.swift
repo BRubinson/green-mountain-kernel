@@ -1,43 +1,43 @@
 import Foundation
 
-public enum GmBridgeLsp {
+enum GmBridgeLsp {
 
-    public enum Transport: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
+    enum Transport: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
 
         case stdio
 
         case socket
     }
 
-    public struct Server: Encodable, Equatable, Sendable {
+    struct Server: Encodable, Equatable, Sendable {
 
-        public var command: String
+        var command: String
 
-        public var extensionToLanguage: [String: String]
+        var extensionToLanguage: [String: String]
 
-        public var args: [String]?
+        var args: [String]?
 
-        public var transport: Transport?
+        var transport: Transport?
 
-        public var env: [String: String]?
+        var env: [String: String]?
 
-        public var initializationOptions: GmBridgeJsonValue?
+        var initializationOptions: GmBridgeJsonValue?
 
-        public var settings: GmBridgeJsonValue?
+        var settings: GmBridgeJsonValue?
 
-        public var workspaceFolder: String?
+        var workspaceFolder: String?
 
-        public var startupTimeout: Int?
+        var startupTimeout: Int?
 
-        public var shutdownTimeout: Int?
+        var shutdownTimeout: Int?
 
-        public var restartOnCrash: Bool?
+        var restartOnCrash: Bool?
 
-        public var maxRestarts: Int?
+        var maxRestarts: Int?
 
-        public var diagnostics: Bool?
+        var diagnostics: Bool?
 
-        public init(
+        init(
             command: String,
             extensionToLanguage: [String: String],
             args: [String]? = nil,
@@ -68,21 +68,21 @@ public enum GmBridgeLsp {
         }
     }
 
-    public struct File: Encodable, Equatable, Sendable, GmBridgeJsonFile {
+    struct File: Encodable, Equatable, Sendable, GmBridgeJsonFile {
 
-        public var relativePath: String { ".lsp.json" }
+        var relativePath: String { ".lsp.json" }
 
-        public var servers: [String: Server]
+        var servers: [String: Server]
 
-        public init(servers: [String: Server]) {
+        init(servers: [String: Server]) {
             self.servers = servers
         }
 
-        public var isEmpty: Bool {
+        var isEmpty: Bool {
             servers.isEmpty
         }
 
-        public func encode(to encoder: Encoder) throws {
+        func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
             try container.encode(servers)
         }

@@ -1,12 +1,12 @@
 import Foundation
 import SwiftProtobuf
 
-public actor ITerm2Client {
-    public static let shared = ITerm2Client()
+actor ITerm2Client {
+    static let shared = ITerm2Client()
 
     private let queue = DispatchSerialQueue(label: "com.gmvibes.iterm2")
 
-    public nonisolated var unownedExecutor: UnownedSerialExecutor {
+    nonisolated var unownedExecutor: UnownedSerialExecutor {
         queue.asUnownedSerialExecutor()
     }
 
@@ -14,7 +14,7 @@ public actor ITerm2Client {
 
     private init() {}
 
-    public func createWindow(_ request: PaneLaunchRequest) async throws(ITerm2Error) -> PaneSession {
+    func createWindow(_ request: PaneLaunchRequest) async throws(ITerm2Error) -> PaneSession {
         do {
             return try await attemptCreate(request, profileName: request.profileName)
         } catch .transportFailed(let reason, let code) {
@@ -28,7 +28,7 @@ public actor ITerm2Client {
         }
     }
 
-    public func disconnect() {
+    func disconnect() {
         teardown()
     }
 

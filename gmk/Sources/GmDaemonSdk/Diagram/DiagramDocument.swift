@@ -8,23 +8,23 @@ import Foundation
 /// degrades to a ghost (nil target), never an error. `version` is the
 /// diagram's revision; the TIER is not persisted, because write gating
 /// already makes it constant.
-public struct DiagramDocument: Codable, Hashable, Sendable {
-    public struct ElementDoc: Codable, Hashable, Sendable {
-        public let code: String
-        public let name: String
-        public let description: String
-        public let sortOrder: Int
-        public let centerX: Double
-        public let centerY: Double
-        public let elementZ: Double
-        public let scale: Double
+struct DiagramDocument: Codable, Hashable, Sendable {
+    struct ElementDoc: Codable, Hashable, Sendable {
+        let code: String
+        let name: String
+        let description: String
+        let sortOrder: Int
+        let centerX: Double
+        let centerY: Double
+        let elementZ: Double
+        let scale: Double
         /// The wire payload, with a connector's `targetElementUuid` nil'd —
         /// the uuid never reaches the file; `targetCodePath` replaces it.
-        public let payload: DiagramElementPayload
-        public let targetCodePath: String?
-        public let children: [ElementDoc]
+        let payload: DiagramElementPayload
+        let targetCodePath: String?
+        let children: [ElementDoc]
 
-        public init(
+        init(
             code: String,
             name: String,
             description: String,
@@ -55,7 +55,7 @@ public struct DiagramDocument: Codable, Hashable, Sendable {
                 elementZ, scale, payload, targetCodePath, children
         }
 
-        public init(from decoder: Decoder) throws {
+        init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             code = try c.decode(String.self, forKey: .code)
             name = try c.decodeIfPresent(String.self, forKey: .name) ?? code
@@ -72,14 +72,14 @@ public struct DiagramDocument: Codable, Hashable, Sendable {
     }
 
     /// The diagram's revision at write time — the ingest gate's left side.
-    public let version: Int64
-    public let code: String
-    public let name: String
-    public let description: String
-    public let dopeScopeCode: String?
-    public let elements: [ElementDoc]
+    let version: Int64
+    let code: String
+    let name: String
+    let description: String
+    let dopeScopeCode: String?
+    let elements: [ElementDoc]
 
-    public init(
+    init(
         version: Int64,
         code: String,
         name: String,
@@ -96,10 +96,10 @@ public struct DiagramDocument: Codable, Hashable, Sendable {
     }
 }
 
-public enum DiagramDocumentCodec {
-    public static let fileSuffix = ".diagram.doped.json"
+enum DiagramDocumentCodec {
+    static let fileSuffix = ".diagram.doped.json"
 
-    public static func fileName(code: String) -> String {
+    static func fileName(code: String) -> String {
         "\(code)\(fileSuffix)"
     }
 
@@ -116,19 +116,19 @@ public enum DiagramDocumentCodec {
         return decoder
     }
 
-    public static func encode(_ document: DiagramDocument) throws -> Data {
+    static func encode(_ document: DiagramDocument) throws -> Data {
         var data = try encoder.encode(document)
         data.append(0x0A)
         return data
     }
 
-    public static func decode(_ data: Data) throws -> DiagramDocument {
+    static func decode(_ data: Data) throws -> DiagramDocument {
         try decoder.decode(DiagramDocument.self, from: data)
     }
 
     /// Just the `version` stamp, for the write-repo files-ahead gate —
     /// mirrors DopeRepoSandbox.peekRevision.
-    public static func peekVersion(_ data: Data) -> Int64? {
+    static func peekVersion(_ data: Data) -> Int64? {
         (try? decode(data))?.version
     }
 
@@ -138,7 +138,7 @@ public enum DiagramDocumentCodec {
     /// paths against the tree's own uuid index; a target uuid that no
     /// longer resolves inside the tree serializes as no target (the ghost
     /// travels as a ghost).
-    public static func document(
+    static func document(
         from tree: DiagramTree,
         dopeScopeCode: String?
     ) -> DiagramDocument {

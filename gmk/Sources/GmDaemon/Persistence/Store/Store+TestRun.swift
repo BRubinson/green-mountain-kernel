@@ -17,7 +17,7 @@ extension Store {
     /// configured in the repo, and a manifest living in the db would be a
     /// second copy that silently disagrees with the checkout the moment the
     /// repo is cloned into another environment.
-    public func testSuiteList(_ req: TestSuiteListRequest) throws -> TestSuiteListResponse {
+    func testSuiteList(_ req: TestSuiteListRequest) throws -> TestSuiteListResponse {
         try boundaryRead { db in
             try TestRunRepository(db: db, core: core).suiteList(req)
         }
@@ -27,7 +27,7 @@ extension Store {
     /// Deliberately does NOT reclaim: a read that silently broke somebody
     /// else's lock would make inspection destructive, which is the same reason
     /// `BOT_NEXT` stopped advancing prompts.
-    public func testLockStatus(_ req: TestLockStatusRequest) throws -> TestLockResponse {
+    func testLockStatus(_ req: TestLockStatusRequest) throws -> TestLockResponse {
         try boundaryRead { db in
             try TestRunRepository(db: db, core: core).lockStatus(req)
         }
@@ -36,25 +36,25 @@ extension Store {
     /// Claim the project. Opens the ledger row and takes the cell in ONE
     /// transaction, so there is no window where a run exists without holding
     /// the lock it was created for.
-    public func testLockAcquire(_ req: TestLockAcquireRequest) throws -> TestLockResponse {
+    func testLockAcquire(_ req: TestLockAcquireRequest) throws -> TestLockResponse {
         try boundary { db in
             try TestRunRepository(db: db, core: core).acquire(req)
         }
     }
 
-    public func testLockRelease(_ req: TestLockReleaseRequest) throws -> TestLockResponse {
+    func testLockRelease(_ req: TestLockReleaseRequest) throws -> TestLockResponse {
         try boundary { db in
             try TestRunRepository(db: db, core: core).release(req)
         }
     }
 
-    public func testRunStart(_ req: TestRunStartRequest) throws -> TestRunResponse {
+    func testRunStart(_ req: TestRunStartRequest) throws -> TestRunResponse {
         try boundary { db in
             try TestRunRepository(db: db, core: core).runStart(req)
         }
     }
 
-    public func testRunStatus(_ req: TestRunStatusRequest) throws -> TestRunResponse {
+    func testRunStatus(_ req: TestRunStatusRequest) throws -> TestRunResponse {
         try boundaryRead { db in
             try TestRunRepository(db: db, core: core).runStatus(req)
         }

@@ -7,8 +7,8 @@ import Foundation
 /// A missing or unreadable repo path is COMMON — live instance rows point at
 /// paths that are gone — and must resolve to .unavailable, never throw, since
 /// these reads run on the daemon's serial queue.
-public enum GitHead {
-    public enum State: Sendable, Equatable {
+enum GitHead {
+    enum State: Sendable, Equatable {
         /// HEAD is a symbolic ref; associated value is the bare branch name
         /// (e.g. "feature/nested-slash").
         case branch(String)
@@ -21,7 +21,7 @@ public enum GitHead {
     /// Slug a branch name to a session code — forward-only (the mapping is
     /// lossy: never attempt to un-slug a code back into a branch). Exactly
     /// the GitContext.sessionCode rule: / → __, nothing else.
-    public static func sessionCode(forBranch branch: String) -> String {
+    static func sessionCode(forBranch branch: String) -> String {
         branch.replacingOccurrences(of: "/", with: "__")
     }
 
@@ -30,7 +30,7 @@ public enum GitHead {
     /// absent or unreadable (COMMON: instance rows point at paths that no
     /// longer exist). Exposed so the checkout watcher and the resolver agree
     /// on the path by construction rather than by parallel implementation.
-    public static func gitDirectory(repoRoot: String) -> String? {
+    static func gitDirectory(repoRoot: String) -> String? {
         let gitPath = repoRoot + "/.git"
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: gitPath, isDirectory: &isDirectory) else {
@@ -57,7 +57,7 @@ public enum GitHead {
     /// Handles the `.git`-as-file `gitdir:` indirection (worktrees emit an
     /// absolute gitdir, submodules a relative one — both resolved against the
     /// containing directory).
-    public static func resolve(repoRoot: String) -> State {
+    static func resolve(repoRoot: String) -> State {
         guard let gitdir = gitDirectory(repoRoot: repoRoot),
             let head = readSmallFile(gitdir + "/HEAD")
         else {

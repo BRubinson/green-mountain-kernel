@@ -41,8 +41,8 @@ private func readStdin() -> Data {
 /// "fail". Keys are spelled literally rather than via a key strategy, because
 /// the top level is snake_case and `structuredPatch` is camelCase and no
 /// single strategy reads both.
-public struct HookPayload: Equatable {
-    public let sessionId: String?
+struct HookPayload: Equatable {
+    let sessionId: String?
     let hookEventName: String?
     let cwd: String?
     let transcriptPath: String?
@@ -67,7 +67,7 @@ public struct HookPayload: Equatable {
     let command: String?
     let structuredPatch: [StructuredPatchHunk]
 
-    public static func decode(_ data: Data) -> HookPayload? {
+    static func decode(_ data: Data) -> HookPayload? {
         guard !data.isEmpty,
             let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         else { return nil }

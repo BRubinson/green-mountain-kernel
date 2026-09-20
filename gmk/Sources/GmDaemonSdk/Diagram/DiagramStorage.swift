@@ -8,12 +8,12 @@ import Foundation
 /// puts the files outside the repo. Pure arithmetic, no I/O: identical in the
 /// CLI and the app because both call this rather than rebuilding the
 /// convention.
-public enum DiagramStorage {
+enum DiagramStorage {
 
     /// The path segment a diagram's own files live under, relative to its
     /// owner's GMFS storage directory. `gmcc_diagram_path` overrides it.
-    public static let defaultDirectory = "diagrams"
-    public static let screenshotsDirectory = "screenshots"
+    static let defaultDirectory = "diagrams"
+    static let screenshotsDirectory = "screenshots"
 
     /// `{owner storage}/{gmcc_diagram_path ?? "diagrams"}/screenshots/{code}.png`
     ///
@@ -21,7 +21,7 @@ public enum DiagramStorage {
     /// is decided by comparing a sidecar fingerprint, so a bot always reads
     /// the same path and never has to guess which of several files is
     /// current.
-    public static func screenshotRelativePath(
+    static func screenshotRelativePath(
         ownerStoragePath: String,
         gmccDiagramPath: String?,
         diagramCode: String,
@@ -42,7 +42,7 @@ public enum DiagramStorage {
     }
 
     /// The fingerprint sidecar sits beside its PNG, same stem.
-    public static func fingerprintRelativePath(
+    static func fingerprintRelativePath(
         ownerStoragePath: String,
         gmccDiagramPath: String?,
         diagramCode: String
@@ -60,7 +60,7 @@ public enum DiagramStorage {
     /// Split and validate, so a stored path can never climb out of the GMFS
     /// root. This runs BEFORE any sandbox check — defence in depth, and it
     /// gives a comprehensible error instead of a containment refusal.
-    public static func sanitizedSegments(_ raw: String, label: String) throws -> [String] {
+    static func sanitizedSegments(_ raw: String, label: String) throws -> [String] {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             throw StoreError.badRequest(detail: "\(label) is empty")
@@ -78,7 +78,7 @@ public enum DiagramStorage {
         return segments
     }
 
-    public static func validateName(_ name: String, label: String) throws {
+    static func validateName(_ name: String, label: String) throws {
         guard !name.isEmpty else {
             throw StoreError.badRequest(detail: "\(label) has an empty segment")
         }
@@ -104,7 +104,7 @@ public enum DiagramStorage {
 /// changes the picture while revision and `updated_at` sit still. The render
 /// CODE is in the key too, via `algoVersion`: a card metric or router padding
 /// change repaints with every persisted input identical.
-public struct DiagramRenderFingerprint: Codable, Hashable, Sendable {
+struct DiagramRenderFingerprint: Codable, Hashable, Sendable {
     /// BUMP THIS when resolver or view geometry changes: card metrics,
     /// `edgeRoutingPadding`, router cost constants, the edge canvas's
     /// stroke geometry. Renders older than the bump re-render once.
@@ -112,18 +112,18 @@ public struct DiagramRenderFingerprint: Codable, Hashable, Sendable {
     // pressure-aware freehand outlines, uml_node chrome, block markdown in
     // text surfaces. Bump on EVERY look change — this constant is the
     // fingerprint's only representative of render code.
-    public static let renderAlgoVersion = 2
+    static let renderAlgoVersion = 2
 
-    public let diagramUuid: String
-    public let diagramRevision: Int64
+    let diagramUuid: String
+    let diagramRevision: Int64
     /// dope scope code -> that scope's revision, for every RESOLVED binding.
     /// Sorted by key when encoded, so the JSON is stable.
-    public let dopeRevisions: [String: Int64]
-    public let scheme: String
-    public let scale: Double
-    public let algoVersion: Int
+    let dopeRevisions: [String: Int64]
+    let scheme: String
+    let scale: Double
+    let algoVersion: Int
 
-    public init(
+    init(
         diagramUuid: String,
         diagramRevision: Int64,
         dopeRevisions: [String: Int64],
@@ -143,15 +143,15 @@ public struct DiagramRenderFingerprint: Codable, Hashable, Sendable {
     ///
     /// `diagramUuid` is part of it: a diagram renamed onto a code another
     /// diagram once held would otherwise inherit that diagram's PNG.
-    public func matches(_ other: DiagramRenderFingerprint) -> Bool { self == other }
+    func matches(_ other: DiagramRenderFingerprint) -> Bool { self == other }
 
-    public func encoded() throws -> Data {
+    func encoded() throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
         return try encoder.encode(self)
     }
 
-    public static func decoded(_ data: Data) -> DiagramRenderFingerprint? {
+    static func decoded(_ data: Data) -> DiagramRenderFingerprint? {
         try? JSONDecoder().decode(DiagramRenderFingerprint.self, from: data)
     }
 }

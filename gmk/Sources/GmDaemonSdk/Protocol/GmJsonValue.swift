@@ -8,7 +8,7 @@ import Foundation
 /// `Sendable` because payloads cross the server's serial queue, `Hashable`
 /// because the message structs are. KEYS ARE NEVER TRANSLATED HERE — the wire
 /// is snake_case and whatever went in comes out.
-public enum GmJsonValue: Codable, Hashable, Sendable {
+enum GmJsonValue: Codable, Hashable, Sendable {
     case null
     case bool(Bool)
     case int(Int64)
@@ -17,7 +17,7 @@ public enum GmJsonValue: Codable, Hashable, Sendable {
     case array([GmJsonValue])
     case object([String: GmJsonValue])
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() { self = .null; return }
         if let value = try? container.decode(Bool.self) { self = .bool(value); return }
@@ -32,7 +32,7 @@ public enum GmJsonValue: Codable, Hashable, Sendable {
         throw DecodingError.dataCorruptedError(in: container, debugDescription: "unrepresentable JSON")
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {
         case .null: try container.encodeNil()

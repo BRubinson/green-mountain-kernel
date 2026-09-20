@@ -5,11 +5,11 @@ import GRDB
 // wrappers own the transaction. The liveness statics stay on Store.
 
 extension Store {
-    public func getSession(_ req: SessionGetRequest) throws -> SessionGetResponse {
+    func getSession(_ req: SessionGetRequest) throws -> SessionGetResponse {
         try boundaryRead { db in try SessionRepository(db: db, core: core).getSession(req) }
     }
 
-    public func updateSession(_ req: SessionUpdateRequest) throws -> SessionRow {
+    func updateSession(_ req: SessionUpdateRequest) throws -> SessionRow {
         try boundary { db in try SessionRepository(db: db, core: core).updateSession(req) }
     }
 

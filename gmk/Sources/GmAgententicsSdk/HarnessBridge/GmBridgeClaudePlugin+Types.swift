@@ -1,31 +1,31 @@
 import Foundation
 
-public enum GmBridgeClaudePlugin {
+enum GmBridgeClaudePlugin {
 
-    public struct Author: Codable, Equatable, Sendable {
+    struct Author: Codable, Equatable, Sendable {
 
-        public var name: String
+        var name: String
 
-        public var email: String?
+        var email: String?
 
-        public var url: String?
+        var url: String?
 
-        public init(name: String, email: String? = nil, url: String? = nil) {
+        init(name: String, email: String? = nil, url: String? = nil) {
             self.name = name
             self.email = email
             self.url = url
         }
     }
 
-    public struct Experimental: Codable, Equatable, Sendable {
+    struct Experimental: Codable, Equatable, Sendable {
 
-        public var themes: [String]?
+        var themes: [String]?
 
-        public var monitors: [String]?
+        var monitors: [String]?
 
-        public var evals: [String]?
+        var evals: [String]?
 
-        public init(
+        init(
             themes: [String]? = nil,
             monitors: [String]? = nil,
             evals: [String]? = nil
@@ -35,59 +35,59 @@ public enum GmBridgeClaudePlugin {
             self.evals = evals
         }
 
-        public var isEmpty: Bool {
+        var isEmpty: Bool {
             themes == nil && monitors == nil && evals == nil
         }
     }
 
-    public struct File: Encodable, Equatable, Sendable, GmBridgeJsonFile {
+    struct File: Encodable, Equatable, Sendable, GmBridgeJsonFile {
 
-        public var relativePath: String { ".claude-plugin/plugin.json" }
+        var relativePath: String { ".claude-plugin/plugin.json" }
 
-        public var name: String
+        var name: String
 
-        public var displayName: String?
+        var displayName: String?
 
-        public var version: String?
+        var version: String?
 
-        public var description: String?
+        var description: String?
 
-        public var author: Author?
+        var author: Author?
 
-        public var homepage: String?
+        var homepage: String?
 
-        public var repository: String?
+        var repository: String?
 
-        public var license: String?
+        var license: String?
 
-        public var keywords: [String]?
+        var keywords: [String]?
 
-        public var metadata: [String: String]?
+        var metadata: [String: String]?
 
-        public var defaultEnabled: Bool?
+        var defaultEnabled: Bool?
 
-        public var skills: [String]?
+        var skills: [String]?
 
-        public var commands: [String]?
+        var commands: [String]?
 
-        public var agents: [String]?
+        var agents: [String]?
 
-        public var workflows: [String]?
+        var workflows: [String]?
 
-        public var hooks: [String]?
+        var hooks: [String]?
 
-        public var mcpServers: [String]?
+        var mcpServers: [String]?
 
         // THERE IS DELIBERATELY NO `outputStyles` FIELD. Claude Code validates this
         // manifest strictly and answers an unknown key with "outputStyles: Invalid
         // input", refusing to load any of the plugin. Output styles are shipped by
         // existing in `output-styles/`; the manifest never lists them.
 
-        public var lspServers: [String]?
+        var lspServers: [String]?
 
-        public var experimental: Experimental?
+        var experimental: Experimental?
 
-        public init(
+        init(
             name: String,
             displayName: String? = nil,
             version: String? = nil,

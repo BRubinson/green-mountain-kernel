@@ -9,35 +9,35 @@ import Foundation
 // Support/ so the MCP server never grows a parallel implementation).
 
 /// A client-context failure (not inside a git repo, detached HEAD, …).
-public struct ClientContextError: Error, LocalizedError {
-    public let message: String
-    public init(_ message: String) { self.message = message }
-    public var errorDescription: String? { message }
+struct ClientContextError: Error, LocalizedError {
+    let message: String
+    init(_ message: String) { self.message = message }
+    var errorDescription: String? { message }
 }
 
 /// The CLI gathers the git context (repo root, basename, branch) from the
 /// working directory and mirrors gm_session_startup.sh's identity
 /// conventions (instance code = {repo}_{4-char md5 of abs path}, branch
 /// slugified / → __) so db rows line up with the gmfs tree.
-public struct GitContext {
-    public let repoRoot: String
-    public let repoName: String
-    public let branch: String
+struct GitContext {
+    let repoRoot: String
+    let repoName: String
+    let branch: String
 
     /// {repo}_{first 4 hex of md5(abs path)} — matches gm_session_startup.sh's hash4.
     /// Single Swift home of the convention: InstanceIdentity in the kit
-    public var instanceCode: String {
+    var instanceCode: String {
         InstanceIdentity.code(repoName: repoName, absolutePath: repoRoot)
     }
 
     /// Branch with / slugified to __ — matches gm_session_startup.sh.
-    public var sessionCode: String {
+    var sessionCode: String {
         branch.replacingOccurrences(of: "/", with: "__")
     }
 
     /// The calling process's own working directory — every interactive client
     /// invocation.
-    public static func detect() throws -> GitContext {
+    static func detect() throws -> GitContext {
         try detect(in: nil)
     }
 
@@ -49,7 +49,7 @@ public struct GitContext {
     /// to. The two differ whenever the hook is launched from somewhere else,
     /// and resolving against the wrong one files a change under another
     /// repo's session.
-    public static func detect(in directory: String?) throws -> GitContext {
+    static func detect(in directory: String?) throws -> GitContext {
         let at = directory.map { ["-C", $0] } ?? []
         guard let repoRoot = runGit(at + ["rev-parse", "--show-toplevel"]) else {
             throw ClientContextError("not inside a git repository — a GMCC client needs git context")
@@ -68,7 +68,7 @@ public struct GitContext {
         )
     }
 
-    public init(repoRoot: String, repoName: String, branch: String) {
+    init(repoRoot: String, repoName: String, branch: String) {
         self.repoRoot = repoRoot
         self.repoName = repoName
         self.branch = branch
@@ -95,20 +95,20 @@ public struct GitContext {
     }
 }
 
-public enum GmFsYaml {
+enum GmFsYaml {
     /// The content root — `Paths.contentRoot`, never a second resolution of
     /// it. Write containment is a prefix test against ONE root, and two roots
     /// that are "always equal" are two roots that can disagree.
-    public static var root: URL { Paths.contentRoot }
+    static var root: URL { Paths.contentRoot }
 
     /// Extract the first top-level `uuid:` from a gmfs data yaml, if present.
-    public static func uuid(_ relativePath: String) -> String? {
+    static func uuid(_ relativePath: String) -> String? {
         scalar("uuid", relativePath)
     }
 
     /// Extract the first top-level single-line scalar value for `key:` from a
     /// gmfs data yaml, if present. Block scalars (|, >) are not resolved.
-    public static func scalar(_ key: String, _ relativePath: String) -> String? {
+    static func scalar(_ key: String, _ relativePath: String) -> String? {
         guard let text = try? String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8) else {
             return nil
         }
@@ -135,7 +135,7 @@ public enum GmFsYaml {
     }
 }
 
-public enum ContextBuilder {
+enum ContextBuilder {
     /// Build the full CONTEXT_ENSURE payload from the working directory's git
     /// identity plus whatever the gmfs tree already knows (uuids). Kbite
     /// registries are db-native — no yaml kbite reads on this path.
@@ -144,14 +144,14 @@ public enum ContextBuilder {
     /// rides this request rather than a verb of its own, so the binding every
     /// hook write resolves through is created by the same call that creates
     /// the session it points at.
-    public static func ensureRequest(claudeSessionId: String? = nil) throws -> ContextEnsureRequest {
+    static func ensureRequest(claudeSessionId: String? = nil) throws -> ContextEnsureRequest {
         ensureRequest(for: try GitContext.detect(), claudeSessionId: claudeSessionId)
     }
 
     /// The same payload for an ALREADY-RESOLVED identity — the hook path,
     /// which derives its git context from the payload's cwd and must not
     /// re-derive it from the hook process's own.
-    public static func ensureRequest(
+    static func ensureRequest(
         for git: GitContext,
         claudeSessionId: String? = nil
     ) -> ContextEnsureRequest {
@@ -191,7 +191,7 @@ public enum ContextBuilder {
     /// The body is one facade call, and the facade hangs off the protocol — so
     /// widening the parameter costs nothing and every existing caller still
     /// passes a `DaemonClient`.
-    public static func resolveSessionUuid(_ client: any GmVerbCaller) throws -> String {
+    static func resolveSessionUuid(_ client: any GmVerbCaller) throws -> String {
         try client.ensureContext(try ensureRequest()).sessionUuid
     }
 }
@@ -204,8 +204,8 @@ public enum ContextBuilder {
 /// active prompts per session without last-writer-wins clobbering. nil when
 /// no claude ancestor exists: callers omit the key and the daemon falls back
 /// to the session's single activation when unambiguous.
-public enum ClientKey {
-    public static func resolve() -> String? {
+enum ClientKey {
+    static func resolve() -> String? {
         var pid = getpid()
         var hops = 0
         while pid > 1, hops < 64 {

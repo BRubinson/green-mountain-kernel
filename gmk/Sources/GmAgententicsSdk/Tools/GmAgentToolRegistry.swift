@@ -3,121 +3,121 @@
 import Foundation
 import FoundationModels
 
-public enum GmAgentTools {
+enum GmAgentTools {
 
-    public enum Dope {
-        public static let searchGlobal = GmAgentDopeSearchGlobalTool()
-        public static let searchSession = GmAgentDopeSearchSessionTool()
-        public static let updateSessionDope = GmAgentDopeUpdateSessionTool()
+    enum Dope {
+        static let searchGlobal = GmAgentDopeSearchGlobalTool()
+        static let searchSession = GmAgentDopeSearchSessionTool()
+        static let updateSessionDope = GmAgentDopeUpdateSessionTool()
 
-        public static let all: [any GmAgentTool] = [
+        static let all: [any GmAgentTool] = [
             searchGlobal, searchSession, updateSessionDope,
         ]
     }
 
-    public enum Kbite {
-        public static let search = GmAgentKbiteSearchTool()
-        public static let openMaw = GmAgentKbiteOpenMawTool()
-        public static let digest = GmAgentKbiteDigestTool()
+    enum Kbite {
+        static let search = GmAgentKbiteSearchTool()
+        static let openMaw = GmAgentKbiteOpenMawTool()
+        static let digest = GmAgentKbiteDigestTool()
 
-        public static let all: [any GmAgentTool] = [search, openMaw, digest]
+        static let all: [any GmAgentTool] = [search, openMaw, digest]
     }
 
-    public enum Diagram {
-        public static let notSupported = GmAgentDiagramPlaceholderTool()
+    enum Diagram {
+        static let notSupported = GmAgentDiagramPlaceholderTool()
 
-        public static let all: [any GmAgentTool] = [notSupported]
+        static let all: [any GmAgentTool] = [notSupported]
     }
 
-    public enum Projects {
-        public static let search = GmAgentProjectsSearchTool()
-        public static let updateSession = GmAgentProjectsUpdateSessionTool()
+    enum Projects {
+        static let search = GmAgentProjectsSearchTool()
+        static let updateSession = GmAgentProjectsUpdateSessionTool()
 
-        public static let all: [any GmAgentTool] = [search, updateSession]
+        static let all: [any GmAgentTool] = [search, updateSession]
     }
 
-    public enum System {
-        public static let notSupported = GmAgentSystemPlaceholderTool()
+    enum System {
+        static let notSupported = GmAgentSystemPlaceholderTool()
 
-        public static let all: [any GmAgentTool] = [notSupported]
+        static let all: [any GmAgentTool] = [notSupported]
     }
 
-    public enum Fs {
-        public static let notSupported = GmAgentFsPlaceholderTool()
+    enum Fs {
+        static let notSupported = GmAgentFsPlaceholderTool()
 
-        public static let all: [any GmAgentTool] = [notSupported]
+        static let all: [any GmAgentTool] = [notSupported]
     }
 
-    public enum Cde {
+    enum Cde {
 
-        public static let initialize = GmAgentCdeInitTool()
-        public static let loadPrompt = GmAgentCdeLoadPromptTool()
-        public static let setStatus = GmAgentCdeSetStatusTool()
-        public static let searchFileChanges = GmAgentCdeSearchFileChangesTool()
+        static let initialize = GmAgentCdeInitTool()
+        static let loadPrompt = GmAgentCdeLoadPromptTool()
+        static let setStatus = GmAgentCdeSetStatusTool()
+        static let searchFileChanges = GmAgentCdeSearchFileChangesTool()
 
-        public static let all: [any GmAgentTool] = [
+        static let all: [any GmAgentTool] = [
             initialize, loadPrompt, setStatus, searchFileChanges,
         ]
     }
 
-    public enum Rpir {
+    enum Rpir {
 
-        public static let next = GmAgentRpirNextTool()
+        static let next = GmAgentRpirNextTool()
 
-        public static let openBriefing = GmAgentRpirOpenBriefingTool()
-        public static let writeBrief = GmAgentRpirWriteBriefTool()
-        public static let closeBrief = GmAgentRpirCloseBriefTool()
-        public static let loadExplorationBrief = GmAgentRpirLoadBriefTool()
+        static let openBriefing = GmAgentRpirOpenBriefingTool()
+        static let writeBrief = GmAgentRpirWriteBriefTool()
+        static let closeBrief = GmAgentRpirCloseBriefTool()
+        static let loadExplorationBrief = GmAgentRpirLoadBriefTool()
 
-        public static let openExploration = GmAgentRpirOpenExplorationTool()
-        public static let writeExplorations = GmAgentRpirWriteExplorationsTool()
-        public static let rankExplorations = GmAgentRpirRankExplorationsTool()
-        public static let completeExploration = GmAgentRpirCompleteExplorationTool()
-        public static let getExploration = GmAgentRpirGetExplorationTool()
+        static let openExploration = GmAgentRpirOpenExplorationTool()
+        static let writeExplorations = GmAgentRpirWriteExplorationsTool()
+        static let rankExplorations = GmAgentRpirRankExplorationsTool()
+        static let completeExploration = GmAgentRpirCompleteExplorationTool()
+        static let getExploration = GmAgentRpirGetExplorationTool()
 
-        public static let openClarification = GmAgentRpirOpenClarificationTool()
-        public static let writeClarificationQuestions =
+        static let openClarification = GmAgentRpirOpenClarificationTool()
+        static let writeClarificationQuestions =
             GmAgentRpirWriteClarificationQuestionsTool()
-        public static let writeClarificationNotes = GmAgentRpirWriteClarificationNotesTool()
-        public static let answerClarificationQuestion =
+        static let writeClarificationNotes = GmAgentRpirWriteClarificationNotesTool()
+        static let answerClarificationQuestion =
             GmAgentRpirAnswerClarificationQuestionTool()
-        public static let sealClarification = GmAgentRpirSealClarificationTool()
-        public static let finalizeClarification = GmAgentRpirFinalizeClarificationTool()
-        public static let openCarePackage = GmAgentRpirOpenCarePackageTool()
-        public static let writeCarePackage = GmAgentRpirWriteCarePackageTool()
-        public static let closeCarePackage = GmAgentRpirCloseCarePackageTool()
-        public static let getClarification = GmAgentRpirGetClarificationTool()
-        public static let getCarePackage = GmAgentRpirGetCarePackageTool()
+        static let sealClarification = GmAgentRpirSealClarificationTool()
+        static let finalizeClarification = GmAgentRpirFinalizeClarificationTool()
+        static let openCarePackage = GmAgentRpirOpenCarePackageTool()
+        static let writeCarePackage = GmAgentRpirWriteCarePackageTool()
+        static let closeCarePackage = GmAgentRpirCloseCarePackageTool()
+        static let getClarification = GmAgentRpirGetClarificationTool()
+        static let getCarePackage = GmAgentRpirGetCarePackageTool()
 
-        public static let openArchitecture = GmAgentRpirOpenArchitectureTool()
-        public static let openArchitectureOption = GmAgentRpirOpenArchitectureOptionTool()
-        public static let writeArchitecturePersistenceChanges =
+        static let openArchitecture = GmAgentRpirOpenArchitectureTool()
+        static let openArchitectureOption = GmAgentRpirOpenArchitectureOptionTool()
+        static let writeArchitecturePersistenceChanges =
             GmAgentRpirWriteArchitecturePersistenceChangesTool()
-        public static let writeArchitectureFieldChanges =
+        static let writeArchitectureFieldChanges =
             GmAgentRpirWriteArchitectureFieldChangesTool()
-        public static let writeArchitectureGeneralChanges =
+        static let writeArchitectureGeneralChanges =
             GmAgentRpirWriteArchitectureGeneralChangesTool()
-        public static let summarizeArchitecture = GmAgentRpirSummarizeArchitectureTool()
-        public static let proposeArchitecture = GmAgentRpirProposeArchitectureTool()
-        public static let approveArchitecture = GmAgentRpirApproveArchitectureTool()
-        public static let reviseArchitecture = GmAgentRpirReviseArchitectureTool()
-        public static let decideArchitecture = GmAgentRpirDecideArchitectureTool()
-        public static let getArchitecture = GmAgentRpirGetArchitectureTool()
+        static let summarizeArchitecture = GmAgentRpirSummarizeArchitectureTool()
+        static let proposeArchitecture = GmAgentRpirProposeArchitectureTool()
+        static let approveArchitecture = GmAgentRpirApproveArchitectureTool()
+        static let reviseArchitecture = GmAgentRpirReviseArchitectureTool()
+        static let decideArchitecture = GmAgentRpirDecideArchitectureTool()
+        static let getArchitecture = GmAgentRpirGetArchitectureTool()
 
-        public static let openReview = GmAgentRpirOpenReviewTool()
-        public static let writeReviews = GmAgentRpirWriteReviewsTool()
-        public static let rankReviews = GmAgentRpirRankReviewsTool()
-        public static let completeReview = GmAgentRpirCompleteReviewTool()
-        public static let resolveReviewFinding = GmAgentRpirResolveReviewFindingTool()
-        public static let getReview = GmAgentRpirGetReviewTool()
+        static let openReview = GmAgentRpirOpenReviewTool()
+        static let writeReviews = GmAgentRpirWriteReviewsTool()
+        static let rankReviews = GmAgentRpirRankReviewsTool()
+        static let completeReview = GmAgentRpirCompleteReviewTool()
+        static let resolveReviewFinding = GmAgentRpirResolveReviewFindingTool()
+        static let getReview = GmAgentRpirGetReviewTool()
 
-        public static let searchExploration = GmAgentRpirSearchExplorationTool()
-        public static let searchClarification = GmAgentRpirSearchClarificationTool()
-        public static let searchArchitecture = GmAgentRpirSearchArchitectureTool()
-        public static let searchArchitectureOption = GmAgentRpirSearchArchitectureOptionTool()
-        public static let searchReview = GmAgentRpirSearchReviewTool()
+        static let searchExploration = GmAgentRpirSearchExplorationTool()
+        static let searchClarification = GmAgentRpirSearchClarificationTool()
+        static let searchArchitecture = GmAgentRpirSearchArchitectureTool()
+        static let searchArchitectureOption = GmAgentRpirSearchArchitectureOptionTool()
+        static let searchReview = GmAgentRpirSearchReviewTool()
 
-        public static let all: [any GmAgentTool] = [
+        static let all: [any GmAgentTool] = [
             next,
             openBriefing, writeBrief, closeBrief, loadExplorationBrief,
             openExploration, writeExplorations, rankExplorations, completeExploration,
@@ -137,11 +137,11 @@ public enum GmAgentTools {
         ]
     }
 
-    public static let all: [any GmAgentTool] =
+    static let all: [any GmAgentTool] =
         Dope.all + Kbite.all + Diagram.all + Cde.all + Rpir.all + Projects.all
         + System.all + Fs.all
 
-    public static func tools(in family: GmAgentToolFamily) -> [any GmAgentTool] {
+    static func tools(in family: GmAgentToolFamily) -> [any GmAgentTool] {
         switch family {
         case .dope: return Dope.all
         case .kbite: return Kbite.all

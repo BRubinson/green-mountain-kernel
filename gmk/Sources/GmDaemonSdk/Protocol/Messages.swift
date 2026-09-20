@@ -12,18 +12,18 @@ import Foundation
 /// The identity block wrapped into every domain table. Defined once here;
 /// GRDB records declare these five columns flat because GRDB flattens only
 /// top-level Codable properties into columns.
-public struct BaseEntity: Codable, Hashable, Sendable {
+struct BaseEntity: Codable, Hashable, Sendable {
     /// Serial rowid — internal to the db, nil before insert.
-    public let id: Int64?
+    let id: Int64?
     /// v4 lowercase — the external join key shared with gmfs yamls and the wire.
-    public let uuid: String
+    let uuid: String
     /// Incremented by the daemon on every write (optimistic concurrency —
     /// guarded updates require the caller's expected_version to match).
-    public let version: Int64
-    public let createdAt: String
-    public let updatedAt: String
+    let version: Int64
+    let createdAt: String
+    let updatedAt: String
 
-    public init(id: Int64? = nil, uuid: String, version: Int64, createdAt: String, updatedAt: String) {
+    init(id: Int64? = nil, uuid: String, version: Int64, createdAt: String, updatedAt: String) {
         self.id = id
         self.uuid = uuid
         self.version = version
@@ -35,7 +35,7 @@ public struct BaseEntity: Codable, Hashable, Sendable {
 /// Kinds of rows in the append-only daemon_event table. Stored as free text in
 /// the db; this enum is the write-path enforcement. On the wire (events,
 /// EVENT_LIST) kind travels as a raw string so old clients survive new kinds.
-public enum DaemonEventKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum DaemonEventKind: String, Codable, Hashable, CaseIterable, Sendable {
     case createProject = "CREATE_PROJECT"
     case createInstance = "CREATE_INSTANCE"
     case createSession = "CREATE_SESSION"
@@ -123,7 +123,7 @@ public enum DaemonEventKind: String, Codable, Hashable, CaseIterable, Sendable {
 /// The four registry levels a kbite can be activated at. rawValue drives the
 /// `{scope}_active_kbite` / `{scope}_uuid` table and column names — the only
 /// way dynamic SQL identifiers are ever built (enum-bound, no injection).
-public enum KbiteScope: String, Codable, Hashable, CaseIterable, Sendable {
+enum KbiteScope: String, Codable, Hashable, CaseIterable, Sendable {
     case project
     case instance
     case session
@@ -132,12 +132,12 @@ public enum KbiteScope: String, Codable, Hashable, CaseIterable, Sendable {
 
 /// Where a KBITE_KEYWORD_TAG attach/detach lands: the kbite-level vocabulary
 /// junction or the per-resource-file junction.
-public enum KeywordTagLevel: String, Codable, Hashable, CaseIterable, Sendable {
+enum KeywordTagLevel: String, Codable, Hashable, CaseIterable, Sendable {
     case kbite
     case file
 }
 
-public enum ChangeKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum ChangeKind: String, Codable, Hashable, CaseIterable, Sendable {
     case edit
     case create
     case delete
@@ -152,7 +152,7 @@ public enum ChangeKind: String, Codable, Hashable, CaseIterable, Sendable {
 /// implementation. `done` IS NOT TERMINAL — done → draft re-opens a finished
 /// prompt, which is why the summary tables carry no per-prompt UNIQUE
 /// constraint: a second run needs a second summary.
-public enum PromptStatus: String, Codable, Hashable, CaseIterable, Sendable {
+enum PromptStatus: String, Codable, Hashable, CaseIterable, Sendable {
     /// Not started, or sent back for editing.
     case draft
     /// The single working state. Stamped by BRIEFING_OPEN, not by an agent —
@@ -167,7 +167,7 @@ public enum PromptStatus: String, Codable, Hashable, CaseIterable, Sendable {
     /// with m0028, and summaries are now created by explicit opens
     /// (CLARIFY_OPEN, ARCH_OPTION_ADD, REVIEW_OPEN) rather than as a side
     /// effect of walking this enum.
-    public var allowedNext: Set<PromptStatus> {
+    var allowedNext: Set<PromptStatus> {
         switch self {
         case .draft: return [.initiated]
         case .initiated: return [.done]
@@ -179,12 +179,12 @@ public enum PromptStatus: String, Codable, Hashable, CaseIterable, Sendable {
 /// Clarification summary lifecycle: building → answering → complete, with one
 /// backward revision edge (complete → answering, the `reopen` verb) so an
 /// answer discovered wrong during architecting stays fixable db-natively.
-public enum ClarificationStatus: String, Codable, Hashable, CaseIterable, Sendable {
+enum ClarificationStatus: String, Codable, Hashable, CaseIterable, Sendable {
     case building
     case answering
     case complete
 
-    public var allowedNext: Set<ClarificationStatus> {
+    var allowedNext: Set<ClarificationStatus> {
         switch self {
         case .building: return [.answering]
         case .answering: return [.complete]
@@ -194,7 +194,7 @@ public enum ClarificationStatus: String, Codable, Hashable, CaseIterable, Sendab
 }
 
 /// One clarification row's answer state.
-public enum ClarificationRowStatus: String, Codable, Hashable, CaseIterable, Sendable {
+enum ClarificationRowStatus: String, Codable, Hashable, CaseIterable, Sendable {
     case open
     case answered
     case skipped
@@ -203,12 +203,12 @@ public enum ClarificationRowStatus: String, Codable, Hashable, CaseIterable, Sen
 /// Architecture summary lifecycle: drafting → proposed → approved, with one
 /// backward revision edge (proposed → drafting, the `revise` verb). approved
 /// is terminal and unlocks the prompt's architecting → implementing gate.
-public enum ArchitectureStatus: String, Codable, Hashable, CaseIterable, Sendable {
+enum ArchitectureStatus: String, Codable, Hashable, CaseIterable, Sendable {
     case drafting
     case proposed
     case approved
 
-    public var allowedNext: Set<ArchitectureStatus> {
+    var allowedNext: Set<ArchitectureStatus> {
         switch self {
         case .drafting: return [.proposed]
         case .proposed: return [.approved, .drafting]
@@ -219,7 +219,7 @@ public enum ArchitectureStatus: String, Codable, Hashable, CaseIterable, Sendabl
 
 /// Fidelity of an architecture_general_change's change_code: sketch-level
 /// pseudo code, near-code draft, or drop-in actual code.
-public enum ChangeDepth: String, Codable, Hashable, CaseIterable, Sendable {
+enum ChangeDepth: String, Codable, Hashable, CaseIterable, Sendable {
     case pseudo
     case draft
     case actual
@@ -227,7 +227,7 @@ public enum ChangeDepth: String, Codable, Hashable, CaseIterable, Sendable {
 
 /// The daemon_config key space is enum-bound — an unknown key is BAD_REQUEST,
 /// keeping config a typed subsystem rather than a free-form bag.
-public enum ConfigKey: String, Codable, Hashable, CaseIterable, Sendable {
+enum ConfigKey: String, Codable, Hashable, CaseIterable, Sendable {
     case gmFsRoot = "gmfs_root"
     case kbiteRoot = "kbite_root"
     case kbiteOpenRoot = "kbite_open_root"
@@ -237,7 +237,7 @@ public enum ConfigKey: String, Codable, Hashable, CaseIterable, Sendable {
 /// Column-only since v7: session.status was retired from the wire (every live
 /// row read 'active' forever; checked-out state is git-derived via
 /// SESSION_RESOLVE). The enum documents the column's legal values.
-public enum SessionStatus: String, Codable, Hashable, CaseIterable, Sendable {
+enum SessionStatus: String, Codable, Hashable, CaseIterable, Sendable {
     case active
     case closed
 }
@@ -246,11 +246,11 @@ public enum SessionStatus: String, Codable, Hashable, CaseIterable, Sendable {
 /// revision edge (complete → exploring, the `reopen` verb) — explore is the
 /// most re-run report (resume, team fallback), so re-runs update the same
 /// summary db-natively (last-run-wins, like the file world it replaces).
-public enum ExplorationStatus: String, Codable, Hashable, CaseIterable, Sendable {
+enum ExplorationStatus: String, Codable, Hashable, CaseIterable, Sendable {
     case exploring
     case complete
 
-    public var allowedNext: Set<ExplorationStatus> {
+    var allowedNext: Set<ExplorationStatus> {
         switch self {
         case .exploring: return [.complete]
         case .complete: return [.exploring]
@@ -261,11 +261,11 @@ public enum ExplorationStatus: String, Codable, Hashable, CaseIterable, Sendable
 /// Review report lifecycle: reviewing → complete, with the same backward
 /// revision edge as ExplorationStatus. Named ReviewSummaryStatus so it can't
 /// be confused with ReviewFindingStatus (the per-finding resolution machine).
-public enum ReviewSummaryStatus: String, Codable, Hashable, CaseIterable, Sendable {
+enum ReviewSummaryStatus: String, Codable, Hashable, CaseIterable, Sendable {
     case reviewing
     case complete
 
-    public var allowedNext: Set<ReviewSummaryStatus> {
+    var allowedNext: Set<ReviewSummaryStatus> {
         switch self {
         case .reviewing: return [.complete]
         case .complete: return [.reviewing]
@@ -275,7 +275,7 @@ public enum ReviewSummaryStatus: String, Codable, Hashable, CaseIterable, Sendab
 
 /// What an exploration finding is about. `keyFile` (m0025) is the merged
 /// exploration_key_file shape: a path-anchored finding with empty body.
-public enum ExplorationFindingKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum ExplorationFindingKind: String, Codable, Hashable, CaseIterable, Sendable {
     case persistenceModel = "persistence_model"
     case implementationPattern = "implementation_pattern"
     case existingFunctionality = "existing_functionality"
@@ -290,7 +290,7 @@ public enum ExplorationFindingKind: String, Codable, Hashable, CaseIterable, Sen
 /// prompt-level seal row the primary completes last (its complete refuses
 /// while any finding across the prompt is unranked). CHECKless in the db;
 /// this registry is the validity surface.
-public enum ExplorationAgentType: String, Codable, Hashable, CaseIterable, Sendable {
+enum ExplorationAgentType: String, Codable, Hashable, CaseIterable, Sendable {
     case aggressive
     case conservative
     case pragmatic
@@ -300,7 +300,7 @@ public enum ExplorationAgentType: String, Codable, Hashable, CaseIterable, Senda
 }
 
 /// What a review finding is about.
-public enum ReviewFindingKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum ReviewFindingKind: String, Codable, Hashable, CaseIterable, Sendable {
     case correctnessBug = "correctness_bug"
     case specDeviation = "spec_deviation"
     case regressionRisk = "regression_risk"
@@ -310,7 +310,7 @@ public enum ReviewFindingKind: String, Codable, Hashable, CaseIterable, Sendable
 }
 
 /// The review's overall verdict, carried only by REVIEW_COMPLETE.
-public enum ReviewVerdict: String, Codable, Hashable, CaseIterable, Sendable {
+enum ReviewVerdict: String, Codable, Hashable, CaseIterable, Sendable {
     case approved
     case approvedWithNits = "approved_with_nits"
     case changesRequested = "changes_requested"
@@ -320,13 +320,13 @@ public enum ReviewVerdict: String, Codable, Hashable, CaseIterable, Sendable {
 /// summary completes — the deliberate inversion of the clarify child-lock).
 /// open → fixed | accepted | wont_fix, plus lateral correction edges among the
 /// resolved values; never back to open.
-public enum ReviewFindingStatus: String, Codable, Hashable, CaseIterable, Sendable {
+enum ReviewFindingStatus: String, Codable, Hashable, CaseIterable, Sendable {
     case open
     case fixed
     case accepted
     case wontFix = "wont_fix"
 
-    public var allowedNext: Set<ReviewFindingStatus> {
+    var allowedNext: Set<ReviewFindingStatus> {
         switch self {
         case .open: return [.fixed, .accepted, .wontFix]
         case .fixed: return [.accepted, .wontFix]
@@ -339,11 +339,11 @@ public enum ReviewFindingStatus: String, Codable, Hashable, CaseIterable, Sendab
 /// One (finding, rating) pair of a batch rank. Ratings run 0–999: 0 is an
 /// absolute critical finding, 999 an always-false-positive tombstone; the
 /// consumption threshold sits at 100.
-public struct FindingRating: Codable, Hashable, Sendable {
-    public let findingUuid: String
-    public let rating: Int
+struct FindingRating: Codable, Hashable, Sendable {
+    let findingUuid: String
+    let rating: Int
 
-    public init(findingUuid: String, rating: Int) {
+    init(findingUuid: String, rating: Int) {
         self.findingUuid = findingUuid
         self.rating = rating
     }
@@ -351,21 +351,21 @@ public struct FindingRating: Codable, Hashable, Sendable {
 
 // MARK: - HELLO
 
-public struct Hello: Codable, Hashable, Sendable {
-    public let clientName: String
-    public let pid: Int32
+struct Hello: Codable, Hashable, Sendable {
+    let clientName: String
+    let pid: Int32
 
-    public init(clientName: String, pid: Int32) {
+    init(clientName: String, pid: Int32) {
         self.clientName = clientName
         self.pid = pid
     }
 }
 
-public struct HelloAck: Codable, Hashable, Sendable {
-    public let daemonPid: Int32
-    public let protocolVersion: Int
+struct HelloAck: Codable, Hashable, Sendable {
+    let daemonPid: Int32
+    let protocolVersion: Int
 
-    public init(daemonPid: Int32, protocolVersion: Int) {
+    init(daemonPid: Int32, protocolVersion: Int) {
         self.daemonPid = daemonPid
         self.protocolVersion = protocolVersion
     }
@@ -381,11 +381,11 @@ public struct HelloAck: Codable, Hashable, Sendable {
 /// carries. Atomicity is the point — each verb is otherwise its own implicit
 /// transaction, so twelve findings are twelve commits and a failure at the
 /// seventh leaves six behind.
-public struct TxBatchRequest: Codable, Hashable, Sendable {
+struct TxBatchRequest: Codable, Hashable, Sendable {
     /// Raw NDJSON request lines, executed in order.
-    public let requests: [String]
+    let requests: [String]
 
-    public init(requests: [String]) {
+    init(requests: [String]) {
         self.requests = requests
     }
 }
@@ -396,29 +396,29 @@ public struct TxBatchRequest: Codable, Hashable, Sendable {
 /// is not expressible to an observer any more than it is to the database.
 /// THERE IS NO `failedIndex` FIELD: a failure THROWS and a throw carries no
 /// payload, so the failing index is named in the error MESSAGE instead.
-public struct TxBatchResponse: Codable, Hashable, Sendable {
+struct TxBatchResponse: Codable, Hashable, Sendable {
     /// Raw NDJSON result lines, one per request, in request order. Present only
     /// on success, because a rolled-back batch throws.
-    public let results: [String]
+    let results: [String]
 
-    public init(results: [String]) {
+    init(results: [String]) {
         self.results = results
     }
 }
 
 // MARK: - PING
 
-public struct PingRequest: Codable, Hashable, Sendable {
-    public init() {}
+struct PingRequest: Codable, Hashable, Sendable {
+    init() {}
 }
 
-public struct PingResponse: Codable, Hashable, Sendable {
-    public let daemonPid: Int32
-    public let protocolVersion: Int
-    public let buildSha: String
-    public let buildDate: String
-    public let startedAt: String
-    public let uptimeSeconds: Int
+struct PingResponse: Codable, Hashable, Sendable {
+    let daemonPid: Int32
+    let protocolVersion: Int
+    let buildSha: String
+    let buildDate: String
+    let startedAt: String
+    let uptimeSeconds: Int
     /// Resident footprint, from `task_info`/`TASK_VM_INFO` `phys_footprint`.
     ///
     /// The vitals ride the WIRE rather than being read in-process, and that is
@@ -426,27 +426,27 @@ public struct PingResponse: Codable, Hashable, Sendable {
     /// no store of its own, and its menu bar still has to show the numbers. An
     /// in-process-only source would go blank in exactly the mode that most
     /// needs to explain itself.
-    public let residentMemoryBytes: UInt64?
+    let residentMemoryBytes: UInt64?
     /// CPU percentage, from a `proc_pid_rusage` delta.
-    public let cpuPercent: Double?
+    let cpuPercent: Double?
     /// `"writer"` | `"client"` — which role the answering kernel holds.
     ///
     /// Client mode is the mitigation for a second app copy, chosen over a hard
     /// refusal because a refusal on the daily Xcode-debug path is a guard that
     /// gets deleted. A mitigation nobody can see is cosmetic, so the role is
     /// reportable.
-    public let writerRole: String?
+    let writerRole: String?
     /// Bundle path of the instance actually holding the db lock, so a
     /// client-mode kernel can name BOTH bundles rather than only its own.
-    public let writerBundlePath: String?
+    let writerBundlePath: String?
     /// The filesystem root this kernel actually resolved. With several
     /// environments on a machine a client that cannot ask has to GUESS from its
     /// own environment, which is the guess that is wrong for a
     /// LaunchServices-launched app: it inherits no environment at all. An
     /// additive optional, so nil means the peer does not report its root.
-    public let gmfsRoot: String?
+    let gmfsRoot: String?
 
-    public init(
+    init(
         daemonPid: Int32,
         protocolVersion: Int,
         buildSha: String,
@@ -475,45 +475,45 @@ public struct PingResponse: Codable, Hashable, Sendable {
 
 // MARK: - STATUS
 
-public struct StatusRequest: Codable, Hashable, Sendable {
-    public init() {}
+struct StatusRequest: Codable, Hashable, Sendable {
+    init() {}
 }
 
 /// One table's row count. An array of pairs rather than [String: Int] because
 /// the coder key strategies rewrite dictionary String keys ("prompt_artifact"
 /// would decode as "promptArtifact"); an array is immune and stays sorted.
-public struct TableCount: Codable, Hashable, Sendable {
-    public let name: String
-    public let count: Int
+struct TableCount: Codable, Hashable, Sendable {
+    let name: String
+    let count: Int
 
-    public init(name: String, count: Int) {
+    init(name: String, count: Int) {
         self.name = name
         self.count = count
     }
 }
 
-public struct StatusResponse: Codable, Hashable, Sendable {
-    public let daemonPid: Int32
-    public let protocolVersion: Int
-    public let socketPath: String
-    public let dbPath: String
-    public let schemaVersion: Int
+struct StatusResponse: Codable, Hashable, Sendable {
+    let daemonPid: Int32
+    let protocolVersion: Int
+    let socketPath: String
+    let dbPath: String
+    let schemaVersion: Int
     /// Row census only — MUST NOT be used as an event cursor; use
     /// `lastEventId` for that.
-    public let tableCounts: [TableCount]
+    let tableCounts: [TableCount]
     /// The real event-log horizon: highest daemon_event.id at status time.
-    public let lastEventId: Int64
-    public let startedAt: String
-    public let uptimeSeconds: Int
+    let lastEventId: Int64
+    let startedAt: String
+    let uptimeSeconds: Int
     /// Vitals and role, in parity with `PingResponse` so the menu bar has ONE
     /// shape to read whichever verb it polls. All four are additive optionals
     /// and contribute no protocol bump — see the v28 note in `GmWireProtocol`.
-    public let residentMemoryBytes: UInt64?
-    public let cpuPercent: Double?
-    public let writerRole: String?
-    public let writerBundlePath: String?
+    let residentMemoryBytes: UInt64?
+    let cpuPercent: Double?
+    let writerRole: String?
+    let writerBundlePath: String?
 
-    public init(
+    init(
         daemonPid: Int32,
         protocolVersion: Int,
         socketPath: String,
@@ -546,38 +546,38 @@ public struct StatusResponse: Codable, Hashable, Sendable {
 
 // MARK: - SHUTDOWN
 
-public struct ShutdownRequest: Codable, Hashable, Sendable {
-    public init() {}
+struct ShutdownRequest: Codable, Hashable, Sendable {
+    init() {}
 }
 
-public struct ShutdownResponse: Codable, Hashable, Sendable {
-    public let message: String
+struct ShutdownResponse: Codable, Hashable, Sendable {
+    let message: String
 
-    public init(message: String) {
+    init(message: String) {
         self.message = message
     }
 }
 
 // MARK: - SUBSCRIBE / EVENT
 
-public struct Subscribe: Codable, Hashable, Sendable {
+struct Subscribe: Codable, Hashable, Sendable {
     /// Replay cursor: daemon_event.id of the last event the subscriber has
     /// seen. Events with id > since_id are replayed before live streaming
     /// begins. nil = live-only from now.
-    public let sinceId: Int64?
+    let sinceId: Int64?
 
-    public init(sinceId: Int64? = nil) {
+    init(sinceId: Int64? = nil) {
         self.sinceId = sinceId
     }
 }
 
-public struct SubscribeAck: Codable, Hashable, Sendable {
+struct SubscribeAck: Codable, Hashable, Sendable {
     /// The replay horizon: highest daemon_event.id at subscribe time. Replayed
     /// EVENT lines (ids ≤ this) follow the ack, then live events stream.
-    public let lastEventId: Int64
-    public let replayCount: Int
+    let lastEventId: Int64
+    let replayCount: Int
 
-    public init(lastEventId: Int64, replayCount: Int) {
+    init(lastEventId: Int64, replayCount: Int) {
         self.lastEventId = lastEventId
         self.replayCount = replayCount
     }
@@ -587,16 +587,16 @@ public struct SubscribeAck: Codable, Hashable, Sendable {
 /// `id` is the durable reconnect cursor (created_at is seconds-precision and
 /// ties — display/coarse filter only, never a cursor). `kind` is a raw string
 /// so rows with kinds added later never break older clients.
-public struct EventNotification: Codable, Hashable, Sendable {
-    public let id: Int64
-    public let kind: String
-    public let subjectUuid: String?
-    public let payload: String?
-    public let createdAt: String
+struct EventNotification: Codable, Hashable, Sendable {
+    let id: Int64
+    let kind: String
+    let subjectUuid: String?
+    let payload: String?
+    let createdAt: String
 
-    public var eventKind: DaemonEventKind? { DaemonEventKind(rawValue: kind) }
+    var eventKind: DaemonEventKind? { DaemonEventKind(rawValue: kind) }
 
-    public init(id: Int64, kind: String, subjectUuid: String? = nil, payload: String? = nil, createdAt: String) {
+    init(id: Int64, kind: String, subjectUuid: String? = nil, payload: String? = nil, createdAt: String) {
         self.id = id
         self.kind = kind
         self.subjectUuid = subjectUuid
@@ -607,15 +607,15 @@ public struct EventNotification: Codable, Hashable, Sendable {
 
 // MARK: - BACKUP
 
-public struct BackupRequest: Codable, Hashable, Sendable {
-    public init() {}
+struct BackupRequest: Codable, Hashable, Sendable {
+    init() {}
 }
 
-public struct BackupResponse: Codable, Hashable, Sendable {
-    public let backupPath: String
-    public let sizeBytes: Int64
+struct BackupResponse: Codable, Hashable, Sendable {
+    let backupPath: String
+    let sizeBytes: Int64
 
-    public init(backupPath: String, sizeBytes: Int64) {
+    init(backupPath: String, sizeBytes: Int64) {
         self.backupPath = backupPath
         self.sizeBytes = sizeBytes
     }
@@ -630,15 +630,15 @@ public struct BackupResponse: Codable, Hashable, Sendable {
 /// mirroring gm_session_startup.sh's inherit_kbite (existing rows are never
 /// re-seeded; a child created without codes copies its parent's junctions).
 
-public struct ProjectContext: Codable, Hashable, Sendable {
-    public let gitRepoName: String
-    public let code: String
-    public let name: String
-    public let gmfsRelativeStoragePath: String
-    public let uuid: String?
-    public let kbiteCodes: [String]?
+struct ProjectContext: Codable, Hashable, Sendable {
+    let gitRepoName: String
+    let code: String
+    let name: String
+    let gmfsRelativeStoragePath: String
+    let uuid: String?
+    let kbiteCodes: [String]?
 
-    public init(
+    init(
         gitRepoName: String,
         code: String,
         name: String,
@@ -655,15 +655,15 @@ public struct ProjectContext: Codable, Hashable, Sendable {
     }
 }
 
-public struct InstanceContext: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let absoluteFileSystemPath: String
-    public let gmfsRelativeStoragePath: String
-    public let uuid: String?
-    public let kbiteCodes: [String]?
+struct InstanceContext: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let absoluteFileSystemPath: String
+    let gmfsRelativeStoragePath: String
+    let uuid: String?
+    let kbiteCodes: [String]?
 
-    public init(
+    init(
         code: String,
         name: String,
         absoluteFileSystemPath: String,
@@ -680,16 +680,16 @@ public struct InstanceContext: Codable, Hashable, Sendable {
     }
 }
 
-public struct SessionContext: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let backstory: String
-    public let goal: String
-    public let gmfsRelativeStoragePath: String
-    public let uuid: String?
-    public let kbiteCodes: [String]?
+struct SessionContext: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let backstory: String
+    let goal: String
+    let gmfsRelativeStoragePath: String
+    let uuid: String?
+    let kbiteCodes: [String]?
 
-    public init(
+    init(
         code: String,
         name: String,
         backstory: String = "",
@@ -710,10 +710,10 @@ public struct SessionContext: Codable, Hashable, Sendable {
 
 // MARK: - CONTEXT_ENSURE / CONTEXT_GET
 
-public struct ContextEnsureRequest: Codable, Hashable, Sendable {
-    public let project: ProjectContext
-    public let instance: InstanceContext
-    public let session: SessionContext
+struct ContextEnsureRequest: Codable, Hashable, Sendable {
+    let project: ProjectContext
+    let instance: InstanceContext
+    let session: SessionContext
     /// Claude Code's conversation uuid, from the SessionStart payload. When
     /// present the daemon pins it to the ensured session in
     /// claude_session_binding, the binding every hook write resolves through.
@@ -722,9 +722,9 @@ public struct ContextEnsureRequest: Codable, Hashable, Sendable {
     /// binding cannot be forgotten independently of the call that creates the
     /// session it points at. The insert is INSERT OR IGNORE against a UNIQUE
     /// index, so pin-once is a schema fact rather than a caller's branch.
-    public let claudeSessionId: String?
+    let claudeSessionId: String?
 
-    public init(
+    init(
         project: ProjectContext,
         instance: InstanceContext,
         session: SessionContext,
@@ -737,13 +737,13 @@ public struct ContextEnsureRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ContextEnsureResponse: Codable, Hashable, Sendable {
-    public let projectUuid: String
-    public let instanceUuid: String
-    public let sessionUuid: String
-    public let createdProject: Bool
-    public let createdInstance: Bool
-    public let createdSession: Bool
+struct ContextEnsureResponse: Codable, Hashable, Sendable {
+    let projectUuid: String
+    let instanceUuid: String
+    let sessionUuid: String
+    let createdProject: Bool
+    let createdInstance: Bool
+    let createdSession: Bool
     /// How many `claude_session_binding` rows exist for this session.
     /// CAPTURE HEALTH, AND THE ONLY WAY THE MCP CAN SEE IT. Zero means no
     /// Claude conversation is bound to this gmcc session, so the PostToolUse
@@ -752,9 +752,9 @@ public struct ContextEnsureResponse: Codable, Hashable, Sendable {
     /// cannot read `claude_session_id` itself, so without this count it cannot
     /// tell a healthy session from a dead one. Optional, so an older client
     /// decodes this response unchanged.
-    public let claudeSessionBindingCount: Int?
+    let claudeSessionBindingCount: Int?
 
-    public init(
+    init(
         projectUuid: String,
         instanceUuid: String,
         sessionUuid: String,
@@ -774,26 +774,26 @@ public struct ContextEnsureResponse: Codable, Hashable, Sendable {
 }
 
 /// Read-only resolution of the current gmcc environment — never creates rows.
-public struct ContextGetRequest: Codable, Hashable, Sendable {
-    public let projectCode: String
-    public let instanceName: String
-    public let sessionCode: String
+struct ContextGetRequest: Codable, Hashable, Sendable {
+    let projectCode: String
+    let instanceName: String
+    let sessionCode: String
 
-    public init(projectCode: String, instanceName: String, sessionCode: String) {
+    init(projectCode: String, instanceName: String, sessionCode: String) {
         self.projectCode = projectCode
         self.instanceName = instanceName
         self.sessionCode = sessionCode
     }
 }
 
-public struct ContextGetResponse: Codable, Hashable, Sendable {
-    public let projectUuid: String?
-    public let instanceUuid: String?
-    public let sessionUuid: String?
+struct ContextGetResponse: Codable, Hashable, Sendable {
+    let projectUuid: String?
+    let instanceUuid: String?
+    let sessionUuid: String?
     /// Session-level active kbite codes, resolved from the junction table.
-    public let kbiteCodes: [String]
+    let kbiteCodes: [String]
 
-    public init(projectUuid: String?, instanceUuid: String?, sessionUuid: String?, kbiteCodes: [String]) {
+    init(projectUuid: String?, instanceUuid: String?, sessionUuid: String?, kbiteCodes: [String]) {
         self.projectUuid = projectUuid
         self.instanceUuid = instanceUuid
         self.sessionUuid = sessionUuid
@@ -804,14 +804,14 @@ public struct ContextGetResponse: Codable, Hashable, Sendable {
 // MARK: - PROJECT_LIST / INSTANCE_LIST / SESSION_LIST
 
 /// Enumerate all projects — the entry point of the Landing browse chain.
-public struct ProjectListRequest: Codable, Hashable, Sendable {
-    public init() {}
+struct ProjectListRequest: Codable, Hashable, Sendable {
+    init() {}
 }
 
-public struct ProjectListResponse: Codable, Hashable, Sendable {
-    public let projects: [ProjectRow]
+struct ProjectListResponse: Codable, Hashable, Sendable {
+    let projects: [ProjectRow]
 
-    public init(projects: [ProjectRow]) {
+    init(projects: [ProjectRow]) {
         self.projects = projects
     }
 }
@@ -819,12 +819,12 @@ public struct ProjectListResponse: Codable, Hashable, Sendable {
 /// PROJECT_UPDATE — the only project-level mutation. `primaryProjectBranch`
 /// is Optional so the request shape can grow more settable fields without a
 /// wire bump; an all-nil request is EMPTY_UPDATE, never a silent no-op.
-public struct ProjectUpdateRequest: Codable, Hashable, Sendable {
-    public let projectUuid: String
-    public let expectedVersion: Int64
-    public let primaryProjectBranch: String?
+struct ProjectUpdateRequest: Codable, Hashable, Sendable {
+    let projectUuid: String
+    let expectedVersion: Int64
+    let primaryProjectBranch: String?
 
-    public init(
+    init(
         projectUuid: String,
         expectedVersion: Int64,
         primaryProjectBranch: String? = nil
@@ -836,10 +836,10 @@ public struct ProjectUpdateRequest: Codable, Hashable, Sendable {
 }
 
 /// The refreshed row, so a caller never re-reads to learn the new version.
-public struct ProjectResponse: Codable, Hashable, Sendable {
-    public let project: ProjectRow
+struct ProjectResponse: Codable, Hashable, Sendable {
+    let project: ProjectRow
 
-    public init(project: ProjectRow) {
+    init(project: ProjectRow) {
         self.project = project
     }
 }
@@ -847,59 +847,59 @@ public struct ProjectResponse: Codable, Hashable, Sendable {
 /// Enumerate instances. `projectUuid` is an optional filter — nil lists every
 /// instance (rows carry their parent uuid); a supplied-but-unknown uuid is
 /// NOT_FOUND, never a silent empty list.
-public struct InstanceListRequest: Codable, Hashable, Sendable {
-    public let projectUuid: String?
+struct InstanceListRequest: Codable, Hashable, Sendable {
+    let projectUuid: String?
 
-    public init(projectUuid: String? = nil) {
+    init(projectUuid: String? = nil) {
         self.projectUuid = projectUuid
     }
 }
 
-public struct InstanceListResponse: Codable, Hashable, Sendable {
-    public let instances: [InstanceRow]
+struct InstanceListResponse: Codable, Hashable, Sendable {
+    let instances: [InstanceRow]
 
-    public init(instances: [InstanceRow]) {
+    init(instances: [InstanceRow]) {
         self.instances = instances
     }
 }
 
 /// Enumerate sessions. Same optional-filter contract as INSTANCE_LIST.
-public struct SessionListRequest: Codable, Hashable, Sendable {
-    public let instanceUuid: String?
+struct SessionListRequest: Codable, Hashable, Sendable {
+    let instanceUuid: String?
 
-    public init(instanceUuid: String? = nil) {
+    init(instanceUuid: String? = nil) {
         self.instanceUuid = instanceUuid
     }
 }
 
-public struct SessionListResponse: Codable, Hashable, Sendable {
-    public let sessions: [SessionStub]
+struct SessionListResponse: Codable, Hashable, Sendable {
+    let sessions: [SessionStub]
 
-    public init(sessions: [SessionStub]) {
+    init(sessions: [SessionStub]) {
         self.sessions = sessions
     }
 }
 
 // MARK: - SESSION_GET / SESSION_UPDATE
 
-public struct SessionGetRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String
+struct SessionGetRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String
 
-    public init(sessionUuid: String) {
+    init(sessionUuid: String) {
         self.sessionUuid = sessionUuid
     }
 }
 
-public struct SessionGetResponse: Codable, Hashable, Sendable {
-    public let session: SessionRow
-    public let prompts: [PromptStub]
-    public let changeSummary: ChangeSummary
+struct SessionGetResponse: Codable, Hashable, Sendable {
+    let session: SessionRow
+    let prompts: [PromptStub]
+    let changeSummary: ChangeSummary
     /// Per-prompt change summaries (promptUuid nil = unattributed changes).
     /// Empty until file changes carry prompt attribution — run context is
     /// deferred from MVP, so entries may only appear via --prompt-uuid.
-    public let promptChanges: [PromptChangeSummary]
+    let promptChanges: [PromptChangeSummary]
 
-    public init(
+    init(
         session: SessionRow,
         prompts: [PromptStub],
         changeSummary: ChangeSummary,
@@ -914,23 +914,23 @@ public struct SessionGetResponse: Codable, Hashable, Sendable {
 
 /// Optimistic-concurrency guarded partial update of session-owned scalars.
 /// nil fields are left unchanged.
-public struct SessionUpdateRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String
-    public let expectedVersion: Int64
-    public let name: String?
-    public let backstory: String?
-    public let goal: String?
+struct SessionUpdateRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String
+    let expectedVersion: Int64
+    let name: String?
+    let backstory: String?
+    let goal: String?
     /// v21-era additive OPTIONAL fields (no bump needed): manual override of
     /// the activation claim that PROMPT_SET_STATUS normally maintains for the
     /// calling Claude instance. activePromptUuid claims for clientKey;
     /// clearActivePrompt releases clientKey's claim. Exactly one of the pair.
-    public let activePromptUuid: String?
-    public let clearActivePrompt: Bool?
+    let activePromptUuid: String?
+    let clearActivePrompt: Bool?
     /// The calling instance's identity (gm resolves it from process
     /// ancestry); required when either activation field is set.
-    public let clientKey: String?
+    let clientKey: String?
 
-    public init(
+    init(
         sessionUuid: String,
         expectedVersion: Int64,
         name: String? = nil,
@@ -953,20 +953,20 @@ public struct SessionUpdateRequest: Codable, Hashable, Sendable {
 
 // MARK: - PROMPT_CREATE / PROMPT_LIST / PROMPT_GET
 
-public struct PromptCreateRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String
+struct PromptCreateRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String
     /// Optional gmfs uuid pass-through (db ↔ gmfs join bridge).
-    public let uuid: String?
+    let uuid: String?
     /// Defaults to "p{seq}" when nil.
-    public let code: String?
-    public let name: String
-    public let backstory: String
-    public let goal: String
-    public let detail: String
-    public let command: String?
-    public let gmfsRelativeStoragePath: String?
+    let code: String?
+    let name: String
+    let backstory: String
+    let goal: String
+    let detail: String
+    let command: String?
+    let gmfsRelativeStoragePath: String?
 
-    public init(
+    init(
         sessionUuid: String,
         uuid: String? = nil,
         code: String? = nil,
@@ -993,42 +993,42 @@ public struct PromptCreateRequest: Codable, Hashable, Sendable {
 /// SESSION_LIST): nil lists every prompt in the db (stubs carry their parent
 /// session uuid); a supplied-but-unknown uuid is NOT_FOUND, never a silent
 /// empty list.
-public struct PromptListRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String?
+struct PromptListRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String?
     /// When true each stub carries its `reports` enrichment block (one call
     /// replaces the per-prompt CLARIFY_GET/ARCH_GET fan-out). Optional so a
     /// v8 client omitting it decodes as false.
-    public let withReports: Bool?
+    let withReports: Bool?
 
-    public init(sessionUuid: String? = nil, withReports: Bool? = nil) {
+    init(sessionUuid: String? = nil, withReports: Bool? = nil) {
         self.sessionUuid = sessionUuid
         self.withReports = withReports
     }
 }
 
-public struct PromptListResponse: Codable, Hashable, Sendable {
-    public let prompts: [PromptStub]
+struct PromptListResponse: Codable, Hashable, Sendable {
+    let prompts: [PromptStub]
 
-    public init(prompts: [PromptStub]) {
+    init(prompts: [PromptStub]) {
         self.prompts = prompts
     }
 }
 
-public struct PromptGetRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct PromptGetRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
 
-    public init(promptUuid: String) {
+    init(promptUuid: String) {
         self.promptUuid = promptUuid
     }
 }
 
-public struct PromptGetResponse: Codable, Hashable, Sendable {
-    public let prompt: PromptRow
-    public let artifacts: [ArtifactRow]
-    public let kbiteCodes: [String]
-    public let changeSummary: ChangeSummary
+struct PromptGetResponse: Codable, Hashable, Sendable {
+    let prompt: PromptRow
+    let artifacts: [ArtifactRow]
+    let kbiteCodes: [String]
+    let changeSummary: ChangeSummary
 
-    public init(prompt: PromptRow, artifacts: [ArtifactRow], kbiteCodes: [String], changeSummary: ChangeSummary) {
+    init(prompt: PromptRow, artifacts: [ArtifactRow], kbiteCodes: [String], changeSummary: ChangeSummary) {
         self.prompt = prompt
         self.artifacts = artifacts
         self.kbiteCodes = kbiteCodes
@@ -1040,14 +1040,14 @@ public struct PromptGetResponse: Codable, Hashable, Sendable {
 
 /// Draft-only edit of exactly the STAY TRUE triple (backstory/goal/detail).
 /// The daemon rejects with CONTENT_LOCKED once the prompt leaves draft.
-public struct PromptUpdateContentRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
-    public let expectedVersion: Int64
-    public let backstory: String?
-    public let goal: String?
-    public let detail: String?
+struct PromptUpdateContentRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
+    let expectedVersion: Int64
+    let backstory: String?
+    let goal: String?
+    let detail: String?
 
-    public init(
+    init(
         promptUuid: String,
         expectedVersion: Int64,
         backstory: String? = nil,
@@ -1062,16 +1062,16 @@ public struct PromptUpdateContentRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct PromptSetStatusRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
-    public let expectedVersion: Int64
-    public let status: PromptStatus
+struct PromptSetStatusRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
+    let expectedVersion: Int64
+    let status: PromptStatus
     /// v21-era additive OPTIONAL (no bump): the calling Claude instance's
     /// identity, resolved from process ancestry by gm. Entering implementing
     /// claims an activation for this key; done releases the prompt's claim.
-    public let clientKey: String?
+    let clientKey: String?
 
-    public init(
+    init(
         promptUuid: String,
         expectedVersion: Int64,
         status: PromptStatus,
@@ -1088,30 +1088,30 @@ public struct PromptSetStatusRequest: Codable, Hashable, Sendable {
 
 /// Register a file pointer for a bot-phase memory/ file. Content stays in the
 /// file; the daemon stores only the pointer.
-public struct ArtifactAddRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
-    public let filePath: String
-    public let note: String?
+struct ArtifactAddRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
+    let filePath: String
+    let note: String?
 
-    public init(promptUuid: String, filePath: String, note: String? = nil) {
+    init(promptUuid: String, filePath: String, note: String? = nil) {
         self.promptUuid = promptUuid
         self.filePath = filePath
         self.note = note
     }
 }
 
-public struct ArtifactListRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct ArtifactListRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
 
-    public init(promptUuid: String) {
+    init(promptUuid: String) {
         self.promptUuid = promptUuid
     }
 }
 
-public struct ArtifactListResponse: Codable, Hashable, Sendable {
-    public let artifacts: [ArtifactRow]
+struct ArtifactListResponse: Codable, Hashable, Sendable {
+    let artifacts: [ArtifactRow]
 
-    public init(artifacts: [ArtifactRow]) {
+    init(artifacts: [ArtifactRow]) {
         self.artifacts = artifacts
     }
 }
@@ -1125,19 +1125,19 @@ public struct ArtifactListResponse: Codable, Hashable, Sendable {
 /// the wire never re-shapes it, so a reader compares it against the sidecar
 /// beside a current PNG byte-for-byte and learns whether this qualification
 /// still describes the picture it was written about.
-public struct PromptQualifiedDiagramRow: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let promptUuid: String
-    public let diagramUuid: String
-    public let renderedPath: String
-    public let renderedRevision: Int64
-    public let renderFingerprint: String
-    public let qualification: String
-    public let version: Int64
-    public let createdAt: String
-    public let updatedAt: String
+struct PromptQualifiedDiagramRow: Codable, Hashable, Sendable {
+    let uuid: String
+    let promptUuid: String
+    let diagramUuid: String
+    let renderedPath: String
+    let renderedRevision: Int64
+    let renderFingerprint: String
+    let qualification: String
+    let version: Int64
+    let createdAt: String
+    let updatedAt: String
 
-    public init(
+    init(
         uuid: String,
         promptUuid: String,
         diagramUuid: String,
@@ -1165,15 +1165,15 @@ public struct PromptQualifiedDiagramRow: Codable, Hashable, Sendable {
 /// Record (or replace) what this prompt makes of this diagram. UPSERT on
 /// (prompt, diagram): no expected_version, because the pair is the identity
 /// and the newer reading is by definition the one that stands.
-public struct PromptDiagramQualifyRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
-    public let diagramUuid: String
-    public let renderedPath: String
-    public let renderedRevision: Int64
-    public let renderFingerprint: String
-    public let qualification: String
+struct PromptDiagramQualifyRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
+    let diagramUuid: String
+    let renderedPath: String
+    let renderedRevision: Int64
+    let renderFingerprint: String
+    let qualification: String
 
-    public init(
+    init(
         promptUuid: String,
         diagramUuid: String,
         renderedPath: String,
@@ -1193,40 +1193,40 @@ public struct PromptDiagramQualifyRequest: Codable, Hashable, Sendable {
 /// One qualification. With `diagramUuid` it is the pair; without, it is the
 /// prompt's only qualification — and an ambiguous ask (several exist) is a
 /// badRequest pointing at the list verb rather than an arbitrary pick.
-public struct PromptDiagramGetRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
-    public let diagramUuid: String?
+struct PromptDiagramGetRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
+    let diagramUuid: String?
 
-    public init(promptUuid: String, diagramUuid: String? = nil) {
+    init(promptUuid: String, diagramUuid: String? = nil) {
         self.promptUuid = promptUuid
         self.diagramUuid = diagramUuid
     }
 }
 
-public struct PromptDiagramListRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct PromptDiagramListRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
 
-    public init(promptUuid: String) {
+    init(promptUuid: String) {
         self.promptUuid = promptUuid
     }
 }
 
-public struct PromptDiagramListResponse: Codable, Hashable, Sendable {
-    public let qualifications: [PromptQualifiedDiagramRow]
+struct PromptDiagramListResponse: Codable, Hashable, Sendable {
+    let qualifications: [PromptQualifiedDiagramRow]
 
-    public init(qualifications: [PromptQualifiedDiagramRow]) {
+    init(qualifications: [PromptQualifiedDiagramRow]) {
         self.qualifications = qualifications
     }
 }
 
 // MARK: - FILE_CHANGE_ADD
 
-public struct ChangeRange: Codable, Hashable, Sendable {
-    public let lineStart: Int
-    public let lineEnd: Int
-    public let changedContent: String?
+struct ChangeRange: Codable, Hashable, Sendable {
+    let lineStart: Int
+    let lineEnd: Int
+    let changedContent: String?
 
-    public init(lineStart: Int, lineEnd: Int, changedContent: String? = nil) {
+    init(lineStart: Int, lineEnd: Int, changedContent: String? = nil) {
         self.lineStart = lineStart
         self.lineEnd = lineEnd
         self.changedContent = changedContent
@@ -1245,34 +1245,34 @@ public struct ChangeRange: Codable, Hashable, Sendable {
 /// it and the dope enum together, or every write of the new value throws. The
 /// absent CHECK is also what lets the list shrink — rows written under a wider
 /// vocabulary still read back, while a value absent here cannot be written.
-public enum FileChangeOrigin {
+enum FileChangeOrigin {
     /// PostToolUse Edit|Write|NotebookEdit — exact paths and exact
     /// structuredPatch ranges, straight off the payload.
-    public static let hook = "hook"
+    static let hook = "hook"
     /// Recorded by hand through `gm file-change add` or the pen tool.
-    public static let manual = "manual"
+    static let manual = "manual"
     /// INFERRED from the paths a Bash command NAMED (the write allowlist).
     /// Its own member rather than a `hook` row with tool_name=Bash: an
     /// inference must never be indistinguishable from an exact
     /// structuredPatch row, and every consumer can filter on it.
-    public static let command = "command"
+    static let command = "command"
 
     /// The accepted set, in documentation order. The guard's error detail is
     /// generated from this — never hand-written.
-    public static let all: [String] = [hook, manual, command]
+    static let all: [String] = [hook, manual, command]
 
     /// `hook|manual|command` — for help text and error details.
-    public static var vocabulary: String { all.joined(separator: "|") }
+    static var vocabulary: String { all.joined(separator: "|") }
 }
 
-public struct FileChangeAdd: Codable, Hashable, Sendable {
-    public let project: ProjectContext
-    public let instance: InstanceContext
-    public let session: SessionContext
-    public let promptUuid: String?
-    public let relativePath: String
-    public let changeKind: ChangeKind
-    public let ranges: [ChangeRange]
+struct FileChangeAdd: Codable, Hashable, Sendable {
+    let project: ProjectContext
+    let instance: InstanceContext
+    let session: SessionContext
+    let promptUuid: String?
+    let relativePath: String
+    let changeKind: ChangeKind
+    let ranges: [ChangeRange]
     /// When autoAttribute is true and promptUuid is nil, the daemon resolves
     /// the prompt itself. OPT-IN, so "omitted prompt means deliberately
     /// session-scoped" stays intact for every other caller.
@@ -1281,15 +1281,15 @@ public struct FileChangeAdd: Codable, Hashable, Sendable {
     /// never through the ClientKey activation ladder, because process ancestry
     /// cannot tell one sibling subagent from another. With no field, no hook
     /// write can reach the ladder.
-    public let autoAttribute: Bool?
+    let autoAttribute: Bool?
     /// Agent identity is SELF-REPORTED, because nothing on the transport
     /// distinguishes sibling subagents. origin is one of
     /// `FileChangeOrigin.all`, nil meaning the db default. workflow_phase is
     /// NEVER taken from the caller: the daemon stamps it from the attributed
     /// prompt's active bot_workflow.
-    public let agentId: String?
-    public let agentName: String?
-    public let origin: String?
+    let agentId: String?
+    let agentName: String?
+    let origin: String?
     /// The PostToolUse payload, one field per column rather than a blob so
     /// every axis stays queryable. All OPTIONAL: the manual path carries none.
     ///
@@ -1298,16 +1298,16 @@ public struct FileChangeAdd: Codable, Hashable, Sendable {
     /// uuid. toolUseId is the idempotency key, paired server-side with the
     /// resolved session_file, so the unit is (tool call, file) and a replay
     /// returns the EXISTING row with `deduplicated` set.
-    public let claudeSessionId: String?
-    public let claudeTurnId: String?
-    public let toolUseId: String?
-    public let toolName: String?
-    public let agentType: String?
-    public let permissionMode: String?
-    public let durationMs: Int?
-    public let transcriptPath: String?
+    let claudeSessionId: String?
+    let claudeTurnId: String?
+    let toolUseId: String?
+    let toolName: String?
+    let agentType: String?
+    let permissionMode: String?
+    let durationMs: Int?
+    let transcriptPath: String?
 
-    public init(
+    init(
         project: ProjectContext,
         instance: InstanceContext,
         session: SessionContext,
@@ -1350,18 +1350,18 @@ public struct FileChangeAdd: Codable, Hashable, Sendable {
     }
 }
 
-public struct FileChangeAddResponse: Codable, Hashable, Sendable {
-    public let sessionFileUuid: String
-    public let fileChangeUuid: String
-    public let rangeUuids: [String]
+struct FileChangeAddResponse: Codable, Hashable, Sendable {
+    let sessionFileUuid: String
+    let fileChangeUuid: String
+    let rangeUuids: [String]
     /// Set when this (tool_use_id, file) pair was ALREADY recorded: the uuids
     /// above are the existing row's, no event was appended and the session
     /// was not touched. An explicit already-recorded SUCCESS, so a replayed
     /// payload is never an error to the hook and never a second edit to a
     /// subscriber. Absent means a row was written.
-    public let deduplicated: Bool?
+    let deduplicated: Bool?
 
-    public init(
+    init(
         sessionFileUuid: String,
         fileChangeUuid: String,
         rangeUuids: [String],
@@ -1376,13 +1376,13 @@ public struct FileChangeAddResponse: Codable, Hashable, Sendable {
 
 // MARK: - FILE_CHANGE_LIST
 
-public struct FileChangeListRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String?
-    public let promptUuid: String?
-    public let relativePath: String?
-    public let limit: Int?
+struct FileChangeListRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String?
+    let promptUuid: String?
+    let relativePath: String?
+    let limit: Int?
 
-    public init(sessionUuid: String? = nil, promptUuid: String? = nil, relativePath: String? = nil, limit: Int? = nil) {
+    init(sessionUuid: String? = nil, promptUuid: String? = nil, relativePath: String? = nil, limit: Int? = nil) {
         self.sessionUuid = sessionUuid
         self.promptUuid = promptUuid
         self.relativePath = relativePath
@@ -1390,10 +1390,10 @@ public struct FileChangeListRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct FileChangeListResponse: Codable, Hashable, Sendable {
-    public let changes: [FileChangeRow]
+struct FileChangeListResponse: Codable, Hashable, Sendable {
+    let changes: [FileChangeRow]
 
-    public init(changes: [FileChangeRow]) {
+    init(changes: [FileChangeRow]) {
         self.changes = changes
     }
 }
@@ -1404,22 +1404,22 @@ public struct FileChangeListResponse: Codable, Hashable, Sendable {
 /// READ time (owner's own junction plus every ancestor's) — correct even for
 /// kbites added after the child row was created. `all: true` ignores scope
 /// and returns every kbite row in the db (the cleanup drift-check listing).
-public struct KbiteListRequest: Codable, Hashable, Sendable {
-    public let scope: KbiteScope
-    public let ownerUuid: String
-    public let all: Bool?
+struct KbiteListRequest: Codable, Hashable, Sendable {
+    let scope: KbiteScope
+    let ownerUuid: String
+    let all: Bool?
 
-    public init(scope: KbiteScope, ownerUuid: String, all: Bool? = nil) {
+    init(scope: KbiteScope, ownerUuid: String, all: Bool? = nil) {
         self.scope = scope
         self.ownerUuid = ownerUuid
         self.all = all
     }
 }
 
-public struct KbiteListResponse: Codable, Hashable, Sendable {
-    public let kbites: [KbiteRef]
+struct KbiteListResponse: Codable, Hashable, Sendable {
+    let kbites: [KbiteRef]
 
-    public init(kbites: [KbiteRef]) {
+    init(kbites: [KbiteRef]) {
         self.kbites = kbites
     }
 }
@@ -1427,46 +1427,46 @@ public struct KbiteListResponse: Codable, Hashable, Sendable {
 /// Explicit-only registration (v11 inheritance model — never auto-added).
 /// Db-only — the db is the sole kbite registry.
 /// Idempotent; `added` is false when the junction already existed.
-public struct KbiteAddRequest: Codable, Hashable, Sendable {
-    public let scope: KbiteScope
-    public let ownerUuid: String
-    public let code: String
+struct KbiteAddRequest: Codable, Hashable, Sendable {
+    let scope: KbiteScope
+    let ownerUuid: String
+    let code: String
 
-    public init(scope: KbiteScope, ownerUuid: String, code: String) {
+    init(scope: KbiteScope, ownerUuid: String, code: String) {
         self.scope = scope
         self.ownerUuid = ownerUuid
         self.code = code
     }
 }
 
-public struct KbiteAddResponse: Codable, Hashable, Sendable {
-    public let kbiteUuid: String
-    public let code: String
-    public let added: Bool
+struct KbiteAddResponse: Codable, Hashable, Sendable {
+    let kbiteUuid: String
+    let code: String
+    let added: Bool
 
-    public init(kbiteUuid: String, code: String, added: Bool) {
+    init(kbiteUuid: String, code: String, added: Bool) {
         self.kbiteUuid = kbiteUuid
         self.code = code
         self.added = added
     }
 }
 
-public struct KbiteRemoveRequest: Codable, Hashable, Sendable {
-    public let scope: KbiteScope
-    public let ownerUuid: String
-    public let code: String
+struct KbiteRemoveRequest: Codable, Hashable, Sendable {
+    let scope: KbiteScope
+    let ownerUuid: String
+    let code: String
 
-    public init(scope: KbiteScope, ownerUuid: String, code: String) {
+    init(scope: KbiteScope, ownerUuid: String, code: String) {
         self.scope = scope
         self.ownerUuid = ownerUuid
         self.code = code
     }
 }
 
-public struct KbiteRemoveResponse: Codable, Hashable, Sendable {
-    public let removed: Bool
+struct KbiteRemoveResponse: Codable, Hashable, Sendable {
+    let removed: Bool
 
-    public init(removed: Bool) {
+    init(removed: Bool) {
         self.removed = removed
     }
 }
@@ -1476,22 +1476,22 @@ public struct KbiteRemoveResponse: Codable, Hashable, Sendable {
 /// Filesystem skeleton only — no db rows (maws are not tracked in the db).
 /// The client resolves $GMCC_KBITE_OPEN and passes the absolute maw path; the
 /// daemon never reads gmfs environment variables.
-public struct KbiteMawOpenRequest: Codable, Hashable, Sendable {
-    public let kbiteName: String
-    public let mawPath: String
+struct KbiteMawOpenRequest: Codable, Hashable, Sendable {
+    let kbiteName: String
+    let mawPath: String
 
-    public init(kbiteName: String, mawPath: String) {
+    init(kbiteName: String, mawPath: String) {
         self.kbiteName = kbiteName
         self.mawPath = mawPath
     }
 }
 
-public struct KbiteMawOpenResponse: Codable, Hashable, Sendable {
-    public let mawPath: String
-    public let createdDirs: [String]
-    public let createdIndex: Bool
+struct KbiteMawOpenResponse: Codable, Hashable, Sendable {
+    let mawPath: String
+    let createdDirs: [String]
+    let createdIndex: Bool
 
-    public init(mawPath: String, createdDirs: [String], createdIndex: Bool) {
+    init(mawPath: String, createdDirs: [String], createdIndex: Bool) {
         self.mawPath = mawPath
         self.createdDirs = createdDirs
         self.createdIndex = createdIndex
@@ -1504,30 +1504,30 @@ public struct KbiteMawOpenResponse: Codable, Hashable, Sendable {
 /// kbite_resource / kbite_resource_file / keyword rows (db becomes canonical
 /// for digested text), then delete the temporary chewed files — raw sources
 /// stay on disk for re-chewing.
-public struct KbiteDigestRequest: Codable, Hashable, Sendable {
-    public let code: String
-    public let kbiteOpenPath: String
+struct KbiteDigestRequest: Codable, Hashable, Sendable {
+    let code: String
+    let kbiteOpenPath: String
 
-    public init(code: String, kbiteOpenPath: String) {
+    init(code: String, kbiteOpenPath: String) {
         self.code = code
         self.kbiteOpenPath = kbiteOpenPath
     }
 }
 
-public struct KbiteDigestResponse: Codable, Hashable, Sendable {
-    public let kbiteUuid: String
-    public let resourceCount: Int
-    public let fileCount: Int
-    public let keywordCount: Int
-    public let deletedChewedFiles: [String]
+struct KbiteDigestResponse: Codable, Hashable, Sendable {
+    let kbiteUuid: String
+    let resourceCount: Int
+    let fileCount: Int
+    let keywordCount: Int
+    let deletedChewedFiles: [String]
     /// Where the maw's raw sources went (`{digested}/{code}/`); nil when
     /// nothing was digested or the archive move failed.
-    public let archivedTo: String?
+    let archivedTo: String?
     /// The archive failure, when there was one. The db commit stands
     /// regardless — the maw is simply still on disk.
-    public let archiveError: String?
+    let archiveError: String?
 
-    public init(
+    init(
         kbiteUuid: String,
         resourceCount: Int,
         fileCount: Int,
@@ -1548,10 +1548,10 @@ public struct KbiteDigestResponse: Codable, Hashable, Sendable {
 
 // MARK: - KBITE_GET / KBITE_FILE_GET
 
-public struct KbiteGetRequest: Codable, Hashable, Sendable {
-    public let code: String
+struct KbiteGetRequest: Codable, Hashable, Sendable {
+    let code: String
 
-    public init(code: String) {
+    init(code: String) {
         self.code = code
     }
 }
@@ -1559,30 +1559,30 @@ public struct KbiteGetRequest: Codable, Hashable, Sendable {
 /// One kbite with its resources, file STUBS (names + summaries, never
 /// content), and kbite-level keywords. Content loads go through
 /// KBITE_FILE_GET one file at a time.
-public struct KbiteGetResponse: Codable, Hashable, Sendable {
-    public let kbite: KbiteRow
-    public let resources: [KbiteResourceRow]
-    public let keywords: [String]
+struct KbiteGetResponse: Codable, Hashable, Sendable {
+    let kbite: KbiteRow
+    let resources: [KbiteResourceRow]
+    let keywords: [String]
 
-    public init(kbite: KbiteRow, resources: [KbiteResourceRow], keywords: [String]) {
+    init(kbite: KbiteRow, resources: [KbiteResourceRow], keywords: [String]) {
         self.kbite = kbite
         self.resources = resources
         self.keywords = keywords
     }
 }
 
-public struct KbiteFileGetRequest: Codable, Hashable, Sendable {
-    public let fileUuid: String
+struct KbiteFileGetRequest: Codable, Hashable, Sendable {
+    let fileUuid: String
 
-    public init(fileUuid: String) {
+    init(fileUuid: String) {
         self.fileUuid = fileUuid
     }
 }
 
-public struct KbiteFileGetResponse: Codable, Hashable, Sendable {
-    public let file: KbiteResourceFileRow
+struct KbiteFileGetResponse: Codable, Hashable, Sendable {
+    let file: KbiteResourceFileRow
 
-    public init(file: KbiteResourceFileRow) {
+    init(file: KbiteResourceFileRow) {
         self.file = file
     }
 }
@@ -1591,22 +1591,22 @@ public struct KbiteFileGetResponse: Codable, Hashable, Sendable {
 
 /// FTS5 full-text query across kbite resource files; ranked stubs, never
 /// content. Empty/nil kbite_uuids searches everything.
-public struct KbiteSearchRequest: Codable, Hashable, Sendable {
-    public let query: String
-    public let kbiteUuids: [String]?
-    public let limit: Int?
+struct KbiteSearchRequest: Codable, Hashable, Sendable {
+    let query: String
+    let kbiteUuids: [String]?
+    let limit: Int?
 
-    public init(query: String, kbiteUuids: [String]? = nil, limit: Int? = nil) {
+    init(query: String, kbiteUuids: [String]? = nil, limit: Int? = nil) {
         self.query = query
         self.kbiteUuids = kbiteUuids
         self.limit = limit
     }
 }
 
-public struct KbiteSearchResponse: Codable, Hashable, Sendable {
-    public let hits: [KbiteSearchHit]
+struct KbiteSearchResponse: Codable, Hashable, Sendable {
+    let hits: [KbiteSearchHit]
 
-    public init(hits: [KbiteSearchHit]) {
+    init(hits: [KbiteSearchHit]) {
         self.hits = hits
     }
 }
@@ -1616,7 +1616,7 @@ public struct KbiteSearchResponse: Codable, Hashable, Sendable {
 /// The searchable row kinds. Raw values match the source table names.
 /// (v9 added the five exploration/review kinds — discharging m0003's
 /// explore.md/review.md deferral note.)
-public enum SearchKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum SearchKind: String, Codable, Hashable, CaseIterable, Sendable {
     case prompt
     /// m0025: the clarification split's searchable rows. clarification /
     /// clarification_summary / exploration_key_file are RETIRED with their
@@ -1638,15 +1638,15 @@ public enum SearchKind: String, Codable, Hashable, CaseIterable, Sendable {
 /// counterpart of KBITE_SEARCH). nil sessionUuid = whole db; a
 /// supplied-but-unknown uuid is NOT_FOUND, never a silent empty list.
 /// A query with no searchable tokens is BAD_REQUEST.
-public struct SearchRequest: Codable, Hashable, Sendable {
-    public let query: String
-    public let sessionUuid: String?
+struct SearchRequest: Codable, Hashable, Sendable {
+    let query: String
+    let sessionUuid: String?
     /// nil/empty = every kind.
-    public let kinds: [SearchKind]?
+    let kinds: [SearchKind]?
     /// Clamped 1…500, default 50.
-    public let limit: Int?
+    let limit: Int?
 
-    public init(query: String, sessionUuid: String? = nil, kinds: [SearchKind]? = nil, limit: Int? = nil) {
+    init(query: String, sessionUuid: String? = nil, kinds: [SearchKind]? = nil, limit: Int? = nil) {
         self.query = query
         self.sessionUuid = sessionUuid
         self.kinds = kinds
@@ -1654,10 +1654,10 @@ public struct SearchRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct SearchResponse: Codable, Hashable, Sendable {
-    public let hits: [SearchHit]
+struct SearchResponse: Codable, Hashable, Sendable {
+    let hits: [SearchHit]
 
-    public init(hits: [SearchHit]) {
+    init(hits: [SearchHit]) {
         self.hits = hits
     }
 }
@@ -1667,16 +1667,16 @@ public struct SearchResponse: Codable, Hashable, Sendable {
 /// Tokenized OR name/code search across instances + sessions, optionally
 /// scoped to one project. Returns matched sessions plus every parent
 /// instance needed to group them; the client orders by created/updated.
-public struct CatalogSearchRequest: Codable, Hashable, Sendable {
-    public let query: String
-    public let projectUuid: String?
-    public let limit: Int?
+struct CatalogSearchRequest: Codable, Hashable, Sendable {
+    let query: String
+    let projectUuid: String?
+    let limit: Int?
     /// ADDITIVE OPTIONAL: byte mode (see `CdePager`); sessions are the paged
     /// region and instances are recomputed as the parents of the page.
-    public let pageBytes: Int?
-    public let pageCursor: String?
+    let pageBytes: Int?
+    let pageCursor: String?
 
-    public init(
+    init(
         query: String,
         projectUuid: String? = nil,
         limit: Int? = nil,
@@ -1691,13 +1691,13 @@ public struct CatalogSearchRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct CatalogSearchResponse: Codable, Hashable, Sendable {
-    public let instances: [InstanceRow]
-    public let sessions: [SessionStub]
+struct CatalogSearchResponse: Codable, Hashable, Sendable {
+    let instances: [InstanceRow]
+    let sessions: [SessionStub]
     /// ADDITIVE OPTIONAL, byte mode only.
-    public let page: CdePage?
+    let page: CdePage?
 
-    public init(instances: [InstanceRow], sessions: [SessionStub], page: CdePage? = nil) {
+    init(instances: [InstanceRow], sessions: [SessionStub], page: CdePage? = nil) {
         self.instances = instances
         self.sessions = sessions
         self.page = page
@@ -1708,13 +1708,13 @@ public struct CatalogSearchResponse: Codable, Hashable, Sendable {
 
 /// Attach or detach normalized keywords at kbite level or resource-file
 /// level. Keywords are upserted into the shared vocabulary on attach.
-public struct KbiteKeywordTagRequest: Codable, Hashable, Sendable {
-    public let level: KeywordTagLevel
-    public let targetUuid: String
-    public let keywords: [String]
-    public let detach: Bool
+struct KbiteKeywordTagRequest: Codable, Hashable, Sendable {
+    let level: KeywordTagLevel
+    let targetUuid: String
+    let keywords: [String]
+    let detach: Bool
 
-    public init(level: KeywordTagLevel, targetUuid: String, keywords: [String], detach: Bool = false) {
+    init(level: KeywordTagLevel, targetUuid: String, keywords: [String], detach: Bool = false) {
         self.level = level
         self.targetUuid = targetUuid
         self.keywords = keywords
@@ -1722,11 +1722,11 @@ public struct KbiteKeywordTagRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct KbiteKeywordTagResponse: Codable, Hashable, Sendable {
-    public let attached: Int
-    public let detached: Int
+struct KbiteKeywordTagResponse: Codable, Hashable, Sendable {
+    let attached: Int
+    let detached: Int
 
-    public init(attached: Int, detached: Int) {
+    init(attached: Int, detached: Int) {
         self.attached = attached
         self.detached = detached
     }
@@ -1743,28 +1743,28 @@ public struct KbiteKeywordTagResponse: Codable, Hashable, Sendable {
 /// Daemon writes the scrubbed db_export.json at `dbExportPath`. `anonymize`
 /// carries the CLI-resolved machine roots as prefix→placeholder rules — the
 /// daemon never learns gmcc env vars exist.
-public struct KbiteExportRequest: Codable, Hashable, Sendable {
-    public let code: String
-    public let dbExportPath: String
-    public let anonymize: [KbitePrefixRule]
+struct KbiteExportRequest: Codable, Hashable, Sendable {
+    let code: String
+    let dbExportPath: String
+    let anonymize: [KbitePrefixRule]
 
-    public init(code: String, dbExportPath: String, anonymize: [KbitePrefixRule]) {
+    init(code: String, dbExportPath: String, anonymize: [KbitePrefixRule]) {
         self.code = code
         self.dbExportPath = dbExportPath
         self.anonymize = anonymize
     }
 }
 
-public struct KbiteExportResponse: Codable, Hashable, Sendable {
-    public let kbiteUuid: String
-    public let code: String
-    public let resourceCount: Int
-    public let fileCount: Int
-    public let kbiteKeywordCount: Int
-    public let fileKeywordCount: Int
-    public let dbExportPath: String
+struct KbiteExportResponse: Codable, Hashable, Sendable {
+    let kbiteUuid: String
+    let code: String
+    let resourceCount: Int
+    let fileCount: Int
+    let kbiteKeywordCount: Int
+    let fileKeywordCount: Int
+    let dbExportPath: String
 
-    public init(
+    init(
         kbiteUuid: String,
         code: String,
         resourceCount: Int,
@@ -1787,7 +1787,7 @@ public struct KbiteExportResponse: Codable, Hashable, Sendable {
 /// `skip` (the CLI default) leaves the existing kbite untouched; `overwrite`
 /// replaces content under the EXISTING kbite uuid so every `*_active_kbite`
 /// registration survives.
-public enum KbiteImportCollision: String, Codable, Hashable, CaseIterable, Sendable {
+enum KbiteImportCollision: String, Codable, Hashable, CaseIterable, Sendable {
     case skip
     case overwrite
 }
@@ -1795,31 +1795,31 @@ public enum KbiteImportCollision: String, Codable, Hashable, CaseIterable, Senda
 /// Daemon reads db_export.json at `dbExportPath`, rehydrates placeholder
 /// paths via `rehydrate`, and writes rows in one transaction. Never creates
 /// registration rows — `gm kbite add` stays the only registration door.
-public struct KbiteImportRequest: Codable, Hashable, Sendable {
-    public let dbExportPath: String
-    public let onCollision: KbiteImportCollision
-    public let rehydrate: [KbitePrefixRule]
+struct KbiteImportRequest: Codable, Hashable, Sendable {
+    let dbExportPath: String
+    let onCollision: KbiteImportCollision
+    let rehydrate: [KbitePrefixRule]
 
-    public init(dbExportPath: String, onCollision: KbiteImportCollision, rehydrate: [KbitePrefixRule]) {
+    init(dbExportPath: String, onCollision: KbiteImportCollision, rehydrate: [KbitePrefixRule]) {
         self.dbExportPath = dbExportPath
         self.onCollision = onCollision
         self.rehydrate = rehydrate
     }
 }
 
-public struct KbiteImportResponse: Codable, Hashable, Sendable {
+struct KbiteImportResponse: Codable, Hashable, Sendable {
     /// Never nil — the skip branch reports the existing kbite's uuid, the
     /// import branch the ensured one. Kept non-optional from birth:
     /// loosening a v22 field later is free, tightening never is.
-    public let kbiteUuid: String
-    public let code: String
-    public let imported: Bool
-    public let skippedExisting: Bool
-    public let resourceCount: Int
-    public let fileCount: Int
-    public let keywordCount: Int
+    let kbiteUuid: String
+    let code: String
+    let imported: Bool
+    let skippedExisting: Bool
+    let resourceCount: Int
+    let fileCount: Int
+    let keywordCount: Int
 
-    public init(
+    init(
         kbiteUuid: String,
         code: String,
         imported: Bool,
@@ -1842,23 +1842,23 @@ public struct KbiteImportResponse: Codable, Hashable, Sendable {
 /// registration go with the kbite row (that unregistration is the desired
 /// behavior here, unlike overwrite). Orphaned shared-vocabulary keywords are
 /// garbage-collected in the same transaction. daemon_event history survives.
-public struct KbiteDeleteRequest: Codable, Hashable, Sendable {
-    public let code: String
+struct KbiteDeleteRequest: Codable, Hashable, Sendable {
+    let code: String
 
-    public init(code: String) {
+    init(code: String) {
         self.code = code
     }
 }
 
-public struct KbiteDeleteResponse: Codable, Hashable, Sendable {
-    public let kbiteUuid: String
-    public let code: String
-    public let deletedResources: Int
-    public let deletedFiles: Int
-    public let deletedRegistrations: Int
-    public let gcKeywordCount: Int
+struct KbiteDeleteResponse: Codable, Hashable, Sendable {
+    let kbiteUuid: String
+    let code: String
+    let deletedResources: Int
+    let deletedFiles: Int
+    let deletedRegistrations: Int
+    let gcKeywordCount: Int
 
-    public init(
+    init(
         kbiteUuid: String,
         code: String,
         deletedResources: Int,
@@ -1877,17 +1877,17 @@ public struct KbiteDeleteResponse: Codable, Hashable, Sendable {
 
 // MARK: - EVENT_LIST
 
-public struct EventListRequest: Codable, Hashable, Sendable {
+struct EventListRequest: Codable, Hashable, Sendable {
     /// Raw kind string (forward compat — filters on the TEXT column).
-    public let kind: String?
-    public let subjectUuid: String?
-    public let sinceId: Int64?
+    let kind: String?
+    let subjectUuid: String?
+    let sinceId: Int64?
     /// ISO-8601 seconds-precision Z bounds; lexicographic comparison.
-    public let sinceTime: String?
-    public let untilTime: String?
-    public let limit: Int?
+    let sinceTime: String?
+    let untilTime: String?
+    let limit: Int?
 
-    public init(
+    init(
         kind: String? = nil,
         subjectUuid: String? = nil,
         sinceId: Int64? = nil,
@@ -1904,20 +1904,20 @@ public struct EventListRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct EventListResponse: Codable, Hashable, Sendable {
-    public let events: [EventNotification]
+struct EventListResponse: Codable, Hashable, Sendable {
+    let events: [EventNotification]
 
-    public init(events: [EventNotification]) {
+    init(events: [EventNotification]) {
         self.events = events
     }
 }
 
 // MARK: - CLARIFY_* (v7)
 
-public struct ClarifyOpenRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct ClarifyOpenRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
 
-    public init(promptUuid: String) {
+    init(promptUuid: String) {
         self.promptUuid = promptUuid
     }
 }
@@ -1925,11 +1925,11 @@ public struct ClarifyOpenRequest: Codable, Hashable, Sendable {
 /// Shared response for clarify verbs that return the summary row. `created`
 /// is true only when OPEN made the row (open is idempotent create-or-return
 /// and never transitions the prompt).
-public struct ClarifySummaryResponse: Codable, Hashable, Sendable {
-    public let summary: ClarificationSummaryRow
-    public let created: Bool
+struct ClarifySummaryResponse: Codable, Hashable, Sendable {
+    let summary: ClarificationSummaryRow
+    let created: Bool
 
-    public init(summary: ClarificationSummaryRow, created: Bool = false) {
+    init(summary: ClarificationSummaryRow, created: Bool = false) {
         self.summary = summary
         self.created = created
     }
@@ -1938,14 +1938,14 @@ public struct ClarifySummaryResponse: Codable, Hashable, Sendable {
 /// Insert a user-facing question while the summary is `building` (m0025).
 /// `options` become option child rows in order; the user answers by
 /// selection (junction rows) and/or typed text.
-public struct ClarifyQuestionAddRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let question: String
-    public let options: [String]?
-    public let agentName: String?
-    public let agentId: String?
+struct ClarifyQuestionAddRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let question: String
+    let options: [String]?
+    let agentName: String?
+    let agentId: String?
 
-    public init(
+    init(
         summaryUuid: String,
         question: String,
         options: [String]? = nil,
@@ -1960,10 +1960,10 @@ public struct ClarifyQuestionAddRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ClarifyQuestionRowResponse: Codable, Hashable, Sendable {
-    public let question: ClarificationQuestionRow
+struct ClarifyQuestionRowResponse: Codable, Hashable, Sendable {
+    let question: ClarificationQuestionRow
 
-    public init(question: ClarificationQuestionRow) {
+    init(question: ClarificationQuestionRow) {
         self.question = question
     }
 }
@@ -1972,17 +1972,17 @@ public struct ClarifyQuestionRowResponse: Codable, Hashable, Sendable {
 /// what confused exploration or itself. weight uses the finding_rating
 /// polarity (0 = critical). questionUuid attaches the note to an answered
 /// user question after the fact.
-public struct ClarifyNoteAddRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let body: String
-    public let confusedEntityUuid: String?
-    public let confusedEntityType: String?
-    public let weight: Int?
-    public let questionUuid: String?
-    public let agentName: String?
-    public let agentId: String?
+struct ClarifyNoteAddRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let body: String
+    let confusedEntityUuid: String?
+    let confusedEntityType: String?
+    let weight: Int?
+    let questionUuid: String?
+    let agentName: String?
+    let agentId: String?
 
-    public init(
+    init(
         summaryUuid: String,
         body: String,
         confusedEntityUuid: String? = nil,
@@ -2003,20 +2003,20 @@ public struct ClarifyNoteAddRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ClarifyNoteRowResponse: Codable, Hashable, Sendable {
-    public let note: ClarificationNoteRow
+struct ClarifyNoteRowResponse: Codable, Hashable, Sendable {
+    let note: ClarificationNoteRow
 
-    public init(note: ClarificationNoteRow) {
+    init(note: ClarificationNoteRow) {
         self.note = note
     }
 }
 
 /// building → answering: locks the question list.
-public struct ClarifySealRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
+struct ClarifySealRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
 
-    public init(summaryUuid: String, expectedVersion: Int64) {
+    init(summaryUuid: String, expectedVersion: Int64) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
     }
@@ -2028,14 +2028,14 @@ public struct ClarifySealRequest: Codable, Hashable, Sendable {
 /// skipped instead of answered. selectedOptionUuids replace the question's
 /// junction rows wholesale; answerText carries a typed answer — either or
 /// both satisfy "answered".
-public struct ClarifyAnswerRequest: Codable, Hashable, Sendable {
-    public let questionUuid: String
-    public let expectedVersion: Int64
-    public let answerText: String?
-    public let selectedOptionUuids: [String]?
-    public let skip: Bool
+struct ClarifyAnswerRequest: Codable, Hashable, Sendable {
+    let questionUuid: String
+    let expectedVersion: Int64
+    let answerText: String?
+    let selectedOptionUuids: [String]?
+    let skip: Bool
 
-    public init(
+    init(
         questionUuid: String,
         expectedVersion: Int64,
         answerText: String? = nil,
@@ -2052,11 +2052,11 @@ public struct ClarifyAnswerRequest: Codable, Hashable, Sendable {
 
 /// complete → answering: the revision edge, as its own verb so `answer` stays
 /// a pure row update (its expected_version targets a child row, not the summary).
-public struct ClarifyReopenRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
+struct ClarifyReopenRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
 
-    public init(summaryUuid: String, expectedVersion: Int64) {
+    init(summaryUuid: String, expectedVersion: Int64) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
     }
@@ -2067,20 +2067,20 @@ public struct ClarifyReopenRequest: Codable, Hashable, Sendable {
 /// non-empty intent), and writes NOTHING to the prompt row — the old
 /// refined_goal→prompt.goal copy is retired; ZERO bot write doors to prompt
 /// content remain (backstory/goal/detail are human input only).
-public struct ClarifyFinalizeRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
+struct ClarifyFinalizeRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
 
-    public init(summaryUuid: String, expectedVersion: Int64) {
+    init(summaryUuid: String, expectedVersion: Int64) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
     }
 }
 
-public struct ClarifyFinalizeResponse: Codable, Hashable, Sendable {
-    public let summary: ClarificationSummaryRow
+struct ClarifyFinalizeResponse: Codable, Hashable, Sendable {
+    let summary: ClarificationSummaryRow
 
-    public init(summary: ClarificationSummaryRow) {
+    init(summary: ClarificationSummaryRow) {
         self.summary = summary
     }
 }
@@ -2092,42 +2092,42 @@ public struct ClarifyFinalizeResponse: Codable, Hashable, Sendable {
 /// exploration COPIES) and the note bodies — and each has its own switch.
 /// Questions are NOT windowed: a question plus its pre-authored options is
 /// bounded by what a human can answer, and the count is small by design.
-public struct ClarifyGetRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct ClarifyGetRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
     /// nil/true = the package rides along (the historical response). false
     /// replaces it with `carePackageStub`, because the whole package is
     /// separately readable through CARE_PACKAGE_GET and duplicating it here
     /// is the single largest avoidable weight in this response.
-    public let includeCarePackage: Bool?
+    let includeCarePackage: Bool?
     /// Weight window over the notes, mirroring the rating windows: a note at
     /// or below this weight stays a full row, the rest drop to `noteStubs`.
     /// Notes with NO weight are ALWAYS full — the same "unranked is the work
     /// queue" rule EXPLORE_GET applies to unranked findings. nil = every note
     /// full.
-    public let noteWeightMax: Int?
+    let noteWeightMax: Int?
 
-    public init(promptUuid: String, includeCarePackage: Bool? = nil, noteWeightMax: Int? = nil) {
+    init(promptUuid: String, includeCarePackage: Bool? = nil, noteWeightMax: Int? = nil) {
         self.promptUuid = promptUuid
         self.includeCarePackage = includeCarePackage
         self.noteWeightMax = noteWeightMax
     }
 
-    public var isNarrowed: Bool { includeCarePackage != nil || noteWeightMax != nil }
+    var isNarrowed: Bool { includeCarePackage != nil || noteWeightMax != nil }
 }
 
 /// A note carrying a leading excerpt of its body plus the body's true length.
 /// A note has no title, so a body-less stub would be unreadable: the excerpt is
 /// what makes "is this one worth widening for" answerable.
-public struct ClarificationNoteStub: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let weight: Int?
-    public let agentName: String?
-    public let questionUuid: String?
-    public let bodyExcerpt: String
-    public let bodyChars: Int
-    public let bodyTruncated: Bool
+struct ClarificationNoteStub: Codable, Hashable, Sendable {
+    let uuid: String
+    let weight: Int?
+    let agentName: String?
+    let questionUuid: String?
+    let bodyExcerpt: String
+    let bodyChars: Int
+    let bodyTruncated: Bool
 
-    public init(
+    init(
         uuid: String,
         weight: Int?,
         agentName: String?,
@@ -2151,18 +2151,18 @@ public struct ClarificationNoteStub: Codable, Hashable, Sendable {
 /// `carePackage`'s place when CLARIFY_GET narrowed it away, so nil-package
 /// and narrowed-away-package stay distinguishable (both-nil means the prompt
 /// genuinely has no package).
-public struct CarePackageStub: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let version: Int64
-    public let status: String
-    public let clarifiedIntentChars: Int
-    public let dopeRefCount: Int
-    public let kbiteRefCount: Int
-    public let explorationRefCount: Int
-    public let dopeScopeUuid: String?
-    public let dopeScopeRevision: Int64?
+struct CarePackageStub: Codable, Hashable, Sendable {
+    let uuid: String
+    let version: Int64
+    let status: String
+    let clarifiedIntentChars: Int
+    let dopeRefCount: Int
+    let kbiteRefCount: Int
+    let explorationRefCount: Int
+    let dopeScopeUuid: String?
+    let dopeScopeRevision: Int64?
 
-    public init(
+    init(
         uuid: String,
         version: Int64,
         status: String,
@@ -2184,7 +2184,7 @@ public struct CarePackageStub: Codable, Hashable, Sendable {
         self.dopeScopeRevision = dopeScopeRevision
     }
 
-    public init(package: CarePackageRow) {
+    init(package: CarePackageRow) {
         self.init(
             uuid: package.uuid,
             version: package.version,
@@ -2202,13 +2202,13 @@ public struct CarePackageStub: Codable, Hashable, Sendable {
 /// The care package's read-time dope drift report — the same shape
 /// BriefingStaleness carries, computed by the same
 /// `DopeRepository.scopeStaleness`. Computed at read, never stored.
-public struct CarePackageStaleness: Codable, Hashable, Sendable {
-    public let stampedRevision: Int64?
-    public let currentRevision: Int64?
-    public let drifted: Bool
-    public let ghostDotPaths: [String]
+struct CarePackageStaleness: Codable, Hashable, Sendable {
+    let stampedRevision: Int64?
+    let currentRevision: Int64?
+    let drifted: Bool
+    let ghostDotPaths: [String]
 
-    public init(
+    init(
         stampedRevision: Int64?,
         currentRevision: Int64?,
         drifted: Bool,
@@ -2224,7 +2224,7 @@ public struct CarePackageStaleness: Codable, Hashable, Sendable {
 /// Shape shared by BriefingStaleness and CarePackageStaleness so clients render
 /// ONE badge. An additive protocol on existing Codable types — the JSON is
 /// byte-identical, so this is NOT a wire change.
-public protocol DopeScopeStalenessReporting {
+protocol DopeScopeStalenessReporting {
     var stampedRevision: Int64? { get }
     var currentRevision: Int64? { get }
     var drifted: Bool { get }
@@ -2234,25 +2234,25 @@ public protocol DopeScopeStalenessReporting {
 extension BriefingStaleness: DopeScopeStalenessReporting {}
 extension CarePackageStaleness: DopeScopeStalenessReporting {}
 
-public struct ClarifyGetResponse: Codable, Hashable, Sendable {
-    public let summary: ClarificationSummaryRow
-    public let questions: [ClarificationQuestionRow]
-    public let notes: [ClarificationNoteRow]
+struct ClarifyGetResponse: Codable, Hashable, Sendable {
+    let summary: ClarificationSummaryRow
+    let questions: [ClarificationQuestionRow]
+    let notes: [ClarificationNoteRow]
     /// nil until package-open (bot-variant flows never create one).
-    public let carePackage: CarePackageRow?
+    let carePackage: CarePackageRow?
     /// ADDITIVE OPTIONAL (no wire bump — decodes as nil on a stale peer).
     /// INVARIANT: non-nil IFF `carePackage` is non-nil.
-    public let carePackageStaleness: CarePackageStaleness?
+    let carePackageStaleness: CarePackageStaleness?
     /// ADDITIVE OPTIONAL (no wire bump). Non-nil ONLY when
     /// `includeCarePackage: false` narrowed a package that DOES exist —
     /// so `carePackage == nil && carePackageStub == nil` still means, as it
     /// always has, that no package was ever opened.
-    public let carePackageStub: CarePackageStub?
+    let carePackageStub: CarePackageStub?
     /// ADDITIVE OPTIONAL. Non-nil ONLY when a weight window was applied:
     /// the notes outside it, as excerpts.
-    public let noteStubs: [ClarificationNoteStub]?
+    let noteStubs: [ClarificationNoteStub]?
 
-    public init(
+    init(
         summary: ClarificationSummaryRow,
         questions: [ClarificationQuestionRow],
         notes: [ClarificationNoteRow],
@@ -2275,26 +2275,26 @@ public struct ClarifyGetResponse: Codable, Hashable, Sendable {
 
 /// Open (or return) the care package on a clarification summary. Multi-agent
 /// flows only by convention — the schema is variant-agnostic.
-public struct CarePackageOpenRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
+struct CarePackageOpenRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
 
-    public init(summaryUuid: String) {
+    init(summaryUuid: String) {
         self.summaryUuid = summaryUuid
     }
 }
 
-public struct CarePackageResponse: Codable, Hashable, Sendable {
-    public let package: CarePackageRow
-    public let created: Bool
+struct CarePackageResponse: Codable, Hashable, Sendable {
+    let package: CarePackageRow
+    let created: Bool
     /// ADDITIVE OPTIONAL (no wire bump). Non-nil ONLY when CARE_PACKAGE_GET
     /// narrowed the curated exploration COPIES away: `package.explorationRefs`
     /// then holds just the refs whose bodies were asked for, and this holds
     /// the complete roster as excerpts. NARROWING EMPTIES AN ARRAY AND NAMES
     /// WHAT LEFT IT — it never rewrites a row's fields, so no value inside a
     /// CarePackageRow is ever a truncated lie.
-    public let explorationRefStubs: [CarePackageExplorationRefStub]?
+    let explorationRefStubs: [CarePackageExplorationRefStub]?
 
-    public init(
+    init(
         package: CarePackageRow,
         created: Bool = false,
         explorationRefStubs: [CarePackageExplorationRefStub]? = nil
@@ -2306,17 +2306,17 @@ public struct CarePackageResponse: Codable, Hashable, Sendable {
 }
 
 /// A curated exploration COPY carrying a leading excerpt of its body.
-public struct CarePackageExplorationRefStub: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let curatedTitle: String
-    public let filePath: String?
-    public let sourceFindingUuid: String?
-    public let seq: Int
-    public let curatedBodyExcerpt: String
-    public let curatedBodyChars: Int
-    public let curatedBodyTruncated: Bool
+struct CarePackageExplorationRefStub: Codable, Hashable, Sendable {
+    let uuid: String
+    let curatedTitle: String
+    let filePath: String?
+    let sourceFindingUuid: String?
+    let seq: Int
+    let curatedBodyExcerpt: String
+    let curatedBodyChars: Int
+    let curatedBodyTruncated: Bool
 
-    public init(
+    init(
         uuid: String,
         curatedTitle: String,
         filePath: String?,
@@ -2338,7 +2338,7 @@ public struct CarePackageExplorationRefStub: Codable, Hashable, Sendable {
 }
 
 /// The ref kind vocabulary for CARE_REF_ADD.
-public enum CarePackageRefKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum CarePackageRefKind: String, Codable, Hashable, CaseIterable, Sendable {
     case dope
     case kbite
     case exploration
@@ -2348,18 +2348,18 @@ public enum CarePackageRefKind: String, Codable, Hashable, CaseIterable, Sendabl
 /// the kind: dope → dopeCode (+note); kbite → kbiteFileUuid; exploration →
 /// curatedTitle + curatedBody (+filePath, +sourceFindingUuid) — a COPY,
 /// never a re-exploration.
-public struct CarePackageRefAddRequest: Codable, Hashable, Sendable {
-    public let packageUuid: String
-    public let kind: CarePackageRefKind
-    public let dopeCode: String?
-    public let note: String?
-    public let kbiteFileUuid: String?
-    public let curatedTitle: String?
-    public let curatedBody: String?
-    public let filePath: String?
-    public let sourceFindingUuid: String?
+struct CarePackageRefAddRequest: Codable, Hashable, Sendable {
+    let packageUuid: String
+    let kind: CarePackageRefKind
+    let dopeCode: String?
+    let note: String?
+    let kbiteFileUuid: String?
+    let curatedTitle: String?
+    let curatedBody: String?
+    let filePath: String?
+    let sourceFindingUuid: String?
 
-    public init(
+    init(
         packageUuid: String,
         kind: CarePackageRefKind,
         dopeCode: String? = nil,
@@ -2385,12 +2385,12 @@ public struct CarePackageRefAddRequest: Codable, Hashable, Sendable {
 /// building → ready. `clarifiedIntent` is carried ONLY here (its one write
 /// path — the overview-at-complete idiom). The daemon stamps the dope scope
 /// revision itself, exactly like briefing complete.
-public struct CarePackageCompleteRequest: Codable, Hashable, Sendable {
-    public let packageUuid: String
-    public let expectedVersion: Int64
-    public let clarifiedIntent: String
+struct CarePackageCompleteRequest: Codable, Hashable, Sendable {
+    let packageUuid: String
+    let expectedVersion: Int64
+    let clarifiedIntent: String
 
-    public init(packageUuid: String, expectedVersion: Int64, clarifiedIntent: String) {
+    init(packageUuid: String, expectedVersion: Int64, clarifiedIntent: String) {
         self.packageUuid = packageUuid
         self.expectedVersion = expectedVersion
         self.clarifiedIntent = clarifiedIntent
@@ -2405,38 +2405,38 @@ public struct CarePackageCompleteRequest: Codable, Hashable, Sendable {
 /// package; a package whose intent had to be fetched in a second round trip
 /// would just be read twice. The curated exploration COPIES are the part that
 /// scales with agent count, so they are the part with a switch.
-public struct CarePackageGetRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct CarePackageGetRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
     /// nil/true = curated exploration bodies inline (the historical
     /// response). false moves the roster to `explorationRefStubs`.
-    public let includeRefBodies: Bool?
+    let includeRefBodies: Bool?
     /// Return exactly this exploration ref's curated body in full.
-    public let refUuid: String?
+    let refUuid: String?
 
-    public init(promptUuid: String, includeRefBodies: Bool? = nil, refUuid: String? = nil) {
+    init(promptUuid: String, includeRefBodies: Bool? = nil, refUuid: String? = nil) {
         self.promptUuid = promptUuid
         self.includeRefBodies = includeRefBodies
         self.refUuid = refUuid
     }
 
-    public var isNarrowed: Bool { includeRefBodies != nil || refUuid != nil }
+    var isNarrowed: Bool { includeRefBodies != nil || refUuid != nil }
 }
 
 // MARK: - ARCH_* (v7)
 
-public struct ArchOpenRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct ArchOpenRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
 
-    public init(promptUuid: String) {
+    init(promptUuid: String) {
         self.promptUuid = promptUuid
     }
 }
 
-public struct ArchSummaryResponse: Codable, Hashable, Sendable {
-    public let summary: ArchitectureSummaryRow
-    public let created: Bool
+struct ArchSummaryResponse: Codable, Hashable, Sendable {
+    let summary: ArchitectureSummaryRow
+    let created: Bool
 
-    public init(summary: ArchitectureSummaryRow, created: Bool = false) {
+    init(summary: ArchitectureSummaryRow, created: Bool = false) {
         self.summary = summary
         self.created = created
     }
@@ -2444,29 +2444,29 @@ public struct ArchSummaryResponse: Codable, Hashable, Sendable {
 
 /// Set the concept-level body (approach, components, data flow, tradeoffs —
 /// never specific file changes; those are the normalized change rows).
-public struct ArchSummarizeRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
-    public let body: String
+struct ArchSummarizeRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
+    let body: String
 
-    public init(summaryUuid: String, expectedVersion: Int64, body: String) {
+    init(summaryUuid: String, expectedVersion: Int64, body: String) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
         self.body = body
     }
 }
 
-public struct ArchPersistAddRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let className: String
-    public let filePath: String
-    public let reasonBrief: String
+struct ArchPersistAddRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let className: String
+    let filePath: String
+    let reasonBrief: String
     /// m0025: add|modify|rename|delete (defaults to modify at write).
-    public let changeKind: String?
+    let changeKind: String?
     /// m0025: domain.entity dot-path CODE, ghost-legal.
-    public let dopeRef: String?
+    let dopeRef: String?
 
-    public init(
+    init(
         summaryUuid: String,
         className: String,
         filePath: String,
@@ -2483,32 +2483,32 @@ public struct ArchPersistAddRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ArchPersistAddResponse: Codable, Hashable, Sendable {
-    public let change: ArchPersistenceChangeRow
+struct ArchPersistAddResponse: Codable, Hashable, Sendable {
+    let change: ArchPersistenceChangeRow
 
-    public init(change: ArchPersistenceChangeRow) {
+    init(change: ArchPersistenceChangeRow) {
         self.change = change
     }
 }
 
-public struct ArchFieldAddRequest: Codable, Hashable, Sendable {
-    public let persistenceChangeUuid: String
-    public let fieldName: String
-    public let dataType: String
-    public let changeReason: String
-    public let changePurpose: String
-    public let nullable: Bool
-    public let isForeignKey: Bool
-    public let fkTarget: String?
-    public let isIndexed: Bool
+struct ArchFieldAddRequest: Codable, Hashable, Sendable {
+    let persistenceChangeUuid: String
+    let fieldName: String
+    let dataType: String
+    let changeReason: String
+    let changePurpose: String
+    let nullable: Bool
+    let isForeignKey: Bool
+    let fkTarget: String?
+    let isIndexed: Bool
     /// m0025: add|modify|rename|delete (defaults to add at write).
-    public let changeKind: String?
+    let changeKind: String?
     /// m0025: old field name when changeKind == rename.
-    public let renamedFrom: String?
+    let renamedFrom: String?
     /// m0025: domain.entity.property dot-path CODE, ghost-legal.
-    public let dopePropertyRef: String?
+    let dopePropertyRef: String?
 
-    public init(
+    init(
         persistenceChangeUuid: String,
         fieldName: String,
         dataType: String,
@@ -2537,23 +2537,23 @@ public struct ArchFieldAddRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ArchFieldAddResponse: Codable, Hashable, Sendable {
-    public let field: ArchPersistenceFieldChangeRow
+struct ArchFieldAddResponse: Codable, Hashable, Sendable {
+    let field: ArchPersistenceFieldChangeRow
 
-    public init(field: ArchPersistenceFieldChangeRow) {
+    init(field: ArchPersistenceFieldChangeRow) {
         self.field = field
     }
 }
 
-public struct ArchGeneralAddRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let filePath: String
-    public let className: String?
-    public let reasonBrief: String
-    public let changeDepth: ChangeDepth
-    public let changeCode: String
+struct ArchGeneralAddRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let filePath: String
+    let className: String?
+    let reasonBrief: String
+    let changeDepth: ChangeDepth
+    let changeCode: String
 
-    public init(
+    init(
         summaryUuid: String,
         filePath: String,
         className: String? = nil,
@@ -2570,42 +2570,42 @@ public struct ArchGeneralAddRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ArchGeneralAddResponse: Codable, Hashable, Sendable {
-    public let change: ArchGeneralChangeRow
+struct ArchGeneralAddResponse: Codable, Hashable, Sendable {
+    let change: ArchGeneralChangeRow
 
-    public init(change: ArchGeneralChangeRow) {
+    init(change: ArchGeneralChangeRow) {
         self.change = change
     }
 }
 
 /// drafting → proposed (seals change rows for review).
-public struct ArchProposeRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
+struct ArchProposeRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
 
-    public init(summaryUuid: String, expectedVersion: Int64) {
+    init(summaryUuid: String, expectedVersion: Int64) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
     }
 }
 
 /// proposed → approved (terminal; unlocks architecting → implementing).
-public struct ArchApproveRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
+struct ArchApproveRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
 
-    public init(summaryUuid: String, expectedVersion: Int64) {
+    init(summaryUuid: String, expectedVersion: Int64) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
     }
 }
 
 /// proposed → drafting (the revision edge).
-public struct ArchReviseRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
+struct ArchReviseRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
 
-    public init(summaryUuid: String, expectedVersion: Int64) {
+    init(summaryUuid: String, expectedVersion: Int64) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
     }
@@ -2619,31 +2619,31 @@ public struct ArchReviseRequest: Codable, Hashable, Sendable {
 /// NARROWING IS APPLIED BY THE PEN, NOT THE DAEMON. persistenceChanges are
 /// NEVER narrowed and NEVER paged, because sorted-key JSON puts "options" ahead
 /// of them and a clip mid-array eats the persistence set silently.
-public struct ArchGetRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct ArchGetRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
     /// nil/true = option BODIES inline (the historical response). false drops
     /// the bodies to `optionStubs` — the option ROSTER never disappears, so
     /// narrowing can hide content but never existence. nil with an
     /// `optionUuid` set means "only that one body".
-    public let includeOptions: Bool?
+    let includeOptions: Bool?
     /// Return exactly this option's body in full. In team flows the options
     /// are four architect essays and this is how you read one.
-    public let optionUuid: String?
+    let optionUuid: String?
     /// nil/true = general change_code verbatim (the store caps it at 2 MB
     /// EACH, which is the other half of the weight). false drops every
     /// general row to `generalChangeStubs` — leading excerpt + true length.
     /// nil with a `changeUuid` set means "only that one body".
-    public let full: Bool?
+    let full: Bool?
     /// Return exactly this general change's change_code in full. Pins one
     /// row, so it ignores limit/cursor.
-    public let changeUuid: String?
+    let changeUuid: String?
     /// Page size over the GENERAL change rows (nil = every row).
-    public let limit: Int?
+    let limit: Int?
     /// Opaque continuation token — the `changePage.nextCursor` of the
     /// previous page, never constructed by hand.
-    public let cursor: String?
+    let cursor: String?
 
-    public init(
+    init(
         promptUuid: String,
         includeOptions: Bool? = nil,
         optionUuid: String? = nil,
@@ -2664,7 +2664,7 @@ public struct ArchGetRequest: Codable, Hashable, Sendable {
     /// True when the caller asked for ANY narrowing. Drives the
     /// byte-identical-default guarantee: false ⇒ none of the additive
     /// response keys is emitted.
-    public var isNarrowed: Bool {
+    var isNarrowed: Bool {
         includeOptions != nil || optionUuid != nil || full != nil
             || changeUuid != nil || limit != nil || cursor != nil
     }
@@ -2674,15 +2674,15 @@ public struct ArchGetRequest: Codable, Hashable, Sendable {
 /// needed to decide whether to fetch it, including which one won. The decision
 /// RATIONALE is not duplicated here: it lives on
 /// `ArchitectureSummaryRow.decisionRationale`, which every response carries.
-public struct ArchitectureOptionStub: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let agentName: String
-    public let agentId: String?
-    public let status: String
-    public let selected: Bool
-    public let bodyChars: Int
+struct ArchitectureOptionStub: Codable, Hashable, Sendable {
+    let uuid: String
+    let agentName: String
+    let agentId: String?
+    let status: String
+    let selected: Bool
+    let bodyChars: Int
 
-    public init(
+    init(
         uuid: String,
         agentName: String,
         agentId: String?,
@@ -2702,19 +2702,19 @@ public struct ArchitectureOptionStub: Codable, Hashable, Sendable {
 /// A general change row carrying a leading excerpt of change_code and its true
 /// length. Every other field — path, reason, depth, derived implementation
 /// state — stays verbatim, because those are what an audit reads.
-public struct ArchGeneralChangeStub: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let seq: Int64
-    public let filePath: String
-    public let className: String?
-    public let reasonBrief: String
-    public let changeDepth: String
-    public let changeCodeExcerpt: String
-    public let changeCodeChars: Int
-    public let changeCodeTruncated: Bool
-    public let implementation: ChangeImplementationState
+struct ArchGeneralChangeStub: Codable, Hashable, Sendable {
+    let uuid: String
+    let seq: Int64
+    let filePath: String
+    let className: String?
+    let reasonBrief: String
+    let changeDepth: String
+    let changeCodeExcerpt: String
+    let changeCodeChars: Int
+    let changeCodeTruncated: Bool
+    let implementation: ChangeImplementationState
 
-    public init(
+    init(
         uuid: String,
         seq: Int64,
         filePath: String,
@@ -2741,14 +2741,14 @@ public struct ArchGeneralChangeStub: Codable, Hashable, Sendable {
 
 /// Where the general-change page sits in the whole ordered set. `total` is
 /// the unpaged count, so a caller always knows what it has NOT seen.
-public struct ArchChangePage: Codable, Hashable, Sendable {
-    public let limit: Int?
-    public let returned: Int
-    public let totalGeneralChanges: Int
+struct ArchChangePage: Codable, Hashable, Sendable {
+    let limit: Int?
+    let returned: Int
+    let totalGeneralChanges: Int
     /// nil = this is the last page.
-    public let nextCursor: String?
+    let nextCursor: String?
 
-    public init(limit: Int?, returned: Int, totalGeneralChanges: Int, nextCursor: String?) {
+    init(limit: Int?, returned: Int, totalGeneralChanges: Int, nextCursor: String?) {
         self.limit = limit
         self.returned = returned
         self.totalGeneralChanges = totalGeneralChanges
@@ -2763,26 +2763,26 @@ public struct ArchChangePage: Codable, Hashable, Sendable {
 /// (nil when either side is empty or untouched). Join is path-level on
 /// daemon-normalized repo-relative paths; file changes without a prompt_uuid
 /// are invisible to it — always pass --prompt-uuid when recording.
-public struct ArchGetResponse: Codable, Hashable, Sendable {
-    public let summary: ArchitectureSummaryRow
+struct ArchGetResponse: Codable, Hashable, Sendable {
+    let summary: ArchitectureSummaryRow
     /// m0025: the persisted methodology options (empty outside team flows).
-    public let options: [ArchitectureOptionRow]
-    public let persistenceChanges: [ArchPersistenceChangeRow]
-    public let generalChanges: [ArchGeneralChangeRow]
-    public let unplannedChanges: [UnplannedChangeRow]
-    public let orderingRespected: Bool?
+    let options: [ArchitectureOptionRow]
+    let persistenceChanges: [ArchPersistenceChangeRow]
+    let generalChanges: [ArchGeneralChangeRow]
+    let unplannedChanges: [UnplannedChangeRow]
+    let orderingRespected: Bool?
     /// ADDITIVE OPTIONAL (no wire bump — absent on every unnarrowed read and
     /// on any stale peer). Non-nil ONLY when the request narrowed options:
     /// the complete roster, so a dropped body is never a dropped option.
-    public let optionStubs: [ArchitectureOptionStub]?
+    let optionStubs: [ArchitectureOptionStub]?
     /// ADDITIVE OPTIONAL. Non-nil ONLY when the request narrowed change_code
     /// or paged: the stub form of the general rows in this page.
-    public let generalChangeStubs: [ArchGeneralChangeStub]?
+    let generalChangeStubs: [ArchGeneralChangeStub]?
     /// ADDITIVE OPTIONAL. Non-nil ONLY on a narrowed read — where the page
     /// sits in the whole set.
-    public let changePage: ArchChangePage?
+    let changePage: ArchChangePage?
 
-    public init(
+    init(
         summary: ArchitectureSummaryRow,
         options: [ArchitectureOptionRow] = [],
         persistenceChanges: [ArchPersistenceChangeRow],
@@ -2810,11 +2810,11 @@ public struct ArchGetResponse: Codable, Hashable, Sendable {
 /// One methodology's proposal written by the architect agent ITSELF — the
 /// first architect pen verb. Options are team-only by convention; zero
 /// options = the direct persist/field/general expansion stays legal.
-public struct ArchOptionAddRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let agentName: String
-    public let agentId: String?
-    public let body: String
+struct ArchOptionAddRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let agentName: String
+    let agentId: String?
+    let body: String
     /// REVISION, as the same verb. Set BOTH of these to supersede an existing
     /// option row: the new row is inserted, the superseded row is stamped
     /// `rejected` (kept — the record is append-only history), and a selection
@@ -2822,11 +2822,11 @@ public struct ArchOptionAddRequest: Codable, Hashable, Sendable {
     /// summary's decision rationale. The pair travels together: one without
     /// the other is refused. Additive OPTIONALS, so nil-nil is the original
     /// wire shape byte-for-byte and this does NOT bump GmWireProtocol.version.
-    public let supersedesOptionUuid: String?
+    let supersedesOptionUuid: String?
     /// The superseded row's version — threaded like every mutation.
-    public let expectedVersion: Int64?
+    let expectedVersion: Int64?
 
-    public init(
+    init(
         summaryUuid: String,
         agentName: String,
         agentId: String? = nil,
@@ -2843,10 +2843,10 @@ public struct ArchOptionAddRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ArchOptionRowResponse: Codable, Hashable, Sendable {
-    public let option: ArchitectureOptionRow
+struct ArchOptionRowResponse: Codable, Hashable, Sendable {
+    let option: ArchitectureOptionRow
 
-    public init(option: ArchitectureOptionRow) {
+    init(option: ArchitectureOptionRow) {
         self.option = option
     }
 }
@@ -2855,23 +2855,23 @@ public struct ArchOptionRowResponse: Codable, Hashable, Sendable {
 /// decision rationale on the summary. Only after a decision may the selected
 /// option expand into persistence/field/general change rows — enforced as a
 /// store guard, not a CHECK (the m0016 cross-table rule).
-public struct ArchDecideRequest: Codable, Hashable, Sendable {
-    public let optionUuid: String
-    public let expectedVersion: Int64
-    public let rationale: String
+struct ArchDecideRequest: Codable, Hashable, Sendable {
+    let optionUuid: String
+    let expectedVersion: Int64
+    let rationale: String
 
-    public init(optionUuid: String, expectedVersion: Int64, rationale: String) {
+    init(optionUuid: String, expectedVersion: Int64, rationale: String) {
         self.optionUuid = optionUuid
         self.expectedVersion = expectedVersion
         self.rationale = rationale
     }
 }
 
-public struct ArchDecideResponse: Codable, Hashable, Sendable {
-    public let summary: ArchitectureSummaryRow
-    public let options: [ArchitectureOptionRow]
+struct ArchDecideResponse: Codable, Hashable, Sendable {
+    let summary: ArchitectureSummaryRow
+    let options: [ArchitectureOptionRow]
 
-    public init(summary: ArchitectureSummaryRow, options: [ArchitectureOptionRow]) {
+    init(summary: ArchitectureSummaryRow, options: [ArchitectureOptionRow]) {
         self.summary = summary
         self.options = options
     }
@@ -2882,7 +2882,7 @@ public struct ArchDecideResponse: Codable, Hashable, Sendable {
 /// Workflow variants. `task` is deliberately ABSENT from the machine — its
 /// write-nothing contract means no workflow row; the registry lists it only
 /// so errors can name it.
-public enum BotVariant: String, Codable, Hashable, CaseIterable, Sendable {
+enum BotVariant: String, Codable, Hashable, CaseIterable, Sendable {
     case bot
     case rpi
     case team
@@ -2892,12 +2892,12 @@ public enum BotVariant: String, Codable, Hashable, CaseIterable, Sendable {
 /// for the calling instance. Deliberately NO status change — briefing and
 /// exploration run while the prompt is still draft, exactly as the manual
 /// flow always has; gm prompt set-status stays the only door.
-public struct PromptStartRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
-    public let variant: BotVariant
-    public let clientKey: String?
+struct PromptStartRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
+    let variant: BotVariant
+    let clientKey: String?
 
-    public init(promptUuid: String, variant: BotVariant, clientKey: String? = nil) {
+    init(promptUuid: String, variant: BotVariant, clientKey: String? = nil) {
         self.promptUuid = promptUuid
         self.variant = variant
         self.clientKey = clientKey
@@ -2907,24 +2907,24 @@ public struct PromptStartRequest: Codable, Hashable, Sendable {
 /// Adopt whatever evidence exists: fetch-or-create the workflow row,
 /// re-stamp the client key, change no status. Phase is recomputed at every
 /// NEXT — resume IS the first-run code path.
-public struct PromptResumeRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct PromptResumeRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
     /// Required when resume must CREATE the row (a pre-machine prompt).
-    public let variant: BotVariant?
-    public let clientKey: String?
+    let variant: BotVariant?
+    let clientKey: String?
 
-    public init(promptUuid: String, variant: BotVariant? = nil, clientKey: String? = nil) {
+    init(promptUuid: String, variant: BotVariant? = nil, clientKey: String? = nil) {
         self.promptUuid = promptUuid
         self.variant = variant
         self.clientKey = clientKey
     }
 }
 
-public struct BotWorkflowResponse: Codable, Hashable, Sendable {
-    public let workflow: BotWorkflowRow
-    public let created: Bool
+struct BotWorkflowResponse: Codable, Hashable, Sendable {
+    let workflow: BotWorkflowRow
+    let created: Bool
 
-    public init(workflow: BotWorkflowRow, created: Bool = false) {
+    init(workflow: BotWorkflowRow, created: Bool = false) {
         self.workflow = workflow
         self.created = created
     }
@@ -2932,12 +2932,12 @@ public struct BotWorkflowResponse: Codable, Hashable, Sendable {
 
 /// Zero-uuid form: promptUuid nil resolves through the activation registry
 /// (caller's own claim → session's single claim), exactly like briefing get.
-public struct BotNextRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String?
-    public let clientKey: String?
-    public let sessionUuid: String?
+struct BotNextRequest: Codable, Hashable, Sendable {
+    let promptUuid: String?
+    let clientKey: String?
+    let sessionUuid: String?
 
-    public init(promptUuid: String? = nil, clientKey: String? = nil, sessionUuid: String? = nil) {
+    init(promptUuid: String? = nil, clientKey: String? = nil, sessionUuid: String? = nil) {
         self.promptUuid = promptUuid
         self.clientKey = clientKey
         self.sessionUuid = sessionUuid
@@ -2946,18 +2946,18 @@ public struct BotNextRequest: Codable, Hashable, Sendable {
 
 /// The uuid bundle NEXT serves alongside the instruction text — everything
 /// the phase needs, computed from db state at read (nothing stored).
-public struct BotPhaseUuids: Codable, Hashable, Sendable {
-    public let promptUuid: String
-    public let sessionUuid: String
-    public let briefingUuid: String?
-    public let clarificationSummaryUuid: String?
-    public let carePackageUuid: String?
-    public let architectureSummaryUuid: String?
-    public let reviewSummaryUuid: String?
+struct BotPhaseUuids: Codable, Hashable, Sendable {
+    let promptUuid: String
+    let sessionUuid: String
+    let briefingUuid: String?
+    let clarificationSummaryUuid: String?
+    let carePackageUuid: String?
+    let architectureSummaryUuid: String?
+    let reviewSummaryUuid: String?
     /// (agent_type → summary uuid) for the prompt's exploration rows.
-    public let explorationSummaryUuids: [String: String]
+    let explorationSummaryUuids: [String: String]
 
-    public init(
+    init(
         promptUuid: String,
         sessionUuid: String,
         briefingUuid: String?,
@@ -2978,19 +2978,19 @@ public struct BotPhaseUuids: Codable, Hashable, Sendable {
     }
 }
 
-public struct BotNextResponse: Codable, Hashable, Sendable {
-    public let workflow: BotWorkflowRow
+struct BotNextResponse: Codable, Hashable, Sendable {
+    let workflow: BotWorkflowRow
     /// The furthest phase whose entry gate is satisfied.
-    public let phase: String
+    let phase: String
     /// Compiled-in instruction text for (variant, phase) — the Cheatsheet
     /// precedent; drift-guarded by WorkflowSpecTests.
-    public let instructions: String
+    let instructions: String
     /// What still blocks the NEXT phase (empty when the phase's own work is
     /// simply not done yet).
-    public let gateBlockers: [String]
-    public let uuids: BotPhaseUuids
+    let gateBlockers: [String]
+    let uuids: BotPhaseUuids
 
-    public init(
+    init(
         workflow: BotWorkflowRow,
         phase: String,
         instructions: String,
@@ -3006,12 +3006,12 @@ public struct BotNextResponse: Codable, Hashable, Sendable {
 }
 
 /// The raw workflow row (zero-uuid resolved like NEXT).
-public struct BotGetRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String?
-    public let clientKey: String?
-    public let sessionUuid: String?
+struct BotGetRequest: Codable, Hashable, Sendable {
+    let promptUuid: String?
+    let clientKey: String?
+    let sessionUuid: String?
 
-    public init(promptUuid: String? = nil, clientKey: String? = nil, sessionUuid: String? = nil) {
+    init(promptUuid: String? = nil, clientKey: String? = nil, sessionUuid: String? = nil) {
         self.promptUuid = promptUuid
         self.clientKey = clientKey
         self.sessionUuid = sessionUuid
@@ -3027,17 +3027,17 @@ public struct BotGetRequest: Codable, Hashable, Sendable {
 /// spawn shape carries a role. Fields are MERGED, never overwritten, so neither
 /// writer can erase the other's half, and ORDERING IS NOT A CONSTRAINT: the
 /// join happens at READ time.
-public struct AgentRegisterRequest: Codable, Hashable, Sendable {
+struct AgentRegisterRequest: Codable, Hashable, Sendable {
     /// Opaque and NEVER parsed. Its shape varies by spawn kind, and reading
     /// structure into it would make the registry wrong for whichever shape
     /// ships next.
-    public let agentId: String
-    public let role: String?
-    public let methodology: String?
+    let agentId: String
+    let role: String?
+    let methodology: String?
     /// The phase the spawner spawned this agent FOR — the spawner's claim,
     /// distinct from the workflow phase the daemon derives and stamps onto a
     /// file_change.
-    public let workflowPhase: String?
+    let workflowPhase: String?
     /// The identity half, off the SubagentStart payload.
     ///
     /// `agentType` is a LABEL and never authoritative: it carries the
@@ -3045,11 +3045,11 @@ public struct AgentRegisterRequest: Codable, Hashable, Sendable {
     /// depending on spawn shape. The role that means something arrives on the
     /// authority half. `claudeTurnId` is the naming trap — the payload calls
     /// it `prompt_id` and it is Claude Code's TURN id, not a prompt uuid.
-    public let agentType: String?
-    public let claudeSessionId: String?
-    public let claudeTurnId: String?
+    let agentType: String?
+    let claudeSessionId: String?
+    let claudeTurnId: String?
 
-    public init(
+    init(
         agentId: String,
         role: String? = nil,
         methodology: String? = nil,
@@ -3068,13 +3068,13 @@ public struct AgentRegisterRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct AgentRegisterResponse: Codable, Hashable, Sendable {
-    public let registration: AgentRegistrationRow
+struct AgentRegisterResponse: Codable, Hashable, Sendable {
+    let registration: AgentRegistrationRow
     /// True when this call created the row — i.e. the spawner got there
     /// before the SubagentStart hook, and the identity half is still empty.
-    public let created: Bool
+    let created: Bool
 
-    public init(registration: AgentRegistrationRow, created: Bool) {
+    init(registration: AgentRegistrationRow, created: Bool) {
         self.registration = registration
         self.created = created
     }
@@ -3085,12 +3085,12 @@ public struct AgentRegisterResponse: Codable, Hashable, Sendable {
 /// Open (or return) the summary for (prompt, agentType). agentType defaults
 /// to 'general'; 'synthesis' is the prompt-level seal/synthesis row the
 /// primary completes last.
-public struct ExploreOpenRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
-    public let agentType: String?
-    public let agentId: String?
+struct ExploreOpenRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
+    let agentType: String?
+    let agentId: String?
 
-    public init(promptUuid: String, agentType: String? = nil, agentId: String? = nil) {
+    init(promptUuid: String, agentType: String? = nil, agentId: String? = nil) {
         self.promptUuid = promptUuid
         self.agentType = agentType
         self.agentId = agentId
@@ -3101,11 +3101,11 @@ public struct ExploreOpenRequest: Codable, Hashable, Sendable {
 /// is true only when OPEN made the row (open is idempotent create-or-return;
 /// it is EXPLICIT-only — never wired into prompt status transitions, since
 /// exploration runs while the prompt is still `draft`).
-public struct ExploreSummaryResponse: Codable, Hashable, Sendable {
-    public let summary: ExplorationSummaryRow
-    public let created: Bool
+struct ExploreSummaryResponse: Codable, Hashable, Sendable {
+    let summary: ExplorationSummaryRow
+    let created: Bool
 
-    public init(summary: ExplorationSummaryRow, created: Bool = false) {
+    init(summary: ExplorationSummaryRow, created: Bool = false) {
         self.summary = summary
         self.created = created
     }
@@ -3114,21 +3114,21 @@ public struct ExploreSummaryResponse: Codable, Hashable, Sendable {
 /// Add one key file (summary must be `exploring`). Key files are a shared
 /// deduped set: a duplicate path is an idempotent upsert-ignore returning the
 /// existing row with created=false, never an error.
-public struct ExploreKeyFileAddRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let filePath: String
+struct ExploreKeyFileAddRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let filePath: String
 
-    public init(summaryUuid: String, filePath: String) {
+    init(summaryUuid: String, filePath: String) {
         self.summaryUuid = summaryUuid
         self.filePath = filePath
     }
 }
 
-public struct ExploreKeyFileAddResponse: Codable, Hashable, Sendable {
-    public let keyFile: ExplorationKeyFileRow
-    public let created: Bool
+struct ExploreKeyFileAddResponse: Codable, Hashable, Sendable {
+    let keyFile: ExplorationKeyFileRow
+    let created: Bool
 
-    public init(keyFile: ExplorationKeyFileRow, created: Bool) {
+    init(keyFile: ExplorationKeyFileRow, created: Bool) {
         self.keyFile = keyFile
         self.created = created
     }
@@ -3137,18 +3137,18 @@ public struct ExploreKeyFileAddResponse: Codable, Hashable, Sendable {
 /// Insert a finding while the summary is `exploring`. `rating` is optional at
 /// insert — NULL marks the finding unranked (work-in-progress); COMPLETE
 /// refuses while any finding is unranked.
-public struct ExploreFindingAddRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let kind: ExplorationFindingKind
-    public let title: String
-    public let body: String
+struct ExploreFindingAddRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let kind: ExplorationFindingKind
+    let title: String
+    let body: String
     /// m0025: the merged key-file half of the finding/file pair.
-    public let filePath: String?
-    public let agentName: String
-    public let agentId: String?
-    public let rating: Int?
+    let filePath: String?
+    let agentName: String
+    let agentId: String?
+    let rating: Int?
 
-    public init(
+    init(
         summaryUuid: String,
         kind: ExplorationFindingKind,
         title: String,
@@ -3169,10 +3169,10 @@ public struct ExploreFindingAddRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ExploreFindingRowResponse: Codable, Hashable, Sendable {
-    public let finding: ExplorationFindingRow
+struct ExploreFindingRowResponse: Codable, Hashable, Sendable {
+    let finding: ExplorationFindingRow
 
-    public init(finding: ExplorationFindingRow) {
+    init(finding: ExplorationFindingRow) {
         self.finding = finding
     }
 }
@@ -3184,26 +3184,26 @@ public struct ExploreFindingRowResponse: Codable, Hashable, Sendable {
 /// Deliberately version-less: the team re-ranker blind-overwrites ratings it
 /// never read — that IS the specified semantic — and the single-writer
 /// DatabaseQueue serializes competing batches. Re-rank = same verb again.
-public struct ExploreRankRequest: Codable, Hashable, Sendable {
+struct ExploreRankRequest: Codable, Hashable, Sendable {
     /// m0025: the batch is PROMPT-scoped — one atomic calibrated batch across
     /// every summary of the prompt (cross-persona tombstoning preserved,
     /// re-keyed from summary to prompt).
-    public let promptUuid: String
-    public let ratings: [FindingRating]
+    let promptUuid: String
+    let ratings: [FindingRating]
 
-    public init(promptUuid: String, ratings: [FindingRating]) {
+    init(promptUuid: String, ratings: [FindingRating]) {
         self.promptUuid = promptUuid
         self.ratings = ratings
     }
 }
 
-public struct ExploreRankResponse: Codable, Hashable, Sendable {
-    public let promptUuid: String
-    public let updatedCount: Int
+struct ExploreRankResponse: Codable, Hashable, Sendable {
+    let promptUuid: String
+    let updatedCount: Int
     /// 0 ⇒ the synthesis COMPLETE (seal) will pass its rank gate.
-    public let unrankedCount: Int
+    let unrankedCount: Int
 
-    public init(promptUuid: String, updatedCount: Int, unrankedCount: Int) {
+    init(promptUuid: String, updatedCount: Int, unrankedCount: Int) {
         self.promptUuid = promptUuid
         self.updatedCount = updatedCount
         self.unrankedCount = unrankedCount
@@ -3213,12 +3213,12 @@ public struct ExploreRankResponse: Codable, Hashable, Sendable {
 /// exploring → complete. Refuses while any finding is unranked. `overview` is
 /// carried ONLY here — there is no earlier write path, so the narrative is
 /// structurally written by the primary agent after the ranked findings exist.
-public struct ExploreCompleteRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
-    public let overview: String
+struct ExploreCompleteRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
+    let overview: String
 
-    public init(summaryUuid: String, expectedVersion: Int64, overview: String) {
+    init(summaryUuid: String, expectedVersion: Int64, overview: String) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
         self.overview = overview
@@ -3228,11 +3228,11 @@ public struct ExploreCompleteRequest: Codable, Hashable, Sendable {
 /// complete → exploring: the revision edge. Preserves everything (findings,
 /// ratings, key files, overview) — the next COMPLETE must re-carry the
 /// overview, so staleness cannot survive a re-seal.
-public struct ExploreReopenRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
+struct ExploreReopenRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
 
-    public init(summaryUuid: String, expectedVersion: Int64) {
+    init(summaryUuid: String, expectedVersion: Int64) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
     }
@@ -3242,15 +3242,15 @@ public struct ExploreReopenRequest: Codable, Hashable, Sendable {
 /// inside the window (or unranked — NULL-rated rows are ALWAYS full, they are
 /// the resume work-queue) come back as full rows, the rest as stubs.
 /// full=true returns everything full; ratingMax/ratingMin shift the window.
-public struct ExploreGetRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct ExploreGetRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
     /// Optional filter to one agent's summary; nil returns all of them.
-    public let agentType: String?
-    public let full: Bool
-    public let ratingMin: Int?
-    public let ratingMax: Int?
+    let agentType: String?
+    let full: Bool
+    let ratingMin: Int?
+    let ratingMax: Int?
 
-    public init(
+    init(
         promptUuid: String,
         agentType: String? = nil,
         full: Bool = false,
@@ -3265,20 +3265,20 @@ public struct ExploreGetRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ExploreGetResponse: Codable, Hashable, Sendable {
+struct ExploreGetResponse: Codable, Hashable, Sendable {
     /// m0025: every summary row of the prompt (or the agentType filter's
     /// one), synthesis first, then alphabetical by agent_type.
-    public let summaries: [ExplorationSummaryRow]
+    let summaries: [ExplorationSummaryRow]
     /// COMPUTED view: findings of kind 'key_file' across those summaries —
     /// kept as a wire array so consumers keep a stable key-file surface.
-    public let keyFiles: [ExplorationKeyFileRow]
+    let keyFiles: [ExplorationKeyFileRow]
     /// Full rows: rating inside the window OR unranked, ordered unranked
     /// first, then by rating ascending.
-    public let findings: [ExplorationFindingRow]
+    let findings: [ExplorationFindingRow]
     /// Lightweight stubs for everything outside the window.
-    public let findingStubs: [ExplorationFindingStub]
+    let findingStubs: [ExplorationFindingStub]
 
-    public init(
+    init(
         summaries: [ExplorationSummaryRow],
         keyFiles: [ExplorationKeyFileRow],
         findings: [ExplorationFindingRow],
@@ -3293,10 +3293,10 @@ public struct ExploreGetResponse: Codable, Hashable, Sendable {
 
 // MARK: - REVIEW_* (v9)
 
-public struct ReviewOpenRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
+struct ReviewOpenRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
 
-    public init(promptUuid: String) {
+    init(promptUuid: String) {
         self.promptUuid = promptUuid
     }
 }
@@ -3304,11 +3304,11 @@ public struct ReviewOpenRequest: Codable, Hashable, Sendable {
 /// Same contract as ExploreSummaryResponse: open is idempotent and EXPLICIT-
 /// only — prompt status transitions never create or gate on this summary
 /// (skip-to-done stays legal).
-public struct ReviewSummaryResponse: Codable, Hashable, Sendable {
-    public let summary: ReviewSummaryRow
-    public let created: Bool
+struct ReviewSummaryResponse: Codable, Hashable, Sendable {
+    let summary: ReviewSummaryRow
+    let created: Bool
 
-    public init(summary: ReviewSummaryRow, created: Bool = false) {
+    init(summary: ReviewSummaryRow, created: Bool = false) {
         self.summary = summary
         self.created = created
     }
@@ -3316,20 +3316,20 @@ public struct ReviewSummaryResponse: Codable, Hashable, Sendable {
 
 /// Insert a finding while the summary is `reviewing`. filePath is nil for
 /// cross-cutting findings; lineEnd requires lineStart.
-public struct ReviewFindingAddRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let kind: ReviewFindingKind
-    public let title: String
-    public let body: String
-    public let filePath: String?
-    public let lineStart: Int?
-    public let lineEnd: Int?
-    public let agentName: String
+struct ReviewFindingAddRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let kind: ReviewFindingKind
+    let title: String
+    let body: String
+    let filePath: String?
+    let lineStart: Int?
+    let lineEnd: Int?
+    let agentName: String
     /// m0025 agent_id sweep (additive optional).
-    public let agentId: String?
-    public let rating: Int?
+    let agentId: String?
+    let rating: Int?
 
-    public init(
+    init(
         summaryUuid: String,
         kind: ReviewFindingKind,
         title: String,
@@ -3354,31 +3354,31 @@ public struct ReviewFindingAddRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ReviewFindingRowResponse: Codable, Hashable, Sendable {
-    public let finding: ReviewFindingRow
+struct ReviewFindingRowResponse: Codable, Hashable, Sendable {
+    let finding: ReviewFindingRow
 
-    public init(finding: ReviewFindingRow) {
+    init(finding: ReviewFindingRow) {
         self.finding = finding
     }
 }
 
 /// Batch rank — same contract and rationale as ExploreRankRequest.
-public struct ReviewRankRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let ratings: [FindingRating]
+struct ReviewRankRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let ratings: [FindingRating]
 
-    public init(summaryUuid: String, ratings: [FindingRating]) {
+    init(summaryUuid: String, ratings: [FindingRating]) {
         self.summaryUuid = summaryUuid
         self.ratings = ratings
     }
 }
 
-public struct ReviewRankResponse: Codable, Hashable, Sendable {
-    public let summary: ReviewSummaryRow
-    public let updatedCount: Int
-    public let unrankedCount: Int
+struct ReviewRankResponse: Codable, Hashable, Sendable {
+    let summary: ReviewSummaryRow
+    let updatedCount: Int
+    let unrankedCount: Int
 
-    public init(summary: ReviewSummaryRow, updatedCount: Int, unrankedCount: Int) {
+    init(summary: ReviewSummaryRow, updatedCount: Int, unrankedCount: Int) {
         self.summary = summary
         self.updatedCount = updatedCount
         self.unrankedCount = unrankedCount
@@ -3389,12 +3389,12 @@ public struct ReviewRankResponse: Codable, Hashable, Sendable {
 /// targets the FINDING. Deliberately UNGATED on summary status — the fix loop
 /// runs after COMPLETE, and a reopen mid-loop must not strand in-flight
 /// resolves (the inversion of the clarify child-lock, by design).
-public struct ReviewResolveRequest: Codable, Hashable, Sendable {
-    public let findingUuid: String
-    public let expectedVersion: Int64
-    public let status: ReviewFindingStatus
+struct ReviewResolveRequest: Codable, Hashable, Sendable {
+    let findingUuid: String
+    let expectedVersion: Int64
+    let status: ReviewFindingStatus
 
-    public init(findingUuid: String, expectedVersion: Int64, status: ReviewFindingStatus) {
+    init(findingUuid: String, expectedVersion: Int64, status: ReviewFindingStatus) {
         self.findingUuid = findingUuid
         self.expectedVersion = expectedVersion
         self.status = status
@@ -3404,13 +3404,13 @@ public struct ReviewResolveRequest: Codable, Hashable, Sendable {
 /// reviewing → complete. Refuses while any finding is unranked; requires a
 /// verdict. overview + verdict are carried ONLY here (primary-agent-only by
 /// write-path shape).
-public struct ReviewCompleteRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
-    public let overview: String
-    public let verdict: ReviewVerdict
+struct ReviewCompleteRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
+    let overview: String
+    let verdict: ReviewVerdict
 
-    public init(summaryUuid: String, expectedVersion: Int64, overview: String, verdict: ReviewVerdict) {
+    init(summaryUuid: String, expectedVersion: Int64, overview: String, verdict: ReviewVerdict) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
         self.overview = overview
@@ -3420,23 +3420,23 @@ public struct ReviewCompleteRequest: Codable, Hashable, Sendable {
 
 /// complete → reviewing: the revision edge (same preservation contract as
 /// ExploreReopenRequest; the persisted verdict survives until re-complete).
-public struct ReviewReopenRequest: Codable, Hashable, Sendable {
-    public let summaryUuid: String
-    public let expectedVersion: Int64
+struct ReviewReopenRequest: Codable, Hashable, Sendable {
+    let summaryUuid: String
+    let expectedVersion: Int64
 
-    public init(summaryUuid: String, expectedVersion: Int64) {
+    init(summaryUuid: String, expectedVersion: Int64) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
     }
 }
 
-public struct ReviewGetRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String
-    public let full: Bool
-    public let ratingMin: Int?
-    public let ratingMax: Int?
+struct ReviewGetRequest: Codable, Hashable, Sendable {
+    let promptUuid: String
+    let full: Bool
+    let ratingMin: Int?
+    let ratingMax: Int?
 
-    public init(promptUuid: String, full: Bool = false, ratingMin: Int? = nil, ratingMax: Int? = nil) {
+    init(promptUuid: String, full: Bool = false, ratingMin: Int? = nil, ratingMax: Int? = nil) {
         self.promptUuid = promptUuid
         self.full = full
         self.ratingMin = ratingMin
@@ -3444,12 +3444,12 @@ public struct ReviewGetRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct ReviewGetResponse: Codable, Hashable, Sendable {
-    public let summary: ReviewSummaryRow
-    public let findings: [ReviewFindingRow]
-    public let findingStubs: [ReviewFindingStub]
+struct ReviewGetResponse: Codable, Hashable, Sendable {
+    let summary: ReviewSummaryRow
+    let findings: [ReviewFindingRow]
+    let findingStubs: [ReviewFindingStub]
 
-    public init(
+    init(
         summary: ReviewSummaryRow,
         findings: [ReviewFindingRow],
         findingStubs: [ReviewFindingStub]
@@ -3465,26 +3465,26 @@ public struct ReviewGetResponse: Codable, Hashable, Sendable {
 /// Git-derived checked-out state for one session. head_state is one of
 /// "branch", "detached", "unavailable" (missing/unreadable instance path —
 /// tolerated, never an error).
-public struct SessionResolveRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String
+struct SessionResolveRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String
 
-    public init(sessionUuid: String) {
+    init(sessionUuid: String) {
         self.sessionUuid = sessionUuid
     }
 }
 
-public struct SessionResolveResponse: Codable, Hashable, Sendable {
-    public let session: SessionRow
-    public let checkedOut: Bool
-    public let headState: String
+struct SessionResolveResponse: Codable, Hashable, Sendable {
+    let session: SessionRow
+    let checkedOut: Bool
+    let headState: String
     /// The slugged code of whatever IS checked out (nil when detached or
     /// unavailable). Slugging is forward-only: branch / → __, never unslugged.
-    public let currentSessionCode: String?
+    let currentSessionCode: String?
     /// The RAW branch name (nil whenever head_state != "branch"). The code
     /// stays slugged; the two are never interconverted client-side.
-    public let currentBranch: String?
+    let currentBranch: String?
 
-    public init(
+    init(
         session: SessionRow,
         checkedOut: Bool,
         headState: String,
@@ -3499,24 +3499,24 @@ public struct SessionResolveResponse: Codable, Hashable, Sendable {
     }
 }
 
-public struct InstanceCurrentSessionRequest: Codable, Hashable, Sendable {
-    public let instanceUuid: String
+struct InstanceCurrentSessionRequest: Codable, Hashable, Sendable {
+    let instanceUuid: String
 
-    public init(instanceUuid: String) {
+    init(instanceUuid: String) {
         self.instanceUuid = instanceUuid
     }
 }
 
 /// session is nil when detached, unavailable, or the checked-out branch has
 /// no session row yet.
-public struct InstanceCurrentSessionResponse: Codable, Hashable, Sendable {
-    public let session: SessionStub?
-    public let headState: String
-    public let currentSessionCode: String?
+struct InstanceCurrentSessionResponse: Codable, Hashable, Sendable {
+    let session: SessionStub?
+    let headState: String
+    let currentSessionCode: String?
     /// The RAW branch name (nil whenever head_state != "branch").
-    public let currentBranch: String?
+    let currentBranch: String?
 
-    public init(session: SessionStub?, headState: String, currentSessionCode: String?, currentBranch: String?) {
+    init(session: SessionStub?, headState: String, currentSessionCode: String?, currentBranch: String?) {
         self.session = session
         self.headState = headState
         self.currentSessionCode = currentSessionCode
@@ -3526,25 +3526,25 @@ public struct InstanceCurrentSessionResponse: Codable, Hashable, Sendable {
 
 // MARK: - PATHS_GET / CONFIG_SET (v7)
 
-public struct PathsGetRequest: Codable, Hashable, Sendable {
-    public init() {}
+struct PathsGetRequest: Codable, Hashable, Sendable {
+    init() {}
 }
 
 /// Typed roots — never a map, because dictionary keys and coder key strategies
 /// do not mix. The fs root plus db/socket/backups come from Paths; the kbite
 /// roots from daemon_config, settable via CONFIG_SET. `projectsRoot` is the
 /// absolute half of every `gmfs_relative_storage_path`.
-public struct PathsGetResponse: Codable, Hashable, Sendable {
-    public let gmFsRoot: String
-    public let dbPath: String
-    public let socketPath: String
-    public let backupsRoot: String
-    public let projectsRoot: String
-    public let kbiteRoot: String
-    public let kbiteOpenRoot: String
-    public let kbiteDigestedRoot: String
+struct PathsGetResponse: Codable, Hashable, Sendable {
+    let gmFsRoot: String
+    let dbPath: String
+    let socketPath: String
+    let backupsRoot: String
+    let projectsRoot: String
+    let kbiteRoot: String
+    let kbiteOpenRoot: String
+    let kbiteDigestedRoot: String
 
-    public init(
+    init(
         gmFsRoot: String,
         dbPath: String,
         socketPath: String,
@@ -3565,21 +3565,21 @@ public struct PathsGetResponse: Codable, Hashable, Sendable {
     }
 }
 
-public struct ConfigSetRequest: Codable, Hashable, Sendable {
-    public let key: ConfigKey
-    public let value: String
+struct ConfigSetRequest: Codable, Hashable, Sendable {
+    let key: ConfigKey
+    let value: String
 
-    public init(key: ConfigKey, value: String) {
+    init(key: ConfigKey, value: String) {
         self.key = key
         self.value = value
     }
 }
 
-public struct ConfigSetResponse: Codable, Hashable, Sendable {
-    public let key: ConfigKey
-    public let value: String
+struct ConfigSetResponse: Codable, Hashable, Sendable {
+    let key: ConfigKey
+    let value: String
 
-    public init(key: ConfigKey, value: String) {
+    init(key: ConfigKey, value: String) {
         self.key = key
         self.value = value
     }
@@ -3594,19 +3594,19 @@ public struct ConfigSetResponse: Codable, Hashable, Sendable {
 /// disagree. OPEN on an existing pair RESETS the row to `building` (version
 /// bump, content kept for wholesale replacement at complete) — a step's
 /// briefing is always its CURRENT briefing, never a pile of drafts.
-public struct BriefingOpenRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String?
-    public let sessionUuid: String?
-    public let briefingForStep: String
+struct BriefingOpenRequest: Codable, Hashable, Sendable {
+    let promptUuid: String?
+    let sessionUuid: String?
+    let briefingForStep: String
     /// The calling instance's identity. A prompt-owned open ALSO claims the
     /// activation for this key: briefings are consumed during explore
     /// (prompt still draft) and architect phases — long before set-status
     /// implementing would claim — and opening a briefing IS declaring "this
     /// instance works this prompt". Without it the zero-uuid resolution
     /// ladder had no path to success in the documented flows.
-    public let clientKey: String?
+    let clientKey: String?
 
-    public init(
+    init(
         promptUuid: String? = nil,
         sessionUuid: String? = nil,
         briefingForStep: String,
@@ -3619,17 +3619,17 @@ public struct BriefingOpenRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct BriefingRowResponse: Codable, Hashable, Sendable {
-    public let briefing: AgentBriefingRow
-    public let created: Bool
+struct BriefingRowResponse: Codable, Hashable, Sendable {
+    let briefing: AgentBriefingRow
+    let created: Bool
     /// Well-formed dope dot-paths the briefing asked for that resolve to
     /// NOTHING in the dope tree. Reported back in the tool result so a briefer
     /// sees its own unresolvable refs instead of discovering them as silence.
     /// Additive OPTIONAL field (nil = this build did not compute it), so it
     /// decodes safely in both directions — no wire bump.
-    public let unresolvedDopeRefs: [String]?
+    let unresolvedDopeRefs: [String]?
 
-    public init(
+    init(
         briefing: AgentBriefingRow,
         created: Bool = false,
         unresolvedDopeRefs: [String]? = nil
@@ -3644,20 +3644,20 @@ public struct BriefingRowResponse: Codable, Hashable, Sendable {
 /// ITSELF from the session's SESSION_INSTANCE scope (the writing agent cannot
 /// mis-stamp), and denormalizes each kbite ref's brief by joining the kbite
 /// tables — the briefer passes file uuids only.
-public struct BriefingCompleteRequest: Codable, Hashable, Sendable {
-    public let briefingUuid: String
-    public let expectedVersion: Int64
+struct BriefingCompleteRequest: Codable, Hashable, Sendable {
+    let briefingUuid: String
+    let expectedVersion: Int64
     /// DOT-PATH strings (domain.entity.property style), never uuids.
     /// m0025: written as agent_briefing_dope_persistence child rows.
-    public let dopeRefs: [String]?
+    let dopeRefs: [String]?
     /// KBite file uuids; the daemon resolves each brief at write time.
-    public let kbiteRefs: [String]?
+    let kbiteRefs: [String]?
     /// file_change uuids (agent_session_file_change children).
-    public let fileChangeRefs: [String]?
+    let fileChangeRefs: [String]?
     /// Briefer self-report for dedup/tracking.
-    public let agentId: String?
+    let agentId: String?
 
-    public init(
+    init(
         briefingUuid: String,
         expectedVersion: Int64,
         dopeRefs: [String]? = nil,
@@ -3681,14 +3681,14 @@ public struct BriefingCompleteRequest: Codable, Hashable, Sendable {
 /// resolves session (cwd) and clientKey (process ancestry) itself, so no
 /// uuid ever has to survive a spawn prompt or an agent's echo. A real owner
 /// with no rows is SUMMARY_ABSENT, never an empty fabrication.
-public struct BriefingGetRequest: Codable, Hashable, Sendable {
-    public let briefingUuid: String?
-    public let promptUuid: String?
-    public let sessionUuid: String?
-    public let step: String?
-    public let clientKey: String?
+struct BriefingGetRequest: Codable, Hashable, Sendable {
+    let briefingUuid: String?
+    let promptUuid: String?
+    let sessionUuid: String?
+    let step: String?
+    let clientKey: String?
 
-    public init(
+    init(
         briefingUuid: String? = nil,
         promptUuid: String? = nil,
         sessionUuid: String? = nil,
@@ -3707,13 +3707,13 @@ public struct BriefingGetRequest: Codable, Hashable, Sendable {
 /// the stored scope revision is compared against the live scope, and each
 /// dope ref dot-path is re-resolved — dangling paths come back as ghosts
 /// (a legal state, diagram-binding precedent). Warn, never block.
-public struct BriefingStaleness: Codable, Hashable, Sendable {
-    public let stampedRevision: Int64?
-    public let currentRevision: Int64?
-    public let drifted: Bool
-    public let ghostDotPaths: [String]
+struct BriefingStaleness: Codable, Hashable, Sendable {
+    let stampedRevision: Int64?
+    let currentRevision: Int64?
+    let drifted: Bool
+    let ghostDotPaths: [String]
 
-    public init(
+    init(
         stampedRevision: Int64?,
         currentRevision: Int64?,
         drifted: Bool,
@@ -3726,30 +3726,30 @@ public struct BriefingStaleness: Codable, Hashable, Sendable {
     }
 }
 
-public struct BriefingGetResponse: Codable, Hashable, Sendable {
-    public let briefing: AgentBriefingRow
-    public let staleness: BriefingStaleness
+struct BriefingGetResponse: Codable, Hashable, Sendable {
+    let briefing: AgentBriefingRow
+    let staleness: BriefingStaleness
 
-    public init(briefing: AgentBriefingRow, staleness: BriefingStaleness) {
+    init(briefing: AgentBriefingRow, staleness: BriefingStaleness) {
         self.briefing = briefing
         self.staleness = staleness
     }
 }
 
-public struct BriefingListRequest: Codable, Hashable, Sendable {
-    public let promptUuid: String?
-    public let sessionUuid: String?
+struct BriefingListRequest: Codable, Hashable, Sendable {
+    let promptUuid: String?
+    let sessionUuid: String?
 
-    public init(promptUuid: String? = nil, sessionUuid: String? = nil) {
+    init(promptUuid: String? = nil, sessionUuid: String? = nil) {
         self.promptUuid = promptUuid
         self.sessionUuid = sessionUuid
     }
 }
 
-public struct BriefingListResponse: Codable, Hashable, Sendable {
-    public let briefings: [AgentBriefingRow]
+struct BriefingListResponse: Codable, Hashable, Sendable {
+    let briefings: [AgentBriefingRow]
 
-    public init(briefings: [AgentBriefingRow]) {
+    init(briefings: [AgentBriefingRow]) {
         self.briefings = briefings
     }
 }
@@ -3760,28 +3760,28 @@ public struct BriefingListResponse: Codable, Hashable, Sendable {
 /// summary, staleness flag, and the exact `gm briefing get` pull command).
 /// Roles without a step — and sessions with nothing applicable — yield an
 /// EMPTY stub with ok=true: the hook must never wedge a spawn.
-public struct BriefingStubRequest: Codable, Hashable, Sendable {
-    public let agentType: String?
+struct BriefingStubRequest: Codable, Hashable, Sendable {
+    let agentType: String?
     /// Client-resolved session (the gm CLI resolves cwd context; the daemon
     /// does not see the caller's working directory).
-    public let sessionUuid: String?
+    let sessionUuid: String?
     /// Client-resolved instance identity (process ancestry) — scopes the
     /// stub to the SPAWNING Claude instance's activation, so concurrent
     /// prompts on one session each hand their agents the right briefing.
-    public let clientKey: String?
+    let clientKey: String?
 
-    public init(agentType: String? = nil, sessionUuid: String? = nil, clientKey: String? = nil) {
+    init(agentType: String? = nil, sessionUuid: String? = nil, clientKey: String? = nil) {
         self.agentType = agentType
         self.sessionUuid = sessionUuid
         self.clientKey = clientKey
     }
 }
 
-public struct BriefingStubResponse: Codable, Hashable, Sendable {
+struct BriefingStubResponse: Codable, Hashable, Sendable {
     /// Plain text, ≤2KB by construction; empty when nothing applies.
-    public let stub: String
+    let stub: String
 
-    public init(stub: String) {
+    init(stub: String) {
         self.stub = stub
     }
 }
@@ -3792,15 +3792,15 @@ public struct BriefingStubResponse: Codable, Hashable, Sendable {
 /// scope_type is derived: PROMPT when promptUuid is present, else
 /// SESSION_INSTANCE. `cloneFromSessionBase` forks the session's
 /// SESSION_INSTANCE tree of the same code into a freshly created PROMPT scope.
-public struct DopeInitRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String
-    public let promptUuid: String?
-    public let code: String
-    public let name: String
-    public let description: String?
-    public let cloneFromSessionBase: Bool?
+struct DopeInitRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String
+    let promptUuid: String?
+    let code: String
+    let name: String
+    let description: String?
+    let cloneFromSessionBase: Bool?
 
-    public init(
+    init(
         sessionUuid: String,
         promptUuid: String? = nil,
         code: String,
@@ -3817,11 +3817,11 @@ public struct DopeInitRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeScopeResponse: Codable, Hashable, Sendable {
-    public let scope: DopeScopeRow
-    public let created: Bool
+struct DopeScopeResponse: Codable, Hashable, Sendable {
+    let scope: DopeScopeRow
+    let created: Bool
 
-    public init(scope: DopeScopeRow, created: Bool) {
+    init(scope: DopeScopeRow, created: Bool) {
         self.scope = scope
         self.created = created
     }
@@ -3833,22 +3833,22 @@ public struct DopeScopeResponse: Codable, Hashable, Sendable {
 /// BAD_REQUEST. Unknown session/prompt uuid is NOT_FOUND; a real target with
 /// no scopes is a normal empty list, never SUMMARY_ABSENT. No code filter:
 /// enumerating IS the point and every row carries its own code.
-public struct DopeListRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String
-    public let promptUuid: String?
+struct DopeListRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String
+    let promptUuid: String?
 
-    public init(sessionUuid: String, promptUuid: String? = nil) {
+    init(sessionUuid: String, promptUuid: String? = nil) {
         self.sessionUuid = sessionUuid
         self.promptUuid = promptUuid
     }
 }
 
-public struct DopeListResponse: Codable, Hashable, Sendable {
+struct DopeListResponse: Codable, Hashable, Sendable {
     /// ORDER BY code — the SAME order dopeGet's candidate list prints, so a
     /// picker's rows and the disambiguator message can never disagree.
-    public let scopes: [DopeScopeRow]
+    let scopes: [DopeScopeRow]
 
-    public init(scopes: [DopeScopeRow]) {
+    init(scopes: [DopeScopeRow]) {
         self.scopes = scopes
     }
 }
@@ -3857,30 +3857,30 @@ public struct DopeListResponse: Codable, Hashable, Sendable {
 /// SESSION_INSTANCE tree is the fallback (resolvedVia reports which). With
 /// several scopes matching and no code, the store answers BAD_REQUEST
 /// naming the candidate codes.
-public struct DopeGetRequest: Codable, Hashable, Sendable {
+struct DopeGetRequest: Codable, Hashable, Sendable {
     /// Empty ONLY when addressing by `projectUuid` instead.
     ///
     /// Kept non-optional so every existing caller and every older peer's
     /// payload still decodes unchanged — a project-tier read passes "" here
     /// and fills `projectUuid`. Making it Optional would have been a
     /// breaking shape change on an existing message for no gain.
-    public let sessionUuid: String
-    public let promptUuid: String?
-    public let code: String?
+    let sessionUuid: String
+    let promptUuid: String?
+    let code: String?
     /// PROJECT-tier addressing: reads the PROJECT_ITEM overlay, else the
     /// BASE_PROJECT scope that `gm dope promote` maintains.
     ///
     /// Additive OPTIONAL, so no wire bump: an older peer omits it and gets
     /// exactly today's session-only behavior.
-    public let projectUuid: String?
+    let projectUuid: String?
     /// Merge the masking overlay over its base and return the resolved tree.
     /// OPT-IN, and deliberately so: without it every existing caller — the
     /// CLI, GMVibes, gm diagram from-dope, the screenshot path — keeps its
     /// exact single-layer semantics. Additive OPTIONAL, so an older peer that
     /// omits it means "unresolved", which is today's behavior.
-    public let resolved: Bool?
+    let resolved: Bool?
 
-    public init(
+    init(
         sessionUuid: String,
         promptUuid: String? = nil,
         code: String? = nil,
@@ -3895,7 +3895,7 @@ public struct DopeGetRequest: Codable, Hashable, Sendable {
     }
 
     /// PROJECT-tier convenience: reads a project's own scope ladder.
-    public init(projectUuid: String, code: String? = nil, resolved: Bool? = nil) {
+    init(projectUuid: String, code: String? = nil, resolved: Bool? = nil) {
         self.sessionUuid = ""
         self.promptUuid = nil
         self.code = code
@@ -3907,7 +3907,7 @@ public struct DopeGetRequest: Codable, Hashable, Sendable {
         case sessionUuid, promptUuid, code, resolved, projectUuid
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         sessionUuid = try c.decodeIfPresent(String.self, forKey: .sessionUuid) ?? ""
         promptUuid = try c.decodeIfPresent(String.self, forKey: .promptUuid)
@@ -3917,24 +3917,24 @@ public struct DopeGetRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeGetResponse: Codable, Hashable, Sendable {
-    public let tree: DopeScopeTree
+struct DopeGetResponse: Codable, Hashable, Sendable {
+    let tree: DopeScopeTree
     /// Which scope supplied the tree: "prompt" | "session_base", or
     /// "<overlay_tier>_over_<base_tier>" when --resolved merged two layers.
-    public let resolvedVia: String
+    let resolvedVia: String
     /// Present only for a resolved read: dot-path -> provenance.
-    public let resolutions: [DopeOverlay.Resolution]?
+    let resolutions: [DopeOverlay.Resolution]?
     /// Dot-paths a whiteout masked away.
-    public let hidden: [String]?
+    let hidden: [String]?
     /// Non-fatal observations (orphaned masks). Never an error.
-    public let warnings: [String]?
+    let warnings: [String]?
     /// Per-area content counters ("persistence", "cogs"). A client compares
     /// one number to decide whether that subtree needs refetching, which is
     /// what makes dope sub-LOADABLE. These sit BESIDE tree.revision, which
     /// remains the whole-tree counter and the sole CAS gate.
-    public let areaVersions: [String: Int64]?
+    let areaVersions: [String: Int64]?
 
-    public init(
+    init(
         tree: DopeScopeTree,
         resolvedVia: String,
         resolutions: [DopeOverlay.Resolution]? = nil,
@@ -3954,25 +3954,25 @@ public struct DopeGetResponse: Codable, Hashable, Sendable {
 // MARK: - DOPE_SEARCH
 
 /// The three search scopes, in the prompt's own vocabulary.
-public enum DopeSearchScope: String, Codable, Hashable, CaseIterable, Sendable {
+enum DopeSearchScope: String, Codable, Hashable, CaseIterable, Sendable {
     case prompt, session, project
 }
 
 /// One UNION arm per source table.
-public enum DopeSearchSource: String, Codable, Hashable, CaseIterable, Sendable {
+enum DopeSearchSource: String, Codable, Hashable, CaseIterable, Sendable {
     case scope, persistence, entity, property, enumeration, option, cog, cogElement
 }
 
-public struct DopeSearchRequest: Codable, Hashable, Sendable {
-    public let query: String
-    public let scope: DopeSearchScope
-    public let sessionUuid: String?
-    public let promptUuid: String?
-    public let projectUuid: String?
+struct DopeSearchRequest: Codable, Hashable, Sendable {
+    let query: String
+    let scope: DopeSearchScope
+    let sessionUuid: String?
+    let promptUuid: String?
+    let projectUuid: String?
     /// Keep only hits whose dot-path came from the overlay rather than the
     /// base. A post-filter over resolver provenance, so the FTS query is the
     /// same shape with and without it.
-    public let onlyMasks: Bool?
+    let onlyMasks: Bool?
     /// Restrict the UNION to these arms. m0028-era ADDITIVE OPTIONAL: nil or
     /// empty means every arm, which is exactly what the absent field meant, so
     /// it decodes safely in both directions and needed no wire bump of its own.
@@ -3981,10 +3981,10 @@ public struct DopeSearchRequest: Codable, Hashable, Sendable {
     /// missing was any way for a caller to SELECT among them, which is what the
     /// agent tool surface needs when it asks for persistence rows or cogs
     /// specifically rather than the whole tree.
-    public let sources: [DopeSearchSource]?
-    public let limit: Int?
+    let sources: [DopeSearchSource]?
+    let limit: Int?
 
-    public init(
+    init(
         query: String,
         scope: DopeSearchScope,
         sessionUuid: String? = nil,
@@ -4000,21 +4000,21 @@ public struct DopeSearchRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeSearchHit: Codable, Hashable, Sendable {
-    public let kind: String
-    public let subjectUuid: String
-    public let scopeUuid: String
-    public let scopeCode: String
-    public let scopeType: String
+struct DopeSearchHit: Codable, Hashable, Sendable {
+    let kind: String
+    let subjectUuid: String
+    let scopeUuid: String
+    let scopeCode: String
+    let scopeType: String
     /// The dot-path — the same identity the resolver merges on.
-    public let path: String
-    public let title: String
-    public let excerpt: String
-    public let score: Double
+    let path: String
+    let title: String
+    let excerpt: String
+    let score: Double
     /// Resolver provenance; present only for an --only-masks search.
-    public let origin: String?
+    let origin: String?
 
-    public init(
+    init(
         kind: String,
         subjectUuid: String,
         scopeUuid: String,
@@ -4032,35 +4032,35 @@ public struct DopeSearchHit: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeSearchResponse: Codable, Hashable, Sendable {
-    public let hits: [DopeSearchHit]
-    public init(hits: [DopeSearchHit]) { self.hits = hits }
+struct DopeSearchResponse: Codable, Hashable, Sendable {
+    let hits: [DopeSearchHit]
+    init(hits: [DopeSearchHit]) { self.hits = hits }
 }
 
 // MARK: - COGS
 
-public struct DopeCogElementNode: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let version: Int64
-    public let elementType: String
-    public let code: String
-    public let name: String
-    public let description: String
-    public let sortOrder: Int
-    public let parentElementUuid: String?
+struct DopeCogElementNode: Codable, Hashable, Sendable {
+    let uuid: String
+    let version: Int64
+    let elementType: String
+    let code: String
+    let name: String
+    let description: String
+    let sortOrder: Int
+    let parentElementUuid: String?
     /// Ghost-tolerant CODE reference to a dope scope, resolved at read time —
     /// never a uuid FK (ingest re-mints uuids, and scope delete is not
     /// offered, so there is no ON DELETE answer to give).
-    public let dopeScopeCode: String?
+    let dopeScopeCode: String?
     /// From the type's subtype table. Hull only.
-    public let primaryPath: String?
+    let primaryPath: String?
     /// From the type's subtype table. PersistenceOwner only: the CODE of the
     /// persistence domain this element's parent Hull owns. Additive and
     /// OPTIONAL, so it decodes safely in both directions.
-    public let dopePersistenceCode: String?
-    public let deletedOn: String?
+    let dopePersistenceCode: String?
+    let deletedOn: String?
 
-    public init(
+    init(
         uuid: String,
         version: Int64,
         elementType: String,
@@ -4089,17 +4089,17 @@ public struct DopeCogElementNode: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeCogNode: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let version: Int64
-    public let code: String
-    public let name: String
-    public let description: String
-    public let sortOrder: Int
-    public let deletedOn: String?
-    public let elements: [DopeCogElementNode]
+struct DopeCogNode: Codable, Hashable, Sendable {
+    let uuid: String
+    let version: Int64
+    let code: String
+    let name: String
+    let description: String
+    let sortOrder: Int
+    let deletedOn: String?
+    let elements: [DopeCogElementNode]
 
-    public init(
+    init(
         uuid: String,
         version: Int64,
         code: String,
@@ -4120,13 +4120,13 @@ public struct DopeCogNode: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeCogAddRequest: Codable, Hashable, Sendable {
-    public let scopeUuid: String
-    public let code: String
-    public let name: String
-    public let description: String?
-    public let sortOrder: Int?
-    public init(
+struct DopeCogAddRequest: Codable, Hashable, Sendable {
+    let scopeUuid: String
+    let code: String
+    let name: String
+    let description: String?
+    let sortOrder: Int?
+    init(
         scopeUuid: String,
         code: String,
         name: String,
@@ -4138,14 +4138,14 @@ public struct DopeCogAddRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeCogUpdateRequest: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let expectedVersion: Int64
-    public let code: String?
-    public let name: String?
-    public let description: String?
-    public let sortOrder: Int?
-    public init(
+struct DopeCogUpdateRequest: Codable, Hashable, Sendable {
+    let uuid: String
+    let expectedVersion: Int64
+    let code: String?
+    let name: String?
+    let description: String?
+    let sortOrder: Int?
+    init(
         uuid: String,
         expectedVersion: Int64,
         code: String? = nil,
@@ -4158,29 +4158,29 @@ public struct DopeCogUpdateRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeCogDeleteRequest: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let expectedVersion: Int64
-    public let soft: Bool?
-    public init(uuid: String, expectedVersion: Int64, soft: Bool? = nil) {
+struct DopeCogDeleteRequest: Codable, Hashable, Sendable {
+    let uuid: String
+    let expectedVersion: Int64
+    let soft: Bool?
+    init(uuid: String, expectedVersion: Int64, soft: Bool? = nil) {
         self.uuid = uuid; self.expectedVersion = expectedVersion; self.soft = soft
     }
 }
 
-public struct DopeCogElementAddRequest: Codable, Hashable, Sendable {
-    public let cogUuid: String
-    public let elementType: String
-    public let code: String
-    public let name: String
-    public let description: String?
-    public let sortOrder: Int?
-    public let parentElementUuid: String?
-    public let dopeScopeCode: String?
-    public let primaryPath: String?
+struct DopeCogElementAddRequest: Codable, Hashable, Sendable {
+    let cogUuid: String
+    let elementType: String
+    let code: String
+    let name: String
+    let description: String?
+    let sortOrder: Int?
+    let parentElementUuid: String?
+    let dopeScopeCode: String?
+    let primaryPath: String?
     /// PersistenceOwner's owned domain CODE. Additive and OPTIONAL, so it
     /// decodes safely in both directions per the wire convention.
-    public let dopePersistenceCode: String?
-    public init(
+    let dopePersistenceCode: String?
+    init(
         cogUuid: String,
         elementType: String,
         code: String,
@@ -4199,17 +4199,17 @@ public struct DopeCogElementAddRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeCogElementUpdateRequest: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let expectedVersion: Int64
-    public let code: String?
-    public let name: String?
-    public let description: String?
-    public let sortOrder: Int?
-    public let dopeScopeCode: String?
-    public let clearDopeScopeCode: Bool?
-    public let primaryPath: String?
-    public init(
+struct DopeCogElementUpdateRequest: Codable, Hashable, Sendable {
+    let uuid: String
+    let expectedVersion: Int64
+    let code: String?
+    let name: String?
+    let description: String?
+    let sortOrder: Int?
+    let dopeScopeCode: String?
+    let clearDopeScopeCode: Bool?
+    let primaryPath: String?
+    init(
         uuid: String,
         expectedVersion: Int64,
         code: String? = nil,
@@ -4227,82 +4227,82 @@ public struct DopeCogElementUpdateRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeCogElementDeleteRequest: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let expectedVersion: Int64
-    public let soft: Bool?
-    public init(uuid: String, expectedVersion: Int64, soft: Bool? = nil) {
+struct DopeCogElementDeleteRequest: Codable, Hashable, Sendable {
+    let uuid: String
+    let expectedVersion: Int64
+    let soft: Bool?
+    init(uuid: String, expectedVersion: Int64, soft: Bool? = nil) {
         self.uuid = uuid; self.expectedVersion = expectedVersion; self.soft = soft
     }
 }
 
-public struct DopeCogGetRequest: Codable, Hashable, Sendable {
-    public let scopeUuid: String
-    public let code: String?
-    public init(scopeUuid: String, code: String? = nil) {
+struct DopeCogGetRequest: Codable, Hashable, Sendable {
+    let scopeUuid: String
+    let code: String?
+    init(scopeUuid: String, code: String? = nil) {
         self.scopeUuid = scopeUuid; self.code = code
     }
 }
 
-public struct DopeCogResponse: Codable, Hashable, Sendable {
-    public let cog: DopeCogNode
-    public let revision: Int64
-    public init(cog: DopeCogNode, revision: Int64) { self.cog = cog; self.revision = revision }
+struct DopeCogResponse: Codable, Hashable, Sendable {
+    let cog: DopeCogNode
+    let revision: Int64
+    init(cog: DopeCogNode, revision: Int64) { self.cog = cog; self.revision = revision }
 }
 
-public struct DopeCogElementResponse: Codable, Hashable, Sendable {
-    public let element: DopeCogElementNode
-    public let revision: Int64
-    public init(element: DopeCogElementNode, revision: Int64) {
+struct DopeCogElementResponse: Codable, Hashable, Sendable {
+    let element: DopeCogElementNode
+    let revision: Int64
+    init(element: DopeCogElementNode, revision: Int64) {
         self.element = element; self.revision = revision
     }
 }
 
-public struct DopeCogDeleteResponse: Codable, Hashable, Sendable {
-    public let deletedUuid: String
-    public let cascadedElements: Int
-    public let scopeUuid: String
-    public let revision: Int64
-    public init(deletedUuid: String, cascadedElements: Int, scopeUuid: String, revision: Int64) {
+struct DopeCogDeleteResponse: Codable, Hashable, Sendable {
+    let deletedUuid: String
+    let cascadedElements: Int
+    let scopeUuid: String
+    let revision: Int64
+    init(deletedUuid: String, cascadedElements: Int, scopeUuid: String, revision: Int64) {
         self.deletedUuid = deletedUuid; self.cascadedElements = cascadedElements
         self.scopeUuid = scopeUuid; self.revision = revision
     }
 }
 
-public struct DopeCogGetResponse: Codable, Hashable, Sendable {
-    public let cogs: [DopeCogNode]
-    public init(cogs: [DopeCogNode]) { self.cogs = cogs }
+struct DopeCogGetResponse: Codable, Hashable, Sendable {
+    let cogs: [DopeCogNode]
+    init(cogs: [DopeCogNode]) { self.cogs = cogs }
 }
 
 /// DOPE_PROMOTE — publish a session's SESSION_INSTANCE tree into the
 /// project's BASE_PROJECT scope. Runs automatically at boot behind
 /// DopeBootSync, and manually via `gm dope promote` (a non-throwing boot path
 /// that silently does nothing is undebuggable, so the verb exists too).
-public struct DopePromoteRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String
-    public let code: String?
+struct DopePromoteRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String
+    let code: String?
     /// Compute the decision and write NOTHING. This is what makes
     /// "why didn't it promote?" answerable, and it is what gm doctor uses to
     /// report a stale BASE_PROJECT without ever publishing as a side effect.
-    public let dryRun: Bool?
+    let dryRun: Bool?
 
-    public init(sessionUuid: String, code: String? = nil, dryRun: Bool? = nil) {
+    init(sessionUuid: String, code: String? = nil, dryRun: Bool? = nil) {
         self.sessionUuid = sessionUuid
         self.code = code
         self.dryRun = dryRun
     }
 }
 
-public struct DopePromotedScope: Codable, Hashable, Sendable {
-    public let code: String
-    public let baseScopeUuid: String
+struct DopePromotedScope: Codable, Hashable, Sendable {
+    let code: String
+    let baseScopeUuid: String
     /// The high-water the base carried before this promotion.
-    public let fromRevision: Int64
+    let fromRevision: Int64
     /// The source revision now recorded as the high-water.
-    public let toRevision: Int64
-    public let counts: DopeTreeCounts
+    let toRevision: Int64
+    let counts: DopeTreeCounts
 
-    public init(
+    init(
         code: String,
         baseScopeUuid: String,
         fromRevision: Int64,
@@ -4317,15 +4317,15 @@ public struct DopePromotedScope: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopePromoteResponse: Codable, Hashable, Sendable {
+struct DopePromoteResponse: Codable, Hashable, Sendable {
     /// On a dry run these are what WOULD be published, and nothing was
     /// written.
-    public let promoted: [DopePromotedScope]
+    let promoted: [DopePromotedScope]
     /// "branch_mismatch" | "no_session_scope" | "up_to_date" | nil
-    public let skipped: String?
-    public let detail: String?
+    let skipped: String?
+    let detail: String?
 
-    public init(promoted: [DopePromotedScope], skipped: String? = nil, detail: String? = nil) {
+    init(promoted: [DopePromotedScope], skipped: String? = nil, detail: String? = nil) {
         self.promoted = promoted
         self.skipped = skipped
         self.detail = detail
@@ -4336,31 +4336,31 @@ public struct DopePromoteResponse: Codable, Hashable, Sendable {
 /// mean "set NULL" — a distinction plain optionals cannot express. Which
 /// fields a level owns is DopeLevelSpec's ownedFields; a misdirected field
 /// is a precise BAD_REQUEST.
-public struct DopeNodeFields: Codable, Hashable, Sendable {
-    public let code: String?
-    public let name: String?
-    public let description: String?
-    public let sortOrder: Int?
-    public let entityType: DopeEntityType?
-    public let repoRepresentativeFile: String?
-    public let baseComposableUuid: String?
-    public let dataType: DopePropertyDataType?
-    public let nullable: Bool?
-    public let isUnique: Bool?
-    public let autoIncrement: Bool?
-    public let textCharLimit: Int?
-    public let enumUuid: String?
-    public let relationshipTargetUuid: String?
-    public let baseOriginPropertyUuid: String?
-    public let clearRepoRepresentativeFile: Bool?
-    public let clearBaseComposable: Bool?
-    public let clearBaseOrigin: Bool?
-    public let clearAutoIncrement: Bool?
-    public let clearTextCharLimit: Bool?
-    public let clearEnum: Bool?
-    public let clearRelationshipTarget: Bool?
+struct DopeNodeFields: Codable, Hashable, Sendable {
+    let code: String?
+    let name: String?
+    let description: String?
+    let sortOrder: Int?
+    let entityType: DopeEntityType?
+    let repoRepresentativeFile: String?
+    let baseComposableUuid: String?
+    let dataType: DopePropertyDataType?
+    let nullable: Bool?
+    let isUnique: Bool?
+    let autoIncrement: Bool?
+    let textCharLimit: Int?
+    let enumUuid: String?
+    let relationshipTargetUuid: String?
+    let baseOriginPropertyUuid: String?
+    let clearRepoRepresentativeFile: Bool?
+    let clearBaseComposable: Bool?
+    let clearBaseOrigin: Bool?
+    let clearAutoIncrement: Bool?
+    let clearTextCharLimit: Bool?
+    let clearEnum: Bool?
+    let clearRelationshipTarget: Bool?
 
-    public init(
+    init(
         code: String? = nil,
         name: String? = nil,
         description: String? = nil,
@@ -4409,25 +4409,25 @@ public struct DopeNodeFields: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeNodeAddRequest: Codable, Hashable, Sendable {
-    public let level: DopeLevel
-    public let parentUuid: String
-    public let fields: DopeNodeFields
+struct DopeNodeAddRequest: Codable, Hashable, Sendable {
+    let level: DopeLevel
+    let parentUuid: String
+    let fields: DopeNodeFields
 
-    public init(level: DopeLevel, parentUuid: String, fields: DopeNodeFields) {
+    init(level: DopeLevel, parentUuid: String, fields: DopeNodeFields) {
         self.level = level
         self.parentUuid = parentUuid
         self.fields = fields
     }
 }
 
-public struct DopeNodeUpdateRequest: Codable, Hashable, Sendable {
-    public let level: DopeLevel
-    public let nodeUuid: String
-    public let expectedVersion: Int64
-    public let fields: DopeNodeFields
+struct DopeNodeUpdateRequest: Codable, Hashable, Sendable {
+    let level: DopeLevel
+    let nodeUuid: String
+    let expectedVersion: Int64
+    let fields: DopeNodeFields
 
-    public init(level: DopeLevel, nodeUuid: String, expectedVersion: Int64, fields: DopeNodeFields) {
+    init(level: DopeLevel, nodeUuid: String, expectedVersion: Int64, fields: DopeNodeFields) {
         self.level = level
         self.nodeUuid = nodeUuid
         self.expectedVersion = expectedVersion
@@ -4435,19 +4435,19 @@ public struct DopeNodeUpdateRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeNodeDeleteRequest: Codable, Hashable, Sendable {
-    public let level: DopeLevel
-    public let nodeUuid: String
-    public let expectedVersion: Int64
+struct DopeNodeDeleteRequest: Codable, Hashable, Sendable {
+    let level: DopeLevel
+    let nodeUuid: String
+    let expectedVersion: Int64
     /// Soft delete: stamp `deleted_on` instead of removing the row. The node
     /// stays visible to every read (that IS the feature — it communicates an
     /// intended delete), keeps satisfying every FK, and in an overlay tree
     /// acts as the resolver's whiteout over the base node at that dot-path.
     ///
     /// Additive OPTIONAL, so a peer that omits it still means "hard delete".
-    public let soft: Bool?
+    let soft: Bool?
 
-    public init(
+    init(
         level: DopeLevel,
         nodeUuid: String,
         expectedVersion: Int64,
@@ -4460,15 +4460,15 @@ public struct DopeNodeDeleteRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeNodeResponse: Codable, Hashable, Sendable {
-    public let level: DopeLevel
-    public let uuid: String
-    public let version: Int64
-    public let scopeUuid: String
+struct DopeNodeResponse: Codable, Hashable, Sendable {
+    let level: DopeLevel
+    let uuid: String
+    let version: Int64
+    let scopeUuid: String
     /// The scope's whole-tree content counter after this mutation.
-    public let revision: Int64
+    let revision: Int64
 
-    public init(level: DopeLevel, uuid: String, version: Int64, scopeUuid: String, revision: Int64) {
+    init(level: DopeLevel, uuid: String, version: Int64, scopeUuid: String, revision: Int64) {
         self.level = level
         self.uuid = uuid
         self.version = version
@@ -4477,13 +4477,13 @@ public struct DopeNodeResponse: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeNodeDeleteResponse: Codable, Hashable, Sendable {
-    public let deletedUuid: String
-    public let cascaded: DopeTreeCounts
-    public let scopeUuid: String
-    public let revision: Int64
+struct DopeNodeDeleteResponse: Codable, Hashable, Sendable {
+    let deletedUuid: String
+    let cascaded: DopeTreeCounts
+    let scopeUuid: String
+    let revision: Int64
 
-    public init(deletedUuid: String, cascaded: DopeTreeCounts, scopeUuid: String, revision: Int64) {
+    init(deletedUuid: String, cascaded: DopeTreeCounts, scopeUuid: String, revision: Int64) {
         self.deletedUuid = deletedUuid
         self.cascaded = cascaded
         self.scopeUuid = scopeUuid
@@ -4494,24 +4494,24 @@ public struct DopeNodeDeleteResponse: Codable, Hashable, Sendable {
 /// Parse + validate the on-disk tree. Never writes. Exactly one of scopeUuid
 /// (resolve the scope's own instance root) or dirPath (an explicit instance
 /// root — read-only, still required to be a git checkout) must be present.
-public struct DopeReadRepoRequest: Codable, Hashable, Sendable {
-    public let scopeUuid: String?
-    public let dirPath: String?
+struct DopeReadRepoRequest: Codable, Hashable, Sendable {
+    let scopeUuid: String?
+    let dirPath: String?
 
-    public init(scopeUuid: String? = nil, dirPath: String? = nil) {
+    init(scopeUuid: String? = nil, dirPath: String? = nil) {
         self.scopeUuid = scopeUuid
         self.dirPath = dirPath
     }
 }
 
-public struct DopeReadRepoResponse: Codable, Hashable, Sendable {
-    public let bundle: DopeDocumentBundle
-    public let onDiskRevision: Int64
-    public let dbRevision: Int64?
-    public let drift: Bool?
-    public let warnings: [String]
+struct DopeReadRepoResponse: Codable, Hashable, Sendable {
+    let bundle: DopeDocumentBundle
+    let onDiskRevision: Int64
+    let dbRevision: Int64?
+    let drift: Bool?
+    let warnings: [String]
 
-    public init(
+    init(
         bundle: DopeDocumentBundle,
         onDiskRevision: Int64,
         dbRevision: Int64?,
@@ -4530,23 +4530,23 @@ public struct DopeReadRepoResponse: Codable, Hashable, Sendable {
 /// (the files hold edits never ingested) unless force. Does not modify the
 /// db beyond the audit event; does not bump revision (a projection, so a
 /// repeat run is byte-idempotent).
-public struct DopeWriteRepoRequest: Codable, Hashable, Sendable {
-    public let scopeUuid: String
-    public let force: Bool?
+struct DopeWriteRepoRequest: Codable, Hashable, Sendable {
+    let scopeUuid: String
+    let force: Bool?
 
-    public init(scopeUuid: String, force: Bool? = nil) {
+    init(scopeUuid: String, force: Bool? = nil) {
         self.scopeUuid = scopeUuid
         self.force = force
     }
 }
 
-public struct DopeWriteRepoResponse: Codable, Hashable, Sendable {
-    public let dopeRoot: String
-    public let filesWritten: [String]
-    public let filesPruned: [String]
-    public let revision: Int64
+struct DopeWriteRepoResponse: Codable, Hashable, Sendable {
+    let dopeRoot: String
+    let filesWritten: [String]
+    let filesPruned: [String]
+    let revision: Int64
 
-    public init(dopeRoot: String, filesWritten: [String], filesPruned: [String], revision: Int64) {
+    init(dopeRoot: String, filesWritten: [String], filesPruned: [String], revision: Int64) {
         self.dopeRoot = dopeRoot
         self.filesWritten = filesWritten
         self.filesPruned = filesPruned
@@ -4557,32 +4557,32 @@ public struct DopeWriteRepoResponse: Codable, Hashable, Sendable {
 /// files → db, whole-tree overwrite (no smart diff): the on-disk version
 /// must equal db revision + 1 exactly. Every child uuid changes on every
 /// ingest — the locked consequence of uuid-free JSON.
-public struct DopeIngestRequest: Codable, Hashable, Sendable {
-    public let scopeUuid: String
+struct DopeIngestRequest: Codable, Hashable, Sendable {
+    let scopeUuid: String
     /// Explicit instance root to read from; nil = the scope's own.
-    public let dirPath: String?
+    let dirPath: String?
     /// Files-are-authoritative mode (boot sync only): permits any strictly
     /// FORWARD move (on-disk version > db revision), including seeding a
     /// virgin scope at revision 0 from a tree at any version. Never moves
     /// backward. Additive optional — absent means the strict +1 gate.
-    public let adopt: Bool?
+    let adopt: Bool?
 
-    public init(scopeUuid: String, dirPath: String? = nil, adopt: Bool? = nil) {
+    init(scopeUuid: String, dirPath: String? = nil, adopt: Bool? = nil) {
         self.scopeUuid = scopeUuid
         self.dirPath = dirPath
         self.adopt = adopt
     }
 }
 
-public struct DopeIngestResponse: Codable, Hashable, Sendable {
-    public let scope: DopeScopeRow
-    public let counts: DopeTreeCounts
+struct DopeIngestResponse: Codable, Hashable, Sendable {
+    let scope: DopeScopeRow
+    let counts: DopeTreeCounts
     /// Revision the scope held before this ingest (additive optional).
-    public let previousRevision: Int64?
+    let previousRevision: Int64?
     /// Revisions skipped beyond the strict +1 step (adopt only, additive).
-    public let gapCrossed: Int64?
+    let gapCrossed: Int64?
 
-    public init(
+    init(
         scope: DopeScopeRow,
         counts: DopeTreeCounts,
         previousRevision: Int64? = nil,
@@ -4602,21 +4602,21 @@ public struct DopeIngestResponse: Codable, Hashable, Sendable {
 /// derives and persists the full ancestor chain by joins (chain-non-null
 /// ladder). gmccDiagramPath is refused at PROJECT tier (no instance root to
 /// resolve it against).
-public struct DiagramInitRequest: Codable, Hashable, Sendable {
-    public let projectUuid: String?
-    public let instanceUuid: String?
-    public let sessionUuid: String?
-    public let promptUuid: String?
-    public let code: String
-    public let name: String
-    public let description: String?
-    public let gmccDiagramPath: String?
+struct DiagramInitRequest: Codable, Hashable, Sendable {
+    let projectUuid: String?
+    let instanceUuid: String?
+    let sessionUuid: String?
+    let promptUuid: String?
+    let code: String
+    let name: String
+    let description: String?
+    let gmccDiagramPath: String?
     /// The dope scope this whole diagram reads/writes through. Restricted to
     /// the masking tiers (PROJECT_ITEM / SESSION_INSTANCE_ITEM) so a canvas
     /// always edits a personal overlay rather than shared truth.
-    public let dopeScopeCode: String?
+    let dopeScopeCode: String?
 
-    public init(
+    init(
         projectUuid: String? = nil,
         instanceUuid: String? = nil,
         sessionUuid: String? = nil,
@@ -4639,11 +4639,11 @@ public struct DiagramInitRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DiagramResponse: Codable, Hashable, Sendable {
-    public let diagram: DiagramRow
-    public let created: Bool
+struct DiagramResponse: Codable, Hashable, Sendable {
+    let diagram: DiagramRow
+    let created: Bool
 
-    public init(diagram: DiagramRow, created: Bool) {
+    init(diagram: DiagramRow, created: Bool) {
         self.diagram = diagram
         self.created = created
     }
@@ -4653,16 +4653,16 @@ public struct DiagramResponse: Codable, Hashable, Sendable {
 /// owner uuid, exactly that tier's rows for that owner, never a union or a
 /// cross-tier ladder, ORDER BY code. Unknown owner is NOT_FOUND; a real
 /// owner with no diagrams is a normal empty list.
-public struct DiagramListRequest: Codable, Hashable, Sendable {
-    public let projectUuid: String?
-    public let instanceUuid: String?
-    public let sessionUuid: String?
-    public let promptUuid: String?
+struct DiagramListRequest: Codable, Hashable, Sendable {
+    let projectUuid: String?
+    let instanceUuid: String?
+    let sessionUuid: String?
+    let promptUuid: String?
     /// v23, additive: server-side visibility filter (PRIVATE|PUBLIC).
     /// Absent = both. Still single-owner single-tier — never a union.
-    public let visibility: String?
+    let visibility: String?
 
-    public init(
+    init(
         projectUuid: String? = nil,
         instanceUuid: String? = nil,
         sessionUuid: String? = nil,
@@ -4678,10 +4678,10 @@ public struct DiagramListRequest: Codable, Hashable, Sendable {
 
 }
 
-public struct DiagramListResponse: Codable, Hashable, Sendable {
-    public let diagrams: [DiagramRow]
+struct DiagramListResponse: Codable, Hashable, Sendable {
+    let diagrams: [DiagramRow]
 
-    public init(diagrams: [DiagramRow]) {
+    init(diagrams: [DiagramRow]) {
         self.diagrams = diagrams
     }
 }
@@ -4692,15 +4692,15 @@ public struct DiagramListResponse: Codable, Hashable, Sendable {
 /// diagram). Several owner matches without a code → BAD_REQUEST naming the
 /// candidate codes; a real owner with none → SUMMARY_ABSENT (diagramAbsent).
 /// The response does NOT embed dope trees — clients pair it with DOPE_GET.
-public struct DiagramGetRequest: Codable, Hashable, Sendable {
-    public let diagramUuid: String?
-    public let projectUuid: String?
-    public let instanceUuid: String?
-    public let sessionUuid: String?
-    public let promptUuid: String?
-    public let code: String?
+struct DiagramGetRequest: Codable, Hashable, Sendable {
+    let diagramUuid: String?
+    let projectUuid: String?
+    let instanceUuid: String?
+    let sessionUuid: String?
+    let promptUuid: String?
+    let code: String?
 
-    public init(
+    init(
         diagramUuid: String? = nil,
         projectUuid: String? = nil,
         instanceUuid: String? = nil,
@@ -4717,10 +4717,10 @@ public struct DiagramGetRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct DiagramGetResponse: Codable, Hashable, Sendable {
-    public let tree: DiagramTree
+struct DiagramGetResponse: Codable, Hashable, Sendable {
+    let tree: DiagramTree
     /// One row per dope_scope binding element (resolvedVia nil = ghost).
-    public let bindings: [DiagramBindingResolution]
+    let bindings: [DiagramBindingResolution]
     /// The OWNER's `gmfs_relative_storage_path` — the root a rendered
     /// screenshot lands under, whichever tier owns the diagram.
     ///
@@ -4728,9 +4728,9 @@ public struct DiagramGetResponse: Codable, Hashable, Sendable {
     /// response rather than being fetched separately because the alternative is
     /// three round trips for something the daemon already held while resolving
     /// the owner.
-    public let ownerStoragePath: String?
+    let ownerStoragePath: String?
 
-    public init(
+    init(
         tree: DiagramTree,
         bindings: [DiagramBindingResolution],
         ownerStoragePath: String? = nil
@@ -4744,7 +4744,7 @@ public struct DiagramGetResponse: Codable, Hashable, Sendable {
         case tree, bindings, ownerStoragePath
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         tree = try c.decode(DiagramTree.self, forKey: .tree)
         bindings = try c.decode([DiagramBindingResolution].self, forKey: .bindings)
@@ -4757,41 +4757,41 @@ public struct DiagramGetResponse: Codable, Hashable, Sendable {
 /// store body as DIAGRAM_BATCH_APPLY, so granular and batch semantics
 /// cannot drift. Diagram-row updates (rename/promotion) ride batch-apply's
 /// diagramUpdate mutation.
-public struct DiagramNodeAddRequest: Codable, Hashable, Sendable {
-    public let diagramUuid: String
-    public let add: DiagramElementAdd
+struct DiagramNodeAddRequest: Codable, Hashable, Sendable {
+    let diagramUuid: String
+    let add: DiagramElementAdd
 
-    public init(diagramUuid: String, add: DiagramElementAdd) {
+    init(diagramUuid: String, add: DiagramElementAdd) {
         self.diagramUuid = diagramUuid
         self.add = add
     }
 }
 
-public struct DiagramNodeUpdateRequest: Codable, Hashable, Sendable {
-    public let update: DiagramElementUpdate
+struct DiagramNodeUpdateRequest: Codable, Hashable, Sendable {
+    let update: DiagramElementUpdate
 
-    public init(update: DiagramElementUpdate) {
+    init(update: DiagramElementUpdate) {
         self.update = update
     }
 }
 
-public struct DiagramNodeDeleteRequest: Codable, Hashable, Sendable {
-    public let delete: DiagramElementDelete
+struct DiagramNodeDeleteRequest: Codable, Hashable, Sendable {
+    let delete: DiagramElementDelete
 
-    public init(delete: DiagramElementDelete) {
+    init(delete: DiagramElementDelete) {
         self.delete = delete
     }
 }
 
 /// Every mutation response carries diagramUuid + revision so clients update
 /// without a refetch (the DopeNodeResponse contract).
-public struct DiagramNodeResponse: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let version: Int64
-    public let diagramUuid: String
-    public let revision: Int64
+struct DiagramNodeResponse: Codable, Hashable, Sendable {
+    let uuid: String
+    let version: Int64
+    let diagramUuid: String
+    let revision: Int64
 
-    public init(uuid: String, version: Int64, diagramUuid: String, revision: Int64) {
+    init(uuid: String, version: Int64, diagramUuid: String, revision: Int64) {
         self.uuid = uuid
         self.version = version
         self.diagramUuid = diagramUuid
@@ -4799,14 +4799,14 @@ public struct DiagramNodeResponse: Codable, Hashable, Sendable {
     }
 }
 
-public struct DiagramNodeDeleteResponse: Codable, Hashable, Sendable {
-    public let deletedUuid: String
+struct DiagramNodeDeleteResponse: Codable, Hashable, Sendable {
+    let deletedUuid: String
     /// Element rows removed, including the target itself.
-    public let cascadedElements: Int
-    public let diagramUuid: String
-    public let revision: Int64
+    let cascadedElements: Int
+    let diagramUuid: String
+    let revision: Int64
 
-    public init(deletedUuid: String, cascadedElements: Int, diagramUuid: String, revision: Int64) {
+    init(deletedUuid: String, cascadedElements: Int, diagramUuid: String, revision: Int64) {
         self.deletedUuid = deletedUuid
         self.cascadedElements = cascadedElements
         self.diagramUuid = diagramUuid
@@ -4819,25 +4819,25 @@ public struct DiagramNodeDeleteResponse: Codable, Hashable, Sendable {
 /// array order; elementAdd clientRefs are resolvable by later mutations in
 /// the same batch. expectedRevision non-nil is a whole-diagram CAS gate
 /// (VERSION_CONFLICT on mismatch — gesture-end concurrency for GMVibes).
-public struct DiagramBatchApplyRequest: Codable, Hashable, Sendable {
-    public let diagramUuid: String
-    public let expectedRevision: Int64?
-    public let mutations: [DiagramMutation]
+struct DiagramBatchApplyRequest: Codable, Hashable, Sendable {
+    let diagramUuid: String
+    let expectedRevision: Int64?
+    let mutations: [DiagramMutation]
 
-    public init(diagramUuid: String, expectedRevision: Int64? = nil, mutations: [DiagramMutation]) {
+    init(diagramUuid: String, expectedRevision: Int64? = nil, mutations: [DiagramMutation]) {
         self.diagramUuid = diagramUuid
         self.expectedRevision = expectedRevision
         self.mutations = mutations
     }
 }
 
-public struct DiagramBatchApplyResponse: Codable, Hashable, Sendable {
-    public let diagramUuid: String
-    public let revision: Int64
+struct DiagramBatchApplyResponse: Codable, Hashable, Sendable {
+    let diagramUuid: String
+    let revision: Int64
     /// Index-aligned with the request's mutations array.
-    public let results: [DiagramMutationResult]
+    let results: [DiagramMutationResult]
 
-    public init(diagramUuid: String, revision: Int64, results: [DiagramMutationResult]) {
+    init(diagramUuid: String, revision: Int64, results: [DiagramMutationResult]) {
         self.diagramUuid = diagramUuid
         self.revision = revision
         self.results = results
@@ -4854,14 +4854,14 @@ public struct DiagramBatchApplyResponse: Codable, Hashable, Sendable {
 /// gallery grid); a non-empty query is a bm25-ranked FTS5 MATCH over
 /// diagram_fts (the gallery search box). `sessionUuid` narrows to one
 /// session's SESSION+PROMPT rows; `visibility` filters the axis.
-public struct DiagramSearchRequest: Codable, Hashable, Sendable {
-    public let projectUuid: String
-    public let sessionUuid: String?
-    public let query: String?
-    public let visibility: String?
-    public let limit: Int?
+struct DiagramSearchRequest: Codable, Hashable, Sendable {
+    let projectUuid: String
+    let sessionUuid: String?
+    let query: String?
+    let visibility: String?
+    let limit: Int?
 
-    public init(
+    init(
         projectUuid: String,
         sessionUuid: String? = nil,
         query: String? = nil,
@@ -4879,10 +4879,10 @@ public struct DiagramSearchRequest: Codable, Hashable, Sendable {
 /// Rows in rank order (bm25 when a query ran, updated_at DESC otherwise).
 /// DiagramRow already carries tier/visibility/owner uuids/revision — the
 /// whole card surface — so hits are plain rows, not a parallel shape.
-public struct DiagramSearchResponse: Codable, Hashable, Sendable {
-    public let diagrams: [DiagramRow]
+struct DiagramSearchResponse: Codable, Hashable, Sendable {
+    let diagrams: [DiagramRow]
 
-    public init(diagrams: [DiagramRow]) {
+    init(diagrams: [DiagramRow]) {
         self.diagrams = diagrams
     }
 }
@@ -4893,28 +4893,28 @@ public struct DiagramSearchResponse: Codable, Hashable, Sendable {
 /// durable DIAGRAM_CHANGE (action "deleted") is recorded BEFORE the row
 /// drops so live galleries/editors close cleanly. Screenshot cleanup is
 /// the CLIENT's (gmfs is gm territory, exactly like rendering).
-public struct DiagramDeleteRequest: Codable, Hashable, Sendable {
-    public let diagramUuid: String
-    public let expectedRevision: Int64?
+struct DiagramDeleteRequest: Codable, Hashable, Sendable {
+    let diagramUuid: String
+    let expectedRevision: Int64?
 
-    public init(diagramUuid: String, expectedRevision: Int64? = nil) {
+    init(diagramUuid: String, expectedRevision: Int64? = nil) {
         self.diagramUuid = diagramUuid
         self.expectedRevision = expectedRevision
     }
 }
 
-public struct DiagramDeleteResponse: Codable, Hashable, Sendable {
-    public let deletedUuid: String
-    public let code: String
+struct DiagramDeleteResponse: Codable, Hashable, Sendable {
+    let deletedUuid: String
+    let code: String
     /// Element rows removed with the diagram.
-    public let cascadedElements: Int
+    let cascadedElements: Int
     /// The owner storage path a screenshot may exist under (client cleanup).
-    public let ownerStoragePath: String?
+    let ownerStoragePath: String?
     /// The row's screenshot directory override — the client must clean the
     /// SAME path gm render wrote, not a guessed default.
-    public let gmccDiagramPath: String?
+    let gmccDiagramPath: String?
 
-    public init(
+    init(
         deletedUuid: String,
         code: String,
         cascadedElements: Int,
@@ -4933,26 +4933,26 @@ public struct DiagramDeleteResponse: Codable, Hashable, Sendable {
 /// diagrams into the repo's committed .gmcc tree, through the session's
 /// instance root (the dope write-repo gate and 4-phase orchestration,
 /// applied verbatim). Explicit only: setting PUBLIC never writes files.
-public struct DiagramWriteRepoRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String
+struct DiagramWriteRepoRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String
     /// Overwrite files stamped AHEAD of the db (the dope --force contract).
-    public let force: Bool
+    let force: Bool
 
-    public init(sessionUuid: String, force: Bool = false) {
+    init(sessionUuid: String, force: Bool = false) {
         self.sessionUuid = sessionUuid
         self.force = force
     }
 }
 
-public struct DiagramWriteRepoResponse: Codable, Hashable, Sendable {
+struct DiagramWriteRepoResponse: Codable, Hashable, Sendable {
     /// Diagram codes written this pass.
-    public let written: [String]
+    let written: [String]
     /// Files pruned because their diagram was demoted or deleted.
-    public let pruned: [String]
+    let pruned: [String]
     /// The absolute .gmcc/diagrams directory written under.
-    public let root: String
+    let root: String
 
-    public init(written: [String], pruned: [String], root: String) {
+    init(written: [String], pruned: [String], root: String) {
         self.written = written
         self.pruned = pruned
         self.root = root
@@ -4963,27 +4963,27 @@ public struct DiagramWriteRepoResponse: Codable, Hashable, Sendable {
 /// a file version must be STRICTLY greater than the db revision to land.
 /// Code-keyed upsert into the calling session's SESSION tier as PUBLIC;
 /// connector code-path targets re-resolve, unresolvable → ghost.
-public struct DiagramIngestRequest: Codable, Hashable, Sendable {
-    public let sessionUuid: String
+struct DiagramIngestRequest: Codable, Hashable, Sendable {
+    let sessionUuid: String
 
-    public init(sessionUuid: String) {
+    init(sessionUuid: String) {
         self.sessionUuid = sessionUuid
     }
 }
 
-public struct DiagramIngestResponse: Codable, Hashable, Sendable {
+struct DiagramIngestResponse: Codable, Hashable, Sendable {
     /// Codes created or updated from files.
-    public let ingested: [String]
+    let ingested: [String]
     /// Codes skipped (db at or ahead of the file, or a PRIVATE collision).
-    public let skipped: [String]
+    let skipped: [String]
     /// Per-file problems (corrupt JSON, name/code mismatch, refused
     /// content). One bad file must never abort the family's sync — and the
     /// boot path must have something to PRINT, or the failure is silent.
-    public let warnings: [String]
+    let warnings: [String]
     /// The absolute .gmcc/diagrams directory read from.
-    public let root: String
+    let root: String
 
-    public init(
+    init(
         ingested: [String],
         skipped: [String],
         warnings: [String] = [],
@@ -4999,49 +4999,49 @@ public struct DiagramIngestResponse: Codable, Hashable, Sendable {
 // MARK: - Dope merge / resolve
 
 /// DOPE_MERGE_PLAN — the per-element boundary plan for one scope. Read-only.
-public struct DopeMergePlanRequest: Codable, Hashable, Sendable {
-    public let scopeUuid: String
-    public init(scopeUuid: String) { self.scopeUuid = scopeUuid }
+struct DopeMergePlanRequest: Codable, Hashable, Sendable {
+    let scopeUuid: String
+    init(scopeUuid: String) { self.scopeUuid = scopeUuid }
 }
 
-public struct DopeMergeOutcomeRow: Codable, Hashable, Sendable {
-    public let dotPath: String
-    public let kind: String
-    public let decision: String
-    public init(dotPath: String, kind: String, decision: String) {
+struct DopeMergeOutcomeRow: Codable, Hashable, Sendable {
+    let dotPath: String
+    let kind: String
+    let decision: String
+    init(dotPath: String, kind: String, decision: String) {
         self.dotPath = dotPath
         self.kind = kind
         self.decision = decision
     }
 }
 
-public struct DopeMergePlanResponse: Codable, Hashable, Sendable {
-    public let outcomes: [DopeMergeOutcomeRow]
-    public let conflictCount: Int
-    public init(outcomes: [DopeMergeOutcomeRow], conflictCount: Int) {
+struct DopeMergePlanResponse: Codable, Hashable, Sendable {
+    let outcomes: [DopeMergeOutcomeRow]
+    let conflictCount: Int
+    init(outcomes: [DopeMergeOutcomeRow], conflictCount: Int) {
         self.outcomes = outcomes
         self.conflictCount = conflictCount
     }
 }
 
 /// DOPE_RESOLVE — settle conflicting dot-paths in one direction.
-public struct DopeResolveRequest: Codable, Hashable, Sendable {
-    public let scopeUuid: String
+struct DopeResolveRequest: Codable, Hashable, Sendable {
+    let scopeUuid: String
     /// nil = every unresolved conflict.
-    public let dotPath: String?
+    let dotPath: String?
     /// true keeps the db side, false takes the file side.
-    public let takeOurs: Bool
-    public init(scopeUuid: String, dotPath: String? = nil, takeOurs: Bool) {
+    let takeOurs: Bool
+    init(scopeUuid: String, dotPath: String? = nil, takeOurs: Bool) {
         self.scopeUuid = scopeUuid
         self.dotPath = dotPath
         self.takeOurs = takeOurs
     }
 }
 
-public struct DopeResolveResponse: Codable, Hashable, Sendable {
-    public let resolved: [String]
-    public let takeOurs: Bool
-    public init(resolved: [String], takeOurs: Bool) {
+struct DopeResolveResponse: Codable, Hashable, Sendable {
+    let resolved: [String]
+    let takeOurs: Bool
+    init(resolved: [String], takeOurs: Bool) {
         self.resolved = resolved
         self.takeOurs = takeOurs
     }
@@ -5051,15 +5051,15 @@ public struct DopeResolveResponse: Codable, Hashable, Sendable {
 
 /// Excerpting policy shared by every stub in this file. One constant, so a
 /// stub is the same size wherever it comes from.
-public enum CdeExcerpt {
+enum CdeExcerpt {
     /// Long enough to recognize what a body is about; short enough that a
     /// hundred stubs still fit inside the result budget below.
-    public static let chars = 400
+    static let chars = 400
 
     /// (excerpt, true length, whether anything was dropped). Character-based,
     /// never byte-based: an excerpt is shown to a reader, and clipping a
     /// grapheme in half would put mojibake in the record.
-    public static func take(
+    static func take(
         _ body: String,
         chars limit: Int = CdeExcerpt.chars
     )
@@ -5074,13 +5074,13 @@ public enum CdeExcerpt {
 /// What a pen read tool can be told to make itself smaller. Data, not prose,
 /// so the guard below can quote it back to the caller in a form the caller
 /// can act on without reading English.
-public struct CdeNarrowing: Codable, Hashable, Sendable {
+struct CdeNarrowing: Codable, Hashable, Sendable {
     /// The tool's own argument names, in the order worth trying.
-    public let parameters: [String]
+    let parameters: [String]
     /// The exact next call to make.
-    public let retryWith: String
+    let retryWith: String
 
-    public init(parameters: [String], retryWith: String) {
+    init(parameters: [String], retryWith: String) {
         self.parameters = parameters
         self.retryWith = retryWith
     }
@@ -5090,23 +5090,23 @@ public struct CdeNarrowing: Codable, Hashable, Sendable {
 /// prose apology and NEVER a clipped JSON body: the failure mode being fixed
 /// is a caller hand-parsing truncated JSON, so an over-budget read returns a
 /// well-formed envelope that names the parameter which narrows THIS tool.
-public struct CdeOversizeNote: Codable, Hashable, Sendable {
-    public let tool: String
+struct CdeOversizeNote: Codable, Hashable, Sendable {
+    let tool: String
     /// "degraded" = a narrowed payload rides along under `result`.
     /// "withheld" = even the narrowed form did not fit; there is no payload.
     /// "completed_degraded" / "completed_withheld" are the same two
     /// outcomes for a WRITE, and the prefix is load-bearing: the write landed,
     /// so the caller must read the result back rather than retry the call.
-    public let outcome: String
+    let outcome: String
     /// Size of the response the tool actually produced.
-    public let bytes: Int
+    let bytes: Int
     /// Size of what is being returned instead (nil when withheld).
-    public let degradedBytes: Int?
-    public let budgetBytes: Int
-    public let parameters: [String]
-    public let retryWith: String
+    let degradedBytes: Int?
+    let budgetBytes: Int
+    let parameters: [String]
+    let retryWith: String
 
-    public init(
+    init(
         tool: String,
         outcome: String,
         bytes: Int,
@@ -5133,14 +5133,14 @@ public struct CdeOversizeNote: Codable, Hashable, Sendable {
 /// result is refused, so the real cap sits below that; against the harness's
 /// 25,000-token ceiling and a pessimistic 2.5 bytes/token for JSON carrying
 /// escaped source, 45,000 bytes is ~18,000 tokens with envelope headroom.
-public enum CdeResultBudget {
-    public static let maxBytes = 45_000
+enum CdeResultBudget {
+    static let maxBytes = 45_000
     /// The page budget the cde server hands `CdePager` by default. 15 KB
     /// under `maxBytes` is the room for the envelope, the fixed parts of a
     /// page and pretty-print inflation, all measured on the same encoder.
-    public static let pageBytes = 30_000
+    static let pageBytes = 30_000
 
-    public static func encoder() -> JSONEncoder {
+    static func encoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         return encoder
@@ -5153,7 +5153,7 @@ public enum CdeResultBudget {
     ///    key knows it got no data, which is a fact it can act on; a truncated
     ///    body is a fact it cannot. Every read is paged by `CdePager` before
     ///    it reaches here, so this branch is a last resort, not a plan.
-    public static func render(
+    static func render(
         tool: String,
         narrowing: CdeNarrowing?,
         value: any Encodable,
@@ -5232,7 +5232,7 @@ struct AnyEncodable: Encodable {
 /// the vocabulary is Swift's job: an inline CHECK cannot be dropped without the
 /// documented twelve-step table rebuild, so encoding five arms in the schema
 /// buys a rebuild the first time a sixth is wanted.
-public enum TestRunState: String, Codable, Hashable, CaseIterable, Sendable {
+enum TestRunState: String, Codable, Hashable, CaseIterable, Sendable {
     case queued
     case running
     case passed
@@ -5245,7 +5245,7 @@ public enum TestRunState: String, Codable, Hashable, CaseIterable, Sendable {
 
 /// How a caller can tell the run finished. The MACHINE-checkable half; the
 /// human sentence is `doneHint`.
-public enum TestDoneKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum TestDoneKind: String, Codable, Hashable, CaseIterable, Sendable {
     /// A file appears at `done_condition.path`.
     case exitFile = "exit_file"
     /// The `test_run` row itself reaches a terminal state.
@@ -5256,13 +5256,13 @@ public enum TestDoneKind: String, Codable, Hashable, CaseIterable, Sendable {
 
 /// The claim cell's two states. The ask spelled the release edge explicitly —
 /// a run holds its target "until it is modified back into an open state".
-public enum TestLockState: String, Codable, Hashable, CaseIterable, Sendable {
+enum TestLockState: String, Codable, Hashable, CaseIterable, Sendable {
     case open
     case held
 }
 
 /// How liveness is decided for the current holder.
-public enum TestHolderKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum TestHolderKind: String, Codable, Hashable, CaseIterable, Sendable {
     /// DEFAULT, and the one that makes the lock safe. Liveness is a
     /// `flock(LOCK_NB)` probe on `lockPath`: if the probe succeeds the holder
     /// is gone, full stop. Authority is DERIVED from a won lock exactly as
@@ -5279,13 +5279,13 @@ public enum TestHolderKind: String, Codable, Hashable, CaseIterable, Sendable {
 /// was that repo tests be configured in the repo, and a manifest that travels
 /// with the checkout is the only version of that which survives cloning the
 /// repo into another environment.
-public struct TestSuiteSpec: Codable, Hashable, Sendable {
-    public let id: String
-    public let command: String
-    public let doneKind: TestDoneKind
-    public let doneHint: String?
+struct TestSuiteSpec: Codable, Hashable, Sendable {
+    let id: String
+    let command: String
+    let doneKind: TestDoneKind
+    let doneHint: String?
 
-    public init(id: String, command: String, doneKind: TestDoneKind, doneHint: String? = nil) {
+    init(id: String, command: String, doneKind: TestDoneKind, doneHint: String? = nil) {
         self.id = id
         self.command = command
         self.doneKind = doneKind
@@ -5293,66 +5293,66 @@ public struct TestSuiteSpec: Codable, Hashable, Sendable {
     }
 }
 
-public struct TestSuiteListRequest: Codable, Hashable, Sendable {
-    public let projectUuid: String
+struct TestSuiteListRequest: Codable, Hashable, Sendable {
+    let projectUuid: String
 
-    public init(projectUuid: String) {
+    init(projectUuid: String) {
         self.projectUuid = projectUuid
     }
 }
 
-public struct TestSuiteListResponse: Codable, Hashable, Sendable {
-    public let suites: [TestSuiteSpec]
+struct TestSuiteListResponse: Codable, Hashable, Sendable {
+    let suites: [TestSuiteSpec]
     /// Where the manifest was read from, so a caller that got an empty list can
     /// tell "no suites declared" from "looked in the wrong checkout".
-    public let manifestPath: String?
+    let manifestPath: String?
 
-    public init(suites: [TestSuiteSpec], manifestPath: String? = nil) {
+    init(suites: [TestSuiteSpec], manifestPath: String? = nil) {
         self.suites = suites
         self.manifestPath = manifestPath
     }
 }
 
-public struct TestLockStatusRequest: Codable, Hashable, Sendable {
-    public let projectUuid: String
+struct TestLockStatusRequest: Codable, Hashable, Sendable {
+    let projectUuid: String
 
-    public init(projectUuid: String) {
+    init(projectUuid: String) {
         self.projectUuid = projectUuid
     }
 }
 
-public struct TestLockAcquireRequest: Codable, Hashable, Sendable {
-    public let projectUuid: String
+struct TestLockAcquireRequest: Codable, Hashable, Sendable {
+    let projectUuid: String
     /// The checkout being claimed — the ask's "targets an instance".
-    public let targetInstanceUuid: String?
-    public let sessionUuid: String?
-    public let agentId: String?
-    public let suiteId: String
+    let targetInstanceUuid: String?
+    let sessionUuid: String?
+    let agentId: String?
+    let suiteId: String
     /// The ephemeral root this run owns.
     ///
     /// HARD CONSTRAINT on whatever generates it: `sun_path` is 104 bytes on
     /// macOS and the server binds `NWEndpoint.unix(path:)` under this root, so
     /// a long root yields a listener that cannot bind. Keep run ids SHORT.
-    public let runRoot: String
+    let runRoot: String
     /// The file the holder `flock`s. Absent means lease mode, which is the
     /// degraded path — see `TestHolderKind`.
-    public let lockPath: String?
-    public let holderPid: Int32?
-    public let gitSha: String?
-    public let gitBranch: String?
-    public let doneKind: TestDoneKind
+    let lockPath: String?
+    let holderPid: Int32?
+    let gitSha: String?
+    let gitBranch: String?
+    let doneKind: TestDoneKind
     /// JSON keyed by `doneKind` (e.g. `{"path": "…/result.json"}`). JSON rather
     /// than columns because the shape varies per kind and none of it is queried.
-    public let doneCondition: String
+    let doneCondition: String
     /// The human sentence another agent reads to decide whether to wait. The
     /// ask's "a description of how to tell when the test is done running" —
     /// deliberately free text, because it is documentation for a reader rather
     /// than a predicate for the machine.
-    public let doneHint: String?
+    let doneHint: String?
     /// Lease mode only. Ignored when a `lockPath` is given.
-    public let leaseSeconds: Int?
+    let leaseSeconds: Int?
 
-    public init(
+    init(
         projectUuid: String,
         targetInstanceUuid: String? = nil,
         sessionUuid: String? = nil,
@@ -5385,21 +5385,21 @@ public struct TestLockAcquireRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct TestLockReleaseRequest: Codable, Hashable, Sendable {
-    public let projectUuid: String
+struct TestLockReleaseRequest: Codable, Hashable, Sendable {
+    let projectUuid: String
     /// The run releasing. Required: releasing a lock you do not hold is the
     /// mistake worth refusing, and without this the verb cannot tell.
-    public let runUuid: String
+    let runUuid: String
     /// Terminal state to stamp on the run as it lets go.
-    public let finalState: TestRunState
-    public let exitCode: Int32?
-    public let summary: String?
+    let finalState: TestRunState
+    let exitCode: Int32?
+    let summary: String?
     /// Break a lock held by someone else. AUDITED — it events like any other
     /// transition, so a forced release is visible afterwards rather than
     /// indistinguishable from a clean one.
-    public let force: Bool
+    let force: Bool
 
-    public init(
+    init(
         projectUuid: String,
         runUuid: String,
         finalState: TestRunState,
@@ -5416,27 +5416,27 @@ public struct TestLockReleaseRequest: Codable, Hashable, Sendable {
     }
 }
 
-public struct TestLockResponse: Codable, Hashable, Sendable {
-    public let projectUuid: String
-    public let state: TestLockState
-    public let heldByRunUuid: String?
-    public let targetInstanceUuid: String?
-    public let holderKind: TestHolderKind?
-    public let lockPath: String?
-    public let holderPid: Int32?
-    public let claimedAt: String?
-    public let expiresAt: String?
-    public let version: Int64
+struct TestLockResponse: Codable, Hashable, Sendable {
+    let projectUuid: String
+    let state: TestLockState
+    let heldByRunUuid: String?
+    let targetInstanceUuid: String?
+    let holderKind: TestHolderKind?
+    let lockPath: String?
+    let holderPid: Int32?
+    let claimedAt: String?
+    let expiresAt: String?
+    let version: Int64
     /// The run currently holding, inlined so a waiting agent gets `doneHint`
     /// and `doneCondition` without a second round trip — the whole point of
     /// asking is "can I go yet", and that answer lives on the run.
-    public let run: TestRunSummary?
+    let run: TestRunSummary?
     /// True when this call RECLAIMED a lock whose holder was gone. Surfaced
     /// rather than silent: a caller that believes it queued cleanly should be
     /// able to see that it actually stepped over a corpse.
-    public let reclaimed: Bool
+    let reclaimed: Bool
 
-    public init(
+    init(
         projectUuid: String,
         state: TestLockState,
         heldByRunUuid: String? = nil,
@@ -5466,29 +5466,29 @@ public struct TestLockResponse: Codable, Hashable, Sendable {
 }
 
 /// The append-only ledger row, as the wire sees it.
-public struct TestRunSummary: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let projectUuid: String
-    public let instanceUuid: String?
-    public let sessionUuid: String?
-    public let agentId: String?
-    public let runRoot: String
-    public let suiteId: String
-    public let gitSha: String?
-    public let gitBranch: String?
-    public let state: TestRunState
-    public let doneKind: TestDoneKind
-    public let doneCondition: String
-    public let doneHint: String?
-    public let startedAt: String?
-    public let finishedAt: String?
-    public let exitCode: Int32?
-    public let summary: String?
-    public let createdAt: String
-    public let updatedAt: String
-    public let version: Int64
+struct TestRunSummary: Codable, Hashable, Sendable {
+    let uuid: String
+    let projectUuid: String
+    let instanceUuid: String?
+    let sessionUuid: String?
+    let agentId: String?
+    let runRoot: String
+    let suiteId: String
+    let gitSha: String?
+    let gitBranch: String?
+    let state: TestRunState
+    let doneKind: TestDoneKind
+    let doneCondition: String
+    let doneHint: String?
+    let startedAt: String?
+    let finishedAt: String?
+    let exitCode: Int32?
+    let summary: String?
+    let createdAt: String
+    let updatedAt: String
+    let version: Int64
 
-    public init(
+    init(
         uuid: String,
         projectUuid: String,
         instanceUuid: String? = nil,
@@ -5536,33 +5536,33 @@ public struct TestRunSummary: Codable, Hashable, Sendable {
 /// Mark a claimed run as actually started. Split from acquire because claiming
 /// the lock and beginning to run are genuinely different moments, and a run
 /// that was claimed but never started is a state worth being able to see.
-public struct TestRunStartRequest: Codable, Hashable, Sendable {
-    public let runUuid: String
-    public let expectedVersion: Int64
+struct TestRunStartRequest: Codable, Hashable, Sendable {
+    let runUuid: String
+    let expectedVersion: Int64
 
-    public init(runUuid: String, expectedVersion: Int64) {
+    init(runUuid: String, expectedVersion: Int64) {
         self.runUuid = runUuid
         self.expectedVersion = expectedVersion
     }
 }
 
-public struct TestRunStatusRequest: Codable, Hashable, Sendable {
+struct TestRunStatusRequest: Codable, Hashable, Sendable {
     /// One run by uuid, or — when nil — the recent runs for `projectUuid`.
-    public let runUuid: String?
-    public let projectUuid: String?
-    public let limit: Int?
+    let runUuid: String?
+    let projectUuid: String?
+    let limit: Int?
 
-    public init(runUuid: String? = nil, projectUuid: String? = nil, limit: Int? = nil) {
+    init(runUuid: String? = nil, projectUuid: String? = nil, limit: Int? = nil) {
         self.runUuid = runUuid
         self.projectUuid = projectUuid
         self.limit = limit
     }
 }
 
-public struct TestRunResponse: Codable, Hashable, Sendable {
-    public let runs: [TestRunSummary]
+struct TestRunResponse: Codable, Hashable, Sendable {
+    let runs: [TestRunSummary]
 
-    public init(runs: [TestRunSummary]) {
+    init(runs: [TestRunSummary]) {
         self.runs = runs
     }
 }
@@ -5581,20 +5581,20 @@ public struct TestRunResponse: Codable, Hashable, Sendable {
 /// The child is therefore THIN: it resolves the triple once at startup and
 /// forwards it. `clientKey` is resolved BEFORE any chdir and cached, since
 /// ancestry cannot change for a live process. `cwd` is read AFTER the chdir.
-public struct GmHarnessIdentity: Codable, Hashable, Sendable {
+struct GmHarnessIdentity: Codable, Hashable, Sendable {
     /// `claude:<pid>:<starttime>`, resolved by the child from ITS ancestry.
     ///
     /// Optional, and the nil case DEGRADES rather than refuses. A refusal here
     /// is a dead pen, and the pen is the repair tool — the one thing a user
     /// reaches for when the machine is already broken. The kernel logs one line
     /// and proceeds unclaimed.
-    public let clientKey: String?
+    let clientKey: String?
     /// The child's working directory, read after it chdirs to the project dir.
-    public let cwd: String?
+    let cwd: String?
     /// `$CLAUDE_PROJECT_DIR` as the harness reported it.
-    public let projectDir: String?
+    let projectDir: String?
 
-    public init(clientKey: String? = nil, cwd: String? = nil, projectDir: String? = nil) {
+    init(clientKey: String? = nil, cwd: String? = nil, projectDir: String? = nil) {
         self.clientKey = clientKey
         self.cwd = cwd
         self.projectDir = projectDir
@@ -5607,14 +5607,14 @@ public struct GmHarnessIdentity: Codable, Hashable, Sendable {
 /// keeps its inner lines opaque: this verb needs no knowledge of the ~57 tool
 /// schemas it can carry, and teaching it would make every roster change a wire
 /// change.
-public struct McpCallRequest: Codable, Hashable, Sendable {
+struct McpCallRequest: Codable, Hashable, Sendable {
     /// The tool name as the harness spelled it, unqualified (`explore_get`,
     /// not `mcp__plugin_gmcc_cde__explore_get`).
-    public let tool: String
-    public let arguments: GmJsonValue?
-    public let identity: GmHarnessIdentity
+    let tool: String
+    let arguments: GmJsonValue?
+    let identity: GmHarnessIdentity
 
-    public init(tool: String, arguments: GmJsonValue? = nil, identity: GmHarnessIdentity) {
+    init(tool: String, arguments: GmJsonValue? = nil, identity: GmHarnessIdentity) {
         self.tool = tool
         self.arguments = arguments
         self.identity = identity
@@ -5629,7 +5629,7 @@ public struct McpCallRequest: Codable, Hashable, Sendable {
 /// child rendered, the budget and the renderer would be in two processes and
 /// free to drift — and the failure mode of that drift is a result that blows the
 /// harness limit, which is exactly what the budget exists to prevent.
-public struct McpCallResponse: Codable, Hashable, Sendable {
+struct McpCallResponse: Codable, Hashable, Sendable {
     /// The rendered tool result, already budget-checked.
     ///
     /// THERE IS NO SEPARATE `budget` FIELD, and its absence is deliberate.
@@ -5638,14 +5638,14 @@ public struct McpCallResponse: Codable, Hashable, Sendable {
     /// payload under `result`. A sibling field would duplicate this string or
     /// sit permanently nil, and a field nothing populates is a claim the wire
     /// does not honour.
-    public let text: String
+    let text: String
     /// A tool-level failure. Rides the RESULT envelope rather than the protocol
     /// error, matching what the MCP server already does: a tool that fails is
     /// not a malformed request, and an MCP client is built to read the
     /// difference.
-    public let isError: Bool
+    let isError: Bool
 
-    public init(text: String, isError: Bool = false) {
+    init(text: String, isError: Bool = false) {
         self.text = text
         self.isError = isError
     }
@@ -5659,14 +5659,14 @@ public struct McpCallResponse: Codable, Hashable, Sendable {
 /// `command` and `mcp_tool`, an `mcp_tool` handler there expects a "not
 /// connected" error on first run, and shell form alone resolves
 /// `${GM_FS_ROOT:-$HOME/gmfs}` at hook time and honours the exit-0 no-op.
-public struct HookEventRequest: Codable, Hashable, Sendable {
+struct HookEventRequest: Codable, Hashable, Sendable {
     /// The lifecycle event name as the harness spells it (`PostToolUse`,
     /// `SessionStart`, `SubagentStart`, …). A raw string rather than an enum:
     /// the harness owns this vocabulary and adds to it, and an unknown event
     /// must be a recorded no-op here, never a decode failure that fails a hook.
-    public let event: String
-    public let payload: GmJsonValue?
-    public let identity: GmHarnessIdentity
+    let event: String
+    let payload: GmJsonValue?
+    let identity: GmHarnessIdentity
     /// When true the daemon returns `ok` for a BUSINESS failure and reports the
     /// problem in `note` instead of throwing.
     ///
@@ -5674,9 +5674,9 @@ public struct HookEventRequest: Codable, Hashable, Sendable {
     /// since a non-zero PostToolUse is a blocked tool call. Putting the contract
     /// in the message means a caller cannot forget it. Transport-level failures
     /// still fail: a malformed envelope is not a business failure.
-    public let hookSafe: Bool
+    let hookSafe: Bool
 
-    public init(event: String, payload: GmJsonValue? = nil, identity: GmHarnessIdentity, hookSafe: Bool = true) {
+    init(event: String, payload: GmJsonValue? = nil, identity: GmHarnessIdentity, hookSafe: Bool = true) {
         self.event = event
         self.payload = payload
         self.identity = identity
@@ -5685,18 +5685,18 @@ public struct HookEventRequest: Codable, Hashable, Sendable {
 }
 
 /// Result of a `HOOK_EVENT`.
-public struct HookEventResponse: Codable, Hashable, Sendable {
+struct HookEventResponse: Codable, Hashable, Sendable {
     /// Whether the event produced a recorded write.
-    public let recorded: Bool
+    let recorded: Bool
     /// Human-readable outcome. Under `hookSafe` this is where a suppressed
     /// business failure is reported, so a swallowed error is still SAID
     /// somewhere rather than vanishing.
-    public let note: String?
+    let note: String?
     /// Text the harness should inject as additional context, for the events that
     /// honour it (`SessionStart` provisioning being the one that matters).
-    public let additionalContext: String?
+    let additionalContext: String?
 
-    public init(recorded: Bool, note: String? = nil, additionalContext: String? = nil) {
+    init(recorded: Bool, note: String? = nil, additionalContext: String? = nil) {
         self.recorded = recorded
         self.note = note
         self.additionalContext = additionalContext

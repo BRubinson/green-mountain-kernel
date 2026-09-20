@@ -8,19 +8,19 @@ import GRDB
 
 extension Store {
 
-    public func promptStart(_ req: PromptStartRequest) throws -> BotWorkflowResponse {
+    func promptStart(_ req: PromptStartRequest) throws -> BotWorkflowResponse {
         try boundary { db in try BotWorkflowRepository(db: db, core: core).start(req) }
     }
 
-    public func promptResume(_ req: PromptResumeRequest) throws -> BotWorkflowResponse {
+    func promptResume(_ req: PromptResumeRequest) throws -> BotWorkflowResponse {
         try boundary { db in try BotWorkflowRepository(db: db, core: core).resume(req) }
     }
 
-    public func botNext(_ req: BotNextRequest) throws -> BotNextResponse {
+    func botNext(_ req: BotNextRequest) throws -> BotNextResponse {
         try boundary { db in try BotWorkflowRepository(db: db, core: core).next(req) }
     }
 
-    public func botGet(_ req: BotGetRequest) throws -> BotWorkflowResponse {
+    func botGet(_ req: BotGetRequest) throws -> BotWorkflowResponse {
         try boundaryRead { db in try BotWorkflowRepository(db: db, core: core).get(req) }
     }
 }

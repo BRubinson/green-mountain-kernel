@@ -1,8 +1,8 @@
 import Foundation
 
-public enum GmBridgeMcp {
+enum GmBridgeMcp {
 
-    public enum Transport: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
+    enum Transport: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
 
         case stdio
 
@@ -13,23 +13,23 @@ public enum GmBridgeMcp {
         case ws
     }
 
-    public struct Server: Codable, Equatable, Hashable, Sendable {
+    struct Server: Codable, Equatable, Hashable, Sendable {
 
-        public var type: Transport?
+        var type: Transport?
 
-        public var command: String?
+        var command: String?
 
-        public var args: [String]?
+        var args: [String]?
 
-        public var env: [String: String]?
+        var env: [String: String]?
 
-        public var url: String?
+        var url: String?
 
-        public var headers: [String: String]?
+        var headers: [String: String]?
 
-        public var alwaysLoad: Bool?
+        var alwaysLoad: Bool?
 
-        public init(
+        init(
             type: Transport? = nil,
             command: String? = nil,
             args: [String]? = nil,
@@ -47,7 +47,7 @@ public enum GmBridgeMcp {
             self.alwaysLoad = alwaysLoad
         }
 
-        public static func stdio(
+        static func stdio(
             command: String,
             args: [String]? = nil,
             env: [String: String]? = nil,
@@ -57,17 +57,17 @@ public enum GmBridgeMcp {
         }
     }
 
-    public struct File: Codable, Equatable, Sendable, GmBridgeJsonFile {
+    struct File: Codable, Equatable, Sendable, GmBridgeJsonFile {
 
-        public var relativePath: String { ".mcp.json" }
+        var relativePath: String { ".mcp.json" }
 
-        public var mcpServers: [String: Server]
+        var mcpServers: [String: Server]
 
-        public init(mcpServers: [String: Server]) {
+        init(mcpServers: [String: Server]) {
             self.mcpServers = mcpServers
         }
 
-        public var isEmpty: Bool {
+        var isEmpty: Bool {
             mcpServers.isEmpty
         }
     }

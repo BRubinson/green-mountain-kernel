@@ -1,9 +1,9 @@
 import Foundation
 
 /// The plugin generator personality: `gm_kernel bridge [--check] <plugin-dir>`.
-public enum GmBridgeCli {
+enum GmBridgeCli {
 
-    public static func main(_ arguments: [String]) -> Never {
+    static func main(_ arguments: [String]) -> Never {
         var args = arguments
         var check = false
         if let i = args.firstIndex(of: "--check") {

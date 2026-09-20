@@ -1,15 +1,15 @@
 import ClaudeForFoundationModels
 import Foundation
 
-public enum GmBridgeAgent {
+enum GmBridgeAgent {
 
-    public typealias Model = GmBridgeClaudeTypeModel
+    typealias Model = GmBridgeClaudeTypeModel
 
-    public typealias Effort = GmBridgeClaudeTypeEffort
+    typealias Effort = GmBridgeClaudeTypeEffort
 
-    public typealias Native = GmBridgeClaudeTypeNativeTool
+    typealias Native = GmBridgeClaudeTypeNativeTool
 
-    public enum Memory: String, Equatable, Hashable, Sendable, CaseIterable {
+    enum Memory: String, Equatable, Hashable, Sendable, CaseIterable {
 
         case user
 
@@ -18,40 +18,40 @@ public enum GmBridgeAgent {
         case local
     }
 
-    public enum Isolation: String, Equatable, Hashable, Sendable, CaseIterable {
+    enum Isolation: String, Equatable, Hashable, Sendable, CaseIterable {
 
         case worktree
     }
 
-    public struct File: Equatable, Sendable, GmBridgeFile {
+    struct File: Equatable, Sendable, GmBridgeFile {
 
-        public var name: String
+        var name: String
 
-        public var description: String
+        var description: String
 
-        public var model: Model?
+        var model: Model?
 
-        public var effort: Effort?
+        var effort: Effort?
 
-        public var maxTurns: Int?
+        var maxTurns: Int?
 
-        public var nativeTools: [Native]
+        var nativeTools: [Native]
 
-        public var mcpTools: [GmBridgeMcpTool]
+        var mcpTools: [GmBridgeMcpTool]
 
-        public var disallowedTools: [Native]
+        var disallowedTools: [Native]
 
-        public var skills: [String]
+        var skills: [String]
 
-        public var memory: Memory?
+        var memory: Memory?
 
-        public var background: Bool?
+        var background: Bool?
 
-        public var isolation: Isolation?
+        var isolation: Isolation?
 
-        public var prompt: String
+        var prompt: String
 
-        public init(
+        init(
             name: String,
             description: String,
             model: Model? = nil,
@@ -81,15 +81,15 @@ public enum GmBridgeAgent {
             self.prompt = prompt
         }
 
-        public var relativePath: String {
+        var relativePath: String {
             "agents/\(name).md"
         }
 
-        public var toolNames: [String] {
+        var toolNames: [String] {
             nativeTools.map(\.rawValue) + mcpTools.map(\.qualifiedName)
         }
 
-        public func contents() -> String? {
+        func contents() -> String? {
             var lines = ["---"]
             lines.append("name: \(GmBridgeYaml.scalar(name))")
             lines.append("description: \(GmBridgeYaml.scalar(description))")

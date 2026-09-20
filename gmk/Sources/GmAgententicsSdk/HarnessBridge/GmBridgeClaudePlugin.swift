@@ -9,9 +9,9 @@ extension GmBridgeClaudePlugin {
     /// slash-command namespace. Setting it for a single `gm_bridge_writer` run
     /// emits a complete alias tree with no string substitution, so a
     /// `--plugin-dir` tree does not collide with the marketplace `gmcc`.
-    public static let pluginNameEnvVar = "GM_BRIDGE_PLUGIN_NAME"
+    static let pluginNameEnvVar = "GM_BRIDGE_PLUGIN_NAME"
 
-    public static let current = File(
+    static let current = File(
         name: ProcessInfo.processInfo.environment[pluginNameEnvVar] ?? "gmcc",
         version: GmVersion.current,
         description: """

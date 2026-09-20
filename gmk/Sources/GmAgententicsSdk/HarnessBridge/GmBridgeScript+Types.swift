@@ -1,15 +1,15 @@
 import Foundation
 
-public enum GmBridgeScript {
+enum GmBridgeScript {
 
-    public enum Location: String, Equatable, Hashable, Sendable, CaseIterable {
+    enum Location: String, Equatable, Hashable, Sendable, CaseIterable {
 
         case scripts
 
         case bin
     }
 
-    public enum Interpreter: String, Equatable, Hashable, Sendable, CaseIterable {
+    enum Interpreter: String, Equatable, Hashable, Sendable, CaseIterable {
 
         case bash
 
@@ -19,7 +19,7 @@ public enum GmBridgeScript {
 
         case node
 
-        public var shebang: String {
+        var shebang: String {
             switch self {
             case .bash: return "#!/usr/bin/env bash"
             case .zsh: return "#!/usr/bin/env zsh"
@@ -29,17 +29,17 @@ public enum GmBridgeScript {
         }
     }
 
-    public struct File: Equatable, Sendable, GmBridgeFile {
+    struct File: Equatable, Sendable, GmBridgeFile {
 
-        public var name: String
+        var name: String
 
-        public var location: Location
+        var location: Location
 
-        public var interpreter: Interpreter?
+        var interpreter: Interpreter?
 
-        public var body: String
+        var body: String
 
-        public init(
+        init(
             name: String,
             location: Location = .scripts,
             interpreter: Interpreter? = nil,
@@ -51,21 +51,21 @@ public enum GmBridgeScript {
             self.body = body
         }
 
-        public var relativePath: String {
+        var relativePath: String {
             "\(location.rawValue)/\(name)"
         }
 
-        public var pluginPath: String {
+        var pluginPath: String {
             "\(GmBridgeClaudeTypePath.pluginRoot)/\(relativePath)"
         }
 
-        public var isEmpty: Bool {
+        var isEmpty: Bool {
             body.isEmpty
         }
 
-        public var isExecutable: Bool { true }
+        var isExecutable: Bool { true }
 
-        public func contents() -> String? {
+        func contents() -> String? {
             guard !isEmpty else { return nil }
 
             let content = body.hasSuffix("\n") ? body : body + "\n"

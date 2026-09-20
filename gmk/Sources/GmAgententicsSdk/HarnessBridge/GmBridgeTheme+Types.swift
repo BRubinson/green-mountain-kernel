@@ -1,25 +1,25 @@
 import Foundation
 
-public enum GmBridgeTheme {
+enum GmBridgeTheme {
 
-    public enum Base: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
+    enum Base: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
 
         case dark
 
         case light
     }
 
-    public struct File: Encodable, Equatable, Sendable, GmBridgeJsonFile {
+    struct File: Encodable, Equatable, Sendable, GmBridgeJsonFile {
 
-        public var slug: String
+        var slug: String
 
-        public var name: String
+        var name: String
 
-        public var base: Base
+        var base: Base
 
-        public var overrides: [String: String]
+        var overrides: [String: String]
 
-        public init(
+        init(
             slug: String,
             name: String,
             base: Base,
@@ -31,11 +31,11 @@ public enum GmBridgeTheme {
             self.overrides = overrides
         }
 
-        public var relativePath: String {
+        var relativePath: String {
             "themes/\(slug).json"
         }
 
-        public var selector: String {
+        var selector: String {
             "custom:\(GmBridgeClaudePlugin.current.name):\(slug)"
         }
 

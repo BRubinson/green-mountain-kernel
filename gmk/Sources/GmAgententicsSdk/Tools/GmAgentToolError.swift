@@ -2,7 +2,7 @@
 
 import Foundation
 
-public enum GmAgentToolError: Error, Sendable {
+enum GmAgentToolError: Error, Sendable {
 
     case notSupported(tool: String, detail: String)
 
@@ -14,7 +14,7 @@ public enum GmAgentToolError: Error, Sendable {
 }
 
 extension GmAgentToolError: LocalizedError {
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .notSupported(let tool, let detail):
             return "\(tool) is declared but not backed by a daemon verb: \(detail)"

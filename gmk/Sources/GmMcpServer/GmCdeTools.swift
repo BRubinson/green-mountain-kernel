@@ -8,13 +8,13 @@ import Foundation
 /// per-tool `narrowing`, and the `degrade` closures that re-run a narrowed call
 /// so an over-budget read returns DATA plus instructions. Both doors read the
 /// one `tools` array, so they cannot disagree about what exists.
-public enum GmCdeTools {
+enum GmCdeTools {
 
     /// Every tool name this build serves. The runtime half of the bidirectional
     /// name-parity check — the build-time half stops a generated plugin naming
     /// a tool nothing serves, and this answers the reverse question for a
     /// caller that arrives with an unknown name.
-    public static var names: Set<String> {
+    static var names: Set<String> {
         Set(tools.map(\.name))
     }
 
@@ -29,7 +29,7 @@ public enum GmCdeTools {
     ///   come back as the `gmcc_oversize` envelope rather than truncated JSON.
     /// - Throws: `GmCdeToolError.unknownTool` for a name this build does not
     ///   serve; whatever the tool body throws otherwise.
-    public static func call(
+    static func call(
         tool name: String,
         arguments: GmJsonValue?,
         caller: any GmVerbCaller
@@ -57,10 +57,10 @@ public enum GmCdeTools {
     }
 }
 
-public enum GmCdeToolError: Error, CustomStringConvertible {
+enum GmCdeToolError: Error, CustomStringConvertible {
     case unknownTool(String)
 
-    public var description: String {
+    var description: String {
         switch self {
         case .unknownTool(let name):
             return "'\(name)' is not a tool this build serves. "
@@ -76,21 +76,21 @@ public enum GmCdeToolError: Error, CustomStringConvertible {
 /// "the plugin names a tool the server does not serve" unrepresentable instead
 /// of merely checked. `tools/list` and the generated `allowed-tools` frontmatter
 /// are then two renderings of one array.
-public struct GmCdeToolDescriptor: Sendable, Hashable {
-    public let name: String
-    public let description: String
+struct GmCdeToolDescriptor: Sendable, Hashable {
+    let name: String
+    let description: String
     /// The published JSON Schema, already in wire shape.
     ///
     /// Serialized to `Data` rather than handed over as a live object because
     /// the schema is built from `[String: Any]` on this side and the generator
     /// lives behind a macOS 27 floor with its own JSON type. Bytes cross that
     /// boundary without either side learning the other's representation.
-    public let inputSchemaJSON: Data
+    let inputSchemaJSON: Data
     /// True when the verb behind this tool RECORDS. The generator uses it to
     /// decide which tools a read-only agent may be granted, and it is derived
     /// from `VerbRegistry.role` rather than from the tool name, so it cannot
     /// drift from what the daemon actually does.
-    public let isWrite: Bool
+    let isWrite: Bool
 }
 
 extension GmCdeTools {
@@ -99,7 +99,7 @@ extension GmCdeTools {
     /// SORTED BY NAME so a regenerated plugin is diffable. An unordered roster
     /// makes every regeneration look like a change to every file, which is how
     /// a real change gets lost in the noise of a reordering.
-    @MainActor public static var descriptors: [GmCdeToolDescriptor] {
+    @MainActor static var descriptors: [GmCdeToolDescriptor] {
         let writes = VerbRegistry.writeCdeTools
         return
             tools

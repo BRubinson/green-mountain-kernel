@@ -14,31 +14,31 @@ extension Store {
 
     // MARK: - Verbs
 
-    public func exploreOpen(_ req: ExploreOpenRequest) throws -> ExploreSummaryResponse {
+    func exploreOpen(_ req: ExploreOpenRequest) throws -> ExploreSummaryResponse {
         try boundary { db in try ExplorationRepository(db: db, core: core).open(req) }
     }
 
-    public func exploreKeyFileAdd(_ req: ExploreKeyFileAddRequest) throws -> ExploreKeyFileAddResponse {
+    func exploreKeyFileAdd(_ req: ExploreKeyFileAddRequest) throws -> ExploreKeyFileAddResponse {
         try boundary { db in try ExplorationRepository(db: db, core: core).keyFileAdd(req) }
     }
 
-    public func exploreFindingAdd(_ req: ExploreFindingAddRequest) throws -> ExploreFindingRowResponse {
+    func exploreFindingAdd(_ req: ExploreFindingAddRequest) throws -> ExploreFindingRowResponse {
         try boundary { db in try ExplorationRepository(db: db, core: core).findingAdd(req) }
     }
 
-    public func exploreRank(_ req: ExploreRankRequest) throws -> ExploreRankResponse {
+    func exploreRank(_ req: ExploreRankRequest) throws -> ExploreRankResponse {
         try boundary { db in try ExplorationRepository(db: db, core: core).rank(req) }
     }
 
-    public func exploreComplete(_ req: ExploreCompleteRequest) throws -> ExploreSummaryResponse {
+    func exploreComplete(_ req: ExploreCompleteRequest) throws -> ExploreSummaryResponse {
         try boundary { db in try ExplorationRepository(db: db, core: core).complete(req) }
     }
 
-    public func exploreReopen(_ req: ExploreReopenRequest) throws -> ExploreSummaryResponse {
+    func exploreReopen(_ req: ExploreReopenRequest) throws -> ExploreSummaryResponse {
         try boundary { db in try ExplorationRepository(db: db, core: core).reopen(req) }
     }
 
-    public func exploreGet(_ req: ExploreGetRequest) throws -> ExploreGetResponse {
+    func exploreGet(_ req: ExploreGetRequest) throws -> ExploreGetResponse {
         try boundaryRead { db in try ExplorationRepository(db: db, core: core).get(req) }
     }
 

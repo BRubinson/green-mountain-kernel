@@ -1,6 +1,6 @@
 import Foundation
 
-public protocol GmBridgeHookEvent: RawRepresentable, CaseIterable, Sendable
+protocol GmBridgeHookEvent: RawRepresentable, CaseIterable, Sendable
 where RawValue == String {
 
     var description: String { get }
@@ -12,16 +12,16 @@ where RawValue == String {
 
 extension GmBridgeHookEvent {
 
-    public var code: String { rawValue }
+    var code: String { rawValue }
 
-    public var supportsMatcher: Bool { true }
+    var supportsMatcher: Bool { true }
 
-    public var canBlock: Bool { false }
+    var canBlock: Bool { false }
 }
 
-public enum GmBridgeHook {
+enum GmBridgeHook {
 
-    public enum Lifecycle: String, GmBridgeHookEvent {
+    enum Lifecycle: String, GmBridgeHookEvent {
 
         case sessionStart = "SessionStart"
 
@@ -29,7 +29,7 @@ public enum GmBridgeHook {
 
         case sessionEnd = "SessionEnd"
 
-        public var description: String {
+        var description: String {
             switch self {
             case .sessionStart:
                 return "A session begins or resumes."
@@ -41,7 +41,7 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Turn: String, GmBridgeHookEvent {
+    enum Turn: String, GmBridgeHookEvent {
 
         case userPromptSubmit = "UserPromptSubmit"
 
@@ -53,21 +53,21 @@ public enum GmBridgeHook {
 
         case stopFailure = "StopFailure"
 
-        public var supportsMatcher: Bool {
+        var supportsMatcher: Bool {
             switch self {
             case .userPromptSubmit, .messageDisplay, .stop: return false
             case .userPromptExpansion, .stopFailure: return true
             }
         }
 
-        public var canBlock: Bool {
+        var canBlock: Bool {
             switch self {
             case .userPromptSubmit, .userPromptExpansion, .stop: return true
             case .messageDisplay, .stopFailure: return false
             }
         }
 
-        public var description: String {
+        var description: String {
             switch self {
             case .userPromptSubmit:
                 return "A prompt is submitted, before Claude processes it."
@@ -83,7 +83,7 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Tool: String, GmBridgeHookEvent {
+    enum Tool: String, GmBridgeHookEvent {
 
         case preToolUse = "PreToolUse"
 
@@ -93,18 +93,18 @@ public enum GmBridgeHook {
 
         case postToolBatch = "PostToolBatch"
 
-        public var supportsMatcher: Bool {
+        var supportsMatcher: Bool {
             self != .postToolBatch
         }
 
-        public var canBlock: Bool {
+        var canBlock: Bool {
             switch self {
             case .preToolUse, .postToolBatch: return true
             case .postToolUse, .postToolUseFailure: return false
             }
         }
 
-        public var description: String {
+        var description: String {
             switch self {
             case .preToolUse:
                 return "Before a tool call executes."
@@ -118,13 +118,13 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Permission: String, GmBridgeHookEvent {
+    enum Permission: String, GmBridgeHookEvent {
 
         case permissionRequest = "PermissionRequest"
 
         case permissionDenied = "PermissionDenied"
 
-        public var description: String {
+        var description: String {
             switch self {
             case .permissionRequest:
                 return "A tool call needs a permission decision."
@@ -134,7 +134,7 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Agent: String, GmBridgeHookEvent {
+    enum Agent: String, GmBridgeHookEvent {
 
         case subagentStart = "SubagentStart"
 
@@ -142,15 +142,15 @@ public enum GmBridgeHook {
 
         case teammateIdle = "TeammateIdle"
 
-        public var supportsMatcher: Bool {
+        var supportsMatcher: Bool {
             self != .teammateIdle
         }
 
-        public var canBlock: Bool {
+        var canBlock: Bool {
             self != .subagentStart
         }
 
-        public var description: String {
+        var description: String {
             switch self {
             case .subagentStart:
                 return "A subagent is spawned."
@@ -162,17 +162,17 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Task: String, GmBridgeHookEvent {
+    enum Task: String, GmBridgeHookEvent {
 
         case taskCreated = "TaskCreated"
 
         case taskCompleted = "TaskCompleted"
 
-        public var supportsMatcher: Bool { false }
+        var supportsMatcher: Bool { false }
 
-        public var canBlock: Bool { true }
+        var canBlock: Bool { true }
 
-        public var description: String {
+        var description: String {
             switch self {
             case .taskCreated:
                 return "A task is being created via TaskCreate."
@@ -182,17 +182,17 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Compaction: String, GmBridgeHookEvent {
+    enum Compaction: String, GmBridgeHookEvent {
 
         case preCompact = "PreCompact"
 
         case postCompact = "PostCompact"
 
-        public var canBlock: Bool {
+        var canBlock: Bool {
             self == .preCompact
         }
 
-        public var description: String {
+        var description: String {
             switch self {
             case .preCompact:
                 return "Before context compaction."
@@ -202,17 +202,17 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Model: String, GmBridgeHookEvent {
+    enum Model: String, GmBridgeHookEvent {
 
         case preModelSwitch = "PreModelSwitch"
 
         case postModelSwitch = "PostModelSwitch"
 
-        public var canBlock: Bool {
+        var canBlock: Bool {
             self == .preModelSwitch
         }
 
-        public var description: String {
+        var description: String {
             switch self {
             case .preModelSwitch:
                 return "Before a requested model switch is applied."
@@ -222,7 +222,7 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Workspace: String, GmBridgeHookEvent {
+    enum Workspace: String, GmBridgeHookEvent {
 
         case instructionsLoaded = "InstructionsLoaded"
 
@@ -234,15 +234,15 @@ public enum GmBridgeHook {
 
         case fileChanged = "FileChanged"
 
-        public var supportsMatcher: Bool {
+        var supportsMatcher: Bool {
             self != .cwdChanged
         }
 
-        public var canBlock: Bool {
+        var canBlock: Bool {
             self == .configChange
         }
 
-        public var description: String {
+        var description: String {
             switch self {
             case .instructionsLoaded:
                 return "A CLAUDE.md or .claude/rules/*.md file is loaded into context."
@@ -258,17 +258,17 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Worktree: String, GmBridgeHookEvent {
+    enum Worktree: String, GmBridgeHookEvent {
 
         case worktreeCreate = "WorktreeCreate"
 
         case worktreeRemove = "WorktreeRemove"
 
-        public var supportsMatcher: Bool { false }
+        var supportsMatcher: Bool { false }
 
-        public var canBlock: Bool { true }
+        var canBlock: Bool { true }
 
-        public var description: String {
+        var description: String {
             switch self {
             case .worktreeCreate:
                 return "A worktree is being created. Replaces default git behavior."
@@ -278,15 +278,15 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Elicitation: String, GmBridgeHookEvent {
+    enum Elicitation: String, GmBridgeHookEvent {
 
         case elicitation = "Elicitation"
 
         case elicitationResult = "ElicitationResult"
 
-        public var canBlock: Bool { true }
+        var canBlock: Bool { true }
 
-        public var description: String {
+        var description: String {
             switch self {
             case .elicitation:
                 return "An MCP server requests user input during a tool call."
@@ -296,16 +296,16 @@ public enum GmBridgeHook {
         }
     }
 
-    public enum Notification: String, GmBridgeHookEvent {
+    enum Notification: String, GmBridgeHookEvent {
 
         case notification = "Notification"
 
-        public var description: String {
+        var description: String {
             "Claude Code sends a notification."
         }
     }
 
-    public enum HandlerType: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
+    enum HandlerType: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
 
         case command
 
@@ -318,29 +318,29 @@ public enum GmBridgeHook {
         case agent
     }
 
-    public struct Handler: Codable, Equatable, Sendable {
+    struct Handler: Codable, Equatable, Sendable {
 
-        public var type: HandlerType
+        var type: HandlerType
 
-        public var command: String?
+        var command: String?
 
-        public var args: [String]?
+        var args: [String]?
 
-        public var url: String?
+        var url: String?
 
-        public var server: String?
+        var server: String?
 
-        public var tool: String?
+        var tool: String?
 
-        public var prompt: String?
+        var prompt: String?
 
-        public var agent: String?
+        var agent: String?
 
-        public var timeout: Int?
+        var timeout: Int?
 
-        public var async: Bool?
+        var async: Bool?
 
-        public init(
+        init(
             type: HandlerType,
             command: String? = nil,
             args: [String]? = nil,
@@ -364,7 +364,7 @@ public enum GmBridgeHook {
             self.async = async
         }
 
-        public init(
+        init(
             command: String,
             args: [String]? = nil,
             timeout: Int? = nil,
@@ -379,7 +379,7 @@ public enum GmBridgeHook {
             )
         }
 
-        public static func http(
+        static func http(
             url: String,
             timeout: Int? = nil,
             async: Bool? = nil
@@ -387,7 +387,7 @@ public enum GmBridgeHook {
             Handler(type: .http, url: url, timeout: timeout, async: async)
         }
 
-        public static func mcpTool(
+        static func mcpTool(
             server: String,
             tool: String,
             timeout: Int? = nil
@@ -395,36 +395,36 @@ public enum GmBridgeHook {
             Handler(type: .mcpTool, server: server, tool: tool, timeout: timeout)
         }
 
-        public static func prompt(_ text: String, timeout: Int? = nil) -> Handler {
+        static func prompt(_ text: String, timeout: Int? = nil) -> Handler {
             Handler(type: .prompt, prompt: text, timeout: timeout)
         }
 
-        public static func agent(_ name: String, timeout: Int? = nil) -> Handler {
+        static func agent(_ name: String, timeout: Int? = nil) -> Handler {
             Handler(type: .agent, agent: name, timeout: timeout)
         }
     }
 
-    public struct MatcherGroup: Codable, Equatable, Sendable {
+    struct MatcherGroup: Codable, Equatable, Sendable {
 
-        public var matcher: String?
+        var matcher: String?
 
-        public var hooks: [Handler]
+        var hooks: [Handler]
 
-        public init(matcher: String? = nil, hooks: [Handler]) {
+        init(matcher: String? = nil, hooks: [Handler]) {
             self.matcher = matcher
             self.hooks = hooks
         }
     }
 
-    public struct File: Codable, Equatable, Sendable, GmBridgeJsonFile {
+    struct File: Codable, Equatable, Sendable, GmBridgeJsonFile {
 
-        public var relativePath: String { "hooks/hooks.json" }
+        var relativePath: String { "hooks/hooks.json" }
 
-        public var description: String?
+        var description: String?
 
-        public var hooks: [String: [MatcherGroup]]
+        var hooks: [String: [MatcherGroup]]
 
-        public init(description: String? = nil, hooks: [String: [MatcherGroup]]) {
+        init(description: String? = nil, hooks: [String: [MatcherGroup]]) {
             self.description = description
             self.hooks = hooks
         }

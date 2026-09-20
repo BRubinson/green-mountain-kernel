@@ -15,10 +15,10 @@ import SwiftUI
 /// the top (the store's invariant); the switch is exhaustive anyway — the
 /// compiler forces every render site to handle every kind, ghosts included
 /// (the prompt's critical design pattern).
-public struct DiagramCanvasView: View {
-    public let resolved: ResolvedDiagram
+struct DiagramCanvasView: View {
+    let resolved: ResolvedDiagram
 
-    public init(resolved: ResolvedDiagram) {
+    init(resolved: ResolvedDiagram) {
         self.resolved = resolved
     }
 
@@ -30,14 +30,14 @@ public struct DiagramCanvasView: View {
         )
     }
 
-    public var totalSize: CGSize {
+    var totalSize: CGSize {
         CGSize(
             width: resolved.contentBounds.width + resolved.environment.padding * 2,
             height: resolved.contentBounds.height + resolved.environment.padding * 2
         )
     }
 
-    public var body: some View {
+    var body: some View {
         // The screenshot wrapper is DiagramSceneView's first customer: the
         // background rides the underlay slot (UN-offset — it paints the whole
         // frame), so the rendered tree keeps the pre-split single ZStack with
@@ -57,12 +57,12 @@ public struct DiagramCanvasView: View {
 
 /// One resolved element + its children. Exhaustive switch #2 (the resolver's
 /// kind construction is #1) — both compiler-enforced over the same enum.
-public struct ResolvedElementView: View {
-    public let element: ResolvedElement
-    public let environment: DiagramRenderEnvironment
-    public let offset: CGSize
+struct ResolvedElementView: View {
+    let element: ResolvedElement
+    let environment: DiagramRenderEnvironment
+    let offset: CGSize
 
-    public init(
+    init(
         element: ResolvedElement,
         environment: DiagramRenderEnvironment,
         offset: CGSize = .zero
@@ -72,7 +72,7 @@ public struct ResolvedElementView: View {
         self.offset = offset
     }
 
-    public var body: some View {
+    var body: some View {
         Group {
             switch element.kind {
             case .layer(let style):
@@ -131,13 +131,13 @@ public struct ResolvedElementView: View {
 /// An endless, totally transparent grouping surface: renders nothing itself
 /// beyond its children (a faint outline when locked/invisible would lie in a
 /// screenshot), honoring opacity/visibility.
-public struct DrawingLayerView: View {
-    public let element: ResolvedElement
-    public let style: LayerStyle
-    public let environment: DiagramRenderEnvironment
-    public let offset: CGSize
+struct DrawingLayerView: View {
+    let element: ResolvedElement
+    let style: LayerStyle
+    let environment: DiagramRenderEnvironment
+    let offset: CGSize
 
-    public var body: some View {
+    var body: some View {
         ZStack(alignment: .topLeading) {
             ForEach(element.children, id: \.uuid) { child in
                 ResolvedElementView(
@@ -326,13 +326,13 @@ struct ShapeView: View {
 /// nil-means-theme-default so unstyled nodes are legible in both schemes.
 /// Children (connectors) render nothing here — connector visuals ride
 /// DiagramEdgeCanvas like every other edge.
-public struct UmlNodeView: View {
-    public let element: ResolvedElement
-    public let node: ResolvedUmlNode
-    public let offset: CGSize
+struct UmlNodeView: View {
+    let element: ResolvedElement
+    let node: ResolvedUmlNode
+    let offset: CGSize
     @Environment(\.diagramSelection) private var selection
 
-    public init(
+    init(
         element: ResolvedElement,
         node: ResolvedUmlNode,
         offset: CGSize = .zero
@@ -397,7 +397,7 @@ public struct UmlNodeView: View {
         }
     }
 
-    public var body: some View {
+    var body: some View {
         ZStack(alignment: .topLeading) {
             UmlNodeShape(kind: node.nodeKind)
                 .fill(fillColor)
@@ -437,20 +437,20 @@ public struct UmlNodeView: View {
 
 /// The UML chrome vocabulary as one Shape — pure geometry over the node's
 /// rect, unit-testable via path(in:).
-public struct UmlNodeShape: Shape {
-    public let kind: DiagramNodeKind
+struct UmlNodeShape: Shape {
+    let kind: DiagramNodeKind
 
-    public init(kind: DiagramNodeKind) {
+    init(kind: DiagramNodeKind) {
         self.kind = kind
     }
 
     /// The cylinder's cap half-height: shallow enough that squat nodes keep
     /// a body, deep enough to read as a disk.
-    public static func cylinderCapHeight(for rect: CGRect) -> CGFloat {
+    static func cylinderCapHeight(for rect: CGRect) -> CGFloat {
         min(rect.height * 0.12, 18)
     }
 
-    public func path(in rect: CGRect) -> Path {
+    func path(in rect: CGRect) -> Path {
         var path = Path()
         switch kind {
         case .roundedRect:
@@ -511,15 +511,15 @@ public struct UmlNodeShape: Shape {
 
 /// The scope container: basic outline + the resolved domain-scope name (or
 /// the ghost variant naming the dangling code). Children render inside.
-public struct DopeScopeOutlineView: View {
-    public let element: ResolvedElement
-    public let card: ResolvedScopeCard?
-    public let environment: DiagramRenderEnvironment
-    public var ghostCode: String?
-    public let offset: CGSize
+struct DopeScopeOutlineView: View {
+    let element: ResolvedElement
+    let card: ResolvedScopeCard?
+    let environment: DiagramRenderEnvironment
+    var ghostCode: String?
+    let offset: CGSize
     @Environment(\.diagramSelection) private var selection
 
-    public init(
+    init(
         element: ResolvedElement,
         card: ResolvedScopeCard?,
         environment: DiagramRenderEnvironment,
@@ -533,7 +533,7 @@ public struct DopeScopeOutlineView: View {
         self.offset = offset
     }
 
-    public var body: some View {
+    var body: some View {
         ZStack(alignment: .topLeading) {
             // Selection accent: if-guarded so the unset default contributes
             // nothing to the view tree (byte-identity at the frozen sites).
@@ -592,15 +592,15 @@ public struct DopeScopeOutlineView: View {
 /// The dbdiagram-style entity card: header tinted by the DOMAIN code's
 /// stable hue, entity name + code, property rows name-left/type-right-gray,
 /// badge capsules — or the dashed ghost frame naming the dangling code.
-public struct DopeEntityCardView: View {
-    public let element: ResolvedElement
-    public let model: EntityCardModel?
-    public let environment: DiagramRenderEnvironment
-    public let ghostCode: String?
-    public let offset: CGSize
+struct DopeEntityCardView: View {
+    let element: ResolvedElement
+    let model: EntityCardModel?
+    let environment: DiagramRenderEnvironment
+    let ghostCode: String?
+    let offset: CGSize
     @Environment(\.diagramSelection) private var selection
 
-    public init(
+    init(
         element: ResolvedElement,
         model: EntityCardModel?,
         environment: DiagramRenderEnvironment,
@@ -619,7 +619,7 @@ public struct DopeEntityCardView: View {
         return Color(hue: model.headerHue, saturation: 0.55, brightness: 0.72)
     }
 
-    public var body: some View {
+    var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 5) {
                 // Table name FIRST — the schema truth. A ghost has no model,
@@ -690,13 +690,13 @@ public struct DopeEntityCardView: View {
 /// resolver's routed orthogonal polylines (rounded corners, radius clamped
 /// per corner), with the legacy cubic quarantined as the `routed: false`
 /// fallback. All geometry decisions live in DiagramEdgeRouter — none here.
-public struct DiagramEdgeCanvas: View {
-    public let edges: [ResolvedEdge]
-    public let environment: DiagramRenderEnvironment
-    public let offset: CGSize
+struct DiagramEdgeCanvas: View {
+    let edges: [ResolvedEdge]
+    let environment: DiagramRenderEnvironment
+    let offset: CGSize
     @Environment(\.diagramSelection) private var selection
 
-    public init(
+    init(
         edges: [ResolvedEdge],
         environment: DiagramRenderEnvironment,
         offset: CGSize = .zero
@@ -706,7 +706,7 @@ public struct DiagramEdgeCanvas: View {
         self.offset = offset
     }
 
-    public var body: some View {
+    var body: some View {
         // Read the environment into a let BEFORE the Canvas closure —
         // renderer closures are not tracked observation scopes.
         let highlighted = selection.highlightedElementUuids

@@ -7,7 +7,7 @@ import AppKit
 /// system icons rather than beside them. STROKES ONLY, no fill, drawn in black, since a
 /// template discards colour and keeps only alpha. Line weight is a fraction of the box rather
 /// than a fixed number, so the glyph carries the same visual weight as the SF Symbols beside it.
-public enum KernelMenuBarIcon {
+enum KernelMenuBarIcon {
     /// 18pt is the status bar's usable height; AppKit scales for Retina from
     /// the point size, so the drawing handler stays resolution-independent.
     private static let side: CGFloat = 18
@@ -18,7 +18,7 @@ public enum KernelMenuBarIcon {
     /// see `snowLine`.
     private static let stroke: CGFloat = 1.15
 
-    public static let image: NSImage = {
+    static let image: NSImage = {
         // The environment letter rides the glyph itself, so the menu bar says
         // which database this instance writes even when no window is open —
         // which, under LSUIElement, is most of the time.

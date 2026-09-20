@@ -5,7 +5,7 @@ import Foundation
 /// nothing about it is persistence. A second copy of a join key's normalizer
 /// is how two writers start disagreeing about the same string, so `StoreCore`
 /// and `Store` keep thin forwarders rather than their own.
-public enum RepoRelativePath {
+enum RepoRelativePath {
 
     /// The join key contract: architecture change rows and file_change rows
     /// meet on this string, so both write paths run through this normalizer.
@@ -13,7 +13,7 @@ public enum RepoRelativePath {
     /// name paths that are gone and architecture rows name files not yet
     /// created. A relative path passes through cleaned, an absolute path inside
     /// the instance root is stripped, and one outside it is rejected.
-    public static func normalizeRepoRelativePath(_ raw: String, repoRoot: String) throws -> String {
+    static func normalizeRepoRelativePath(_ raw: String, repoRoot: String) throws -> String {
         var path = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty else {
             throw StoreError.badRequest(detail: "file path is empty")

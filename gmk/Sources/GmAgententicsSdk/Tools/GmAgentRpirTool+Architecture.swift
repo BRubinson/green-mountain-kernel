@@ -4,39 +4,39 @@ import Foundation
 import FoundationModels
 
 @Generable
-public struct GmAgentRpirOpenArchitectureArguments: Sendable {
+struct GmAgentRpirOpenArchitectureArguments: Sendable {
     @Guide(description: promptUuidGuide("to open an architecture summary for"))
-    public var promptUuid: String
+    var promptUuid: String
 
-    public init(promptUuid: String) {
+    init(promptUuid: String) {
         self.promptUuid = promptUuid
     }
 }
 
-public struct GmAgentRpirOpenArchitectureTool: GmAgentRpirTool {
-    public let name = "rpir_open_architecture"
-    public let description = "Start the plan page."
+struct GmAgentRpirOpenArchitectureTool: GmAgentRpirTool {
+    let name = "rpir_open_architecture"
+    let description = "Start the plan page."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirOpenArchitectureArguments) throws -> String {
+    func call(arguments _: GmAgentRpirOpenArchitectureArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_OPEN")
     }
 }
 
 @Generable
-public struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
+struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
     @Guide(description: "Which prompt's architecture, by summary uuid.")
-    public var summaryUuid: String
+    var summaryUuid: String
 
     @Guide(description: "Your methodology name. One plan per methodology.")
-    public var agentName: String
+    var agentName: String
 
     @Guide(description: "Your own agent id.")
-    public var agentId: String
+    var agentId: String
 
     @Guide(description: "Your whole proposal, written out.")
-    public var body: String
+    var body: String
 
     @Guide(
         description: """
@@ -45,12 +45,12 @@ public struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
             selected plan the new one takes the selection.
             """
     )
-    public var supersedesOptionUuid: String
+    var supersedesOptionUuid: String
 
     @Guide(description: "Version of the replaced option. Required with supersedesOptionUuid.")
-    public var expectedVersion: Int
+    var expectedVersion: Int
 
-    public init(
+    init(
         summaryUuid: String,
         agentName: String,
         agentId: String = "",
@@ -67,13 +67,13 @@ public struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
     }
 }
 
-public struct GmAgentRpirOpenArchitectureOptionTool: GmAgentRpirTool {
-    public let name = "rpir_open_architecture_option"
-    public let description = "Start my own plan."
+struct GmAgentRpirOpenArchitectureOptionTool: GmAgentRpirTool {
+    let name = "rpir_open_architecture_option"
+    let description = "Start my own plan."
 
-    public init() {}
+    init() {}
 
-    public func call(
+    func call(
         arguments _: GmAgentRpirOpenArchitectureOptionArguments
     ) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_OPTION_ADD")
@@ -81,35 +81,35 @@ public struct GmAgentRpirOpenArchitectureOptionTool: GmAgentRpirTool {
 }
 
 @Generable
-public struct GmAgentPersistenceFieldChange: Sendable {
+struct GmAgentPersistenceFieldChange: Sendable {
     @Guide(description: "Name of the field.")
-    public var fieldName: String
+    var fieldName: String
 
     @Guide(description: "Type of the field.")
-    public var dataType: String
+    var dataType: String
 
     @Guide(description: "Why this field is changing.")
-    public var changeReason: String
+    var changeReason: String
 
     @Guide(description: "What the change is for.")
-    public var changePurpose: String
+    var changePurpose: String
 
     @Guide(description: "True if the field may be null.")
-    public var nullable: Bool
+    var nullable: Bool
 
     @Guide(description: "True if the field points at another table.")
-    public var isForeignKey: Bool
+    var isForeignKey: Bool
 
     @Guide(description: "What is happening to it.", .anyOf(GM_TOOL_ANYOF_ARCH_CHANGE_KIND))
-    public var changeKind: String
+    var changeKind: String
 
     @Guide(description: "Old field name, only when renaming.")
-    public var renamedFrom: String
+    var renamedFrom: String
 
     @Guide(description: "For the property. " + GM_TOOL_GUIDE_DOPE_CODE)
-    public var dopePropertyRef: String
+    var dopePropertyRef: String
 
-    public init(
+    init(
         fieldName: String,
         dataType: String,
         changeReason: String,
@@ -133,26 +133,26 @@ public struct GmAgentPersistenceFieldChange: Sendable {
 }
 
 @Generable
-public struct GmAgentPersistenceChange: Sendable {
+struct GmAgentPersistenceChange: Sendable {
     @Guide(description: "Name of the class or table changing.")
-    public var className: String
+    var className: String
 
     @Guide(description: "Repo-relative file it lives in.")
-    public var filePath: String
+    var filePath: String
 
     @Guide(description: "Why this change, in one or two sentences.")
-    public var reasonBrief: String
+    var reasonBrief: String
 
     @Guide(description: "What is happening to it.", .anyOf(GM_TOOL_ANYOF_ARCH_CHANGE_KIND))
-    public var changeKind: String
+    var changeKind: String
 
     @Guide(description: "For the entity. " + GM_TOOL_GUIDE_DOPE_CODE)
-    public var dopeRef: String
+    var dopeRef: String
 
     @Guide(description: "The field-level changes inside this one.")
-    public var fields: [GmAgentPersistenceFieldChange]
+    var fields: [GmAgentPersistenceFieldChange]
 
-    public init(
+    init(
         className: String,
         filePath: String,
         reasonBrief: String,
@@ -170,26 +170,26 @@ public struct GmAgentPersistenceChange: Sendable {
 }
 
 @Generable
-public struct GmAgentRpirWritePersistenceChangesArguments: Sendable {
+struct GmAgentRpirWritePersistenceChangesArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "architecture"))
-    public var summaryUuid: String
+    var summaryUuid: String
 
     @Guide(description: "All the database changes, in one go.")
-    public var changes: [GmAgentPersistenceChange]
+    var changes: [GmAgentPersistenceChange]
 
-    public init(summaryUuid: String, changes: [GmAgentPersistenceChange]) {
+    init(summaryUuid: String, changes: [GmAgentPersistenceChange]) {
         self.summaryUuid = summaryUuid
         self.changes = changes
     }
 }
 
-public struct GmAgentRpirWriteArchitecturePersistenceChangesTool: GmAgentRpirTool {
-    public let name = "rpir_write_architecture_persistence_changes"
-    public let description = "Write down many database changes."
+struct GmAgentRpirWriteArchitecturePersistenceChangesTool: GmAgentRpirTool {
+    let name = "rpir_write_architecture_persistence_changes"
+    let description = "Write down many database changes."
 
-    public init() {}
+    init() {}
 
-    public func call(
+    func call(
         arguments _: GmAgentRpirWritePersistenceChangesArguments
     ) throws -> String {
         throw GmAgentToolError.notWired(
@@ -200,18 +200,18 @@ public struct GmAgentRpirWriteArchitecturePersistenceChangesTool: GmAgentRpirToo
 }
 
 @Generable
-public struct GmAgentGeneralChange: Sendable {
+struct GmAgentGeneralChange: Sendable {
     @Guide(description: "Repo-relative file this change owns.")
-    public var filePath: String
+    var filePath: String
 
     @Guide(description: "Class or type being changed, if there is one.")
-    public var className: String
+    var className: String
 
     @Guide(description: "Why this change, in one or two sentences.")
-    public var reasonBrief: String
+    var reasonBrief: String
 
     @Guide(description: "How worked-out it is.", .anyOf(GM_TOOL_ANYOF_CHANGE_DEPTH))
-    public var changeDepth: String
+    var changeDepth: String
 
     @Guide(
         description: """
@@ -219,9 +219,9 @@ public struct GmAgentGeneralChange: Sendable {
             not about them.
             """
     )
-    public var changeCode: String
+    var changeCode: String
 
-    public init(
+    init(
         filePath: String,
         className: String = "",
         reasonBrief: String,
@@ -237,138 +237,138 @@ public struct GmAgentGeneralChange: Sendable {
 }
 
 @Generable
-public struct GmAgentRpirWriteGeneralChangesArguments: Sendable {
+struct GmAgentRpirWriteGeneralChangesArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "architecture"))
-    public var summaryUuid: String
+    var summaryUuid: String
 
     @Guide(description: "All the code changes, in one go.")
-    public var changes: [GmAgentGeneralChange]
+    var changes: [GmAgentGeneralChange]
 
-    public init(summaryUuid: String, changes: [GmAgentGeneralChange]) {
+    init(summaryUuid: String, changes: [GmAgentGeneralChange]) {
         self.summaryUuid = summaryUuid
         self.changes = changes
     }
 }
 
-public struct GmAgentRpirWriteArchitectureGeneralChangesTool: GmAgentRpirTool {
-    public let name = "rpir_write_architecture_general_changes"
-    public let description = "Write down many code changes."
+struct GmAgentRpirWriteArchitectureGeneralChangesTool: GmAgentRpirTool {
+    let name = "rpir_write_architecture_general_changes"
+    let description = "Write down many code changes."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirWriteGeneralChangesArguments) throws -> String {
+    func call(arguments _: GmAgentRpirWriteGeneralChangesArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_GENERAL_ADD (looped)")
     }
 }
 
 @Generable
-public struct GmAgentRpirWriteFieldChangesArguments: Sendable {
+struct GmAgentRpirWriteFieldChangesArguments: Sendable {
     @Guide(description: "The database change row these fields belong to, by uuid.")
-    public var persistenceChangeUuid: String
+    var persistenceChangeUuid: String
 
     @Guide(description: "All the field changes for that row, in one go.")
-    public var fields: [GmAgentPersistenceFieldChange]
+    var fields: [GmAgentPersistenceFieldChange]
 
-    public init(persistenceChangeUuid: String, fields: [GmAgentPersistenceFieldChange]) {
+    init(persistenceChangeUuid: String, fields: [GmAgentPersistenceFieldChange]) {
         self.persistenceChangeUuid = persistenceChangeUuid
         self.fields = fields
     }
 }
 
-public struct GmAgentRpirWriteArchitectureFieldChangesTool: GmAgentRpirTool {
-    public let name = "rpir_write_architecture_field_changes"
-    public let description = "Write down field-level changes under one database change."
+struct GmAgentRpirWriteArchitectureFieldChangesTool: GmAgentRpirTool {
+    let name = "rpir_write_architecture_field_changes"
+    let description = "Write down field-level changes under one database change."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirWriteFieldChangesArguments) throws -> String {
+    func call(arguments _: GmAgentRpirWriteFieldChangesArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_FIELD_ADD (looped)")
     }
 }
 
 @Generable
-public struct GmAgentRpirSummarizeArchitectureArguments: Sendable {
+struct GmAgentRpirSummarizeArchitectureArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write", "architecture"))
-    public var summaryUuid: String
+    var summaryUuid: String
 
     @Guide(description: "Version of the summary you read.")
-    public var expectedVersion: Int
+    var expectedVersion: Int
 
     @Guide(description: "The plan narrative, written over the expanded rows.")
-    public var body: String
+    var body: String
 
-    public init(summaryUuid: String, expectedVersion: Int, body: String) {
+    init(summaryUuid: String, expectedVersion: Int, body: String) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
         self.body = body
     }
 }
 
-public struct GmAgentRpirSummarizeArchitectureTool: GmAgentRpirTool {
-    public let name = "rpir_summarize_architecture"
-    public let description = "Write the plan's own summary."
+struct GmAgentRpirSummarizeArchitectureTool: GmAgentRpirTool {
+    let name = "rpir_summarize_architecture"
+    let description = "Write the plan's own summary."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirSummarizeArchitectureArguments) throws -> String {
+    func call(arguments _: GmAgentRpirSummarizeArchitectureArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_SUMMARIZE")
     }
 }
 
 @Generable
-public struct GmAgentRpirArchitectureGateArguments: Sendable {
+struct GmAgentRpirArchitectureGateArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "move", "architecture"))
-    public var summaryUuid: String
+    var summaryUuid: String
 
     @Guide(description: "Version of the summary you read.")
-    public var expectedVersion: Int
+    var expectedVersion: Int
 
-    public init(summaryUuid: String, expectedVersion: Int) {
+    init(summaryUuid: String, expectedVersion: Int) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
     }
 }
 
-public struct GmAgentRpirProposeArchitectureTool: GmAgentRpirTool {
-    public let name = "rpir_propose_architecture"
-    public let description = "Put the plan on the table."
+struct GmAgentRpirProposeArchitectureTool: GmAgentRpirTool {
+    let name = "rpir_propose_architecture"
+    let description = "Put the plan on the table."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirArchitectureGateArguments) throws -> String {
+    func call(arguments _: GmAgentRpirArchitectureGateArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_PROPOSE")
     }
 }
 
-public struct GmAgentRpirApproveArchitectureTool: GmAgentRpirTool {
-    public let name = "rpir_approve_architecture"
-    public let description = "The human said yes; lock the plan."
+struct GmAgentRpirApproveArchitectureTool: GmAgentRpirTool {
+    let name = "rpir_approve_architecture"
+    let description = "The human said yes; lock the plan."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirArchitectureGateArguments) throws -> String {
+    func call(arguments _: GmAgentRpirArchitectureGateArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_APPROVE")
     }
 }
 
-public struct GmAgentRpirReviseArchitectureTool: GmAgentRpirTool {
-    public let name = "rpir_revise_architecture"
-    public let description = "Reopen the plan for changes."
+struct GmAgentRpirReviseArchitectureTool: GmAgentRpirTool {
+    let name = "rpir_revise_architecture"
+    let description = "Reopen the plan for changes."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirArchitectureGateArguments) throws -> String {
+    func call(arguments _: GmAgentRpirArchitectureGateArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_REVISE")
     }
 }
 
 @Generable
-public struct GmAgentRpirDecideArchitectureArguments: Sendable {
+struct GmAgentRpirDecideArchitectureArguments: Sendable {
     @Guide(description: "Which plan won, by option uuid.")
-    public var optionUuid: String
+    var optionUuid: String
 
     @Guide(description: "Version of the option you read.")
-    public var expectedVersion: Int
+    var expectedVersion: Int
 
     @Guide(
         description: """
@@ -376,51 +376,51 @@ public struct GmAgentRpirDecideArchitectureArguments: Sendable {
             decision with no reasoning gets argued again later.
             """
     )
-    public var rationale: String
+    var rationale: String
 
-    public init(optionUuid: String, expectedVersion: Int, rationale: String) {
+    init(optionUuid: String, expectedVersion: Int, rationale: String) {
         self.optionUuid = optionUuid
         self.expectedVersion = expectedVersion
         self.rationale = rationale
     }
 }
 
-public struct GmAgentRpirDecideArchitectureTool: GmAgentRpirTool {
-    public let name = "rpir_decide_architecture"
-    public let description = "Pick the winning plan."
+struct GmAgentRpirDecideArchitectureTool: GmAgentRpirTool {
+    let name = "rpir_decide_architecture"
+    let description = "Pick the winning plan."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirDecideArchitectureArguments) throws -> String {
+    func call(arguments _: GmAgentRpirDecideArchitectureArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_DECIDE")
     }
 }
 
 @Generable
-public struct GmAgentRpirGetArchitectureArguments: Sendable {
+struct GmAgentRpirGetArchitectureArguments: Sendable {
     @Guide(description: promptUuidGuide("'s architecture to read"))
-    public var promptUuid: String
+    var promptUuid: String
 
     @Guide(description: "Read one option in full, by uuid. Leave empty for short versions of all.")
-    public var optionUuid: String
+    var optionUuid: String
 
     @Guide(description: "Read one change in full, by uuid. Leave empty for short versions of all.")
-    public var changeUuid: String
+    var changeUuid: String
 
-    public init(promptUuid: String, optionUuid: String = "", changeUuid: String = "") {
+    init(promptUuid: String, optionUuid: String = "", changeUuid: String = "") {
         self.promptUuid = promptUuid
         self.optionUuid = optionUuid
         self.changeUuid = changeUuid
     }
 }
 
-public struct GmAgentRpirGetArchitectureTool: GmAgentRpirTool {
-    public let name = "rpir_get_architecture"
-    public let description = "Show me the plan and how much of it is built."
+struct GmAgentRpirGetArchitectureTool: GmAgentRpirTool {
+    let name = "rpir_get_architecture"
+    let description = "Show me the plan and how much of it is built."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirGetArchitectureArguments) throws -> String {
+    func call(arguments _: GmAgentRpirGetArchitectureArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "ARCH_GET")
     }
 }

@@ -1,24 +1,24 @@
 import Foundation
 
-public struct GmBridgeMcpTool: Codable, Equatable, Hashable, Sendable {
+struct GmBridgeMcpTool: Codable, Equatable, Hashable, Sendable {
 
-    public static let server = GmBridgeMcp.qualifiedServer
+    static let server = GmBridgeMcp.qualifiedServer
 
-    public var name: String
+    var name: String
 
-    public var title: String?
+    var title: String?
 
-    public var description: String?
+    var description: String?
 
-    public var inputSchema: GmBridgeJsonValue
+    var inputSchema: GmBridgeJsonValue
 
-    public var outputSchema: GmBridgeJsonValue?
+    var outputSchema: GmBridgeJsonValue?
 
-    public var annotations: Annotations?
+    var annotations: Annotations?
 
-    public var icons: [Icon]?
+    var icons: [Icon]?
 
-    public init(
+    init(
         name: String,
         title: String? = nil,
         description: String? = nil,
@@ -36,23 +36,23 @@ public struct GmBridgeMcpTool: Codable, Equatable, Hashable, Sendable {
         self.icons = icons
     }
 
-    public var qualifiedName: String {
+    var qualifiedName: String {
         "mcp__\(Self.server)__\(name)"
     }
 
-    public struct Annotations: Codable, Equatable, Hashable, Sendable {
+    struct Annotations: Codable, Equatable, Hashable, Sendable {
 
-        public var title: String?
+        var title: String?
 
-        public var readOnlyHint: Bool?
+        var readOnlyHint: Bool?
 
-        public var destructiveHint: Bool?
+        var destructiveHint: Bool?
 
-        public var idempotentHint: Bool?
+        var idempotentHint: Bool?
 
-        public var openWorldHint: Bool?
+        var openWorldHint: Bool?
 
-        public init(
+        init(
             title: String? = nil,
             readOnlyHint: Bool? = nil,
             destructiveHint: Bool? = nil,
@@ -67,15 +67,15 @@ public struct GmBridgeMcpTool: Codable, Equatable, Hashable, Sendable {
         }
     }
 
-    public struct Icon: Codable, Equatable, Hashable, Sendable {
+    struct Icon: Codable, Equatable, Hashable, Sendable {
 
-        public var src: String
+        var src: String
 
-        public var mimeType: String?
+        var mimeType: String?
 
-        public var sizes: [String]?
+        var sizes: [String]?
 
-        public init(src: String, mimeType: String? = nil, sizes: [String]? = nil) {
+        init(src: String, mimeType: String? = nil, sizes: [String]? = nil) {
             self.src = src
             self.mimeType = mimeType
             self.sizes = sizes
@@ -87,7 +87,7 @@ extension GmBridgeMcpTool {
 
     /// Every tool the bridge declares — the SERVED roster. The MCP server
     /// answers to exactly this set, refusals included.
-    public static let all: [GmBridgeMcpTool] = GmAgentTools.all.map(GmBridgeMcpTool.init)
+    static let all: [GmBridgeMcpTool] = GmAgentTools.all.map(GmBridgeMcpTool.init)
 
     /// The tools worth GRANTING in an `allowed-tools` list.
     ///
@@ -97,15 +97,15 @@ extension GmBridgeMcpTool {
     /// that takes the family, for a tool whose only behaviour is to throw. Keyed on
     /// the suffix, so an individually-refusing tool that names a real capability
     /// stays grantable and its specific refusal stays reachable.
-    public static var grantable: [GmBridgeMcpTool] {
+    static var grantable: [GmBridgeMcpTool] {
         all.filter { !$0.name.hasSuffix("_not_supported") }
     }
 
-    public static func tools(in family: GmAgentToolFamily) -> [GmBridgeMcpTool] {
+    static func tools(in family: GmAgentToolFamily) -> [GmBridgeMcpTool] {
         GmAgentTools.tools(in: family).map(GmBridgeMcpTool.init)
     }
 
-    public static var qualifiedNames: [String] {
+    static var qualifiedNames: [String] {
         all.map(\.qualifiedName)
     }
 }

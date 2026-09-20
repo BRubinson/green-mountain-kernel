@@ -8,7 +8,7 @@ import GRDB
 // (and the pre-transaction payload validation).
 
 extension Store {
-    public func promptDiagramQualify(
+    func promptDiagramQualify(
         _ req: PromptDiagramQualifyRequest
     ) throws -> PromptQualifiedDiagramRow {
         let qualification = req.qualification.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -35,13 +35,13 @@ extension Store {
         }
     }
 
-    public func promptDiagramGet(
+    func promptDiagramGet(
         _ req: PromptDiagramGetRequest
     ) throws -> PromptQualifiedDiagramRow {
         try boundaryRead { db in try PromptDiagramRepository(db: db, core: core).get(req) }
     }
 
-    public func promptDiagramList(
+    func promptDiagramList(
         _ req: PromptDiagramListRequest
     ) throws -> PromptDiagramListResponse {
         try boundaryRead { db in try PromptDiagramRepository(db: db, core: core).list(req) }

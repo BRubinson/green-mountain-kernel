@@ -9,7 +9,7 @@ import Observation
 /// (`uptime_seconds` on PING/STATUS), and a second clock in the menu bar would
 /// drift from it for no gain. Memory and CPU are optional because a very old
 /// daemon answers without them — see `KernelVitals` for the precedence.
-public struct KernelVitalsReport: Equatable, Sendable {
+struct KernelVitalsReport: Equatable, Sendable {
     var uptimeSeconds: Int?
     var residentMemoryBytes: UInt64?
     var cpuPercent: Double?
@@ -42,7 +42,7 @@ struct KernelVitalsReading: Equatable, Sendable {
 /// Local sampling is the fallback that keeps the rows populated before anything has answered.
 @Observable
 @MainActor
-public final class KernelVitals {
+final class KernelVitals {
     private(set) var residentMemoryBytes: UInt64?
     private(set) var cpuPercent: Double?
     /// Always adopted from the report — never recomputed from a start date.
@@ -65,7 +65,7 @@ public final class KernelVitals {
     private var ticker: DispatchSourceTimer?
     private let cpu = CpuDeltaState()
 
-    public init(
+    init(
         interval: TimeInterval = 2,
         report: @escaping @MainActor () -> KernelVitalsReport? = { nil }
     ) {

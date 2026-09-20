@@ -8,13 +8,13 @@ import Foundation
 
 /// One row of the chewed file's Contents Overview table, back-filled with an
 /// absolute path from the **Full Paths** list when a basename matches.
-public struct ChewedFileEntry: Hashable, Sendable {
-    public let name: String
-    public let type: String
-    public let description: String
-    public let fullPath: String?
+struct ChewedFileEntry: Hashable, Sendable {
+    let name: String
+    let type: String
+    let description: String
+    let fullPath: String?
 
-    public init(name: String, type: String, description: String, fullPath: String?) {
+    init(name: String, type: String, description: String, fullPath: String?) {
         self.name = name
         self.type = type
         self.description = description
@@ -22,15 +22,15 @@ public struct ChewedFileEntry: Hashable, Sendable {
     }
 }
 
-public struct ChewedArtifact: Hashable, Sendable {
-    public let resourceName: String
-    public let confidence: Int?
+struct ChewedArtifact: Hashable, Sendable {
+    let resourceName: String
+    let confidence: Int?
     /// The ENTIRE chewed markdown, verbatim → kbite_resource.resource_summary.
-    public let body: String
-    public let files: [ChewedFileEntry]
-    public let keywords: [String]
+    let body: String
+    let files: [ChewedFileEntry]
+    let keywords: [String]
 
-    public init(resourceName: String, confidence: Int?, body: String, files: [ChewedFileEntry], keywords: [String]) {
+    init(resourceName: String, confidence: Int?, body: String, files: [ChewedFileEntry], keywords: [String]) {
         self.resourceName = resourceName
         self.confidence = confidence
         self.body = body
@@ -39,7 +39,7 @@ public struct ChewedArtifact: Hashable, Sendable {
     }
 }
 
-public enum ChewedArtifactParser {
+enum ChewedArtifactParser {
     private enum Section {
         case header
         case contents
@@ -47,7 +47,7 @@ public enum ChewedArtifactParser {
         case other
     }
 
-    public static func parse(text: String, fallbackName: String) -> ChewedArtifact {
+    static func parse(text: String, fallbackName: String) -> ChewedArtifact {
         var resourceName = fallbackName
         var confidence: Int?
         var entries: [ChewedFileEntry] = []
@@ -173,7 +173,7 @@ public enum ChewedArtifactParser {
 
     /// Keyword vocabulary is snake_case: lowercase, space/hyphen → _, strip
     /// everything outside [a-z0-9_], collapse runs of _.
-    public static func normalizeKeyword(_ raw: String) -> String {
+    static func normalizeKeyword(_ raw: String) -> String {
         var result = ""
         var lastWasUnderscore = false
         for character in raw.lowercased().trimmingCharacters(in: .whitespaces) {
@@ -217,7 +217,7 @@ public enum ChewedArtifactParser {
         "log", "conf", "ini", "env",
     ]
 
-    public static func isTextType(fileName: String) -> Bool {
+    static func isTextType(fileName: String) -> Bool {
         textExtensions.contains(URL(fileURLWithPath: fileName).pathExtension.lowercased())
     }
 }

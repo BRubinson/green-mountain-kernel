@@ -9,7 +9,7 @@ import SwiftUI
 ///
 /// `Paths.isProductionRoot` compares `(st_dev, st_ino)` of `gm.db` rather than paths, because
 /// `standardizedFileURL` does not resolve symlinks and a firmlink makes one root look like two.
-public enum EnvironmentKind: Sendable {
+enum EnvironmentKind: Sendable {
     case production
     case beta
     case test
@@ -20,7 +20,7 @@ public enum EnvironmentKind: Sendable {
     /// never to decide whether we are on production — that answer comes from the
     /// filesystem. A label that could override the root would reintroduce the
     /// second source of truth this type exists to remove.
-    public static var current: EnvironmentKind {
+    static var current: EnvironmentKind {
         if Paths.isProductionRoot { return .production }
         switch Paths.declaredEnvironmentName?.lowercased() {
         case "beta": return .beta
@@ -28,10 +28,10 @@ public enum EnvironmentKind: Sendable {
         }
     }
 
-    public var isProduction: Bool { self == .production }
+    var isProduction: Bool { self == .production }
 
     /// The single letter the menu bar and Dock carry.
-    public var badge: String {
+    var badge: String {
         switch self {
         case .production: return ""
         case .beta: return "B"
@@ -39,7 +39,7 @@ public enum EnvironmentKind: Sendable {
         }
     }
 
-    public var displayName: String {
+    var displayName: String {
         switch self {
         case .production: return "Production"
         case .beta: return "Beta"
@@ -50,7 +50,7 @@ public enum EnvironmentKind: Sendable {
     /// The banner colour. Red for test, amber for beta — distinct because
     /// mistaking beta for test is a different mistake from mistaking either for
     /// production, and a single "not prod" colour would hide that.
-    public var bannerColor: Color {
+    var bannerColor: Color {
         switch self {
         case .production: return .clear
         case .beta: return Color(nsColor: .systemOrange)
@@ -65,7 +65,7 @@ public enum EnvironmentKind: Sendable {
     /// behind terminal text, so these are two quantities rather than two descriptions of one.
     /// Terminal contrast is not a linear function of a UI fill, so neither derives from the
     /// other. KEEP THE TINTS DARK AND LOW-SATURATION; never `systemOrange`.
-    public var paneBackgroundHex: String? {
+    var paneBackgroundHex: String? {
         switch self {
         case .production: return nil
         case .beta: return "3a2410"  // dark amber
@@ -80,14 +80,14 @@ public enum EnvironmentKind: Sendable {
 /// the bundle key synchronously in-process, so this renders the truth on frame
 /// zero — unlike the daemon's `PATHS_GET` answer, which arrives after the window
 /// is already on screen and would flash production chrome first.
-public struct EnvironmentBanner: View {
+struct EnvironmentBanner: View {
     private let kind: EnvironmentKind
 
-    public init(kind: EnvironmentKind = .current) {
+    init(kind: EnvironmentKind = .current) {
         self.kind = kind
     }
 
-    public var body: some View {
+    var body: some View {
         if kind.isProduction {
             EmptyView()
         } else {
@@ -122,9 +122,9 @@ public struct EnvironmentBanner: View {
 /// Call this after the activation policy changes. It is a no-op on production and when there
 /// is no tile to draw on.
 @MainActor
-public enum EnvironmentDockBadge {
+enum EnvironmentDockBadge {
 
-    public static func apply(kind: EnvironmentKind = .current) {
+    static func apply(kind: EnvironmentKind = .current) {
         guard !kind.isProduction else {
             NSApp.applicationIconImage = nil  // back to the bundle icon
             return

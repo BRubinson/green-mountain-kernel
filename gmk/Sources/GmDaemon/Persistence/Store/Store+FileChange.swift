@@ -6,7 +6,7 @@ import GRDB
 // Bodies live in FileChangeRepository; these wrappers own the transaction.
 
 extension Store {
-    public func addFileChange(_ req: FileChangeAdd) throws -> FileChangeAddResponse {
+    func addFileChange(_ req: FileChangeAdd) throws -> FileChangeAddResponse {
         do {
             return try boundary { db in try FileChangeRepository(db: db, core: core).add(req) }
         } catch StoreError.hookUnbound(let claudeSessionId, let booted) {
@@ -27,7 +27,7 @@ extension Store {
         }
     }
 
-    public func listFileChanges(_ req: FileChangeListRequest) throws -> FileChangeListResponse {
+    func listFileChanges(_ req: FileChangeListRequest) throws -> FileChangeListResponse {
         try boundaryRead { db in try FileChangeRepository(db: db, core: core).list(req) }
     }
 

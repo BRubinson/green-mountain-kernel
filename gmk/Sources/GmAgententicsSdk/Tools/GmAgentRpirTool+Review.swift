@@ -4,33 +4,33 @@ import Foundation
 import FoundationModels
 
 @Generable
-public struct GmAgentRpirOpenReviewArguments: Sendable {
+struct GmAgentRpirOpenReviewArguments: Sendable {
     @Guide(description: promptUuidGuide("to review"))
-    public var promptUuid: String
+    var promptUuid: String
 
-    public init(promptUuid: String) {
+    init(promptUuid: String) {
         self.promptUuid = promptUuid
     }
 }
 
-public struct GmAgentRpirOpenReviewTool: GmAgentRpirTool {
-    public let name = "rpir_open_review"
-    public let description = "Start the complaints list."
+struct GmAgentRpirOpenReviewTool: GmAgentRpirTool {
+    let name = "rpir_open_review"
+    let description = "Start the complaints list."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirOpenReviewArguments) throws -> String {
+    func call(arguments _: GmAgentRpirOpenReviewArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_OPEN")
     }
 }
 
 @Generable
-public struct GmAgentReviewFinding: Sendable {
+struct GmAgentReviewFinding: Sendable {
     @Guide(description: "What kind of problem this is.", .anyOf(GM_TOOL_ANYOF_REVIEW_KIND))
-    public var kind: String
+    var kind: String
 
     @Guide(description: "Short title for the problem.")
-    public var title: String
+    var title: String
 
     @Guide(
         description: """
@@ -38,21 +38,21 @@ public struct GmAgentReviewFinding: Sendable {
             break. A claim with no failure case is an opinion.
             """
     )
-    public var body: String
+    var body: String
 
     @Guide(description: "Repo-relative file it is in, or empty.")
-    public var filePath: String
+    var filePath: String
 
     @Guide(description: "First line it covers, or 0 if not line-specific.")
-    public var lineStart: Int
+    var lineStart: Int
 
     @Guide(description: "Last line it covers, or 0 if not line-specific.")
-    public var lineEnd: Int
+    var lineEnd: Int
 
     @Guide(description: "How bad, 0 is most severe and 999 is ignore. Leave it out unless ranking.")
-    public var rating: Int?
+    var rating: Int?
 
-    public init(
+    init(
         kind: String,
         title: String,
         body: String,
@@ -72,74 +72,74 @@ public struct GmAgentReviewFinding: Sendable {
 }
 
 @Generable
-public struct GmAgentRpirWriteReviewsArguments: Sendable {
+struct GmAgentRpirWriteReviewsArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "complaints list"))
-    public var summaryUuid: String
+    var summaryUuid: String
 
     @Guide(description: "Who is reviewing. This is what tells reviewers apart.")
-    public var agentName: String
+    var agentName: String
 
     @Guide(description: "All the problems found, in one go.")
-    public var findings: [GmAgentReviewFinding]
+    var findings: [GmAgentReviewFinding]
 
-    public init(summaryUuid: String, agentName: String, findings: [GmAgentReviewFinding]) {
+    init(summaryUuid: String, agentName: String, findings: [GmAgentReviewFinding]) {
         self.summaryUuid = summaryUuid
         self.agentName = agentName
         self.findings = findings
     }
 }
 
-public struct GmAgentRpirWriteReviewsTool: GmAgentRpirTool {
-    public let name = "rpir_write_reviews"
-    public let description = "Write down many complaints."
+struct GmAgentRpirWriteReviewsTool: GmAgentRpirTool {
+    let name = "rpir_write_reviews"
+    let description = "Write down many complaints."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirWriteReviewsArguments) throws -> String {
+    func call(arguments _: GmAgentRpirWriteReviewsArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_FINDING_ADD (looped)")
     }
 }
 
 @Generable
-public struct GmAgentRpirRankReviewsArguments: Sendable {
+struct GmAgentRpirRankReviewsArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "rank", "complaints list"))
-    public var summaryUuid: String
+    var summaryUuid: String
 
     @Guide(description: "Every problem and its rating, all at once.")
-    public var ratings: [GmAgentFindingRating]
+    var ratings: [GmAgentFindingRating]
 
-    public init(summaryUuid: String, ratings: [GmAgentFindingRating]) {
+    init(summaryUuid: String, ratings: [GmAgentFindingRating]) {
         self.summaryUuid = summaryUuid
         self.ratings = ratings
     }
 }
 
-public struct GmAgentRpirRankReviewsTool: GmAgentRpirTool {
-    public let name = "rpir_rank_reviews"
-    public let description = "Give every complaint a number, all at once."
+struct GmAgentRpirRankReviewsTool: GmAgentRpirTool {
+    let name = "rpir_rank_reviews"
+    let description = "Give every complaint a number, all at once."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirRankReviewsArguments) throws -> String {
+    func call(arguments _: GmAgentRpirRankReviewsArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_RANK")
     }
 }
 
 @Generable
-public struct GmAgentRpirCompleteReviewArguments: Sendable {
+struct GmAgentRpirCompleteReviewArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "seal", "complaints list"))
-    public var summaryUuid: String
+    var summaryUuid: String
 
     @Guide(description: GM_TOOL_GUIDE_EXPECTED_VERSION)
-    public var expectedVersion: Int
+    var expectedVersion: Int
 
     @Guide(description: "What the review found, taken as a whole.")
-    public var overview: String
+    var overview: String
 
     @Guide(description: "The verdict.", .anyOf(GM_TOOL_ANYOF_REVIEW_VERDICT))
-    public var verdict: String
+    var verdict: String
 
-    public init(summaryUuid: String, expectedVersion: Int, overview: String, verdict: String) {
+    init(summaryUuid: String, expectedVersion: Int, overview: String, verdict: String) {
         self.summaryUuid = summaryUuid
         self.expectedVersion = expectedVersion
         self.overview = overview
@@ -147,42 +147,42 @@ public struct GmAgentRpirCompleteReviewArguments: Sendable {
     }
 }
 
-public struct GmAgentRpirCompleteReviewTool: GmAgentRpirTool {
-    public let name = "rpir_complete_review"
-    public let description = "Complaints done, here is the verdict."
+struct GmAgentRpirCompleteReviewTool: GmAgentRpirTool {
+    let name = "rpir_complete_review"
+    let description = "Complaints done, here is the verdict."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirCompleteReviewArguments) throws -> String {
+    func call(arguments _: GmAgentRpirCompleteReviewArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_COMPLETE")
     }
 }
 
 @Generable
-public struct GmAgentRpirResolveReviewFindingArguments: Sendable {
+struct GmAgentRpirResolveReviewFindingArguments: Sendable {
     @Guide(description: "Which problem was handled, by uuid.")
-    public var findingUuid: String
+    var findingUuid: String
 
     @Guide(description: "Version of the finding you read.")
-    public var expectedVersion: Int
+    var expectedVersion: Int
 
     @Guide(description: "How it was handled.", .anyOf(GM_TOOL_ANYOF_REVIEW_RESOLUTION))
-    public var status: String
+    var status: String
 
-    public init(findingUuid: String, expectedVersion: Int, status: String) {
+    init(findingUuid: String, expectedVersion: Int, status: String) {
         self.findingUuid = findingUuid
         self.expectedVersion = expectedVersion
         self.status = status
     }
 }
 
-public struct GmAgentRpirResolveReviewFindingTool: GmAgentRpirTool {
-    public let name = "rpir_resolve_review_finding"
-    public let description = "This complaint is handled."
+struct GmAgentRpirResolveReviewFindingTool: GmAgentRpirTool {
+    let name = "rpir_resolve_review_finding"
+    let description = "This complaint is handled."
 
-    public init() {}
+    init() {}
 
-    public func call(
+    func call(
         arguments _: GmAgentRpirResolveReviewFindingArguments
     ) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_RESOLVE")
@@ -190,9 +190,9 @@ public struct GmAgentRpirResolveReviewFindingTool: GmAgentRpirTool {
 }
 
 @Generable
-public struct GmAgentRpirGetReviewArguments: Sendable {
+struct GmAgentRpirGetReviewArguments: Sendable {
     @Guide(description: promptUuidGuide("'s review to read"))
-    public var promptUuid: String
+    var promptUuid: String
 
     @Guide(
         description: """
@@ -201,21 +201,21 @@ public struct GmAgentRpirGetReviewArguments: Sendable {
             """,
         .range(0...999)
     )
-    public var maxRating: Int
+    var maxRating: Int
 
-    public init(promptUuid: String, maxRating: Int = 100) {
+    init(promptUuid: String, maxRating: Int = 100) {
         self.promptUuid = promptUuid
         self.maxRating = maxRating
     }
 }
 
-public struct GmAgentRpirGetReviewTool: GmAgentRpirTool {
-    public let name = "rpir_get_review"
-    public let description = "Show me the complaints so far."
+struct GmAgentRpirGetReviewTool: GmAgentRpirTool {
+    let name = "rpir_get_review"
+    let description = "Show me the complaints so far."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentRpirGetReviewArguments) throws -> String {
+    func call(arguments _: GmAgentRpirGetReviewArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "REVIEW_GET")
     }
 }

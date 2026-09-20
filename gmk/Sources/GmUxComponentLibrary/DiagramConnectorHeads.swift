@@ -8,16 +8,16 @@ import SwiftUI
 /// The direction MUST come from the terminal ROUTED segment (head: the last
 /// segment, tail: the first segment reversed), never from the from→to chord:
 /// the chord orientation is wrong exactly when routing did its job.
-public enum DiagramConnectorHeadGeometry {
+enum DiagramConnectorHeadGeometry {
 
     /// How the built path should be painted.
-    public struct Rendering {
-        public let path: Path
+    struct Rendering {
+        let path: Path
         /// Fill for solid decorations (arrow, dot, diamond), stroke for the
         /// open ones (open_arrow, circle outline, cross).
-        public let fill: Bool
+        let fill: Bool
 
-        public init(path: Path, fill: Bool) {
+        init(path: Path, fill: Bool) {
             self.path = path
             self.fill = fill
         }
@@ -25,14 +25,14 @@ public enum DiagramConnectorHeadGeometry {
 
     /// Decoration length for a given line width — one formula for every
     /// kind so mixed-head diagrams read as one family.
-    public static func headLength(lineWidth: Double) -> CGFloat {
+    static func headLength(lineWidth: Double) -> CGFloat {
         max(8, lineWidth * 3)
     }
 
     /// The head path at `tip`, arriving along `direction` (need not be
     /// normalized; a zero vector falls back to +x so a degenerate edge still
     /// draws something sane). Returns nil for `.none`.
-    public static func headPath(
+    static func headPath(
         kind: DiagramConnectorHead,
         tip: CGPoint,
         direction: CGVector,

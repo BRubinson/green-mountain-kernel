@@ -9,10 +9,10 @@ import CryptoKit
 /// session never touched, and an element edited here that ALSO moved on disk
 /// is a conflict that must be chosen. The base hash is keyed by dot-path, not
 /// uuid — ingest re-mints every child uuid. Pure: no db, no filesystem.
-public enum DopeMerge {
+enum DopeMerge {
 
     /// What should happen to one dot-path.
-    public enum Decision: String, Codable, Hashable, Sendable {
+    enum Decision: String, Codable, Hashable, Sendable {
         /// Present on disk, untouched here (or identical) — take the file.
         case takeTheirs
         /// Edited here, unchanged on disk since the base — keep the db.
@@ -25,20 +25,20 @@ public enum DopeMerge {
         case deletedHere
     }
 
-    public struct Outcome: Hashable, Sendable {
-        public let dotPath: String
-        public let kind: String
-        public let decision: Decision
+    struct Outcome: Hashable, Sendable {
+        let dotPath: String
+        let kind: String
+        let decision: Decision
     }
 
     /// One element's identity as the merge sees it: what it is called, and
     /// what it currently contains.
-    public struct Element: Hashable, Sendable {
-        public let dotPath: String
-        public let kind: String
-        public let contentHash: String
+    struct Element: Hashable, Sendable {
+        let dotPath: String
+        let kind: String
+        let contentHash: String
 
-        public init(dotPath: String, kind: String, contentHash: String) {
+        init(dotPath: String, kind: String, contentHash: String) {
             self.dotPath = dotPath
             self.kind = kind
             self.contentHash = contentHash
@@ -46,11 +46,11 @@ public enum DopeMerge {
     }
 
     /// The stored base for one dot-path.
-    public struct Base: Hashable, Sendable {
-        public let syncedContentHash: String?
-        public let locallyModified: Bool
+    struct Base: Hashable, Sendable {
+        let syncedContentHash: String?
+        let locallyModified: Bool
 
-        public init(syncedContentHash: String?, locallyModified: Bool) {
+        init(syncedContentHash: String?, locallyModified: Bool) {
             self.syncedContentHash = syncedContentHash
             self.locallyModified = locallyModified
         }
@@ -60,7 +60,7 @@ public enum DopeMerge {
     ///
     /// Deliberately total: a path present on either side gets an outcome, so
     /// nothing is silently dropped by being absent from one tree.
-    public static func plan(
+    static func plan(
         ours: [Element],
         theirs: [Element],
         base: [String: Base]
@@ -131,7 +131,7 @@ public enum DopeMerge {
     }
 
     /// The unresolved conflicts in a plan, in dot-path order.
-    public static func conflicts(in plan: [Outcome]) -> [Outcome] {
+    static func conflicts(in plan: [Outcome]) -> [Outcome] {
         plan.filter { $0.decision == .conflict }
     }
 
@@ -141,7 +141,7 @@ public enum DopeMerge {
     /// merge reasons about. The dot-path forms are the same ones dope refs
     /// already use, so a conflict names something a person can actually go
     /// and look at.
-    public static func elements(of bundle: DopeDocumentBundle) -> [Element] {
+    static func elements(of bundle: DopeDocumentBundle) -> [Element] {
         var out: [Element] = []
         for domain in bundle.domainFiles.sorted(by: { $0.body.code < $1.body.code }) {
             let d = domain.body.code
@@ -195,7 +195,7 @@ public enum DopeMerge {
     /// Content hash of any document node. Uses the file codec so the hash is
     /// computed over exactly the bytes that would be written — the encoder is
     /// `.sortedKeys`, so this is stable across runs.
-    public static func hash<T: Encodable>(_ value: T) -> String {
+    static func hash<T: Encodable>(_ value: T) -> String {
         guard let data = try? DopeDocumentCodec.encoder.encode(value) else { return "" }
         return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }

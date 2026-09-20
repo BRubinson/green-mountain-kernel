@@ -14,23 +14,23 @@ import GRDB
 /// carry NO db CHECK, so a future step or status is an entry here — never a
 /// migration. The role map is what lets BRIEFING_STUB resolve an agent
 /// type to its step without the hook script knowing anything.
-public enum BriefingStepSpec {
+enum BriefingStepSpec {
     /// m0025: pre_architecture is RETIRED — the care package replaced it
     /// (existing rows were retagged to initial by the migration). A future
     /// step is still a registry entry, never a migration.
-    public static let steps: [String] = ["initial"]
-    public static let statuses: [String] = ["building", "ready"]
+    static let steps: [String] = ["initial"]
+    static let statuses: [String] = ["building", "ready"]
 
     /// agent role (plugin-scoped name with or without the `gmcc:` prefix) →
     /// the step that role consumes. Roles absent here get no briefing line in
     /// their stub — deliberately, not an error. code-architect dropped out
     /// with pre_architecture: architects load the care package instead.
-    public static let roleStepMap: [String: String] = [
+    static let roleStepMap: [String: String] = [
         "briefer": "initial",
         "code-explorer": "initial",
     ]
 
-    public static func validateStep(_ raw: String) throws -> String {
+    static func validateStep(_ raw: String) throws -> String {
         guard steps.contains(raw) else {
             throw StoreError.badRequest(
                 detail: "unknown briefing step '\(raw)' — known: \(steps.joined(separator: ", "))"
@@ -39,7 +39,7 @@ public enum BriefingStepSpec {
         return raw
     }
 
-    public static func step(forAgentType agentType: String) -> String? {
+    static func step(forAgentType agentType: String) -> String? {
         let bare =
             agentType.hasPrefix("gmcc:")
             ? String(agentType.dropFirst("gmcc:".count))
@@ -52,25 +52,25 @@ extension Store {
 
     // MARK: - Verbs
 
-    public func briefingOpen(_ req: BriefingOpenRequest) throws -> BriefingRowResponse {
+    func briefingOpen(_ req: BriefingOpenRequest) throws -> BriefingRowResponse {
         try boundary { db in try BriefingRepository(db: db, core: core).open(req) }
     }
 
-    public func briefingComplete(_ req: BriefingCompleteRequest) throws -> BriefingRowResponse {
+    func briefingComplete(_ req: BriefingCompleteRequest) throws -> BriefingRowResponse {
         try boundary { db in try BriefingRepository(db: db, core: core).complete(req) }
     }
 
-    public func briefingGet(_ req: BriefingGetRequest) throws -> BriefingGetResponse {
+    func briefingGet(_ req: BriefingGetRequest) throws -> BriefingGetResponse {
         try boundaryRead { db in try BriefingRepository(db: db, core: core).get(req) }
     }
 
-    public func briefingList(_ req: BriefingListRequest) throws -> BriefingListResponse {
+    func briefingList(_ req: BriefingListRequest) throws -> BriefingListResponse {
         try boundaryRead { db in try BriefingRepository(db: db, core: core).list(req) }
     }
 
     /// The SubagentStart hook's one call. Empty stub + success when nothing
     /// applies — the hook must never wedge a spawn.
-    public func briefingStub(_ req: BriefingStubRequest) throws -> BriefingStubResponse {
+    func briefingStub(_ req: BriefingStubRequest) throws -> BriefingStubResponse {
         try boundaryRead { db in try BriefingRepository(db: db, core: core).stub(req) }
     }
 

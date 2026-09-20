@@ -11,31 +11,31 @@ import GRDB
 // strand in-flight resolves. Bodies live in ReviewRepository.
 
 extension Store {
-    public func reviewOpen(_ req: ReviewOpenRequest) throws -> ReviewSummaryResponse {
+    func reviewOpen(_ req: ReviewOpenRequest) throws -> ReviewSummaryResponse {
         try boundary { db in try ReviewRepository(db: db, core: core).open(req) }
     }
 
-    public func reviewFindingAdd(_ req: ReviewFindingAddRequest) throws -> ReviewFindingRowResponse {
+    func reviewFindingAdd(_ req: ReviewFindingAddRequest) throws -> ReviewFindingRowResponse {
         try boundary { db in try ReviewRepository(db: db, core: core).findingAdd(req) }
     }
 
-    public func reviewRank(_ req: ReviewRankRequest) throws -> ReviewRankResponse {
+    func reviewRank(_ req: ReviewRankRequest) throws -> ReviewRankResponse {
         try boundary { db in try ReviewRepository(db: db, core: core).rank(req) }
     }
 
-    public func reviewResolve(_ req: ReviewResolveRequest) throws -> ReviewFindingRowResponse {
+    func reviewResolve(_ req: ReviewResolveRequest) throws -> ReviewFindingRowResponse {
         try boundary { db in try ReviewRepository(db: db, core: core).resolve(req) }
     }
 
-    public func reviewComplete(_ req: ReviewCompleteRequest) throws -> ReviewSummaryResponse {
+    func reviewComplete(_ req: ReviewCompleteRequest) throws -> ReviewSummaryResponse {
         try boundary { db in try ReviewRepository(db: db, core: core).complete(req) }
     }
 
-    public func reviewReopen(_ req: ReviewReopenRequest) throws -> ReviewSummaryResponse {
+    func reviewReopen(_ req: ReviewReopenRequest) throws -> ReviewSummaryResponse {
         try boundary { db in try ReviewRepository(db: db, core: core).reopen(req) }
     }
 
-    public func reviewGet(_ req: ReviewGetRequest) throws -> ReviewGetResponse {
+    func reviewGet(_ req: ReviewGetRequest) throws -> ReviewGetResponse {
         try boundaryRead { db in try ReviewRepository(db: db, core: core).get(req) }
     }
 

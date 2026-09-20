@@ -3,23 +3,23 @@ import Foundation
 /// Render-environment knobs shared by the resolver, the views, and the
 /// headless screenshot renderer. SwiftUI-free on purpose: the resolver (and
 /// its tests) must never need a UI framework.
-public struct DiagramRenderEnvironment: Hashable, Sendable {
-    public enum ColorScheme: String, Codable, Hashable, Sendable {
+struct DiagramRenderEnvironment: Hashable, Sendable {
+    enum ColorScheme: String, Codable, Hashable, Sendable {
         case light
         case dark
     }
 
-    public let colorScheme: ColorScheme
+    let colorScheme: ColorScheme
     /// Pixels per point in the exported PNG.
-    public let displayScale: Double
+    let displayScale: Double
     /// Padding around contentBounds.
-    public let padding: Double
+    let padding: Double
     /// Entity card layout constants (points, pre-scale).
-    public let cardWidth: Double
-    public let cardHeaderHeight: Double
-    public let cardRowHeight: Double
+    let cardWidth: Double
+    let cardHeaderHeight: Double
+    let cardRowHeight: Double
 
-    public init(
+    init(
         colorScheme: ColorScheme = .light,
         displayScale: Double = 2,
         padding: Double = 48,
@@ -38,7 +38,7 @@ public struct DiagramRenderEnvironment: Hashable, Sendable {
     /// Entity card height (points, pre-scale) for a row count. The single
     /// home of the formula — the resolver's frames and DopeCanvasLayout's
     /// generated geometry both call this, so they can never disagree.
-    public func cardHeight(rowCount: Int) -> Double {
+    func cardHeight(rowCount: Int) -> Double {
         cardHeaderHeight + Double(max(rowCount, 1)) * cardRowHeight + 8
     }
 }
@@ -47,9 +47,9 @@ public struct DiagramRenderEnvironment: Hashable, Sendable {
 /// per-process seed-randomized, and a naive `hashValue` would give the same
 /// screenshot different colors on every run. Determinism is a correctness
 /// requirement (screenshots diff-able across runs), not a style choice.
-public enum DiagramPalette {
+enum DiagramPalette {
     /// Stable hue in [0, 1) for a domain code.
-    public static func domainHue(_ code: String) -> Double {
+    static func domainHue(_ code: String) -> Double {
         var hash: UInt64 = 0xcbf29ce484222325
         for byte in code.utf8 {
             hash ^= UInt64(byte)

@@ -6,7 +6,7 @@ import GRDB
 
 extension Store {
 
-    public func agentRegister(_ req: AgentRegisterRequest) throws -> AgentRegisterResponse {
+    func agentRegister(_ req: AgentRegisterRequest) throws -> AgentRegisterResponse {
         try boundary { db in
             try AgentRegistrationRepository(db: db, core: core).register(req)
         }

@@ -14,7 +14,7 @@ import Foundation
 ///
 /// SENDABLE IS A REQUIREMENT, not decoration: the app trampolines every verb
 /// from MainActor onto a serial queue, so a caller crosses executors by design.
-public protocol GmVerbCaller: Sendable {
+protocol GmVerbCaller: Sendable {
     /// One request/response round-trip, however the conformer gets there —
     /// over the unix socket, or in-process against the store it already holds.
     func request<Req: Codable & Sendable, Resp: Codable & Sendable>(

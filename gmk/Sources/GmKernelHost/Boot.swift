@@ -8,10 +8,10 @@ import Foundation
 /// Boot order is load-bearing: the ownership lock comes first, so nothing can
 /// open the database before it, and log redirection precedes the db work so a
 /// failure lands in the log rather than an unread stderr.
-public enum KernelHost {
+enum KernelHost {
 
     /// Run as the headless writer. Never returns.
-    public static func bootHeadlessAndRun() -> Never {
+    static func bootHeadlessAndRun() -> Never {
         let outcome: KernelOwnership.Outcome
         do {
             outcome = try KernelOwnership.acquire()

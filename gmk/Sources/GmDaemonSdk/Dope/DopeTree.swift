@@ -11,25 +11,25 @@ import Foundation
 
 // MARK: - Bodies (one declaration per level)
 
-public struct DopeScopeBody: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let description: String
+struct DopeScopeBody: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let description: String
 
-    public init(code: String, name: String, description: String) {
+    init(code: String, name: String, description: String) {
         self.code = code
         self.name = name
         self.description = description
     }
 }
 
-public struct DopePersistenceBody: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let description: String
-    public let sortOrder: Int
+struct DopePersistenceBody: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let description: String
+    let sortOrder: Int
 
-    public init(
+    init(
         code: String,
         name: String,
         description: String,
@@ -42,20 +42,20 @@ public struct DopePersistenceBody: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeEntityBody: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let entityType: String
-    public let description: String
-    public let sortOrder: Int
-    public let repoRepresentativeFile: String?
+struct DopeEntityBody: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let entityType: String
+    let description: String
+    let sortOrder: Int
+    let repoRepresentativeFile: String?
     /// `domain_code.entity_code` — the BASE_COMPOSABLE entity whose
     /// properties this entity composes. A pure lookup like enumRef: the
     /// base's properties are NEVER replicated onto this entity in the db or
     /// the JSON; consumers union them at render time.
-    public let baseComposableRef: String?
+    let baseComposableRef: String?
 
-    public init(
+    init(
         code: String,
         name: String,
         entityType: String,
@@ -74,26 +74,26 @@ public struct DopeEntityBody: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopePropertyBody: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let description: String
-    public let sortOrder: Int
-    public let dataType: String
-    public let nullable: Bool
-    public let isUnique: Bool
-    public let autoIncrement: Bool?
-    public let textCharLimit: Int?
+struct DopePropertyBody: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let description: String
+    let sortOrder: Int
+    let dataType: String
+    let nullable: Bool
+    let isUnique: Bool
+    let autoIncrement: Bool?
+    let textCharLimit: Int?
     /// `domain.enums.enum_code` — non-nil iff dataType == "enum".
-    public let enumRef: String?
+    let enumRef: String?
     /// `domain.entity.property` — non-nil iff dataType == "relationship".
-    public let relationshipTargetRef: String?
+    let relationshipTargetRef: String?
     /// `domain.entity.property` — the BASE_COMPOSABLE property this one
     /// materializes. Provenance only: the row is real and FK-referenceable;
     /// the tag records where it came from. Orthogonal to dataType.
-    public let baseOriginRef: String?
+    let baseOriginRef: String?
 
-    public init(
+    init(
         code: String,
         name: String,
         description: String,
@@ -122,14 +122,14 @@ public struct DopePropertyBody: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeEnumBody: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let description: String
-    public let sortOrder: Int
-    public let repoRepresentativeFile: String?
+struct DopeEnumBody: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let description: String
+    let sortOrder: Int
+    let repoRepresentativeFile: String?
 
-    public init(
+    init(
         code: String,
         name: String,
         description: String,
@@ -144,13 +144,13 @@ public struct DopeEnumBody: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopeOptionBody: Codable, Hashable, Sendable {
-    public let code: String
-    public let name: String
-    public let description: String
-    public let sortOrder: Int
+struct DopeOptionBody: Codable, Hashable, Sendable {
+    let code: String
+    let name: String
+    let description: String
+    let sortOrder: Int
 
-    public init(
+    init(
         code: String,
         name: String,
         description: String,
@@ -165,11 +165,11 @@ public struct DopeOptionBody: Codable, Hashable, Sendable {
 
 // MARK: - Identity (wire only — documents never carry it)
 
-public struct DopeNodeIdentity: Codable, Hashable, Sendable {
-    public let uuid: String
-    public let version: Int64
-    public let createdAt: String
-    public let updatedAt: String
+struct DopeNodeIdentity: Codable, Hashable, Sendable {
+    let uuid: String
+    let version: Int64
+    let createdAt: String
+    let updatedAt: String
     /// Soft delete / whiteout. Lives HERE, on the wire-only identity layer,
     /// and deliberately NOT on the body: the body is what
     /// DopeProjection.documents emits, and a saved .doped.json represents
@@ -178,9 +178,9 @@ public struct DopeNodeIdentity: Codable, Hashable, Sendable {
     /// (PROJECT_ITEM / SESSION_INSTANCE_ITEM), which are db-only and never
     /// serialized. Keeping it off the body makes that structural rather than
     /// a rule someone has to remember.
-    public let deletedOn: String?
+    let deletedOn: String?
 
-    public init(
+    init(
         uuid: String,
         version: Int64,
         createdAt: String,
@@ -195,7 +195,7 @@ public struct DopeNodeIdentity: Codable, Hashable, Sendable {
     }
 
     /// Tolerant: neither field exists on a pre-m0012 peer.
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         uuid = try c.decode(String.self, forKey: .uuid)
         version = try c.decode(Int64.self, forKey: .version)
@@ -205,7 +205,7 @@ public struct DopeNodeIdentity: Codable, Hashable, Sendable {
     }
 }
 
-public extension DopeScopeTree {
+extension DopeScopeTree {
     /// The same scope with a different domain list — the resolver rebuilds
     /// the tree structurally and must not invent scope identity.
     func replacingDomains(_ domains: [DopePersistenceNode]) -> DopeScopeTree {
@@ -236,47 +236,47 @@ public extension DopeScopeTree {
 
 // MARK: - Wire nodes (identity + body + children, flattened)
 
-public struct DopeOptionNode: Codable, Hashable, Sendable {
-    public let identity: DopeNodeIdentity
-    public let body: DopeOptionBody
+struct DopeOptionNode: Codable, Hashable, Sendable {
+    let identity: DopeNodeIdentity
+    let body: DopeOptionBody
 
-    public init(identity: DopeNodeIdentity, body: DopeOptionBody) {
+    init(identity: DopeNodeIdentity, body: DopeOptionBody) {
         self.identity = identity
         self.body = body
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopeOptionBody(from: decoder)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
     }
 }
 
-public struct DopeEnumNode: Codable, Hashable, Sendable {
-    public let identity: DopeNodeIdentity
-    public let body: DopeEnumBody
-    public let options: [DopeOptionNode]
+struct DopeEnumNode: Codable, Hashable, Sendable {
+    let identity: DopeNodeIdentity
+    let body: DopeEnumBody
+    let options: [DopeOptionNode]
 
     private enum CodingKeys: String, CodingKey { case options }
 
-    public init(identity: DopeNodeIdentity, body: DopeEnumBody, options: [DopeOptionNode]) {
+    init(identity: DopeNodeIdentity, body: DopeEnumBody, options: [DopeOptionNode]) {
         self.identity = identity
         self.body = body
         self.options = options
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopeEnumBody(from: decoder)
         options = try decoder.container(keyedBy: CodingKeys.self)
             .decode([DopeOptionNode].self, forKey: .options)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -284,47 +284,47 @@ public struct DopeEnumNode: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopePropertyNode: Codable, Hashable, Sendable {
-    public let identity: DopeNodeIdentity
-    public let body: DopePropertyBody
+struct DopePropertyNode: Codable, Hashable, Sendable {
+    let identity: DopeNodeIdentity
+    let body: DopePropertyBody
 
-    public init(identity: DopeNodeIdentity, body: DopePropertyBody) {
+    init(identity: DopeNodeIdentity, body: DopePropertyBody) {
         self.identity = identity
         self.body = body
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopePropertyBody(from: decoder)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
     }
 }
 
-public struct DopeEntityNode: Codable, Hashable, Sendable {
-    public let identity: DopeNodeIdentity
-    public let body: DopeEntityBody
-    public let properties: [DopePropertyNode]
+struct DopeEntityNode: Codable, Hashable, Sendable {
+    let identity: DopeNodeIdentity
+    let body: DopeEntityBody
+    let properties: [DopePropertyNode]
 
     private enum CodingKeys: String, CodingKey { case properties }
 
-    public init(identity: DopeNodeIdentity, body: DopeEntityBody, properties: [DopePropertyNode]) {
+    init(identity: DopeNodeIdentity, body: DopeEntityBody, properties: [DopePropertyNode]) {
         self.identity = identity
         self.body = body
         self.properties = properties
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopeEntityBody(from: decoder)
         properties = try decoder.container(keyedBy: CodingKeys.self)
             .decode([DopePropertyNode].self, forKey: .properties)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -332,15 +332,15 @@ public struct DopeEntityNode: Codable, Hashable, Sendable {
     }
 }
 
-public struct DopePersistenceNode: Codable, Hashable, Sendable {
-    public let identity: DopeNodeIdentity
-    public let body: DopePersistenceBody
-    public let entities: [DopeEntityNode]
-    public let enums: [DopeEnumNode]
+struct DopePersistenceNode: Codable, Hashable, Sendable {
+    let identity: DopeNodeIdentity
+    let body: DopePersistenceBody
+    let entities: [DopeEntityNode]
+    let enums: [DopeEnumNode]
 
     private enum CodingKeys: String, CodingKey { case entities, enums }
 
-    public init(
+    init(
         identity: DopeNodeIdentity,
         body: DopePersistenceBody,
         entities: [DopeEntityNode],
@@ -352,7 +352,7 @@ public struct DopePersistenceNode: Codable, Hashable, Sendable {
         self.enums = enums
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopePersistenceBody(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -360,7 +360,7 @@ public struct DopePersistenceNode: Codable, Hashable, Sendable {
         enums = try c.decode([DopeEnumNode].self, forKey: .enums)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -370,22 +370,22 @@ public struct DopePersistenceNode: Codable, Hashable, Sendable {
 }
 
 /// The full wire tree of one scope.
-public struct DopeScopeTree: Codable, Hashable, Sendable {
-    public let identity: DopeNodeIdentity
-    public let body: DopeScopeBody
+struct DopeScopeTree: Codable, Hashable, Sendable {
+    let identity: DopeNodeIdentity
+    let body: DopeScopeBody
     /// nil for the two project tiers (m0013). A project-tier tree has no
     /// session, and the repo/boot axis is session-only by construction.
-    public let sessionUuid: String?
-    public let promptUuid: String?
-    public let scopeType: String
-    public let revision: Int64
-    public let domains: [DopePersistenceNode]
+    let sessionUuid: String?
+    let promptUuid: String?
+    let scopeType: String
+    let revision: Int64
+    let domains: [DopePersistenceNode]
 
     private enum CodingKeys: String, CodingKey {
         case sessionUuid, promptUuid, scopeType, revision, domains
     }
 
-    public init(
+    init(
         identity: DopeNodeIdentity,
         body: DopeScopeBody,
         sessionUuid: String?,
@@ -403,7 +403,7 @@ public struct DopeScopeTree: Codable, Hashable, Sendable {
         self.domains = domains
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopeScopeBody(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -414,7 +414,7 @@ public struct DopeScopeTree: Codable, Hashable, Sendable {
         domains = try c.decode([DopePersistenceNode].self, forKey: .domains)
     }
 
-    public func encode(to encoder: Encoder) throws {
+    func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -427,14 +427,14 @@ public struct DopeScopeTree: Codable, Hashable, Sendable {
 }
 
 /// Cascade accounting returned by node deletions.
-public struct DopeTreeCounts: Codable, Hashable, Sendable {
-    public let domains: Int
-    public let entities: Int
-    public let properties: Int
-    public let enums: Int
-    public let options: Int
+struct DopeTreeCounts: Codable, Hashable, Sendable {
+    let domains: Int
+    let entities: Int
+    let properties: Int
+    let enums: Int
+    let options: Int
 
-    public init(domains: Int, entities: Int, properties: Int, enums: Int, options: Int) {
+    init(domains: Int, entities: Int, properties: Int, enums: Int, options: Int) {
         self.domains = domains
         self.entities = entities
         self.properties = properties

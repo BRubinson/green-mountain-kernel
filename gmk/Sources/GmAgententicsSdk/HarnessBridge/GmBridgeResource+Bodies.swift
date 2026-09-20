@@ -8,7 +8,7 @@ import Foundation
 
 extension GmBridgeResource {
 
-    public static let botWorkflows = GmBridgeResource(
+    static let botWorkflows = GmBridgeResource(
         skill: "cde",
         path: "ref/bot_workflows.md",
         summary:
@@ -242,7 +242,7 @@ extension GmBridgeResource {
             """#
     )
 
-    public static let dopedFiles = GmBridgeResource(
+    static let dopedFiles = GmBridgeResource(
         skill: "dope",
         path: "ref/doped_files.md",
         summary:
@@ -459,7 +459,7 @@ extension GmBridgeResource {
             """#
     )
 
-    public static let gmfsDetails = GmBridgeResource(
+    static let gmfsDetails = GmBridgeResource(
         skill: "kernel",
         path: "ref/gmfs_details.md",
         summary:
@@ -733,7 +733,7 @@ extension GmBridgeResource {
             """#
     )
 
-    public static let kbiteAwareness = GmBridgeResource(
+    static let kbiteAwareness = GmBridgeResource(
         skill: "kbite",
         path: "ref/kbite_awareness.md",
         summary: "What kbites are, how they are searched, and when to reach for one instead of reading files.",
@@ -792,14 +792,14 @@ extension GmBridgeResource {
     )
 
     /// Every reference document, in a stable order.
-    public static let all: [GmBridgeResource] = [
+    static let all: [GmBridgeResource] = [
         botWorkflows, dopedFiles, gmfsDetails, kbiteAwareness,
     ]
 }
 
 extension GmBridgePrompt {
 
-    public static let gmccAgentKbiteCrunchChew = GmBridgePrompt(
+    static let gmccAgentKbiteCrunchChew = GmBridgePrompt(
         name: "gmcc_agent_kbite_crunch_chew",
         body: #"""
             ---
@@ -1110,7 +1110,7 @@ extension GmBridgePrompt {
             """#
     )
 
-    public static let gmccAgentMawWebFetch = GmBridgePrompt(
+    static let gmccAgentMawWebFetch = GmBridgePrompt(
         name: "gmcc_agent_maw_web_fetch",
         body: #"""
             ---
@@ -1313,7 +1313,7 @@ extension GmBridgePrompt {
             """#
     )
 
-    public static let all: [GmBridgePrompt] = [
+    static let all: [GmBridgePrompt] = [
         gmccAgentKbiteCrunchChew, gmccAgentMawWebFetch,
     ]
 }

@@ -4,39 +4,39 @@ import Foundation
 import FoundationModels
 
 @Generable
-public struct GmAgentNoArguments: Sendable {
-    public init() {}
+struct GmAgentNoArguments: Sendable {
+    init() {}
 }
 
-public struct GmAgentDiagramPlaceholderTool: GmAgentDiagramTool {
-    public let name = "diagram_not_supported"
-    public let description = notBuiltDescription("Look at and change pictures")
+struct GmAgentDiagramPlaceholderTool: GmAgentDiagramTool {
+    let name = "diagram_not_supported"
+    let description = notBuiltDescription("Look at and change pictures")
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentNoArguments) throws -> String {
+    func call(arguments _: GmAgentNoArguments) throws -> String {
         throw GmAgentToolError.notImplemented(family: .diagram)
     }
 }
 
-public struct GmAgentSystemPlaceholderTool: GmAgentSystemTool {
-    public let name = "system_not_supported"
-    public let description = notBuiltDescription("Change how the whole system behaves")
+struct GmAgentSystemPlaceholderTool: GmAgentSystemTool {
+    let name = "system_not_supported"
+    let description = notBuiltDescription("Change how the whole system behaves")
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentNoArguments) throws -> String {
+    func call(arguments _: GmAgentNoArguments) throws -> String {
         throw GmAgentToolError.notImplemented(family: .system)
     }
 }
 
-public struct GmAgentFsPlaceholderTool: GmAgentFsTool {
-    public let name = "fs_not_supported"
-    public let description = notBuiltDescription("Touch files in the gmfs folder")
+struct GmAgentFsPlaceholderTool: GmAgentFsTool {
+    let name = "fs_not_supported"
+    let description = notBuiltDescription("Touch files in the gmfs folder")
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentNoArguments) throws -> String {
+    func call(arguments _: GmAgentNoArguments) throws -> String {
         throw GmAgentToolError.notImplemented(family: .fs)
     }
 }

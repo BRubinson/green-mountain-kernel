@@ -8,10 +8,10 @@ import Foundation
 /// dot-path `d.e.p` masks whatever sits there in the base, and no cross-layer
 /// pointer is stored, so nothing can dangle. `resolve` NEVER throws; a
 /// malformed pair degrades to warnings.
-public enum DopeOverlay {
+enum DopeOverlay {
 
     /// Where a resolved node came from, and what happened to it.
-    public enum Origin: String, Codable, Hashable, Sendable {
+    enum Origin: String, Codable, Hashable, Sendable {
         /// Present only in the base — the overlay has nothing at this path.
         case base
         /// The overlay carried a real node at this path; its body won
@@ -31,14 +31,14 @@ public enum DopeOverlay {
     /// Per-path provenance. `effectiveUuid` is where copy-on-write lives: a
     /// caller holding a node whose origin is `.base` is holding a BASE row,
     /// so writing it would write the shared layer.
-    public struct Resolution: Codable, Hashable, Sendable {
-        public let path: String
-        public let origin: Origin
-        public let effectiveUuid: String
-        public let baseUuid: String?
-        public let overlayUuid: String?
+    struct Resolution: Codable, Hashable, Sendable {
+        let path: String
+        let origin: Origin
+        let effectiveUuid: String
+        let baseUuid: String?
+        let overlayUuid: String?
 
-        public init(
+        init(
             path: String,
             origin: Origin,
             effectiveUuid: String,
@@ -53,17 +53,17 @@ public enum DopeOverlay {
         }
     }
 
-    public struct Resolved: Sendable {
+    struct Resolved: Sendable {
         /// The merged tree, with tombstoned subtrees removed.
-        public let tree: DopeScopeTree
+        let tree: DopeScopeTree
         /// dot-path -> provenance, including the hidden ones.
-        public let resolutions: [String: Resolution]
+        let resolutions: [String: Resolution]
         /// Dot-paths masked away by a whiteout.
-        public let hidden: [String]
+        let hidden: [String]
         /// Non-fatal observations (orphaned masks, most often).
-        public let warnings: [String]
+        let warnings: [String]
 
-        public init(
+        init(
             tree: DopeScopeTree,
             resolutions: [String: Resolution],
             hidden: [String],
@@ -79,7 +79,7 @@ public enum DopeOverlay {
         /// DopeCanvasLayout, DiagramResolver, the headless renderer, GMVibes.
         /// This is what keeps the resolver from forcing a type change through
         /// five subsystems at once.
-        public func flattened() -> DopeScopeTree { tree }
+        func flattened() -> DopeScopeTree { tree }
     }
 
     static func isTombstone(_ identity: DopeNodeIdentity) -> Bool {
@@ -89,7 +89,7 @@ public enum DopeOverlay {
     /// Merge `overlay` over `base`. A nil overlay resolves to the base
     /// unchanged; a nil base resolves the overlay alone (every node an
     /// orphaned mask, since there is nothing to mask).
-    public static func resolve(base: DopeScopeTree?, overlay: DopeScopeTree?) -> Resolved {
+    static func resolve(base: DopeScopeTree?, overlay: DopeScopeTree?) -> Resolved {
         switch (base, overlay) {
         case (nil, nil):
             return Resolved(tree: DopeScopeTree.empty, resolutions: [:], hidden: [], warnings: [])

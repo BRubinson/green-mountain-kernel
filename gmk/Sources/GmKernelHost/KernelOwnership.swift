@@ -8,7 +8,7 @@ import Foundation
 /// lock is therefore the only way to obtain the capability: `Token` cannot be
 /// constructed outside this file, `acquire()` is its only producer, and
 /// `KernelWriter.start` — the single `Store(path:)` site — consumes one.
-public enum KernelOwnership {
+enum KernelOwnership {
 
     /// Proof that this process holds the exclusive database lock.
     ///
@@ -17,22 +17,22 @@ public enum KernelOwnership {
     /// mint one. The held descriptor is never closed: the lock is meant to last
     /// for the process's lifetime, and letting the kernel release it at exit is
     /// what makes a CRASHED kernel leave no stale lock behind.
-    public struct Token: ~Copyable {
+    struct Token: ~Copyable {
         fileprivate let fd: Int32
     }
 
     /// Who holds the lock, when we did not get it.
-    public struct Holder: Sendable, Equatable {
-        public let pid: pid_t
-        public let executablePath: String
+    struct Holder: Sendable, Equatable {
+        let pid: pid_t
+        let executablePath: String
         /// nil means the holder is HEADLESS — a `gm_kernel daemon` process
         /// rather than an app bundle. The distinction decides what a losing app
         /// does next: take over from a headless writer, but never from another
         /// app copy.
-        public let bundlePath: String?
+        let bundlePath: String?
     }
 
-    public enum Outcome: ~Copyable {
+    enum Outcome: ~Copyable {
         case acquired(Token)
         case heldBy(Holder)
     }
@@ -43,7 +43,7 @@ public enum KernelOwnership {
     /// could touch the database happens after the `flock`, and the `.heldBy`
     /// path has no fall-through — it cannot reach a `Store` even by accident,
     /// because it does not produce a `Token`.
-    public static func acquire() throws -> Outcome {
+    static func acquire() throws -> Outcome {
         try Paths.ensureRuntimeDirs()
 
         // The pidfile is DELIBERATELY `daemon.pid` in every root. A renamed
@@ -85,7 +85,7 @@ public enum KernelOwnership {
 
     /// The current holder, read without attempting to take the lock. Used by the
     /// menu bar to name the owning process in client mode.
-    public static func readHolder() -> Holder? {
+    static func readHolder() -> Holder? {
         let fd = open(Paths.pidfile.path, O_RDONLY)
         guard fd >= 0 else { return nil }
         defer { close(fd) }
@@ -127,10 +127,10 @@ public enum KernelOwnership {
         return path.hasSuffix(".app") ? path : nil
     }
 
-    public enum OwnershipError: Error, CustomStringConvertible {
+    enum OwnershipError: Error, CustomStringConvertible {
         case cannotOpenPidfile(errno: Int32)
 
-        public var description: String {
+        var description: String {
             switch self {
             case .cannotOpenPidfile(let code):
                 return "cannot open \(Paths.pidfile.path): \(String(cString: strerror(code)))"

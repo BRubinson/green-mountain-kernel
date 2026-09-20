@@ -8,14 +8,14 @@ import Foundation
 /// brush-width change is not a migration. Strokes pack because a vertex row
 /// is a full BaseEntity — ~250 bytes of scaffolding around 24 bytes of
 /// coordinate. `DiagramElementTypeSpec.vertexStorage` decides, per type.
-public enum DiagramStrokeCodec {
+enum DiagramStrokeCodec {
 
     /// RDP tolerance in element-local units. ~0.75px keeps a 100-vertex
     /// trackpad stroke at roughly 25 with no visible change.
-    public static let defaultEpsilon: Double = 0.75
+    static let defaultEpsilon: Double = 0.75
 
     /// 4-byte float x, 4-byte float y, 1-byte pressure.
-    public static let bytesPerVertex = 9
+    static let bytesPerVertex = 9
 
     /// Pressure sentinel for "this device reported none" — distinct from a
     /// genuine zero, which is a real (feather-light) reading.
@@ -33,7 +33,7 @@ public enum DiagramStrokeCodec {
     /// reads them back changed in the last bits. Both write paths normalize
     /// through here, so the in-memory tree and the persisted tree hold the
     /// same numbers by construction rather than by tolerance.
-    public static func normalizedForStorage(_ vertex: DiagramVertex) -> DiagramVertex {
+    static func normalizedForStorage(_ vertex: DiagramVertex) -> DiagramVertex {
         DiagramVertex(
             x: Double(Float(vertex.x)),
             y: Double(Float(vertex.y)),
@@ -41,7 +41,7 @@ public enum DiagramStrokeCodec {
         )
     }
 
-    public static func normalizedForStorage(_ vertices: [DiagramVertex]) -> [DiagramVertex] {
+    static func normalizedForStorage(_ vertices: [DiagramVertex]) -> [DiagramVertex] {
         vertices.map(normalizedForStorage)
     }
 
@@ -52,7 +52,7 @@ public enum DiagramStrokeCodec {
     /// strokes are affected: shape vertices are stored as REAL rows and
     /// round-trip exactly, so quantizing them would be a lie about
     /// precision that does not exist.
-    public static func normalizedForStorage(
+    static func normalizedForStorage(
         _ payload: DiagramElementPayload
     ) -> DiagramElementPayload {
         guard case .drawingStroke(let stroke) = payload else { return payload }
@@ -75,7 +75,7 @@ public enum DiagramStrokeCodec {
 
     /// Little-endian, explicitly: this blob outlives the machine that wrote
     /// it, and "native order" is not a format.
-    public static func pack(_ vertices: [DiagramVertex]) -> Data {
+    static func pack(_ vertices: [DiagramVertex]) -> Data {
         var data = Data(capacity: vertices.count * bytesPerVertex)
         for vertex in vertices {
             withUnsafeBytes(of: Float(vertex.x).bitPattern.littleEndian) {
@@ -94,7 +94,7 @@ public enum DiagramStrokeCodec {
         return data
     }
 
-    public static func unpack(_ data: Data, count: Int) throws -> [DiagramVertex] {
+    static func unpack(_ data: Data, count: Int) throws -> [DiagramVertex] {
         guard count >= 0 else {
             throw StoreError.corruptState(
                 entity: "diagram_drawing_stroke",
@@ -144,7 +144,7 @@ public enum DiagramStrokeCodec {
     /// all costs storage and slows every later render for no visual gain.
     /// Endpoints are always preserved, so a decimated stroke still starts
     /// and ends exactly where the hand did.
-    public static func decimate(
+    static func decimate(
         _ vertices: [DiagramVertex],
         epsilon: Double = defaultEpsilon
     ) -> [DiagramVertex] {

@@ -2,12 +2,12 @@ import AppKit
 import Foundation
 
 @MainActor
-public enum ITerm2App {
-    public static let bundleIdentifier = "com.googlecode.iterm2"
+enum ITerm2App {
+    static let bundleIdentifier = "com.googlecode.iterm2"
 
-    public static var socketPath: String { SocketConnection.socketPath() }
+    static var socketPath: String { SocketConnection.socketPath() }
 
-    public static func appURL() throws(ITerm2Error) -> URL {
+    static func appURL() throws(ITerm2Error) -> URL {
         guard
             let url = NSWorkspace.shared.urlForApplication(
                 withBundleIdentifier: bundleIdentifier
@@ -18,7 +18,7 @@ public enum ITerm2App {
         return url
     }
 
-    public static func ensureRunning(
+    static func ensureRunning(
         progress: @Sendable (LaunchStage) -> Void = { _ in }
     ) async throws(ITerm2Error) {
         let path = SocketConnection.socketPath()
@@ -61,7 +61,7 @@ public enum ITerm2App {
         throw .apiServerUnavailable(socketPath: path)
     }
 
-    public static func activate() {
+    static func activate() {
         for app in NSRunningApplication.runningApplications(
             withBundleIdentifier: bundleIdentifier
         ) {

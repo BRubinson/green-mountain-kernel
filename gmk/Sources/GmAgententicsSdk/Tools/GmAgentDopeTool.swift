@@ -4,9 +4,9 @@ import Foundation
 import FoundationModels
 
 @Generable
-public struct GmAgentDopeSearchArguments: Sendable {
+struct GmAgentDopeSearchArguments: Sendable {
     @Guide(description: GM_TOOL_GUIDE_SEARCH_QUERY)
-    public var query: String
+    var query: String
 
     @Guide(
         description: """
@@ -14,29 +14,29 @@ public struct GmAgentDopeSearchArguments: Sendable {
             Use this to ask for only persistence rows, or only cogs.
             """
     )
-    public var sources: [String]
+    var sources: [String]
 
     @Guide(description: GM_TOOL_GUIDE_SEARCH_LIMIT, .range(1...500))
-    public var limit: Int
+    var limit: Int
 
-    public init(query: String, sources: [String] = [], limit: Int = 50) {
+    init(query: String, sources: [String] = [], limit: Int = 50) {
         self.query = query
         self.sources = sources
         self.limit = limit
     }
 
-    public var resolvedSources: [DopeSearchSource] {
+    var resolvedSources: [DopeSearchSource] {
         sources.compactMap(DopeSearchSource.init(rawValue:))
     }
 }
 
-public struct GmAgentDopeSearchGlobalTool: GmAgentDopeTool {
-    public let name = "dope_search_global"
-    public let description = "Look in ALL projects and sessions for doped data."
+struct GmAgentDopeSearchGlobalTool: GmAgentDopeTool {
+    let name = "dope_search_global"
+    let description = "Look in ALL projects and sessions for doped data."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentDopeSearchArguments) throws -> String {
+    func call(arguments _: GmAgentDopeSearchArguments) throws -> String {
         throw GmAgentToolError.notSupported(
             tool: name,
             detail: """
@@ -50,29 +50,29 @@ public struct GmAgentDopeSearchGlobalTool: GmAgentDopeTool {
     }
 }
 
-public struct GmAgentDopeSearchSessionTool: GmAgentDopeTool {
-    public let name = "dope_search_session"
-    public let description = "Look in THIS session only for doped data."
+struct GmAgentDopeSearchSessionTool: GmAgentDopeTool {
+    let name = "dope_search_session"
+    let description = "Look in THIS session only for doped data."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentDopeSearchArguments) throws -> String {
+    func call(arguments _: GmAgentDopeSearchArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "DOPE_SEARCH")
     }
 }
 
 @Generable
-public struct GmAgentDopeNodeUpdate: Sendable {
+struct GmAgentDopeNodeUpdate: Sendable {
     @Guide(description: "The node to change. " + GM_TOOL_GUIDE_DOPE_CODE)
-    public var code: String
+    var code: String
 
     @Guide(description: "New title for the node, or empty to leave it alone.")
-    public var title: String
+    var title: String
 
     @Guide(description: "New body text for the node, or empty to leave it alone.")
-    public var body: String
+    var body: String
 
-    public init(code: String, title: String = "", body: String = "") {
+    init(code: String, title: String = "", body: String = "") {
         self.code = code
         self.title = title
         self.body = body
@@ -80,22 +80,22 @@ public struct GmAgentDopeNodeUpdate: Sendable {
 }
 
 @Generable
-public struct GmAgentDopeUpdateSessionArguments: Sendable {
+struct GmAgentDopeUpdateSessionArguments: Sendable {
     @Guide(description: "All the node changes to make in one go.")
-    public var updates: [GmAgentDopeNodeUpdate]
+    var updates: [GmAgentDopeNodeUpdate]
 
-    public init(updates: [GmAgentDopeNodeUpdate]) {
+    init(updates: [GmAgentDopeNodeUpdate]) {
         self.updates = updates
     }
 }
 
-public struct GmAgentDopeUpdateSessionTool: GmAgentDopeTool {
-    public let name = "dope_update_session"
-    public let description = "Change many session dopes on disk at once."
+struct GmAgentDopeUpdateSessionTool: GmAgentDopeTool {
+    let name = "dope_update_session"
+    let description = "Change many session dopes on disk at once."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentDopeUpdateSessionArguments) throws -> String {
+    func call(arguments _: GmAgentDopeUpdateSessionArguments) throws -> String {
         throw GmAgentToolError.notSupported(
             tool: name,
             detail: """

@@ -1,69 +1,69 @@
 import ClaudeForFoundationModels
 import Foundation
 
-public enum GmBridgeSkill {
+enum GmBridgeSkill {
 
-    public typealias Model = GmBridgeClaudeTypeModel
+    typealias Model = GmBridgeClaudeTypeModel
 
-    public typealias Effort = GmBridgeClaudeTypeEffort
+    typealias Effort = GmBridgeClaudeTypeEffort
 
-    public typealias Native = GmBridgeClaudeTypeNativeTool
+    typealias Native = GmBridgeClaudeTypeNativeTool
 
-    public typealias Tool = GmBridgeClaudeTypeTool
+    typealias Tool = GmBridgeClaudeTypeTool
 
-    public typealias Shell = GmBridgeClaudeTypeShell
+    typealias Shell = GmBridgeClaudeTypeShell
 
-    public typealias Context = GmBridgeClaudeTypeContext
+    typealias Context = GmBridgeClaudeTypeContext
 
-    public typealias HookHandler = GmBridgeClaudeTypeHookHandler
+    typealias HookHandler = GmBridgeClaudeTypeHookHandler
 
-    public typealias HookGroup = GmBridgeClaudeTypeHookGroup
+    typealias HookGroup = GmBridgeClaudeTypeHookGroup
 
-    public struct File: Equatable, Sendable, GmBridgeFile {
+    struct File: Equatable, Sendable, GmBridgeFile {
 
-        public var name: String
+        var name: String
 
-        public var description: String?
+        var description: String?
 
-        public var whenToUse: String?
+        var whenToUse: String?
 
-        public var argumentHint: String?
+        var argumentHint: String?
 
-        public var arguments: [String]
+        var arguments: [String]
 
-        public var disableModelInvocation: Bool?
+        var disableModelInvocation: Bool?
 
-        public var userInvocable: Bool?
+        var userInvocable: Bool?
 
-        public var allowedTools: [Tool]
+        var allowedTools: [Tool]
 
-        public var disallowedTools: [Tool]
+        var disallowedTools: [Tool]
 
-        public var model: Model?
+        var model: Model?
 
-        public var effort: Effort?
+        var effort: Effort?
 
-        public var context: Context?
+        var context: Context?
 
-        public var agent: String?
+        var agent: String?
 
-        public var background: Bool?
+        var background: Bool?
 
-        public var hooks: [String: [HookGroup]]
+        var hooks: [String: [HookGroup]]
 
-        public var paths: [String]
+        var paths: [String]
 
-        public var shell: Shell?
+        var shell: Shell?
 
-        public var metadata: [String: String]
+        var metadata: [String: String]
 
-        public var license: String?
+        var license: String?
 
-        public var compatibility: String?
+        var compatibility: String?
 
-        public var body: String
+        var body: String
 
-        public init(
+        init(
             name: String,
             description: String? = nil,
             whenToUse: String? = nil,
@@ -109,15 +109,15 @@ public enum GmBridgeSkill {
             self.body = body
         }
 
-        public var relativePath: String {
+        var relativePath: String {
             "skills/\(name)/SKILL.md"
         }
 
-        public var isEmpty: Bool {
+        var isEmpty: Bool {
             body.isEmpty
         }
 
-        public func contents() throws -> String? {
+        func contents() throws -> String? {
             guard !isEmpty else { return nil }
 
             var lines = ["---"]
@@ -187,6 +187,6 @@ public enum GmBridgeSkill {
             return lines.joined(separator: "\n") + "\n\n" + content
         }
 
-        public static let compatibilityLimit = 500
+        static let compatibilityLimit = 500
     }
 }

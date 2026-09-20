@@ -5,18 +5,18 @@ import Foundation
 /// Where a byte-mode page sits in the whole record. Every cde read that was
 /// asked for `page_bytes` carries one of these; a read that was not carries
 /// nil and is the historical response, byte for byte.
-public struct CdePage: Codable, Hashable, Sendable {
+struct CdePage: Codable, Hashable, Sendable {
     /// The budget that was applied, after clamping.
-    public let pageBytes: Int
+    let pageBytes: Int
     /// nil on the last page; otherwise the opaque `"<region>:<position>"` to
     /// pass back as `page_cursor`, never constructed by hand.
-    public let nextCursor: String?
+    let nextCursor: String?
     /// Every pageable region of this read, IN FILL ORDER, whether or not any
     /// of it landed on this page — so an empty region on the page is
     /// distinguishable from an empty region in the record.
-    public let regions: [CdePageRegion]
+    let regions: [CdePageRegion]
 
-    public init(pageBytes: Int, nextCursor: String?, regions: [CdePageRegion]) {
+    init(pageBytes: Int, nextCursor: String?, regions: [CdePageRegion]) {
         self.pageBytes = pageBytes
         self.nextCursor = nextCursor
         self.regions = regions
@@ -24,14 +24,14 @@ public struct CdePage: Codable, Hashable, Sendable {
 }
 
 /// One pageable region: a row array, or one long text delivered as windows.
-public struct CdePageRegion: Codable, Hashable, Sendable {
-    public let name: String
+struct CdePageRegion: Codable, Hashable, Sendable {
+    let name: String
     /// Rows (or characters, for a text region) delivered on THIS page.
-    public let returned: Int
+    let returned: Int
     /// The region's full size in the record.
-    public let total: Int
+    let total: Int
 
-    public init(name: String, returned: Int, total: Int) {
+    init(name: String, returned: Int, total: Int) {
         self.name = name
         self.returned = returned
         self.total = total
@@ -41,16 +41,16 @@ public struct CdePageRegion: Codable, Hashable, Sendable {
 /// One character window of a long text. The reader concatenates windows of
 /// the same region in `offset` order; a text that fits arrives as one window
 /// with offset 0 and `returnedChars == totalChars`.
-public struct CdeTextWindow: Codable, Hashable, Sendable {
-    public let region: String
-    public let text: String
+struct CdeTextWindow: Codable, Hashable, Sendable {
+    let region: String
+    let text: String
     /// Character offset of `text` inside the whole blob (Swift `Character`
     /// units, so a grapheme is never split).
-    public let offset: Int
-    public let returnedChars: Int
-    public let totalChars: Int
+    let offset: Int
+    let returnedChars: Int
+    let totalChars: Int
 
-    public init(region: String, text: String, offset: Int, returnedChars: Int, totalChars: Int) {
+    init(region: String, text: String, offset: Int, returnedChars: Int, totalChars: Int) {
         self.region = region
         self.text = text
         self.offset = offset
@@ -61,18 +61,18 @@ public struct CdeTextWindow: Codable, Hashable, Sendable {
 
 /// The parsed form of the opaque cursor string. Only the string crosses the
 /// wire; this is what a repository validates on the way in.
-public struct CdePageCursor: Hashable, Sendable {
-    public let region: String
-    public let position: Int
+struct CdePageCursor: Hashable, Sendable {
+    let region: String
+    let position: Int
 
-    public init(region: String, position: Int) {
+    init(region: String, position: Int) {
         self.region = region
         self.position = position
     }
 
     /// `"<region>:<position>"`, split on the LAST colon because a region name
     /// may itself carry one (`overview:<uuid>`).
-    public init?(_ wire: String) {
+    init?(_ wire: String) {
         guard let colon = wire.lastIndex(of: ":") else { return nil }
         let region = String(wire[wire.startIndex..<colon])
         let digits = wire[wire.index(after: colon)...]
@@ -81,13 +81,13 @@ public struct CdePageCursor: Hashable, Sendable {
         self.position = position
     }
 
-    public var wireString: String { "\(region):\(position)" }
+    var wireString: String { "\(region):\(position)" }
 }
 
-public enum CdePagerError: Error, CustomStringConvertible, Equatable {
+enum CdePagerError: Error, CustomStringConvertible, Equatable {
     case badCursor(String)
 
-    public var description: String {
+    var description: String {
         switch self {
         case .badCursor(let cursor):
             return "page_cursor '\(cursor)' is not a page.next_cursor this read produced"
@@ -103,12 +103,12 @@ public enum CdePagerError: Error, CustomStringConvertible, Equatable {
 /// regions before the cursor's are skipped and regions after an exhausted
 /// one report returned 0, both with their true totals; a cursor naming an
 /// unoffered region or a position past its end is `badCursor`.
-public struct CdePager {
-    public static let minimumTextSlice = 512
-    public static let textStep = 512
-    public static let minimumPageBytes = 4_096
+struct CdePager {
+    static let minimumTextSlice = 512
+    static let textStep = 512
+    static let minimumPageBytes = 4_096
 
-    public let pageBytes: Int
+    let pageBytes: Int
     private let encoder = CdeResultBudget.encoder()
     private var remaining: Int
     private var regions: [CdePageRegion] = []
@@ -120,7 +120,7 @@ public struct CdePager {
     /// offered. Still set at `page` time means the cursor was bad.
     private var cursorRegionSeen = false
 
-    public init(pageBytes: Int, cursor: String?) throws {
+    init(pageBytes: Int, cursor: String?) throws {
         let clamped = min(max(pageBytes, Self.minimumPageBytes), CdeResultBudget.maxBytes)
         self.pageBytes = clamped
         self.remaining = clamped
@@ -135,22 +135,22 @@ public struct CdePager {
     }
 
     /// The parsed cursor, for regions the repository pages in SQL itself.
-    public var startPosition: CdePageCursor? { cursor }
+    var startPosition: CdePageCursor? { cursor }
 
     /// Budget still unspent, for a SQL-paged region deciding how much to fetch.
-    public var budgetRemaining: Int { remaining }
+    var budgetRemaining: Int { remaining }
 
     // MARK: Fixed parts
 
     /// Charge the parts that ride on every page (stubs, questions, staleness).
-    public mutating func charge<T: Encodable>(_ fixed: T) {
+    mutating func charge<T: Encodable>(_ fixed: T) {
         remaining -= size(fixed)
     }
 
     // MARK: Row regions
 
     /// Offer a row region; returns the rows that land on this page.
-    public mutating func rows<Row: Encodable>(_ name: String, _ all: [Row]) throws -> [Row] {
+    mutating func rows<Row: Encodable>(_ name: String, _ all: [Row]) throws -> [Row] {
         guard let start = try begin(name, total: all.count) else { return [] }
         var taken: [Row] = []
         var index = start
@@ -170,7 +170,7 @@ public struct CdePager {
 
     /// Size-trim rows a repository fetched itself, WITHOUT reporting or setting
     /// a cursor — pair with `external(_:returned:total:next:)`.
-    public mutating func take<Row: Encodable>(_ rows: [Row]) -> [Row] {
+    mutating func take<Row: Encodable>(_ rows: [Row]) -> [Row] {
         var taken: [Row] = []
         for row in rows {
             let cost = size(row) + 2
@@ -183,7 +183,7 @@ public struct CdePager {
 
     /// Report a SQL-paged region. `next` is the position to resume at (a row
     /// id or an offset), nil when the region is finished.
-    public mutating func external(_ name: String, returned: Int, total: Int, next: Int?) {
+    mutating func external(_ name: String, returned: Int, total: Int, next: Int?) {
         if cursor?.region == name { cursorRegionSeen = true; reachedCursorRegion = true }
         report(name, returned: returned, total: total)
         if let next { stop(at: CdePageCursor(region: name, position: next)) }
@@ -193,7 +193,7 @@ public struct CdePager {
 
     /// Offer a text region; returns the window that lands on this page, or
     /// nil when none of it does. An EMPTY blob is still a region (0 of 0).
-    public mutating func text(_ name: String, _ blob: String) throws -> CdeTextWindow? {
+    mutating func text(_ name: String, _ blob: String) throws -> CdeTextWindow? {
         let total = blob.count
         guard let offset = try begin(name, total: total) else { return nil }
         guard total > 0 else {
@@ -226,7 +226,7 @@ public struct CdePager {
 
     // MARK: The page
 
-    public func page() throws -> CdePage {
+    func page() throws -> CdePage {
         if let cursor, !cursorRegionSeen {
             throw CdePagerError.badCursor(cursor.wireString)
         }

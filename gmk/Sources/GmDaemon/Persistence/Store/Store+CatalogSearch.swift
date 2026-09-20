@@ -11,7 +11,7 @@ import GRDB
 // Bodies live in CatalogSearchRepository; this wrapper owns the transaction.
 
 extension Store {
-    public func searchCatalog(_ req: CatalogSearchRequest) throws -> CatalogSearchResponse {
+    func searchCatalog(_ req: CatalogSearchRequest) throws -> CatalogSearchResponse {
         let tokens = req.query
             .split(whereSeparator: \.isWhitespace)
             .map { Self.escapeLikeToken(String($0)) }

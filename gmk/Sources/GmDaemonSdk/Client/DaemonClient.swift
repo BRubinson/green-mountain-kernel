@@ -1,6 +1,6 @@
 import Foundation
 
-public enum DaemonClientError: Error, Sendable {
+enum DaemonClientError: Error, Sendable {
     /// Socket unreachable after autostart + retries → client exit code 2.
     case unreachable(String)
     /// Server rejected our protocol version (after one respawn when the
@@ -22,7 +22,7 @@ public enum DaemonClientError: Error, Sendable {
 /// socket spawns the headless kernel, which the pidfile flock makes
 /// idempotent. Event streaming lives in DaemonEventSubscription, which owns
 /// its own connection, so a streaming connection cannot issue requests.
-public final class DaemonClient: @unchecked Sendable {
+final class DaemonClient: @unchecked Sendable {
     private let socketPath: String
     private let daemonBinaryPath: String
     private let clientName: String
@@ -32,7 +32,7 @@ public final class DaemonClient: @unchecked Sendable {
     private var fd: Int32 = -1
     private var readBuffer = Data()
 
-    public init(
+    init(
         socketPath: String = Paths.socket.path,
         daemonBinaryPath: String = Paths.binDaemon.path,
         clientName: String = "gm",
@@ -48,7 +48,7 @@ public final class DaemonClient: @unchecked Sendable {
         close()
     }
 
-    public func close() {
+    func close() {
         lock.lock()
         defer { lock.unlock() }
         closeLocked()
@@ -74,7 +74,7 @@ public final class DaemonClient: @unchecked Sendable {
     /// when the daemon reported an older version than ours (the freshly built
     /// binary wins); when the daemon is newer, a respawn cycle is doomed —
     /// surface the mismatch immediately.
-    public func connect() throws -> HelloAck {
+    func connect() throws -> HelloAck {
         lock.lock()
         defer { lock.unlock() }
         return try connectLocked()
@@ -95,7 +95,7 @@ public final class DaemonClient: @unchecked Sendable {
 
     /// One request/response round-trip. Connects (with handshake) lazily.
     /// Serialized: concurrent callers queue on the internal lock.
-    public func request<Req: Codable & Sendable, Resp: Codable & Sendable>(
+    func request<Req: Codable & Sendable, Resp: Codable & Sendable>(
         type: MessageType,
         payload: Req,
         responseType _: Resp.Type

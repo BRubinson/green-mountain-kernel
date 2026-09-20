@@ -3,7 +3,7 @@ import FoundationModels
 
 extension GmBridgeMcpTool {
 
-    public static func flattenedName(
+    static func flattenedName(
         family: GmAgentToolFamily,
         name: String
     ) -> String {
@@ -11,7 +11,7 @@ extension GmBridgeMcpTool {
         return name.hasPrefix(prefix) ? name : prefix + name
     }
 
-    public static func inputSchema(for tool: any GmAgentTool) -> GmBridgeJsonValue {
+    static func inputSchema(for tool: any GmAgentTool) -> GmBridgeJsonValue {
         guard
             let data = try? JSONEncoder().encode(tool.parameters),
             let schema = try? JSONDecoder().decode(GmBridgeJsonValue.self, from: data)
@@ -21,7 +21,7 @@ extension GmBridgeMcpTool {
         return schema
     }
 
-    public init(_ tool: any GmAgentTool) {
+    init(_ tool: any GmAgentTool) {
         self.init(
             name: Self.flattenedName(family: tool.family, name: tool.name),
             description: tool.description,
@@ -32,11 +32,11 @@ extension GmBridgeMcpTool {
 
 extension GmAgentTool {
 
-    public var bridgeTool: GmBridgeMcpTool {
+    var bridgeTool: GmBridgeMcpTool {
         GmBridgeMcpTool(self)
     }
 
-    public var qualifiedName: String {
+    var qualifiedName: String {
         bridgeTool.qualifiedName
     }
 }

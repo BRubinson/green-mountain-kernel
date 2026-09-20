@@ -9,8 +9,8 @@ import AppKit
 /// Windows are COUNTED, not flagged, because `WindowSeed`'s per-open UUID makes `WindowGroup`
 /// dedupe impossible: the policy retires on the last close, not the first.
 @MainActor
-public final class WindowPresence {
-    public static let shared = WindowPresence()
+final class WindowPresence {
+    static let shared = WindowPresence()
 
     private var openWindows = 0
     /// Invalidates a scheduled demotion. See `release()`.
@@ -26,7 +26,7 @@ public final class WindowPresence {
     ///
     /// Only the menu bar needs to call this: it is the only surface that can open a window
     /// from the zero-window state, and every other call site already runs inside one.
-    public func prepareForWindow() {
+    func prepareForWindow() {
         raise()
     }
 

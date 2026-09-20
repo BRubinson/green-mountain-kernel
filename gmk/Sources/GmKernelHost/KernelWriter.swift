@@ -4,9 +4,9 @@ import Foundation
 /// consumes a `KernelOwnership.Token`, which only a won `flock` can produce, so
 /// "did we take the lock first?" is a question the compiler answers. A second
 /// `Store(path:)` site anywhere is a second writer.
-public final class KernelWriter {
+final class KernelWriter {
 
-    public let store: Store
+    let store: Store
     /// Held for the process's lifetime. Never closed deliberately: the kernel
     /// releasing it at exit is what makes a crash leave no stale lock.
     private let token: KernelOwnership.Token
@@ -15,7 +15,7 @@ public final class KernelWriter {
     /// `token` is consumed proof of exclusive ownership; `log` is injected
     /// because the headless host writes to the daemon log and an app host does
     /// not.
-    public static func start(
+    static func start(
         _ token: consuming KernelOwnership.Token,
         log: (String) -> Void = { _ in }
     ) throws -> KernelWriter {

@@ -6,17 +6,17 @@ import Foundation
 /// freshly built binary can take over, while an older client is merely
 /// rejected — the daemon stays up (an old pinned-Kit GMVibes must never be
 /// able to kill-loop a fresh daemon).
-public enum GmWireProtocol {
+enum GmWireProtocol {
     /// Bumped by a NEW message type, or by an incompatible change to an
     /// existing one: a renamed field, or a REMOVED enum case. Additive
     /// OPTIONAL fields do NOT bump — they decode safely in both directions.
     /// Message types that land together share a single bump.
-    public static let version = 30
+    static let version = 30
 }
 
 /// Discriminator for every NDJSON message on the socket. One case per spec
 /// message; each request type has its own handler in gm_daemon.
-public enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
+enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     // Infra
     case hello = "HELLO"
     case ping = "PING"
@@ -221,12 +221,12 @@ public enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
 /// ErrorPayload.code and event kind. Narrow to MessageType only AFTER the
 /// version check; unknown-but-version-matched names get UNKNOWN_TYPE echoing
 /// the real request_id.
-public struct RawEnvelopeHead: Codable, Hashable, Sendable {
-    public let protocolVersion: Int
-    public let typeRaw: String
-    public let requestId: String?
+struct RawEnvelopeHead: Codable, Hashable, Sendable {
+    let protocolVersion: Int
+    let typeRaw: String
+    let requestId: String?
 
-    public var type: MessageType? { MessageType(rawValue: typeRaw) }
+    var type: MessageType? { MessageType(rawValue: typeRaw) }
 
     // The intentional rename ("type" is kept raw for forward compat).
     // Sibling keys MUST stay bare cases: an explicit snake_case raw value
@@ -239,7 +239,7 @@ public struct RawEnvelopeHead: Codable, Hashable, Sendable {
         case requestId
     }
 
-    public init(
+    init(
         protocolVersion: Int,
         typeRaw: String,
         requestId: String?
@@ -253,12 +253,12 @@ public struct RawEnvelopeHead: Codable, Hashable, Sendable {
 /// The minimal prefix decodable from any incoming line — enough to route the
 /// message and enforce the protocol-version handshake before the payload type
 /// is known.
-public struct EnvelopeHead: Codable, Hashable, Sendable {
-    public let protocolVersion: Int
-    public let type: MessageType
-    public let requestId: String
+struct EnvelopeHead: Codable, Hashable, Sendable {
+    let protocolVersion: Int
+    let type: MessageType
+    let requestId: String
 
-    public init(
+    init(
         protocolVersion: Int,
         type: MessageType,
         requestId: String
@@ -270,13 +270,13 @@ public struct EnvelopeHead: Codable, Hashable, Sendable {
 }
 
 /// Client → daemon message wrapper.
-public struct RequestEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
-    public let protocolVersion: Int
-    public let type: MessageType
-    public let requestId: String
-    public let payload: Payload
+struct RequestEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
+    let protocolVersion: Int
+    let type: MessageType
+    let requestId: String
+    let payload: Payload
 
-    public init(
+    init(
         type: MessageType,
         requestId: String = UUID().uuidString.lowercased(),
         payload: Payload
@@ -290,15 +290,15 @@ public struct RequestEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
 
 /// Daemon → client message wrapper. `requestId` echoes the request (empty for
 /// unsolicited event notifications).
-public struct ResponseEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
-    public let protocolVersion: Int
-    public let type: MessageType
-    public let requestId: String
-    public let ok: Bool
-    public let payload: Payload?
-    public let error: ErrorPayload?
+struct ResponseEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
+    let protocolVersion: Int
+    let type: MessageType
+    let requestId: String
+    let ok: Bool
+    let payload: Payload?
+    let error: ErrorPayload?
 
-    public init(
+    init(
         type: MessageType,
         requestId: String,
         ok: Bool,
@@ -314,7 +314,7 @@ public struct ResponseEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
     }
 }
 
-public enum ErrorCode: String, Codable, Hashable, CaseIterable, Sendable {
+enum ErrorCode: String, Codable, Hashable, CaseIterable, Sendable {
     case protocolMismatch = "PROTOCOL_MISMATCH"
     case badRequest = "BAD_REQUEST"
     case unknownType = "UNKNOWN_TYPE"
@@ -334,14 +334,14 @@ public enum ErrorCode: String, Codable, Hashable, CaseIterable, Sendable {
 /// Error envelope. `code` travels as a RAW STRING so a daemon that grows new
 /// codes can't make an older pinned-Kit client fail to decode the whole
 /// envelope — clients switch on the typed accessor and fall through on nil.
-public struct ErrorPayload: Codable, Hashable, Sendable {
-    public let codeRaw: String
-    public let message: String
+struct ErrorPayload: Codable, Hashable, Sendable {
+    let codeRaw: String
+    let message: String
     /// Set on PROTOCOL_MISMATCH so clients can be directional too: retry with
     /// autostart only when a freshly built binary would win.
-    public let daemonProtocolVersion: Int?
+    let daemonProtocolVersion: Int?
 
-    public var code: ErrorCode? { ErrorCode(rawValue: codeRaw) }
+    var code: ErrorCode? { ErrorCode(rawValue: codeRaw) }
 
     // Same rule as RawEnvelopeHead: only the intentional rename is explicit,
     // every sibling stays a bare case ("daemon_protocol_version" as a raw
@@ -353,7 +353,7 @@ public struct ErrorPayload: Codable, Hashable, Sendable {
         case daemonProtocolVersion
     }
 
-    public init(code: ErrorCode, message: String, daemonProtocolVersion: Int? = nil) {
+    init(code: ErrorCode, message: String, daemonProtocolVersion: Int? = nil) {
         self.codeRaw = code.rawValue
         self.message = message
         self.daemonProtocolVersion = daemonProtocolVersion
@@ -361,21 +361,21 @@ public struct ErrorPayload: Codable, Hashable, Sendable {
 }
 
 /// Payload type for responses that carry no data.
-public struct EmptyPayload: Codable, Hashable, Sendable {
-    public init() {}
+struct EmptyPayload: Codable, Hashable, Sendable {
+    init() {}
 }
 
 /// NDJSON framing helpers: one JSON document per `\n`-terminated line.
 /// Coders come from WireCodec — the snake_case key strategies are the wire's
 /// entire casing contract now that types carry no CodingKeys.
-public enum NDJSON {
-    public static func encodeLine<T: Encodable>(_ value: T) throws -> Data {
+enum NDJSON {
+    static func encodeLine<T: Encodable>(_ value: T) throws -> Data {
         var data = try WireCodec.encoder.encode(value)
         data.append(0x0A)
         return data
     }
 
-    public static func decode<T: Decodable>(_ type: T.Type, from line: Data) throws -> T {
+    static func decode<T: Decodable>(_ type: T.Type, from line: Data) throws -> T {
         try WireCodec.decoder.decode(type, from: line)
     }
 }

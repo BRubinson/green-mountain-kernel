@@ -9,10 +9,10 @@ import GRDB
 /// The completeness rule turns nil-vs-empty into meaning: omitting a ref class
 /// ENTIRELY is refused while `[]` is accepted, so a stored zero-row class reads
 /// as ATTEMPTED AND EMPTY. It is a PAYLOAD rule, applying to every caller.
-public enum BriefingCompletenessRule {
+enum BriefingCompletenessRule {
 
     /// Throws when the caller left a ref class out of the payload.
-    public static func check(_ req: BriefingCompleteRequest) throws {
+    static func check(_ req: BriefingCompleteRequest) throws {
         let missing = [
             ("dope_refs", req.dopeRefs == nil),
             ("kbite_refs", req.kbiteRefs == nil),

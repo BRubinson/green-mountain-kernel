@@ -5,14 +5,14 @@ import Foundation
 /// Decoded with a PLAIN JSONDecoder, never the wire codec: these keys come
 /// from Claude Code's payload in camelCase, and running them through
 /// `convertFromSnakeCase` would silently nil every one of them.
-public struct StructuredPatchHunk: Codable, Hashable, Sendable {
-    public let oldStart: Int
-    public let oldLines: Int
-    public let newStart: Int
-    public let newLines: Int
-    public let lines: [String]
+struct StructuredPatchHunk: Codable, Hashable, Sendable {
+    let oldStart: Int
+    let oldLines: Int
+    let newStart: Int
+    let newLines: Int
+    let lines: [String]
 
-    public init(oldStart: Int, oldLines: Int, newStart: Int, newLines: Int, lines: [String]) {
+    init(oldStart: Int, oldLines: Int, newStart: Int, newLines: Int, lines: [String]) {
         self.oldStart = oldStart
         self.oldLines = oldLines
         self.newStart = newStart
@@ -29,14 +29,14 @@ public struct StructuredPatchHunk: Codable, Hashable, Sendable {
 /// that deletes every line it touches reports `newLines: 0`, and a zero-height
 /// range would be unreadable — hence the `max(newLines, 1)` floor, which puts
 /// the deletion on the line it collapsed into.
-public enum StructuredPatchExpander {
+enum StructuredPatchExpander {
     /// Applied at the source as well as in `FileChangeRepository`, which is
     /// the actual guarantee: expanding here keeps a megabyte of generated-file
     /// rewrite off the socket in the first place.
-    public static let maxHunks = FileChangeLimits.maxRangesPerChange
-    public static let maxHunkBodyCharacters = FileChangeLimits.maxChangedContentCharacters
+    static let maxHunks = FileChangeLimits.maxRangesPerChange
+    static let maxHunkBodyCharacters = FileChangeLimits.maxChangedContentCharacters
 
-    public static func expand(_ hunks: [StructuredPatchHunk]) -> [ChangeRange] {
+    static func expand(_ hunks: [StructuredPatchHunk]) -> [ChangeRange] {
         hunks.prefix(maxHunks)
             .map { hunk in
                 ChangeRange(
@@ -55,7 +55,7 @@ public enum StructuredPatchExpander {
 /// rows are written. A structuredPatch for a regenerated file can carry
 /// thousands of hunks and megabytes of body; file_change is append-only
 /// history, so an uncapped expansion is permanent.
-public enum FileChangeLimits {
-    public static let maxRangesPerChange = 100
-    public static let maxChangedContentCharacters = 4000
+enum FileChangeLimits {
+    static let maxRangesPerChange = 100
+    static let maxChangedContentCharacters = 4000
 }

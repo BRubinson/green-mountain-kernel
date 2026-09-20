@@ -4,7 +4,7 @@ import SwiftUI
 /// global rail on the left (collapsed by default) and a route-switched content
 /// area. The session screen is a `NavigationSplitView`, so routes swap at the
 /// root instead of pushing onto a `NavigationStack`.
-public struct GMVibesWindow: View {
+struct GMVibesWindow: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(DaemonConnectionModel.self) private var daemon
     @Environment(GMVibesEnvironment.self) private var gmcc
@@ -15,11 +15,11 @@ public struct GMVibesWindow: View {
     // DrawingsStore occupied before the Drawing/ tear-out.
     @State private var diagrams = DiagramWorkspaceStore()
 
-    public init(seed: WindowSeed) {
+    init(seed: WindowSeed) {
         _nav = State(initialValue: WindowNav(initial: seed.route))
     }
 
-    public var body: some View {
+    var body: some View {
         VStack(spacing: 0) {
             // THE ENVIRONMENT BANNER, ABOVE EVERYTHING, ON EVERY WINDOW. It renders nothing
             // on production, and on beta and test it is the always-visible signal: the Dock

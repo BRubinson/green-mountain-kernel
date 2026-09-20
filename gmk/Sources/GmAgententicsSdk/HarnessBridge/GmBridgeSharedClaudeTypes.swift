@@ -1,9 +1,9 @@
 import Foundation
 import ClaudeForFoundationModels
 
-public typealias GmBridgeClaudeTypeEffort = ClaudeModel.Effort
+typealias GmBridgeClaudeTypeEffort = ClaudeModel.Effort
 
-public enum GmBridgeClaudeTypeModel: String, Equatable, Hashable, Sendable, CaseIterable {
+enum GmBridgeClaudeTypeModel: String, Equatable, Hashable, Sendable, CaseIterable {
 
     case opus
 
@@ -16,7 +16,7 @@ public enum GmBridgeClaudeTypeModel: String, Equatable, Hashable, Sendable, Case
     case inherit
 }
 
-public enum GmBridgeClaudeTypeNativeTool: String, Equatable, Hashable, Sendable, CaseIterable {
+enum GmBridgeClaudeTypeNativeTool: String, Equatable, Hashable, Sendable, CaseIterable {
 
     case bash = "Bash"
 
@@ -45,7 +45,7 @@ public enum GmBridgeClaudeTypeNativeTool: String, Equatable, Hashable, Sendable,
     case askUserQuestion = "AskUserQuestion"
 }
 
-public enum GmBridgeClaudeTypeTool: Equatable, Hashable, Sendable {
+enum GmBridgeClaudeTypeTool: Equatable, Hashable, Sendable {
 
     case native(GmBridgeClaudeTypeNativeTool)
 
@@ -56,7 +56,7 @@ public enum GmBridgeClaudeTypeTool: Equatable, Hashable, Sendable {
     /// anything the two typed cases above cannot name.
     case rule(String)
 
-    public var frontmatterValue: String {
+    var frontmatterValue: String {
         switch self {
         case .native(let tool): return tool.rawValue
         case .mcp(let tool): return tool.qualifiedName
@@ -64,58 +64,58 @@ public enum GmBridgeClaudeTypeTool: Equatable, Hashable, Sendable {
         }
     }
 
-    public static let bash = Self.native(.bash)
+    static let bash = Self.native(.bash)
 
-    public static let read = Self.native(.read)
+    static let read = Self.native(.read)
 
-    public static let write = Self.native(.write)
+    static let write = Self.native(.write)
 
-    public static let edit = Self.native(.edit)
+    static let edit = Self.native(.edit)
 
-    public static let grep = Self.native(.grep)
+    static let grep = Self.native(.grep)
 
-    public static let glob = Self.native(.glob)
+    static let glob = Self.native(.glob)
 
-    public static let webFetch = Self.native(.webFetch)
+    static let webFetch = Self.native(.webFetch)
 
-    public static let webSearch = Self.native(.webSearch)
+    static let webSearch = Self.native(.webSearch)
 
-    public static let skill = Self.native(.skill)
+    static let skill = Self.native(.skill)
 
-    public static let task = Self.native(.task)
+    static let task = Self.native(.task)
 
-    public static let todoWrite = Self.native(.todoWrite)
+    static let todoWrite = Self.native(.todoWrite)
 
-    public static let notebookEdit = Self.native(.notebookEdit)
+    static let notebookEdit = Self.native(.notebookEdit)
 
-    public static let askUserQuestion = Self.native(.askUserQuestion)
+    static let askUserQuestion = Self.native(.askUserQuestion)
 }
 
-public enum GmBridgeClaudeTypeShell: String, Equatable, Hashable, Sendable, CaseIterable {
+enum GmBridgeClaudeTypeShell: String, Equatable, Hashable, Sendable, CaseIterable {
 
     case bash
 
     case powershell
 }
 
-public enum GmBridgeClaudeTypeContext: String, Equatable, Hashable, Sendable, CaseIterable {
+enum GmBridgeClaudeTypeContext: String, Equatable, Hashable, Sendable, CaseIterable {
 
     case fork
 }
 
-public struct GmBridgeClaudeTypeHookHandler: Codable, Equatable, Sendable {
+struct GmBridgeClaudeTypeHookHandler: Codable, Equatable, Sendable {
 
-    public var type: String
+    var type: String
 
-    public var command: String
+    var command: String
 
-    public var timeout: Int?
+    var timeout: Int?
 
-    public var async: Bool?
+    var async: Bool?
 
-    public var once: Bool?
+    var once: Bool?
 
-    public init(
+    init(
         command: String,
         timeout: Int? = nil,
         async: Bool? = nil,
@@ -129,23 +129,23 @@ public struct GmBridgeClaudeTypeHookHandler: Codable, Equatable, Sendable {
     }
 }
 
-public struct GmBridgeClaudeTypeHookGroup: Codable, Equatable, Sendable {
+struct GmBridgeClaudeTypeHookGroup: Codable, Equatable, Sendable {
 
-    public var matcher: String?
+    var matcher: String?
 
-    public var hooks: [GmBridgeClaudeTypeHookHandler]
+    var hooks: [GmBridgeClaudeTypeHookHandler]
 
-    public init(matcher: String? = nil, hooks: [GmBridgeClaudeTypeHookHandler]) {
+    init(matcher: String? = nil, hooks: [GmBridgeClaudeTypeHookHandler]) {
         self.matcher = matcher
         self.hooks = hooks
     }
 }
 
-public enum GmBridgeClaudeTypePath {
+enum GmBridgeClaudeTypePath {
 
-    public static let pluginRoot = "${CLAUDE_PLUGIN_ROOT}"
+    static let pluginRoot = "${CLAUDE_PLUGIN_ROOT}"
 
-    public static let projectDir = "${CLAUDE_PROJECT_DIR}"
+    static let projectDir = "${CLAUDE_PROJECT_DIR}"
 
-    public static let pluginData = "${CLAUDE_PLUGIN_DATA}"
+    static let pluginData = "${CLAUDE_PLUGIN_DATA}"
 }

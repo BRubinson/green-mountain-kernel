@@ -1,6 +1,6 @@
 import Foundation
 
-public enum ITerm2Error: Error, Sendable, Equatable {
+enum ITerm2Error: Error, Sendable, Equatable {
     case appNotInstalled
 
     case apiServerUnavailable(socketPath: String)

@@ -11,10 +11,10 @@ import GRDB
 /// `StoreBoundary.swift`, so a verb called inside `inTransaction` enlists rather
 /// than trapping. This file holds lifecycle, health, the StoreCore forwards and
 /// the four-phase verb orchestration a repository cannot host.
-public final class Store: @unchecked Sendable {
+final class Store: @unchecked Sendable {
     let dbQueue: DatabaseQueue
 
-    public let dbPath: String
+    let dbPath: String
 
     /// The shared write core. `let`, never `var`: a recreated core would
     /// silently drop every already-registered subscriber, and the daemon would
@@ -31,15 +31,15 @@ public final class Store: @unchecked Sendable {
     /// second assignment displace the first with no error anywhere, and two
     /// consumers exist: the socket server and the in-process app host.
     @discardableResult
-    public func subscribeToEvents(_ sink: @escaping (PersistedEvent) -> Void) -> UUID {
+    func subscribeToEvents(_ sink: @escaping (PersistedEvent) -> Void) -> UUID {
         core.subscribe(sink)
     }
 
-    public func unsubscribeFromEvents(_ token: UUID) {
+    func unsubscribeFromEvents(_ token: UUID) {
         core.unsubscribe(token)
     }
 
-    public init(path: String) throws {
+    init(path: String) throws {
         var config = Configuration()
         config.prepareDatabase { db in
             // GRDB enables foreign_keys by default; WAL is opt-in.
@@ -52,7 +52,7 @@ public final class Store: @unchecked Sendable {
         self.dbQueue = try DatabaseQueue(path: path, configuration: config)
     }
 
-    public func migrate() throws {
+    func migrate() throws {
         try Migrations.migrator.migrate(dbQueue)
     }
 
@@ -108,11 +108,11 @@ public final class Store: @unchecked Sendable {
         try core.touchSession(db, uuid: uuid)
     }
 
-    public static func isoNow() -> String { StoreCore.isoNow() }
+    static func isoNow() -> String { StoreCore.isoNow() }
 
     static func newUuid() -> String { StoreCore.newUuid() }
 
-    public static func jsonPayload(_ object: [String: Any]) -> String? {
+    static func jsonPayload(_ object: [String: Any]) -> String? {
         StoreCore.jsonPayload(object)
     }
 
@@ -130,13 +130,13 @@ public final class Store: @unchecked Sendable {
 
     // MARK: - Lifecycle events
 
-    public func recordDaemonStart() throws {
+    func recordDaemonStart() throws {
         _ = try boundary { db in
             try self.appendEvent(db, kind: .daemonStart, payload: Store.jsonPayload(["pid": Int(getpid())]))
         }
     }
 
-    public func recordDaemonStop() throws {
+    func recordDaemonStop() throws {
         _ = try boundary { db in
             try self.appendEvent(db, kind: .daemonStop, payload: Store.jsonPayload(["pid": Int(getpid())]))
         }
@@ -144,13 +144,13 @@ public final class Store: @unchecked Sendable {
 
     // MARK: - Health reads
 
-    public func schemaVersion() throws -> Int {
+    func schemaVersion() throws -> Int {
         try boundaryRead { db in
             try Int.fetchOne(db, sql: "SELECT MAX(version) FROM schema_migrations") ?? 0
         }
     }
 
-    public func tableCounts() throws -> [TableCount] {
+    func tableCounts() throws -> [TableCount] {
         try boundaryRead { db in
             let tables = try String.fetchAll(
                 db,
@@ -179,7 +179,7 @@ public final class Store: @unchecked Sendable {
     /// deliberately does not route through `boundary` — and it refuses when a
     /// caller has one open rather than failing deeper in with a SQLite error
     /// whose text would not name the cause.
-    public func checkpointTruncate() throws {
+    func checkpointTruncate() throws {
         guard !isInTransaction else {
             throw StoreError.notComposable(verb: "checkpointTruncate")
         }
@@ -188,7 +188,7 @@ public final class Store: @unchecked Sendable {
         }
     }
 
-    public func closeDatabase() throws {
+    func closeDatabase() throws {
         // Closing the queue from inside one of its own transactions is the same
         // re-entrancy trap as `backup` and `checkpointTruncate`, and it is
         // reachable now that in-process callers exist: a termination path that

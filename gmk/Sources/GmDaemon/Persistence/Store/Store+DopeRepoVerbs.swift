@@ -35,7 +35,7 @@ extension Store {
 
     // MARK: - read-repo
 
-    public func dopeReadRepo(_ req: DopeReadRepoRequest) throws -> DopeReadRepoResponse {
+    func dopeReadRepo(_ req: DopeReadRepoRequest) throws -> DopeReadRepoResponse {
         // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
         // Phase 3 does filesystem work while holding NO db lock, by design.
         // Composing this would pin the single writer across file I/O and block
@@ -101,7 +101,7 @@ extension Store {
 
     // MARK: - write-repo
 
-    public func dopeWriteRepo(_ req: DopeWriteRepoRequest) throws -> DopeWriteRepoResponse {
+    func dopeWriteRepo(_ req: DopeWriteRepoRequest) throws -> DopeWriteRepoResponse {
         // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
         // Phase 3 does filesystem work while holding NO db lock, by design.
         // Composing this would pin the single writer across file I/O and block
@@ -176,7 +176,7 @@ extension Store {
 
     // MARK: - ingest
 
-    public func dopeIngest(_ req: DopeIngestRequest) throws -> DopeIngestResponse {
+    func dopeIngest(_ req: DopeIngestRequest) throws -> DopeIngestResponse {
         // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
         // Phase 3 does filesystem work while holding NO db lock, by design.
         // Composing this would pin the single writer across file I/O and block

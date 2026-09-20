@@ -35,7 +35,7 @@ extension GmBridgeResource {
     /// unordered index makes every rebuild look like a content change.
     /// A resource with no `summary` is still listed: an unexplained door beats a
     /// hidden one, and the blank is visible pressure to write the line.
-    public static func index(for skill: String) -> String {
+    static func index(for skill: String) -> String {
         all.filter { $0.skill == skill }
             .sorted { $0.path < $1.path }
             .map { "- `\($0.citedPath)` — \($0.summary.isEmpty ? "(no summary)" : $0.summary)" }

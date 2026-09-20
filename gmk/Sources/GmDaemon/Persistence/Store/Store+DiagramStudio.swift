@@ -10,7 +10,7 @@ extension Store {
 
     // MARK: - Search / browse (the GMVibes gallery backend)
 
-    public func diagramSearch(_ req: DiagramSearchRequest) throws -> DiagramSearchResponse {
+    func diagramSearch(_ req: DiagramSearchRequest) throws -> DiagramSearchResponse {
         if let visibility = req.visibility, DiagramVisibility(rawValue: visibility) == nil {
             throw StoreError.badRequest(
                 detail:
@@ -37,7 +37,7 @@ extension Store {
 
     // MARK: - Delete
 
-    public func diagramDelete(_ req: DiagramDeleteRequest) throws -> DiagramDeleteResponse {
+    func diagramDelete(_ req: DiagramDeleteRequest) throws -> DiagramDeleteResponse {
         try boundary { db in
             try DiagramStudioRepository(db: db, core: core).diagramDelete(req)
         }

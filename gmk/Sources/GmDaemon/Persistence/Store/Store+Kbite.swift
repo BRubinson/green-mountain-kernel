@@ -12,15 +12,15 @@ extension Store {
     /// the create-time-only seeding path, this sees kbites added to a parent
     /// after the child row was created. `all: true` bypasses scope resolution
     /// and returns every kbite row.
-    public func listKbites(_ req: KbiteListRequest) throws -> KbiteListResponse {
+    func listKbites(_ req: KbiteListRequest) throws -> KbiteListResponse {
         try boundaryRead { db in try KbiteRepository(db: db, core: core).listKbites(req) }
     }
 
-    public func addKbite(_ req: KbiteAddRequest) throws -> KbiteAddResponse {
+    func addKbite(_ req: KbiteAddRequest) throws -> KbiteAddResponse {
         try boundary { db in try KbiteRepository(db: db, core: core).addKbite(req) }
     }
 
-    public func removeKbite(_ req: KbiteRemoveRequest) throws -> KbiteRemoveResponse {
+    func removeKbite(_ req: KbiteRemoveRequest) throws -> KbiteRemoveResponse {
         try boundary { db in try KbiteRepository(db: db, core: core).removeKbite(req) }
     }
 

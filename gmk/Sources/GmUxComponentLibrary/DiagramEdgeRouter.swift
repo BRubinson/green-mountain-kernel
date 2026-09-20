@@ -9,25 +9,25 @@ import Foundation
 /// requirement here, and an integer domain rules out float slivers and hash-order
 /// hazards by construction. Anchor sides are an OUTPUT — each endpoint offers both
 /// candidate terminals, and an exhausted search yields `routed: false`.
-public enum DiagramEdgeRouter {
+enum DiagramEdgeRouter {
 
     // MARK: - Public surface
 
-    public struct EdgeRequest: Sendable {
+    struct EdgeRequest: Sendable {
         /// UNinflated diagram-space frame of the source card.
-        public let fromFrame: CGRect
+        let fromFrame: CGRect
         /// UNinflated diagram-space frame of the target card.
-        public let toFrame: CGRect
+        let toFrame: CGRect
         /// Diagram-space y of the FK property ROW on the source card — the
         /// edge leaves at the row, not the card's midY.
-        public let sourceRowY: CGFloat
+        let sourceRowY: CGFloat
         /// `domain.entity.property` — nudge/order key part 1.
-        public let propertyRef: String
+        let propertyRef: String
         /// Order key part 2: propertyRef alone is NOT a total order
         /// (duplicate cards binding one entity emit identical refs).
-        public let fromElementUuid: String
+        let fromElementUuid: String
 
-        public init(
+        init(
             fromFrame: CGRect,
             toFrame: CGRect,
             sourceRowY: CGFloat,
@@ -42,25 +42,25 @@ public enum DiagramEdgeRouter {
         }
     }
 
-    public struct Obstacle: Sendable {
+    struct Obstacle: Sendable {
         /// UNinflated diagram-space card frame.
-        public let frame: CGRect
+        let frame: CGRect
         /// Accumulated transform scale — inflation = `padding * scale`, so
         /// corridors survive scaled subtrees.
-        public let scale: CGFloat
+        let scale: CGFloat
 
-        public init(frame: CGRect, scale: CGFloat) {
+        init(frame: CGRect, scale: CGFloat) {
             self.frame = frame
             self.scale = scale
         }
     }
 
-    public struct RoutedPolyline: Sendable {
+    struct RoutedPolyline: Sendable {
         /// When `routed`: >= 2 diagram-space points, orthogonal,
         /// collinear-merged. When not: EMPTY — the caller substitutes its
         /// legacy straight pair.
-        public let points: [CGPoint]
-        public let routed: Bool
+        let points: [CGPoint]
+        let routed: Bool
     }
 
     /// Cost per 90° turn, in points. Bends dominate legibility.
@@ -83,7 +83,7 @@ public enum DiagramEdgeRouter {
         isSane(rect.minX) && isSane(rect.minY) && isSane(rect.maxX) && isSane(rect.maxY)
     }
 
-    public static func route(
+    static func route(
         edges: [EdgeRequest],
         obstacles: [Obstacle],
         padding: CGFloat = 12

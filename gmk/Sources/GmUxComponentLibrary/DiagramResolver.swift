@@ -10,37 +10,37 @@ import Foundation
 /// Caller-assembled dope context: one hydrated tree per RESOLVED dope_scope
 /// binding code (from DIAGRAM_GET's bindings + one DOPE_GET each). Codes the
 /// caller could not resolve are simply absent — their elements ghost.
-public struct DiagramDopeContext: Sendable {
-    public struct Entry: Sendable {
-        public let tree: DopeScopeTree
+struct DiagramDopeContext: Sendable {
+    struct Entry: Sendable {
+        let tree: DopeScopeTree
         /// "prompt" | "session_base" — surfaced on the scope card.
-        public let resolvedVia: String
+        let resolvedVia: String
 
-        public init(tree: DopeScopeTree, resolvedVia: String) {
+        init(tree: DopeScopeTree, resolvedVia: String) {
             self.tree = tree
             self.resolvedVia = resolvedVia
         }
     }
 
     /// Keyed by dope scope code.
-    public let entries: [String: Entry]
+    let entries: [String: Entry]
 
-    public init(entries: [String: Entry] = [:]) {
+    init(entries: [String: Entry] = [:]) {
         self.entries = entries
     }
 }
 
-public struct ResolvedDiagram: Sendable {
+struct ResolvedDiagram: Sendable {
     /// Union of every drawn frame + edge, pre-padding — the screenshot
     /// viewport (content-derived, never a window guess).
-    public let contentBounds: CGRect
+    let contentBounds: CGRect
     /// Painter-sorted ((elementZ, code) among siblings; depth-first global).
-    public let topLevel: [ResolvedElement]
+    let topLevel: [ResolvedElement]
     /// FK edges between entity cards, computed in their own pass.
-    public let edges: [ResolvedEdge]
-    public let environment: DiagramRenderEnvironment
+    let edges: [ResolvedEdge]
+    let environment: DiagramRenderEnvironment
 
-    public init(
+    init(
         contentBounds: CGRect,
         topLevel: [ResolvedElement],
         edges: [ResolvedEdge],
@@ -53,26 +53,26 @@ public struct ResolvedDiagram: Sendable {
     }
 }
 
-public struct ResolvedElement: Sendable {
-    public let uuid: String
-    public let code: String
-    public let name: String
+struct ResolvedElement: Sendable {
+    let uuid: String
+    let code: String
+    let name: String
     /// Diagram-space frame (transforms already composed).
-    public let frame: CGRect
-    public let elementZ: Double
-    public let kind: ResolvedElementKind
-    public let children: [ResolvedElement]
+    let frame: CGRect
+    let elementZ: Double
+    let kind: ResolvedElementKind
+    let children: [ResolvedElement]
     /// This element's composed diagram-space center — the same value the
     /// resolver positioned the frame around. Hosts invert view hits with it
     /// instead of re-walking the tree.
-    public let accumulatedCenter: CGPoint
+    let accumulatedCenter: CGPoint
     /// This element's OWN composed scale (parentScale × node.scale). The
     /// drag-delta divisor is the PARENT's accumulated scale — use
     /// `DiagramDrag.moveMutation`, which divides correctly, rather than
     /// dividing by this value directly.
-    public let accumulatedScale: Double
+    let accumulatedScale: Double
 
-    public init(
+    init(
         uuid: String,
         code: String,
         name: String,
@@ -134,7 +134,7 @@ extension ResolvedElement {
     /// card — the FK-exit formula. `resolveEdges` and the host's search
     /// field-jump both call this, so the two can never disagree. Row order
     /// is own-properties-first, composed-base union appended.
-    public func rowCenterY(_ rowIndex: Int, environment: DiagramRenderEnvironment) -> CGFloat {
+    func rowCenterY(_ rowIndex: Int, environment: DiagramRenderEnvironment) -> CGFloat {
         DiagramResolver.rowCenterY(
             frameMinY: frame.minY,
             scale: accumulatedScale,
@@ -149,7 +149,7 @@ extension ResolvedDiagram {
     /// Valid because `DiagramResolver.resolve` never reads
     /// `environment.colorScheme` (geometry depends only on the card metrics);
     /// changing metrics or padding still requires a full resolve.
-    public func reskinned(_ scheme: DiagramRenderEnvironment.ColorScheme) -> ResolvedDiagram {
+    func reskinned(_ scheme: DiagramRenderEnvironment.ColorScheme) -> ResolvedDiagram {
         guard scheme != environment.colorScheme else { return self }
         let env = DiagramRenderEnvironment(
             colorScheme: scheme,
@@ -171,7 +171,7 @@ extension ResolvedDiagram {
 /// The exhaustive render-kind switch — the prompt's critical design pattern,
 /// compiler-enforced: a new element type (or the ghost state) cannot ship
 /// without every render site handling it.
-public enum ResolvedElementKind: Sendable {
+enum ResolvedElementKind: Sendable {
     case layer(LayerStyle)
     case stroke(ResolvedStroke)
     case shape(ResolvedShape)
@@ -190,13 +190,13 @@ public enum ResolvedElementKind: Sendable {
 /// A laid-out markdown text box. `width`/`height` come from the subtype row
 /// scaled by the accumulated tree scale — never from a vertex extent, so the
 /// wrapping width is known before layout rather than derived from it.
-public struct ResolvedText: Hashable, Sendable {
-    public let markdown: String
-    public let fontSize: Double
-    public let textColor: String
-    public let backgroundColor: String?
+struct ResolvedText: Hashable, Sendable {
+    let markdown: String
+    let fontSize: Double
+    let textColor: String
+    let backgroundColor: String?
 
-    public init(
+    init(
         markdown: String,
         fontSize: Double,
         textColor: String,
@@ -215,22 +215,22 @@ public struct ResolvedText: Hashable, Sendable {
 /// target was deleted (the column is ON DELETE SET NULL) or whose target
 /// never resolved is `.absent` and simply does not draw, rather than
 /// failing the diagram. Nothing about a missing endpoint is an error.
-public struct ResolvedConnector: Hashable, Sendable {
-    public enum Target: Hashable, Sendable {
+struct ResolvedConnector: Hashable, Sendable {
+    enum Target: Hashable, Sendable {
         case resolved(CGRect)
         case absent
     }
 
-    public let target: Target
-    public let strokeColor: String
-    public let lineWidth: Double
-    public let lineStyle: DiagramConnectorLineStyle
-    public let headKind: DiagramConnectorHead
-    public let routingKind: DiagramConnectorRouting
-    public let tailKind: DiagramConnectorHead
-    public let label: String
+    let target: Target
+    let strokeColor: String
+    let lineWidth: Double
+    let lineStyle: DiagramConnectorLineStyle
+    let headKind: DiagramConnectorHead
+    let routingKind: DiagramConnectorRouting
+    let tailKind: DiagramConnectorHead
+    let label: String
 
-    public init(
+    init(
         target: Target,
         strokeColor: String,
         lineWidth: Double,
@@ -254,16 +254,16 @@ public struct ResolvedConnector: Hashable, Sendable {
 /// A resolved UML node: explicit frame (never text-measured), a kind that
 /// picks the chrome, and the markdown interior. Optional chrome is
 /// nil-means-theme-default so unstyled nodes stay legible in both schemes.
-public struct ResolvedUmlNode: Hashable, Sendable {
-    public let nodeKind: DiagramNodeKind
-    public let markdown: String
-    public let fontSize: Double
-    public let textColor: String?
-    public let strokeColor: String?
-    public let lineWidth: Double
-    public let fillColor: String?
+struct ResolvedUmlNode: Hashable, Sendable {
+    let nodeKind: DiagramNodeKind
+    let markdown: String
+    let fontSize: Double
+    let textColor: String?
+    let strokeColor: String?
+    let lineWidth: Double
+    let fillColor: String?
 
-    public init(
+    init(
         nodeKind: DiagramNodeKind,
         markdown: String,
         fontSize: Double,
@@ -282,31 +282,31 @@ public struct ResolvedUmlNode: Hashable, Sendable {
     }
 }
 
-public struct LayerStyle: Hashable, Sendable {
-    public let opacity: Double
-    public let visible: Bool
-    public let locked: Bool
+struct LayerStyle: Hashable, Sendable {
+    let opacity: Double
+    let visible: Bool
+    let locked: Bool
 
-    public init(opacity: Double, visible: Bool, locked: Bool) {
+    init(opacity: Double, visible: Bool, locked: Bool) {
         self.opacity = opacity
         self.visible = visible
         self.locked = locked
     }
 }
 
-public struct ResolvedStroke: Sendable {
+struct ResolvedStroke: Sendable {
     /// Diagram-space points (element-local vertices transformed).
-    public let points: [CGPoint]
-    public let color: String
+    let points: [CGPoint]
+    let color: String
     /// Scales with the accumulated transform.
-    public let lineWidth: Double
-    public let tool: DiagramStrokeTool
+    let lineWidth: Double
+    let tool: DiagramStrokeTool
     /// The perfect-freehand outline polygon, derived at resolve time from
     /// the persisted centerline+pressure (renderAlgoVersion 2). Empty =
     /// degenerate stroke; the view falls back to the plain stroked line.
-    public let outline: [CGPoint]
+    let outline: [CGPoint]
 
-    public init(
+    init(
         points: [CGPoint],
         color: String,
         lineWidth: Double,
@@ -321,15 +321,15 @@ public struct ResolvedStroke: Sendable {
     }
 }
 
-public struct ResolvedShape: Sendable {
-    public let kind: DiagramShapeKind
-    public let points: [CGPoint]
-    public let strokeColor: String
-    public let lineWidth: Double
-    public let fillColor: String?
-    public let cornerRadius: Double?
+struct ResolvedShape: Sendable {
+    let kind: DiagramShapeKind
+    let points: [CGPoint]
+    let strokeColor: String
+    let lineWidth: Double
+    let fillColor: String?
+    let cornerRadius: Double?
 
-    public init(
+    init(
         kind: DiagramShapeKind,
         points: [CGPoint],
         strokeColor: String,
@@ -346,13 +346,13 @@ public struct ResolvedShape: Sendable {
     }
 }
 
-public struct ResolvedScopeCard: Sendable {
-    public let dopeScopeCode: String
-    public let scopeName: String
+struct ResolvedScopeCard: Sendable {
+    let dopeScopeCode: String
+    let scopeName: String
     /// "prompt" | "session_base" — which ladder rung won.
-    public let resolvedVia: String
+    let resolvedVia: String
 
-    public init(dopeScopeCode: String, scopeName: String, resolvedVia: String) {
+    init(dopeScopeCode: String, scopeName: String, resolvedVia: String) {
         self.dopeScopeCode = dopeScopeCode
         self.scopeName = scopeName
         self.resolvedVia = resolvedVia
@@ -362,15 +362,15 @@ public struct ResolvedScopeCard: Sendable {
 /// dbdiagram-style card contents — 100% derived state (authored geometry is
 /// the only thing persisted): header colored by the DOMAIN code's stable
 /// hue, entity name + code, property rows name-left/type-right, badges.
-public struct EntityCardModel: Sendable {
-    public struct PropertyRow: Hashable, Sendable {
-        public let name: String
-        public let typeLabel: String
+struct EntityCardModel: Sendable {
+    struct PropertyRow: Hashable, Sendable {
+        let name: String
+        let typeLabel: String
         /// "NN" (not nullable), "UQ" (unique), "AI" (auto-increment),
         /// "FK" (relationship), "B" (materialized from a composed base).
-        public let badges: [String]
+        let badges: [String]
 
-        public init(name: String, typeLabel: String, badges: [String]) {
+        init(name: String, typeLabel: String, badges: [String]) {
             self.name = name
             self.typeLabel = typeLabel
             self.badges = badges
@@ -378,21 +378,21 @@ public struct EntityCardModel: Sendable {
     }
 
     /// 2-segment domain.entity binding code.
-    public let entityCode: String
-    public let entityName: String
-    public let domainCode: String
+    let entityCode: String
+    let entityName: String
+    let domainCode: String
     /// The entity's OWN code — i.e. the table name, the second segment of
     /// `entityCode`. Cards render this, never the 2-segment binding path:
     /// the domain is already carried by the header hue and the enclosing
     /// scope card, so repeating it in the header is noise.
-    public var tableName: String {
+    var tableName: String {
         entityCode.split(separator: ".").last.map(String.init) ?? entityCode
     }
     /// Stable FNV-1a hue in [0, 1).
-    public let headerHue: Double
-    public let rows: [PropertyRow]
+    let headerHue: Double
+    let rows: [PropertyRow]
 
-    public init(
+    init(
         entityCode: String,
         entityName: String,
         domainCode: String,
@@ -413,31 +413,31 @@ public struct EntityCardModel: Sendable {
 /// came from — a derived FK arrow and a hand-drawn connector look different
 /// and mean different things, but they route identically and must not be
 /// two parallel routing systems.
-public enum ResolvedEdgeOrigin: Sendable, Equatable {
+enum ResolvedEdgeOrigin: Sendable, Equatable {
     /// Derived from a dope relationship property. Nothing persisted it.
     case dopeForeignKey
     /// A persisted `connector` element, carrying its own styling.
     case connector(elementUuid: String, style: ResolvedConnector)
 }
 
-public struct ResolvedEdge: Sendable {
+struct ResolvedEdge: Sendable {
     /// Diagram-space anchor points on the two card borders. When `routed`,
     /// these are the routed polyline's real endpoints (`points.first/.last`).
-    public let from: CGPoint
-    public let to: CGPoint
-    public let fromElementUuid: String
-    public let toElementUuid: String
+    let from: CGPoint
+    let to: CGPoint
+    let fromElementUuid: String
+    let toElementUuid: String
     /// `domain.entity.property` of the relationship property. For a
     /// connector this is its element code — the edge's human name either way.
-    public let propertyRef: String
+    let propertyRef: String
     /// Diagram-space orthogonal polyline, >= 2 points — `[from, to]` when
     /// routing declined (`routed == false`) and the view keeps the legacy
     /// cubic. Derived state: never persisted, never on the wire.
-    public let points: [CGPoint]
-    public let routed: Bool
-    public let origin: ResolvedEdgeOrigin
+    let points: [CGPoint]
+    let routed: Bool
+    let origin: ResolvedEdgeOrigin
 
-    public init(
+    init(
         from: CGPoint,
         to: CGPoint,
         fromElementUuid: String,
@@ -458,7 +458,7 @@ public struct ResolvedEdge: Sendable {
     }
 }
 
-public enum DiagramResolver {
+enum DiagramResolver {
 
     /// The one entry point. Semantics frozen here:
     ///  - `center_x/y` are PARENT-space, vertices are element-local, `scale`
@@ -467,7 +467,7 @@ public enum DiagramResolver {
     ///    is depth-first, so a child never interleaves with another parent's.
     ///  - Ghost injection happens here once: an unresolved scope code makes the
     ///    card `.absentScope` and its entity children `.absentEntity`.
-    public static func resolve(
+    static func resolve(
         _ tree: DiagramTree,
         dope: DiagramDopeContext,
         environment: DiagramRenderEnvironment = DiagramRenderEnvironment()

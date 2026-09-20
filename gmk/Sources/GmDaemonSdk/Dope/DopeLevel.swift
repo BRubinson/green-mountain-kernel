@@ -4,7 +4,7 @@ import Foundation
 /// renames are wire-safe: the CodingKeys hazard documented in Envelope.swift
 /// applies to property keys under the snake_case strategies, not to enum raw
 /// values.
-public enum DopeLevel: String, Codable, Hashable, CaseIterable, Sendable {
+enum DopeLevel: String, Codable, Hashable, CaseIterable, Sendable {
     case scope
     /// Renamed from `domain` when the Dope*Domain* vocabulary became
     /// Dope*Persistence* down to the SQL. The ON-DISK .doped.json grammar
@@ -18,7 +18,7 @@ public enum DopeLevel: String, Codable, Hashable, CaseIterable, Sendable {
     /// Accepts the retired "domain" spelling so a stale peer, a scripted
     /// call, or a queued request still resolves. Decoding is tolerant;
     /// encoding always emits the current raw value.
-    public init?(fromWire raw: String) {
+    init?(fromWire raw: String) {
         if raw == "domain" { self = .persistence; return }
         self.init(rawValue: raw)
     }
@@ -27,7 +27,7 @@ public enum DopeLevel: String, Codable, Hashable, CaseIterable, Sendable {
 /// Field identifiers a granular node mutation may carry. Which subset is
 /// legal at which level is the registry's `ownedFields` — stated once, so a
 /// misdirected field is a precise BAD_REQUEST instead of a silent no-op.
-public enum DopeField: String, Codable, Hashable, CaseIterable, Sendable {
+enum DopeField: String, Codable, Hashable, CaseIterable, Sendable {
     case code, name, description, sortOrder
     case entityType, repoRepresentativeFile, baseComposableUuid
     case dataType, nullable, isUnique, autoIncrement, textCharLimit
@@ -38,14 +38,14 @@ public enum DopeField: String, Codable, Hashable, CaseIterable, Sendable {
 /// The registry is the single truth consumed by the generic store mutations,
 /// the tree fetch, the projection, and the validator — adding a level later
 /// is one entry here plus one CLI verb triple.
-public struct DopeLevelSpec: Sendable {
-    public let level: DopeLevel
-    public let table: String
-    public let parentLevel: DopeLevel?
-    public let parentColumn: String?
-    public let ownedFields: Set<DopeField>
+struct DopeLevelSpec: Sendable {
+    let level: DopeLevel
+    let table: String
+    let parentLevel: DopeLevel?
+    let parentColumn: String?
+    let ownedFields: Set<DopeField>
 
-    public static let all: [DopeLevel: DopeLevelSpec] = {
+    static let all: [DopeLevel: DopeLevelSpec] = {
         let common: Set<DopeField> = [.code, .name, .description, .sortOrder]
         let specs: [DopeLevelSpec] = [
             DopeLevelSpec(
@@ -102,7 +102,7 @@ public struct DopeLevelSpec: Sendable {
         return Dictionary(uniqueKeysWithValues: specs.map { ($0.level, $0) })
     }()
 
-    public static func spec(for level: DopeLevel) -> DopeLevelSpec {
+    static func spec(for level: DopeLevel) -> DopeLevelSpec {
         // The registry is total over DopeLevel by construction.
         all[level]!
     }
@@ -113,7 +113,7 @@ public struct DopeLevelSpec: Sendable {
 /// The two retired spellings map one-to-one onto the session tiers, which is
 /// what made the widening drop-in: SESSION_BASE became SESSION_INSTANCE and
 /// PROMPT became SESSION_INSTANCE_ITEM, a pure value rename.
-public enum DopeScopeType: String, Codable, Hashable, CaseIterable, Sendable {
+enum DopeScopeType: String, Codable, Hashable, CaseIterable, Sendable {
     /// Project-wide shared truth, promoted from the primary branch's
     /// SESSION_INSTANCE scope. Always fully hydrated.
     case baseProject = "BASE_PROJECT"
@@ -129,7 +129,7 @@ public enum DopeScopeType: String, Codable, Hashable, CaseIterable, Sendable {
     /// main.doped.json says "SESSION_BASE"; the file self-updates on its next
     /// write-repo. Decoding is tolerant, encoding always emits the current
     /// raw value.
-    public init?(fromWire raw: String) {
+    init?(fromWire raw: String) {
         switch raw {
         case "SESSION_BASE": self = .sessionInstance
         case "PROMPT": self = .sessionInstanceItem
@@ -140,10 +140,10 @@ public enum DopeScopeType: String, Codable, Hashable, CaseIterable, Sendable {
     /// True for the two personal masking tiers. Expressed ONCE so
     /// overlay-vs-base logic is never re-derived from `promptUuid == nil`,
     /// which would compile and be silently wrong for a PROJECT_ITEM.
-    public var isOverlay: Bool { self == .projectItem || self == .sessionInstanceItem }
+    var isOverlay: Bool { self == .projectItem || self == .sessionInstanceItem }
 
     /// The tier this one masks, or nil for a base tier.
-    public var masks: DopeScopeType? {
+    var masks: DopeScopeType? {
         switch self {
         case .projectItem: return .baseProject
         case .sessionInstanceItem: return .sessionInstance
@@ -153,13 +153,13 @@ public enum DopeScopeType: String, Codable, Hashable, CaseIterable, Sendable {
 
     /// Session-owned tiers carry session_uuid (and instance_uuid); the
     /// project tiers carry neither.
-    public var isSessionOwned: Bool {
+    var isSessionOwned: Bool {
         self == .sessionInstance || self == .sessionInstanceItem
     }
 }
 
 /// DopePersistenceEntity.entity_type values.
-public enum DopeEntityType: String, Codable, Hashable, CaseIterable, Sendable {
+enum DopeEntityType: String, Codable, Hashable, CaseIterable, Sendable {
     case model = "MODEL"
     case junction = "JUNCTION"
     /// Not persisted on its own — a shared column block other entities
@@ -169,7 +169,7 @@ public enum DopeEntityType: String, Codable, Hashable, CaseIterable, Sendable {
 }
 
 /// DopePersistenceEntityProperty.data_type values — the prompt's enum verbatim.
-public enum DopePropertyDataType: String, Codable, Hashable, CaseIterable, Sendable {
+enum DopePropertyDataType: String, Codable, Hashable, CaseIterable, Sendable {
     case enumeration = "enum"
     case relationship
     case boolean

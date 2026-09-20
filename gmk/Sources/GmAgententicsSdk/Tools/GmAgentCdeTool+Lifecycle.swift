@@ -4,17 +4,17 @@ import Foundation
 import FoundationModels
 
 @Generable
-public struct GmAgentCdeInitArguments: Sendable {
-    public init() {}
+struct GmAgentCdeInitArguments: Sendable {
+    init() {}
 }
 
-public struct GmAgentCdeInitTool: GmAgentCdeTool {
-    public let name = "cde_init"
-    public let description = "Tell me who I am and what I am working on."
+struct GmAgentCdeInitTool: GmAgentCdeTool {
+    let name = "cde_init"
+    let description = "Tell me who I am and what I am working on."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentCdeInitArguments) throws -> String {
+    func call(arguments _: GmAgentCdeInitArguments) throws -> String {
         throw GmAgentToolError.notWired(
             tool: name,
             verb: "CONTEXT_GET + PATHS_GET + AGENT_REGISTER"
@@ -23,7 +23,7 @@ public struct GmAgentCdeInitTool: GmAgentCdeTool {
 }
 
 @Generable
-public enum GmAgentPromptMatchKind: String, Sendable {
+enum GmAgentPromptMatchKind: String, Sendable {
     case seq
     case code
     case name
@@ -34,26 +34,26 @@ public enum GmAgentPromptMatchKind: String, Sendable {
 }
 
 @Generable
-public struct GmAgentLoadedPrompt: Sendable {
+struct GmAgentLoadedPrompt: Sendable {
     @Guide(description: "How the selector matched, or 'ambiguous'/'notFound' if it did not.")
-    public var matchKind: GmAgentPromptMatchKind
+    var matchKind: GmAgentPromptMatchKind
 
     @Guide(description: "The matched prompt's uuid, empty if nothing matched.")
-    public var promptUuid: String
+    var promptUuid: String
 
     @Guide(description: "Where the prompt is: draft, initiated, or done.")
-    public var status: String
+    var status: String
 
     @Guide(description: "Every prompt the selector matched, when it matched more than one.")
-    public var candidates: [String]
+    var candidates: [String]
 
     @Guide(description: "Briefings that exist for this prompt, top level only.")
-    public var briefingUuids: [String]
+    var briefingUuids: [String]
 
     @Guide(description: "Kbite codes switched on for this prompt.")
-    public var kbiteCodes: [String]
+    var kbiteCodes: [String]
 
-    public init(
+    init(
         matchKind: GmAgentPromptMatchKind,
         promptUuid: String = "",
         status: String = "",
@@ -71,27 +71,27 @@ public struct GmAgentLoadedPrompt: Sendable {
 }
 
 @Generable
-public struct GmAgentCdeLoadPromptArguments: Sendable {
+struct GmAgentCdeLoadPromptArguments: Sendable {
     @Guide(
         description: """
             Which prompt: a number like 1, a code like p10, its exact name, a \
             unique piece of its name, or its uuid.
             """
     )
-    public var selector: String
+    var selector: String
 
-    public init(selector: String) {
+    init(selector: String) {
         self.selector = selector
     }
 }
 
-public struct GmAgentCdeLoadPromptTool: GmAgentCdeTool {
-    public let name = "cde_load_prompt"
-    public let description = "Get one prompt by number, name, or id."
+struct GmAgentCdeLoadPromptTool: GmAgentCdeTool {
+    let name = "cde_load_prompt"
+    let description = "Get one prompt by number, name, or id."
 
-    public init() {}
+    init() {}
 
-    public func call(
+    func call(
         arguments _: GmAgentCdeLoadPromptArguments
     ) throws -> GmAgentLoadedPrompt {
         throw GmAgentToolError.notWired(tool: name, verb: "PROMPT_LIST + PROMPT_GET + BRIEFING_LIST")
@@ -99,12 +99,12 @@ public struct GmAgentCdeLoadPromptTool: GmAgentCdeTool {
 }
 
 @Generable
-public struct GmAgentCdeSetStatusArguments: Sendable {
+struct GmAgentCdeSetStatusArguments: Sendable {
     @Guide(description: promptUuidGuide("to move"))
-    public var promptUuid: String
+    var promptUuid: String
 
     @Guide(description: "Version of the prompt you read, so two writers cannot clobber each other.")
-    public var expectedVersion: Int
+    var expectedVersion: Int
 
     @Guide(
         description: """
@@ -113,43 +113,43 @@ public struct GmAgentCdeSetStatusArguments: Sendable {
             """,
         .anyOf(GM_TOOL_ANYOF_PROMPT_STATUS)
     )
-    public var status: String
+    var status: String
 
-    public init(promptUuid: String, expectedVersion: Int, status: String) {
+    init(promptUuid: String, expectedVersion: Int, status: String) {
         self.promptUuid = promptUuid
         self.expectedVersion = expectedVersion
         self.status = status
     }
 }
 
-public struct GmAgentCdeSetStatusTool: GmAgentCdeTool {
-    public let name = "cde_set_status"
-    public let description = "Say the prompt is started or finished."
+struct GmAgentCdeSetStatusTool: GmAgentCdeTool {
+    let name = "cde_set_status"
+    let description = "Say the prompt is started or finished."
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentCdeSetStatusArguments) throws -> String {
+    func call(arguments _: GmAgentCdeSetStatusArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "PROMPT_SET_STATUS")
     }
 }
 
 @Generable
-public struct GmAgentCdeNextArguments: Sendable {
+struct GmAgentCdeNextArguments: Sendable {
     @Guide(description: "Which prompt, by uuid. Leave empty to use the one this session is on.")
-    public var promptUuid: String
+    var promptUuid: String
 
-    public init(promptUuid: String = "") {
+    init(promptUuid: String = "") {
         self.promptUuid = promptUuid
     }
 }
 
-public struct GmAgentRpirNextTool: GmAgentRpirTool {
-    public let name = "rpir_next"
-    public let description = "What phase am I in and what do I do now?"
+struct GmAgentRpirNextTool: GmAgentRpirTool {
+    let name = "rpir_next"
+    let description = "What phase am I in and what do I do now?"
 
-    public init() {}
+    init() {}
 
-    public func call(arguments _: GmAgentCdeNextArguments) throws -> String {
+    func call(arguments _: GmAgentCdeNextArguments) throws -> String {
         throw GmAgentToolError.notWired(tool: name, verb: "BOT_NEXT")
     }
 }

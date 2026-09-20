@@ -12,8 +12,8 @@ import Foundation
 /// shell. `GitContext` derives it on the client side and the daemon derives it
 /// when resolving an instance, so one implementation is what keeps a session
 /// from being filed under two different codes for the same checkout.
-public enum InstanceIdentity {
-    public static func code(repoName: String, absolutePath: String) -> String {
+enum InstanceIdentity {
+    static func code(repoName: String, absolutePath: String) -> String {
         let digest = Insecure.MD5.hash(data: Data(absolutePath.utf8))
         let hex = digest.map { String(format: "%02x", $0) }.joined()
         return "\(repoName)_\(hex.prefix(4))"

@@ -6,8 +6,8 @@ import Foundation
 /// verbs composed here reach no DOPE_WRITE_REPO, so repo files are read and
 /// never written. Every outcome is non-throwing — boot must never block on a
 /// domain model.
-public enum DopeBootSync {
-    public enum Outcome {
+enum DopeBootSync {
+    enum Outcome {
         /// No `.gmcc/scope.doped.json` on disk — the silent common case,
         /// decided by one stat before any socket is opened.
         case noRepoTree
@@ -31,7 +31,7 @@ public enum DopeBootSync {
     /// Reconcile the session's SESSION_INSTANCE scope with the repo tree.
     /// `instanceRoot` is the repo checkout root (the tree lives at
     /// `{instanceRoot}/.gmcc`).
-    public static func run(
+    static func run(
         client: DaemonClient,
         sessionUuid: String,
         instanceRoot: String
@@ -110,7 +110,7 @@ public enum DopeBootSync {
     }
 
     /// One human line for hook/CLI output; nil for the silent outcomes.
-    public static func notice(for outcome: Outcome) -> String? {
+    static func notice(for outcome: Outcome) -> String? {
         switch outcome {
         case .noRepoTree, .inSync:
             return nil

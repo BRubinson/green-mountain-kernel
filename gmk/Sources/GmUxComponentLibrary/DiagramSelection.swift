@@ -8,15 +8,15 @@ import SwiftUI
 /// Environment-carried rather than init params, so a new emphasis axis (hover,
 /// search-match, error markers) is a one-struct change instead of re-threading
 /// every leaf init.
-public struct DiagramSelectionState: Hashable, Sendable {
+struct DiagramSelectionState: Hashable, Sendable {
     /// The selected element (outline accent on its card/scope).
-    public var selectedElementUuid: String?
+    var selectedElementUuid: String?
     /// Elements whose INCIDENT FK edges restroke in accent color.
-    public var highlightedElementUuids: Set<String>
+    var highlightedElementUuids: Set<String>
     /// Elements faded back (domain filtering, drag ghosting).
-    public var dimmedElementUuids: Set<String>
+    var dimmedElementUuids: Set<String>
 
-    public init(
+    init(
         selectedElementUuid: String? = nil,
         highlightedElementUuids: Set<String> = [],
         dimmedElementUuids: Set<String> = []
@@ -26,7 +26,7 @@ public struct DiagramSelectionState: Hashable, Sendable {
         self.dimmedElementUuids = dimmedElementUuids
     }
 
-    public var isActive: Bool {
+    var isActive: Bool {
         selectedElementUuid != nil
             || !highlightedElementUuids.isEmpty
             || !dimmedElementUuids.isEmpty
@@ -38,7 +38,7 @@ private struct DiagramSelectionKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    public var diagramSelection: DiagramSelectionState {
+    var diagramSelection: DiagramSelectionState {
         get { self[DiagramSelectionKey.self] }
         set { self[DiagramSelectionKey.self] = newValue }
     }

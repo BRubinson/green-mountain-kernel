@@ -6,7 +6,7 @@ import GRDB
 // atop DopePromoteRepository; this wrapper owns the transaction.
 
 extension Store {
-    public func dopePromote(_ req: DopePromoteRequest) throws -> DopePromoteResponse {
+    func dopePromote(_ req: DopePromoteRequest) throws -> DopePromoteResponse {
         try boundary { db in try DopePromoteRepository(db: db, core: core).promote(req) }
     }
 }

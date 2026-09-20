@@ -8,12 +8,12 @@ import Foundation
 /// `emit` is socket-free by construction — every value comes from
 /// ProcessInfo/Paths (plus an optional db-provided gmfs root the caller
 /// fetched best-effort). Only `check` needs a daemon response.
-public enum GmEnvironment {
+enum GmEnvironment {
 
-    public struct Finding {
-        public let code: String
-        public let message: String
-        public init(code: String, message: String) {
+    struct Finding {
+        let code: String
+        let message: String
+        init(code: String, message: String) {
             self.code = code
             self.message = message
         }
@@ -27,7 +27,7 @@ public enum GmEnvironment {
     /// The explicit-`env` path stays env-only: a caller passing a dictionary
     /// is asking what a session with THAT environment would resolve, and
     /// answering from this process's bundle would ignore the question.
-    public static func fallbackFsRoot(
+    static func fallbackFsRoot(
         env: [String: String]? = nil
     ) -> URL {
         guard let env else { return Paths.root }
@@ -45,7 +45,7 @@ public enum GmEnvironment {
     /// Single quotes, because an unquoted value stops at the first space and a
     /// PATH component holding one truncates the assignment. Passing `dbFsRoot`
     /// makes the env/db match invariant true by construction.
-    public static func emit(
+    static func emit(
         pluginRoot: String,
         inheritedPath: String,
         dbFsRoot: String? = nil,
@@ -68,7 +68,7 @@ public enum GmEnvironment {
     /// POSIX single-quote escaping: wrap in `'`, and close/escape/reopen for
     /// every embedded `'`. Safe for every byte a path can hold except a
     /// newline, which no env value here can contain.
-    public static func shellQuote(_ value: String) -> String {
+    static func shellQuote(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
     }
 
@@ -76,7 +76,7 @@ public enum GmEnvironment {
     /// other component that already points at it, so re-boots are idempotent
     /// and a stale leading entry can never win a bare binary name over the
     /// install this session is actually running.
-    public static func pathValue(current: String, bin: URL = Paths.bin) -> String {
+    static func pathValue(current: String, bin: URL = Paths.bin) -> String {
         let mine = bin.path
         let survivors =
             current
@@ -94,7 +94,7 @@ public enum GmEnvironment {
     /// would make the mismatch assertion conditional on the runtime being
     /// installed, and a check that silently stops asserting is worse than one
     /// that fails.
-    public static func check(
+    static func check(
         _ paths: PathsGetResponse,
         env: [String: String] = ProcessInfo.processInfo.environment
     ) -> [Finding] {
@@ -121,7 +121,7 @@ public enum GmEnvironment {
     /// a path in, so one installed shim keeps working across upgrades and
     /// rollbacks — the release store swaps what `bin/` points at, and this
     /// follows it. The SessionStart hook sets GM_FS_ROOT.
-    public static let shimScript = """
+    static let shimScript = """
         #!/bin/sh
         # GM client resolver. Do not edit.
         # Resolves at call time so one install survives upgrade and rollback;

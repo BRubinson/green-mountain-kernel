@@ -11,11 +11,11 @@ import GRDB
 // Bodies live in ConfigRepository; these wrappers own the transaction.
 
 extension Store {
-    public func pathsGet() throws -> PathsGetResponse {
+    func pathsGet() throws -> PathsGetResponse {
         try boundaryRead { db in try ConfigRepository(db: db, core: core).pathsGet() }
     }
 
-    public func configSet(_ req: ConfigSetRequest) throws -> ConfigSetResponse {
+    func configSet(_ req: ConfigSetRequest) throws -> ConfigSetResponse {
         let value = req.value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else {
             throw StoreError.badRequest(detail: "config value is empty")
@@ -27,12 +27,12 @@ extension Store {
 
     /// The watcher's root, read outside a request cycle. nil until config
     /// exists (a daemon booted before m0002 seeded it simply has no watcher).
-    public func configValue(_ key: ConfigKey) throws -> String? {
+    func configValue(_ key: ConfigKey) throws -> String? {
         try boundaryRead { db in try ConfigRepository(db: db, core: core).configValue(key) }
     }
 
     /// MemoryWatcher's reverse lookup: prompt by its gmfs folder path.
-    public func promptUuid(byStoragePath path: String) throws -> String? {
+    func promptUuid(byStoragePath path: String) throws -> String? {
         try boundaryRead { db in try ConfigRepository(db: db, core: core).promptUuid(byStoragePath: path) }
     }
 }

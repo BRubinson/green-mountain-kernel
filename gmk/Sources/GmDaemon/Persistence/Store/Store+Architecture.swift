@@ -17,27 +17,27 @@ extension Store {
 
     // MARK: - Verbs
 
-    public func archOpen(_ req: ArchOpenRequest) throws -> ArchSummaryResponse {
+    func archOpen(_ req: ArchOpenRequest) throws -> ArchSummaryResponse {
         try boundary { db in try ArchitectureRepository(db: db, core: core).open(req) }
     }
 
-    public func archSummarize(_ req: ArchSummarizeRequest) throws -> ArchSummaryResponse {
+    func archSummarize(_ req: ArchSummarizeRequest) throws -> ArchSummaryResponse {
         try boundary { db in try ArchitectureRepository(db: db, core: core).summarize(req) }
     }
 
-    public func archPersistAdd(_ req: ArchPersistAddRequest) throws -> ArchPersistAddResponse {
+    func archPersistAdd(_ req: ArchPersistAddRequest) throws -> ArchPersistAddResponse {
         try boundary { db in try ArchitectureRepository(db: db, core: core).persistAdd(req) }
     }
 
-    public func archFieldAdd(_ req: ArchFieldAddRequest) throws -> ArchFieldAddResponse {
+    func archFieldAdd(_ req: ArchFieldAddRequest) throws -> ArchFieldAddResponse {
         try boundary { db in try ArchitectureRepository(db: db, core: core).fieldAdd(req) }
     }
 
-    public func archGeneralAdd(_ req: ArchGeneralAddRequest) throws -> ArchGeneralAddResponse {
+    func archGeneralAdd(_ req: ArchGeneralAddRequest) throws -> ArchGeneralAddResponse {
         try boundary { db in try ArchitectureRepository(db: db, core: core).generalAdd(req) }
     }
 
-    public func archPropose(_ req: ArchProposeRequest) throws -> ArchSummaryResponse {
+    func archPropose(_ req: ArchProposeRequest) throws -> ArchSummaryResponse {
         try boundary { db in
             try ArchitectureRepository(db: db, core: core)
                 .transition(
@@ -50,7 +50,7 @@ extension Store {
         }
     }
 
-    public func archApprove(_ req: ArchApproveRequest) throws -> ArchSummaryResponse {
+    func archApprove(_ req: ArchApproveRequest) throws -> ArchSummaryResponse {
         try boundary { db in
             try ArchitectureRepository(db: db, core: core)
                 .transition(
@@ -63,7 +63,7 @@ extension Store {
         }
     }
 
-    public func archRevise(_ req: ArchReviseRequest) throws -> ArchSummaryResponse {
+    func archRevise(_ req: ArchReviseRequest) throws -> ArchSummaryResponse {
         try boundary { db in
             try ArchitectureRepository(db: db, core: core)
                 .transition(
@@ -76,15 +76,15 @@ extension Store {
         }
     }
 
-    public func archOptionAdd(_ req: ArchOptionAddRequest) throws -> ArchOptionRowResponse {
+    func archOptionAdd(_ req: ArchOptionAddRequest) throws -> ArchOptionRowResponse {
         try boundary { db in try ArchitectureRepository(db: db, core: core).optionAdd(req) }
     }
 
-    public func archDecide(_ req: ArchDecideRequest) throws -> ArchDecideResponse {
+    func archDecide(_ req: ArchDecideRequest) throws -> ArchDecideResponse {
         try boundary { db in try ArchitectureRepository(db: db, core: core).decide(req) }
     }
 
-    public func archGet(_ req: ArchGetRequest) throws -> ArchGetResponse {
+    func archGet(_ req: ArchGetRequest) throws -> ArchGetResponse {
         try boundaryRead { db in try ArchitectureRepository(db: db, core: core).get(req) }
     }
 

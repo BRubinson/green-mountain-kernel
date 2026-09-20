@@ -8,12 +8,12 @@ import Foundation
 /// redirection; each of those belongs to a PERSONALITY. `bootWriter` consumes a
 /// `KernelOwnership.Token`, so a losing process has no expression that opens
 /// the database.
-public final class KernelServices {
+final class KernelServices {
 
     /// The open database. Public because the app host needs it for in-process
     /// event subscription; it is NOT re-exported past `GMVibesServices`, which
     /// keeps a deliberately narrow facade.
-    public let store: Store
+    let store: Store
 
     private let writer: KernelWriter
     private let server: Server
@@ -29,7 +29,7 @@ public final class KernelServices {
     /// and a refusal an app can catch and SHOW beats a process that vanished.
     /// `personality` appears in the ready line only, so a log reader can tell a
     /// headless kernel from an app-hosted one.
-    public static func bootWriter(
+    static func bootWriter(
         _ token: consuming KernelOwnership.Token,
         personality: String = "hosted",
         log: @escaping (String) -> Void = { _ in }
@@ -53,7 +53,7 @@ public final class KernelServices {
     /// EMPTY conformance, so a consumer written against the socket client runs
     /// unchanged here. `from: nil` marks the call in-process, which refuses
     /// SUBSCRIBE: an in-process consumer uses `store.subscribeToEvents`.
-    public var verbCaller: any GmVerbCaller {
+    var verbCaller: any GmVerbCaller {
         KernelVerbCaller(dispatch: { [server] line in
             server.dispatch(line: line, from: nil)
         })
@@ -66,7 +66,7 @@ public final class KernelServices {
     /// closes, or a write can arrive after the caller has decided what was
     /// dirty. The lock is NOT released here: it lives for the process, so a
     /// CRASHED kernel leaves no stale lock behind.
-    public func shutdown(beforeClose: () -> Void = {}) {
+    func shutdown(beforeClose: () -> Void = {}) {
         server.shutdownForHost(beforeClose: beforeClose)
     }
 
