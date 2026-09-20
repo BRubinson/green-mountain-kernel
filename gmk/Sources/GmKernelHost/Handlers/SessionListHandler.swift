@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// SESSION_LIST — enumerate sessions, optionally filtered to one instance
 /// (read-only; unknown instance uuid ⇒ NOT_FOUND).

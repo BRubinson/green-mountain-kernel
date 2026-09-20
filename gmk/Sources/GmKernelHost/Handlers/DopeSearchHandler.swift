@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// DOPE_SEARCH — full-text over the dope tree at prompt/session/project scope.
 enum DopeSearchHandler {

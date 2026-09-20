@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0002 — db-native clarification + architecture entities, prompt lifecycle

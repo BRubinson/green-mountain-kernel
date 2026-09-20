@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0005 — purge the legacy concepts: three rebuilds plus a backfill, so no

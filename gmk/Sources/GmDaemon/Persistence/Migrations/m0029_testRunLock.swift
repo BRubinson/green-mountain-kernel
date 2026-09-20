@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0029 — agent-scoped test mutual exclusion. Two pure CREATE TABLEs, both

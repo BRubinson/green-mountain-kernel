@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// SEARCH data access — FTS5 UNION over the bot-report mirrors. Runs INSIDE a
 /// Store-owned transaction; holds no dbQueue and never self-transacts.

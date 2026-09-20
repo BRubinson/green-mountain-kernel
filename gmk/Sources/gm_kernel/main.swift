@@ -1,9 +1,4 @@
 import Foundation
-import GmAgententicsSdk
-import GmDaemonSdk
-import GmHookCli
-import GmKernelHost
-import GmMcpServer
 import SwiftUI
 
 // gm_kernel — the multi-call dispatcher. One Mach-O: the CLI in ~/gmfs/bin and

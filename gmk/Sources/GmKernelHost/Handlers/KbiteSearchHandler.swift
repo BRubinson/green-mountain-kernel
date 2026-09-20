@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// KBITE_SEARCH — FTS5 ranked stubs, optionally scoped by kbite_uuids.
 enum KbiteSearchHandler {

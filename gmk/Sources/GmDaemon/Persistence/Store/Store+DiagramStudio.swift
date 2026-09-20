@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Diagram Studio (v23): the cross-tier browse/search surface and the row
 /// delete. Both deliberately live OUTSIDE DiagramListRequest's no-union

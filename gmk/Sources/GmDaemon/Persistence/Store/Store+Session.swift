@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // SESSION_GET / SESSION_UPDATE. Bodies live in SessionRepository; these
 // wrappers own the transaction. The liveness statics stay on Store.

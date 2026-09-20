@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemonSdk
-import GmITerm2Client
 
 nonisolated func shellSingleQuoted(_ s: String) -> String {
     "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"

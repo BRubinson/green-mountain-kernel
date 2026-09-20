@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `review_summary` table. Columns map via convertFromSnakeCase.
 struct ReviewSummaryRecord: BaseRecordFields {

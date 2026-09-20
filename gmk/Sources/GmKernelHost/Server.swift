@@ -1,7 +1,5 @@
 import Foundation
 import Network
-import GmDaemon
-import GmDaemonSdk
 
 /// What the connection should do after writing a handler's response.
 enum PostAction {
@@ -99,7 +97,7 @@ final class Server: @unchecked Sendable {
         let memory = MemoryWatcher { [weak self] storagePath in
             self?.promptMemoryChanged(storagePath: storagePath)
         }
-        let checkout = CheckoutWatcher { [weak self] instanceUuid, repoRoot in
+        let checkout = CheckoutFSEventLane { [weak self] instanceUuid, repoRoot in
             self?.checkoutChanged(instanceUuid: instanceUuid, repoRoot: repoRoot)
         }
         supervisor = WatcherSupervisor(store: store, memory: memory, checkout: checkout)

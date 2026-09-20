@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// REVIEW_OPEN — idempotent create-or-return of the review summary.
 /// EXPLICIT-only: prompt status transitions never create or gate on it, which

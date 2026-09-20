@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// Three-state lifecycle badge, shared by the prompt navigator and the phase sections.
 ///

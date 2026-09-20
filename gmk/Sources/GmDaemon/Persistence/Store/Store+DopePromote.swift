@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // BASE_PROJECT promotion — the third sync direction. Full design rationale
 // (high-water mark predicate, ping-pong and event-storm failure modes) lives

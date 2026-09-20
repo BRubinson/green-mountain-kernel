@@ -1,7 +1,5 @@
 import SwiftUI
 import Observation
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// Window-lifetime diagram state, keyed by `DiagramWindowID.workspaceKey` —
 /// the DIAGRAM's identity (its uuid when saved, owner+scope for a preview),

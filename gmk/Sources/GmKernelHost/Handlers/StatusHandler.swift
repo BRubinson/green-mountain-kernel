@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// STATUS — daemon + db health: pid, protocol version, socket path, schema
 /// version, uptime, and per-table row counts.

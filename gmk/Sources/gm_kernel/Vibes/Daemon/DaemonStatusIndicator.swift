@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 // The old dot-style DaemonStatusIndicator is gone — the top bar's
 // GmDaemonStatus pill (Chrome/GmDaemonStatus.swift) is the single status

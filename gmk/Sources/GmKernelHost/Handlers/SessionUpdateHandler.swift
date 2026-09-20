@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// SESSION_UPDATE — optimistic-concurrency guarded partial update of
 /// session-owned scalars (name, backstory, goal, status active|closed).

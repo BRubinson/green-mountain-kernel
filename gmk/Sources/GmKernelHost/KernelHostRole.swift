@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// The ARBITRATION RESULT: what THIS process is, decided locally before
 /// anything could open the database. Distinct from `GmVibesCore.KernelRole`,

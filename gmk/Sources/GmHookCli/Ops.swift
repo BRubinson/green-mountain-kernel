@@ -1,7 +1,6 @@
 import Foundation
-import GmDaemonSdk
 
-let usage = """
+let hookUsage = """
     gm_hook — the shell-callable GMCC client.
 
     Claude records through the pen (the MCP server). This binary exists for the two
@@ -97,7 +96,7 @@ func runOps(_ argv: [String]) -> Int32 {
         return 0
 
     default:
-        FileHandle.standardError.write(Data("[GMB] unknown command '\(command)'\n\n\(usage)".utf8))
+        FileHandle.standardError.write(Data("[GMB] unknown command '\(command)'\n\n\(hookUsage)".utf8))
         return 2
     }
 }

@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `project_test_lock` table (m0029): the ONE mutable
 /// claim cell per project.

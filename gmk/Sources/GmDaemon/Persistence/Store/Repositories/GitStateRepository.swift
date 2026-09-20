@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Git-derived checked-out state reads (SESSION_RESOLVE /
 /// INSTANCE_CURRENT_SESSION). Runs INSIDE a Store-owned transaction; holds no

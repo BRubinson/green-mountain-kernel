@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // PATHS_GET / CONFIG_SET — the daemon's config subsystem. Backed by
 // the daemon_config table (seeded with $HOME defaults by m0002) rather than

@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// CLARIFY_SEAL — building → answering; locks the question list.
 enum ClarifySealHandler {

@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// The headless, AppKit-free kernel host — what `gm_kernel daemon` (and the
 /// `gm_daemon` symlink) runs. `DaemonClient.autostart()` `posix_spawn`s a binary

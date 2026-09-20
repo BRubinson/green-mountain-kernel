@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0016 — diagram.dope_scope binding: which scope this WHOLE diagram reads

@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // AGENT_REGISTER — the spawner's authority write for one agent_id. The body
 // lives in AgentRegistrationRepository; this wrapper owns the transaction.

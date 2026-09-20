@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import GmDaemonSdk
 
 /// Read model over DOPE_LIST + DOPE_GET + DOPE_READ_REPO, plus the one DOPE_INIT write.
 ///

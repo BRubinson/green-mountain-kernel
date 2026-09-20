@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0024 — Diagram Studio: the visibility axis, the first diagram FTS mirror,

@@ -10,6 +10,7 @@ import Observation
 // selects one occurrence (green) among all (yellow). Scrolling targets the segment
 // that owns the active occurrence (a `Text` can't expose sub-string scroll anchors).
 
+@MainActor
 @Observable
 final class FindController {
     var query: String = ""

@@ -1,6 +1,5 @@
 import CoreGraphics
 import Foundation
-import GmDaemonSdk
 
 /// Pressure-aware freehand outlining — a compact Swift port of the
 /// perfect-freehand algorithm (Steve Ruiz, MIT).

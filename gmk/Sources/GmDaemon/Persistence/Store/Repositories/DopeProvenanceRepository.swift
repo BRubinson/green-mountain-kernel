@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Reads and writes `dope_element_provenance` — the merge base. Runs INSIDE a
 /// Store-owned transaction; holds no dbQueue and never self-transacts. The

@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// The RECALL and CATALOG tools: pen doors over `SEARCH`, `CATALOG_SEARCH`,
 /// `DOPE_SEARCH`, `DOPE_WRITE_REPO` and `SESSION_UPDATE`, so an agent can go
@@ -16,8 +15,8 @@ private func searchDoor(
     name: String,
     description: String,
     kinds: [SearchKind]
-) -> Tool {
-    Tool(
+) -> CdeTool {
+    CdeTool(
         name: name,
         description: description,
         params: [
@@ -41,7 +40,7 @@ private func searchDoor(
     )
 }
 
-func makeRecallDoors() -> [Tool] {
+func makeRecallDoors() -> [CdeTool] {
     [
         searchDoor(
             name: "rpir_search_exploration",
@@ -69,7 +68,7 @@ func makeRecallDoors() -> [Tool] {
             kinds: [.reviewSummary, .reviewFinding]
         ),
 
-        Tool(
+        CdeTool(
             name: "dope_search_global",
             description: "FTS over the dope trees of ALL projects and sessions, not just this one.",
             params: [
@@ -96,7 +95,7 @@ func makeRecallDoors() -> [Tool] {
                 return try CdeHitsPage.build(response.hits, pager: &pager)
             }
         ),
-        Tool(
+        CdeTool(
             name: "dope_update_session",
             description: "Write the session's dope tree back to its repo — many dope nodes to disk at once.",
             params: [
@@ -112,7 +111,7 @@ func makeRecallDoors() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "projects_search",
             description: "Find projects, instances and sessions by name or id.",
             params: [
@@ -133,7 +132,7 @@ func makeRecallDoors() -> [Tool] {
                 return try CdeCatalogPage.build(response, pager: &pager)
             }
         ),
-        Tool(
+        CdeTool(
             name: "projects_update_session",
             description: "Change a session's name, backstory or goal.",
             params: [

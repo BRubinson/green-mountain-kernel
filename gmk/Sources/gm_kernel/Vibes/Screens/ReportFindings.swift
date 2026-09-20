@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// Shared primitives for the two v9 report read surfaces (ExplorationPane,
 /// ReviewPane) and the phaseCard header badges — one vocabulary for ratings,

@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// DOPE_INGEST — files → db, whole-tree overwrite gated on exactly
 /// revision + 1. Every child uuid changes (uuid-free JSON, no smart diff).

@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// `HOOK_EVENT` — one Claude Code lifecycle hook, served by the kernel. It
 /// re-points `HookLogic` / `HookRunner` at the in-process caller; those take

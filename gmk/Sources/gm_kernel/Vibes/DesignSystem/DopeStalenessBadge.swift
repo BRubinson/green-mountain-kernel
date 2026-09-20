@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// ONE badge for both staleness types, generic over `DopeScopeStalenessReporting`, so a care
 /// package's ghosts render as the same pixels as a briefing's.

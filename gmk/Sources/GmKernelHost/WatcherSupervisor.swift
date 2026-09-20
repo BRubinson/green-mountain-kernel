@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// Owns both watchers and the ONE recompute path serving A3 (gmfs re-rooting)
 /// and A8 (instance-set churn). It recomputes both watched sets from
@@ -13,10 +11,10 @@ import GmDaemonSdk
 final class WatcherSupervisor: @unchecked Sendable {
     private let store: Store
     private let memory: MemoryWatcher
-    private let checkout: CheckoutWatcher
+    private let checkout: CheckoutFSEventLane
     private var bootLogged = false
 
-    init(store: Store, memory: MemoryWatcher, checkout: CheckoutWatcher) {
+    init(store: Store, memory: MemoryWatcher, checkout: CheckoutFSEventLane) {
         self.store = store
         self.memory = memory
         self.checkout = checkout

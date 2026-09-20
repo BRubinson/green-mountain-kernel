@@ -1,5 +1,4 @@
 import AppKit
-import GmDaemonSdk
 import SwiftUI
 
 /// Which environment this bundle is looking at, and how it says so.

@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 // BRIEFING_* (v21) — thin decode-and-delegate shims over Store+Briefing, one
 // file for the family (the DiagramHandlers precedent).

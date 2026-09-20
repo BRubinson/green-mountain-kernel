@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// The PROJECT page (`Route.project`): all of one project's instances,
 /// searchable, with the last 5 sessions of each rendered inline — the active

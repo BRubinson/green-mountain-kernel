@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 import XCTest
 
 /// The PreToolUse guard: `gm_hook` is the harness's client and an agent never

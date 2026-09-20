@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `diagram_dope_entity` table. Columns map via convertFromSnakeCase.
 struct DiagramDopeEntityRecord: DiagramSubtypeRecord {

@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// EXPLORE_RANK — atomic version-less batch rank (whole batch validates before any write).
 enum ExploreRankHandler {

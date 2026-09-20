@@ -1,6 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// Cross-domain index over ONE already-loaded `DopeScopeTree`: enum ref →
 /// definition, and enum ref → every property (in ANY domain) pointing at it.

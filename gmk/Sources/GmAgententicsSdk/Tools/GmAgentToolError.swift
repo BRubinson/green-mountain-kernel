@@ -2,7 +2,6 @@
 
 import Foundation
 
-@available(GmAgentOs 1.0, *)
 public enum GmAgentToolError: Error, Sendable {
 
     case notSupported(tool: String, detail: String)
@@ -14,7 +13,6 @@ public enum GmAgentToolError: Error, Sendable {
     case notWired(tool: String, verb: String)
 }
 
-@available(GmAgentOs 1.0, *)
 extension GmAgentToolError: LocalizedError {
     public var errorDescription: String? {
         switch self {

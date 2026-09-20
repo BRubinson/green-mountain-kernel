@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // SEARCH — FTS5 full-text search over prompt/clarification/architecture/
 // exploration/review text. Eleven external-content mirrors, one SELECT arm per

@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// ARCH_SUMMARIZE — set the concept-level body (drafting only).
 enum ArchSummarizeHandler {

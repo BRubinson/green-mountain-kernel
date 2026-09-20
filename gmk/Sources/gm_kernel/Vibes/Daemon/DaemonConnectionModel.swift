@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import GmDaemonSdk
 
 /// App-wide daemon liveness plus the single event subscription.
 ///

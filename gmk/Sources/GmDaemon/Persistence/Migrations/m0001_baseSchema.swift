@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     static func m0001_baseSchema(_ migrator: inout DatabaseMigrator) {

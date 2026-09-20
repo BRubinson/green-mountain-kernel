@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PROMPT_DIAGRAM_QUALIFY — record what this prompt makes of a rendered
 /// diagram. Upserts on (prompt, diagram): the newest reading stands.

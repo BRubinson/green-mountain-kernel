@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// Browser for NON-checked-out sessions. PROJECT-level: scoped to one project
 /// when the caller passes its uuid (the instance page does), searching across

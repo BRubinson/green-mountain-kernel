@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0007 — DOPE persistence modeling. Pure ADD: six BaseEntity tables, no

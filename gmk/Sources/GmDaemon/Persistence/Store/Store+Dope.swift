@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // DOPED domain modeling — scope lifecycle, tree hydration, and the generic
 // per-level node mutations. Bodies live in DopeRepository; these wrappers own

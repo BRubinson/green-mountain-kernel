@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// DOPE_WRITE_REPO — db → files via the sandbox's staged atomic swap;
 /// refuses when the files are ahead of the db unless forced.

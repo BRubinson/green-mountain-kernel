@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// FILE_CHANGE_LIST — query changes by session, prompt, or file with ranges
 /// joined. Replaces grepping changed_files: lists.

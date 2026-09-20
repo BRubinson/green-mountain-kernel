@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0023 — agent_briefing + prompt_activation: the context package a briefer

@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0010 — DIAGRAM domain modeling in m0007's grammar: baseColumns identity,

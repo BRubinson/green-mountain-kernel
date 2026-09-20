@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 import XCTest
 
 /// The ONE environment every case in this package shares: it boots a real
@@ -48,7 +47,7 @@ final class SharedEnvironment: NSObject, XCTestObservation {
             withIntermediateDirectories: true
         )
 
-        kernelBinary = Self.locateKernelBinary()
+        kernelBinary = Self.stageKernel(into: root)
 
         // The socket path is what has to fit in 104 bytes. Assert it here
         // rather than letting the bind fail opaquely later.
@@ -137,42 +136,23 @@ final class SharedEnvironment: NSObject, XCTestObservation {
         )
     }
 
-    // MARK: - Locating the binary under test
+    // MARK: - Staging the binary under test
 
-    /// Find the `gm_kernel` this suite should exercise.
+    /// Copy the kernel under test into the run root and return the copy.
     ///
-    /// `GM_TEST_KERNEL_BIN` first, then the repo's own `.build` products. Never
-    /// `~/gmfs/bin/gm_kernel`: falling back to the installed runtime would test the
-    /// last RELEASE instead of the working tree, going green for absent code.
-    private static func locateKernelBinary() -> URL? {
-        if let explicit = ProcessInfo.processInfo.environment["GM_TEST_KERNEL_BIN"],
-            !explicit.isEmpty,
-            FileManager.default.isExecutableFile(atPath: explicit)
-        {
-            return URL(fileURLWithPath: explicit)
-        }
-        let repo = repoRoot()
-        for config in ["debug", "release"] {
-            let candidate =
-                repo
-                .appendingPathComponent("gmk/.build/\(config)/gm_kernel")
-            if FileManager.default.isExecutableFile(atPath: candidate.path) {
-                return candidate
-            }
-        }
-        return nil
-    }
-
-    /// The repository root, from this file's own location.
-    ///
-    /// `#filePath` rather than a directory walk from the working directory:
-    /// `swift test` can be invoked from anywhere, and a relative walk silently
-    /// resolves against whatever shell happened to launch it.
-    static func repoRoot() -> URL {
-        // …/gmk/Tests/GmKernelTests/Harness/ThisFile.swift
-        var url = URL(fileURLWithPath: #filePath)
-        for _ in 0..<5 { url.deleteLastPathComponent() }
-        return url
+    /// `GM_TEST_KERNEL_BIN` first, else the app bundle beside this test bundle in
+    /// BUILT_PRODUCTS_DIR. Never `~/gmfs/bin/gm_kernel`: that would test the last
+    /// RELEASE instead of the working tree. The COPY is what gets spawned, so no
+    /// Info.plist sits beside it and the harness's GM_FS_ROOT wins over the baked root.
+    private static func stageKernel(into root: URL) -> URL? {
+        let env = ProcessInfo.processInfo.environment["GM_TEST_KERNEL_BIN"]
+        let source =
+            env.flatMap { $0.isEmpty ? nil : URL(fileURLWithPath: $0) }
+            ?? Bundle(for: SharedEnvironment.self).bundleURL.deletingLastPathComponent()
+            .appendingPathComponent("gm_kernel.app/Contents/MacOS/gm_kernel")
+        guard FileManager.default.isExecutableFile(atPath: source.path) else { return nil }
+        let copy = root.appendingPathComponent("gm_kernel")
+        return (try? FileManager.default.copyItem(at: source, to: copy)) == nil ? nil : copy
     }
 }
 
@@ -191,7 +171,7 @@ class KernelBackedTestCase: XCTestCase {
         try XCTSkipUnless(
             SharedEnvironment.shared.isAvailable,
             "no gm_kernel to test — build it first: "
-                + "swift build --package-path gmk --product gm_kernel  (or set GM_TEST_KERNEL_BIN)"
+                + "xcodebuild -workspace gmk/gmk.xcworkspace -scheme gm_kernel build (or set GM_TEST_KERNEL_BIN)"
         )
     }
 }

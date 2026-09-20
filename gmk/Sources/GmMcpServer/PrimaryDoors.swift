@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// The four tools that ADVANCE the workflow: move a prompt, decide among
 /// architecture options, apply the calibrated review rank, seal the care
@@ -9,10 +8,10 @@ import GmDaemonSdk
 /// primary is METHODOLOGY, not policy: cross-agent calibration and the choice
 /// among options belong to one reader. A persona holding one may use it; a
 /// persona without it reports that it is ready for one.
-func makePrimaryDoorTools() -> [Tool] {
+func makePrimaryDoorTools() -> [CdeTool] {
     [
 
-        Tool(
+        CdeTool(
             name: "cde_set_status",
             description: """
                 THE ONLY DOOR THAT MOVES A PROMPT. draft → initiated → done, plus done → \
@@ -46,7 +45,7 @@ func makePrimaryDoorTools() -> [Tool] {
             }
         ),
 
-        Tool(
+        CdeTool(
             name: "rpir_decide_architecture",
             description: """
                 Select ONE architecture option. Stamps it selected, rejects every sibling, and \
@@ -82,7 +81,7 @@ func makePrimaryDoorTools() -> [Tool] {
             }
         ),
 
-        Tool(
+        CdeTool(
             name: "rpir_rank_reviews",
             description: """
                 Apply the calibrated review rating batch. Version-less and atomic: ranking is \
@@ -119,7 +118,7 @@ func makePrimaryDoorTools() -> [Tool] {
             }
         ),
 
-        Tool(
+        CdeTool(
             name: "rpir_close_care_package",
             description: """
                 Seal the care package with the clarified intent — building → ready. THE INTENT \

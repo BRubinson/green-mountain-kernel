@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 enum KBitePreview {
     case markdown(blocks: [MarkdownBlock], source: String)

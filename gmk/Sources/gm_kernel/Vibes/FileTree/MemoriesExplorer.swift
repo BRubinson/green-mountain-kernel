@@ -1,6 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 // CodeEdit-style file explorer over a prompt's memory/ folder: a recursive
 // navigator on the left, a block-markdown / find-in-page reader on the right.

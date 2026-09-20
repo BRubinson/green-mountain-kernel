@@ -227,19 +227,21 @@ everything the plugin ships.
 
 ## Contributing
 
-Requires Xcode and a Swift toolchain. `gmk/` holds nine Swift packages — one shipping
-nothing but the test suite, one vendored third-party — plus the Xcode project for the app.
+Requires Xcode 27. `gmk/` is one Xcode project with one `gm_kernel` target that compiles
+every source under `gmk/Sources/`, one unit-test bundle, and one vendored third-party
+package; SwiftPM is only Xcode's dependency resolver.
 
 ```bash
-swift build --package-path gmk/gmKernel        # build the kernel first…
-swift test  --package-path gmk/Gm_Kernel_test  # …the suite boots it
+XCB="xcodebuild -workspace gmk/gmk.xcworkspace -scheme gm_kernel -derivedDataPath gmk/.build/DerivedData CODE_SIGNING_ALLOWED=NO"
+$XCB -configuration Debug build                # build the kernel first…
+$XCB -configuration Debug test                 # …the suite boots it
 
 bash gmk/scripts/rebuild_local.sh              # build, stage <version>-BETA, activate
-bash gmk/scripts/generate_plugin.sh --check    # plugin drift check
+GM_KERNEL_BIN=~/gmfs/bin/gm_kernel bash gmk/scripts/generate_plugin.sh --check   # plugin drift check
 ```
 
-**Open `gmk/gmk.xcworkspace`, not the project** — package test targets only get schemes
-under the workspace.
+**Open `gmk/gmk.xcworkspace`, not the project** — the workspace is what resolves the
+packages, and its `xcshareddata/swiftpm/Package.resolved` is the one lockfile.
 
 `gmk/VERSION` is the one version behind the binaries, the app, `plugin.json` and the
 marketplace manifest. A local build is always stamped `-BETA`; there is no flag to suppress

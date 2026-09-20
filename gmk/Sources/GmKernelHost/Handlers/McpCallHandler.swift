@@ -1,7 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
-import GmMcpServer
 
 /// `MCP_CALL` — one MCP `tools/call`, served by the kernel. The tool body runs
 /// HERE, where `StoreBoundary` is ambient and re-entrant, so a composite's

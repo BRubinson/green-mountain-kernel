@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// ARCH_OPEN — idempotent create-or-return of the architecture summary. Never transitions the prompt.
 enum ArchOpenHandler {

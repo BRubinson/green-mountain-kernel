@@ -69,8 +69,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=gm_releases.sh
-. "$SCRIPT_DIR/gm_releases.sh"
+# shellcheck source=gm_build.sh
+. "$SCRIPT_DIR/gm_build.sh"
+gm_repo_root
 
 DRY=0
 ALLOW_ADHOC=0
@@ -84,24 +85,13 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
-if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/gmk" ]; then
-    REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-fi
-GMK="$REPO_ROOT/gmk"
 RELEASE_REPO="${GM_DAEMON_RELEASE_REPO:-BRubinson/green-mountain-kernel}"
 
 VERSION="$(cat "$GMK/VERSION")"
 TAG="$GM_TAG_PREFIX$VERSION"
-# "universal" IS HISTORICAL AND THE NAME IS DELIBERATELY FROZEN. The artifact is
-# arm64-only since the Intel slice was dropped, so the word no longer describes
-# the bytes — and it stays anyway. This exact literal is derived INDEPENDENTLY in
-# two other places that are not upgraded in lockstep with this script:
-# plugins/gmcc/scripts/install_gm.sh and .github/workflows/daemon-release.yml.
-# Renaming it here would 404 every installed plugin that has not been regenerated
-# and re-installed, which is precisely the cross-version break the unified
-# release exists to prevent. An inaccurate filename costs nothing; a filename
-# nobody can fetch costs every upgrade.
+# The asset name is derived independently by plugins/gmcc/scripts/install_gm.sh,
+# which is not upgraded in lockstep with this script; a rename here 404s every
+# installed plugin that has not been regenerated and re-installed.
 DMG_ASSET="$GM_APP_NAME-$VERSION.dmg"
 STAGE_VERSION="$VERSION-BETA"
 
@@ -184,26 +174,25 @@ echo "  built from $STAGED_SHA, which is HEAD"
 
 # ── 4. Tests ─────────────────────────────────────────────────────────────────
 say "4/8  TESTS — never ship what was not tested"
-# ONE package now. The six-name loop that used to live here iterated targets
-# that no longer exist, and a loop over a stale list is the WORST failure
-# available on this path: `swift test` on a package with no test target SUCCEEDS,
-# so the gate would have printed "all suites green" having run nothing at all.
-# Failing permissively, on the publish path, is exactly the shape of bug this
-# gate exists to prevent — so it now counts what it ran and refuses zero.
+# A test run that executed nothing SUCCEEDS, and failing permissively on the
+# publish path is exactly the bug this gate exists to prevent — so it counts
+# what it ran and refuses zero. That count reads the per-case lines, which is
+# why the test action runs WITHOUT -quiet.
 #
-# The suite boots a real gm_kernel, so it needs one built. Point it at the
-# artifact that is about to SHIP rather than at whatever is in .build: testing
-# bits other than the ones being published is how "what you tested is what
-# ships" quietly stops being true.
+# The suite boots a real gm_kernel. It is pointed at the artifact about to
+# SHIP rather than at whatever the build left behind: testing bits other than
+# the ones being published is how "what you tested is what ships" quietly
+# stops being true. The harness reads GM_TEST_KERNEL_BIN; the TEST_RUNNER_
+# spelling is the one the test action forwards into the runner explicitly.
 TEST_TARGET="GmKernelTests"
 TMP_TEST_LOG="$(mktemp "${TMPDIR:-/tmp}/gm-test.XXXXXX")"
 trap 'rm -f "$TMP_TEST_LOG"' EXIT
 [ -d "$GMK/Tests/$TEST_TARGET" ] || die "$TEST_TARGET is missing — refusing to publish untested binaries"
 
-echo "  swift test $TEST_TARGET (against the staged kernel)"
-GM_TEST_KERNEL_BIN="$STAGE/$GM_MACHO" \
-    swift test --package-path "$GMK" 2>&1 | tee "$TMP_TEST_LOG" >/dev/null \
-    || die "$TEST_TARGET failed — not publishing"
+echo "  gm_xcb test Debug — $TEST_TARGET against the staged kernel"
+( export GM_TEST_KERNEL_BIN="$STAGE/$GM_MACHO" TEST_RUNNER_GM_TEST_KERNEL_BIN="$STAGE/$GM_MACHO"
+  gm_xcb test Debug ) >"$TMP_TEST_LOG" 2>&1 \
+    || { tail -40 "$TMP_TEST_LOG" >&2; die "$TEST_TARGET failed — not publishing"; }
 
 # Prove the run was not vacuous. A suite that executed nothing is not a pass.
 EXECUTED="$(grep -cE "' passed \(" "$TMP_TEST_LOG" || true)"
@@ -224,9 +213,7 @@ say "5/8  APP"
 #
 # --allow-adhoc remains because a private or test release to yourself is a real
 # case; it has to be asked for.
-DEV_ID="$(security find-identity -v -p codesigning 2>/dev/null \
-  | grep "Developer ID Application" | head -1 \
-  | sed -E 's/.*"(Developer ID Application: [^"]+)".*/\1/' || true)"
+DEV_ID="$(gm_dev_id)"
 
 if [ -z "$DEV_ID" ]; then
     if [ "$ALLOW_ADHOC" -eq 0 ]; then
@@ -279,8 +266,8 @@ APP_BUILT="$GMK/build/gm_kernel.xcarchive/Products/Applications/$GM_APP_NAME.app
 # writes the wrong database on every machine that upgrades. The baked root is the
 # only honest evidence of which one this is — the filename and the tag are both
 # just labels.
-PUB_ROOT="$(plutil -extract GMFSRoot raw "$APP_BUILT/Contents/Info.plist" 2>/dev/null || echo '')"
-PUB_ENV="$(plutil -extract GMEnvironment raw "$APP_BUILT/Contents/Info.plist" 2>/dev/null || echo '?')"
+PUB_BAKED="$(gm_app_baked "$APP_BUILT")" || die "the staged bundle bakes no usable root — it cannot be published"
+read -r PUB_ENV PUB_ROOT <<<"$PUB_BAKED"
 [ "$PUB_ROOT" = "~/gmfs" ] && [ "$PUB_ENV" = "prod" ] || die \
     "the staged bundle bakes '$PUB_ENV' -> '$PUB_ROOT', not 'prod' -> '~/gmfs'.
 
@@ -290,8 +277,7 @@ PUB_ENV="$(plutil -extract GMEnvironment raw "$APP_BUILT/Contents/Info.plist" 2>
            bash gmk/scripts/rebuild_local.sh --app --universal"
 
 # ── SLICES, read off the bundle now that there is no tarball to read ─────────
-PUB_HELPER="$APP_BUILT/Contents/MacOS/$GM_MACHO"
-[ -x "$PUB_HELPER" ] || die "the staged bundle's executable is not $GM_MACHO.
+PUB_HELPER="$(gm_app_kernel "$APP_BUILT")" || die "the staged bundle's executable is not the kernel.
        install_gm.sh takes the CLI out of the bundle, so a helperless app
        installs and leaves bin/ empty — and gm_hook exits 0 silently when its
        binary is missing, so the machine records nothing rather than failing."

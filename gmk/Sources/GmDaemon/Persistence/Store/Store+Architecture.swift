@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // ARCH_* — the db-native architecture machine (replaces architecture.md).
 // drafting → proposed → approved, plus the proposed → drafting revision edge.

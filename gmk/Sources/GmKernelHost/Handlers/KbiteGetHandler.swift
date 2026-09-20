@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// KBITE_GET — one kbite with resources, file stubs (no content), keywords.
 enum KbiteGetHandler {

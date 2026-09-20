@@ -1,6 +1,5 @@
 import CoreGraphics
 import Foundation
-import GmDaemonSdk
 
 /// Pure, SwiftUI-free hit resolution over the resolved value — the ONLY
 /// place a host gesture becomes a target. Every SwiftUI render layer stays

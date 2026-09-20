@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Data access for prompt_artifact pointers. Runs INSIDE a Store-owned
 /// transaction; holds no dbQueue and never self-transacts.

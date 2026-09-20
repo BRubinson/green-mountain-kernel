@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// The project page's right-hand diagram gallery.
 ///

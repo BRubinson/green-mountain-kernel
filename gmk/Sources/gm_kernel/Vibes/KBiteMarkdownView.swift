@@ -1,6 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 struct KBiteMarkdownView: View {
     let url: URL

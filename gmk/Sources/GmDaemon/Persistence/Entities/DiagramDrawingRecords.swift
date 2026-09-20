@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `diagram_drawing_layer` table. Columns map via convertFromSnakeCase.
 struct DiagramDrawingLayerRecord: DiagramSubtypeRecord {

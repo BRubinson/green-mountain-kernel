@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// Real-uuid minting for the non-persisted tree. Uuids must be REAL (not a
 /// "local-" scheme) so a later daemon replay of the same mutations is
@@ -79,6 +77,7 @@ actor DiagramTreeBox {
 /// dope preview canvases, which have no diagram row to write to. The
 /// db-backed editor swaps in `DaemonDiagramCommitter` and nothing else
 /// changes — the one-committer-swap contract, now with both halves built.
+@MainActor
 final class LocalDiagramCommitter: DiagramCommitting {
     let box: DiagramTreeBox
     private let onCommit: @MainActor @Sendable (DiagramTree) -> Void

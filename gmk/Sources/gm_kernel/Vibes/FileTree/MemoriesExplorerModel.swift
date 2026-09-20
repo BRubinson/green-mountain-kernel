@@ -4,6 +4,7 @@ import Observation
 // External, shareable state for the Memories explorer (selection + expansion). The
 // inline tab owns one; CMD-click hands its current values to the popout window via
 // PromptMemoriesWindowID, so the popout opens on the same file/expansion.
+@MainActor
 @Observable
 final class MemoriesExplorerModel {
     var selectedFile: URL?

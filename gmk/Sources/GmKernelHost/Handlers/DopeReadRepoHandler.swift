@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// DOPE_READ_REPO — parse + validate {instance_root}/.gmcc; never
 /// writes. Filesystem access runs OUTSIDE any db lock (see Store+DopeRepo).

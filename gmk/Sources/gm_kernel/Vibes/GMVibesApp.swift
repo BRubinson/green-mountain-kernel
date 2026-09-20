@@ -1,4 +1,3 @@
-import GmDaemonSdk
 import SwiftUI
 
 /// The app personality. `main.swift` calls `GMVibesApp.main()`; a target with a

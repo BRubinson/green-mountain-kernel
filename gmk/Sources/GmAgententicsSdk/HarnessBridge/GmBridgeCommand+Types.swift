@@ -1,3 +1,4 @@
+import ClaudeForFoundationModels
 import Foundation
 
 public enum GmBridgeCommand {

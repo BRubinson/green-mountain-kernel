@@ -9,7 +9,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Opt-in snake_case column mapping. Every read-side decoder in this module
 /// declares this conformance explicitly — there is deliberately NO blanket

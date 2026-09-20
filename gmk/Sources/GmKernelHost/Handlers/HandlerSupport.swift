@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// Shared success-envelope encoding for the per-message handler enums.
 func okResult<P: Codable & Sendable>(

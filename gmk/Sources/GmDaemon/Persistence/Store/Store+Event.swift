@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // EVENT_LIST — the queryable audit trail, plus the replay read SUBSCRIBE uses.
 // Bodies live in EventRepository; these wrappers own the transaction.

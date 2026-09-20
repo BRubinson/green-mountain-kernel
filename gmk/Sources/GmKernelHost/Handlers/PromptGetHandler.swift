@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PROMPT_GET — full prompt row + artifact pointers + kbite codes + change
 /// summary. Backs bot resume logic's branch-on-status.

@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PROMPT_CREATE — atomically allocates the next per-session seq (replaces
 /// the max-id+1 yaml scan), inserts the prompt row with seeded

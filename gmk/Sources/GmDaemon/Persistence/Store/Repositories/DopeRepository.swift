@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// DOPE domain modeling data access — scope lifecycle, tree hydration, and the
 /// generic per-level node mutations. Whole-tree repo verbs live in

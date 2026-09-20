@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// The post-draft RUN DOCUMENT: one continuous card assembling the phase panes into a
 /// narrative read of the prompt's run. Every section EMBEDS its existing pane unchanged, so

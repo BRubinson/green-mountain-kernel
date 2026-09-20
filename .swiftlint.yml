@@ -13,7 +13,6 @@ excluded:
   - gmk/build
   - gmk/scripts
   - gmk/.build
-  - gmk/Package.swift
 
 # Run by hand only: swiftlint analyze --compiler-log-path <log>
 analyzer_rules:

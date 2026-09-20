@@ -2,9 +2,7 @@
 
 import Foundation
 import FoundationModels
-import GmDaemonSdk
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirOpenBriefingArguments: Sendable {
     @Guide(description: promptUuidGuide("the briefing belongs to"))
@@ -19,7 +17,6 @@ public struct GmAgentRpirOpenBriefingArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirOpenBriefingTool: GmAgentRpirTool {
     public let name = "rpir_open_briefing"
     public let description = "Make empty note page for the briefer to fill."
@@ -31,7 +28,6 @@ public struct GmAgentRpirOpenBriefingTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirWriteBriefArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "briefing"))
@@ -64,7 +60,6 @@ public struct GmAgentRpirWriteBriefArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirWriteBriefTool: GmAgentRpirTool {
     public let name = "rpir_write_brief"
     public let description = "Put dope, kbite, and file-change notes on the page."
@@ -76,7 +71,6 @@ public struct GmAgentRpirWriteBriefTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirCloseBriefArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "mark ready", "briefing"))
@@ -91,7 +85,6 @@ public struct GmAgentRpirCloseBriefArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirCloseBriefTool: GmAgentRpirTool {
     public let name = "rpir_close_brief"
     public let description = "Page is done, agent can go away now."
@@ -103,7 +96,6 @@ public struct GmAgentRpirCloseBriefTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirLoadBriefArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "read", "briefing"))
@@ -114,7 +106,6 @@ public struct GmAgentRpirLoadBriefArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirLoadBriefTool: GmAgentRpirTool {
     public let name = "rpir_load_exploration_brief"
     public let description = "Read the page everyone should know."

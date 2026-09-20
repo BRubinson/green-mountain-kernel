@@ -5,7 +5,6 @@ import ClaudeForFoundationModels
 
 let GM_AGENT_PLACEHOLDER_AUTH: AuthMode = .apiKey("gm-placeholder")
 
-@available(GmAgentOs 1.0, *)
 extension AgentGmkDirective {
 
     func languageModel(auth: AuthMode = GM_AGENT_PLACEHOLDER_AUTH) -> ClaudeLanguageModel {

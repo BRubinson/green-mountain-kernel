@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // PROMPT_DIAGRAM_QUALIFY / _GET / _LIST — a prompt's standing reading of a
 // rendered diagram (m0022). No status machine and no findings: the row IS the

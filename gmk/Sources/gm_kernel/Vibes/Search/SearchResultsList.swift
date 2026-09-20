@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// The one SEARCH hit list, shared by the ⌘K palette and the search screen.
 /// `List` (not a glass-row ScrollView) because macOS gives it arrow-key

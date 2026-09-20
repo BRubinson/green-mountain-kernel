@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// INSTANCE_CURRENT_SESSION — the session matching the instance's checked-out branch, or none.
 enum InstanceCurrentSessionHandler {

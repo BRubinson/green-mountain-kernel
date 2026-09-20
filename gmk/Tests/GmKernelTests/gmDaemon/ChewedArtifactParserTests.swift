@@ -1,5 +1,4 @@
 import XCTest
-@testable import GmDaemon
 
 /// The chewed-artifact parser had no coverage at all, and two gaps in it
 /// silently produced kbites whose file rows all carried NULL content: the

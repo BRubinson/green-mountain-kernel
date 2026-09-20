@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// SEARCH — FTS5 ranked stubs with prompt lineage over
 /// prompt/clarification/architecture text, optionally session-scoped.

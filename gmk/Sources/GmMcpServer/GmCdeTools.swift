@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// The pen's tool surface as a LIBRARY entry point — one call, one rendered
 /// result — so the kernel serves `MCP_CALL` without a second copy of the

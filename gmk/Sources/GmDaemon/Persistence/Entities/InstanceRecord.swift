@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `instance` table. Columns map via convertFromSnakeCase.
 struct InstanceRecord: BaseRecordFields {

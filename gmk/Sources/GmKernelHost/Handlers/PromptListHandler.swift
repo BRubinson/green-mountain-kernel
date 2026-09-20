@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PROMPT_LIST — lightweight stubs (seq, code, status, uuid) for a session.
 enum PromptListHandler {

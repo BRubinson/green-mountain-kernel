@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // BASE_PROJECT promotion — the third sync direction (data access half). It is
 // db -> db, ACROSS scope tiers, conditioned on the session's branch matching the

@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PROJECT_LIST — enumerate all projects (read-only).
 enum ProjectListHandler {

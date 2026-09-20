@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// App-facing typed error surface. Views and stores branch on these cases —
 /// never on message text — per the daemon's typed-code contract.

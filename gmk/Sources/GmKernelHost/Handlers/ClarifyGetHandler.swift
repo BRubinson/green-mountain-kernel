@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// CLARIFY_GET — summary plus ordered clarification rows for a prompt.
 enum ClarifyGetHandler {

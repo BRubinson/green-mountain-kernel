@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import GmDaemonSdk
 
 enum GMVibesEnvKey: String, CaseIterable, Hashable {
     case gmFsRoot = "GM_FS_ROOT"

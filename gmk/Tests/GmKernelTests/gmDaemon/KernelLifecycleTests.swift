@@ -1,7 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemon
-import GmDaemonSdk
 import XCTest
 
 /// The kernel comes up on a fresh root, migrates itself, and answers.

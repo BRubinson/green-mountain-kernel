@@ -1,6 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// Read-only architecture section (ARCH_GET): summary body + status,
 /// methodology options when a team flow ran (the selected option's body IS

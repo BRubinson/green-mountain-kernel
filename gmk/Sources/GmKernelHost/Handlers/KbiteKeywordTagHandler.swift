@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// KBITE_KEYWORD_TAG — attach/detach normalized keywords at kbite or
 /// resource-file level.

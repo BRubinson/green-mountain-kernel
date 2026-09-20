@@ -2,9 +2,7 @@
 
 import Foundation
 import FoundationModels
-import GmDaemonSdk
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirOpenReviewArguments: Sendable {
     @Guide(description: promptUuidGuide("to review"))
@@ -15,7 +13,6 @@ public struct GmAgentRpirOpenReviewArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirOpenReviewTool: GmAgentRpirTool {
     public let name = "rpir_open_review"
     public let description = "Start the complaints list."
@@ -27,7 +24,6 @@ public struct GmAgentRpirOpenReviewTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentReviewFinding: Sendable {
     @Guide(description: "What kind of problem this is.", .anyOf(GM_TOOL_ANYOF_REVIEW_KIND))
@@ -75,7 +71,6 @@ public struct GmAgentReviewFinding: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirWriteReviewsArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "complaints list"))
@@ -94,7 +89,6 @@ public struct GmAgentRpirWriteReviewsArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirWriteReviewsTool: GmAgentRpirTool {
     public let name = "rpir_write_reviews"
     public let description = "Write down many complaints."
@@ -106,7 +100,6 @@ public struct GmAgentRpirWriteReviewsTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirRankReviewsArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "rank", "complaints list"))
@@ -121,7 +114,6 @@ public struct GmAgentRpirRankReviewsArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirRankReviewsTool: GmAgentRpirTool {
     public let name = "rpir_rank_reviews"
     public let description = "Give every complaint a number, all at once."
@@ -133,7 +125,6 @@ public struct GmAgentRpirRankReviewsTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirCompleteReviewArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "seal", "complaints list"))
@@ -156,7 +147,6 @@ public struct GmAgentRpirCompleteReviewArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirCompleteReviewTool: GmAgentRpirTool {
     public let name = "rpir_complete_review"
     public let description = "Complaints done, here is the verdict."
@@ -168,7 +158,6 @@ public struct GmAgentRpirCompleteReviewTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirResolveReviewFindingArguments: Sendable {
     @Guide(description: "Which problem was handled, by uuid.")
@@ -187,7 +176,6 @@ public struct GmAgentRpirResolveReviewFindingArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirResolveReviewFindingTool: GmAgentRpirTool {
     public let name = "rpir_resolve_review_finding"
     public let description = "This complaint is handled."
@@ -201,7 +189,6 @@ public struct GmAgentRpirResolveReviewFindingTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirGetReviewArguments: Sendable {
     @Guide(description: promptUuidGuide("'s review to read"))
@@ -222,7 +209,6 @@ public struct GmAgentRpirGetReviewArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirGetReviewTool: GmAgentRpirTool {
     public let name = "rpir_get_review"
     public let description = "Show me the complaints so far."

@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// DOPE_LIST — scope enumeration for pickers (SESSION_INSTANCE, or one prompt's
 /// PROMPT scopes; unknown uuid ⇒ NOT_FOUND, no scopes ⇒ empty list).

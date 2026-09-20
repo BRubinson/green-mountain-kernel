@@ -2,7 +2,7 @@ import Foundation
 import CoreServices
 
 /// The ONE watcher-lifecycle primitive shared by MemoryWatcher and
-/// CheckoutWatcher. FSEventStreamCreate takes a fixed path array at
+/// CheckoutFSEventLane. FSEventStreamCreate takes a fixed path array at
 /// construction, so any change to the watched set means stopping and recreating
 /// the stream; one implementation keeps re-rooting and instance-set churn from
 /// diverging.

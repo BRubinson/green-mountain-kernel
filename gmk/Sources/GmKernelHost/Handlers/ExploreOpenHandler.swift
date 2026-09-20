@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// EXPLORE_OPEN — idempotent create-or-return of the exploration summary.
 /// EXPLICIT-only: exploration runs while the prompt is still draft, so no

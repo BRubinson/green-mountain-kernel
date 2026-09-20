@@ -1,7 +1,5 @@
 import Foundation
 import CoreGraphics
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// The domain pill filter, as a projection of the RESOLVED output.
 ///

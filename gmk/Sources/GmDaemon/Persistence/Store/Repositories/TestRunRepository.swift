@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// TEST_* data access — the agent-scoped test mutex, run INSIDE a Store-owned
 /// transaction. It is a mutex for AGENTS above the kernel's own single-writer

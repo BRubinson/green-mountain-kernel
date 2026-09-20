@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// EXPLORE_FINDING_ADD — insert a finding (rating optional; NULL = unranked work-in-progress).
 enum ExploreFindingAddHandler {

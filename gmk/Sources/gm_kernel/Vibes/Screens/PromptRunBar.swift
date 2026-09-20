@@ -1,7 +1,5 @@
 import SwiftUI
 import AppKit
-import GmDaemonSdk
-import GmITerm2Client
 
 /// The disk reads behind the plugin preflight, taken ONCE per process, because
 /// `PromptRunBar.block` is recomputed on every view update. The cache cannot see a

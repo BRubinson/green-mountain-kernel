@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0022 — prompt_qualified_diagram: what a prompt understood when it read a

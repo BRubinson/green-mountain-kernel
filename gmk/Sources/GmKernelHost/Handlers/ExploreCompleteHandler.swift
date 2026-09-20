@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// EXPLORE_COMPLETE — exploring → complete; refuses unranked findings; the ONLY write path for overview.
 enum ExploreCompleteHandler {

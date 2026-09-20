@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// App-wide search popup (cmd+K). Floats centered over all content; Esc or a
 /// click outside dismisses. Global full-text SEARCH over the GMCC database

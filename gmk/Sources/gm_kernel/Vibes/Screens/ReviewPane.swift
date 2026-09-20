@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// Read-only review section (REVIEW_GET): verdict + overview + PARTITIONED
 /// findings with per-finding fix-loop resolution badges — full rows rendered

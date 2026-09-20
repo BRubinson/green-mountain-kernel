@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `architecture_summary` table. Columns map via convertFromSnakeCase.
 struct ArchitectureSummaryRecord: BaseRecordFields {

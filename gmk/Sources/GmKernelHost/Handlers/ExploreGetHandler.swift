@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// EXPLORE_GET — threshold-partitioned read (full rows under the rating window plus every unranked row; stubs outside).
 enum ExploreGetHandler {

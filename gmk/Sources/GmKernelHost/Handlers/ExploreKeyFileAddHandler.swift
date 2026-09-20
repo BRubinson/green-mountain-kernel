@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// EXPLORE_KEY_FILE_ADD — add one key file to the shared deduped set (duplicate path = idempotent upsert-ignore).
 enum ExploreKeyFileAddHandler {

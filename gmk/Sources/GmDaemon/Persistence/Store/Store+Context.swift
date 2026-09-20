@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // CONTEXT_ENSURE / CONTEXT_GET — the promoted ensure chain (mirrors
 // gm_session_startup.sh lazy creation) plus create-time-only kbite seeding

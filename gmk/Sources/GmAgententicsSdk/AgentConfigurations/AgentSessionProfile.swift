@@ -4,7 +4,6 @@ import Foundation
 import FoundationModels
 import ClaudeForFoundationModels
 
-@available(GmAgentOs 1.0, *)
 extension AgentGmkSessionProfile {
 
     /// The session profile for this identity: one fixed instruction body, the

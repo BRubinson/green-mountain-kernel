@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// KBITE_ADD — explicit-only registration at one scope. Db only — no yaml
 /// write-through (the interim yaml sync is the client skill's job).

@@ -1,6 +1,5 @@
 #if canImport(SwiftUI)
 import SwiftUI
-import GmDaemonSdk
 
 // The DIAGRAM component library. Every view consumes ResolvedDiagram values from
 // DiagramResolver, so rendering needs no client, database or daemon; it is a

@@ -1,6 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// KBites route host. KnowledgeBitesView is a TabView with a toolbar but no
 /// navigation container of its own, so wrap it in the ScreenScaffold as the

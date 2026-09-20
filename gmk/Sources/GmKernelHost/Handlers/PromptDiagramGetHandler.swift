@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PROMPT_DIAGRAM_GET — one qualification, by (prompt, diagram) or by a
 /// prompt that has exactly one. A real prompt with none answers

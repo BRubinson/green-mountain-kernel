@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// DIAGRAM domain modeling — db-persisted canvases over the dope subsystem.
 ///

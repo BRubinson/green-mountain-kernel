@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// claude_session_binding data access: Claude Code's conversation uuid → the
 /// gmcc session (instance + branch) it was started in. Runs INSIDE a

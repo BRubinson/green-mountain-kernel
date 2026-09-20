@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// The cold-start fast path: `cde_init` → `rpir_open_briefing` →
 /// `wait_for_briefing`. COMPOSITES, NOT VERBS. Every step below already exists as a daemon verb;
@@ -75,13 +74,13 @@ struct BriefingWaitResult: Encodable {
 
 // MARK: - Tools
 
-/// A function rather than a global `let`: `Tool` holds a closure and is not
+/// A function rather than a global `let`: `CdeTool` holds a closure and is not
 /// Sendable, which Swift 6 refuses as shared mutable state at file scope. The
 /// roster in main.swift escapes this only by living in top-level code.
-func makeFastPathTools() -> [Tool] {
+func makeFastPathTools() -> [CdeTool] {
     [
 
-        Tool(
+        CdeTool(
             name: "cde_init",
             description: """
                 START A BOT RUN. Resolve a prompt by what a person actually types — a seq (10), \
@@ -290,7 +289,7 @@ func makeFastPathTools() -> [Tool] {
             }
         ),
 
-        Tool(
+        CdeTool(
             name: "rpir_open_briefing",
             description: """
                 Open the briefing row a briefer then fills. The only legal response to the \

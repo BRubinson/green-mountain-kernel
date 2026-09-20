@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// BACKUP — SQLite Online Backup into ~/gmfs/backups/ (timestamped,
 /// collision-guarded). Emits a BACKUP event.

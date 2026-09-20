@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // PROJECT_UPDATE — the project-level mutation. The project table carries exactly
 // one settable field: primary_project_branch, the branch whose SESSION_INSTANCE

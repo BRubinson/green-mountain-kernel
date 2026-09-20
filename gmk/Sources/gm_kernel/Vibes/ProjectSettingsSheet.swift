@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// Project settings: one field today, shaped to grow.
 ///

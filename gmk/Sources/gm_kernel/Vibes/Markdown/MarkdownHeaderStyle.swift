@@ -1,6 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
-import GmUxComponentLibrary
 import AppKit
 
 // Single source of truth for the in-editor markdown header look — the purplish hue and

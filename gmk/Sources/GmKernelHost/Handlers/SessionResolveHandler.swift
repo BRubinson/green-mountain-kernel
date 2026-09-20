@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// SESSION_RESOLVE — session row + git-derived checked-out state (.git/HEAD read, no subprocess).
 enum SessionResolveHandler {

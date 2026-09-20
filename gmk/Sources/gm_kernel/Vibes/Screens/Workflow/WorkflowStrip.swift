@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// The prompt's `bot_workflow` phase graph from BOT_NEXT's derived view: one pill per phase,
 /// the served phase highlighted, entry blockers underneath.

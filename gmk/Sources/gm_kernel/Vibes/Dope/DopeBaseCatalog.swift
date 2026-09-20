@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// Cross-domain index over ONE already-loaded `DopeScopeTree`: entity ref
 /// (`domain.entity`) → node, base-domain classification, and the inherited

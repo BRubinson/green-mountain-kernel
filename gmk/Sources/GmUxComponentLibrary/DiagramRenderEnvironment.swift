@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// Render-environment knobs shared by the resolver, the views, and the
 /// headless screenshot renderer. SwiftUI-free on purpose: the resolver (and

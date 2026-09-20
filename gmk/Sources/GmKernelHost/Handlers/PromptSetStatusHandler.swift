@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PROMPT_SET_STATUS — validated lifecycle transition over the three-state
 /// prompt lifecycle (draft → initiated → done, and done → draft to re-open);

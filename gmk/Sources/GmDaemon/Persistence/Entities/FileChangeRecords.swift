@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `file_change` table. Columns map via convertFromSnakeCase.
 struct FileChangeRecord: BaseRecordFields {

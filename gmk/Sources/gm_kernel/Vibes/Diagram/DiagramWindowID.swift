@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// Route payload for `Route.diagram`.
 ///

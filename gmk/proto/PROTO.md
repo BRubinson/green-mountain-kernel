@@ -37,19 +37,25 @@ Versions that produced the committed `Sources/GmITerm2Client/Generated/api.pb.sw
 |---|---|
 | `protoc` | **libprotoc 36.1** |
 | `protoc-gen-swift` | **1.38.1** |
-| SwiftProtobuf runtime | **1.38.1** (`Package.resolved`, revision `55d7a1cc`) |
+| SwiftProtobuf runtime | **1.38.1** (`gmk/gmk.xcworkspace/xcshareddata/swiftpm/Package.resolved`, revision `55d7a1cc`) |
 
 **`protoc-gen-swift` must match the pinned SwiftProtobuf runtime's minor
 version.** The generated file opens with a `ProtobufAPIVersionCheck` conformance
-whose whole job is to fail to compile when it does not. `Package.swift` declares
-`from: "1.28.0"`, which is a floor, not a pin; `Package.resolved` is the record
-of what actually resolved, and it is committed for exactly this reason. If you
-upgrade one side, regenerate against the other.
+whose whole job is to fail to compile when it does not. The
+`XCRemoteSwiftPackageReference` for `swift-protobuf` in
+`gmk/gmk.xcodeproj/project.pbxproj` declares a minimum of `1.28.0`, which is a
+floor, not a pin; the workspace's `xcshareddata/swiftpm/Package.resolved` is the
+ONE lockfile and the record of what actually resolved, and it is committed for
+exactly this reason. If you upgrade one side, regenerate against the other.
 
 `--swift_opt=Visibility=Internal` is not optional. Without it the ~16,500
-generated lines become this package's public surface, and `gmVibesCore` starts
-being able to see protobuf types it must never import. Only the hand-written
-façade (`ITerm2Launcher.swift`) and its value types are `public`.
+generated lines become exported API of the kernel module. Everything under
+`gmk/Sources` is one module, so `Internal` does not hide the types from the
+Vibes layer; what keeps the Vibes layer off protobuf types is the convention
+that only files under `Sources/GmITerm2Client/` write `import SwiftProtobuf`,
+which `MEMBER_IMPORT_VISIBILITY` makes visible per file. The hand-written
+façade (`ITerm2Launcher.swift`) and its value types are the surface the rest of
+the tree is meant to use.
 
 ## **READ THE DIFF BEFORE COMMITTING IT**
 

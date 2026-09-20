@@ -3,13 +3,11 @@
 import Foundation
 import FoundationModels
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentNoArguments: Sendable {
     public init() {}
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentDiagramPlaceholderTool: GmAgentDiagramTool {
     public let name = "diagram_not_supported"
     public let description = notBuiltDescription("Look at and change pictures")
@@ -21,7 +19,6 @@ public struct GmAgentDiagramPlaceholderTool: GmAgentDiagramTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentSystemPlaceholderTool: GmAgentSystemTool {
     public let name = "system_not_supported"
     public let description = notBuiltDescription("Change how the whole system behaves")
@@ -33,7 +30,6 @@ public struct GmAgentSystemPlaceholderTool: GmAgentSystemTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentFsPlaceholderTool: GmAgentFsTool {
     public let name = "fs_not_supported"
     public let description = notBuiltDescription("Touch files in the gmfs folder")

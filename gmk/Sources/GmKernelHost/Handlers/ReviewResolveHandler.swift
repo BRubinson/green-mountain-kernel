@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// REVIEW_RESOLVE — record one finding's resolution; UNGATED on summary status (the fix loop runs after complete).
 enum ReviewResolveHandler {

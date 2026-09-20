@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-only enumeration for the Landing browse surface (PROJECT_LIST /
 /// INSTANCE_LIST / SESSION_LIST). Runs INSIDE a Store-owned transaction;

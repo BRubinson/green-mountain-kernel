@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// The 0–999 finding-rating write path, shared by ExplorationRepository and
 /// ReviewRepository.

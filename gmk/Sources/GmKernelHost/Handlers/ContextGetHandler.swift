@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// CONTEXT_GET — read-only resolution of the current gmcc environment.
 /// Never creates rows.

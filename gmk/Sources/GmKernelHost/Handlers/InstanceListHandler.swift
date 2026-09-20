@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// INSTANCE_LIST — enumerate instances, optionally filtered to one project
 /// (read-only; unknown project uuid ⇒ NOT_FOUND).

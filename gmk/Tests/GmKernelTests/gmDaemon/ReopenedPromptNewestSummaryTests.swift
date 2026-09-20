@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 import XCTest
 
 /// The m0028 re-open edge (done → draft), driven entirely over the wire.

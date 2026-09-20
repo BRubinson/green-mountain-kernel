@@ -1,6 +1,5 @@
 import Foundation
 import AppKit
-import GmDaemonSdk
 
 /// Per-prompt serialized writer over PROMPT_UPDATE_CONTENT. Actor isolation IS
 /// the serialization; every successful write threads the returned row's
@@ -126,7 +125,7 @@ final class PromptFlushRegistry {
         // Concurrent: N open prompts must not serialize N socket timeouts.
         await withTaskGroup(of: Void.self) { group in
             for box in boxes.values where box.isDirty {
-                group.addTask { @MainActor in await box.flush() }
+                group.addTask { await box.flush() }
             }
         }
     }

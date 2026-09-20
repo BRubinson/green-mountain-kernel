@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 // The SESSION view (`Route.session`): the drill-down level between an
 // instance and a single prompt. Sidebar: the tabbed navigator (prompts /

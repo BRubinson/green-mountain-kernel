@@ -1,7 +1,5 @@
 import Foundation
 import Observation
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// Read model over DIAGRAM_LIST, plus the three writes that create or move a
 /// diagram ROW (init / copy / promote). Element-level writes never come here
@@ -106,7 +104,7 @@ final class DiagramCatalogStore {
     func refresh(prompts: [String]) async {
         await withTaskGroup(of: Void.self) { group in
             for uuid in prompts {
-                group.addTask { @MainActor in await self.refresh(.prompt(uuid)) }
+                group.addTask { await self.refresh(.prompt(uuid)) }
             }
         }
     }

@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Reads and writes `dope_element_provenance` — the merge base.
 ///

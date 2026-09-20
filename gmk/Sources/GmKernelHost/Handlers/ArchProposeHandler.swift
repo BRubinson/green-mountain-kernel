@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// ARCH_PROPOSE — drafting → proposed; change rows sealed for review.
 enum ArchProposeHandler {

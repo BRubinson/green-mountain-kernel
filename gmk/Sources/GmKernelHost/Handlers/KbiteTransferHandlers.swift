@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 // KBITE_EXPORT / KBITE_IMPORT / KBITE_DELETE — the portable-kbite family.
 // The wire carries paths and counts only; zip assembly and source-tree

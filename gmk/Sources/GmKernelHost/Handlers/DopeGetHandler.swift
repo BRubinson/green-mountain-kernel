@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// DOPE_GET — full-tree read; PROMPT scope preferred, SESSION_INSTANCE fallback.
 enum DopeGetHandler {

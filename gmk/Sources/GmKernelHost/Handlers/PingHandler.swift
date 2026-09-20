@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PING — liveness, build identity, and the kernel's own vitals. The
 /// protocol-version handshake runs in Server.dispatch before any handler; this

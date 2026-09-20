@@ -1,7 +1,5 @@
 import SwiftUI
 import AppKit
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// The ONE dope surface, mounted at both levels: the session view's dope tab
 /// (`promptUuid: nil` — SESSION_BASE) and the prompt editor's phase card

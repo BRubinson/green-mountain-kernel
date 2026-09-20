@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// REVIEW_FINDING_ADD — insert a finding (optional file/line location; rating optional).
 enum ReviewFindingAddHandler {

@@ -15,23 +15,15 @@
 #
 set -euo pipefail
 
-# REPO ROOT, RESOLVED THE WAY THE OTHER SCRIPTS RESOLVE IT. A bare
-# `git rev-parse --show-toplevel` can resolve to an unrelated ENCLOSING
-# repository, and a $HOME under version control is the case that actually bites:
-# it would point this script's destructive step at the wrong tree. So: rev-parse,
-# plus a script-directory walk, plus a check that gmk/ is really there.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
-if [ ! -d "$REPO/gmk" ] || [ ! -d "$REPO/plugins/gmcc" ]; then
-    GIT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
-    if [ -n "$GIT_ROOT" ] && [ -d "$GIT_ROOT/gmk" ]; then
-        REPO="$GIT_ROOT"
-    fi
-fi
-if [ ! -d "$REPO/gmk" ]; then
-    echo "[GMB] cannot locate the repo root — gmk/ is not under '$REPO'" >&2
-    exit 1
-fi
+# The repo root comes from the build library's own location: this script's
+# destructive step must never be pointed at an unrelated enclosing repository.
+# shellcheck source=gm_build.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gm_build.sh"
+gm_repo_root
+REPO="$REPO_ROOT"
+[ -f "$REPO/plugins/gmcc/.claude-plugin/plugin.json" ] || {
+    echo "[GMB] no plugin manifest at $REPO/plugins/gmcc — refusing to regenerate into a non-plugin tree" >&2
+    exit 1; }
 
 CHECK=""
 [ "${1:-}" = "--check" ] && CHECK="--check"
@@ -44,14 +36,14 @@ echo "[GMB] repo:    $REPO"
 echo "[GMB] version: $VERSION (from gmk/VERSION)"
 
 # The generator is a personality of the kernel binary: `gm_kernel bridge <dir>`.
-# A caller that already holds a built kernel hands it in as GM_KERNEL_BIN
-# (rebuild_local.sh passes the exact staged Mach-O); otherwise the release build
-# of the package is used. The plugin directory is always an explicit argument.
-if [ -n "${GM_KERNEL_BIN:-}" ] && [ -x "$GM_KERNEL_BIN" ]; then
-    BRIDGE=("$GM_KERNEL_BIN" bridge)
-else
-    BRIDGE=(swift run -c release --package-path "$REPO/gmk" gm_kernel bridge)
-fi
+# The caller hands in the kernel it built as GM_KERNEL_BIN — rebuild_local.sh
+# passes the exact staged Mach-O, xcode_phase.sh the bundle's executable — and
+# there is deliberately no fallback build: a plugin generated from bits nobody
+# staged is a plugin that disagrees with the binary beside it.
+[ -x "${GM_KERNEL_BIN:-}" ] || {
+    echo "[GMB] GM_KERNEL_BIN is required (the kernel that generates the plugin); rebuild_local.sh and xcode_phase.sh set it" >&2
+    exit 2; }
+BRIDGE=("$GM_KERNEL_BIN" bridge)
 # shellcheck disable=SC2086
 "${BRIDGE[@]}" $CHECK "$PLUGIN"
 

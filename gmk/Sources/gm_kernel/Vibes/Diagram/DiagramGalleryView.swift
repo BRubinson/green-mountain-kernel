@@ -1,6 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// The Lucidchart-style browse surface both diagram pages share: a searchable
 /// LazyVGrid of thumbnail-first cards over DIAGRAM_SEARCH (empty query =

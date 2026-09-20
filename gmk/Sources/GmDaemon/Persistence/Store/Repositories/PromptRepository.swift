@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// PROMPT_* data access — the prompt lifecycle. Runs INSIDE a Store-owned
 /// transaction; holds no dbQueue and never self-transacts.

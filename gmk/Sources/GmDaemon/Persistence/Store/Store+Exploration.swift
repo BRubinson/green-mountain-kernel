@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // EXPLORE_* — the db-native exploration report machine. exploring → complete,
 // plus the complete → exploring revision edge, since explore is the most re-run

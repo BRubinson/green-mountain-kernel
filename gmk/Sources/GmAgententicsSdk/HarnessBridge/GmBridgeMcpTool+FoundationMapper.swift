@@ -1,7 +1,6 @@
 import Foundation
 import FoundationModels
 
-@available(GmAgentOs 1.0, *)
 extension GmBridgeMcpTool {
 
     public static func flattenedName(
@@ -31,7 +30,6 @@ extension GmBridgeMcpTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 extension GmAgentTool {
 
     public var bridgeTool: GmBridgeMcpTool {

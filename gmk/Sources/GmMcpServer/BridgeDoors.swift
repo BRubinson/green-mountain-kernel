@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// The last of the bridge's roster: the named search doors, the two `projects_*`
 /// doors, and the tools that exist in order to REFUSE.
@@ -13,7 +12,7 @@ import GmDaemonSdk
 /// REFUSALS ARE PUBLISHED RATHER THAN OMITTED. An omitted tool is
 /// indistinguishable from a capability nobody thought of, and an agent that
 /// cannot see a refusal invents a workaround.
-func makeBridgeDoorTools() -> [Tool] {
+func makeBridgeDoorTools() -> [CdeTool] {
     [
         // THE SEARCH AND `projects_*` DOORS LIVE IN `RecallDoors.swift`, not
         // here. An earlier draft of this file declared them too and produced
@@ -46,8 +45,8 @@ func makeBridgeDoorTools() -> [Tool] {
 /// The reason is the whole value. "Not supported" alone invites a retry with
 /// different arguments; a named reason ends the question and points at whatever
 /// does serve the need.
-private func refusal(_ name: String, _ description: String, _ reason: String) -> Tool {
-    Tool(
+private func refusal(_ name: String, _ description: String, _ reason: String) -> CdeTool {
+    CdeTool(
         name: name,
         description: "\(description) NOT AVAILABLE: \(reason)",
         params: [],

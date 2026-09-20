@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // KBITE_LIST / KBITE_ADD / KBITE_REMOVE — the registry family over the
 // {scope}_active_kbite junctions from m0001. The db is the sole kbite

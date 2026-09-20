@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import GmDaemonSdk
 
 // The PROMPT-EDITOR screen (`Route.sessionPrompt`) — one level below the
 // session view. Left: a prompts-only navigator (SESSION_GET / PROMPT_LIST

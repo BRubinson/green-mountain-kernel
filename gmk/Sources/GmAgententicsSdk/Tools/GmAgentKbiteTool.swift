@@ -2,9 +2,7 @@
 
 import Foundation
 import FoundationModels
-import GmDaemonSdk
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentKbiteSearchArguments: Sendable {
     @Guide(description: GM_TOOL_GUIDE_SEARCH_QUERY)
@@ -28,7 +26,6 @@ public struct GmAgentKbiteSearchArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentKbiteSearchTool: GmAgentKbiteTool {
     public let name = "kbite_search"
     public let description = "Find stuff in chewed-up kbites."
@@ -40,7 +37,6 @@ public struct GmAgentKbiteSearchTool: GmAgentKbiteTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentKbiteOpenMawArguments: Sendable {
     @Guide(description: "Name of the kbite this maw collects for.")
@@ -55,7 +51,6 @@ public struct GmAgentKbiteOpenMawArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentKbiteOpenMawTool: GmAgentKbiteTool {
     public let name = "kbite_open_maw"
     public let description = "Open big mouth to collect stuff."
@@ -67,7 +62,6 @@ public struct GmAgentKbiteOpenMawTool: GmAgentKbiteTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentKbiteDigestArguments: Sendable {
     @Guide(description: "Short code that names the kbite.")
@@ -82,7 +76,6 @@ public struct GmAgentKbiteDigestArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentKbiteDigestTool: GmAgentKbiteTool {
     public let name = "kbite_digest"
     public let description = "Swallow the chewed stuff into the brain."

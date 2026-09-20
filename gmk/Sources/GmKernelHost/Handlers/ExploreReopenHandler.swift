@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// EXPLORE_REOPEN — complete → exploring revision edge; preserves all data.
 enum ExploreReopenHandler {

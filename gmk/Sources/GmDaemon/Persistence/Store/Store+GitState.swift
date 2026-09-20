@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // SESSION_RESOLVE / INSTANCE_CURRENT_SESSION — git-derived checked-out state
 // (item 2). Runs ON the serial queue deliberately: a HEAD read is a sub-100-

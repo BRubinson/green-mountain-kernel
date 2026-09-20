@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// CATALOG_SEARCH data access — tokenized OR name/code search across
 /// instances + sessions. Runs INSIDE a Store-owned transaction; holds no

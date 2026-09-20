@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// The phase verbs, each a door for a daemon verb an agent would otherwise have
 /// to reach through the shell, keeping the pen's promise that where a pen tool
@@ -10,10 +9,10 @@ import GmDaemonSdk
 /// SHAPES ARE READ OFF THE REQUEST STRUCTS, NOT INVENTED. Each `params` list
 /// mirrors its `*Request` field for field, including which are required, so the
 /// published schema and the decoder cannot disagree.
-func makePhaseDoorTools() -> [Tool] {
+func makePhaseDoorTools() -> [CdeTool] {
     [
         // ── Clarification ────────────────────────────────────────────────
-        Tool(
+        CdeTool(
             name: "rpir_open_clarification",
             description:
                 "Open the prompt's clarification summary. No status move — the prompt is already initiated; summaries are opened explicitly since the lifecycle collapsed to three states.",
@@ -28,7 +27,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_answer_clarification_question",
             description:
                 "Record the user's answer to ONE clarification question. `skip` marks a question deliberately not asked — the append-only record keeps it either way.",
@@ -54,7 +53,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_seal_clarification",
             description:
                 "Seal the question suite building → answering. Answers are writable only after this seal; rpir_finalize_clarification is the LATER move (answering → complete). The primary's call, like every seal.",
@@ -71,7 +70,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_finalize_clarification",
             description:
                 "answering → complete. Every question is answered or skipped; the care package carries the decided intent forward.",
@@ -88,7 +87,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_open_care_package",
             description:
                 "Open the care package on a clarification summary. Note the selector is the CLARIFICATION SUMMARY uuid, not the prompt uuid — the package hangs off the summary that produced it.",
@@ -104,7 +103,7 @@ func makePhaseDoorTools() -> [Tool] {
             }
         ),
 
-        Tool(
+        CdeTool(
             name: "rpir_close_brief",
             description:
                 "Seal the briefing — the briefer's page is done and the agent can go away. Same verb as rpir_write_brief: BRIEFING_COMPLETE both writes the ref set and moves building → ready.",
@@ -141,7 +140,7 @@ func makePhaseDoorTools() -> [Tool] {
         ),
 
         // ── Review ───────────────────────────────────────────────────────
-        Tool(
+        CdeTool(
             name: "rpir_open_review",
             description:
                 "Open the prompt's review summary. Like the other summaries, opened explicitly rather than as a side effect of a status move.",
@@ -156,7 +155,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_resolve_review_finding",
             description:
                 "Resolve ONE review finding during the fix loop. `open` is deliberately not accepted — it is the initial state, not a resolution, so resolving TO it would be a move backwards through an append-only record.",
@@ -181,7 +180,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_complete_review",
             description: "Seal the review with its overview and verdict.",
             params: [
@@ -209,7 +208,7 @@ func makePhaseDoorTools() -> [Tool] {
         ),
 
         // ── Architecture ─────────────────────────────────────────────────
-        Tool(
+        CdeTool(
             name: "rpir_open_architecture",
             description:
                 "Open the prompt's architecture summary page — fetch-or-open, idempotent. Opened explicitly like every summary; nothing opens it as a side effect.",
@@ -224,7 +223,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_write_architecture_persistence_changes",
             description:
                 "Record ONE persistence-tier change. Persistence rows come before general rows because a schema or wire delta is what the plan gate is signed off against.",
@@ -249,7 +248,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_write_architecture_general_changes",
             description:
                 "Record ONE general (non-persistence) change. change_depth is pseudo|draft|actual — draft is a planned change not yet written.",
@@ -278,7 +277,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_write_architecture_field_changes",
             description:
                 "Record ONE field-level change under a persistence change row (m0025 grain: add|modify|rename|delete per field).",
@@ -315,7 +314,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_summarize_architecture",
             description: "Write the architecture summary's own body — the plan narrative over the expanded rows.",
             params: [
@@ -333,7 +332,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_propose_architecture",
             description: "drafting → proposed: put the expanded plan on the table for the plan gate.",
             params: [
@@ -349,7 +348,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_approve_architecture",
             description:
                 "proposed → approved (terminal; unlocks implementation). The user's sign-off at the plan gate is what authorizes this call.",
@@ -366,7 +365,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_revise_architecture",
             description:
                 "proposed → drafting: the revision edge. Reopens the summary so options and rows can change; compose with rpir_open_architecture_option's supersede form to replace a proposal.",
@@ -383,7 +382,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "kbite_open_maw",
             description:
                 "Open a maw — the staging directory a kbite's raw sources are collected into before they are chewed and digested.",
@@ -400,7 +399,7 @@ func makePhaseDoorTools() -> [Tool] {
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "kbite_digest",
             description: "Digest a chewed maw into the database and archive its raw sources.",
             params: [

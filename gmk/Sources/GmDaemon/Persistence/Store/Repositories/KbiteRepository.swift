@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Registry data access over the {scope}_active_kbite junctions. All dynamic
 /// table/column identifiers come from KbiteScope.rawValue — enum-bound, never

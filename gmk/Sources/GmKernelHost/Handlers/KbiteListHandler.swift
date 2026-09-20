@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// KBITE_LIST — registry at a scope, resolved through the inheritance chain
 /// at read time.

@@ -2,9 +2,7 @@
 
 import Foundation
 import FoundationModels
-import GmDaemonSdk
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirOpenExplorationArguments: Sendable {
     @Guide(description: promptUuidGuide("to explore"))
@@ -23,7 +21,6 @@ public struct GmAgentRpirOpenExplorationArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirOpenExplorationTool: GmAgentRpirTool {
     public let name = "rpir_open_exploration"
     public let description = "Start my own finding list."
@@ -35,7 +32,6 @@ public struct GmAgentRpirOpenExplorationTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentExplorationFinding: Sendable {
     @Guide(description: "What kind of finding this is.", .anyOf(GM_TOOL_ANYOF_FINDING_KIND))
@@ -68,7 +64,6 @@ public struct GmAgentExplorationFinding: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirWriteExplorationsArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "finding list"))
@@ -87,7 +82,6 @@ public struct GmAgentRpirWriteExplorationsArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirWriteExplorationsTool: GmAgentRpirTool {
     public let name = "rpir_write_explorations"
     public let description = "Write down many findings at once."
@@ -99,7 +93,6 @@ public struct GmAgentRpirWriteExplorationsTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentFindingRating: Sendable {
     @Guide(description: "Which finding, by uuid.")
@@ -114,7 +107,6 @@ public struct GmAgentFindingRating: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirRankExplorationsArguments: Sendable {
     @Guide(description: promptUuidGuide("'s findings to rank"))
@@ -129,7 +121,6 @@ public struct GmAgentRpirRankExplorationsArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirRankExplorationsTool: GmAgentRpirTool {
     public let name = "rpir_rank_explorations"
     public let description = "Give every finding a number, all at once."
@@ -141,7 +132,6 @@ public struct GmAgentRpirRankExplorationsTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirCompleteExplorationArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "seal", "finding list"))
@@ -160,7 +150,6 @@ public struct GmAgentRpirCompleteExplorationArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirCompleteExplorationTool: GmAgentRpirTool {
     public let name = "rpir_complete_exploration"
     public let description = "Finding list done, here is what it all means."
@@ -172,7 +161,6 @@ public struct GmAgentRpirCompleteExplorationTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirGetExplorationArguments: Sendable {
     @Guide(description: promptUuidGuide("'s findings to read"))
@@ -191,7 +179,6 @@ public struct GmAgentRpirGetExplorationArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirGetExplorationTool: GmAgentRpirTool {
     public let name = "rpir_get_exploration"
     public let description = "Show me the findings so far."

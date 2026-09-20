@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// DOPE_PROMOTE — publish a session's SESSION_INSTANCE tree into the
 /// project's BASE_PROJECT scope.

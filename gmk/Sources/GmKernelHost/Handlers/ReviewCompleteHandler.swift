@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// REVIEW_COMPLETE — reviewing → complete; refuses unranked findings; the ONLY write path for overview + verdict.
 enum ReviewCompleteHandler {

@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// AGENT_REGISTER data access plus the on-demand identity write the
 /// file_change path leans on. Runs INSIDE a Store-owned transaction; holds no

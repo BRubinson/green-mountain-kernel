@@ -57,7 +57,6 @@ public enum DiagramEditSessionError: Error, Sendable {
 
 #if canImport(Observation)
 import Observation
-import GmDaemonSdk
 
 /// Window-lived staging store for interactive editing: stage mutations
 /// per-frame (cheap value appends), flush once at gesture end. Absorbing
@@ -133,7 +132,8 @@ public final class DiagramEditSession {
     /// second flush while one is in flight is refused rather than
     /// double-committing.
     @discardableResult
-    public func flush(guarded: Bool = true) async throws -> Int64? {
+    // Runs on the caller's actor: the session is owned by whoever drives it.
+    public nonisolated(nonsending) func flush(guarded: Bool = true) async throws -> Int64? {
         guard !staged.isEmpty else { return baseRevision }
         guard !inFlight else {
             throw DiagramEditSessionError.flushInFlight

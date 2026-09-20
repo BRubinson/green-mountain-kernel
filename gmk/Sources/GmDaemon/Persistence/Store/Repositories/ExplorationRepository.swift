@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// EXPLORE_* data access — the db-native exploration report machine. Runs
 /// INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts.

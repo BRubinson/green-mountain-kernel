@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // CLARIFY_* — the db-native clarification machine (replaces qualified.md).
 // building → answering → complete, plus the complete → answering revision

@@ -2,9 +2,7 @@
 
 import Foundation
 import FoundationModels
-import GmDaemonSdk
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirOpenClarificationArguments: Sendable {
     @Guide(description: promptUuidGuide("to open questions for"))
@@ -15,7 +13,6 @@ public struct GmAgentRpirOpenClarificationArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirOpenClarificationTool: GmAgentRpirTool {
     public let name = "rpir_open_clarification"
     public let description = "Start the question list."
@@ -27,7 +24,6 @@ public struct GmAgentRpirOpenClarificationTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentClarificationQuestion: Sendable {
     @Guide(description: "The question, written so a human can answer it without reading code.")
@@ -47,7 +43,6 @@ public struct GmAgentClarificationQuestion: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirWriteClarificationQuestionsArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "question list"))
@@ -70,7 +65,6 @@ public struct GmAgentRpirWriteClarificationQuestionsArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirWriteClarificationQuestionsTool: GmAgentRpirTool {
     public let name = "rpir_write_clarification_questions"
     public let description = "Write down many questions for the human."
@@ -84,7 +78,6 @@ public struct GmAgentRpirWriteClarificationQuestionsTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentClarificationNote: Sendable {
     @Guide(description: "The note.")
@@ -99,7 +92,6 @@ public struct GmAgentClarificationNote: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirWriteClarificationNotesArguments: Sendable {
     @Guide(description: "Which question list the notes belong to, by uuid.")
@@ -118,7 +110,6 @@ public struct GmAgentRpirWriteClarificationNotesArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirWriteClarificationNotesTool: GmAgentRpirTool {
     public let name = "rpir_write_clarification_notes"
     public let description = "Write down many private notes."
@@ -132,7 +123,6 @@ public struct GmAgentRpirWriteClarificationNotesTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirAnswerClarificationQuestionArguments: Sendable {
     @Guide(description: "Which question was answered, by uuid.")
@@ -165,7 +155,6 @@ public struct GmAgentRpirAnswerClarificationQuestionArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirAnswerClarificationQuestionTool: GmAgentRpirTool {
     public let name = "rpir_answer_clarification_question"
     public let description = "Human said this."
@@ -179,7 +168,6 @@ public struct GmAgentRpirAnswerClarificationQuestionTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirFinalizeClarificationArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "finish", "question list"))
@@ -194,7 +182,6 @@ public struct GmAgentRpirFinalizeClarificationArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirFinalizeClarificationTool: GmAgentRpirTool {
     public let name = "rpir_finalize_clarification"
     public let description = "Questions all done."
@@ -208,7 +195,6 @@ public struct GmAgentRpirFinalizeClarificationTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirSealClarificationArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "seal", "question list"))
@@ -223,7 +209,6 @@ public struct GmAgentRpirSealClarificationArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirSealClarificationTool: GmAgentRpirTool {
     public let name = "rpir_seal_clarification"
     public let description = "Questions written; open them for answers."
@@ -237,7 +222,6 @@ public struct GmAgentRpirSealClarificationTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirOpenCarePackageArguments: Sendable {
     @Guide(description: "Which question list the box belongs to, by uuid.")
@@ -248,7 +232,6 @@ public struct GmAgentRpirOpenCarePackageArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirOpenCarePackageTool: GmAgentRpirTool {
     public let name = "rpir_open_care_package"
     public let description = "Get an empty box ready for the next agent."
@@ -260,7 +243,6 @@ public struct GmAgentRpirOpenCarePackageTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCareRef: Sendable {
     @Guide(description: "What sort of thing this is.", .anyOf(GM_TOOL_ANYOF_CARE_REF_KIND))
@@ -298,7 +280,6 @@ public struct GmAgentCareRef: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirWriteCarePackageArguments: Sendable {
     @Guide(description: "Which box to fill, by uuid.")
@@ -313,7 +294,6 @@ public struct GmAgentRpirWriteCarePackageArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirWriteCarePackageTool: GmAgentRpirTool {
     public let name = "rpir_write_care_package"
     public let description = "Put the good bits in the box for the next agent."
@@ -325,7 +305,6 @@ public struct GmAgentRpirWriteCarePackageTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirCloseCarePackageArguments: Sendable {
     @Guide(description: "Which box to seal, by uuid.")
@@ -349,7 +328,6 @@ public struct GmAgentRpirCloseCarePackageArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirCloseCarePackageTool: GmAgentRpirTool {
     public let name = "rpir_close_care_package"
     public let description = "Box is ready."
@@ -361,7 +339,6 @@ public struct GmAgentRpirCloseCarePackageTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirGetClarificationArguments: Sendable {
     @Guide(description: promptUuidGuide("'s questions to read"))
@@ -382,7 +359,6 @@ public struct GmAgentRpirGetClarificationArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirGetClarificationTool: GmAgentRpirTool {
     public let name = "rpir_get_clarification"
     public let description = "Show me the questions and answers so far."
@@ -394,7 +370,6 @@ public struct GmAgentRpirGetClarificationTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirGetCarePackageArguments: Sendable {
     @Guide(description: promptUuidGuide("'s care package to read"))
@@ -428,7 +403,6 @@ public struct GmAgentRpirGetCarePackageArguments: Sendable {
 /// curated exploration copies — narrowable to a stub roster and one body at a
 /// time. The same shape `rpir_get_architecture` uses for options and change
 /// rows, and the door `rpir_get_clarification`'s overflow retry points at.
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirGetCarePackageTool: GmAgentRpirTool {
     public let name = "rpir_get_care_package"
     public let description = "Show me the box on its own, one item at a time if it is big."

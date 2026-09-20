@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `agent_briefing` table (m0025 shape: opinion-free
 /// ref set — body/dope_refs/kbite_refs TEXT columns are gone, refs are child

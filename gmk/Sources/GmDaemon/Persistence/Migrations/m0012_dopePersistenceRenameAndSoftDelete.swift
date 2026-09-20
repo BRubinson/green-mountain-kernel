@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0012 — the Dope*Domain* -> Dope*Persistence* table/column rename, fused

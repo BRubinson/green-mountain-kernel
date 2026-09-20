@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PROJECT_UPDATE — set the project's primary_project_branch.
 enum ProjectUpdateHandler {

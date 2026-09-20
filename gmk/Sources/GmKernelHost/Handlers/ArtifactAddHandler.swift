@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// ARTIFACT_ADD — register a file pointer for a bot-phase memory/ file
 /// (kind explore|architecture|review|qualified|other). Content stays in the

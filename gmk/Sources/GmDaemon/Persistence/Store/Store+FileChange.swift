@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // FILE_CHANGE_ADD / FILE_CHANGE_LIST — the original add_file_change
 // capability plus the query side that replaces grepping changed_files: lists.

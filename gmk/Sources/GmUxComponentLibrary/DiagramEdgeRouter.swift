@@ -1,6 +1,5 @@
 import CoreGraphics
 import Foundation
-import GmDaemonSdk
 
 /// Obstacle-avoiding orthogonal edge routing behind ONE pure entry point:
 /// visibility lattice → multi-terminal A* with bend costs → corridor nudging.

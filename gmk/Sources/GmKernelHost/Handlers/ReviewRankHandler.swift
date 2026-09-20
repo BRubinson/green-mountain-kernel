@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// REVIEW_RANK — atomic version-less batch rank (same contract as EXPLORE_RANK).
 enum ReviewRankHandler {

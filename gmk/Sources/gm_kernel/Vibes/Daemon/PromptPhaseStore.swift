@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import GmDaemonSdk
 
 /// Per-prompt read model over CLARIFY_GET + ARCH_GET + EXPLORE_GET + REVIEW_GET, the app's
 /// read-only surface onto the report subsystem; every write verb stays bot/CLI-side.

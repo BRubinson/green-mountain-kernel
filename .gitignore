@@ -27,21 +27,16 @@ xcuserdata/
 !**/xcshareddata/
 !**/xcshareddata/**
 
-# Swift Package Manager
-# `.build/` and `.swiftpm/` are unanchored and already cover gmk/.build; the
-# explicit entries make the one package build dir visible to a reader.
+# Build output. gmk/.build/DerivedData is where every SCRIPTED xcodebuild lands
+# (gm_build.sh's gm_xcb); ⌘R keeps Xcode's default DerivedData. The unanchored
+# entries also cover any stray SwiftPM output, e.g. from the vendored package.
 .build/
 .swiftpm/
 gmk/.build/
-gmk/.swiftpm/
 
-# The ROOT Package.swift is a tooling-only LSP shim (see its header). It ships
-# nothing and is consumed by no build, so its resolved pins are local tooling
-# state — committing them would add a SECOND GRDB pin that nothing verifies
-# against the real one in gmDaemon. ANCHORED, so the packages under gmk/ keep
-# their own Package.resolved. The repo-root `.build/` the shim creates is
-# already covered by the unanchored `.build/` above.
-/Package.resolved
+# xcode-build-server's parsed-flags cache, written beside buildServer.json at
+# the repo root. buildServer.json itself is COMMITTED; the cache is per machine.
+/.compile
 
 # Distribution / signing secrets
 ExportOptions.plist

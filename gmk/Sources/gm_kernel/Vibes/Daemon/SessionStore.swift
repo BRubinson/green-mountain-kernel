@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import GmDaemonSdk
 
 /// Per-session-window read state: the SessionRow, its prompt stubs, change
 /// summaries, and a full PromptGetResponse per stub. The prefetch is

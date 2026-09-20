@@ -1,6 +1,5 @@
 #if canImport(SwiftUI)
 import SwiftUI
-import GmDaemonSdk
 
 // Renders parsed MarkdownBlocks as real SwiftUI layout: sized headings, indented
 // lists, fenced code in a monospaced filled block, bordered blockquotes, and pipe

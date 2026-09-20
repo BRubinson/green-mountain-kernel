@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0008 — BASE_COMPOSABLE entities + the base_composable_uuid self-FK.

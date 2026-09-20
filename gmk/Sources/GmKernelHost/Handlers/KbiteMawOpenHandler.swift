@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// KBITE_MAW_OPEN — filesystem skeleton only, NO db rows (maws are not
 /// tracked in the db; mirrors /gm_crunch_open_maw). The interactive

@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// DOPE_SEARCH data access — full-text over the dope tree at one of three
 /// scopes; --only-masks is a post-filter over resolver provenance. Runs

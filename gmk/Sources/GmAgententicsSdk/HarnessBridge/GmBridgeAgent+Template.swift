@@ -9,7 +9,6 @@ extension GmBridgeAgent {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 extension GmBridgeAgent {
 
     /// Builds one agent file from the session profile it embodies.

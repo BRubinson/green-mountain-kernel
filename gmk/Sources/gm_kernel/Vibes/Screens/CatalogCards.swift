@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 // Shared drill-down leaves for the landing / project / instance surfaces:
 // one instance row with its inline session blocks, and the compact session
@@ -7,7 +6,8 @@ import GmDaemonSdk
 // idiom — green outline + dot — as the ONE active indicator everywhere.
 
 enum CatalogDates {
-    private static let iso = ISO8601DateFormatter()
+    // ISO8601DateFormatter is thread-safe; the checker cannot see that.
+    nonisolated(unsafe) private static let iso = ISO8601DateFormatter()
     nonisolated static func relative(_ raw: String) -> String {
         guard let date = iso.date(from: raw) else { return "—" }
         return date.formatted(.relative(presentation: .named))

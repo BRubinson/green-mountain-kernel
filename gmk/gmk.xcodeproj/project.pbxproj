@@ -14,6 +14,7 @@
 				1B4010F12FDCA09300DAF751 /* Generate plugins/gmcc */,
 			);
 			dependencies = (
+				A17E00212FDCB00000DAF751 /* PBXTargetDependency */,
 			);
 			name = PluginBridge;
 			productName = PluginBridge;
@@ -25,6 +26,7 @@
 				1B5EED012FDCA09300DAF751 /* Seed ~/test_gmfs */,
 			);
 			dependencies = (
+				A17E001F2FDCB00000DAF751 /* PBXTargetDependency */,
 			);
 			name = TestEnvSeed;
 			productName = TestEnvSeed;
@@ -32,16 +34,274 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
+		A17E00042FDCB00000DAF751 /* VERSION in Sources */ = {isa = PBXBuildFile; fileRef = A17E00032FDCB00000DAF751 /* VERSION */; };
+		A17E000C2FDCB00000DAF751 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A17E00092FDCB00000DAF751 /* GRDB */; };
+		A17E000D2FDCB00000DAF751 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = A17E000A2FDCB00000DAF751 /* SwiftProtobuf */; };
+		A17E000E2FDCB00000DAF751 /* ClaudeForFoundationModels in Frameworks */ = {isa = PBXBuildFile; productRef = A17E000B2FDCB00000DAF751 /* ClaudeForFoundationModels */; };
+		A17E00172FDCB00000DAF751 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A17E00162FDCB00000DAF751 /* GRDB */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXBuildRule section */
+		A17E00052FDCB00000DAF751 /* PBXBuildRule */ = {
+			isa = PBXBuildRule;
+			compilerSpec = com.apple.compilers.proxy.script;
+			filePatterns = "*/VERSION";
+			fileType = pattern.proxy;
+			inputFiles = (
+				"$(SRCROOT)/scripts/stamp_build_info.sh",
+				"$(SRCROOT)/../.git/HEAD",
+			);
+			isEditable = 1;
+			name = "Stamp GmVersion and BuildInfo";
+			outputFiles = (
+				"$(DERIVED_FILE_DIR)/GmVersion.swift",
+				"$(DERIVED_FILE_DIR)/BuildInfo.swift",
+			);
+			runOncePerArchitecture = 0;
+			script = "exec /bin/bash \"${SRCROOT}/scripts/stamp_build_info.sh\"\n";
+		};
+/* End PBXBuildRule section */
+
+/* Begin PBXContainerItemProxy section */
+		A17E001C2FDCB00000DAF751 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1B40106B2FDCA09200DAF751 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1B4010722FDCA09200DAF751;
+			remoteInfo = gm_kernel;
+		};
+		A17E001E2FDCB00000DAF751 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1B40106B2FDCA09200DAF751 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1B4010722FDCA09200DAF751;
+			remoteInfo = gm_kernel;
+		};
+		A17E00202FDCB00000DAF751 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1B40106B2FDCA09200DAF751 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1B4010722FDCA09200DAF751;
+			remoteInfo = gm_kernel;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
-		1B4010732FDCA09200DAF751 /* GMVibes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = GMVibes.app; path = gm_kernel.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1B4010732FDCA09200DAF751 /* gm_kernel.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = gm_kernel.app; path = gm_kernel.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A17E00032FDCB00000DAF751 /* VERSION */ = {isa = PBXFileReference; lastKnownFileType = text; path = VERSION; sourceTree = "<group>"; };
+		A17E00112FDCB00000DAF751 /* GmKernelTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GmKernelTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		A17E00022FDCB00000DAF751 /* Exceptions for "Sources" folder in "GmKernelTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"GmDaemon/ChewedArtifact.swift",
+				"GmDaemon/DopeAreaTable.swift",
+				"GmDaemon/PersistedEvent.swift",
+				"GmDaemon/Persistence/Entities/ActiveKbiteRecords.swift",
+				"GmDaemon/Persistence/Entities/AgentRegistrationRecord.swift",
+				"GmDaemon/Persistence/Entities/ArchitectureRecords.swift",
+				"GmDaemon/Persistence/Entities/BaseRecordFields.swift",
+				"GmDaemon/Persistence/Entities/BotWorkflowRecords.swift",
+				"GmDaemon/Persistence/Entities/BriefingRecord.swift",
+				"GmDaemon/Persistence/Entities/ClarificationRecords.swift",
+				"GmDaemon/Persistence/Entities/ConfigRecord.swift",
+				"GmDaemon/Persistence/Entities/DiagramDopeRecords.swift",
+				"GmDaemon/Persistence/Entities/DiagramDrawingRecords.swift",
+				"GmDaemon/Persistence/Entities/DiagramRecords.swift",
+				"GmDaemon/Persistence/Entities/DopeCogRecords.swift",
+				"GmDaemon/Persistence/Entities/DopePersistenceRecords.swift",
+				"GmDaemon/Persistence/Entities/DopeProvenanceRecord.swift",
+				"GmDaemon/Persistence/Entities/DopeScopeRecord.swift",
+				"GmDaemon/Persistence/Entities/EventRecord.swift",
+				"GmDaemon/Persistence/Entities/ExplorationRecords.swift",
+				"GmDaemon/Persistence/Entities/FileChangeRecords.swift",
+				"GmDaemon/Persistence/Entities/InstanceRecord.swift",
+				"GmDaemon/Persistence/Entities/KbiteRecords.swift",
+				"GmDaemon/Persistence/Entities/KbiteResourceRecords.swift",
+				"GmDaemon/Persistence/Entities/ProjectRecord.swift",
+				"GmDaemon/Persistence/Entities/PromptRecords.swift",
+				"GmDaemon/Persistence/Entities/ReviewRecords.swift",
+				"GmDaemon/Persistence/Entities/SessionRecords.swift",
+				"GmDaemon/Persistence/Entities/TestRunRecords.swift",
+				"GmDaemon/Persistence/Migrations/Migrations.swift",
+				"GmDaemon/Persistence/Migrations/m0001_baseSchema.swift",
+				"GmDaemon/Persistence/Migrations/m0002_clarificationArchitectureLifecycleV2.swift",
+				"GmDaemon/Persistence/Migrations/m0003_searchIndexes.swift",
+				"GmDaemon/Persistence/Migrations/m0004_explorationReviewReports.swift",
+				"GmDaemon/Persistence/Migrations/m0005_purgeLegacyConcepts.swift",
+				"GmDaemon/Persistence/Migrations/m0006_dropDraftPlaceholderSummaries.swift",
+				"GmDaemon/Persistence/Migrations/m0007_dopeDomainModel.swift",
+				"GmDaemon/Persistence/Migrations/m0008_dopeBaseComposableEntities.swift",
+				"GmDaemon/Persistence/Migrations/m0009_dopePropertyBaseOrigin.swift",
+				"GmDaemon/Persistence/Migrations/m0010_diagramDomainModel.swift",
+				"GmDaemon/Persistence/Migrations/m0011_projectPrimaryBranch.swift",
+				"GmDaemon/Persistence/Migrations/m0012_dopePersistenceRenameAndSoftDelete.swift",
+				"GmDaemon/Persistence/Migrations/m0013_dopeScopeTierLadder.swift",
+				"GmDaemon/Persistence/Migrations/m0014_dopeCogElement.swift",
+				"GmDaemon/Persistence/Migrations/m0015_dopeSearchIndexes.swift",
+				"GmDaemon/Persistence/Migrations/m0016_diagramDopeScopeBinding.swift",
+				"GmDaemon/Persistence/Migrations/m0017_relationshipTargetAndDropMaskKind.swift",
+				"GmDaemon/Persistence/Migrations/m0018_diagramDopeScopePersistenceLayer.swift",
+				"GmDaemon/Persistence/Migrations/m0019_cogHullsAndPersistenceOwner.swift",
+				"GmDaemon/Persistence/Migrations/m0020_dopeElementProvenance.swift",
+				"GmDaemon/Persistence/Migrations/m0021_diagramVocabularyAndTierCollapse.swift",
+				"GmDaemon/Persistence/Migrations/m0022_promptQualifiedDiagram.swift",
+				"GmDaemon/Persistence/Migrations/m0023_agentBriefing.swift",
+				"GmDaemon/Persistence/Migrations/m0024_diagramStudio.swift",
+				"GmDaemon/Persistence/Migrations/m0025_dynamicWorkflows.swift",
+				"GmDaemon/Persistence/Migrations/m0026_claudeSessionAttribution.swift",
+				"GmDaemon/Persistence/Migrations/m0027_ckfsToGmfs.swift",
+				"GmDaemon/Persistence/Migrations/m0028_promptLifecycleCollapse.swift",
+				"GmDaemon/Persistence/Migrations/m0029_testRunLock.swift",
+				"GmDaemon/Persistence/Migrations/m0030_retiredRootConfigValues.swift",
+				"GmDaemon/Persistence/Store/Repositories/AgentRegistrationRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/ArchitectureRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/ArtifactRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/BotWorkflowRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/BriefingRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/CatalogSearchRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/ClarificationRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/ClaudeSessionBindingRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/ConfigRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/ContextRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/DiagramRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/DiagramStudioRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/DopeCogRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/DopePromoteRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/DopeProvenanceRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/DopeRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/DopeSearchRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/EventRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/ExplorationRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/FileChangeRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/FindingRankRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/GitStateRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/KbiteArchiveRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/KbiteRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/KbiteResourceRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/ListingRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/ProjectRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/PromptDiagramRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/PromptRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/RepositoryContext.swift",
+				"GmDaemon/Persistence/Store/Repositories/ReviewRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/SearchRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/SessionRepository.swift",
+				"GmDaemon/Persistence/Store/Repositories/TestRunRepository.swift",
+				"GmDaemon/Persistence/Store/Store+AgentRegistration.swift",
+				"GmDaemon/Persistence/Store/Store+Architecture.swift",
+				"GmDaemon/Persistence/Store/Store+Artifact.swift",
+				"GmDaemon/Persistence/Store/Store+Backup.swift",
+				"GmDaemon/Persistence/Store/Store+BotWorkflow.swift",
+				"GmDaemon/Persistence/Store/Store+Briefing.swift",
+				"GmDaemon/Persistence/Store/Store+CatalogSearch.swift",
+				"GmDaemon/Persistence/Store/Store+Clarification.swift",
+				"GmDaemon/Persistence/Store/Store+Config.swift",
+				"GmDaemon/Persistence/Store/Store+Context.swift",
+				"GmDaemon/Persistence/Store/Store+Diagram.swift",
+				"GmDaemon/Persistence/Store/Store+DiagramRepoVerbs.swift",
+				"GmDaemon/Persistence/Store/Store+DiagramStudio.swift",
+				"GmDaemon/Persistence/Store/Store+Dope.swift",
+				"GmDaemon/Persistence/Store/Store+DopeCog.swift",
+				"GmDaemon/Persistence/Store/Store+DopePromote.swift",
+				"GmDaemon/Persistence/Store/Store+DopeProvenance.swift",
+				"GmDaemon/Persistence/Store/Store+DopeRepoVerbs.swift",
+				"GmDaemon/Persistence/Store/Store+DopeSearch.swift",
+				"GmDaemon/Persistence/Store/Store+Event.swift",
+				"GmDaemon/Persistence/Store/Store+Exploration.swift",
+				"GmDaemon/Persistence/Store/Store+FileChange.swift",
+				"GmDaemon/Persistence/Store/Store+GitState.swift",
+				"GmDaemon/Persistence/Store/Store+Kbite.swift",
+				"GmDaemon/Persistence/Store/Store+KbiteArchive.swift",
+				"GmDaemon/Persistence/Store/Store+KbiteResource.swift",
+				"GmDaemon/Persistence/Store/Store+Listing.swift",
+				"GmDaemon/Persistence/Store/Store+Project.swift",
+				"GmDaemon/Persistence/Store/Store+Prompt.swift",
+				"GmDaemon/Persistence/Store/Store+PromptDiagram.swift",
+				"GmDaemon/Persistence/Store/Store+Review.swift",
+				"GmDaemon/Persistence/Store/Store+Search.swift",
+				"GmDaemon/Persistence/Store/Store+Session.swift",
+				"GmDaemon/Persistence/Store/Store+TestRun.swift",
+				"GmDaemon/Persistence/Store/Store.swift",
+				"GmDaemon/Persistence/Store/StoreBoundary.swift",
+				"GmDaemon/Persistence/Store/StoreCore.swift",
+				"GmDaemon/WorkflowGates.swift",
+				"GmDaemonSdk/Client/BriefingWait.swift",
+				"GmDaemonSdk/Client/ClientContext.swift",
+				"GmDaemonSdk/Client/DaemonClient+API.swift",
+				"GmDaemonSdk/Client/DaemonClient.swift",
+				"GmDaemonSdk/Client/DaemonEventSubscription.swift",
+				"GmDaemonSdk/Client/GmVerbCaller.swift",
+				"GmDaemonSdk/Client/PromptResolver.swift",
+				"GmDaemonSdk/Diagram/DiagramContainment.swift",
+				"GmDaemonSdk/Diagram/DiagramDocument.swift",
+				"GmDaemonSdk/Diagram/DiagramLevel.swift",
+				"GmDaemonSdk/Diagram/DiagramMutation.swift",
+				"GmDaemonSdk/Diagram/DiagramPayload.swift",
+				"GmDaemonSdk/Diagram/DiagramStorage.swift",
+				"GmDaemonSdk/Diagram/DiagramStrokeCodec.swift",
+				"GmDaemonSdk/Diagram/DiagramTree.swift",
+				"GmDaemonSdk/Diagram/DiagramTreeReducer.swift",
+				"GmDaemonSdk/Dope/DopeBootSync.swift",
+				"GmDaemonSdk/Dope/DopeCode.swift",
+				"GmDaemonSdk/Dope/DopeCogDocument.swift",
+				"GmDaemonSdk/Dope/DopeCogElement.swift",
+				"GmDaemonSdk/Dope/DopeCogProjection.swift",
+				"GmDaemonSdk/Dope/DopeDocument.swift",
+				"GmDaemonSdk/Dope/DopeLevel.swift",
+				"GmDaemonSdk/Dope/DopeMerge.swift",
+				"GmDaemonSdk/Dope/DopeOverlay.swift",
+				"GmDaemonSdk/Dope/DopeProjection.swift",
+				"GmDaemonSdk/Dope/DopePromotion.swift",
+				"GmDaemonSdk/Dope/DopeRepoSandbox.swift",
+				"GmDaemonSdk/Dope/DopeTree.swift",
+				"GmDaemonSdk/Dope/DopeValidator.swift",
+				"GmDaemonSdk/Dope/DopeVocabulary.swift",
+				"GmDaemonSdk/Environment/GmEnvironment.swift",
+				"GmDaemonSdk/GitHead.swift",
+				"GmDaemonSdk/Hook/HookLogic.swift",
+				"GmDaemonSdk/Hook/HookRunner.swift",
+				"GmDaemonSdk/InstanceIdentity.swift",
+				"GmDaemonSdk/Kbite/KbiteArchive.swift",
+				"GmDaemonSdk/Paths.swift",
+				"GmDaemonSdk/Protocol/CdePaging.swift",
+				"GmDaemonSdk/Protocol/CdeSheet.swift",
+				"GmDaemonSdk/Protocol/Envelope.swift",
+				"GmDaemonSdk/Protocol/GmJsonValue.swift",
+				"GmDaemonSdk/Protocol/Messages.swift",
+				"GmDaemonSdk/Protocol/Rows.swift",
+				"GmDaemonSdk/Protocol/VerbLedger.swift",
+				"GmDaemonSdk/Protocol/VerbRegistry.swift",
+				"GmDaemonSdk/Protocol/WireCodec.swift",
+				"GmDaemonSdk/Protocol/WorkflowSpec.swift",
+				"GmDaemonSdk/RepoRelativePath.swift",
+				"GmDaemonSdk/StoreError.swift",
+				"GmDaemonSdk/StructuredPatch.swift",
+			);
+			target = A17E00102FDCB00000DAF751 /* GmKernelTests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		1B4010752FDCA09200DAF751 /* gmVibes */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = gmVibes;
+			sourceTree = "<group>";
+		};
+		A17E00012FDCB00000DAF751 /* Sources */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A17E00022FDCB00000DAF751 /* Exceptions for "Sources" folder in "GmKernelTests" target */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A17E00152FDCB00000DAF751 /* GmKernelTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			name = GmKernelTests;
+			path = Tests/GmKernelTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -51,6 +311,17 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A17E000C2FDCB00000DAF751 /* GRDB in Frameworks */,
+				A17E000D2FDCB00000DAF751 /* SwiftProtobuf in Frameworks */,
+				A17E000E2FDCB00000DAF751 /* ClaudeForFoundationModels in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A17E00132FDCB00000DAF751 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A17E00172FDCB00000DAF751 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -60,7 +331,10 @@
 		1B40106A2FDCA09200DAF751 = {
 			isa = PBXGroup;
 			children = (
+				A17E00012FDCB00000DAF751 /* Sources */,
+				A17E00152FDCB00000DAF751 /* GmKernelTests */,
 				1B4010752FDCA09200DAF751 /* gmVibes */,
+				A17E00032FDCB00000DAF751 /* VERSION */,
 				1B4010742FDCA09200DAF751 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -68,7 +342,8 @@
 		1B4010742FDCA09200DAF751 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				1B4010732FDCA09200DAF751 /* GMVibes.app */,
+				1B4010732FDCA09200DAF751 /* gm_kernel.app */,
+				A17E00112FDCB00000DAF751 /* GmKernelTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,39 +351,58 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		1B4010722FDCA09200DAF751 /* GMVibes */ = {
+		1B4010722FDCA09200DAF751 /* gm_kernel */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 1B4010962FDCA09300DAF751 /* Build configuration list for PBXNativeTarget "GMVibes" */;
+			buildConfigurationList = 1B4010962FDCA09300DAF751 /* Build configuration list for PBXNativeTarget "gm_kernel" */;
 			buildPhases = (
 				1B40106F2FDCA09200DAF751 /* Sources */,
 				1B4010702FDCA09200DAF751 /* Frameworks */,
 				1B4010712FDCA09200DAF751 /* Resources */,
-				1B4010E02FDCA09300DAF751 /* Install gm_kernel executable */,
+			);
+			buildRules = (
+				A17E00052FDCB00000DAF751 /* PBXBuildRule */,
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A17E00012FDCB00000DAF751 /* Sources */,
+				1B4010752FDCA09200DAF751 /* gmVibes */,
+			);
+			name = gm_kernel;
+			packageProductDependencies = (
+				A17E00092FDCB00000DAF751 /* GRDB */,
+				A17E000A2FDCB00000DAF751 /* SwiftProtobuf */,
+				A17E000B2FDCB00000DAF751 /* ClaudeForFoundationModels */,
+			);
+			productName = gm_kernel;
+			productReference = 1B4010732FDCA09200DAF751 /* gm_kernel.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A17E00102FDCB00000DAF751 /* GmKernelTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A17E00182FDCB00000DAF751 /* Build configuration list for PBXNativeTarget "GmKernelTests" */;
+			buildPhases = (
+				A17E00122FDCB00000DAF751 /* Sources */,
+				A17E00132FDCB00000DAF751 /* Frameworks */,
+				A17E00142FDCB00000DAF751 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
-				1B4010F92FDCA09300DAF751 /* PBXTargetDependency */,
+				A17E001D2FDCB00000DAF751 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				1B4010752FDCA09200DAF751 /* gmVibes */,
+				A17E00152FDCB00000DAF751 /* GmKernelTests */,
 			);
-			name = GMVibes;
+			name = GmKernelTests;
 			packageProductDependencies = (
-				1B4010D22FDCA09300DAF751 /* gm_kernel */,
+				A17E00162FDCB00000DAF751 /* GRDB */,
 			);
-			productName = GMVibes;
-			productReference = 1B4010732FDCA09200DAF751 /* GMVibes.app */;
-			productType = "com.apple.product-type.application";
+			productName = GmKernelTests;
+			productReference = A17E00112FDCB00000DAF751 /* GmKernelTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
-
-/* Begin PBXTargetDependency section */
-		1B4010F92FDCA09300DAF751 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			productRef = 1B4010D22FDCA09300DAF751 /* gm_kernel */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		1B40106B2FDCA09200DAF751 /* Project object */ = {
@@ -120,6 +414,9 @@
 				TargetAttributes = {
 					1B4010722FDCA09200DAF751 = {
 						CreatedOnToolsVersion = 26.3;
+					};
+					A17E00102FDCB00000DAF751 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -133,14 +430,17 @@
 			mainGroup = 1B40106A2FDCA09200DAF751;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				1B4010A42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmk" */,
+				A17E00062FDCB00000DAF751 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+				A17E00072FDCB00000DAF751 /* XCRemoteSwiftPackageReference "swift-protobuf" */,
+				A17E00082FDCB00000DAF751 /* XCLocalSwiftPackageReference "gmClaudeForFoundationModels" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1B4010742FDCA09200DAF751 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				1B4010722FDCA09200DAF751 /* GMVibes */,
+				1B4010722FDCA09200DAF751 /* gm_kernel */,
+				A17E00102FDCB00000DAF751 /* GmKernelTests */,
 				1B4010F02FDCA09300DAF751 /* PluginBridge */,
 				1B5EED002FDCA09300DAF751 /* TestEnvSeed */,
 			);
@@ -155,30 +455,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-/* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		1B4010E02FDCA09300DAF751 /* Install gm_kernel executable */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 0;
+		A17E00142FDCB00000DAF751 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"$(BUILT_PRODUCTS_DIR)/gm_kernel",
-			);
-			name = "Install gm_kernel executable";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
-			);
 			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -eu\n# Make the package-built gm_kernel the bundle's executable. Xcode builds the\n# product through this target's dependency; the copy lands before code signing,\n# so the signed executable is the kernel. A build that leaves Xcode's own stub\n# in place would ship an app that is not the kernel, hence the hard checks.\nSRC=\"${BUILT_PRODUCTS_DIR}/gm_kernel\"\n[ -x \"$SRC\" ] || { echo \"error: Xcode did not build the gm_kernel package product at $SRC\" >&2; exit 1; }\nDEST=\"${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}\"\ncp -p \"$SRC\" \"$DEST\"\n\"$DEST\" --version | grep -q \"gm_kernel protocol\" || { echo \"error: $DEST does not answer as gm_kernel\" >&2; exit 1; }\necho \"installed gm_kernel ($(lipo -archs \"$DEST\")) as the bundle executable\"\n";
 		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
 		1B4010F12FDCA09300DAF751 /* Generate plugins/gmcc */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -192,7 +478,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "set -euo pipefail\n# Regenerate plugins/gmcc from the bridge values in gmAgententicsSdk.\n#\n# IT CALLS generate_plugin.sh AND REIMPLEMENTS NOTHING. rebuild_local.sh:331\n# already calls the same script; a second implementation of the generation\n# logic is the next gm_releases.sh-exists-twice, which CLAUDE.md records as\n# having been believed FIXED for two versions before anyone caught it. The\n# script re-derives the repo root itself, so it needs no argument.\n#\n# `set -euo pipefail` IS MANDATORY. The `Embed gm_kernel CLI` phase's own\n# comment records the same fact: without it a failed step leaves the phase\n# GREEN.\n#\n# FAILURE POLICY: A REAL GENERATION FAILURE FAILS THE BUILD. No `|| true`, no\n# fallback. A green build over a stale plugin is exactly the silent-wrong this\n# target exists to prevent. Only the three gates exit 0, and each prints a\n# `note:` saying which one fired.\n#\n# NO PBXTargetDependency EXISTS IN EITHER DIRECTION, and that is deliberate.\n# Parallelism is bought by INDEPENDENCE, not by a setting:\n# BuildIndependentTargetsInParallel = 1 buys nothing unless the two targets are\n# genuinely independent. A dependency edge silently serialises the build.\n\n# GATE 1 - configuration. Inside the script, not only in the scheme: a\n# build-setting gate is bypassed by anyone who builds the target directly or\n# drags it into another scheme. This is what keeps a source-tree write off the\n# Release path that publish_release.sh requires clean.\n[ \"${CONFIGURATION:-}\" = \"Beta\" ] || { echo \"note: plugin generation is Beta-only (CONFIGURATION=${CONFIGURATION:-})\"; exit 0; }\n\n# GATE 2 - CONFLICTED INDEX. NOT hypothetical: the tree has unmerged paths\n# RIGHT NOW. Regenerating into unresolved conflicts writes generated bytes over\n# a half-resolved state, and gm_bridge_writer's stage-and-swap will do it\n# happily: its ONLY target check is that .claude-plugin/plugin.json exists,\n# which a conflicted tree satisfies, and the half-resolved tree it renames into\n# a trash directory is then dropped with `try? removeItem` - no prompt, no\n# backup. plugins/gmcc is itself a COMMITTED, conflictable tree, so that is\n# reachable rather than theoretical.\n#\n# ls-files -u RATHER THAN MERGE_HEAD: MERGE_HEAD exists ONLY during `git\n# merge`. A conflicted rebase, cherry-pick, revert or `stash pop` walks\n# straight through that test. An unmerged INDEX ENTRY is what all five leave\n# behind, so this one test catches every conflicted state.\nif [ -n \"$(git -C \"${SRCROOT}/..\" ls-files -u)\" ]; then\n  echo \"note: tree has unmerged paths - skipping plugin generation\"; exit 0\nfi\n\n# GATE 3 - target sanity. gm_bridge_writer already refuses a target with no\n# manifest; restating it here makes the failure land at the phase with a\n# readable message instead of deep inside Swift. Sandboxing off buys the\n# ability to write anywhere; these three lines say where.\n[ -f \"${SRCROOT}/../plugins/gmcc/.claude-plugin/plugin.json\" ] || { echo \"error: no plugin manifest at plugins/gmcc\"; exit 1; }\n\n# STRIP THE INHERITED BUILD ENVIRONMENT.\n# The macOS 27 objection was killed with dependency-edge reasoning, which says\n# NOTHING about the ENVIRONMENT. xcodebuild exports MACOSX_DEPLOYMENT_TARGET,\n# SDKROOT, TOOLCHAINS and DEVELOPER_DIR into this phase; SwiftPM reads several\n# of them; and gmAgententicsSdk floors at 27 with unsafeFlags. A nested build\n# inheriting a 26.0 deployment target may fail to resolve a package requiring\n# 27 - the same symptom, arriving through a door the refutation did not cover.\n# Cheap to defend, so defended here rather than offered as a remedy after.\nenv -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET -u TOOLCHAINS -u DEVELOPER_DIR \\\n    bash \"${SRCROOT}/scripts/generate_plugin.sh\"\n\n# VALIDATE WHAT WAS EMITTED.\n# CLAUDE.md records that the writer's verify() checks a file RENDERED, never\n# that it is VALID - the gap v54.0.0's `outputStyles` key fell through, taking\n# the ENTIRE plugin down (an unknown key in plugin.json makes Claude Code\n# refuse to load any of it). The current remedy is \"eyeball the emitted\n# plugin.json\". There is a machine check and it is free.\n# PLAIN, not --strict: --strict fails TODAY on one warning (the manifest\n# declares no `author`), and adding that bridge field is a separate decision.\n# Guarded on the binary, so the build does not fail where claude is not on the\n# phase's PATH - and LOUD when it skips, because a silent skip logs identically\n# to a pass.\n#\n# FIND THE BINARY RATHER THAN HOPING. A GUI-launched Xcode inherits launchd's\n# PATH - /usr/bin:/bin:/usr/sbin:/sbin, since `launchctl getenv PATH` is empty -\n# while claude lives at /opt/homebrew/bin, which reaches a shell only through\n# ~/.zprofile. So `xcodebuild` typed in a terminal finds it (how this was\n# tested) and Cmd-R in Xcode.app does not (how it will be used). swift, git and\n# python3 are all under /usr/bin and are unaffected; claude is the only tool\n# here that is not on the launchd default PATH.\n#\n# A FAILING `claude plugin validate` STILL FAILS THE BUILD: inside an `if` BODY\n# a failing command is not exempt from `set -e`, so the shell exits non-zero.\nPATH=\"/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.claude/local:$PATH\"\nif command -v claude >/dev/null 2>&1; then\n  claude plugin validate \"${SRCROOT}/../plugins/gmcc\"\nelse\n  echo \"note: claude not on this phase's PATH - plugin.json was NOT validated\"\nfi\n";
+			shellScript = "exec /bin/bash \"${SRCROOT}/scripts/xcode_phase.sh\" bridge\n";
 		};
 		1B5EED012FDCA09300DAF751 /* Seed ~/test_gmfs */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -207,7 +493,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "set -euo pipefail\n# Seed ~/test_gmfs in parallel with the Debug app build, so a plain Cmd-R\n# lands on a provisioned environment: kernel binaries staged, this checkout\n# cloned into $ROOT/repos, and the clone registered in the environment's db.\n#\n# IT CALLS gm_env.sh seed AND REIMPLEMENTS NOTHING. The environment script\n# owns environments; a second implementation here is the next\n# gm_releases.sh-exists-twice, which CLAUDE.md records as having been\n# believed fixed for two versions before anyone caught it.\n#\n# NO PBXTargetDependency EXISTS IN EITHER DIRECTION, deliberately - the\n# parallelism is bought by INDEPENDENCE, exactly like PluginBridge. Xcode\n# launches the app only after every scheme build entry finishes, so the seed\n# always completes before the app runs: parallel AND ordered, for free.\n#\n# GATE - configuration, in the script rather than only in the scheme: a\n# scheme gate is bypassed by anyone who builds the target directly or drags\n# it into another scheme. Seeding is Debug-only; Beta/Release get a note and\n# a green no-op.\n[ \"${CONFIGURATION:-}\" = \"Debug\" ] || { echo \"note: env seeding is Debug-only (CONFIGURATION=${CONFIGURATION:-})\"; exit 0; }\n\n# Sandboxing is OFF on this target's configurations because the seed writes\n# to $HOME/test_gmfs - outside the build directory. That root (plus\n# gmKernel's own SwiftPM .build) is the ONLY place it writes.\n#\n# The env strip mirrors PluginBridge: xcodebuild exports SDKROOT,\n# MACOSX_DEPLOYMENT_TARGET, TOOLCHAINS and DEVELOPER_DIR into this phase,\n# SwiftPM reads several of them, and the nested kernel build must not\n# inherit the app's.\nenv -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET -u TOOLCHAINS -u DEVELOPER_DIR bash \"${SRCROOT}/scripts/gm_env.sh\" seed test\n";
+			shellScript = "exec /bin/bash \"${SRCROOT}/scripts/xcode_phase.sh\" seed\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -216,10 +502,36 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A17E00042FDCB00000DAF751 /* VERSION in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A17E00122FDCB00000DAF751 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A17E001D2FDCB00000DAF751 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1B4010722FDCA09200DAF751 /* gm_kernel */;
+			targetProxy = A17E001C2FDCB00000DAF751 /* PBXContainerItemProxy */;
+		};
+		A17E001F2FDCB00000DAF751 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1B4010722FDCA09200DAF751 /* gm_kernel */;
+			targetProxy = A17E001E2FDCB00000DAF751 /* PBXContainerItemProxy */;
+		};
+		A17E00212FDCB00000DAF751 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1B4010722FDCA09200DAF751 /* gm_kernel */;
+			targetProxy = A17E00202FDCB00000DAF751 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1B4010942FDCA09300DAF751 /* Debug */ = {
@@ -276,13 +588,16 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Debug;
 		};
@@ -334,11 +649,14 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Release;
 		};
@@ -355,6 +673,7 @@
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=macosx*]" = 4VL4UGNPQQ;
 				ENABLE_APP_SANDBOX = NO;
+				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_HARDENED_RUNTIME = NO;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
@@ -365,7 +684,7 @@
 				GM_FS_ROOT_BAKED = "~/test_gmfs";
 				INFOPLIST_FILE = gmVibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "GMVibes opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "gm_kernel opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -377,11 +696,8 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};
@@ -407,7 +723,7 @@
 				GM_FS_ROOT_BAKED = "~/gmfs";
 				INFOPLIST_FILE = gmVibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "GMVibes opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "gm_kernel opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -419,11 +735,8 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -475,11 +788,14 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MACOSX_DEPLOYMENT_TARGET = 27.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
 			};
 			name = Beta;
 		};
@@ -506,7 +822,7 @@
 				GM_FS_ROOT_BAKED = "~/beta_gmfs";
 				INFOPLIST_FILE = gmVibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "GMVibes opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "gm_kernel opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -518,11 +834,8 @@
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
 			};
 			name = Beta;
 		};
@@ -580,6 +893,42 @@
 			};
 			name = Release;
 		};
+		A17E00192FDCB00000DAF751 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 4VL4UGNPQQ;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "rube.gm-kernel.tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		A17E001A2FDCB00000DAF751 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 4VL4UGNPQQ;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "rube.gm-kernel.tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Beta;
+		};
+		A17E001B2FDCB00000DAF751 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = 4VL4UGNPQQ;
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = "rube.gm-kernel.tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -593,7 +942,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		1B4010962FDCA09300DAF751 /* Build configuration list for PBXNativeTarget "GMVibes" */ = {
+		1B4010962FDCA09300DAF751 /* Build configuration list for PBXNativeTarget "gm_kernel" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				1B4010972FDCA09300DAF751 /* Debug */,
@@ -623,19 +972,63 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		A17E00182FDCB00000DAF751 /* Build configuration list for PBXNativeTarget "GmKernelTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A17E00192FDCB00000DAF751 /* Debug */,
+				A17E001A2FDCB00000DAF751 /* Beta */,
+				A17E001B2FDCB00000DAF751 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		1B4010A42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmk" */ = {
+		A17E00082FDCB00000DAF751 /* XCLocalSwiftPackageReference "gmClaudeForFoundationModels" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = .;
+			relativePath = gmClaudeForFoundationModels;
 		};
 /* End XCLocalSwiftPackageReference section */
 
+/* Begin XCRemoteSwiftPackageReference section */
+		A17E00062FDCB00000DAF751 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.0;
+			};
+		};
+		A17E00072FDCB00000DAF751 /* XCRemoteSwiftPackageReference "swift-protobuf" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-protobuf.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.28.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
 /* Begin XCSwiftPackageProductDependency section */
-		1B4010D22FDCA09300DAF751 /* gm_kernel */ = {
+		A17E00092FDCB00000DAF751 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = gm_kernel;
+			package = A17E00062FDCB00000DAF751 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		A17E000A2FDCB00000DAF751 /* SwiftProtobuf */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A17E00072FDCB00000DAF751 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
+			productName = SwiftProtobuf;
+		};
+		A17E000B2FDCB00000DAF751 /* ClaudeForFoundationModels */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ClaudeForFoundationModels;
+		};
+		A17E00162FDCB00000DAF751 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A17E00062FDCB00000DAF751 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

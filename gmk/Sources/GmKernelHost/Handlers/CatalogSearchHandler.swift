@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// CATALOG_SEARCH — tokenized OR name/code search over instances + sessions,
 /// optionally scoped to one project.

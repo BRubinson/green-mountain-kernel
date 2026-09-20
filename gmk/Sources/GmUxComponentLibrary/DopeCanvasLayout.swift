@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// Pure layout: dope tree → one all-or-nothing batch laying the whole domain model
 /// out as a canvas, one `dope_scope` container plus one `dope_entity` card per

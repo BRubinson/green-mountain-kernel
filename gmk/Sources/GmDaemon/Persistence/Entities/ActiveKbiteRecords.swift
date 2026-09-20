@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `project_active_kbite` table. Columns map via convertFromSnakeCase.
 struct ProjectActiveKbiteRecord: BaseRecordFields {

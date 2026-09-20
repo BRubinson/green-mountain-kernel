@@ -83,7 +83,6 @@ public struct GmBridgeMcpTool: Codable, Equatable, Hashable, Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 extension GmBridgeMcpTool {
 
     /// Every tool the bridge declares — the SERVED roster. The MCP server

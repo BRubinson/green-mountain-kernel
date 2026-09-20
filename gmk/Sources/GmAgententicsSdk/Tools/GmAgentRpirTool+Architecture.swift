@@ -2,9 +2,7 @@
 
 import Foundation
 import FoundationModels
-import GmDaemonSdk
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirOpenArchitectureArguments: Sendable {
     @Guide(description: promptUuidGuide("to open an architecture summary for"))
@@ -15,7 +13,6 @@ public struct GmAgentRpirOpenArchitectureArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirOpenArchitectureTool: GmAgentRpirTool {
     public let name = "rpir_open_architecture"
     public let description = "Start the plan page."
@@ -27,7 +24,6 @@ public struct GmAgentRpirOpenArchitectureTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
     @Guide(description: "Which prompt's architecture, by summary uuid.")
@@ -71,7 +67,6 @@ public struct GmAgentRpirOpenArchitectureOptionArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirOpenArchitectureOptionTool: GmAgentRpirTool {
     public let name = "rpir_open_architecture_option"
     public let description = "Start my own plan."
@@ -85,7 +80,6 @@ public struct GmAgentRpirOpenArchitectureOptionTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentPersistenceFieldChange: Sendable {
     @Guide(description: "Name of the field.")
@@ -138,7 +132,6 @@ public struct GmAgentPersistenceFieldChange: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentPersistenceChange: Sendable {
     @Guide(description: "Name of the class or table changing.")
@@ -176,7 +169,6 @@ public struct GmAgentPersistenceChange: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirWritePersistenceChangesArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "architecture"))
@@ -191,7 +183,6 @@ public struct GmAgentRpirWritePersistenceChangesArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirWriteArchitecturePersistenceChangesTool: GmAgentRpirTool {
     public let name = "rpir_write_architecture_persistence_changes"
     public let description = "Write down many database changes."
@@ -208,7 +199,6 @@ public struct GmAgentRpirWriteArchitecturePersistenceChangesTool: GmAgentRpirToo
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentGeneralChange: Sendable {
     @Guide(description: "Repo-relative file this change owns.")
@@ -246,7 +236,6 @@ public struct GmAgentGeneralChange: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirWriteGeneralChangesArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write to", "architecture"))
@@ -261,7 +250,6 @@ public struct GmAgentRpirWriteGeneralChangesArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirWriteArchitectureGeneralChangesTool: GmAgentRpirTool {
     public let name = "rpir_write_architecture_general_changes"
     public let description = "Write down many code changes."
@@ -273,7 +261,6 @@ public struct GmAgentRpirWriteArchitectureGeneralChangesTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirWriteFieldChangesArguments: Sendable {
     @Guide(description: "The database change row these fields belong to, by uuid.")
@@ -288,7 +275,6 @@ public struct GmAgentRpirWriteFieldChangesArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirWriteArchitectureFieldChangesTool: GmAgentRpirTool {
     public let name = "rpir_write_architecture_field_changes"
     public let description = "Write down field-level changes under one database change."
@@ -300,7 +286,6 @@ public struct GmAgentRpirWriteArchitectureFieldChangesTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirSummarizeArchitectureArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "write", "architecture"))
@@ -319,7 +304,6 @@ public struct GmAgentRpirSummarizeArchitectureArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirSummarizeArchitectureTool: GmAgentRpirTool {
     public let name = "rpir_summarize_architecture"
     public let description = "Write the plan's own summary."
@@ -331,7 +315,6 @@ public struct GmAgentRpirSummarizeArchitectureTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirArchitectureGateArguments: Sendable {
     @Guide(description: summaryUuidGuide(to: "move", "architecture"))
@@ -346,7 +329,6 @@ public struct GmAgentRpirArchitectureGateArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirProposeArchitectureTool: GmAgentRpirTool {
     public let name = "rpir_propose_architecture"
     public let description = "Put the plan on the table."
@@ -358,7 +340,6 @@ public struct GmAgentRpirProposeArchitectureTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirApproveArchitectureTool: GmAgentRpirTool {
     public let name = "rpir_approve_architecture"
     public let description = "The human said yes; lock the plan."
@@ -370,7 +351,6 @@ public struct GmAgentRpirApproveArchitectureTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirReviseArchitectureTool: GmAgentRpirTool {
     public let name = "rpir_revise_architecture"
     public let description = "Reopen the plan for changes."
@@ -382,7 +362,6 @@ public struct GmAgentRpirReviseArchitectureTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirDecideArchitectureArguments: Sendable {
     @Guide(description: "Which plan won, by option uuid.")
@@ -406,7 +385,6 @@ public struct GmAgentRpirDecideArchitectureArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirDecideArchitectureTool: GmAgentRpirTool {
     public let name = "rpir_decide_architecture"
     public let description = "Pick the winning plan."
@@ -418,7 +396,6 @@ public struct GmAgentRpirDecideArchitectureTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentRpirGetArchitectureArguments: Sendable {
     @Guide(description: promptUuidGuide("'s architecture to read"))
@@ -437,7 +414,6 @@ public struct GmAgentRpirGetArchitectureArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirGetArchitectureTool: GmAgentRpirTool {
     public let name = "rpir_get_architecture"
     public let description = "Show me the plan and how much of it is built."

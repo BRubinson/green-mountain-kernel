@@ -1,7 +1,5 @@
 import AppKit
 import Foundation
-import GmDaemonSdk
-import GmITerm2Client
 
 // External-app launchers + the bot tier catalog, moved verbatim out of
 // SessionPromptEditorView.swift (they are not editor code).

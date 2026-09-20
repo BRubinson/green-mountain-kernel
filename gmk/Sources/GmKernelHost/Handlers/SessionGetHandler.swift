@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// SESSION_GET — one-shot session context: session row + prompt stubs +
 /// change summaries (per-prompt entries stay empty until file changes carry

@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Everything a repository is allowed to hold: the ambient transaction's
 /// `Database`, and the shared write primitives.

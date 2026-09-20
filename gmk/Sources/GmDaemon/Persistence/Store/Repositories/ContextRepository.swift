@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// CONTEXT_ENSURE / CONTEXT_GET data access — the promoted ensure chain plus
 /// create-time-only kbite seeding. Runs INSIDE a Store-owned transaction;

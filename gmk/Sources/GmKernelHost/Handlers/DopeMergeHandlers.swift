@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// DOPE_MERGE_PLAN — read-only per-element plan of the db tree against the
 /// on-disk tree, judged from the stored base. Never ingests, never writes

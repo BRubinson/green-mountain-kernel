@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// REVIEW_REOPEN — complete → reviewing revision edge; preserves all data (verdict survives until re-complete).
 enum ReviewReopenHandler {

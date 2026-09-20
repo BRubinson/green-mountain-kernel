@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// DOPE_INIT — idempotent create-or-return of a dope scope (scope_type
 /// derived from the presence of prompt_uuid; optional clone-from-base fork).

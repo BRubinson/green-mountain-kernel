@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import GmDaemonSdk
 
 /// The whole project → instance → session tree, fetched in three unfiltered
 /// Listing calls and grouped in memory. At gmfs scale this is cheaper than the

@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Digested-content data access (KBITE_DIGEST db phase / KBITE_GET /
 /// KBITE_FILE_GET / KBITE_SEARCH / KBITE_KEYWORD_TAG). Runs INSIDE a

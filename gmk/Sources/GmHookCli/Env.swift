@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// `gm_hook context env` — the SessionStart env block on stdout, consistency
 /// warnings on stderr, ALWAYS exit 0.

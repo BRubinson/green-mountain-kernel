@@ -19,11 +19,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
-if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/gmk" ]; then
-    REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-fi
-GMK="$REPO_ROOT/gmk"
+# shellcheck source=gm_build.sh
+. "$SCRIPT_DIR/gm_build.sh"
+gm_repo_root
 CONFIG="$REPO_ROOT/.swift-format"
 
 [ -f "$CONFIG" ] || { echo "[GMB] ERROR: $CONFIG not found" >&2; exit 1; }

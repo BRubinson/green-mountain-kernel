@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// BOT_* / PROMPT_START / PROMPT_RESUME data access — the daemon-held
 /// workflow state machine (m0025). Runs INSIDE a Store-owned transaction.

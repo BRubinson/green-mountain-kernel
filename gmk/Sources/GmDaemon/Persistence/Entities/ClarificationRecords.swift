@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `clarification_summary` table (m0025: slimmed —
 /// backstory_note/refined_goal/refined_detail are gone; clarified intent

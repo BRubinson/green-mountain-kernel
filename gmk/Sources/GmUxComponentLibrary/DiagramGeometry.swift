@@ -1,6 +1,5 @@
 import CoreGraphics
 import Foundation
-import GmDaemonSdk
 
 /// Drag arithmetic the kit owns so no host ever writes it. SwiftUI-free.
 public enum DiagramDrag {

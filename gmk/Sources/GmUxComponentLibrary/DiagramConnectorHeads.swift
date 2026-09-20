@@ -1,6 +1,5 @@
 #if canImport(SwiftUI)
 import SwiftUI
-import GmDaemonSdk
 
 /// Pure connector head/tail geometry — Path values built from a tip point
 /// and an incoming direction, with no Canvas or rasterization involved, so

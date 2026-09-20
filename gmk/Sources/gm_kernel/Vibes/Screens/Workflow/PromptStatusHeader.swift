@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// The ONLY lifecycle chrome in the app: the status chip plus two controls, Mark done and
 /// Back to Draft. The daemon's lifecycle has a real backward edge, done → draft, so Back to

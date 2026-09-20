@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `prompt` table. Columns map via convertFromSnakeCase.
 struct PromptRecord: BaseRecordFields {

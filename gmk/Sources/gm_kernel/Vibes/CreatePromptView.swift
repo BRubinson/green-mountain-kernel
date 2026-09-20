@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 // Authoring sheet: create a new prompt in an existing session via PROMPT_CREATE
 // (the daemon allocates the per-session seq atomically — no client-side id

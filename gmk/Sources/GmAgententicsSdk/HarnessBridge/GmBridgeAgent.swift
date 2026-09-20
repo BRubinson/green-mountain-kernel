@@ -1,6 +1,5 @@
 import Foundation
 
-@available(GmAgentOs 1.0, *)
 extension GmBridgeAgent {
 
     /// The eight directive+instruction combos, one harness agent each.

@@ -3,7 +3,6 @@
 import Foundation
 import FoundationModels
 
-@available(GmAgentOs 1.0, *)
 public enum GmAgentTools {
 
     public enum Dope {

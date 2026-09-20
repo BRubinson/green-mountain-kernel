@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// SESSION_GET / SESSION_UPDATE data access, plus the activation registry
 /// (v21) and the shared prompt-stub/change-summary aggregations. Runs INSIDE

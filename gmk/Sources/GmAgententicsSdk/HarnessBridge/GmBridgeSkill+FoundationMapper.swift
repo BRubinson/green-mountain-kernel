@@ -1,7 +1,6 @@
 import Foundation
 import FoundationModels
 
-@available(GmAgentOs 1.0, *)
 extension GmConcept {
 
     public var toolFamilies: [GmAgentToolFamily] {
@@ -38,7 +37,6 @@ extension GmConcept {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 extension GmBridgeSkill.File {
 
     public init(_ concept: GmConcept) {

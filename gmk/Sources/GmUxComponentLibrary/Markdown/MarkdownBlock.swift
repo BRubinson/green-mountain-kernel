@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 // A lightweight block-level markdown model. SwiftUI's `Text(AttributedString(markdown:))`
 // PARSES block structure but FLATTENS it (headings/lists/code render as one run of

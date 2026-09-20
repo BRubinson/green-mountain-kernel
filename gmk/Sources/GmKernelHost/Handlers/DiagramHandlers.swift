@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 // DIAGRAM_* (v15) — thin decode+dispatch shims, one per verb. The NODE
 // verbs land in the store as one-mutation batches over the same body as

@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// Read-only exploration section (EXPLORE_GET, m0025 per-agent rows):
 /// every summary (synthesis first) + key files + PARTITIONED findings —

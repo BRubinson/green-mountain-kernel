@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // ARTIFACT_ADD / ARTIFACT_LIST — file pointers for bot-phase memory/ files.
 // Content stays in the files; the db stores only pointers.

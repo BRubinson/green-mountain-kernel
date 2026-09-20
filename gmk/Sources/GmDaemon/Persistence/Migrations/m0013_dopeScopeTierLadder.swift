@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0013 — dope_scope widened from two tiers to four: BASE_PROJECT /

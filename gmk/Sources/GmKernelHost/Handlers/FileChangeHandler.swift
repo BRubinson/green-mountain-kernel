@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// FILE_CHANGE_ADD — ensures the project → instance → session chain, writes
 /// session_file / file_change / file_change_range rows plus the FILE_CHANGE

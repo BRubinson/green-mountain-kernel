@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// CONTEXT_ENSURE — upsert project → instance → session from repo identity,
 /// seeding kbite inheritance down the chain at create time (mirrors

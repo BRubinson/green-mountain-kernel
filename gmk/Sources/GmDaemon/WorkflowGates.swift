@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// The two phase-exit contracts: what "implementation is finished" and "the
 /// review fix loop is finished" mean in db evidence. ADVISORY ONLY — derivePhase

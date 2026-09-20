@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// The eight diagram element subtype tables share one shape: a row keyed to
 /// its parent element. This lets fetchDiagramTree hydrate all eight through a

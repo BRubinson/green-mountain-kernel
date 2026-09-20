@@ -20,8 +20,8 @@ no gmfs to read.
 
 ## Requirements
 
-- macOS 26.1 (Tahoe) or later
-- Xcode 26.x (to build from source)
+- macOS 27 or later
+- Xcode 27 (to build from source)
 - The [green-mountain-kernel](https://github.com/BRubinson/green-mountain-kernel) plugin,
   for a populated workspace
 
@@ -42,16 +42,16 @@ app bundle.
 
 ### By hand
 
-1. Download `GMVibes-<version>.dmg` from the
+1. Download `gm_kernel-<version>.dmg` from the
    [Releases](https://github.com/BRubinson/green-mountain-kernel/releases) page
    (tags `gm_kernel-v*`; the retired `gmvibes-v*` tags are app-only and frozen).
-2. Open the DMG and drag **GM Vibes** to **Applications**.
+2. Open the DMG and drag **gm_kernel** to **Applications**.
 
 If the build is **ad-hoc / unsigned** (no Apple notarization), macOS Gatekeeper
 will block it on first launch. Clear the quarantine flag once:
 
 ```sh
-xattr -dr com.apple.quarantine "/Applications/GMVibes.app"
+xattr -dr com.apple.quarantine "/Applications/gm_kernel.app"
 ```
 
 …or right-click the app → **Open** → **Open** in the dialog. Notarized builds
@@ -59,22 +59,26 @@ install with no extra steps.
 
 ## Build from source
 
-GM Vibes lives in the green-mountain-kernel monorepo. Its code is the `Vibes/`
-folder of the `gm_kernel` target in `gmk/Package.swift`; `gmk/gmVibes/` holds
-only the bundle's Info.plist and assets. The `GMVibes` target in
-`gmk.xcodeproj` depends on the package's `gm_kernel` product and installs that
-binary as the bundle's executable, so the app and the CLI are one Mach-O:
+GM Vibes lives in the green-mountain-kernel monorepo. Its code is
+`gmk/Sources/gm_kernel/Vibes/`; `gmk/gmVibes/` holds only the bundle's
+Info.plist and assets. The one `gm_kernel` target in `gmk.xcodeproj` compiles
+every source under `gmk/Sources/` into the bundle's executable, so the app and
+the CLI are one Mach-O:
 
 ```sh
 git clone https://github.com/BRubinson/green-mountain-kernel.git
 cd green-mountain-kernel/gmk
-open gmk.xcworkspace            # build & run in Xcode (scheme: GMVibes)
+open gmk.xcworkspace            # build & run in Xcode (scheme: gm_kernel; gm_kernel_beta for the Beta root)
+
+# headless, from the repo root
+xcodebuild -workspace gmk/gmk.xcworkspace -scheme gm_kernel -configuration Debug \
+    -derivedDataPath gmk/.build/DerivedData CODE_SIGNING_ALLOWED=NO build
 ```
 
 ## Build a DMG
 
 ```sh
-scripts/build-dmg.sh            # → build/GMVibes.dmg
+scripts/build-dmg.sh            # → build/gm_kernel-<version>.dmg
 ```
 
 The script auto-detects signing:

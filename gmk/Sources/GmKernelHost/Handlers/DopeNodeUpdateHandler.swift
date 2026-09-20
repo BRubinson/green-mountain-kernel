@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// DOPE_NODE_UPDATE — level-parameterized guarded update (expected-version).
 enum DopeNodeUpdateHandler {

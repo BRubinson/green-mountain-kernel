@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// CLARIFY_REOPEN — complete → answering, the revision edge.
 enum ClarifyReopenHandler {

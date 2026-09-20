@@ -1,6 +1,5 @@
 import Darwin
 import Foundation
-import GmDaemonSdk
 
 /// The kernel's own resource usage and writer identity, as reported on the wire.
 /// The numbers a person wants are the WRITER's, and that is often not the

@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// A committed daemon_event row, as delivered to the event sink. `id` is the
 /// durable cursor shared by live broadcast and since_id replay.

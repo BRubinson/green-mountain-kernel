@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// CLARIFY_FINALIZE — answering → complete; writes refined goal/detail and copies refined_goal into prompt.goal.
 enum ClarifyFinalizeHandler {

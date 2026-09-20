@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// KBITE_FILE_GET — a single resource file including full content (the
 /// targeted load replacing "cat the chewed file").

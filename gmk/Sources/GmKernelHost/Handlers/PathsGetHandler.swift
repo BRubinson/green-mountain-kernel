@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PATHS_GET — typed runtime/gmfs/kbite roots from Paths + daemon_config.
 enum PathsGetHandler {

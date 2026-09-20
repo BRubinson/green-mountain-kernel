@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// The app's render of the db-native clarification over CLARIFY_GET: questions with their
 /// option and selection children, weighted internal notes, and the care package.

@@ -2,9 +2,7 @@
 
 import Foundation
 import FoundationModels
-import GmDaemonSdk
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeSearchArguments: Sendable {
     @Guide(description: GM_TOOL_GUIDE_SEARCH_QUERY)
@@ -23,7 +21,6 @@ public struct GmAgentCdeSearchArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirSearchExplorationTool: GmAgentRpirTool {
     public let name = "rpir_search_exploration"
     public let description = "Find old findings by words in them."
@@ -38,7 +35,6 @@ public struct GmAgentRpirSearchExplorationTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirSearchClarificationTool: GmAgentRpirTool {
     public let name = "rpir_search_clarification"
     public let description = "Find old questions and notes by words in them."
@@ -53,7 +49,6 @@ public struct GmAgentRpirSearchClarificationTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirSearchArchitectureTool: GmAgentRpirTool {
     public let name = "rpir_search_architecture"
     public let description = "Find old plans by words in them."
@@ -71,7 +66,6 @@ public struct GmAgentRpirSearchArchitectureTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirSearchReviewTool: GmAgentRpirTool {
     public let name = "rpir_search_review"
     public let description = "Find old complaints by words in them."
@@ -86,7 +80,6 @@ public struct GmAgentRpirSearchReviewTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirSearchArchitectureOptionTool: GmAgentRpirTool {
     public let name = "rpir_search_architecture_option"
     public let description = "Find one architect's plan by words in it."
@@ -106,7 +99,6 @@ public struct GmAgentRpirSearchArchitectureOptionTool: GmAgentRpirTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeSearchFileChangesArguments: Sendable {
     @Guide(description: promptUuidGuide("'s changes to filter to") + " Leave empty to skip this filter.")
@@ -134,7 +126,6 @@ public struct GmAgentCdeSearchFileChangesArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentCdeSearchFileChangesTool: GmAgentCdeTool {
     public let name = "cde_search_file_changes"
     public let description = "Find what files got changed."

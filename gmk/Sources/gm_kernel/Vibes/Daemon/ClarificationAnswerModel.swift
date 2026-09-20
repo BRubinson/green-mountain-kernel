@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import GmDaemonSdk
 
 /// Per-question answer drafts over CLARIFY_ANSWER, the app's only clarification write.
 ///
@@ -40,7 +39,7 @@ final class ClarificationAnswerModel {
     /// The one daemon call this model makes, behind a closure so a test can assert the
     /// request shape without a live socket. Production never reassigns it.
     @ObservationIgnored
-    var send: (ClarifyAnswerRequest) async throws -> ClarificationQuestionRow = {
+    var send: @MainActor (ClarifyAnswerRequest) async throws -> ClarificationQuestionRow = {
         try await GMCCDaemonService.shared.clarifyAnswer($0)
     }
 

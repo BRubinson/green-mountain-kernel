@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import GmDaemonSdk
 
 /// App landing page — ForgeApprentice Liquid Glass composition: brand header,
 /// Recent Sessions strip (activity-ranked, checked-out ring), and a

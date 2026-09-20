@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PROMPT_UPDATE_CONTENT — Draft-only edit of the STAY TRUE triple
 /// (backstory/goal/detail); CONTENT_LOCKED once Clarifying/Clarified.

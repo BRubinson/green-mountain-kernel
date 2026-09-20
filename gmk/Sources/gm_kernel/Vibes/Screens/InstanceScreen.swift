@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// The instance page: ALL of one instance's sessions, current-first. The
 /// active (checked-out) session is resolved DAEMON-side

@@ -7,7 +7,6 @@
 
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Read-side mirror of the `exploration_summary` table (m0025: literal
 /// per-agent rows keyed UNIQUE(prompt_uuid, agent_type); the prompt-level

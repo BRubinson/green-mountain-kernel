@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Data access for the daemon_config table (plus the MemoryWatcher's prompt
 /// reverse lookup). Runs INSIDE a Store-owned transaction; holds no dbQueue

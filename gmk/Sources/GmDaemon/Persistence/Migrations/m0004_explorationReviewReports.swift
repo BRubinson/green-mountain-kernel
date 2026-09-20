@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0004 — db-native exploration + review reports. Pure ADD: five BaseEntity

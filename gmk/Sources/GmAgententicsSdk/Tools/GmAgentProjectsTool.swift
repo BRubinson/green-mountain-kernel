@@ -2,9 +2,7 @@
 
 import Foundation
 import FoundationModels
-import GmDaemonSdk
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentProjectsSearchArguments: Sendable {
     @Guide(description: "Name or id to look for.")
@@ -23,7 +21,6 @@ public struct GmAgentProjectsSearchArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentProjectsSearchTool: GmAgentProjectsTool {
     public let name = "projects_search"
     public let description = "Find projects, sessions, and instances by name or id."
@@ -43,7 +40,6 @@ public struct GmAgentProjectsSearchTool: GmAgentProjectsTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentProjectsUpdateSessionArguments: Sendable {
     @Guide(description: "Which session to change, by uuid.")
@@ -81,7 +77,6 @@ public struct GmAgentProjectsUpdateSessionArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentProjectsUpdateSessionTool: GmAgentProjectsTool {
     public let name = "projects_update_session"
     public let description = "Change session kbites and backstory."

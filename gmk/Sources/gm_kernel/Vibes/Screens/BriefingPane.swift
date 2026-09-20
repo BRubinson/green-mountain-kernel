@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// Read-only briefing section over BRIEFING_LIST plus per-row BRIEFING_GET: the context
 /// packages a briefer agent assembled per phase step.

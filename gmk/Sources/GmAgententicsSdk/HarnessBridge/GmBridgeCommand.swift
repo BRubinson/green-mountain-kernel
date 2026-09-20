@@ -1,6 +1,5 @@
 import Foundation
 
-@available(GmAgentOs 1.0, *)
 extension GmBridgeCommand {
 
     public static let all: [File] = [

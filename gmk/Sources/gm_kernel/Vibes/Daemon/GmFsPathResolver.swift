@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// Filesystem derivations off daemon rows, isolated in one place. Rows carry gmfs-RELATIVE
 /// storage paths; everything here resolves against $GM_FS_ROOT. The archive mirror lives at

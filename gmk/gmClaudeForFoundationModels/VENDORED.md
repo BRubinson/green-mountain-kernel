@@ -28,22 +28,21 @@ Two targets and one product:
 It has **zero external package dependencies**, which is what makes vendoring it
 a self-contained copy rather than the head of a dependency tree.
 
-## Why a local copy and not a `.package(url:)` pin
+## Why a local copy and not a remote package reference
 
-GRDB — pinned in `gmk/Package.swift` and consumed only by the GmDaemon target — is fetched by URL, and
-that is the convention this package would otherwise follow. It cannot, for a
-structural reason specific to the intended consumer:
+GRDB and swift-protobuf are `XCRemoteSwiftPackageReference`s in
+`gmk/gmk.xcodeproj/project.pbxproj`, resolved into the workspace's one lockfile
+(`gmk/gmk.xcworkspace/xcshareddata/swiftpm/Package.resolved`), and each is
+imported only by files under its one folder (`Sources/GmDaemon/`,
+`Sources/GmITerm2Client/`). That is the convention this package would otherwise
+follow, and nothing structural prevents it any more: it is consumed as an
+`XCLocalSwiftPackageReference` at `gmClaudeForFoundationModels`, and only files
+under `Sources/GmAgententicsSdk/` import it.
 
-the `GmAgententicsSdk` target in `gmk/Package.swift` applies `SwiftSetting.unsafeFlags` to define its
-`GmAgentOs` availability macro, and **SwiftPM refuses to resolve a package that
-uses `unsafeFlags` as a versioned remote dependency**. The `gmk` package
-is therefore consumed by local `path:`, and anything entering that graph has to
-be reachable the same way. Vendoring is what makes this package reachable by
-path.
-
-The trade is the usual one: no automatic upgrades, and the re-sync below is a
-manual step. In exchange the build is hermetic and the exact bytes are in-tree
-and reviewable.
+It stays vendored on the merits of the trade rather than by necessity: no
+automatic upgrades, and the re-sync below is a manual step; in exchange the
+build is hermetic and the exact bytes are in-tree and reviewable, which matters
+for a pre-1.0 upstream that this repo's agent surface sits directly on.
 
 ## What was left behind
 
@@ -83,7 +82,7 @@ cp /tmp/cffm/{LICENSE,README.md,CHANGELOG.md,version.txt,.swift-format} $D/
 Then re-read **Platform floor**, below — it is the thing most likely to have
 changed, and the thing that decides whether the package can be consumed at all.
 
-## Platform floor — the open blocker
+## Platform floor — 27, matched by the project
 
 Upstream declares:
 
@@ -92,27 +91,27 @@ platforms: [.iOS("27.0"), .macOS("27.0"), .visionOS("27.0"), .watchOS("27.0")]
 ```
 
 because the server-side `LanguageModel` API it implements ships in the OS 27
-SDK. The `GmAgententicsSdk` target used to declare `platforms: [.macOS("26.0")]`, and CI pins
-`macos-26` on every job.
+SDK. The `gm_kernel` project sets `MACOSX_DEPLOYMENT_TARGET = 27.0` at project
+level, so the consumer's floor matches and the product is a dependency of the
+one `gm_kernel` target.
 
-**A dependency may not have a floor above its consumer's**, so this package is
-*not* wired into `gmAgententicsSdk`. Adding the edge as-is fails at planning
-time, before a single file compiles:
+**A dependency may not have a floor above its consumer's.** Lowering the
+project's deployment target below 27 fails at package resolution, before a
+single file compiles:
 
 ```
 error: The package product 'ClaudeForFoundationModels-product' requires minimum
 platform version 27.0 for the macOS platform, but this target supports 26.0
 ```
 
-Lowering *this* package's floor to 26 is not a fix either — the bridge target
-then fails to compile with 26 availability errors across `ClaudeExecutor`,
+Lowering *this* package's floor is not a fix either — the bridge target then
+fails to compile with availability errors across `ClaudeExecutor`,
 `ClaudeLanguageModel`, `EventTranslator` and `RequestBuilder`
 (`LanguageModelExecutorGenerationRequest`, `LanguageModelExecutorGenerationChannel`,
 `LanguageModelCapabilities`, `ContextOptions`, `ToolCallingMode` are all
-macOS-27-only). Note that the repo's usual escape hatch — floor 26 with 27-only
-symbols gated behind `@available(GmAgentOs, *)` — does **not** apply: SwiftPM
-checks platform floors when it resolves the package graph, which is strictly
-before any availability scope exists.
+macOS-27-only). An `@available` gate on the consumer side cannot help: the
+floor is checked when the package graph resolves, which is strictly before any
+availability scope exists.
 
 `ClaudeAPI` alone *does* build clean at a macOS 26 floor, since it never imports
 FoundationModels. Exposing it would mean adding a `.library` product upstream
@@ -120,5 +119,5 @@ does not declare, and it delivers the raw Messages API client rather than the
 FoundationModels bridge — a different thing from what this package was vendored
 for.
 
-Resolving this is a decision about the repo's platform floor and its CI runner,
-not about this directory.
+The floor is a decision about the repo's deployment target, not about this
+directory.

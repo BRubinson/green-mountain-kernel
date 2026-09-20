@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// ARCH_GENERAL_ADD — add a general change row (drafting only; path normalized; change_code capped).
 enum ArchGeneralAddHandler {

@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// The transaction-scoped write core: the five shared primitives, the
 /// post-commit event sink, and the shared static contracts.

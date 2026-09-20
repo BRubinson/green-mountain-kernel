@@ -1,7 +1,6 @@
 // The tool vocabulary described to agents in their instruction text.
 
 import Foundation
-import GmDaemonSdk
 
 func promptUuidGuide(_ tail: String) -> String {
     "Which prompt \(tail), by uuid."

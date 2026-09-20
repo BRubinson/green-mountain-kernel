@@ -5,7 +5,6 @@ import CoreGraphics
 // the component library instead of sitting in the SDK beside them.
 
 import Foundation
-import GmDaemonSdk
 
 /// Organize-by-closeness: one deterministic pass over the entity cards returning
 /// plain `elementUpdate` mutations, so the organize button flows through the same

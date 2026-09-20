@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// KBITE_REMOVE — drop a kbite from one scope's registry. Db only.
 enum KbiteRemoveHandler {

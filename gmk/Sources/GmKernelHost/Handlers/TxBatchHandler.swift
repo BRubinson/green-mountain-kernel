@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// `TX_BATCH` — N inner request lines, ONE transaction. A relayed tool call
 /// otherwise arrives as its own wire message, so twelve writes are twelve

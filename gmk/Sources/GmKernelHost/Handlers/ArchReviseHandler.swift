@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// ARCH_REVISE — proposed → drafting, the revision edge.
 enum ArchReviseHandler {

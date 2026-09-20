@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// CLARIFY_* / CARE_PACKAGE_* data access — the db-native clarification
 /// machine. Runs INSIDE a Store-owned transaction; holds no dbQueue and

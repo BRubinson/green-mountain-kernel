@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// The COGS verb family. One handler per message, each the ten-line shape
 /// DopeListHandler established.

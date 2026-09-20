@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import GmDaemonSdk
 
 /// The route() → checkout-state edge. A protocol so DaemonConnectionModel
 /// stays free of concrete store types. No owner token: unlike the session

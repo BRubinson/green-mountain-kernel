@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 /// `GmVerbCaller` satisfied WITHOUT a socket, by re-entering the dispatcher the
 /// kernel already runs: a tool or hook body that dialled the daemon it runs

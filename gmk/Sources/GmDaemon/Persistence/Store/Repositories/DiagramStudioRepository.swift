@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Diagram Studio (v23) data access: cross-tier search/browse and the row
 /// delete. Runs INSIDE a Store-owned transaction; holds no dbQueue and never

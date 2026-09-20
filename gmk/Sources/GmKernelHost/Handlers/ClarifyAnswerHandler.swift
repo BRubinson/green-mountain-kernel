@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// CLARIFY_ANSWER — answer or skip one clarification row (summary must be answering); pure row update.
 enum ClarifyAnswerHandler {

@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// DOPE_INIT cannot be a bare button: it requires a validated code + name.
 /// The code is checked client-side on every keystroke via the kit's public

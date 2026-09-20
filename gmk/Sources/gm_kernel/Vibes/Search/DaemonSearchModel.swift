@@ -1,7 +1,6 @@
 import Foundation
 import Observation
 import SwiftUI
-import GmDaemonSdk
 
 /// The debounced SEARCH engine shared by the ⌘K palette and the search screen.
 /// Query text stays in the VIEW (@State, the KBiteSearchPane shape) — this owns

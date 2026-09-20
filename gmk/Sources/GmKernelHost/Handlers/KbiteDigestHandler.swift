@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// KBITE_DIGEST — one-step chewed → db import; deletes the temporary chewed
 /// files after commit, keeps raw sources on disk.

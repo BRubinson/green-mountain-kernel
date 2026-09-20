@@ -1,6 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// The "Add dope scope" modal: pick entities from the workspace's bound dope
 /// scope and land them as dopeEntity cards — plus the scope's

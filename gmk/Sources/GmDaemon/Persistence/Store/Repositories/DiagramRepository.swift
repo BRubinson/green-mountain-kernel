@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// DIAGRAM data access: db-persisted canvases over the dope subsystem. Runs
 /// INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts.

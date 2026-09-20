@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // BOT_* / PROMPT_START / PROMPT_RESUME — the daemon-held workflow state
 // machine (m0025). Bodies live in BotWorkflowRepository; these wrappers own

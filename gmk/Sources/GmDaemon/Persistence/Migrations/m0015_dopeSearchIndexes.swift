@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0015 — FTS5 mirrors over the dope tables. Pure ADD. The FtsSpec loop is a

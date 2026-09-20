@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// The db-backed `DiagramCommitting`: one DIAGRAM_BATCH_APPLY, then one DIAGRAM_GET.
 ///
@@ -9,6 +7,7 @@ import GmUxComponentLibrary
 /// version — a stale one makes the NEXT drag a VERSION_CONFLICT — plus everything the store
 /// normalized on the way in: minted codes, packed stroke vertices, clientRef-resolved
 /// connector targets. Rebuilding that client-side is a second implementation of the reducer.
+@MainActor
 final class DaemonDiagramCommitter: DiagramCommitting {
     private let diagramUuid: String
     private let onCommit: @MainActor @Sendable (DiagramGetResponse) -> Void

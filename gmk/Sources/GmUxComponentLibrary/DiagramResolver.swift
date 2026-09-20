@@ -1,6 +1,5 @@
 import CoreGraphics
 import Foundation
-import GmDaemonSdk
 
 /// The pure pre-pass that turns (DiagramTree + hydrated dope trees) into a
 /// ready-to-draw `ResolvedDiagram`. Transforms, sibling z-order, dope injection,

@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 // Lenient section-scanner for {name}_chewed.md artifacts (the
 // gmcc_agent_kbite_crunch_chew output contract). Deliberately dependency-free

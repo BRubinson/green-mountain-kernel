@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// The kernel, as something an application can HOLD: the ONE boot sequence —
 /// take the lock, open, back up if pending, migrate, bind, serve — composed by

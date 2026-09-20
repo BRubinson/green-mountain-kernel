@@ -1,6 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// Read-only enum inspector: the enum's options up top, every property that
 /// uses it below. Exists so an enum can be read WITHOUT scrolling to its

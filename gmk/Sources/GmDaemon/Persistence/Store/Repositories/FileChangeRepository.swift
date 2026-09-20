@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// FILE_CHANGE_ADD / FILE_CHANGE_LIST data access. Runs INSIDE a Store-owned
 /// transaction; holds no dbQueue and never self-transacts.

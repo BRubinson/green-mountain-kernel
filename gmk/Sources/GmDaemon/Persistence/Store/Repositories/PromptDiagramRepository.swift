@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// PROMPT_DIAGRAM_QUALIFY / _GET / _LIST data access — a prompt's standing
 /// reading of a rendered diagram (m0022). Runs INSIDE a Store-owned

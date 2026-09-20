@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// SHUTDOWN — graceful stop. The response flushes first; the connection's
 /// .shutdown postAction then runs Server.performShutdown (drain-by-queue,

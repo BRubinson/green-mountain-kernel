@@ -1,6 +1,5 @@
 #if canImport(SwiftUI)
 import SwiftUI
-import GmDaemonSdk
 
 /// The one selection/emphasis channel: a host sets this ONCE at its scene root
 /// via `.environment(\.diagramSelection, …)` and every leaf reads it. The unset

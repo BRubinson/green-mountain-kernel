@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// The session view's DIAGRAMS tab: the session's SAVED diagrams over DIAGRAM_LIST at SESSION
 /// tier. A diagram is a document, and the dope scope it is drawn over is a property of it.

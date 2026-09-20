@@ -1,6 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// The diagram screen's chrome (toolbar `primaryAction` slot): tool picker,
 /// search over entities AND fields with viewport jump, the domain multi-pill

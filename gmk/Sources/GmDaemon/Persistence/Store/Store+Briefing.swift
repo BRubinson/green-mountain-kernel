@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // BRIEFING_* — the agent-briefing machine: the context package a briefer
 // assembles for a phase, pulled by spawned agents at start.

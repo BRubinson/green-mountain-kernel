@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 // MARK: - Root view
 //

@@ -1,37 +1,31 @@
 #!/usr/bin/env bash
 #
-# build-dmg.sh — Build the GM kernel app (gmk/gmVibes/ in the green-mountain-kernel
-# monorepo) into a distributable .dmg. The bundle is gm_kernel.app; the Xcode
-# target and scheme are still named GMVibes.
-# Run from anywhere; it resolves gmk/ from its own location.
+# build-dmg.sh — archive the gm_kernel app through the workspace, sign it
+# inside-out, and package a distributable .dmg. Run from anywhere; the repo is
+# resolved from this script's own location.
 #
-# Auto-detects signing capability:
-#   • If a "Developer ID Application" cert is installed, the app is signed with
-#     the hardened runtime and the DMG can be notarized (see NOTARIZE below).
-#   • Otherwise the app is ad-hoc signed and packaged into a DMG that works
-#     today — recipients clear Gatekeeper quarantine once (see README).
+# Signing auto-detects:
+#   • With a "Developer ID Application" cert installed, the app is signed with
+#     the hardened runtime and the DMG can be notarized (NOTARIZE=1).
+#   • Otherwise the app is ad-hoc signed; recipients clear quarantine once.
 #
 # ── THE VERSION COMES FROM gmk/VERSION, NOT FROM THE PROJECT FILE ────────────
 #
-# One release, one number. `gmk/VERSION` pins the three binaries and the app
-# together, and MARKETING_VERSION is STAMPED from it at archive time rather than
-# read out of project.pbxproj. Before this the app carried an independently
-# edited MARKETING_VERSION and shipped under its own `gmvibes-v*` tag, so the
-# app's About box and the installed runtime could disagree with nothing to
-# notice. The stamp is a build setting override, so project.pbxproj is never
-# rewritten and the working tree stays clean for publish_release.sh's check.
+# One release, one number. MARKETING_VERSION is STAMPED from gmk/VERSION as a
+# build-setting override at archive time, so project.pbxproj is never rewritten
+# and the working tree stays clean for publish_release.sh's check.
 #
 # Usage:
-#   scripts/build-dmg.sh                 # build at gmk/VERSION (auto-detect signing)
-#   scripts/build-dmg.sh 50.0.2          # build at an explicit version
-#   NOTARIZE=1 scripts/build-dmg.sh      # also notarize + staple (needs Dev ID
-#                                        # + a `notarytool` keychain profile)
+#   scripts/build-dmg.sh                       # Release at gmk/VERSION (auto-detect signing)
+#   scripts/build-dmg.sh --config Beta 50.0.2  # explicit configuration and version
+#   scripts/build-dmg.sh --universal           # arm64 + x86_64 (arm64 alone by default)
+#   NOTARIZE=1 scripts/build-dmg.sh            # also notarize + staple (needs Dev ID
+#                                              # + a `notarytool` keychain profile)
 #
-# Output: build/gm_kernel-<version>.dmg — the name carries the version because it
-# becomes a release asset, and an asset named gm_kernel.dmg forces every installer
-# to guess what is inside it. The BUNDLE was renamed GMVibes.app -> gm_kernel.app
-# when the app became the kernel host; gm_releases.sh's GM_APP_NAME and this
-# script's APP_NAME are the two spellings that must agree.
+# Output: build/gm_kernel-<version>[-<config>].dmg. The version is in the name
+# because it becomes a release asset; the configuration is in the name because
+# two DMGs installing two applications that write two different databases must
+# never be called the same thing.
 #
 # Notarization prerequisites (one-time):
 #   xcrun notarytool store-credentials gmcc-ui \
@@ -39,169 +33,78 @@
 #
 set -euo pipefail
 
-SCHEME="GMVibes"
-# The BUNDLE name, which is now gm_kernel — the app hosts the writer, so the
-# bundle IS the kernel. The Xcode TARGET and SCHEME stay named GMVibes (this
-# script and gmk-ci.yml both drive `-scheme GMVibes`), and the BUNDLE IDENTIFIER
-# stays `rube.GMVibes` on purpose: a new id is a new NSUserDefaults domain, so
-# every preference and window position would reset once for no functional gain.
-# gm_releases.sh's GM_APP_NAME must agree with this or the installer looks for a
-# bundle the build never produced.
-APP_NAME="gm_kernel"
-PROJECT="gmk.xcodeproj"
+# shellcheck source=gm_build.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/gm_build.sh"
+gm_repo_root
+cd "$GMK"
+
+die() { echo "error: $*" >&2; exit 1; }
+
 NOTARY_PROFILE="${NOTARY_PROFILE:-gmcc-ui}"
 
-# ── Which environment's bundle is this? ──────────────────────────────────────
-#
-# THE CONFIGURATION IS THE ENVIRONMENT. Each one bakes its own GMFSRoot into the
-# Info.plist, and the baked key — not $GM_FS_ROOT, which a LaunchServices-started
-# app never sees — is what decides the database an app writes:
-#
-#   Release → ~/gmfs        (prod)    the ONLY thing publish_release.sh may ship
-#   Beta    → ~/beta_gmfs   (beta)    hand-built, hand-delivered, never published
-#   Debug   → ~/test_gmfs   (test)    what Xcode Run produces
-#
-# A Beta bundle is a DIFFERENT APPLICATION to LaunchServices (its bundle id
-# carries `.beta`), so it is its own single writer over its own root rather than
-# a second writer over prod's.
+# THE CONFIGURATION IS THE ENVIRONMENT. Each one bakes its own GMFSRoot into
+# the Info.plist, and the baked key — not $GM_FS_ROOT, which a LaunchServices-
+# started app never sees — is what decides the database an app writes. Release
+# (prod) is the only one publish_release.sh may ship; a Beta bundle is a
+# DIFFERENT APPLICATION to LaunchServices and its own single writer.
 CONFIG="Release"
-CONFIG_SUFFIX=""
-
-# arm64 alone by default, matching rebuild_local.sh: the archive was compiling
-# every dependency in the app's graph a second time for x86_64, and the machines
-# this ships to are Apple Silicon. `--universal` opts back up.
-#
-# IT MUST BE A REAL FLAG. rebuild_local.sh --universal used to build its packages
-# universal and then call this script, which hardcoded arm64 — so the published
-# helper was arm64-only while the caller believed otherwise. A flag that is
-# accepted and ignored is worse than one that does not exist.
-ARCH_LIST="arm64"
-
-# gmk/ — the directory holding the one Xcode project, one level up from
-# gmk/scripts/. This script sits beside build_gm.sh rather than under
-# gmk/gmVibes/ because everything in the app's source directory is inside its
-# filesystem-synchronized Xcode group, and a shell script is not app sources.
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+ARCH_CHOICE="arm64"
 
 VERSION=""
 while [ $# -gt 0 ]; do
     case "$1" in
-        --config)
-            CONFIG="${2:-}"; shift 2
-            case "$CONFIG" in
-                Release) CONFIG_SUFFIX="" ;;
-                Beta)    CONFIG_SUFFIX="-beta" ;;
-                Debug)   CONFIG_SUFFIX="-debug" ;;
-                *) echo "error: --config must be Release, Beta or Debug (got '$CONFIG')" >&2; exit 1 ;;
-            esac
-            ;;
-        --universal) ARCH_LIST="arm64 x86_64"; shift ;;
-        -*) echo "error: unknown flag $1" >&2; exit 1 ;;
+        --config)    CONFIG="${2:-}"; shift 2 ;;
+        --universal) ARCH_CHOICE="universal"; shift ;;
+        -*) die "unknown flag $1" ;;
         *)  VERSION="$1"; shift ;;
     esac
 done
 
-VERSION="${VERSION:-$(cat "$ROOT/VERSION")}"
-VERSION="${VERSION#v}"
-[ -n "$VERSION" ] || { echo "error: no version — gmk/VERSION is empty and none was passed" >&2; exit 1; }
+WANT_ENV="$(gm_config_env "$CONFIG")" || die "--config must be Release, Beta or Debug (got '$CONFIG')"
+CONFIG_SUFFIX=""
+[ "$CONFIG" = "Release" ] || CONFIG_SUFFIX="-$(tr '[:upper:]' '[:lower:]' <<<"$CONFIG")"
 
-BUILD_DIR="$ROOT/build"
-ARCHIVE="$BUILD_DIR/$APP_NAME.xcarchive"
+VERSION="${VERSION:-$(cat "$GMK/VERSION")}"
+VERSION="${VERSION#v}"
+[ -n "$VERSION" ] || die "no version — gmk/VERSION is empty and none was passed"
+
+BUILD_DIR="$GMK/build"
+ARCHIVE="$BUILD_DIR/$GM_APP_NAME.xcarchive"
 STAGE="$BUILD_DIR/dmg"
-# THE ENVIRONMENT IS IN THE FILENAME. Two DMGs named identically that install
-# two different applications writing two different databases is exactly the
-# ambiguity the per-bundle baked root exists to remove; reintroducing it in the
-# filename would be a joke at our own expense.
-DMG_PATH="$BUILD_DIR/$APP_NAME-$VERSION$CONFIG_SUFFIX.dmg"
+DMG_PATH="$BUILD_DIR/$GM_APP_NAME-$VERSION$CONFIG_SUFFIX.dmg"
 
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-# Detect a Developer ID Application signing identity, if present.
-DEV_ID="$(security find-identity -v -p codesigning 2>/dev/null \
-  | grep "Developer ID Application" | head -1 \
-  | sed -E 's/.*"(Developer ID Application: [^"]+)".*/\1/' || true)"
+DEV_ID="$(gm_dev_id)"
 
-# BRACES ARE LOAD-BEARING HERE. The `…` that follows is multi-byte, and bash
-# absorbs its leading byte into an unbraced variable name — `$VERSION…` expands
-# a name that does not exist, which under `set -u` kills the script on a line
-# that is only printing a message.
-# The kernel is NOT pre-built here. The GMVibes target depends on the package's
-# gm_kernel product, so the archive builds it with ARCHS applied and the
-# install phase makes it the bundle's executable.
-echo "==> Archiving $SCHEME ($CONFIG) at ${VERSION}…"
-# MARKETING_VERSION/CURRENT_PROJECT_VERSION are overridden on the command line
-# rather than written into project.pbxproj: the number lives in gmk/VERSION, and
-# a build that edits the project file would dirty the tree that
-# publish_release.sh requires to be clean.
-# ARCHS=arm64 for the same reason rebuild_local.sh dropped the Intel slice: the
-# archive was compiling every dependency in the app's graph — GRDB included —
-# a second time for x86_64, and the machines this ships to are Apple Silicon.
-# This is the app-side half of that saving.
-#
-# ONLY_ACTIVE_ARCH=NO is set alongside it DELIBERATELY. Left at YES the output
-# would depend on the architecture of whatever machine happened to run the
-# archive, which means the same command producing different bits on different
-# builders — exactly the ambiguity a release build must not have.
-#
-# Passed on the COMMAND LINE, like MARKETING_VERSION above and for the same
-# reason: a build that edits project.pbxproj dirties the tree publish_release.sh
-# requires to be clean.
-xcodebuild archive \
-  -project "$PROJECT" \
-  -scheme "$SCHEME" \
-  -configuration "$CONFIG" \
-  -archivePath "$ARCHIVE" \
-  MARKETING_VERSION="$VERSION" \
-  CURRENT_PROJECT_VERSION="$VERSION" \
-  ARCHS="$ARCH_LIST" \
-  ONLY_ACTIVE_ARCH=NO \
-  CODE_SIGN_STYLE=Manual \
-  CODE_SIGNING_ALLOWED=NO \
-  | grep -E "^(===|\*\*|note:|error:|warning:)" || true
+# BRACES ARE LOAD-BEARING in the message: `…` is multi-byte and bash absorbs
+# its leading byte into an unbraced name, which `set -u` then reports as unset.
+echo "==> Archiving $GM_APP_NAME ($CONFIG) at ${VERSION}…"
+# Through the WORKSPACE, so gmk.xcworkspace/xcshareddata/swiftpm/Package.resolved
+# is the one lockfile (-project resolves from the project's private one).
+# Version and architecture ride as command-line overrides, never as project
+# edits, so the tree publish_release.sh requires clean stays clean.
+# shellcheck disable=SC2046
+gm_xcb archive "$CONFIG" -archivePath "$ARCHIVE" \
+  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$VERSION" \
+  $(gm_xcb_arch "$ARCH_CHOICE") CODE_SIGN_STYLE=Manual -quiet
 
-APP="$ARCHIVE/Products/Applications/$APP_NAME.app"
-[ -d "$APP" ] || { echo "error: archive did not produce $APP" >&2; exit 1; }
+APP="$ARCHIVE/Products/Applications/$GM_APP_NAME.app"
+[ -d "$APP" ] || die "archive did not produce $APP"
 
-# ── The baked root must BE THERE, and a missing one is FATAL ─────────────────
+# ── The baked root must BE THERE and BE THE ONE THIS CONFIGURATION ASKED FOR ─
 #
-# The app resolves its filesystem root from this Info.plist key first, precisely
-# so that no launch context can redirect it. The failure mode when the key is
-# absent is the dangerous direction: resolution falls through to ~/gmfs and the
-# bundle writes PRODUCTION while believing it is isolated.
-#
-# That is not hypothetical. `INFOPLIST_KEY_GMFSRoot` — the obvious way to set
-# this — is silently DROPPED, because that build-setting prefix is a declared
-# allow-list Xcode filters against. It builds clean and produces a bundle with
-# no key. Verified empirically; hence a real Info.plist, and hence this gate.
-#
-# Fail the BUILD rather than ship a bundle whose root is a guess.
-BAKED_ROOT="$(plutil -extract GMFSRoot raw "$APP/Contents/Info.plist" 2>/dev/null || true)"
-case "$BAKED_ROOT" in
-    ""|*'$('*)
-        echo "error: $APP has no usable GMFSRoot in Info.plist (got '${BAKED_ROOT:-<absent>}')." >&2
-        echo "       Without it the app falls through to ~/gmfs and writes PRODUCTION." >&2
-        exit 1
-        ;;
-esac
-BAKED_ENV="$(plutil -extract GMEnvironment raw "$APP/Contents/Info.plist" 2>/dev/null || echo '?')"
+# gm_app_baked fails the build on an absent key (the app would fall through to
+# ~/gmfs and write PRODUCTION while believing it is isolated). The comparison
+# below catches the worse case: a bundle labelled beta that bakes ~/gmfs writes
+# production while its own menu bar says otherwise. Both keys are checked,
+# because they come from two build settings and disagreeing is itself the bug.
+BAKED="$(gm_app_baked "$APP")"
+read -r BAKED_ENV BAKED_ROOT <<<"$BAKED"
 echo "  baked environment: $BAKED_ENV -> $BAKED_ROOT"
-
-# ── …AND IT MUST BE THE ROOT THIS CONFIGURATION ASKED FOR ───────────────────
-#
-# The check above catches an ABSENT key. This one catches a WRONG one, which is
-# the worse failure by a distance: a bundle labelled beta that bakes ~/gmfs
-# writes production while its own menu bar says otherwise, and every safeguard
-# downstream reads the label rather than the root.
-#
-# Cross-check both keys against the configuration, because they come from two
-# separate build settings and disagreeing is itself the bug.
-case "$CONFIG" in
-    Release) WANT_ENV="prod"; WANT_ROOT="~/gmfs" ;;
-    Beta)    WANT_ENV="beta"; WANT_ROOT="~/beta_gmfs" ;;
-    Debug)   WANT_ENV="test"; WANT_ROOT="~/test_gmfs" ;;
-esac
+WANT_ROOT_ABS="$(gm_env_root "$WANT_ENV")"
+WANT_ROOT="~${WANT_ROOT_ABS#"$HOME"}"
 if [ "$BAKED_ENV" != "$WANT_ENV" ] || [ "$BAKED_ROOT" != "$WANT_ROOT" ]; then
     echo "error: $CONFIG baked '$BAKED_ENV' -> '$BAKED_ROOT', expected '$WANT_ENV' -> '$WANT_ROOT'." >&2
     echo "       A bundle whose baked root disagrees with its configuration writes" >&2
@@ -209,57 +112,34 @@ if [ "$BAKED_ENV" != "$WANT_ENV" ] || [ "$BAKED_ROOT" != "$WANT_ROOT" ]; then
     exit 1
 fi
 
-# ── The CLI must actually be IN the bundle ──────────────────────────────────
+# ── The CLI must actually be IN the bundle, and be the kernel ───────────────
 #
-# The bundle is the ONLY shipped artifact now: `install_gm.sh` takes the app from
-# the DMG and the CLI out of the app. A bundle with no helper installs cleanly
-# and leaves $GM_FS_ROOT/bin empty — and because `gm_hook` exits 0 SILENTLY when
-# its binary is missing, the result is a machine that records nothing rather than
-# one that reports a problem.
-#
-# The embed phase is sandboxed and declares this exact path as its output, so it
-# either landed or the build already failed. Check anyway: this assertion is
-# cheap and the failure it guards is silent.
-HELPER="$APP/Contents/MacOS/gm_kernel"
-[ -x "$HELPER" ] || {
-    echo "error: $APP carries no Contents/MacOS/gm_kernel." >&2
-    echo "       The 'Install gm_kernel executable' phase did not run or did not land." >&2
-    exit 1; }
-# A helper personality answers `--version`; a bundle whose executable is not the
-# kernel would be a stub that Xcode linked and the install phase never replaced.
-"$HELPER" --version | grep -q "gm_kernel protocol" || {
-    echo "error: $HELPER does not answer as gm_kernel." >&2; exit 1; }
-
-# ── Slice verification, which used to live in publish ───────────────────────
+# The bundle is the ONLY shipped artifact: install_gm.sh takes the app from the
+# DMG and the CLI out of the app. A bundle with no kernel installs cleanly and
+# leaves $GM_FS_ROOT/bin empty — and gm_hook exits 0 SILENTLY when its binary
+# is missing, so the machine records nothing rather than reporting a problem.
+HELPER="$(gm_app_kernel "$APP")"
 APP_ARCHS="$(lipo -archs "$HELPER")"
-echo "  slices: gm_kernel [$APP_ARCHS]"
+echo "  slices: $GM_MACHO [$APP_ARCHS]"
 case " $APP_ARCHS " in *" arm64 "*) ;; *)
-    echo "error: gm_kernel carries no arm64 slice ([$APP_ARCHS])." >&2; exit 1 ;;
+    die "$GM_MACHO carries no arm64 slice ([$APP_ARCHS])" ;;
 esac
 
 # ── Signing: INSIDE-OUT, and `--deep` is gone ────────────────────────────────
 #
-# `--deep` is deprecated by Apple and is the wrong tool for a bundle that carries
-# embedded executables. It became the wrong tool for THIS bundle the moment the
-# kernel CLI moved inside it: helpers must be signed INDIVIDUALLY, innermost
-# first, each with the hardened runtime and the same Team ID, and the outer bundle
-# LAST — otherwise the outer signature is computed over helper signatures that are
-# then replaced, and the seal no longer describes the contents.
-#
-# THE FAILURE IS REMOTE AND LATE, which is why this is worth the words: `--deep`
-# signs without complaint and `codesign --verify` passes locally. Notarization
-# rejects the submission minutes later, on a machine you are not looking at, with
-# a message about nested code. Nothing on the build host tells you.
-#
-# `--deep` survives on --verify, where it is the correct flag: verifying deeply is
-# reading, not writing.
+# `--deep` is deprecated and wrong for a bundle carrying embedded executables:
+# helpers must be signed INDIVIDUALLY, innermost first, each with the hardened
+# runtime and the same Team ID, and the outer bundle LAST — otherwise the outer
+# seal is computed over helper signatures that are then replaced. The failure
+# is remote and late: `--verify` passes locally and notarization rejects the
+# submission minutes later. `--deep` survives on --verify, where it reads.
 sign_inside_out() {
   _identity="$1"
   _runtime_flags="$2"
 
-  # Nested executables first, each independently; the bundle no longer carries
-  # any (the kernel IS the main executable), but a helper added later must not
-  # silently ship unsigned.
+  # Nested executables first, each independently; the bundle carries none
+  # today (the kernel IS the main executable), but a helper added later must
+  # not silently ship unsigned.
   if [ -d "$APP/Contents/Helpers" ]; then
     find "$APP/Contents/Helpers" -type f -perm +111 -print | while IFS= read -r helper; do
       echo "    helper: $(basename "$helper")"
@@ -293,7 +173,7 @@ else
   sign_inside_out "-" ""
 fi
 
-# Verify DEEPLY — this is the one place --deep is correct, because it reads.
+# Verify DEEPLY — the one place --deep is correct, because it reads.
 codesign --verify --strict --deep-verify -vv "$APP" 2>&1 | sed 's/^/    /'
 
 echo "==> Staging DMG contents…"
@@ -302,7 +182,7 @@ cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 
 echo "==> Building ${DMG_PATH}…"
-hdiutil create -volname "$APP_NAME" \
+hdiutil create -volname "$GM_APP_NAME" \
   -srcfolder "$STAGE" \
   -ov -format UDZO \
   "$DMG_PATH"
@@ -312,7 +192,7 @@ if [ -n "$DEV_ID" ]; then
 fi
 
 if [ "${NOTARIZE:-0}" = "1" ]; then
-  [ -n "$DEV_ID" ] || { echo "error: NOTARIZE=1 requires a Developer ID cert" >&2; exit 1; }
+  [ -n "$DEV_ID" ] || die "NOTARIZE=1 requires a Developer ID cert"
   echo "==> Notarizing (profile: $NOTARY_PROFILE)…"
   xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
   echo "==> Stapling…"

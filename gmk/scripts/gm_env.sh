@@ -7,7 +7,7 @@
 #     bash gmk/scripts/gm_env.sh refresh beta
 #     bash gmk/scripts/gm_env.sh seed    test
 #     bash gmk/scripts/gm_env.sh doctor  beta
-#     bash gmk/scripts/gm_env.sh run     test -- swift test --package-path ...
+#     bash gmk/scripts/gm_env.sh run     test -- <command>      # e.g. the test action, on an ephemeral root
 #     bash gmk/scripts/gm_env.sh reap    test
 #     bash gmk/scripts/gm_env.sh destroy beta
 #
@@ -60,13 +60,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=gm_releases.sh
-. "$SCRIPT_DIR/gm_releases.sh"
-
-REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || true)"
-if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/gmk" ]; then
-    REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
-fi
+# shellcheck source=gm_build.sh
+. "$SCRIPT_DIR/gm_build.sh"
+gm_repo_root
 
 die() { echo "[GMB] $*" >&2; exit 1; }
 
@@ -198,33 +194,24 @@ env_refresh() {
 
 # ── seed — the Xcode Debug phase's door ──────────────────────────────────────
 #
-# A FAST, IDEMPOTENT subset of create, sized to run on EVERY ⌘R in parallel
-# with the app build (the TestEnvSeed aggregate target calls it). It must not
-# be create: create stages through rebuild_local, a full build that ALSO
-# regenerates plugins/gmcc into the source tree — a write PluginBridge
-# deliberately gates to Beta builds behind three gates, and the Debug path
-# must not acquire. So seed builds the kernel package incrementally and
-# stages the Mach-O itself through the gm_releases functions.
+# A FAST, IDEMPOTENT subset of create, sized to run on EVERY ⌘R (the
+# TestEnvSeed aggregate calls it through xcode_phase.sh). It BUILDS NOTHING:
+# the enclosing Xcode build hands it the app it just produced as GM_SEED_APP,
+# and the bundle's own executable is staged through the release-store
+# functions. It must not be create: create runs rebuild_local, which also
+# regenerates plugins/gmcc into the source tree — a write PluginBridge gates
+# to Beta builds and the Debug path must not acquire.
 env_seed() {
     _env="$1"; guard_not_prod "$_env" seed
     _root="$(env_root "$_env")" || exit 2
     echo "[GMB] seed $_env -> $_root"
     mkdir -p "$_root/bin" "$_root/repos" "$_root/backups"
 
-    # Incremental: seconds on an unchanged tree. SwiftPM's .build directory is
-    # its own — never Xcode's DerivedData — so a parallel app build has nothing
-    # to contend with. The env strip mirrors PluginBridge's: xcodebuild exports
-    # SDKROOT / MACOSX_DEPLOYMENT_TARGET / TOOLCHAINS / DEVELOPER_DIR into a
-    # phase, SwiftPM reads several of them, and a hand-run must behave the
-    # same as a phase-run.
-    env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET -u TOOLCHAINS -u DEVELOPER_DIR \
-        swift build --package-path "$REPO_ROOT/gmk" --product "$GM_MACHO" -c debug
-    _built="$(env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET -u TOOLCHAINS -u DEVELOPER_DIR \
-        swift build --package-path "$REPO_ROOT/gmk" -c debug --show-bin-path)/$GM_MACHO"
-    [ -x "$_built" ] || die "no built kernel at $_built"
+    _app="${GM_SEED_APP:?seed needs GM_SEED_APP (xcode_phase.sh seed sets it); by hand: bash gmk/scripts/rebuild_local.sh --env test}"
+    _built="$(gm_app_kernel "$_app")"
 
     GM_ENV="$_env"; GM_FS_ROOT="$_root"; gm_resolve_fs_root
-    _version="$(cat "$REPO_ROOT/gmk/VERSION")-BETA"
+    _version="$(cat "$GMK/VERSION")-BETA"
 
     # Stage only when the bits changed. A staged binary is NEVER overwritten in
     # place — the kernel's codesign cache answers a rewritten inode with
@@ -236,13 +223,9 @@ env_seed() {
     if [ "$_new_sha" = "$_old_sha" ]; then
         echo "[GMB] staged kernel already matches the build — skipping stage"
     else
-        _stage="$(gm_stage_dir local "$_version")"
-        rm -rf "$_stage"
-        _stage="$(gm_stage_dir local "$_version")"
-        cp -p "$_built" "$_stage/$GM_MACHO"
+        rm -rf "$(gm_stage_dir local "$_version")"
         _src_sha="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
-        gm_write_manifest "$_stage" "$_version" local "$_src_sha" \
-            "$(lipo -archs "$_stage/$GM_MACHO" 2>/dev/null || echo arm64)"
+        gm_stage_from_bundle "$_app" local "$_version" "$_src_sha" >/dev/null
         gm_activate local "$_version"
     fi
 

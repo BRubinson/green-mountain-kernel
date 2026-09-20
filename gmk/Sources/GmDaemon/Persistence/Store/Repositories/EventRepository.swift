@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 /// Data access for daemon_event reads. Runs INSIDE a Store-owned transaction;
 /// holds no dbQueue and never self-transacts.

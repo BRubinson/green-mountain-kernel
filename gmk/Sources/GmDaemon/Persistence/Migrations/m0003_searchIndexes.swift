@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 extension Migrations {
     // m0003 — FTS5 search over prompt/clarification/architecture text. Six

@@ -2,9 +2,7 @@
 
 import Foundation
 import FoundationModels
-import GmDaemonSdk
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentDopeSearchArguments: Sendable {
     @Guide(description: GM_TOOL_GUIDE_SEARCH_QUERY)
@@ -32,7 +30,6 @@ public struct GmAgentDopeSearchArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentDopeSearchGlobalTool: GmAgentDopeTool {
     public let name = "dope_search_global"
     public let description = "Look in ALL projects and sessions for doped data."
@@ -53,7 +50,6 @@ public struct GmAgentDopeSearchGlobalTool: GmAgentDopeTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentDopeSearchSessionTool: GmAgentDopeTool {
     public let name = "dope_search_session"
     public let description = "Look in THIS session only for doped data."
@@ -65,7 +61,6 @@ public struct GmAgentDopeSearchSessionTool: GmAgentDopeTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentDopeNodeUpdate: Sendable {
     @Guide(description: "The node to change. " + GM_TOOL_GUIDE_DOPE_CODE)
@@ -84,7 +79,6 @@ public struct GmAgentDopeNodeUpdate: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentDopeUpdateSessionArguments: Sendable {
     @Guide(description: "All the node changes to make in one go.")
@@ -95,7 +89,6 @@ public struct GmAgentDopeUpdateSessionArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentDopeUpdateSessionTool: GmAgentDopeTool {
     public let name = "dope_update_session"
     public let description = "Change many session dopes on disk at once."

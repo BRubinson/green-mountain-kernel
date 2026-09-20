@@ -2,15 +2,12 @@
 
 import Foundation
 import FoundationModels
-import GmDaemonSdk
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeInitArguments: Sendable {
     public init() {}
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentCdeInitTool: GmAgentCdeTool {
     public let name = "cde_init"
     public let description = "Tell me who I am and what I am working on."
@@ -25,7 +22,6 @@ public struct GmAgentCdeInitTool: GmAgentCdeTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public enum GmAgentPromptMatchKind: String, Sendable {
     case seq
@@ -37,7 +33,6 @@ public enum GmAgentPromptMatchKind: String, Sendable {
     case notFound
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentLoadedPrompt: Sendable {
     @Guide(description: "How the selector matched, or 'ambiguous'/'notFound' if it did not.")
@@ -75,7 +70,6 @@ public struct GmAgentLoadedPrompt: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeLoadPromptArguments: Sendable {
     @Guide(
@@ -91,7 +85,6 @@ public struct GmAgentCdeLoadPromptArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentCdeLoadPromptTool: GmAgentCdeTool {
     public let name = "cde_load_prompt"
     public let description = "Get one prompt by number, name, or id."
@@ -105,7 +98,6 @@ public struct GmAgentCdeLoadPromptTool: GmAgentCdeTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeSetStatusArguments: Sendable {
     @Guide(description: promptUuidGuide("to move"))
@@ -130,7 +122,6 @@ public struct GmAgentCdeSetStatusArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentCdeSetStatusTool: GmAgentCdeTool {
     public let name = "cde_set_status"
     public let description = "Say the prompt is started or finished."
@@ -142,7 +133,6 @@ public struct GmAgentCdeSetStatusTool: GmAgentCdeTool {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 @Generable
 public struct GmAgentCdeNextArguments: Sendable {
     @Guide(description: "Which prompt, by uuid. Leave empty to use the one this session is on.")
@@ -153,7 +143,6 @@ public struct GmAgentCdeNextArguments: Sendable {
     }
 }
 
-@available(GmAgentOs 1.0, *)
 public struct GmAgentRpirNextTool: GmAgentRpirTool {
     public let name = "rpir_next"
     public let description = "What phase am I in and what do I do now?"

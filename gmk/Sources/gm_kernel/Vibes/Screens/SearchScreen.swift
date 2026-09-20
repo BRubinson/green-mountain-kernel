@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// Dedicated full-text search screen (`Route.search`). Same result list as
 /// the ⌘K palette plus the affordances the overlay has no room for: a

@@ -1,5 +1,4 @@
 import Foundation
-import GmDaemonSdk
 
 // gm_mcp — the GMCC MCP stdio server: the agent PEN surface as typed MCP
 // tools. A thin client of the daemon socket that reuses DaemonClient/WireCodec
@@ -177,9 +176,9 @@ struct Args {
     }
 }
 
-// MARK: - Tool registry
+// MARK: - CdeTool registry
 
-struct Tool {
+struct CdeTool {
     let name: String
     let description: String
     /// {property name: (type, description, required)}
@@ -291,14 +290,14 @@ func pagedNarrowing(_ tool: String, selectors: [String] = []) -> CdeNarrowing {
 }
 
 // `nonisolated(unsafe)` because a library target gives globals no implicit
-// main-actor isolation and `[Tool]` cannot be `Sendable`: a `Tool` carries
+// main-actor isolation and `[CdeTool]` cannot be `Sendable`: a `CdeTool` carries
 // `run`/`degrade` closures over `Args` and `DaemonClient`. What makes it safe
 // is that the array is built ONCE, never mutated, and read only from the single
 // stdio read loop in `GmMcpServer.main()` — one thread, one connection, no
 // concurrency in this process.
-nonisolated(unsafe) let tools: [Tool] =
+nonisolated(unsafe) let tools: [CdeTool] =
     [
-        Tool(
+        CdeTool(
             name: "rpir_next",
             description:
                 "Current workflow phase + instructions + uuid bundle + gate blockers. Zero-uuid: resolves YOUR workflow.",
@@ -314,7 +313,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "cde_load_prompt",
             description:
                 "The workflow's prompt row — read the prompt without being told a uuid. The prompt's detail / backstory / goal arrive as text windows; loop on cursor until page.next_cursor is null.",
@@ -336,7 +335,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 return try CdePromptPage.build(response, pager: &pager)
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_open_exploration",
             description:
                 "Fetch-or-open an exploration summary (identity is the self-reported agent_type; 'synthesis' is the prompt-level seal row the clarifier opens once everything is ranked).",
@@ -370,7 +369,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_load_exploration_brief",
             description: "Fetch a briefing + staleness. Zero-uuid form: pass only step and YOUR briefing resolves.",
             params: [
@@ -397,7 +396,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 return try CdeBriefingPage.build(response, pager: &pager)
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_write_brief",
             description: """
                 building → ready: write the briefing's ref set (opinion-free; the daemon \
@@ -438,7 +437,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_write_explorations",
             description:
                 "Insert an exploration finding (self-rate 0=critical…999=ignore; unranked blocks the synthesis seal).",
@@ -474,7 +473,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_complete_exploration",
             description:
                 "Seal a summary with its overview — your own methodology row, or the synthesis row once every finding is ranked (it refuses while anything is unranked).",
@@ -493,7 +492,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_write_reviews",
             description: "Insert a review finding (self-rate 0=critical…999=ignore).",
             params: [
@@ -531,7 +530,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_write_clarification_questions",
             description:
                 "Insert a user-facing clarification question (+ordered options) while the summary is building.",
@@ -554,7 +553,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_write_clarification_notes",
             description: "Insert an internal clarification note (weight 0=critical…999; any summary state).",
             params: [
@@ -582,7 +581,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_write_care_package",
             description:
                 "Add one care package ref while building (dope code / kbite file / curated exploration COPY — never re-explore).",
@@ -616,7 +615,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_open_architecture_option",
             description:
                 "Write YOUR methodology's architecture Option row (the architect pen; one per agent_name). To REVISE an existing proposal, pass supersedes_option_uuid + expected_version together: the old row is kept as rejected history and a selected row hands its selection to the revision.",
@@ -647,7 +646,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "dope_search_session",
             description: "FTS over the session's dope tree (hits carry dot-paths).",
             params: [
@@ -680,7 +679,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 return try CdeHitsPage.build(response.hits, pager: &pager)
             }
         ),
-        Tool(
+        CdeTool(
             name: "kbite_search",
             description: "bm25-ranked kbite file stubs with briefs — read briefs, then kbite_file_get.",
             params: [
@@ -708,7 +707,7 @@ nonisolated(unsafe) let tools: [Tool] =
         // along because it is the same reader's next move — read the findings,
         // calibrate them in one batch.
 
-        Tool(
+        CdeTool(
             name: "rpir_get_exploration",
             description:
                 "The prompt's exploration record: summaries, key files, findings inside the rating window, stubs outside it. Default window is ratings under 100; unranked findings are ALWAYS full rows (they are the work queue).",
@@ -736,7 +735,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 return try CdeExplorationPage.build(response, pager: &pager, findingUuid: findingUuid)
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_rank_explorations",
             description:
                 "Batch-rank exploration findings PROMPT-wide: one atomic calibrated batch across every summary. One bad pair rejects the whole batch; 0 unranked is what lets the synthesis seal pass.",
@@ -764,7 +763,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_get_review",
             description:
                 "The prompt's review record: summary, findings inside the rating window, stubs outside it. Same window semantics as rpir_get_exploration.",
@@ -788,7 +787,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 return try CdeReviewPage.build(response, pager: &pager, findingUuid: findingUuid)
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_get_clarification",
             description:
                 "The prompt's clarification record: summary, questions (+answers), notes, and the care package with its dope staleness when one exists.",
@@ -818,7 +817,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 return try CdeClarificationPage.build(response, pager: &pager, noteUuid: noteUuid)
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_get_care_package",
             description:
                 "The prompt's sealed care package on its own: the clarified intent (as text windows), the dope and kbite refs, and the curated exploration copies as a stub roster (title, path, excerpt, size). Pass ref_uuid to read one curated body in full; loop on cursor until page.next_cursor is null.",
@@ -843,7 +842,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "rpir_get_architecture",
             description:
                 "The approved architecture with its implementation state: persistence changes (whole) before general changes (stubs with a leading excerpt), each joined to its recorded file changes, plus the touched-but-unplanned set. This is the implementation spec. The summary body, the decision rationale, one option body (option_uuid) or one change_code (change_uuid) arrive as text windows; loop on cursor until page.next_cursor is null.",
@@ -872,7 +871,7 @@ nonisolated(unsafe) let tools: [Tool] =
                 )
             }
         ),
-        Tool(
+        CdeTool(
             name: "cde_search_file_changes",
             description:
                 "Recorded file changes for the prompt (or an explicit session/path). What the machine believes you have touched — read it to check your own capture.",
@@ -964,13 +963,13 @@ extension GmCdeTools {
 
 // MARK: - Rendering (byte-budgeted)
 
-/// Tool results are the wire response as sorted-key JSON, the form agents
+/// CdeTool results are the wire response as sorted-key JSON, the form agents
 /// parse. THIS NEVER CLIPS: cutting the JSON at a byte count lands the cut
 /// inside whichever key sorts there and eats the rest silently. Every read is
 /// paged by `CdePager` before it gets here, so the guard's withhold note is a
 /// last resort. The threshold and the envelope shape live in
 /// `CdeResultBudget` in GmDaemonSdk so the test package can exercise them.
-func renderResult(tool: Tool, value: any Encodable) throws -> String {
+func renderResult(tool: CdeTool, value: any Encodable) throws -> String {
     try CdeResultBudget.render(
         tool: tool.name,
         narrowing: tool.narrowing,
@@ -1101,7 +1100,7 @@ public enum GmMcpServer {
                     default:
                         text = "\(error)"
                     }
-                    // Tool-level failures ride the result envelope (isError), never
+                    // CdeTool-level failures ride the result envelope (isError), never
                     // a protocol error — the agent should read and react to them.
                     respond(
                         id: id,

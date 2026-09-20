@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// PROMPT_DIAGRAM_LIST — every diagram this prompt has qualified, so a
 /// resuming session sees what it already understood without re-reading images.

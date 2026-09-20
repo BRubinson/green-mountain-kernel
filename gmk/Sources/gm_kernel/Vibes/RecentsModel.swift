@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import GmDaemonSdk
 
 /// One session surfaced on the landing page's Recent Sessions strip. Recency
 /// is the stub's `lastActivityAt` — computed daemon-side as MAX(session

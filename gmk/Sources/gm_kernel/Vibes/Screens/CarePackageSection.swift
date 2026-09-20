@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// The care package expanded: the clarified-intent bundle a multi-agent clarify flow curates,
 /// rendered as its children instead of as a count.

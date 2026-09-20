@@ -1,6 +1,5 @@
 import Foundation
 import GRDB
-import GmDaemonSdk
 
 // CATALOG_SEARCH — tokenized OR name/code search across instances + sessions,
 // the GMVibes per-project search bar. Read-only; no daemon_event rows. Matching

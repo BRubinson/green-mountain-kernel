@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// CONFIG_SET — write one enum-bound daemon_config key.
 enum ConfigSetHandler {

@@ -1,7 +1,5 @@
 import SwiftUI
 import AppKit
-import GmDaemonSdk
-import GmUxComponentLibrary
 
 /// The full-window diagram editor (`Route.diagram`). Persistence follows the route payload,
 /// not this screen: a `.saved` workspace writes every gesture through DIAGRAM_BATCH_APPLY,

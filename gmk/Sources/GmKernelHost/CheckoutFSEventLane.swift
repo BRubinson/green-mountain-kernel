@@ -7,7 +7,7 @@ import Foundation
 /// Lane contract as MemoryWatcher: no Store, no Server; `deliver` hops onto the
 /// server queue, which resolves the head state there and dedupes against its own
 /// per-instance cache, so only a genuine change broadcasts.
-final class CheckoutWatcher: @unchecked Sendable {
+final class CheckoutFSEventLane: @unchecked Sendable {
     private let lane = FSEventLane(label: "gmcc.daemon.git", latency: 0.5)
     /// Lane-confined: gitDir → (instanceUuid, repoRoot).
     private var byGitDir: [String: (instanceUuid: String, repoRoot: String)] = [:]

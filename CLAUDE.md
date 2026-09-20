@@ -58,6 +58,25 @@ bash gmk/scripts/publish_release.sh   # verify, run the suites, tag, upload, pro
 releasable — `publish_release.sh` uploads exactly those bytes rather than
 rebuilding, so what you tested is what ships.
 
+**THERE IS ONE BUILD SYSTEM, AND IT IS `xcodebuild`.** Every script that
+compiles anything does it through `gm_xcb` in `gmk/scripts/gm_build.sh`, which
+is the ONE place the word `xcodebuild` appears under `gmk/scripts`:
+
+```bash
+xcodebuild -workspace gmk/gmk.xcworkspace -scheme gm_kernel -configuration <Debug|Beta|Release> \
+    -derivedDataPath gmk/.build/DerivedData CODE_SIGNING_ALLOWED=NO build
+```
+
+The product is `gmk/.build/DerivedData/Build/Products/<config>/gm_kernel.app`,
+and the CLI is `Contents/MacOS/gm_kernel` inside it. `rebuild_local.sh` has ONE
+staging path for the plain and `--app` cases — `gm_stage_from_bundle` in
+`gm_releases.sh` — because both produce a bundle; `--app` adds signing through
+`build-dmg.sh`. The plain path no longer strips the binary: stripping a linked
+Mach-O invalidates its signature, and `codesign --verify --strict` on the staged
+copy is the check that stays. `MARKETING_VERSION` is passed from `gmk/VERSION`
+on both paths. `gm_build.sh` is repo-side ONLY — nothing in it goes into
+`gm_releases.sh` or the plugin twin, because the plugin never builds anything.
+
 **THIS INVERTED. It used to build universal, and `--fast` opted DOWN to arm64
 and produced something publish REFUSED.** The x86_64 slice was dropped: it
 doubled every compile and link, the toolchain emits "the x86_64 architecture is
@@ -74,11 +93,11 @@ one. Frozen rather than tidied: those releases are already published and cannot
 be rewritten, so renaming the literal would 404 the entire back-catalogue.
 
 **`rebuild_local.sh` ALSO GENERATES THE PLUGIN**, by calling
-`generate_plugin.sh` after staging and before activation. It previously did not,
-so a build could report success while `plugins/gmcc/` still reflected an older
-bridge. This is why the script builds `gmAgententicsSdk` even though that package
-was removed from its `PACKAGES` list — it is not built for the artifact, it is
-built because it *is* the generator.
+`generate_plugin.sh` after staging and before activation, handing it the exact
+staged Mach-O as `GM_KERNEL_BIN`. It previously did not, so a build could report
+success while `plugins/gmcc/` still reflected an older bridge. There is no
+separate generator build: the generator is `gm_kernel bridge`, a personality of
+the binary that was just staged.
 
 A local build is **always** stamped `-BETA`. There is no flag to suppress it: the
 suffix is the only thing distinguishing bits that were merely built from bits
@@ -232,81 +251,123 @@ workflow that cannot succeed is worse than an absent one, because it sits in the
 Actions tab inviting a dispatch that cuts an empty tag. `gmk-ci.yml` went with it
 by decision.
 
-What was lost, so nobody rediscovers it as a surprise: per-package `swift build`
-on every push, the `xcodebuild` job for the app, `bash -n` over every shipped
-script, JSON-parsing of the plugin manifests, the semver check on `gmk/VERSION`,
-and the one `swift test` job. **Nothing replaced them.** Verification is now
-whatever a person runs:
+What was lost, so nobody rediscovers it as a surprise: the per-package SwiftPM
+build on every push (history — those packages no longer exist), the `xcodebuild`
+job for the app, `bash -n` over every shipped script, JSON-parsing of the plugin
+manifests, the semver check on `gmk/VERSION`, and the one test job. **Nothing
+replaced them.** Verification is now whatever a person runs:
 
 ```bash
-swift build --package-path gmk --product gm_kernel
-swift test  --package-path gmk
+XCB="xcodebuild -workspace gmk/gmk.xcworkspace -scheme gm_kernel -derivedDataPath gmk/.build/DerivedData CODE_SIGNING_ALLOWED=NO"
+$XCB -configuration Debug build
+$XCB -configuration Debug test     # no -quiet: the "' passed (" lines are the proof the run was not vacuous
 ```
 
-## Layout — ONE package, ONE binary
+## Layout — ONE Xcode target, ONE module, ONE binary
 
-- `gmk/Package.swift` — **the whole Swift deliverable is one SwiftPM package**,
-  swift-tools-version 6.2, `platforms: [.macOS("27.0")]`, with exactly ONE
-  product: the `gm_kernel` executable. There is no library product. Sections
-  are TARGETS of that package, kept as separate modules only where a module
-  boundary carries a setting (GRDB confined to `GmDaemon`, SwiftProtobuf confined
-  to `GmITerm2Client`, the `GmAgentOs` `unsafeFlags` define on `GmAgententicsSdk`)
-  or where the test target imports them. `import` lines did not change.
+- `gmk/gmk.xcodeproj` — **the whole Swift deliverable is one Xcode target,
+  `gm_kernel`**, and it compiles EVERY source under `gmk/Sources/` through one
+  `PBXFileSystemSynchronizedRootGroup`. There is no SwiftPM manifest, no library
+  product and no per-section module: the eight `Gm*` folders and `gm_kernel/`
+  are ONE module, and the folders are navigation only. No `import Gm*` line
+  exists anywhere under `gmk/Sources` or `gmk/Tests`. Project-level settings:
+  `SWIFT_VERSION = 6.0`, `SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated`,
+  `SWIFT_STRICT_CONCURRENCY = complete`, `MACOSX_DEPLOYMENT_TARGET = 27.0`.
+  Only the Vibes/UX layer holds `MainActor`, and it holds it EXPLICITLY on each
+  type; nothing else is re-annotated.
   - `Sources/GmDaemonSdk/` — the base: wire protocol (including the workflow
     spec), the client, the shared domain layer (`Dope/`, `Diagram/`, `Hook/`,
-    `Kbite/`, `Environment/`, `Paths.swift`, `StoreError`). Zero external deps.
-    Carries the `StampVersion` prebuild plugin that generates `GmVersion.current`
-    from `gmk/VERSION`.
+    `Kbite/`, `Environment/`, `Paths.swift`, `StoreError`). Imports no package
+    product.
   - `Sources/GmHookCli/`, `Sources/GmMcpServer/` — the shell-client and pen
-    personalities, both pure relays over the SDK.
+    personalities, both pure relays over the SDK. `Ops.swift`'s usage text is
+    `hookUsage`, because `usage` in `main.swift` shares the module now.
   - `Sources/GmDaemon/` — persistence (`Persistence/{Migrations,Entities,Store}`),
-    the only target that names GRDB. Migrations are one file each plus the
-    ordered `ladder` in `Migrations.swift`; a file without a ladder entry never
-    runs, and `testTheLedgerIsDenseAndUnique` catches it.
+    the only folder whose files `import GRDB`. Migrations are one file each plus
+    the ordered `ladder` in `Migrations.swift`; a file without a ladder entry
+    never runs, and `testTheLedgerIsDenseAndUnique` catches it.
   - `Sources/GmKernelHost/` — the server, handlers, watchers and the ownership
-    primitives (`KernelOwnership` / `KernelWriter`). Carries the
-    `StampBuildInfo` prebuild plugin.
+    primitives (`KernelOwnership` / `KernelWriter`). The checkout FSEvent lane is
+    `CheckoutFSEventLane` (file and type): the Vibes UI cache is also called
+    `CheckoutWatcher`, and one module cannot hold two.
   - `Sources/GmUxComponentLibrary/` — the diagram UI views and their geometry,
     routing, layout and organizer helpers.
   - `Sources/GmAgententicsSdk/` — the agent-tool surface, the templates, the
     agent configurations and **`HarnessBridge/`, which the plugin is generated
-    from**. The only target with `unsafeFlags` (the `GmAgentOs` availability
-    define); that flag already barred every gmk package from remote consumption,
-    so it costs nothing inside one package. `GmBridgeCli` here is the body of
-    `gm_kernel bridge`.
+    from**. `GmBridgeCli` here is the body of `gm_kernel bridge`. The only
+    folder whose files import `ClaudeForFoundationModels`. The `GmAgentOs`
+    availability define and every `@available(GmAgentOs 1.0, *)` are GONE: the
+    project floor is 27, so there is nothing to gate.
   - `Sources/GmITerm2Client/` — the iTerm2 transport: the committed generated
     protobuf Swift (`Generated/`; `gmk/proto/PROTO.md` carries the regeneration
-    recipe), the lifted transport files, one public façade. Nonisolated by
-    default; blocking socket I/O runs on a `DispatchSerialQueue`-backed actor
-    executor, never the cooperative pool. GMCC-agnostic by construction.
+    recipe), the lifted transport files, one façade. The only folder whose files
+    `import SwiftProtobuf`. Blocking socket I/O runs on a
+    `DispatchSerialQueue`-backed actor executor, never the cooperative pool.
+    GMCC-agnostic by construction.
   - `Sources/gm_kernel/` — **the kernel, and the app.** `main.swift` is the
     dispatcher; `Vibes/` is the GM Vibes app's ~107 sources including
     `GMVibesApp.swift` (no `@main`; the dispatcher calls `GMVibesApp.main()`).
-    The target compiles under `.swiftLanguageMode(.v5)` and
-    `.defaultIsolation(MainActor.self)` because the app code was written under
-    both; the Xcode project restates the same two settings.
-  - `Plugins/StampVersion/`, `Plugins/StampBuildInfo/` — the two prebuild
-    plugins. Both read `gmk/VERSION` from the package directory itself.
-  - `Tests/GmKernelTests/` — the ONE test target (subfoldered per section for
-    navigation, not isolation). `Tests/.swift-format` is the nested config that
-    allows force-try and IUOs there. See "ONE test target" below.
+    Views, AppKit subclasses and the app delegate are `MainActor` by protocol
+    inference; the `@Observable` models and the handful of plain classes carry
+    `@MainActor` explicitly, because the module default is `nonisolated`. The
+    `GMCCDaemonService` trampoline, the three actors and `StoreBoundary` are
+    unchanged.
+  - `VERSION` — the one version pin for the binary, the DMG and the plugin. It
+    is a SOURCE of the target: a `PBXBuildRule` matching `*/VERSION` runs
+    `scripts/stamp_build_info.sh`, which writes `GmVersion.swift` and
+    `BuildInfo.swift` into `$(DERIVED_FILE_DIR)` (only when the content changed,
+    so nothing recompiles needlessly), and those two files are compiled like
+    any other. A build RULE rather than a run-script phase because rule outputs
+    ending in `.swift` are compiled and script-phase outputs are not. It runs
+    under `ENABLE_USER_SCRIPT_SANDBOXING = YES` with its inputs (`VERSION`,
+    `.git/HEAD`) declared; if the sandbox ever denies `git`, the sha reads
+    `unknown` — the remedy is reading `.git/HEAD` in shell, never disabling the
+    sandbox on the app target.
+  - `Tests/GmKernelTests/` — the ONE test target, an Xcode unit-test BUNDLE
+    (subfoldered per section for navigation, not isolation).
+    `Tests/.swift-format` is the nested config that allows force-try and IUOs
+    there. See "ONE test target" below.
   - `gmClaudeForFoundationModels/` — Anthropic's ClaudeForFoundationModels,
-    **vendored** (Apache-2.0) and consumed by `.package(path:)`. The only
-    separate package left, because it is upstream source: `VENDORED.md` carries
-    the commit and the re-sync recipe. Do not edit it in place.
-  - `proto/api.proto` — the iTerm2 protobuf, outside any target because SwiftPM
-    would otherwise report it as an unhandled resource.
+    **vendored** (Apache-2.0) and consumed as an `XCLocalSwiftPackageReference`.
+    The only SwiftPM package in the tree, because it is upstream source:
+    `VENDORED.md` carries the commit and the re-sync recipe. Do not edit it in
+    place.
+  - `proto/api.proto` — the iTerm2 protobuf, a member of no target.
   - `scripts/` — build, release, environment and lint scripts, plus
-    `wire_keys.py`. Scripts live here and never beside the app sources.
-  - `gmVibes/` — the Xcode app target's **non-code** payload: `Info.plist`
-    (the three baked keys), `Assets.xcassets`, README. It compiles no Swift.
-  - `gmk.xcodeproj` / `gmk.xcworkspace` — see "The app bundle" below.
-  - `VERSION` — the one version pin for the binary, the DMG and the plugin.
+    `wire_keys.py`. `gm_build.sh` is the one place that spells `xcodebuild`;
+    `xcode_phase.sh` is the body of both aggregate targets;
+    `stamp_build_info.sh` is the build rule. Scripts live here and never beside
+    the app sources.
+  - `gmVibes/` — the app target's **non-code** payload: `Info.plist` (the three
+    baked keys), `Assets.xcassets`, README.
+  - `gmk.xcodeproj` / `gmk.xcworkspace` — see "The app bundle" below. Open the
+    WORKSPACE: it is what resolves the packages, and its
+    `xcshareddata/swiftpm/Package.resolved` is the ONE lockfile.
+  - `.build/DerivedData/` — where every SCRIPTED build lands (gitignored). ⌘R
+    keeps Xcode's default DerivedData; the two never contend.
+- `buildServer.json` (repo root) — committed, static; what lets `sourcekit-lsp`
+  navigate the Xcode workspace. See "The language server" below.
 - `plugins/gmcc/` — the Claude Code plugin. **ENTIRELY GENERATED — DO NOT
   HAND-EDIT.** Every byte comes from `Sources/GmAgententicsSdk/HarnessBridge/`
   through `gm_kernel bridge`; the next regeneration overwrites whatever you
   changed. See "The plugin is GENERATED" below.
 - `.gmcc/` — this repo's committed DOPE tree. The directory keeps this name.
+
+**SwiftPM survives ONLY as Xcode's dependency resolver.** The project holds
+three package references and nothing else about packages: `GRDB.swift`
+(remote, `upToNextMajor` from 7.0.0, resolved 7.11.1), `swift-protobuf` (remote,
+from 1.28.0, resolved 1.38.1) and the vendored `gmClaudeForFoundationModels`
+(local). The lockfile is `gmk/gmk.xcworkspace/xcshareddata/swiftpm/Package.resolved`
+— never hand-edit it, and never archive with `-project`, which resolves against
+the project's own private lockfile and mints a second one.
+
+**Module confinement is now a CONVENTION, kept visible by
+`SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY`.** With one module, "GRDB is
+confined to `GmDaemon`" cannot be a target boundary; it means only files under
+`Sources/GmDaemon/` write `import GRDB`, and member-import visibility is what
+stops a file that does not import it from reaching its members. The same holds
+for `SwiftProtobuf` under `GmITerm2Client/` and `ClaudeForFoundationModels`
+under `GmAgententicsSdk/`. Nothing enforces the file placement.
 
 ### The five personalities of `gm_kernel`
 
@@ -322,48 +383,44 @@ binary does not make a hook-spawned daemon an AppKit process.
 
 The generator became a subcommand because the ONLY reason it was a separate
 executable was the kernel's macOS 14 floor against the agentics section's 27.
-With one package everything floors at 27 (accepted at v55). The
-`-define-availability` macro expands at parse time inside the agentics target,
-so no other target needs the flag.
+Everything now floors at 27 through the project-level
+`MACOSX_DEPLOYMENT_TARGET`, and the availability define that used to bridge the
+gap no longer exists.
 
 ### The app bundle: the executable IS the kernel
 
-`gm_kernel.app`'s `Contents/MacOS/gm_kernel` is the SwiftPM-built binary. The
-Xcode `GMVibes` target **depends on the package's `gm_kernel` executable
-product** (one `XCLocalSwiftPackageReference` at `.`, one
-`XCSwiftPackageProductDependency`, one `PBXTargetDependency` with a `productRef`),
-so Xcode compiles every kernel source itself — indexing, completion, previews
-and Xcode debug symbols cover `Sources/gm_kernel/Vibes` — and the "Install
-gm_kernel executable" phase copies `$BUILT_PRODUCTS_DIR/gm_kernel` over
-`$TARGET_BUILD_DIR/$EXECUTABLE_PATH` BEFORE code signing. The phase declares its
-input and output, so the target keeps `ENABLE_USER_SCRIPT_SANDBOXING = YES`, and
-it refuses a bundle whose executable does not answer `--version` as the kernel.
+`gm_kernel.app`'s `Contents/MacOS/gm_kernel` is the target's own product: the
+`gm_kernel` target compiles every source under `gmk/Sources/` and links it into
+the bundle's executable directly. There is no Install phase, no package
+self-reference and no second build system — indexing, completion, previews and
+debug symbols cover the whole tree because Xcode is the only thing that
+compiles it. `rebuild_local.sh` stages that executable out of the bundle, so
+the released bytes, the tested bytes and the ⌘R bytes are one build's output.
 **`Contents/Helpers/` no longer exists.** The installer and release store read
-`Contents/MacOS/gm_kernel` first and fall back to `Contents/Helpers` only for the
-published back-catalogue.
+`Contents/MacOS/gm_kernel` first and fall back to `Contents/Helpers` only for
+the published back-catalogue.
 
-Two build systems compile one source: SwiftPM (`swift build --product
-gm_kernel`) for the release store, tests and plugin generation; Xcode for the
-bundle, the DMG, ⌘R and previews. That is the arrangement that already existed
-for the old app module. `rebuild_local.sh --app` stages the bundle's executable,
-so released bytes are Xcode's build; the plain loop stages SwiftPM's.
+**`ENABLE_DEBUG_DYLIB = NO` on Debug, and it is load-bearing.** Xcode's default
+Debug product is a ~59KB stub whose entry point is a blank executor that loads
+`gm_kernel.debug.dylib` beside it; that stub does not dispatch on `argv`, so a
+Debug binary copied out of the bundle — which is what the test harness and
+`gm_env.sh seed` do — is not the kernel. With the dylib off, the Debug product is
+one Mach-O that answers `--version` inside the bundle and outside it.
+`ENABLE_PREVIEWS` stays `YES`; the tree carries zero `#Preview` blocks, so
+nothing depends on it either way.
 
-Dependency graph, inside one package, acyclic:
+What the target contains, and what it links:
 
 ```
-GmDaemonSdk ──┬── GmHookCli ─────────────┐
-   │          ├── GmMcpServer ──┐        │
-   │          │                 │        │
-   │          └── GmDaemon ── GmKernelHost ─┤
-   │                 (GRDB)                 ├── gm_kernel  (main.swift + Vibes/)
-   ├── GmUxComponentLibrary ────────────────┤      = the CLI, the daemon, the pen,
-   │                                        │        the generator AND the app
-   ├── GmAgententicsSdk ────────────────────┤
-   │        └── gmClaudeForFoundationModels │  (vendored, separate package)
-   │                                        │
-   └── GmITerm2Client (SwiftProtobuf) ──────┘
+gm_kernel  (one target, one module)
+├── Sources/GmDaemonSdk, GmHookCli, GmMcpServer, GmDaemon, GmKernelHost,
+│   GmUxComponentLibrary, GmAgententicsSdk, GmITerm2Client, gm_kernel/
+│   = the CLI, the daemon, the pen, the generator AND the app
+├── GRDB                      (remote package product; imported under GmDaemon/ only)
+├── SwiftProtobuf             (remote package product; imported under GmITerm2Client/ only)
+└── ClaudeForFoundationModels (vendored local package; imported under GmAgententicsSdk/ only)
 
-GmKernelTests → GmDaemonSdk, GmDaemon
+GmKernelTests  (unit-test bundle) → the GmDaemonSdk + GmDaemon folders, GRDB
 ```
 
 ## The shared service layer — what "shared memory" actually meant
@@ -515,14 +572,13 @@ as on a real quit. The kernel is stopped from ONE place: the menu bar's two-step
 `confirmingQuit`. Filter windows on `canBecomeMain` — the MenuBarExtra's own panel
 is an `NSWindow` and closing it tears down the status item.
 
-**The bundle's executable IS the kernel.** The `GMVibes` target compiles no
-Swift; it depends on the package's `gm_kernel` product and its Install phase
-copies that product over the bundle executable before signing. Declared input
-and output paths are what let it run under `ENABLE_USER_SCRIPT_SANDBOXING = YES`,
-and `set -eu` is what keeps a failed copy from reporting success. **That `YES` is
-this target's setting, not the project's policy:** the `PluginBridge` aggregate
-target sets it to `NO` on its own configurations, because it writes into the
-source tree. See "THREE ENVIRONMENTS".
+**The bundle's executable IS the kernel.** The `gm_kernel` target compiles every
+source and links the bundle executable itself; there is no copy step to get
+wrong. The target keeps `ENABLE_USER_SCRIPT_SANDBOXING = YES`, which the
+`VERSION` build rule runs under with its inputs declared. **That `YES` is this
+target's setting, not the project's policy:** the `PluginBridge` and
+`TestEnvSeed` aggregate targets set it to `NO` on their own configurations,
+because they write outside the build directory. See "THREE ENVIRONMENTS".
 
 **`eventSink` is gone; the store has a SUBSCRIBER TABLE.** It was a plain settable
 property, and a second assignment displaced the first with no error anywhere. That
@@ -557,17 +613,26 @@ boundary (the commit has landed), which is why it does not violate the rule abov
 
 ## Build / test loop — the `gmk/` stack
 
-From the repo root:
+From the repo root, everything goes through `xcodebuild` against the workspace,
+the `gm_kernel` scheme and the repo-relative DerivedData:
 
 ```bash
-swift build --package-path gmk --product gm_kernel   # the kernel (and the app code inside it)
-swift test  --package-path gmk                       # the whole suite; it BOOTS the kernel it finds in gmk/.build
-swift build --package-path gmk                       # every target, the test target included
-bash gmk/scripts/rebuild_local.sh                    # build → stage <version>-BETA → generate the plugin → activate
+XCB="xcodebuild -workspace gmk/gmk.xcworkspace -scheme gm_kernel -derivedDataPath gmk/.build/DerivedData CODE_SIGNING_ALLOWED=NO"
+$XCB -configuration Debug   build   # the kernel (and the app code inside it) → gmk/.build/DerivedData/Build/Products/Debug/gm_kernel.app
+$XCB -configuration Release build
+$XCB -configuration Debug   test    # the whole suite; it BOOTS the kernel it finds in BUILT_PRODUCTS_DIR. No -quiet here.
+bash gmk/scripts/rebuild_local.sh   # build → stage <version>-BETA → generate the plugin → activate
 ```
 
-`gmk/gmClaudeForFoundationModels` is VENDORED and compiles as a dependency of
-the agentics section; its own upstream suite is run by hand when re-syncing
+Scripts never spell that line themselves: they source `gmk/scripts/gm_build.sh`
+and call `gm_xcb <action> <config> [args…]`, which is the ONE place
+`xcodebuild` appears. `-quiet` is a caller argument, and `test` must not pass
+it, or the `' passed (` lines that prove the run was not vacuous vanish with the
+noise. ⌘R in Xcode uses Xcode's default DerivedData, not this one; the two
+never contend, and the language server reads only the scripted one.
+
+`gmk/gmClaudeForFoundationModels` is VENDORED and compiles as a package
+dependency of the target; its own upstream suite is run by hand when re-syncing
 (see `VENDORED.md`), never as a gate here.
 
 See **The release loop** above for how `rebuild_local.sh`, `publish_release.sh`
@@ -602,9 +667,39 @@ bash gmk/scripts/install_swiftlint.sh          # pinned SwiftLint into $GM_FS_RO
 
 ### ONE test target — and what was given up to get it
 
-`gmk/Tests/GmKernelTests` is the repository's only test target. It boots ONE real
+`gmk/Tests/GmKernelTests` is the repository's only test target: an Xcode
+**unit-test bundle** (`GmKernelTests.xctest`) with a synced group over its
+folder, **no `TEST_HOST`** and **no `@testable import`**. It boots ONE real
 `gm_kernel` against a temporary root and drives the whole kit through its
 **public** surface — the wire protocol, a real socket — plus **read-only** SQL.
+
+Two things about its shape are deliberate and easy to re-derive wrongly:
+
+- **The in-process subjects are compiled INTO the bundle, not imported.** The
+  few tests that touch types directly (`ChewedArtifact`, the migration ladder,
+  `CdePaging`) need the `GmDaemonSdk` and `GmDaemon` folders, so those two
+  folders are members of BOTH targets through membership exceptions on the
+  `Sources` synced group, and the test target carries its own GRDB product
+  dependency. The closure is the two FOLDERS, not three files: the migration
+  ladder pulls the store, the store pulls the SDK. If Xcode expands the
+  exception set to per-file entries, accept what it writes.
+- **`TEST_HOST` was ruled out**, because hosting the tests in `gm_kernel.app`
+  launches the app, and a launched app arbitrates for the `flock` and boots a
+  WRITER — inside the suite whose whole design is that the booted kernel is the
+  only one.
+
+Kernel discovery has ONE path and no fallback: `GM_TEST_KERNEL_BIN` if set
+(publish sets it to the staged Mach-O), else
+`$BUILT_PRODUCTS_DIR/gm_kernel.app/Contents/MacOS/gm_kernel` found relative to
+the test bundle. Either way the binary is **COPIED into the minted root** and
+the copy is what gets spawned, so no `Info.plist` sits beside it and the
+harness's `GM_FS_ROOT` wins over the baked root. It deliberately never falls
+back to `~/gmfs/bin/gm_kernel` — a suite that silently tested the last RELEASE
+instead of the working tree would be green for code that is not there.
+`xcodebuild test -scheme gm_kernel` also runs the `TestEnvSeed` entry
+(`buildForTesting = YES`, by ruling): `~/test_gmfs` is the full test
+environment, the seed is idempotent and hash-skipped, and the harness's own
+ephemeral roots are untouched by it.
 
 This replaced seven per-package test targets: **~647 cases, 66 files, ~19,000
 lines, deleted in one commit**. That was a deliberate clean break, taken with
@@ -624,7 +719,8 @@ the cost stated in advance, and the cost is real enough to write down:
   nothing; and no test now proves a test cannot write the production database.
 - `gmk/gmToolchain` is **deleted outright** — it shipped nothing but those
   tests. `RepoRoot` went with it.
-- The CI matrix rows are now `build`, with ONE `test` job.
+- The CI matrix became `build` rows with ONE `test` job, and then CI went
+  entirely (see "CI is GONE").
 
 Three rules the new suite runs on, all load-bearing:
 
@@ -642,61 +738,67 @@ Three rules the new suite runs on, all load-bearing:
 Isolation is now **by construction** rather than by a guard: the harness mints a
 root under `NSTemporaryDirectory()`, string-appends every path (it never calls
 `Paths.*` to DISCOVER one), and WRITES `GM_FS_ROOT` into the spawned child.
-It deliberately never falls back to `~/gmfs/bin/gm_kernel` — a suite that
-silently tested the last RELEASE instead of the working tree would be green for
-code that is not there. Keep run ids SHORT: `sun_path` is **104 bytes** on
-macOS and the kernel binds a socket under the run root.
+Keep run ids SHORT: `sun_path` is **104 bytes** on macOS and the kernel binds a
+socket under the run root.
 
-CI `bash -n` syntax-checks the scripts and never runs them — they write to
-`~/gmfs` and, in publish's case, tag and upload. That is a preserved invariant,
-not an oversight; the packages are built directly, which is the part worth
-gating. Do not "fix" it by adding a real build.
+The scripts never ran under CI even while CI existed — they write to `~/gmfs`
+and, in publish's case, tag and upload — and that stays true of any future
+gate. Do not "fix" it by adding a real build.
 
-`rebuild_local.sh` and `publish_release.sh` resolve the repo with `git rev-parse
---show-toplevel` plus a script-directory walk, and then **verify `gmk/` is
-actually there**. That check is not decoration: a bare `git rev-parse` can
-resolve to an unrelated enclosing repository, and a `$HOME` under version control
-is the case that actually bites. The plugin's installer sidesteps the problem
-entirely by needing no repo at all.
+Every repo-side script resolves the repo the same way: `gm_repo_root` in
+`gm_build.sh` walks from the library's OWN location (`gmk/scripts/..`) and dies
+unless `gmk/gmk.xcworkspace` is actually there. There is no `git rev-parse
+--show-toplevel` anywhere under `gmk/scripts` any more: a bare `rev-parse` can
+resolve to an unrelated enclosing repository, and a `$HOME` under version
+control is the case that actually bites. The plugin's installer sidesteps the
+problem entirely by needing no repo at all.
 
-There is no BuildInfo stamping step anywhere. A SwiftPM **prebuild plugin** in
-`gmk/Plugins/StampBuildInfo` does it inside the build graph, so Xcode and every CI job get it
-free and a clean clone compiles with no prior shell step.
+There is no BuildInfo stamping STEP anywhere. The `VERSION` build rule
+(`scripts/stamp_build_info.sh`) does it inside the build graph, so ⌘R and every
+scripted build get it free and a clean clone compiles with no prior shell step.
+It re-stamps only when `VERSION` or `.git/HEAD` changes, or on a clean build.
 
-### The language server, and why `Package.swift` sits at the repo root
+### The language server — `buildServer.json` at the repo root
 
-The root `Package.swift` is a **tooling-only shim**: no targets, no products, and
-nothing in the repo reads it. It exists because `sourcekit-lsp` selects a build
-system by looking for `Package.swift` / `compile_commands.json` /
-`buildServer.json` **at the workspace root**, and it does **not** search
-downward. The editor integration launches the server rooted at the repo root, so
-without a manifest there every request fails `No language service found` — which
-is what the whole `gmk/` tree did before this landed.
+`sourcekit-lsp` selects a build system by looking for `buildServer.json` /
+`compile_commands.json` / a SwiftPM manifest **at the workspace root**, in that
+order, and it does **not** search downward. The editor integration launches the
+server rooted at the repo root, so the repo root carries a committed, static
+`buildServer.json` naming `xcode-build-server` (`brew install
+xcode-build-server`), the workspace `gmk/gmk.xcworkspace`, the scheme
+`gm_kernel` and `build_root: gmk/.build/DerivedData`. The paths are RELATIVE and
+resolve against the server's working directory, which is the repo root — that
+is what makes the file committable rather than per-machine.
 
 Three things a reader would otherwise re-derive wrongly:
 
-- **sourcekit-lsp is not an Xcode client.** It reads neither `.xcworkspace` nor
-  `.xcodeproj`, and Xcode's `DerivedData/Index.noindex` is private to Xcode. So
-  moving code TOWARD the Xcode project **reduces** code intelligence — the exact
-  opposite of the natural assumption, and the reason the app's code lives in
-  the package (`Sources/gm_kernel/Vibes`) and the Xcode target compiles none of it.
+- **A manifest at the same root SHADOWS `buildServer.json`.** The old root
+  manifest shim was what made navigation work under SwiftPM, and it is exactly
+  what would break it now: with both present, sourcekit-lsp takes the manifest
+  and finds a package with no targets. Do not bring the shim back for any
+  reason.
+- **Navigation follows the SCRIPTED build, not ⌘R.** `xcode-build-server` reads
+  compile flags out of the DerivedData it is pointed at, and that is
+  `gmk/.build/DerivedData`, which only `gm_xcb` writes. So one scripted build
+  (`rebuild_local.sh`, or the Debug `build` line above) is what makes
+  goToDefinition answer; ⌘R writes Xcode's default DerivedData and the server
+  never sees it. Moving code INTO the Xcode project no longer reduces code
+  intelligence, because the server now consumes Xcode's own build settings;
+  that inversion is the whole reason the build server exists.
 - **A server with no language service still publishes CLEAN diagnostics.** The
   failure mode is a false NEGATIVE, not noise, so an absence of errors is not
-  evidence of correctness. `swift build` / `swift test` / `xcodebuild` remain the
+  evidence of correctness. `xcodebuild build` / `xcodebuild test` remain the
   verification authority; the language server is for NAVIGATION
   (goToDefinition, findReferences, workspaceSymbol). The smoke check is
   `documentSymbol` on a known file returning its expected top-level symbol — it
   fails loudly where diagnostics stay quiet.
-- The server starts **at session start**, so a fresh session is needed before any
-  change here is observable.
 
-Cross-file search additionally needs an index store, which plain `swift build`
-does not write. Background indexing is the current answer; index-while-building
-(`-Xswiftc -index-store-path`) is a deliberate follow-up, not an oversight.
-
-`Package.swift` itself reports `No such module 'PackageDescription'` forever — a
-manifest belongs to no target, so it gets the same fallback settings described
-above. Harmless; do not chase it.
+The server starts **at session start**, so a fresh session is needed before any
+change here is observable. `xcode-build-server` keeps its parsed-flags cache at
+`.compile` beside `buildServer.json`; it is gitignored, and deleting it costs one
+re-parse on the next request. If the relative `build_root` ever fails to resolve
+under some launcher, the fallback is an absolute path in `argv` only — never a
+per-machine `build_root`, which is a file that cannot be committed.
 
 ### Guard rails — MOSTLY REVOKED, deliberately
 
@@ -856,10 +958,12 @@ is refused with a pointer, not worked around.
   rarer state than it used to be.
 - The app was already coupled and stays so: `gmk/VERSION` moves the DMG too.
 - **THE macOS 27 FLOOR IS NOT A CI FACT AND SURVIVES CI'S DELETION.**
-  `gmAgententicsSdk` depends on the vendored `gmClaudeForFoundationModels`, whose
-  own floor is 27, and SwiftPM checks platform floors at GRAPH RESOLUTION —
-  before any `@available` scope exists. An older toolchain does not degrade; the
-  package does not resolve at all. Reaching for `@available` to lower it is the
+  `MACOSX_DEPLOYMENT_TARGET = 27.0` is set at PROJECT level, and the vendored
+  `gmClaudeForFoundationModels` declares its own floor at 27; Xcode checks a
+  package product's floor against its consumer's when it resolves the package
+  graph, before a single file compiles. Lowering the deployment target does not
+  degrade — the product stops resolving, and the bridge target inside the
+  package stops compiling. Reaching for `@available` to lower it is the
   plausible-looking move that cannot work. (The `xcode-27` runner-label note that
   used to sit here went with the workflows: it documented a label nothing selects
   any more. The FLOOR is unrelated to runners and stays.)
@@ -886,10 +990,14 @@ Consequences a reader must not re-derive incorrectly:
   `gm_kernel bridge [--check] <plugin-dir>` is a command of the shipped binary —
   the same bytes in the DMG, the app and `~/gmfs/bin` — and the plugin directory
   is always an explicit argument. `generate_plugin.sh` runs it on the kernel a
-  caller hands in as `GM_KERNEL_BIN` (`rebuild_local.sh` passes the exact staged
-  Mach-O), else on the package's release build. What stays impossible is a
-  SwiftPM build-tool plugin doing it inside `swift build`: plugins are sandboxed
-  from the source tree, and `plugins/gmcc` is committed source.
+  caller hands in as `GM_KERNEL_BIN`, and **`GM_KERNEL_BIN` is REQUIRED** — it
+  exits 2 with a pointer when unset. `rebuild_local.sh` passes the exact staged
+  Mach-O; `xcode_phase.sh bridge` passes the product of the enclosing Beta
+  build. There is no fallback build: a fallback is a second, quieter way to
+  generate from bits nobody staged. What stays impossible is generating inside
+  the compile itself: a build phase sandboxed to the build directory cannot
+  write `plugins/gmcc`, which is committed source, and that is why the write
+  lives in an aggregate target with sandboxing OFF.
 - **TWO OWNERS, TWO DIRECTORIES, and confusing them is the trap.**
   `gm_kernel bridge` owns everything inside `plugins/gmcc/` and REFUSES to touch
   anything outside it — which is why it cannot bump the repo-ROOT
@@ -1063,54 +1171,61 @@ writers: the concurrency guarantee REPLICATES rather than weakening.
 someone, so it carries release optimisation and release signing. Debug exists as
 the test environment only because it is what Xcode Run produces.
 
-**`GMVibesBeta.xcscheme` is the second shared scheme, and it is how Xcode Run
-reaches Beta** — Run, Test, Profile and Analyze all on `Beta`.
-`GMVibes.xcscheme` stays on `Debug` in every action — ⌘R must keep landing on
+**`gm_kernel_beta.xcscheme` is the second shared scheme, and it is how Xcode
+Run reaches Beta** — Run, Test, Profile and Analyze all on `Beta`, and it
+carries the `PluginBridge` build entry. `gm_kernel.xcscheme` stays on `Debug`
+in every action and carries `TestEnvSeed` — ⌘R must keep landing on
 `~/test_gmfs`, because "Debug builds are the TEST environment" is the property
 that dissolved the "second COPY of the app" two-writer hazard. Reaching Beta is
-a scheme SWITCH, never a change to the default one. (This file used to say the
-scheme was "deliberately UNTOUCHED"; it now carries a second build entry,
-`TestEnvSeed` — see below — and the protected property was always the Debug
-configuration, not the file's byte-identity.)
+a scheme SWITCH, never a change to the default one. The protected property is
+the Debug configuration, not the scheme file's byte-identity; the scheme also
+lists `GmKernelTests` as its testable, which is what gives `xcodebuild test`
+something to run.
 
 **`TestEnvSeed` is the second aggregate target, and it is why a plain ⌘R lands
-on a PROVISIONED test environment.** It runs `gm_env.sh seed test` in parallel
-with the Debug app build (no `PBXTargetDependency` in either direction — the
-PluginBridge independence rule verbatim), and Xcode launches the app only after
-every scheme build entry finishes, so the seed always completes first. `seed`
-is a fast, idempotent subset of `create`: an INCREMENTAL `swift build` of
-`gmk` (`--product gm_kernel`; SwiftPM's own `.build`, never DerivedData — no contention),
-staging through the `gm_releases.sh` functions SKIPPED when the staged Mach-O's
-hash already matches, a clone-ONCE of this checkout into `$ROOT/repos` (the
-dated branch is minted at clone time only — a fresh branch per ⌘R would mint a
-session row per build), and `gm_hook context ensure` registration, with any
-autostarted headless kernel SHUT DOWN so the incoming app never pays the
-takeover wait. It deliberately does NOT run `rebuild_local.sh`: that would
-regenerate `plugins/gmcc` into the source tree, the write PluginBridge gates to
-Beta behind three gates, and the Debug path must not acquire it. Gates live
-IN THE SCRIPT (`CONFIGURATION = Debug` only), sandboxing is off on its own
+on a PROVISIONED test environment.** It DEPENDS on `gm_kernel` (a
+`PBXTargetDependency`), and its whole phase is
+`exec /bin/bash "${SRCROOT}/scripts/xcode_phase.sh" seed`. That script gates on
+`CONFIGURATION = Debug` (anything else exits 0 with a `note:`), then runs
+`gm_env.sh seed test` with `GM_SEED_APP` set to the bundle the enclosing build
+just produced. **The seed BUILDS NOTHING.** It stages the kernel out of that
+bundle through `gm_stage_from_bundle`, skipped when the staged Mach-O's hash
+already matches, then does the rest of `create`'s idempotent subset: a
+clone-ONCE of this checkout into `$ROOT/repos` (the dated branch is minted at
+clone time only — a fresh branch per ⌘R would mint a session row per build),
+`gm_hook context ensure` registration, and any autostarted headless kernel SHUT
+DOWN so the incoming app never pays the takeover wait. It deliberately does NOT
+run `rebuild_local.sh`: that would regenerate `plugins/gmcc` into the source
+tree, the write PluginBridge gates to Beta behind three gates, and the Debug
+path must not acquire it. Gates live IN THE SCRIPT, sandboxing is off on its own
 configurations because `~/test_gmfs` is outside the build directory, and that
-root plus `gmKernel/.build` are the only places it writes.
+root is the only place it writes.
 
 **`PluginBridge` is a `PBXAggregateTarget` that regenerates `plugins/gmcc`
 during a Beta build**, and it is the one target in this project that writes into
-the SOURCE TREE. It CALLS `gmk/scripts/generate_plugin.sh` and reimplements
-nothing — a second copy of the generation logic is the next
-`gm_releases.sh`-exists-twice. Three things about it are load-bearing:
+the SOURCE TREE. Its phase is `exec /bin/bash "${SRCROOT}/scripts/xcode_phase.sh"
+bridge`, which CALLS `gmk/scripts/generate_plugin.sh` with `GM_KERNEL_BIN` set
+to the product of the enclosing build, and reimplements nothing — a second copy
+of the generation logic is the next `gm_releases.sh`-exists-twice. Three things
+about it are load-bearing:
 
 - **It sets `ENABLE_USER_SCRIPT_SANDBOXING = NO`** on all three of its own
   configurations, because a sandboxed phase cannot write outside the build
-  directory. The GMVibes target keeps `YES`.
+  directory. The `gm_kernel` target keeps `YES`.
 - **It STAGE-AND-SWAPS the whole committed `plugins/gmcc` tree**, so a Beta
   build can rewrite a committed directory — the largest blast radius in the
   project. Hence its gates, all inside the script rather than only in the
   scheme: `CONFIGURATION = Beta`, an empty `git ls-files -u` (any conflicted
   state, not just `MERGE_HEAD`), and a present `.claude-plugin/plugin.json`.
   Each exits 0 with a `note:`; a real generation failure fails the build.
-- **There is NO `PBXTargetDependency` in either direction**, deliberately.
-  Parallelism comes from the two targets being genuinely INDEPENDENT;
-  `BuildIndependentTargetsInParallel = 1` buys nothing on its own, and a
-  dependency edge would silently serialise the build.
+- **Both aggregates DEPEND on `gm_kernel`, and the old "no edge" rule is
+  REVERSED.** That rule bought parallelism when the aggregates ran their own
+  builds beside Xcode's; now the seed stages and the bridge generates FROM THE
+  PRODUCT of the enclosing build, so the product must exist first and the
+  dependency edge is what makes them correct. There is no second compile left
+  to parallelise, and `BuildIndependentTargetsInParallel = 1` is inert here.
+  The gates run by hand too: `CONFIGURATION=Release bash
+  gmk/scripts/xcode_phase.sh bridge` prints its `note:` and exits 0.
 
 Three places cross-check the baked root, and they ask different questions:
 `build-dmg.sh` (does the bundle match the configuration it was built with?),

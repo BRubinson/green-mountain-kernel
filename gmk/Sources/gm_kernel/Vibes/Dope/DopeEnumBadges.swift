@@ -1,5 +1,4 @@
 import SwiftUI
-import GmDaemonSdk
 
 /// Single-line capsule strip of an enum's option codes with a trailing "+N" overflow chip.
 /// `ViewThatFits` picks the widest candidate that fits the width the property row leaves over.

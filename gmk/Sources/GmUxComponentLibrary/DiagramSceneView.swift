@@ -1,6 +1,5 @@
 #if canImport(SwiftUI)
 import SwiftUI
-import GmDaemonSdk
 
 /// Scene composition: the painter-ordered ZStack (underlay → cards/scopes → edge
 /// canvas → overlay) at a HOST-SUPPLIED offset. It carries no background paint,

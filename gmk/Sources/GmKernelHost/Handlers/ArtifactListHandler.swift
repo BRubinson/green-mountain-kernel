@@ -1,6 +1,4 @@
 import Foundation
-import GmDaemon
-import GmDaemonSdk
 
 /// ARTIFACT_LIST — artifact pointers for a prompt, so resume/review flows
 /// know which phase files exist without globbing.
