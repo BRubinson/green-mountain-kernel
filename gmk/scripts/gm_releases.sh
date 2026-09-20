@@ -214,23 +214,25 @@ gm_stage_dir() {
 # the app hosts the writer they are literally the same binary, and shipping both
 # is how the two-track drift this store was built to end comes back.
 #
-# So the DMG is the artifact and this is the extraction. The app carries the CLI
-# at Contents/Helpers/gm_kernel; everything downstream — the version directory,
-# the manifest, SHA256SUMS, the symlink activation, rollback by swap — is
-# UNCHANGED. Only the source of the bytes moved.
+# So the DMG is the artifact and this is the extraction. The app's own executable
+# at Contents/MacOS/gm_kernel IS the CLI; everything downstream — the version
+# directory, the manifest, SHA256SUMS, the symlink activation, rollback by swap —
+# is UNCHANGED. Releases before the one-Mach-O bundle carried a copy at
+# Contents/Helpers, which is read only when MacOS has no kernel.
 #
 # ## Do not re-sign what comes out
 #
-# A helper copied out of a signed bundle keeps its signature, and re-signing it
+# A binary copied out of a signed bundle keeps its signature, and re-signing it
 # here would replace a Developer ID signature with whatever this machine happens
 # to hold — usually nothing.
 gm_stage_from_bundle() {
     _app="$1"; _channel="$2"; _version="$3"; _sha="${4:-unknown}"
-    _helper="$_app/Contents/Helpers/$GM_MACHO"
+    _helper="$_app/Contents/MacOS/$GM_MACHO"
+    [ -x "$_helper" ] || _helper="$_app/Contents/Helpers/$GM_MACHO"
 
     if [ ! -x "$_helper" ]; then
-        echo "[GMB] ERROR: $_app carries no Contents/Helpers/$GM_MACHO" >&2
-        echo "       Nothing to stage. The bundle was built without the embed phase." >&2
+        echo "[GMB] ERROR: $_app carries no Contents/MacOS/$GM_MACHO (nor a legacy Contents/Helpers copy)" >&2
+        echo "       Nothing to stage. The bundle was built without the kernel install phase." >&2
         return 1
     fi
 

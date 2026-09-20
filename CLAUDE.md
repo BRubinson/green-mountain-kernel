@@ -103,7 +103,7 @@ gm_kernel-v54.0.2
 ```
 
 **THE TARBALL IS GONE.** It held the same Mach-O the bundle now carries at
-`Contents/Helpers/gm_kernel` — one piece of code, staged twice, versioned by two
+`Contents/MacOS/gm_kernel` (it was `Contents/Helpers` until the one-Mach-O bundle) — one piece of code, staged twice, versioned by two
 mechanisms (`.gm_version` for the tarball, `MARKETING_VERSION` for the app). That
 is the two-track drift the single-tag release was created to end, reproduced
 inside a single tag.
@@ -239,359 +239,132 @@ and the one `swift test` job. **Nothing replaced them.** Verification is now
 whatever a person runs:
 
 ```bash
-swift build --package-path gmk/gmKernel
-swift test  --package-path gmk/Gm_Kernel_test
+swift build --package-path gmk --product gm_kernel
+swift test  --package-path gmk
 ```
 
-## Layout
+## Layout — ONE package, ONE binary
 
-- `gmk/` — the new home of every Swift deliverable: one Xcode project
-  (`gmk/gmk.xcodeproj`) over SEVEN shipped packages, plus an eighth that ships
-  nothing and holds the repository's ONE test suite, plus a ninth that is
-  **vendored third-party source and authored nowhere in this repo**.
-  (TWO histories cross here and the count only makes sense with both. There were
-  seven shipped packages until v30, when `gmMcp` was deleted and its three
-  sources became the `GmMcpServer` target inside `gmDaemonSdk` — see the entry
-  below for why that package existed only to own them — which took the count to
-  six. `gmITerm2Client` then arrived with the run bar and took it back to seven.
-  Separately, the test slot held `gmToolchain`, the contract-test package,
-  deleted in the test rebuild; `Gm_Kernel_test` occupies it now.)
-  - **Open `gmk/gmk.xcworkspace`, not the project.** The workspace lists the
-    project alongside SEVEN packages as first-class members, which is the
-    only arrangement in which Xcode generates schemes for a package's TEST
-    targets — `GmKernelTests` exists under the workspace and does not exist
-    under the project. (It used to name `GmToolchainTests` and `GmMcpTests`;
-    both are gone, and `Gm_Kernel_test` is the sole test package now.) The project is deliberately kept
-    SELF-SUFFICIENT anyway (it still carries its own local package references),
-    because `build-dmg.sh` drives it with `-project`;
-    the workspace is an additional door, not a replacement, and neither file
-    needed to change.
-  - `gmk/gmDaemonSdk/` — the base layer: the wire protocol (including the
-    workflow spec the bot phases are driven by), the client, and the shared
-    domain layer (`Dope/`, `Diagram/` models, `Hook/`, `Kbite/`, `Environment/`,
-    `Paths.swift`, `RepoRelativePath.swift`, `GitHead.swift`, `StoreError`), plus
-    **`GmHookCli`**, the shell-client personality as a LIBRARY, and a four-line
-    `gm_hook` shim over it. Still zero external dependencies — the library split
-    added none, and that property is the whole point of this manifest.
-  - `gmk/gmDaemon/` — persistence plus **`GmKernelHost`**: the server, the
-    handlers, the watchers, and the ownership primitives
-    (`KernelOwnership` / `KernelWriter`). Owns the sole GRDB pin.
-    **The app DOES now link this**, reversing what this file said for the whole
-    life of the split — see the manifest's own header for why, and why the
-    single-writer guarantee got STRONGER rather than weaker in the process.
-    Sources are laid out as `Sources/GmDaemon/Persistence/{Migrations,Entities,Store}/`,
-    with `Store/Repositories/` beneath the Store surface. **`Migrations/` is
-    one file per migration** (`m00NN_<name>.swift`, each an `extension
-    Migrations` with one `static func` registering exactly one id) plus
-    `Migrations.swift`, which holds `currentSchemaVersion`, `baseColumns` and
-    the ordered `ladder` array that IS the run order. Adding a migration is a
-    new file AND a new ladder entry; a file without an entry never runs, and
-    `testTheLedgerIsDenseAndUnique` is what catches it. Bodies were moved
-    byte-identically — the ledger INSERT still lives inside each body, and
-    m0001 is still frozen. `ChewedArtifact`, `WorkflowGates`, `DopeAreaTable`
-    and `PersistedEvent` deliberately stay at the target root: they are not
-    persistence.
-  - `gmk/gmKernel/` — the multi-call binary: ONE Mach-O linking `GmKernelHost`,
-    `GmMcpServer` and `GmHookCli`, dispatching on `basename(argv[0])` and then on
-    a subcommand. **argv[0] must win**, because `gm_hook call BACKUP` has `call`
-    as `argv[1]` and a subcommand-first rule would try to dispatch it. A bare
-    `gm_kernel` prints usage and **exits 2** — of every possible dispatch default
-    that is the one that could cost data, so it deliberately does not become a
-    writer. Ships NO test target, and its CI row is `swift build` for that
-    reason. Its contract USED to be asserted by `MultiCallBinaryContractTests`,
-    which read the source as a file; that test was deleted in the test rebuild,
-    so argv[0]-beats-argv[1] and the exit-2 default are now conventions held by
-    the code and this note alone. `Gm_Kernel_test` does exercise the binary — it
-    boots one — but it does not assert the dispatch rules.
-  - `gmk/gmUxComponentLibrary/` — the shared component surface: the diagram UI
-    views plus the geometry, routing, layout and organizer helpers they are built
-    on. Diagrams only for now, built as a surface that expects to grow.
-  - `gmk/gmAgententicsSdk/` — the agent-tool surface: seven `GmAgentTool`
-    families declared against Apple's FoundationModels `Tool` protocol, with
-    `@Generable` argument/result schemas and `@Guide`-carried invariants.
-    **Declared, not wired** — every `call(arguments:)` throws and names the
-    daemon verb it will send. It **depends on `gmDaemonSdk`** so the tool
-    vocabulary IS the wire vocabulary and cannot drift from it; that edge was
-    added deliberately and it replaced an earlier decision that this package stay
-    empty. It is the only package carrying `unsafeFlags` (the `GmAgentOs 1.0`
-    availability define), which permanently bars it from being consumed as a
-    versioned remote dependency — free today, since every gmk package is a local
-    `path:` dependency, and the direct cause of the vendoring below.
-    It also owns `Templates/`. **`Templates/original/` IS DELETED (v30)** —
-    `OriginalGmccEnums` / `OriginalGmccInstructions` / `OriginalGmccPrompts`, the
-    quarantined byte-exact archive of the hand-written plugin markdown, is gone,
-    and nothing referenced it. It existed to preserve what the plugin USED to say
-    while the native templates were written; now that the plugin is GENERATED
-    from those templates, an archive of the pre-generation text is a third
-    description of the same thing and a standing invitation to generate from the
-    wrong one. Git holds the history.
-    Personas are `Instructions` and invocations are `Prompt`, and that split is
-    load-bearing: a model obeys instructions over prompts, so caller-supplied
-    text must never reach the instruction half.
-    **PHASE TEXT LIVES IN `Template+GmCdeWpirWorkflowTemplate.swift`, AND THAT IS
-    THE NEWER DESCRIPTION.** This file used to claim phase text was "read live
-    from `WorkflowSpec.instructions(variant:phase:)`" — it never was, and the
-    claim is what makes the mistake tempting. The twelve
-    `GM_CDE_PHASE_*_TEMPLATE` constants are structured (**Calls** / **Gate**) and
-    speak the `cde` vocabulary natively; `WorkflowSpec` is the older prose that
-    only acquired those names by a mechanical rename. **The direction of travel
-    is `WorkflowSpec` → the templates, never the reverse.** A v30 change briefly
-    repointed the templates at `WorkflowSpec` on the theory that they were the
-    duplicate, which fed the new layer the old text.
-    TWO DESCRIPTIONS DO COEXIST, and the platform floor is why: `WorkflowSpec`
-    lives in the macOS 14 base and is what `BOT_NEXT` serves at runtime, while
-    these constants are macOS 27 and cannot be read by the daemon. They are
-    reconcilable only where both are reachable — the generator.
-    `AgentConfigurations/` is what ASSEMBLES all of it into native values, and it
-    is the layer to read first. `AgentSessionProfile.swift` holds the
-    `DynamicInstructions` + `DynamicProfile` pair, built with `Profile { }` and
-    its modifier chain rather than a hand-rolled conformance. Assembly order is
-    **core → personality → directive(s) → phase text → step set**, toolset
-    composed last inside the dynamic body; longest-lived content first, because
-    reordering on a phase change throws away the key-value cache silently. One
-    wart in that order is recorded in the file: phase text is the most volatile
-    block and sits ahead of the fixed step set, kept deliberately.
-    Each part is wrapped as `Instructions(...)` because `String` is
-    `InstructionsRepresentable` but NOT `DynamicInstructions` — `Instructions`
-    itself conforms, and that single wrap is the whole adapter.
-    `AgentSessionAsk.swift` is the other half: it wraps a filled ask as a
-    `Prompt` and REFUSES to build one whose `{snake_case}` holes are unfilled,
-    turning a visible-after-the-fact convention into a precondition.
-    **IT IS NO LONGER "DECLARED, NOT WIRED"**, and the earlier claim here that it
-    "deliberately sets no `.model()`" is retired: the profile calls `.model()`
-    with a `ClaudeLanguageModel` from `AgentGmkDirective+ModelChoice`, so model
-    selection lives IN-PACKAGE for this layer rather than being daemon-managed.
-    Tool `call(arguments:)` bodies are still all stubs that throw.
-    **Two reasoning knobs exist and only ONE is used.** `ClaudeModel.Effort` is
-    baked into the model handle via `fixedEffort:`; the framework's own
-    `.reasoningLevel()` is deliberately left UNSET. Setting both leaves two
-    layers deciding one thing with no precedence between them — if reasoning ever
-    moves to the framework side, delete `fixedEffort` in the same change.
-    **`GmCdeRpirWorkflowPhase` is a deliberate MIRROR of `WorkflowSpec.Phase`**,
-    and the source of truth for this layer. The daemon's enum could not be moved
-    here: `gmDaemonSdk` is the zero-dependency base and this package already
-    depends on it, so inverting the edge would cycle AND drag `unsafeFlags` plus
-    the macOS 27 floor into `gm_hook`, `gm_daemon` and every CI job. The two
-    enums are bridged by **exhaustive switches with no `default:`** — with the
-    contract-test tier deleted, that is the only mechanism left that still fails
-    the build when the daemon grows a phase. A `rawValue` bridge would compile
-    forever and return `nil` for a phase the daemon had started serving.
-    `Templates/Template+GmAgentTool.swift` is the tool vocabulary, authored once:
-    the shared field guides are **stems plus tails** (`promptUuid` had 13 distinct
-    descriptions across 13 sites, most contextually correct — collapsing them to
-    one constant makes the schemas worse), and every `.anyOf` now DERIVES from its
-    `GmDaemonSdk` enum. Two are deliberate non-derivations, marked as such:
-    review resolution excludes `open` (not a terminal status), and the
-    architecture change kind has no SDK enum — `ChangeKind` is `edit/create/...`
-    for FILE changes and is a near-miss trap.
-    `@Guide(description:)` and `.anyOf` accept non-literal expressions; verified
-    empirically against the macOS 27 SDK, since the macro signature alone does not
-    settle it.
-    **Its floor is macOS 27, not 26** — see the runner note below.
-  - `gmk/gmClaudeForFoundationModels/` — the ninth package: Anthropic's
-    **ClaudeForFoundationModels, vendored** (Apache-2.0). It conforms Claude to
-    Apple's `LanguageModel` protocol so a `LanguageModelSession` can be driven by
-    a server-side Claude model. **Do not edit it** — the only local modification
-    is a provenance header on its `Package.swift`; everything else is
-    byte-identical to the recorded upstream commit, and `VENDORED.md` carries the
-    commit, what was left behind, and the re-sync recipe. Fix a problem upstream
-    or in the re-sync, never in place.
-    **Vendored rather than pinned by URL, and that asymmetry with GRDB is the
-    point**: `unsafeFlags` bars `gmAgententicsSdk` from remote resolution, so every
-    `gmk/` package is consumed by local `path:`, and anything joining that graph
-    must be reachable the same way. Zero external dependencies of its own, which
-    is what keeps it a self-contained copy rather than the head of a tree.
-  - **`gmk/gmMcp/` IS DELETED (v30).** Its three sources — `GmMcpServer.swift`,
-    `FastPath.swift`, `PrimaryDoors.swift` — are the `GmMcpServer` target inside
-    `gmDaemonSdk` now, beside `GmHookCli`. They belong together: both are
-    harness-side CLIENTS of the daemon, both are pure relays with no persistence
-    of their own, and both floor at macOS 14. The package existed only to own
-    those files and a GRDB checkout it never used.
-    **THE `gm_mcp` NAME IS NOT DELETED, and the distinction is load-bearing.**
-    It is an ENTRYPOINT in the release-store contract — `GM_ENTRYPOINTS` in
-    `gm_releases.sh`, which drives the symlink loop and the manifest's
-    `entrypoints` array — plus the installer, the stale check, both CI workflows
-    and `project.pbxproj`. `gm_kernel` still dispatches it through `argv[0]`.
-    Deleting the PACKAGE was asked for; deleting the NAME was not, and would
-    break every install that upgrades.
-  - `gmk/gmITerm2Client/` — the iTerm2 transport, and the only way the app opens
-    a pane. It holds the vendored `api.proto`, the **COMMITTED** generated Swift
-    (CI has no `protoc`, and that cost was accepted at decision time — `PROTO.md`
-    carries the regeneration recipe and the rule that the diff is read before it
-    is accepted), four lifted transport files, a typed error enum and ONE public
-    façade. Four things a reader must not re-derive wrongly:
-    - **It carries the tree's FIRST remote non-GRDB pin** (SwiftProtobuf),
-      confined to this package exactly as GRDB is confined to `gmDaemon`.
-      Nothing generated crosses its actor boundary, so `gmVibesCore` never
-      imports SwiftProtobuf.
-    - **It is NONISOLATED by default while `gmVibesCore` is MainActor by
-      default**, and that asymmetry is deliberate rather than an oversight in
-      one of them.
-    - Its blocking POSIX socket I/O runs on a `DispatchSerialQueue`-backed actor
-      executor, **never the cooperative pool** — a 30-second blocking `recv` on
-      a pool thread can starve every other async in the app.
-    - **It is GMCC-AGNOSTIC by construction**: it takes a ready-made command
-      string and knows nothing of `GM_FS_ROOT`, `gm_hook`, prompts or bot tiers.
-      That is why the script builder lives in `gmVibesCore`, which already has
-      `Paths`.
-  - `gmk/gmVibes/` — the GMVibes macOS app target, and now a **THIN** one: it
-    holds `GMVibesApp.swift` (the `@main` entry point), `Assets.xcassets` and a
-    README, and nothing else. Release via the `release-dmg` skill.
-    **THE PRODUCT IS `gm_kernel.app`; GMVibes is now an internal name only.**
-    `PRODUCT_NAME = gm_kernel` in all three configurations, so Finder, the Dock
-    and the menu bar all say gm_kernel. What deliberately did NOT move: the
-    bundle identifiers stay `rube.GMVibes` / `.beta` / `.test` (the
-    debug→`~/test_gmfs` environment mapping and the NSUserDefaults domains key
-    on them); the Xcode TARGET and SCHEMES stay `GMVibes` / `GMVibesBeta`
-    (`build-dmg.sh` drives `-scheme GMVibes`); this directory and the
-    `gmVibesCore` package keep their names; and the window title stays
-    "GM Vibes" — the one place the old name is meant to show.
-    **`gm_kernel` IS A HOMONYM, accepted at decision time:** it names both the
-    staged CLI Mach-O in `~/gmfs/bin` and the app bundle
-    `/Applications/gm_kernel.app`. They are not merely the same version — the
-    installer extracts the CLI out of the bundle, so they are the same bytes;
-    one name for one piece of code in two containers. `gm_retire_legacy_app`
-    in `gm_releases.sh` removes a lingering `/Applications/GMVibes.app` on
-    install/publish (guarded: refuses while the app runs, checks the bundle id
-    is `rube.GMVibes` before touching it) — the second-copy hazard for the OLD
-    name. The installer still reads EITHER bundle name out of a DMG, because
-    the published back-catalogue contains `GMVibes.app` and cannot be
-    rewritten.
-  - `gmk/gmVibesCore/` — the shipped package holding the app's ~99
-    sources. They
-    moved out of the Xcode target so that **sourcekit-lsp can resolve them**: the
-    language server reads SwiftPM, `compile_commands.json` or `buildServer.json`
-    and is **not** an Xcode client, so a source that lives only in an Xcode
-    target gets no build settings and reports `No such module 'GmDaemonSdk'` on
-    every import. See the root `Package.swift` note below. Depends on
-    `gmDaemonSdk`, `gmUxComponentLibrary` and `gmITerm2Client`, and on nothing
-    else — **not** on
-    `gmDaemon`: the app target links `GmKernelHost` for future writer hosting but
-    nothing imports it, so that link stays on the APP target.
-    **IT FLOORS AT macOS 26, AND SO DOES THE APP.** Both were 27, and neither
-    needed to be: the GMVibes target also linked `GmAgententicsSdk`, which depends
-    on the vendored `gmClaudeForFoundationModels` — both at 27 — and SwiftPM
-    checks floors at GRAPH RESOLUTION, so that one link pinned the whole app.
-    Nothing imported it. The link is gone from `project.pbxproj` (product
-    dependency, build file, frameworks entry and the local package reference, all
-    four) and `MACOSX_DEPLOYMENT_TARGET` is 26.0 in both configurations.
-    Verified rather than assumed: a macOS 26 build of the scheme failed ONLY
-    inside `ClaudeForFoundationModels` before the link was cut, and succeeds after.
-    **`GmKernelHost` must NOT be removed alongside it** — that link is the
-    deliberate future writer-hosting one and floors at 14, so it costs nothing.
-    A consequence worth holding: `gm_bridge_writer` can no longer be built from
-    the Xcode project. It is built by `swift build --package-path
-    gmk/gmAgententicsSdk` via `generate_plugin.sh`, and CI builds it directly.
-    **`gmVibesCore`'s own manifest is swift-tools-version 6.2** while the rest of
-    the repo is on
-    6.0, because `defaultIsolation` does not exist before 6.2. That setting is
-    not a preference: `project.pbxproj` compiles the app target with
-    `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` and `SWIFT_VERSION = 5.0`, these
-    sources were written against both, and the package restates them in
-    `appTargetSettings`. **The two halves compile the same code — if the app
-    target's settings move, these must move with them.**
-    The app/package boundary is deliberately narrow. `GMVibesServices` exposes a
-    four-property FACADE (`vitalsReport`, `kernelRole`, `protocolVersion`,
-    `buildSha`) rather than a public `daemon`, because publishing
-    `DaemonConnectionModel` would drag an entire observable model into the public
-    surface to serve a handful of reads. Raise nothing to `public` that
-    `GMVibesApp.swift` does not name.
-    Two facts about its `gmITerm2Client` edge, kept here because this is the only
-    package that takes it. **`gmITerm2Client` WAS LOWERED FROM 27 TO 26 IN THIS
-    MERGE, and it had to be.** It arrived on a branch that floored at 27
-    throughout, so it was internally consistent there and neither merge diff
-    shows the clash — but a dependency may not floor ABOVE its consumer, and
-    `gmVibesCore` is 26. The 27 was never earned: nothing in that package's
-    sources needs it, and SwiftProtobuf supports macOS 10.15+. Verified by build
-    at 26 rather than inferred. And that edge is what `PromptRunBar`'s Play
-    button launches through; it adds no wire verb and no daemon involvement,
-    because the app talks to iTerm2 directly.
-  - `gmk/Gm_Kernel_test/` — the eighth package, and the only one that **ships
-    nothing** (`products: []`). The repository's ENTIRE test suite: one shared
-    environment per test process, a real `gm_kernel` booted against a temporary
-    root, driven over the wire and read back with read-only SQL. Subfoldered per
-    package under `Tests/GmKernelTests/` for navigation, not isolation — they
-    share the one environment.
-    Depends on `gmDaemonSdk` (the public wire surface it is written against) and
-    `gmDaemon` (for `Migrations` ONLY — never `Store`, which would be the second
-    writer the ownership token forbids).
-    **It replaced `gmToolchain`**, the contract-test package, which was deleted
-    outright along with ~647 cases across seven targets. `RepoRoot` went with it.
-    See "ONE test package — and what was given up to get it" for the full cost,
-    including the ten invariants that are now unenforced.
-  - `gmk/scripts/` — the build and install path for the binaries (see below),
-    plus the app's DMG build and release scripts used by the `release-dmg`
-    skill. Scripts live HERE and not beside the app sources: `gmk/gmVibes/` is a
-    filesystem-synchronized Xcode group, so anything dropped in it becomes part
-    of the app target's source directory.
-  - `gmk/VERSION` — the version pin for the three shipped binaries.
-- `plugins/gmcc/` — the Claude Code plugin. **ENTIRELY GENERATED SINCE v30 — DO
-  NOT HAND-EDIT ANY FILE IN IT.** Every byte comes from the bridge values in
-  `gmk/gmAgententicsSdk/Sources/GmAgententicsSdk/HarnessBridge/`, and the next
-  regeneration overwrites whatever you changed. To change the plugin, change the
-  bridge. See "The plugin is GENERATED" below.
-  It ships **no Swift sources** — the package left this directory for `gmk/` and
-  did not come back.
-- `.gmcc/` — this repo's committed DOPE tree (Domain Optimized Project Essence);
-  sessions boot-sync their dope scope from it. **The directory keeps this name.**
-  Any rename pass must exclude the `.gmcc/` path segment — a blind sweep would
-  break every dope-scope path at once.
+- `gmk/Package.swift` — **the whole Swift deliverable is one SwiftPM package**,
+  swift-tools-version 6.2, `platforms: [.macOS("27.0")]`, with exactly ONE
+  product: the `gm_kernel` executable. There is no library product. Sections
+  are TARGETS of that package, kept as separate modules only where a module
+  boundary carries a setting (GRDB confined to `GmDaemon`, SwiftProtobuf confined
+  to `GmITerm2Client`, the `GmAgentOs` `unsafeFlags` define on `GmAgententicsSdk`)
+  or where the test target imports them. `import` lines did not change.
+  - `Sources/GmDaemonSdk/` — the base: wire protocol (including the workflow
+    spec), the client, the shared domain layer (`Dope/`, `Diagram/`, `Hook/`,
+    `Kbite/`, `Environment/`, `Paths.swift`, `StoreError`). Zero external deps.
+    Carries the `StampVersion` prebuild plugin that generates `GmVersion.current`
+    from `gmk/VERSION`.
+  - `Sources/GmHookCli/`, `Sources/GmMcpServer/` — the shell-client and pen
+    personalities, both pure relays over the SDK.
+  - `Sources/GmDaemon/` — persistence (`Persistence/{Migrations,Entities,Store}`),
+    the only target that names GRDB. Migrations are one file each plus the
+    ordered `ladder` in `Migrations.swift`; a file without a ladder entry never
+    runs, and `testTheLedgerIsDenseAndUnique` catches it.
+  - `Sources/GmKernelHost/` — the server, handlers, watchers and the ownership
+    primitives (`KernelOwnership` / `KernelWriter`). Carries the
+    `StampBuildInfo` prebuild plugin.
+  - `Sources/GmUxComponentLibrary/` — the diagram UI views and their geometry,
+    routing, layout and organizer helpers.
+  - `Sources/GmAgententicsSdk/` — the agent-tool surface, the templates, the
+    agent configurations and **`HarnessBridge/`, which the plugin is generated
+    from**. The only target with `unsafeFlags` (the `GmAgentOs` availability
+    define); that flag already barred every gmk package from remote consumption,
+    so it costs nothing inside one package. `GmBridgeCli` here is the body of
+    `gm_kernel bridge`.
+  - `Sources/GmITerm2Client/` — the iTerm2 transport: the committed generated
+    protobuf Swift (`Generated/`; `gmk/proto/PROTO.md` carries the regeneration
+    recipe), the lifted transport files, one public façade. Nonisolated by
+    default; blocking socket I/O runs on a `DispatchSerialQueue`-backed actor
+    executor, never the cooperative pool. GMCC-agnostic by construction.
+  - `Sources/gm_kernel/` — **the kernel, and the app.** `main.swift` is the
+    dispatcher; `Vibes/` is the GM Vibes app's ~107 sources including
+    `GMVibesApp.swift` (no `@main`; the dispatcher calls `GMVibesApp.main()`).
+    The target compiles under `.swiftLanguageMode(.v5)` and
+    `.defaultIsolation(MainActor.self)` because the app code was written under
+    both; the Xcode project restates the same two settings.
+  - `Plugins/StampVersion/`, `Plugins/StampBuildInfo/` — the two prebuild
+    plugins. Both read `gmk/VERSION` from the package directory itself.
+  - `Tests/GmKernelTests/` — the ONE test target (subfoldered per section for
+    navigation, not isolation). `Tests/.swift-format` is the nested config that
+    allows force-try and IUOs there. See "ONE test target" below.
+  - `gmClaudeForFoundationModels/` — Anthropic's ClaudeForFoundationModels,
+    **vendored** (Apache-2.0) and consumed by `.package(path:)`. The only
+    separate package left, because it is upstream source: `VENDORED.md` carries
+    the commit and the re-sync recipe. Do not edit it in place.
+  - `proto/api.proto` — the iTerm2 protobuf, outside any target because SwiftPM
+    would otherwise report it as an unhandled resource.
+  - `scripts/` — build, release, environment and lint scripts, plus
+    `wire_keys.py`. Scripts live here and never beside the app sources.
+  - `gmVibes/` — the Xcode app target's **non-code** payload: `Info.plist`
+    (the three baked keys), `Assets.xcassets`, README. It compiles no Swift.
+  - `gmk.xcodeproj` / `gmk.xcworkspace` — see "The app bundle" below.
+  - `VERSION` — the one version pin for the binary, the DMG and the plugin.
+- `plugins/gmcc/` — the Claude Code plugin. **ENTIRELY GENERATED — DO NOT
+  HAND-EDIT.** Every byte comes from `Sources/GmAgententicsSdk/HarnessBridge/`
+  through `gm_kernel bridge`; the next regeneration overwrites whatever you
+  changed. See "The plugin is GENERATED" below.
+- `.gmcc/` — this repo's committed DOPE tree. The directory keeps this name.
 
-Dependency graph, acyclic and 5 deep:
+### The five personalities of `gm_kernel`
+
+argv[0] wins over argv[1] (`gm_hook call BACKUP` has `call` as argv[1]):
+`gm_daemon`, `gm_mcp`, `gm_hook` are release-store symlinks at the one Mach-O.
+Subcommands: `daemon`, `mcp`, `hook`, `bridge` (`gm_kernel bridge [--check]
+<plugin-dir>`, the plugin generator) and `app`. **A no-argument launch runs the
+app ONLY when the binary sits inside an `.app` bundle** — that is what
+LaunchServices does — and a bare `gm_kernel` in a shell still prints usage and
+exits 2, because a stray invocation must never become a writer. The headless
+daemon personality never touches `NSApp`, so linking AppKit/SwiftUI into the
+binary does not make a hook-spawned daemon an AppKit process.
+
+The generator became a subcommand because the ONLY reason it was a separate
+executable was the kernel's macOS 14 floor against the agentics section's 27.
+With one package everything floors at 27 (accepted at v55). The
+`-define-availability` macro expands at parse time inside the agentics target,
+so no other target needs the flag.
+
+### The app bundle: the executable IS the kernel
+
+`gm_kernel.app`'s `Contents/MacOS/gm_kernel` is the SwiftPM-built binary. The
+Xcode `GMVibes` target **depends on the package's `gm_kernel` executable
+product** (one `XCLocalSwiftPackageReference` at `.`, one
+`XCSwiftPackageProductDependency`, one `PBXTargetDependency` with a `productRef`),
+so Xcode compiles every kernel source itself — indexing, completion, previews
+and Xcode debug symbols cover `Sources/gm_kernel/Vibes` — and the "Install
+gm_kernel executable" phase copies `$BUILT_PRODUCTS_DIR/gm_kernel` over
+`$TARGET_BUILD_DIR/$EXECUTABLE_PATH` BEFORE code signing. The phase declares its
+input and output, so the target keeps `ENABLE_USER_SCRIPT_SANDBOXING = YES`, and
+it refuses a bundle whose executable does not answer `--version` as the kernel.
+**`Contents/Helpers/` no longer exists.** The installer and release store read
+`Contents/MacOS/gm_kernel` first and fall back to `Contents/Helpers` only for the
+published back-catalogue.
+
+Two build systems compile one source: SwiftPM (`swift build --product
+gm_kernel`) for the release store, tests and plugin generation; Xcode for the
+bundle, the DMG, ⌘R and previews. That is the arrangement that already existed
+for the old app module. `rebuild_local.sh --app` stages the bundle's executable,
+so released bytes are Xcode's build; the plain loop stages SwiftPM's.
+
+Dependency graph, inside one package, acyclic:
 
 ```
-gmDaemonSdk ──┬── gmDaemon ──────────────────┐   (gmDaemonSdk now also holds
-   │          │                              │    the GmMcpServer target;
-   │          ├── gmUxComponentLibrary ──────┤    gmMcp the PACKAGE is deleted)
-   │          │                              │
-   │          └──────────────────────────────┤
-   │                                         ├── gmVibesCore ── gmVibes (the app)
-   │              gmITerm2Client ────────────┘                  (a THIN target:
-   │              (SwiftProtobuf, confined)                      @main + Assets)
-   │
-   ├── gmAgententicsSdk ──┐
-   │        │             │  (vendored, zero deps of its own)
-   │        │  gmClaudeForFoundationModels ──┘
-   │        │
-   │        └── gm_bridge_writer  (executable: emits plugins/gmcc)
-   │
-   └── gmKernel  ← links GmKernelHost + GmMcpServer + GmHookCli
-                   (the CLI half: one Mach-O, three personalities)
+GmDaemonSdk ──┬── GmHookCli ─────────────┐
+   │          ├── GmMcpServer ──┐        │
+   │          │                 │        │
+   │          └── GmDaemon ── GmKernelHost ─┤
+   │                 (GRDB)                 ├── gm_kernel  (main.swift + Vibes/)
+   ├── GmUxComponentLibrary ────────────────┤      = the CLI, the daemon, the pen,
+   │                                        │        the generator AND the app
+   ├── GmAgententicsSdk ────────────────────┤
+   │        └── gmClaudeForFoundationModels │  (vendored, separate package)
+   │                                        │
+   └── GmITerm2Client (SwiftProtobuf) ──────┘
+
+GmKernelTests → GmDaemonSdk, GmDaemon
 ```
-
-`gmITerm2Client` hangs off nothing in this tree — it does not depend on
-`gmDaemonSdk` and it is GMCC-agnostic by construction. It **cannot cycle** for
-the strongest available reason: nothing depends on it except `gmVibesCore`, and
-its only dependency is remote.
-
-`gmVibes` now takes an edge on `gmDaemon` — the LINK is in place and the app is
-where the writer will be hosted. **It does not host it yet**; see "What this pass
-did NOT land" below before assuming otherwise.
-
-`gmKernel` cannot cycle: nothing depends on it. It is a leaf that happens to link
-three libraries.
-
-The forcing constraint: the wire types already reference the dope and diagram
-document types, so those models cannot sit ABOVE the SDK. Any layering that
-tries becomes a dependency cycle.
-
-`gmAgententicsSdk` was drawn standing alone until its tool surface was filled
-in. It joined the graph because every tool schema speaks the daemon's vocabulary
-(`ExplorationFindingKind`, `SearchKind`, `ReviewVerdict`, `PromptStatus`…), and
-the alternative was a hand-maintained second copy of a dozen enums whose raw
-values are load-bearing on the wire AND in db CHECK constraints. The edge cannot
-cycle — nothing depends on that package — and `gmDaemonSdk` does not inherit its
-`unsafeFlags`, because SwiftPM target settings apply only to the declaring
-target.
-
-It has since taken a **second** edge, to the vendored
-`gmClaudeForFoundationModels`. That one also cannot cycle, for a stronger reason:
-the vendored package has zero dependencies of its own. Its cost is the platform
-floor — it requires macOS 27, a dependency may not have a floor above its
-consumer's, and **SwiftPM checks floors at GRAPH RESOLUTION, before any
-`@available` scope exists**. So `gmAgententicsSdk` had to move to 27 as well, and
-the CI runners with it. Reaching for `@available` to keep the floor at 26 is the
-plausible-looking move that cannot work.
 
 ## The shared service layer — what "shared memory" actually meant
 
@@ -618,7 +391,7 @@ in 133 places in one directory. So composition needed no new vocabulary:
 - `inTransaction { }` is the ONE new public API. The ~120 already-`public` verbs
   on the `Store+*` extensions compose inside it unchanged, so there is exactly
   one implementation per verb, so nothing downstream notices. (The composition
-  used to be pinned by `VerbRegistryTests`; `Gm_Kernel_test` re-asserts the
+  used to be pinned by `VerbRegistryTests`; `GmKernelTests` re-asserts the
   registry-row half of that check.)
 - An explicit `uow:` parameter was rejected deliberately: it is the deferred
   96-handler retype wearing a different hat, because it has to appear in every
@@ -742,16 +515,14 @@ as on a real quit. The kernel is stopped from ONE place: the menu bar's two-step
 `confirmingQuit`. Filter windows on `canBecomeMain` — the MenuBarExtra's own panel
 is an `NSWindow` and closing it tears down the status item.
 
-**`Contents/Helpers/` IS populated**, by a sandboxed Run Script phase that COPIES
-a prebuilt Mach-O (`GM_KERNEL_MACHO`). It does not build one: `swift build` inside
-an xcodebuild phase puts two build systems on one directory. The phase declares
-its input and output paths because **the GMVibes target** sets
-`ENABLE_USER_SCRIPT_SANDBOXING = YES` — without that declaration `mkdir` inside
-the bundle fails with EPERM, and without `set -eu` the failure is SILENT and the
-phase reports success. **That `YES` is this target's setting, not the project's
-policy:** the `PluginBridge` aggregate target sets it to `NO` on its own
-configurations, because it writes into the source tree. See "THREE
-ENVIRONMENTS".
+**The bundle's executable IS the kernel.** The `GMVibes` target compiles no
+Swift; it depends on the package's `gm_kernel` product and its Install phase
+copies that product over the bundle executable before signing. Declared input
+and output paths are what let it run under `ENABLE_USER_SCRIPT_SANDBOXING = YES`,
+and `set -eu` is what keeps a failed copy from reporting success. **That `YES` is
+this target's setting, not the project's policy:** the `PluginBridge` aggregate
+target sets it to `NO` on its own configurations, because it writes into the
+source tree. See "THREE ENVIRONMENTS".
 
 **`eventSink` is gone; the store has a SUBSCRIBER TABLE.** It was a plain settable
 property, and a second assignment displaced the first with no error anywhere. That
@@ -771,10 +542,10 @@ boundary (the commit has landed), which is why it does not violate the rule abov
 - **The GM pane is OUTBOUND ONLY.** `PromptRunBar` starts a Claude Code session
   in an iTerm2 window and learns nothing further about it: no return channel, no
   feedback, no hooks, no generated MCP config, and no native-model routing. The
-  four amended doc comments in `gmVibesCore` say "no **RETURN** channel" for
+  four amended doc comments in `Sources/gm_kernel/Vibes` say "no **RETURN** channel" for
   exactly this reason and **must not be read as promising one** — what stays true
   in all of them is that nothing comes back.
-- Nothing app-side is covered by a test. `Gm_Kernel_test` boots a headless binary
+- Nothing app-side is covered by a test. `GmKernelTests` boots a headless binary
   into a temp root; XCTest cannot launch an app bundle, and the baked `GMFSRoot`
   would override `GM_FS_ROOT` anyway. Arbitration, takeover, ordered termination,
   ⌘Q and the event fan-out rest on review and on hand-running in `~/test_gmfs`.
@@ -789,28 +560,15 @@ boundary (the commit has landed), which is why it does not violate the rule abov
 From the repo root:
 
 ```bash
-# ONE test package. Build the kernel first — the suite BOOTS it.
-swift build --package-path gmk/gmKernel
-swift test  --package-path gmk/Gm_Kernel_test       # the whole suite
-
-# The shipped packages are BUILD-only now; they carry no test targets.
-swift build --package-path gmk/gmDaemonSdk
-swift build --package-path gmk/gmDaemon
-swift build --package-path gmk/gmUxComponentLibrary
-swift build --package-path gmk/gmAgententicsSdk   # also builds gm_bridge_writer
-swift build --package-path gmk/gmITerm2Client
-swift build --package-path gmk/gmVibesCore
-# gmk/gmMcp is GONE (v30) — GmMcpServer is a target inside gmDaemonSdk, so the
-# gmDaemonSdk line above already builds it.
-# gmk/gmClaudeForFoundationModels is VENDORED. It gets NO CI job of its own, and
-# that is a decision, not an oversight: it is already COMPILE-GATED in CI as a
-# dependency of gmAgententicsSdk, so a vendored break that can affect us fails
-# that job. What we deliberately do not run is UPSTREAM'S OWN SUITE — it can
-# only fail for reasons we did not cause and cannot fix in-tree (the fix is a
-# re-sync, never a patch), and gating our PRs on it would make someone else's
-# red build our red build. Run it by hand when re-syncing; see VENDORED.md.
-bash gmk/scripts/rebuild_local.sh                   # universal build → staged + activated
+swift build --package-path gmk --product gm_kernel   # the kernel (and the app code inside it)
+swift test  --package-path gmk                       # the whole suite; it BOOTS the kernel it finds in gmk/.build
+swift build --package-path gmk                       # every target, the test target included
+bash gmk/scripts/rebuild_local.sh                    # build → stage <version>-BETA → generate the plugin → activate
 ```
+
+`gmk/gmClaudeForFoundationModels` is VENDORED and compiles as a dependency of
+the agentics section; its own upstream suite is run by hand when re-syncing
+(see `VENDORED.md`), never as a gate here.
 
 See **The release loop** above for how `rebuild_local.sh`, `publish_release.sh`
 and the plugin's `install_gm.sh` divide the work.
@@ -825,7 +583,7 @@ bash gmk/scripts/swift_lint_format.sh --fix    # swift-format in place, then lin
 bash gmk/scripts/install_swiftlint.sh          # pinned SwiftLint into $GM_FS_ROOT/tools, symlinked at bin/swiftlint
 ```
 
-- **swift-format owns layout.** Root `.swift-format`; `gmk/Gm_Kernel_test/.swift-format`
+- **swift-format owns layout.** Root `.swift-format`; `gmk/Tests/.swift-format`
   is a full copy that allows force-try and IUOs (nested configs replace, they do not
   merge, and the script passes no `--configuration` so discovery reaches it).
   `.swift-format-ignore` declares vendored, generated and build output.
@@ -842,9 +600,9 @@ bash gmk/scripts/install_swiftlint.sh          # pinned SwiftLint into $GM_FS_RO
   as context. The hook never formats: a rewrite between an agent's read and its next Edit
   breaks the edit. Format at a checkpoint with `--fix`.
 
-### ONE test package — and what was given up to get it
+### ONE test target — and what was given up to get it
 
-`gmk/Gm_Kernel_test` is the repository's only test package. It boots ONE real
+`gmk/Tests/GmKernelTests` is the repository's only test target. It boots ONE real
 `gm_kernel` against a temporary root and drives the whole kit through its
 **public** surface — the wire protocol, a real socket — plus **read-only** SQL.
 
@@ -902,7 +660,7 @@ is the case that actually bites. The plugin's installer sidesteps the problem
 entirely by needing no repo at all.
 
 There is no BuildInfo stamping step anywhere. A SwiftPM **prebuild plugin** in
-`gmk/gmDaemon` does it inside the build graph, so Xcode and every CI job get it
+`gmk/Plugins/StampBuildInfo` does it inside the build graph, so Xcode and every CI job get it
 free and a clean clone compiles with no prior shell step.
 
 ### The language server, and why `Package.swift` sits at the repo root
@@ -920,9 +678,8 @@ Three things a reader would otherwise re-derive wrongly:
 - **sourcekit-lsp is not an Xcode client.** It reads neither `.xcworkspace` nor
   `.xcodeproj`, and Xcode's `DerivedData/Index.noindex` is private to Xcode. So
   moving code TOWARD the Xcode project **reduces** code intelligence — the exact
-  opposite of the natural assumption, and the reason `gmVibesCore` exists. This
-  is unrelated to "Open `gmk/gmk.xcworkspace`, not the project" above, which is
-  about Xcode generating schemes for package test targets.
+  opposite of the natural assumption, and the reason the app's code lives in
+  the package (`Sources/gm_kernel/Vibes`) and the Xcode target compiles none of it.
 - **A server with no language service still publishes CLEAN diagnostics.** The
   failure mode is a false NEGATIVE, not noise, so an absence of errors is not
   evidence of correctness. `swift build` / `swift test` / `xcodebuild` remain the
@@ -952,7 +709,7 @@ file.** The ten repository contract tests were DELETED in the test rebuild (see
 - **The dispatcher switch is exhaustive.** A new `MessageType` with no handler
   arm does not COMPILE. Same for `DaemonEventKind` in the app's event router.
   This is stronger than the test it outlived and cannot be deleted by a sweep.
-- `Gm_Kernel_test` re-asserts the verb registry (every non-transport
+- `GmKernelTests` re-asserts the verb registry (every non-transport
   `MessageType` has a `VerbRegistry` row) and the m0029 schema shape, because
   both guard hazards worth keeping.
 - Migrations are append-only and the ledger is asserted DENSE from 1 to head —
@@ -1000,7 +757,7 @@ file.** The ten repository contract tests were DELETED in the test rebuild (see
 - **`wire_keys.golden` DOES NOT EXIST ANY MORE.** This file described it as
   "gated by nothing"; in fact the fixture itself went with the deleted test tier,
   so there is no golden to diff and nothing to regenerate. The generator
-  `gmk/gmDaemonSdk/scripts/wire_keys.py` still runs and still prints the
+  `gmk/scripts/wire_keys.py` still runs and still prints the
   snake_case wire contract — it is a useful thing to eyeball when changing a
   payload — but nothing compares its output to anything.
 - Nothing proves a test cannot write the production database. The new harness
@@ -1113,7 +870,7 @@ bash gmk/scripts/generate_plugin.sh            # regenerate + bump the version
 bash gmk/scripts/generate_plugin.sh --check    # report only, change nothing
 ```
 
-The whole plugin is emitted from the bridge values in `gmAgententicsSdk`. The
+The whole plugin is emitted from the bridge values in `Sources/GmAgententicsSdk/HarnessBridge` by `gm_kernel bridge <plugin-dir>`. The
 writer imports nothing from `gmDaemonSdk`, reads no file out of the existing
 plugin, and consults no hand-kept list — so "the plugin says X but the code says
 Y" is not a state it can produce. Adding a file to the plugin means declaring a
@@ -1125,14 +882,16 @@ Consequences a reader must not re-derive incorrectly:
   (a marketplace install materialises it directly, so it has to be), which makes
   it look hand-maintained. It is not. The next `generate_plugin.sh` silently
   discards the edit.
-- **THE GENERATOR IS ITS OWN EXECUTABLE, and cannot be a `gm_kernel` subcommand.**
-  `gmAgententicsSdk` is macOS 27 with `unsafeFlags`; the kernel is macOS 14; and
-  SwiftPM checks platform floors at GRAPH RESOLUTION, before any `@available`
-  scope exists. `gm_kernel bridge emit` would move `gm_hook`, `gm_daemon` and
-  every CI job to 27. Reaching for `@available` is the plausible move that
-  cannot work. Generation is a developer-machine act, like `rebuild_local.sh`.
+- **THE GENERATOR IS A PERSONALITY OF THE KERNEL, not a second executable.**
+  `gm_kernel bridge [--check] <plugin-dir>` is a command of the shipped binary —
+  the same bytes in the DMG, the app and `~/gmfs/bin` — and the plugin directory
+  is always an explicit argument. `generate_plugin.sh` runs it on the kernel a
+  caller hands in as `GM_KERNEL_BIN` (`rebuild_local.sh` passes the exact staged
+  Mach-O), else on the package's release build. What stays impossible is a
+  SwiftPM build-tool plugin doing it inside `swift build`: plugins are sandboxed
+  from the source tree, and `plugins/gmcc` is committed source.
 - **TWO OWNERS, TWO DIRECTORIES, and confusing them is the trap.**
-  `gm_bridge_writer` owns everything inside `plugins/gmcc/` and REFUSES to touch
+  `gm_kernel bridge` owns everything inside `plugins/gmcc/` and REFUSES to touch
   anything outside it — which is why it cannot bump the repo-ROOT
   `.claude-plugin/marketplace.json`, a different `.claude-plugin/` directory from
   the plugin's own. `generate_plugin.sh` does that half. A writer that could
@@ -1267,12 +1026,12 @@ more, and no fewer.
 unless explicitly asked.**
 
 This is ENFORCED, not merely documented: `Paths.assertContained(_:)` in
-`gmk/gmDaemonSdk` throws unless a URL is under the filesystem root or the working
+the `GmDaemonSdk` section throws unless a URL is under the filesystem root or the working
 repo, and every kit-side file write routes through it. A rule that lives only in
 markdown erodes; this one fails a call.
 
 **ONE KNOWN EXCEPTION, and it is app-side.** `ITerm.writeProfile` in
-`gmk/gmVibesCore/Sources/GmVibesCore/Screens/ExternalLaunchers.swift` writes an
+`gmk/Sources/gm_kernel/Vibes/Screens/ExternalLaunchers.swift` writes an
 iTerm2 Dynamic Profile under `~/Library/Application Support/iTerm2/DynamicProfiles/`
 — outside `$GM_FS_ROOT` and outside the repo, with no `assertContained` call. It
 arrived with the iTerm2 run bar, it is how iTerm2 is configured at all (that
@@ -1320,7 +1079,7 @@ with the Debug app build (no `PBXTargetDependency` in either direction — the
 PluginBridge independence rule verbatim), and Xcode launches the app only after
 every scheme build entry finishes, so the seed always completes first. `seed`
 is a fast, idempotent subset of `create`: an INCREMENTAL `swift build` of
-`gmk/gmKernel` (SwiftPM's own `.build`, never DerivedData — no contention),
+`gmk` (`--product gm_kernel`; SwiftPM's own `.build`, never DerivedData — no contention),
 staging through the `gm_releases.sh` functions SKIPPED when the staged Mach-O's
 hash already matches, a clone-ONCE of this checkout into `$ROOT/repos` (the
 dated branch is minted at clone time only — a fresh branch per ⌘R would mint a

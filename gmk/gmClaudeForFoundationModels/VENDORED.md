@@ -30,13 +30,13 @@ a self-contained copy rather than the head of a dependency tree.
 
 ## Why a local copy and not a `.package(url:)` pin
 
-GRDB — the repo's only remote pin, in `gmk/gmDaemon` — is fetched by URL, and
+GRDB — pinned in `gmk/Package.swift` and consumed only by the GmDaemon target — is fetched by URL, and
 that is the convention this package would otherwise follow. It cannot, for a
 structural reason specific to the intended consumer:
 
-`gmk/gmAgententicsSdk` applies `SwiftSetting.unsafeFlags` to define its
+the `GmAgententicsSdk` target in `gmk/Package.swift` applies `SwiftSetting.unsafeFlags` to define its
 `GmAgentOs` availability macro, and **SwiftPM refuses to resolve a package that
-uses `unsafeFlags` as a versioned remote dependency**. Every package in `gmk/`
+uses `unsafeFlags` as a versioned remote dependency**. The `gmk` package
 is therefore consumed by local `path:`, and anything entering that graph has to
 be reachable the same way. Vendoring is what makes this package reachable by
 path.
@@ -92,7 +92,7 @@ platforms: [.iOS("27.0"), .macOS("27.0"), .visionOS("27.0"), .watchOS("27.0")]
 ```
 
 because the server-side `LanguageModel` API it implements ships in the OS 27
-SDK. `gmk/gmAgententicsSdk` declares `platforms: [.macOS("26.0")]`, and CI pins
+SDK. The `GmAgententicsSdk` target used to declare `platforms: [.macOS("26.0")]`, and CI pins
 `macos-26` on every job.
 
 **A dependency may not have a floor above its consumer's**, so this package is

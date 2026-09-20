@@ -28,13 +28,12 @@ xcuserdata/
 !**/xcshareddata/**
 
 # Swift Package Manager
-# `.build/` and `.swiftpm/` are unanchored, so they already cover every
-# gmk/<package>/ build directory; the explicit entries exist so the five
-# package build dirs are visible to a reader of this file rather than implied.
+# `.build/` and `.swiftpm/` are unanchored and already cover gmk/.build; the
+# explicit entries make the one package build dir visible to a reader.
 .build/
 .swiftpm/
-gmk/*/.build/
-gmk/*/.swiftpm/
+gmk/.build/
+gmk/.swiftpm/
 
 # The ROOT Package.swift is a tooling-only LSP shim (see its header). It ships
 # nothing and is consumed by no build, so its resolved pins are local tooling

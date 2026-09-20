@@ -59,11 +59,11 @@ install with no extra steps.
 
 ## Build from source
 
-GM Vibes lives in the green-mountain-kernel monorepo under `gmk/gmVibes/`. It
-is one target in the single `gmk.xcodeproj`, building directly against the
-sibling packages `gmDaemonSdk` and `gmUxComponentLibrary` by local path (no
-vendored copy). It does NOT link `gmDaemon`, so GRDB is not in its link
-closure:
+GM Vibes lives in the green-mountain-kernel monorepo. Its code is the `Vibes/`
+folder of the `gm_kernel` target in `gmk/Package.swift`; `gmk/gmVibes/` holds
+only the bundle's Info.plist and assets. The `GMVibes` target in
+`gmk.xcodeproj` depends on the package's `gm_kernel` product and installs that
+binary as the bundle's executable, so the app and the CLI are one Mach-O:
 
 ```sh
 git clone https://github.com/BRubinson/green-mountain-kernel.git

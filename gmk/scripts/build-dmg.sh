@@ -127,27 +127,9 @@ DEV_ID="$(security find-identity -v -p codesigning 2>/dev/null \
 # absorbs its leading byte into an unbraced variable name — `$VERSION…` expands
 # a name that does not exist, which under `set -u` kills the script on a line
 # that is only printing a message.
-# ── The CLI comes FIRST, and it is built here rather than by Xcode ──────────
-#
-# `gm_kernel` is a SwiftPM executable. Building it from inside an xcodebuild
-# script phase would put two build systems on one build directory, so the phase
-# only COPIES — this is where the bytes come from, and the path is handed over
-# as GM_KERNEL_MACHO.
-#
-# ARCHS must match the archive's. A universal app around an arm64-only helper is
-# a bundle that half-works on an Intel machine, which is worse than one that
-# plainly does not.
-echo "==> Building the gm_kernel CLI ($ARCH_LIST)…"
-SWIFT_ARCH_FLAGS=""
-for a in $ARCH_LIST; do SWIFT_ARCH_FLAGS="$SWIFT_ARCH_FLAGS --arch $a"; done
-# shellcheck disable=SC2086
-swift build -c release --package-path "$ROOT/gmKernel" $SWIFT_ARCH_FLAGS >/dev/null
-# shellcheck disable=SC2086
-GM_KERNEL_MACHO="$(swift build -c release --package-path "$ROOT/gmKernel" $SWIFT_ARCH_FLAGS --show-bin-path)/gm_kernel"
-[ -x "$GM_KERNEL_MACHO" ] || {
-    echo "error: the CLI build produced no executable at $GM_KERNEL_MACHO" >&2; exit 1; }
-echo "  CLI: $GM_KERNEL_MACHO ($(lipo -archs "$GM_KERNEL_MACHO"))"
-
+# The kernel is NOT pre-built here. The GMVibes target depends on the package's
+# gm_kernel product, so the archive builds it with ARCHS applied and the
+# install phase makes it the bundle's executable.
 echo "==> Archiving $SCHEME ($CONFIG) at ${VERSION}…"
 # MARKETING_VERSION/CURRENT_PROJECT_VERSION are overridden on the command line
 # rather than written into project.pbxproj: the number lives in gmk/VERSION, and
@@ -173,7 +155,6 @@ xcodebuild archive \
   -archivePath "$ARCHIVE" \
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$VERSION" \
-  GM_KERNEL_MACHO="$GM_KERNEL_MACHO" \
   ARCHS="$ARCH_LIST" \
   ONLY_ACTIVE_ARCH=NO \
   CODE_SIGN_STYLE=Manual \
@@ -239,28 +220,22 @@ fi
 # The embed phase is sandboxed and declares this exact path as its output, so it
 # either landed or the build already failed. Check anyway: this assertion is
 # cheap and the failure it guards is silent.
-HELPER="$APP/Contents/Helpers/gm_kernel"
+HELPER="$APP/Contents/MacOS/gm_kernel"
 [ -x "$HELPER" ] || {
-    echo "error: $APP carries no Contents/Helpers/gm_kernel." >&2
-    echo "       The 'Embed gm_kernel CLI' phase did not run or did not land." >&2
+    echo "error: $APP carries no Contents/MacOS/gm_kernel." >&2
+    echo "       The 'Install gm_kernel executable' phase did not run or did not land." >&2
     exit 1; }
+# A helper personality answers `--version`; a bundle whose executable is not the
+# kernel would be a stub that Xcode linked and the install phase never replaced.
+"$HELPER" --version | grep -q "gm_kernel protocol" || {
+    echo "error: $HELPER does not answer as gm_kernel." >&2; exit 1; }
 
 # ── Slice verification, which used to live in publish ───────────────────────
-#
-# publish_release.sh read slices off the TARBALL with lipo. The tarball is gone,
-# so the check has to happen where the bits are made or it does not happen at
-# all. Verify the helper and the app's own Mach-O carry the same architectures —
-# a universal app around an arm64-only helper half-works, which is worse than a
-# clean refusal.
-HELPER_ARCHS="$(lipo -archs "$HELPER")"
-APP_ARCHS="$(lipo -archs "$APP/Contents/MacOS/$APP_NAME")"
-echo "  slices: app [$APP_ARCHS], helper [$HELPER_ARCHS]"
-if [ "$HELPER_ARCHS" != "$APP_ARCHS" ]; then
-    echo "error: app is [$APP_ARCHS] but its helper is [$HELPER_ARCHS]." >&2
-    echo "       A bundle whose halves disagree on architecture fails on one machine" >&2
-    echo "       and not another. Refusing to build." >&2
-    exit 1
-fi
+APP_ARCHS="$(lipo -archs "$HELPER")"
+echo "  slices: gm_kernel [$APP_ARCHS]"
+case " $APP_ARCHS " in *" arm64 "*) ;; *)
+    echo "error: gm_kernel carries no arm64 slice ([$APP_ARCHS])." >&2; exit 1 ;;
+esac
 
 # ── Signing: INSIDE-OUT, and `--deep` is gone ────────────────────────────────
 #
@@ -282,9 +257,9 @@ sign_inside_out() {
   _identity="$1"
   _runtime_flags="$2"
 
-  # Helpers first, deepest last-modified order irrelevant — each is independent.
-  # `-perm +111 -type f` rather than a hardcoded list: a helper added later must
-  # not silently ship unsigned.
+  # Nested executables first, each independently; the bundle no longer carries
+  # any (the kernel IS the main executable), but a helper added later must not
+  # silently ship unsigned.
   if [ -d "$APP/Contents/Helpers" ]; then
     find "$APP/Contents/Helpers" -type f -perm +111 -print | while IFS= read -r helper; do
       echo "    helper: $(basename "$helper")"

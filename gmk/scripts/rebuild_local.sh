@@ -67,20 +67,9 @@ if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT/gmk" ]; then
 fi
 GMK="$REPO_ROOT/gmk"
 
-# ONLY WHAT THE STAGED ARTIFACT IS MADE OF. gmKernel links GmKernelHost,
-# GmMcpServer and GmHookCli — all of which live in gmDaemon and gmDaemonSdk — and
+# ONE PACKAGE, ONE PRODUCT. gmk/Package.swift builds exactly one executable and
 # its Mach-O is the one file this script stages.
-#
-# gmUxComponentLibrary and gmAgententicsSdk USED TO BE IN THIS LIST and are
-# deliberately not any more. Neither is linked into gm_kernel: the first is UI
-# consumed only by gmVibesCore, the second is the generator/tool surface. They
-# were being built universal-release on every publish purely as a compile check,
-# at roughly 50s each.
-#
-# THE CHECK MOVED, IT DID NOT VANISH: .github/workflows/gmk-ci.yml runs a
-# `packages` matrix with one job per package, so both still compile on every
-# push and a break still names the module that broke. Do not "restore" them here.
-PACKAGES="gmDaemonSdk gmDaemon gmKernel"
+KERNEL_PRODUCT="gm_kernel"
 
 ARCH_FLAGS=""
 ARCHES="arm64"
@@ -125,8 +114,8 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-[ -f "$GMK/gmDaemonSdk/Package.swift" ] || {
-    echo "[GMB] ERROR: gmk packages not found under $GMK" >&2; exit 1; }
+[ -f "$GMK/Package.swift" ] || {
+    echo "[GMB] ERROR: gmk package not found under $GMK" >&2; exit 1; }
 command -v swift >/dev/null 2>&1 || {
     echo "[GMB] ERROR: swift toolchain not found — xcode-select --install" >&2; exit 1; }
 
@@ -197,26 +186,13 @@ else
 fi
 
 # --- build -------------------------------------------------------------------
-# Each package on its own so a failure names the module that broke rather than
-# producing one opaque graph error — the property the CI matrix buys, kept here.
-#
-# No BuildInfo stamp step: the SwiftPM prebuild plugin in gmDaemon stamps build
-# identity inside the build graph, so there is no shell step left to forget.
-for p in $PACKAGES; do
-    echo "[GMB]   $p"
-    # shellcheck disable=SC2086
-    swift build -c release --package-path "$GMK/$p" $ARCH_FLAGS
-done
-
-bin_path() {
-    # shellcheck disable=SC2086
-    swift build -c release --package-path "$GMK/$1" $ARCH_FLAGS --show-bin-path
-}
-# ONE bin path now. The three personalities are library targets inside
-# gmDaemonSdk / gmDaemon (the pen server now lives in gmDaemonSdk), and
-# gmKernel links all three personalities into a single
-# Mach-O — so there is exactly one artifact to stage and nothing to keep in sync.
-KERNEL_BIN="$(bin_path gmKernel)"
+# The gm_kernel product only. Build identity is stamped by the package's own
+# prebuild plugins, so there is no shell step left to forget.
+echo "[GMB]   swift build --product $KERNEL_PRODUCT"
+# shellcheck disable=SC2086
+swift build -c release --package-path "$GMK" --product "$KERNEL_PRODUCT" $ARCH_FLAGS
+# shellcheck disable=SC2086
+KERNEL_BIN="$(swift build -c release --package-path "$GMK" $ARCH_FLAGS --show-bin-path)"
 
 # --- stage -------------------------------------------------------------------
 # Staged fresh every time: the directory is removed and rebuilt rather than
@@ -237,10 +213,10 @@ STAGE="$(gm_stage_dir local "$STAGE_VERSION")"
 #   default   the SwiftPM product, copied straight out of the build directory.
 #             Fast, unsigned, right for the edit-compile loop.
 #
-#   --app     the bundle's Contents/Helpers/gm_kernel — the SAME bytes the DMG
-#             ships and the SAME bytes publish promotes, already signed with the
-#             Developer ID. This is the path that makes local staging and
-#             release staging identical instead of merely similar.
+#   --app     the bundle's own executable, Contents/MacOS/gm_kernel — the SAME
+#             bytes the DMG ships and the SAME bytes publish promotes, already
+#             signed with the Developer ID. This is the path that makes local
+#             staging and release staging identical instead of merely similar.
 if [ "$BUILD_APP" = 1 ]; then
     echo "[GMB] building the app ($APP_CONFIG) — its helper becomes the staged CLI"
     # FORWARD THE ARCHITECTURE. `--universal` used to stop at the package
@@ -276,7 +252,7 @@ if [ "$BUILD_APP" = 1 ]; then
         exit 1
     fi
 
-    cp -p "$APP_BUILT/Contents/Helpers/$GM_MACHO" "$STAGE/$GM_MACHO"
+    cp -p "$APP_BUILT/Contents/MacOS/$GM_MACHO" "$STAGE/$GM_MACHO"
 else
     cp "$KERNEL_BIN/$GM_MACHO" "$STAGE/$GM_MACHO"
 fi
@@ -323,31 +299,12 @@ done
 echo "         entry points (symlinked at activation): $GM_ENTRYPOINTS"
 
 # --- generate the plugin -----------------------------------------------------
-# THE PLUGIN IS PART OF THE BUILD. It is not a separate manual chore:
-# plugins/gmcc is emitted from the bridge in gmAgententicsSdk, so a build of this
-# working tree that did not regenerate it could report success while the plugin
-# on disk still reflected an older bridge — with nothing saying so.
-#
-# Placed AFTER the build and staging: the kernel build is the expensive and most
-# likely to fail step, and there is no reason to rewrite repo content to
-# accompany bits that never built. Placed BEFORE activation because it is
-# working-tree content, not part of the release store.
-#
-# RUNS EVEN WITH --no-activate, deliberately. The plugin is produced regardless
-# of whether these binaries are promoted into the store.
-#
-# Delegated to generate_plugin.sh rather than reimplemented here. That script
-# owns two things this one must not duplicate: the repo-root resolution guard,
-# and the two-owner split that keeps gm_bridge_writer inside plugins/gmcc while
-# the repo-ROOT marketplace manifest is bumped separately. It is idempotent — an
-# unchanged bridge at an unchanged version produces no diff.
-#
-# YES, THIS BUILDS gmAgententicsSdk, which was deliberately removed from
-# $PACKAGES above. That is not a contradiction and is not an oversight to
-# "optimise" away: it is excluded from PACKAGES because it is not linked into the
-# staged Mach-O, and it is built here because it IS the generator.
-echo "[GMB] generating the plugin from the bridge..."
-bash "$SCRIPT_DIR/generate_plugin.sh"
+# THE PLUGIN IS PART OF THE BUILD: `gm_kernel bridge` on the exact binary just
+# staged emits plugins/gmcc, so the plugin on disk always reflects these bits.
+# generate_plugin.sh owns the repo-root guard and the marketplace bump; it runs
+# even with --no-activate because the plugin is working-tree content.
+echo "[GMB] generating the plugin from the staged kernel..."
+GM_KERNEL_BIN="$STAGE/$GM_MACHO" bash "$SCRIPT_DIR/generate_plugin.sh"
 
 # --- activate ----------------------------------------------------------------
 if [ "$ACTIVATE" -eq 1 ]; then

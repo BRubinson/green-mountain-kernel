@@ -3,7 +3,7 @@
 # Regenerate plugins/gmcc from the agentics bridge, then sync the marketplace
 # manifest's version to match.
 #
-# TWO STEPS AND TWO OWNERS, on purpose. `gm_bridge_writer` owns everything
+# TWO STEPS AND TWO OWNERS, on purpose. `gm_kernel bridge` owns everything
 # INSIDE the plugin directory and refuses to touch anything outside it — which is
 # why it cannot bump `.claude-plugin/marketplace.json`, a repo-ROOT file in a
 # different `.claude-plugin/` directory than the plugin's own. Confusing those
@@ -43,11 +43,17 @@ VERSION="$(tr -d '[:space:]' < "$REPO/gmk/VERSION")"
 echo "[GMB] repo:    $REPO"
 echo "[GMB] version: $VERSION (from gmk/VERSION)"
 
-# The generator is a macOS 27 executable in gmAgententicsSdk, not a gm_kernel
-# subcommand: the kernel floors at macOS 14 and SwiftPM checks floors at graph
-# resolution, so linking the bridge into it would move gm_hook, gm_daemon and
-# every CI job to 27.
-swift run --package-path "$REPO/gmk/gmAgententicsSdk" gm_bridge_writer $CHECK "$PLUGIN"
+# The generator is a personality of the kernel binary: `gm_kernel bridge <dir>`.
+# A caller that already holds a built kernel hands it in as GM_KERNEL_BIN
+# (rebuild_local.sh passes the exact staged Mach-O); otherwise the release build
+# of the package is used. The plugin directory is always an explicit argument.
+if [ -n "${GM_KERNEL_BIN:-}" ] && [ -x "$GM_KERNEL_BIN" ]; then
+    BRIDGE=("$GM_KERNEL_BIN" bridge)
+else
+    BRIDGE=(swift run -c release --package-path "$REPO/gmk" gm_kernel bridge)
+fi
+# shellcheck disable=SC2086
+"${BRIDGE[@]}" $CHECK "$PLUGIN"
 
 # THE gmbeta ALIAS TREE. A second emit of the SAME bridge under a different
 # plugin NAME, so a beta/test GMVibes pane can load the working tree through
@@ -62,8 +68,8 @@ swift run --package-path "$REPO/gmk/gmAgententicsSdk" gm_bridge_writer $CHECK "$
 # deliberately does NOT touch the manifest or the version bump below.
 GMBETA="$REPO/plugins/gmbeta"
 echo "[GMB] gmbeta alias -> $GMBETA"
-GM_BRIDGE_PLUGIN_NAME=gmbeta \
-    swift run --package-path "$REPO/gmk/gmAgententicsSdk" gm_bridge_writer $CHECK "$GMBETA"
+# shellcheck disable=SC2086
+GM_BRIDGE_PLUGIN_NAME=gmbeta "${BRIDGE[@]}" $CHECK "$GMBETA"
 
 if [ -n "$CHECK" ]; then
     CURRENT="$(python3 -c "import json;print(json.load(open('$MARKETPLACE'))['plugins'][0]['version'])")"

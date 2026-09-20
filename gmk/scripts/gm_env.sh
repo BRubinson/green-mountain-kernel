@@ -218,8 +218,9 @@ env_seed() {
     # phase, SwiftPM reads several of them, and a hand-run must behave the
     # same as a phase-run.
     env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET -u TOOLCHAINS -u DEVELOPER_DIR \
-        swift build --package-path "$REPO_ROOT/gmk/gmKernel" -c debug
-    _built="$REPO_ROOT/gmk/gmKernel/.build/debug/$GM_MACHO"
+        swift build --package-path "$REPO_ROOT/gmk" --product "$GM_MACHO" -c debug
+    _built="$(env -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET -u TOOLCHAINS -u DEVELOPER_DIR \
+        swift build --package-path "$REPO_ROOT/gmk" -c debug --show-bin-path)/$GM_MACHO"
     [ -x "$_built" ] || die "no built kernel at $_built"
 
     GM_ENV="$_env"; GM_FS_ROOT="$_root"; gm_resolve_fs_root

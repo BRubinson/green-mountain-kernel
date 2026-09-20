@@ -32,10 +32,6 @@
 /* End PBXAggregateTarget section */
 
 /* Begin PBXBuildFile section */
-		1B4010B02FDCA09300DAF751 /* GmDaemonSdk in Frameworks */ = {isa = PBXBuildFile; productRef = 1B4010B22FDCA09300DAF751 /* GmDaemonSdk */; };
-		1B4010B12FDCA09300DAF751 /* GmUxComponentLibrary in Frameworks */ = {isa = PBXBuildFile; productRef = 1B4010B32FDCA09300DAF751 /* GmUxComponentLibrary */; };
-		1B4010C02FDCA09300DAF751 /* GmKernelHost in Frameworks */ = {isa = PBXBuildFile; productRef = 1B4010C22FDCA09300DAF751 /* GmKernelHost */; };
-		1B4010D02FDCA09300DAF751 /* GmVibesCore in Frameworks */ = {isa = PBXBuildFile; productRef = 1B4010D22FDCA09300DAF751 /* GmVibesCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -55,10 +51,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1B4010B02FDCA09300DAF751 /* GmDaemonSdk in Frameworks */,
-				1B4010B12FDCA09300DAF751 /* GmUxComponentLibrary in Frameworks */,
-				1B4010C02FDCA09300DAF751 /* GmKernelHost in Frameworks */,
-				1B4010D02FDCA09300DAF751 /* GmVibesCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -91,21 +83,19 @@
 				1B40106F2FDCA09200DAF751 /* Sources */,
 				1B4010702FDCA09200DAF751 /* Frameworks */,
 				1B4010712FDCA09200DAF751 /* Resources */,
-				1B4010E02FDCA09300DAF751 /* Embed gm_kernel CLI */,
+				1B4010E02FDCA09300DAF751 /* Install gm_kernel executable */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				1B4010F92FDCA09300DAF751 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				1B4010752FDCA09200DAF751 /* gmVibes */,
 			);
 			name = GMVibes;
 			packageProductDependencies = (
-				1B4010B22FDCA09300DAF751 /* GmDaemonSdk */,
-				1B4010B32FDCA09300DAF751 /* GmUxComponentLibrary */,
-				1B4010C22FDCA09300DAF751 /* GmKernelHost */,
-				1B4010D22FDCA09300DAF751 /* GmVibesCore */,
+				1B4010D22FDCA09300DAF751 /* gm_kernel */,
 			);
 			productName = GMVibes;
 			productReference = 1B4010732FDCA09200DAF751 /* GMVibes.app */;
@@ -113,23 +103,81 @@
 		};
 /* End PBXNativeTarget section */
 
-/* Begin PBXShellScriptBuildPhase section */
-		1B4010E02FDCA09300DAF751 /* Embed gm_kernel CLI */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
+/* Begin PBXTargetDependency section */
+		1B4010F92FDCA09300DAF751 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			productRef = 1B4010D22FDCA09300DAF751 /* gm_kernel */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXProject section */
+		1B40106B2FDCA09200DAF751 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2630;
+				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+					1B4010722FDCA09200DAF751 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+				};
+			};
+			buildConfigurationList = 1B40106E2FDCA09200DAF751 /* Build configuration list for PBXProject "gmk" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 1B40106A2FDCA09200DAF751;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1B4010A42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmk" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 1B4010742FDCA09200DAF751 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				1B4010722FDCA09200DAF751 /* GMVibes */,
+				1B4010F02FDCA09300DAF751 /* PluginBridge */,
+				1B5EED002FDCA09300DAF751 /* TestEnvSeed */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1B4010712FDCA09200DAF751 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
-			inputPaths = (
-				"$(GM_KERNEL_MACHO)",
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		1B4010E02FDCA09300DAF751 /* Install gm_kernel executable */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 0;
+			buildActionMask = 2147483647;
+			files = (
 			);
-			name = "Embed gm_kernel CLI";
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(BUILT_PRODUCTS_DIR)/gm_kernel",
+			);
+			name = "Install gm_kernel executable";
+			outputFileListPaths = (
+			);
 			outputPaths = (
-				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/gm_kernel",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -eu\n# Embed the gm_kernel CLI Mach-O at Contents/Helpers.\n#\n# IT IS COPIED, NEVER BUILT HERE. The CLI is a SwiftPM executable, and running\n# `swift build` from inside an xcodebuild phase means two build systems\n# contending for one build directory. build-dmg.sh builds it FIRST and passes\n# the path in as GM_KERNEL_MACHO.\n#\n# `set -eu` IS LOAD-BEARING. Without it a failed cp leaves the phase green and\n# the bundle helperless, and the only symptom is an install that puts no CLI in\n# bin/ — which, because gm_hook exits 0 silently when its binary is missing,\n# records nothing rather than failing.\n#\n# WHEN GM_KERNEL_MACHO IS UNSET THIS IS A DELIBERATE NO-OP, so a plain Xcode\n# Run still works: a debug build talks to ~/test_gmfs and hosts its own writer\n# in-process, so it needs no helper in its bundle. A RELEASE bundle absolutely\n# does, and build-dmg.sh makes a missing helper FATAL rather than relying on\n# anyone reading this note.\nif [ -z \"${GM_KERNEL_MACHO:-}\" ]; then\n  echo \"note: GM_KERNEL_MACHO unset - no CLI embedded (expected for Xcode Run; build-dmg.sh sets it)\"\n  exit 0\nfi\nif [ ! -x \"$GM_KERNEL_MACHO\" ]; then\n  echo \"error: GM_KERNEL_MACHO=$GM_KERNEL_MACHO is not an executable file\" >&2\n  exit 1\nfi\nHELPERS=\"${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/Helpers\"\nmkdir -p \"$HELPERS\"\n# -p preserves the mode so the `find -perm +111` signing loop in build-dmg.sh\n# still finds it.\ncp -p \"$GM_KERNEL_MACHO\" \"$HELPERS/gm_kernel\"\ntest -x \"$HELPERS/gm_kernel\" || { echo \"error: helper did not land at $HELPERS/gm_kernel\" >&2; exit 1; }\necho \"embedded gm_kernel ($(lipo -archs \"$HELPERS/gm_kernel\")) at $HELPERS\"\n";
+			shellScript = "set -eu\n# Make the package-built gm_kernel the bundle's executable. Xcode builds the\n# product through this target's dependency; the copy lands before code signing,\n# so the signed executable is the kernel. A build that leaves Xcode's own stub\n# in place would ship an app that is not the kernel, hence the hard checks.\nSRC=\"${BUILT_PRODUCTS_DIR}/gm_kernel\"\n[ -x \"$SRC\" ] || { echo \"error: Xcode did not build the gm_kernel package product at $SRC\" >&2; exit 1; }\nDEST=\"${TARGET_BUILD_DIR}/${EXECUTABLE_PATH}\"\ncp -p \"$SRC\" \"$DEST\"\n\"$DEST\" --version | grep -q \"gm_kernel protocol\" || { echo \"error: $DEST does not answer as gm_kernel\" >&2; exit 1; }\necho \"installed gm_kernel ($(lipo -archs \"$DEST\")) as the bundle executable\"\n";
 		};
 		1B4010F12FDCA09300DAF751 /* Generate plugins/gmcc */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -162,58 +210,6 @@
 			shellScript = "set -euo pipefail\n# Seed ~/test_gmfs in parallel with the Debug app build, so a plain Cmd-R\n# lands on a provisioned environment: kernel binaries staged, this checkout\n# cloned into $ROOT/repos, and the clone registered in the environment's db.\n#\n# IT CALLS gm_env.sh seed AND REIMPLEMENTS NOTHING. The environment script\n# owns environments; a second implementation here is the next\n# gm_releases.sh-exists-twice, which CLAUDE.md records as having been\n# believed fixed for two versions before anyone caught it.\n#\n# NO PBXTargetDependency EXISTS IN EITHER DIRECTION, deliberately - the\n# parallelism is bought by INDEPENDENCE, exactly like PluginBridge. Xcode\n# launches the app only after every scheme build entry finishes, so the seed\n# always completes before the app runs: parallel AND ordered, for free.\n#\n# GATE - configuration, in the script rather than only in the scheme: a\n# scheme gate is bypassed by anyone who builds the target directly or drags\n# it into another scheme. Seeding is Debug-only; Beta/Release get a note and\n# a green no-op.\n[ \"${CONFIGURATION:-}\" = \"Debug\" ] || { echo \"note: env seeding is Debug-only (CONFIGURATION=${CONFIGURATION:-})\"; exit 0; }\n\n# Sandboxing is OFF on this target's configurations because the seed writes\n# to $HOME/test_gmfs - outside the build directory. That root (plus\n# gmKernel's own SwiftPM .build) is the ONLY place it writes.\n#\n# The env strip mirrors PluginBridge: xcodebuild exports SDKROOT,\n# MACOSX_DEPLOYMENT_TARGET, TOOLCHAINS and DEVELOPER_DIR into this phase,\n# SwiftPM reads several of them, and the nested kernel build must not\n# inherit the app's.\nenv -u SDKROOT -u MACOSX_DEPLOYMENT_TARGET -u TOOLCHAINS -u DEVELOPER_DIR bash \"${SRCROOT}/scripts/gm_env.sh\" seed test\n";
 		};
 /* End PBXShellScriptBuildPhase section */
-
-/* Begin PBXProject section */
-		1B40106B2FDCA09200DAF751 /* Project object */ = {
-			isa = PBXProject;
-			attributes = {
-				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2630;
-				LastUpgradeCheck = 2630;
-				TargetAttributes = {
-					1B4010722FDCA09200DAF751 = {
-						CreatedOnToolsVersion = 26.3;
-					};
-				};
-			};
-			buildConfigurationList = 1B40106E2FDCA09200DAF751 /* Build configuration list for PBXProject "gmk" */;
-			developmentRegion = en;
-			hasScannedForEncodings = 0;
-			knownRegions = (
-				en,
-				Base,
-			);
-			mainGroup = 1B40106A2FDCA09200DAF751;
-			minimizedProjectReferenceProxies = 1;
-			packageReferences = (
-				1B4010A42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmDaemonSdk" */,
-				1B4010A52FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmDaemon" */,
-				1B4010A62FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmUxComponentLibrary" */,
-				1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "Gm_Kernel_test" */,
-				1B4010D32FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmVibesCore" */,
-				1B4010E42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmITerm2Client" */,
-			);
-			preferredProjectObjectVersion = 77;
-			productRefGroup = 1B4010742FDCA09200DAF751 /* Products */;
-			projectDirPath = "";
-			projectRoot = "";
-			targets = (
-				1B4010722FDCA09200DAF751 /* GMVibes */,
-				1B4010F02FDCA09300DAF751 /* PluginBridge */,
-				1B5EED002FDCA09300DAF751 /* TestEnvSeed */,
-			);
-		};
-/* End PBXProject section */
-
-/* Begin PBXResourcesBuildPhase section */
-		1B4010712FDCA09200DAF751 /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		1B40106F2FDCA09200DAF751 /* Sources */ = {
@@ -346,62 +342,6 @@
 			};
 			name = Release;
 		};
-1B4010B92FDCA09300DAF751 /* Beta */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				CLANG_ANALYZER_NONNULL = YES;
-				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
-				CLANG_ENABLE_MODULES = YES;
-				CLANG_ENABLE_OBJC_ARC = YES;
-				CLANG_ENABLE_OBJC_WEAK = YES;
-				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
-				CLANG_WARN_BOOL_CONVERSION = YES;
-				CLANG_WARN_COMMA = YES;
-				CLANG_WARN_CONSTANT_CONVERSION = YES;
-				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
-				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
-				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
-				CLANG_WARN_EMPTY_BODY = YES;
-				CLANG_WARN_ENUM_CONVERSION = YES;
-				CLANG_WARN_INFINITE_RECURSION = YES;
-				CLANG_WARN_INT_CONVERSION = YES;
-				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
-				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
-				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
-				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
-				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
-				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
-				CLANG_WARN_STRICT_PROTOTYPES = YES;
-				CLANG_WARN_SUSPICIOUS_MOVE = YES;
-				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
-				CLANG_WARN_UNREACHABLE_CODE = YES;
-				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				COPY_PHASE_STRIP = NO;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 4VL4UGNPQQ;
-				ENABLE_NS_ASSERTIONS = NO;
-				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
-				GCC_C_LANGUAGE_STANDARD = gnu17;
-				GCC_NO_COMMON_BLOCKS = YES;
-				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
-				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
-				GCC_WARN_UNDECLARED_SELECTOR = YES;
-				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
-				GCC_WARN_UNUSED_FUNCTION = YES;
-				GCC_WARN_UNUSED_VARIABLE = YES;
-				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 26.0;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				MTL_FAST_MATH = YES;
-				SDKROOT = macosx;
-				SWIFT_COMPILATION_MODE = wholemodule;
-			};
-			name = Beta;
-		};
 		1B4010972FDCA09300DAF751 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -419,7 +359,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				GM_BUNDLE_SUFFIX = ".test";
+				GM_BUNDLE_SUFFIX = .test;
 				GM_DEV_PLUGIN_DIR = "$(SRCROOT)/../plugins/gmbeta";
 				GM_ENV = test;
 				GM_FS_ROOT_BAKED = "~/test_gmfs";
@@ -487,7 +427,63 @@
 			};
 			name = Release;
 		};
-1B4010BA2FDCA09300DAF751 /* Beta */ = {
+		1B4010B92FDCA09300DAF751 /* Beta */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 4VL4UGNPQQ;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Beta;
+		};
+		1B4010BA2FDCA09300DAF751 /* Beta */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -504,7 +500,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				GM_BUNDLE_SUFFIX = ".beta";
+				GM_BUNDLE_SUFFIX = .beta;
 				GM_DEV_PLUGIN_DIR = "$(SRCROOT)/../plugins/gmbeta";
 				GM_ENV = beta;
 				GM_FS_ROOT_BAKED = "~/beta_gmfs";
@@ -630,48 +626,16 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		1B4010A42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmDaemonSdk" */ = {
+		1B4010A42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmk" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = gmDaemonSdk;
-		};
-		1B4010A52FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmDaemon" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = gmDaemon;
-		};
-		1B4010A62FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmUxComponentLibrary" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = gmUxComponentLibrary;
-		};
-		1B4010A92FDCA09300DAF751 /* XCLocalSwiftPackageReference "Gm_Kernel_test" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Gm_Kernel_test;
-		};
-		1B4010D32FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmVibesCore" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = gmVibesCore;
-		};
-		1B4010E42FDCA09300DAF751 /* XCLocalSwiftPackageReference "gmITerm2Client" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = gmITerm2Client;
+			relativePath = .;
 		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		1B4010B22FDCA09300DAF751 /* GmDaemonSdk */ = {
+		1B4010D22FDCA09300DAF751 /* gm_kernel */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = GmDaemonSdk;
-		};
-		1B4010B32FDCA09300DAF751 /* GmUxComponentLibrary */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = GmUxComponentLibrary;
-		};
-		1B4010C22FDCA09300DAF751 /* GmKernelHost */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = GmKernelHost;
-		};
-		1B4010D22FDCA09300DAF751 /* GmVibesCore */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = GmVibesCore;
+			productName = gm_kernel;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

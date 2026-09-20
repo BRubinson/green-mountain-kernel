@@ -167,7 +167,7 @@ BASE="https://github.com/$RELEASE_REPO/releases/download/$TAG"
 # Two layouts exist and both must install, because the older one is the rollback
 # target for every machine already running:
 #
-#   current  ONE asset, the DMG. The app carries the CLI at Contents/Helpers, so
+#   current  ONE asset, the DMG. The app's executable IS the CLI, so
 #            the binaries are EXTRACTED FROM THE APP rather than downloaded
 #            separately. One artifact, used twice, which is what stops the
 #            installed binary and the installed app from ever disagreeing.
@@ -415,7 +415,7 @@ if [ "$BIN_WORK" -eq 1 ]; then
         [ -d "$_app" ] || _app="$_mnt/$GM_APP_NAME_LEGACY.app"
 
         _ok=0
-        if [ -x "$_app/Contents/Helpers/$GM_MACHO" ]; then
+        if [ -x "$_app/Contents/MacOS/$GM_MACHO" ] || [ -x "$_app/Contents/Helpers/$GM_MACHO" ]; then
             rm -rf "$GM_DOWNLOADS/$VERSION"
             if gm_stage_from_bundle "$_app" downloads "$VERSION" "$TAG" >/dev/null; then
                 _ok=1
@@ -428,7 +428,7 @@ if [ "$BIN_WORK" -eq 1 ]; then
         rmdir "$_mnt" 2>/dev/null || true
 
         [ "$_ok" -eq 1 ] || {
-            echo "[GMB] ERROR: $DMG_ASSET carries no $GM_MACHO at Contents/Helpers." >&2
+            echo "[GMB] ERROR: $DMG_ASSET carries no $GM_MACHO at Contents/MacOS (nor Contents/Helpers)." >&2
             echo "       It predates the one-bundle layout but is not in the legacy" >&2
             echo "       namespace either. Install a newer version." >&2
             exit 1; }

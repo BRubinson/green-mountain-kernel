@@ -4,29 +4,7 @@
    <FileRef
       location = "group:gmk.xcodeproj">
    </FileRef>
-   <Group
-      location = "container:"
-      name = "Packages">
-      <FileRef
-         location = "group:gmDaemonSdk">
-      </FileRef>
-      <FileRef
-         location = "group:gmDaemon">
-      </FileRef>
-      <FileRef
-         location = "group:gmUxComponentLibrary">
-      </FileRef>
-      <FileRef
-         location = "group:gmAgententicsSdk">
-      </FileRef>
-      <FileRef
-         location = "group:Gm_Kernel_test">
-      </FileRef>
-      <FileRef
-         location = "group:gmVibesCore">
-      </FileRef>
-      <FileRef
-         location = "group:gmITerm2Client">
-      </FileRef>
-   </Group>
+   <FileRef
+      location = "group:Package.swift">
+   </FileRef>
 </Workspace>

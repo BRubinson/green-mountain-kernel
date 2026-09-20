@@ -1,0 +1,223 @@
+import Foundation
+import GRDB
+import GmDaemonSdk
+
+// KBITE_DIGEST / KBITE_GET / KBITE_FILE_GET / KBITE_SEARCH /
+// KBITE_KEYWORD_TAG — the digested-content family over the m0002 tables.
+// The db is canonical for digested text; the filesystem keeps raw sources
+// (re-chewable) and open maws.
+// Db bodies live in KbiteResourceRepository; these wrappers own the
+// transaction. digestKbite's filesystem phases (maw scan, content pre-read,
+// post-commit chewed-file deletion, maw archive) stay HERE — filesystem work
+// never enters a db transaction.
+
+extension Store {
+    /// Raw file content larger than this stays filesystem-only (row gets a
+    /// NULL content, like binaries).
+    private static let maxInlineContentBytes = 2 * 1024 * 1024
+
+    /// The one-step import. Walks {open}/{axis1}/{axis2}/*_chewed.md, parses
+    /// each chewed artifact, and writes resource/file/keyword rows in ONE
+    /// transaction — re-digesting a resource replaces its previous rows.
+    /// Chewed files are deleted only AFTER the commit succeeds (a rollback
+    /// never destroys the artifacts). The maw's raw sources are then moved to
+    /// `{digested}/{code}/` and the open maw is dropped; an archive failure is
+    /// reported on the response, never thrown, because the commit already stands.
+    public func digestKbite(_ req: KbiteDigestRequest) throws -> KbiteDigestResponse {
+        // FOUR-PHASE VERB — see StoreError.notComposable. Filesystem work
+        // between the read and the write must not hold the single writer.
+        guard !isInTransaction else {
+            throw StoreError.notComposable(verb: "digestKbite")
+        }
+        let fm = FileManager.default
+        let openURL = URL(fileURLWithPath: req.kbiteOpenPath, isDirectory: true)
+
+        // Scan the maw up front — pure filesystem, no reason to hold the
+        // write lock for it.
+        var found: [(artifact: ChewedArtifact, axis1: String, axis2: String, chewedPath: String)] = []
+        for axis1 in ["primary", "secondary"] {
+            for axis2 in ["documentation", "example_project", "api_reference", "blogs", "all_others"] {
+                let dir = openURL.appendingPathComponent(axis1, isDirectory: true)
+                    .appendingPathComponent(axis2, isDirectory: true)
+                guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { continue }
+                for name in names.sorted() where name.hasSuffix("_chewed.md") {
+                    let chewedURL = dir.appendingPathComponent(name)
+                    guard let text = try? String(contentsOf: chewedURL, encoding: .utf8) else { continue }
+                    let fallback = String(name.dropLast("_chewed.md".count))
+                    var artifact = ChewedArtifactParser.parse(text: text, fallbackName: fallback)
+                    // Entries with no absolute path resolve against the
+                    // sibling raw-source folder ({axis2}/{resource_name}/).
+                    let sourceDir = dir.appendingPathComponent(artifact.resourceName, isDirectory: true)
+                    artifact = ChewedArtifact(
+                        resourceName: artifact.resourceName,
+                        confidence: artifact.confidence,
+                        body: artifact.body,
+                        files: artifact.files.map { entry in
+                            entry.fullPath != nil
+                                ? entry
+                                : ChewedFileEntry(
+                                    name: entry.name,
+                                    type: entry.type,
+                                    description: entry.description,
+                                    fullPath: sourceDir.appendingPathComponent(entry.name).path
+                                )
+                        },
+                        keywords: artifact.keywords
+                    )
+                    found.append((artifact, axis1, axis2, chewedURL.path))
+                }
+            }
+        }
+
+        // Raw-source content is also read up front — inlineContent stats and
+        // reads up to 2 MB per file, which must not happen while the single
+        // serialized connection holds the write lock.
+        let inlinedContents: [[String?]] = found.map { item in
+            item.artifact.files.map { self.inlineContent($0) }
+        }
+
+        var resourceCount = 0
+        var fileCount = 0
+        var attachedKeywords: Set<String> = []
+
+        let kbiteUuid = try boundary { db -> String in
+            var rc = resourceCount
+            var fc = fileCount
+            var kw = attachedKeywords
+            let uuid = try KbiteResourceRepository(db: db, core: core)
+                .digestApply(
+                    code: req.code,
+                    found: found,
+                    inlinedContents: inlinedContents,
+                    resourceCount: &rc,
+                    fileCount: &fc,
+                    attachedKeywords: &kw
+                )
+            resourceCount = rc
+            fileCount = fc
+            attachedKeywords = kw
+            return uuid
+        }
+
+        // Commit succeeded — now (and only now) the temporary chewed files go.
+        var deleted: [String] = []
+        for item in found where (try? fm.removeItem(atPath: item.chewedPath)) != nil {
+            deleted.append(item.chewedPath)
+        }
+
+        // An empty digest leaves the maw where it is: moving un-chewed sources
+        // into the archive would strand them somewhere no chew step looks.
+        var archivedTo: String?
+        var archiveError: String?
+        if resourceCount > 0 {
+            do {
+                archivedTo = try archiveMaw(openURL, code: req.code).path
+            } catch {
+                archiveError = String(describing: error)
+            }
+        }
+
+        return KbiteDigestResponse(
+            kbiteUuid: kbiteUuid,
+            resourceCount: resourceCount,
+            fileCount: fileCount,
+            keywordCount: attachedKeywords.count,
+            deletedChewedFiles: deleted,
+            archivedTo: archivedTo,
+            archiveError: archiveError
+        )
+    }
+
+    /// Merge-move the maw into `{digested}/{code}/` and remove the emptied maw.
+    /// A re-digest merges over the earlier archive file by file, so a partial
+    /// re-chew replaces only the resources it carried.
+    private func archiveMaw(_ openURL: URL, code: String) throws -> URL {
+        let destination = Paths.kbitesDigestedRoot.appendingPathComponent(code, isDirectory: true)
+        try Paths.assertContained(openURL)
+        try Paths.assertContained(destination)
+        try Self.mergeMove(from: openURL, to: destination)
+        try FileManager.default.removeItem(at: openURL)
+        return destination
+    }
+
+    private static func mergeMove(from source: URL, to destination: URL) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: destination, withIntermediateDirectories: true)
+        for name in try fm.contentsOfDirectory(atPath: source.path) {
+            let from = source.appendingPathComponent(name)
+            let to = destination.appendingPathComponent(name)
+            var isDir: ObjCBool = false
+            fm.fileExists(atPath: from.path, isDirectory: &isDir)
+            if isDir.boolValue {
+                try mergeMove(from: from, to: to)
+            } else {
+                if fm.fileExists(atPath: to.path) { try fm.removeItem(at: to) }
+                try fm.moveItem(at: from, to: to)
+            }
+        }
+    }
+
+    /// Full text for text types under the size cap; NULL for everything else
+    /// (missing, unreadable, binary, oversized) — the row still exists so the
+    /// file is discoverable, the filesystem keeps the raw bytes.
+    private func inlineContent(_ entry: ChewedFileEntry) -> String? {
+        guard let path = entry.fullPath, ChewedArtifactParser.isTextType(fileName: entry.name) else {
+            return nil
+        }
+        let attrs = try? FileManager.default.attributesOfItem(atPath: path)
+        if let size = attrs?[.size] as? Int, size > Store.maxInlineContentBytes {
+            return nil
+        }
+        return try? String(contentsOfFile: path, encoding: .utf8)
+    }
+
+    public func getKbite(_ req: KbiteGetRequest) throws -> KbiteGetResponse {
+        try boundaryRead { db in try KbiteResourceRepository(db: db, core: core).getKbite(req) }
+    }
+
+    /// The targeted load replacing "cat the chewed file".
+    public func getKbiteFile(_ req: KbiteFileGetRequest) throws -> KbiteFileGetResponse {
+        try boundaryRead { db in try KbiteResourceRepository(db: db, core: core).getKbiteFile(req) }
+    }
+
+    public func searchKbites(_ req: KbiteSearchRequest) throws -> KbiteSearchResponse {
+        // ORs the query tokens (see Store+DopeSearch for why AND was wrong).
+        // The empty-hit-list answer to an untokenizable query is a DELIBERATE
+        // divergence from DOPE_SEARCH and SEARCH, which throw badRequest; it
+        // predates this change and is left alone.
+        guard let pattern = FTS5Pattern(matchingAnyTokenIn: req.query) else {
+            return KbiteSearchResponse(hits: [])
+        }
+        return try boundaryRead { db in
+            try KbiteResourceRepository(db: db, core: core).searchKbites(req, pattern: pattern)
+        }
+    }
+
+    /// Attach/detach normalized keywords at kbite or resource-file level.
+    public func tagKeyword(_ req: KbiteKeywordTagRequest) throws -> KbiteKeywordTagResponse {
+        try boundary { db in try KbiteResourceRepository(db: db, core: core).tagKeyword(req) }
+    }
+
+    // MARK: - Cross-domain helper forwards (Store+KbiteArchive's import reuses these)
+
+    func ensureKeyword(_ db: Database, _ keyword: String) throws -> String {
+        try KbiteResourceRepository(db: db, core: core).ensureKeyword(keyword)
+    }
+
+    @discardableResult
+    func attachKeyword(
+        _ db: Database,
+        table: String,
+        ownerColumn: String,
+        ownerUuid: String,
+        keywordUuid: String
+    ) throws -> Bool {
+        try KbiteResourceRepository(db: db, core: core)
+            .attachKeyword(
+                table: table,
+                ownerColumn: ownerColumn,
+                ownerUuid: ownerUuid,
+                keywordUuid: keywordUuid
+            )
+    }
+}

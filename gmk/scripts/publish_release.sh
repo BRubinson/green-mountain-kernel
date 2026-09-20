@@ -29,7 +29,7 @@
 #   └── gm_kernel-<version>.dmg.sha256
 #
 # ONE ASSET. The tarball is gone: it carried the same Mach-O the app bundle now
-# holds at Contents/Helpers/gm_kernel, staged twice and versioned by two
+# holds at Contents/MacOS/gm_kernel, staged twice and versioned by two
 # mechanisms. install_gm.sh mounts the DMG, installs the app, and extracts the
 # CLI out of the installed bundle — so the binary in bin/ is provably the one
 # inside the app beside it.
@@ -195,20 +195,20 @@ say "4/8  TESTS — never ship what was not tested"
 # artifact that is about to SHIP rather than at whatever is in .build: testing
 # bits other than the ones being published is how "what you tested is what
 # ships" quietly stops being true.
-TEST_PACKAGE="Gm_Kernel_test"
+TEST_TARGET="GmKernelTests"
 TMP_TEST_LOG="$(mktemp "${TMPDIR:-/tmp}/gm-test.XXXXXX")"
 trap 'rm -f "$TMP_TEST_LOG"' EXIT
-[ -d "$GMK/$TEST_PACKAGE" ] || die "$TEST_PACKAGE is missing — refusing to publish untested binaries"
+[ -d "$GMK/Tests/$TEST_TARGET" ] || die "$TEST_TARGET is missing — refusing to publish untested binaries"
 
-echo "  swift test $TEST_PACKAGE (against the staged kernel)"
+echo "  swift test $TEST_TARGET (against the staged kernel)"
 GM_TEST_KERNEL_BIN="$STAGE/$GM_MACHO" \
-    swift test --package-path "$GMK/$TEST_PACKAGE" 2>&1 | tee "$TMP_TEST_LOG" >/dev/null \
-    || die "$TEST_PACKAGE failed — not publishing"
+    swift test --package-path "$GMK" 2>&1 | tee "$TMP_TEST_LOG" >/dev/null \
+    || die "$TEST_TARGET failed — not publishing"
 
 # Prove the run was not vacuous. A suite that executed nothing is not a pass.
 EXECUTED="$(grep -cE "' passed \(" "$TMP_TEST_LOG" || true)"
 [ "${EXECUTED:-0}" -gt 0 ] \
-    || die "$TEST_PACKAGE reported success but ran ZERO cases — refusing to ship on a vacuous gate"
+    || die "$TEST_TARGET reported success but ran ZERO cases — refusing to ship on a vacuous gate"
 echo "  $EXECUTED cases green"
 
 # ── 5. The app ───────────────────────────────────────────────────────────────
@@ -290,8 +290,8 @@ PUB_ENV="$(plutil -extract GMEnvironment raw "$APP_BUILT/Contents/Info.plist" 2>
            bash gmk/scripts/rebuild_local.sh --app --universal"
 
 # ── SLICES, read off the bundle now that there is no tarball to read ─────────
-PUB_HELPER="$APP_BUILT/Contents/Helpers/$GM_MACHO"
-[ -x "$PUB_HELPER" ] || die "the staged bundle carries no $GM_MACHO helper.
+PUB_HELPER="$APP_BUILT/Contents/MacOS/$GM_MACHO"
+[ -x "$PUB_HELPER" ] || die "the staged bundle's executable is not $GM_MACHO.
        install_gm.sh takes the CLI out of the bundle, so a helperless app
        installs and leaves bin/ empty — and gm_hook exits 0 silently when its
        binary is missing, so the machine records nothing rather than failing."
@@ -336,7 +336,7 @@ say "6/8  PACKAGE"
 # ── ONE ARTIFACT ────────────────────────────────────────────────────────────
 #
 # THE TARBALL IS GONE. It held the same Mach-O the app bundle now carries at
-# Contents/Helpers/gm_kernel — one piece of code, staged twice, versioned by two
+# Contents/MacOS/gm_kernel — one piece of code, staged twice, versioned by two
 # mechanisms (.gm_version for the tarball, MARKETING_VERSION for the app). That
 # is the two-track drift the single-tag release was created to end, reproduced
 # inside a single tag.
@@ -385,7 +385,7 @@ One release, one version: the runtime and the app are both \`$VERSION\`.
 
 | Asset | What it is |
 | --- | --- |
-| \`$DMG_ASSET\` | **The whole release.** The $GM_APP_NAME app — a menu-bar-resident kernel that owns the database and serves every client — with the \`gm_kernel\` CLI inside it at \`Contents/Helpers\`. The installer takes the app to \`/Applications\` and the CLI to \`\$GM_FS_ROOT/bin\`, where \`gm_daemon\`, \`gm_mcp\` and \`gm_hook\` are symlinks at it. |
+| \`$DMG_ASSET\` | **The whole release.** The $GM_APP_NAME app — a menu-bar-resident kernel that owns the database and serves every client — with the \`gm_kernel\` CLI inside it at \`Contents/MacOS\`. The installer takes the app to \`/Applications\` and the CLI to \`\$GM_FS_ROOT/bin\`, where \`gm_daemon\`, \`gm_mcp\` and \`gm_hook\` are symlinks at it. |
 
 $SIGNING_NOTE
 

@@ -9,7 +9,7 @@
 #   swift_lint_format.sh [--fix] PATH... # restrict to the given files or directories
 #
 # Configs are discovered by walking up from each file (root .swift-format, the
-# Gm_Kernel_test override, root .swiftlint.yml), so no --configuration is passed.
+# gmk/Tests override, root .swiftlint.yml), so no --configuration is passed.
 # SwiftLint is optional: when it is not installed the stage is skipped with a warning
 # (install: bash gmk/scripts/install_swiftlint.sh).
 #
@@ -66,13 +66,8 @@ while [ $# -gt 0 ]; do
 done
 
 if [ ${#PATHS[@]} -eq 0 ]; then
-    for d in "$GMK"/*/; do
-        d="${d%/}"
-        case "$(basename "$d")" in
-            gmClaudeForFoundationModels|build|scripts) continue ;;
-        esac
-        [ -f "$d/Package.swift" ] || [ "$(basename "$d")" = gmVibes ] || continue
-        PATHS+=("$d")
+    for d in Sources Tests Plugins gmVibes; do
+        [ -d "$GMK/$d" ] && PATHS+=("$GMK/$d")
     done
 fi
 
