@@ -1,7 +1,7 @@
 ---
 description: Open a maw for collecting kbite resources
 argument-hint: <kbite_name>
-allowed-tools: Read, Write, Bash, Glob, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest
+allowed-tools: Read, Write, Bash, Glob, mcp__plugin_gmcc_cde__cde_kbite
 ---
 
 Open a maw for collecting kbite resources.

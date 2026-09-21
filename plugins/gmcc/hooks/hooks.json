@@ -5,7 +5,7 @@
         "hooks" : [
           {
             "async" : true,
-            "command" : "[ -x \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" ] || exit 0; exec \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" hook post-tool-use",
+            "command" : "[ -x \"${CLAUDE_PLUGIN_ROOT}/hooks/bin/gm_hook_post_tool_use\" ] || exit 0; exec \"${CLAUDE_PLUGIN_ROOT}/hooks/bin/gm_hook_post_tool_use\"",
             "type" : "command"
           }
         ],
@@ -16,7 +16,7 @@
       {
         "hooks" : [
           {
-            "command" : "[ -x \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" ] || exit 0; exec \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" hook pre-tool-use",
+            "command" : "[ -x \"${CLAUDE_PLUGIN_ROOT}/hooks/bin/gm_hook_pre_tool_use\" ] || exit 0; exec \"${CLAUDE_PLUGIN_ROOT}/hooks/bin/gm_hook_pre_tool_use\"",
             "timeout" : 5,
             "type" : "command"
           }
@@ -32,7 +32,7 @@
             "type" : "command"
           },
           {
-            "command" : "if [ ! -x \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" ]; then \\\n  echo \"[GMB] gm_hook missing at ${GM_FS_ROOT:-$HOME/gmfs}/bin — run: bash \\\"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\\\"\" >&2; \\\nfi; exit 0",
+            "command" : "if [ ! -x \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_daemon\" ]; then \\\n  echo \"[GMB] kernel missing at ${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_daemon — run: bash \\\"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\\\"\" >&2; \\\nfi; exit 0",
             "type" : "command"
           }
         ],
@@ -43,7 +43,7 @@
       {
         "hooks" : [
           {
-            "command" : "[ -x \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" ] || exit 0; exec \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook\" hook subagent-start",
+            "command" : "[ -x \"${CLAUDE_PLUGIN_ROOT}/hooks/bin/gm_hook_subagent_start\" ] || exit 0; exec \"${CLAUDE_PLUGIN_ROOT}/hooks/bin/gm_hook_subagent_start\"",
             "timeout" : 5,
             "type" : "command"
           }

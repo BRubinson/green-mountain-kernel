@@ -16,7 +16,7 @@ FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/nul
 case "$FILE" in *.swift) ;; *) exit 0 ;; esac
 [ -f "$FILE" ] || exit 0
 case "$FILE" in
-    */gmClaudeForFoundationModels/*|*/Generated/*|*/.build/*|*/plugins/*|*/Package.swift) exit 0 ;;
+    */Generated/*|*/.build/*|*/plugins/*|*/Package.swift) exit 0 ;;
 esac
 
 ROOT="${CLAUDE_PROJECT_DIR:-}"

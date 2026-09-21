@@ -1,0 +1,2 @@
+plugins/gmcc/hooks/bin/** binary
+plugins/gmcc/bin/gm_* binary

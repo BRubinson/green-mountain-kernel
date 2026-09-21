@@ -1,7 +1,7 @@
 ---
 description: Digest chewed maw resources into the kernel db and archive raw sources
 argument-hint: <kbite_name>
-allowed-tools: Read, Write, Bash, Glob, Grep, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest
+allowed-tools: Read, Write, Bash, Glob, Grep, mcp__plugin_gmcc_cde__cde_kbite
 ---
 
 Digest chewed maw resources into the kernel db and archive the raw sources.

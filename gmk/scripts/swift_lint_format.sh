@@ -13,8 +13,7 @@
 # SwiftLint is optional: when it is not installed the stage is skipped with a warning
 # (install: bash gmk/scripts/install_swiftlint.sh).
 #
-# Skipped: the vendored gmClaudeForFoundationModels package, generated protobuf sources,
-# and every .build directory.
+# Skipped: generated protobuf sources and every .build directory.
 
 set -euo pipefail
 
@@ -64,7 +63,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ ${#PATHS[@]} -eq 0 ]; then
-    for d in Sources Tests Plugins gmVibes; do
+    for d in Sources Tests Plugins; do
         [ -d "$GMK/$d" ] && PATHS+=("$GMK/$d")
     done
 fi
@@ -80,7 +79,7 @@ for p in "${PATHS[@]}"; do
     else
         echo "[GMB] ERROR: no such path $p" >&2; exit 2
     fi
-done | grep -v '/gmClaudeForFoundationModels/' | sort -u > "$FILES"
+done | sort -u > "$FILES"
 
 COUNT="$(wc -l < "$FILES" | tr -d ' ')"
 [ "$COUNT" -gt 0 ] || { echo "[GMB] swift-format: no Swift files matched" >&2; exit 0; }

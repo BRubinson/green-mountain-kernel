@@ -7,15 +7,15 @@ files directly** — authoring a tree from scratch, repairing a hand-edit, or
 reviewing a diff of `.gmcc/`.
 
 A normal bot run does **not** need this file. The bot tiers reach dope
-search-first through the pen (`dope_search`, then targeted `dope_get` by
-`code`) and never touch the files; that protocol lives in
-`ref/bot_workflows.md` and is unaffected by anything here.
+search-first through the pen (`cde_dope` op `search_session`, then op
+`search_global` by `code`) and never touch the files; that protocol lives
+in the `cde_rpir_*` phase skills and is unaffected by anything here.
 
 ## The supported path
 
 The db is the editing surface. The files are a **publication** of it.
-The one pen door from db to files is `dope_update_session` (scope_uuid;
-`force` writes even when the repo has diverged).
+The one pen door from db to files is `cde_dope` op `update_session`
+(scope_uuid; `force` writes even when the repo has diverged).
 
 Granular node edits — add or update one node at one level (persistence,
 entity, property, enum, option) — and hand-edit reconciliation (parse and

@@ -1,0 +1,113 @@
+import Foundation
+
+/// The agent-facing sheet, GENERATED FROM `CdeToolRoster` rather than written
+/// down: reading the roster the pen serves from means a tool cannot be listed
+/// here unless it exists, nor exist without being listed.
+///
+/// TWO PROPERTIES, TWO BUDGETS. `instructions` is the MCP server's
+/// `initialize` response and is capped at 2048 bytes, asserted at startup.
+/// `text` is what a spawning agent receives as SubagentStart context, where
+/// there is room for invariants a tool schema cannot carry.
+enum CdeSheet {
+
+    /// Compact orientation for the MCP `initialize` response.
+    static var instructions: String {
+        let roster = self.roster
+        return """
+            The GMCC cde server: the GM-CDE workflow machine's record, as tools.
+
+            START HERE — cde_init returns your current phase, its skill pointer, \
+            your uuid bundle, and the gate blockers. Call it before anything else, \
+            and again after every seal. It answers without being told a uuid.
+
+            THE RULE — where a pen op exists, it is the write path. It is typed, \
+            it threads expected_version, and it is what the record is made of. \
+            Every tool takes an `op` (cde_rpir_search takes a `scope`).
+
+            READ: \(roster.reads.joined(separator: ", ")).
+            WRITE: \(roster.writes.joined(separator: ", ")).
+
+            THE PRIMARY'S CALLS — \(roster.primaryCalls.joined(separator: ", ")). \
+            Cross-agent calibration, the choice among options, and the seals \
+            belong to one reader; unless your own tool list says otherwise, \
+            report that you are ready for one rather than making it.
+            """
+    }
+
+    /// The fuller sheet handed to a spawned agent at SubagentStart.
+    ///
+    /// THE INVARIANTS BLOCK IS THE LOAD-BEARING HALF. A tool schema conveys a
+    /// parameter list and nothing else — it cannot tell an agent that the db is
+    /// append-only, that a VERSION_CONFLICT is re-read-and-retry rather than a
+    /// failure, or that a dope ref is a dot-path code and never a uuid.
+    static var text: String {
+        """
+        \(instructions)
+
+        INVARIANTS
+          - Thread expected_version on every mutation. On VERSION_CONFLICT, \
+        re-run the matching get, take .version, and retry — it is a normal \
+        outcome of concurrent work, not an error to report.
+          - The db is APPEND-ONLY history. Nothing is wiped, and a row you \
+        wrote by mistake is corrected by writing again, never by deletion.
+          - SUMMARY_ABSENT means the prompt exists but that summary was never \
+        opened — open it. It is never a reason to fall back to a file.
+          - Dope refs are dot-path CODES (domain.entity.property), never uuids.
+          - Rate your OWN findings 0 (critical) to 999 (ignore); the read \
+        threshold is 100. Ranking is a single cross-agent calibration pass over \
+        every agent's findings at once, so it is one reader's job, not yours.
+          - Seal only your own summary. That seal is yours; another agent's is not.
+
+        CDE WORK IS PEN-ONLY. Every workflow step has a pen door; a tool you \
+        cannot see is a missing GRANT, and that is a fact to REPORT, never a \
+        cue to shell to the wire — CLI output is unbudgeted and the harness \
+        silently truncates it mid-JSON. File-change capture belongs to the \
+        PostToolUse hook alone (Bash included): never write capture rows \
+        yourself.
+        """
+    }
+
+    // MARK: - Generation
+
+    struct Roster {
+        var reads: [String]
+        var writes: [String]
+        var primaryCalls: [String]
+    }
+
+    /// Orientation before record before write: an agent that calls cde_init
+    /// first never needs the rest of this text. A tool appears on the READ line,
+    /// the WRITE line or both, carrying only the ops of that kind — one tool
+    /// with eleven ops is not eleven entries.
+    static var roster: Roster {
+        var reads: [String] = []
+        var writes: [String] = []
+        var primaryCalls: [String] = []
+        for spec in CdeToolRoster.specs.sorted(by: { $0.name < $1.name }) where !spec.refuses {
+            var readOps: [String] = []
+            var writeOps: [String] = []
+            for op in spec.ops {
+                // The primary's four are listed on their own line rather than
+                // among the writes — METHODOLOGY, not a gate. Named rather than
+                // withheld, so an agent can say it is ready for a specific one
+                // instead of reporting "blocked" without saying on what.
+                if VerbRegistry.primaryPenTools.contains("\(spec.name).\(op.op)") {
+                    primaryCalls.append("\(spec.name)(\(op.op))")
+                } else if op.isWrite {
+                    writeOps.append(op.op)
+                } else {
+                    readOps.append(op.op)
+                }
+            }
+            if !readOps.isEmpty { reads.append(entry(spec.name, readOps)) }
+            if !writeOps.isEmpty { writes.append(entry(spec.name, writeOps)) }
+        }
+        return Roster(reads: reads, writes: writes, primaryCalls: primaryCalls.sorted())
+    }
+
+    /// `tool` when the whole tool is meant, `tool(op|op)` when it is a subset.
+    private static func entry(_ tool: String, _ ops: [String]) -> String {
+        let all = CdeToolRoster.spec(named: tool)?.ops.count ?? 0
+        return ops.count == all ? tool : "\(tool)(\(ops.joined(separator: "|")))"
+    }
+}

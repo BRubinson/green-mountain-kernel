@@ -1,7 +1,7 @@
 ---
 description: Import a gmcc_kbite zip into this machine's kernel db
 argument-hint: <zip_path> [overwrite]
-allowed-tools: Read, Bash, Glob, AskUserQuestion, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest
+allowed-tools: Read, Bash, Glob, AskUserQuestion, mcp__plugin_gmcc_cde__cde_kbite
 ---
 
 Import a `gmcc_kbite` zip into this machine's kernel db.

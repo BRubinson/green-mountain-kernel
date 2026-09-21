@@ -2,7 +2,7 @@
 name: project
 description: "Identity spine: project, instance, session"
 user-invocable: false
-allowed-tools: mcp__plugin_gmcc_cde__projects_search, mcp__plugin_gmcc_cde__projects_update_session
+allowed-tools: mcp__plugin_gmcc_cde__cde_session
 ---
 
 ## Project, Instance, Session — Identity Spine

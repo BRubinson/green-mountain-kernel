@@ -8,11 +8,14 @@ included:
 
 # Single-star paths only: a ** globstar here crashes SwiftLint 0.65.1 on this tree.
 excluded:
-  - gmk/gmClaudeForFoundationModels
-  - gmk/Sources/GmITerm2Client/Generated
+  - gmk/Sources/API/Clients/ITerm2Client/Generated
   - gmk/build
   - gmk/scripts
   - gmk/.build
+  - plugins/gmcc/hooks/src
+  - plugins/gmbeta/hooks/src
+  - plugins/gmcc/bin/src
+  - plugins/gmbeta/bin/src
 
 # Run by hand only: swiftlint analyze --compiler-log-path <log>
 analyzer_rules:

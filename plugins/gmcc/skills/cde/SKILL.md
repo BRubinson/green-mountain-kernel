@@ -2,7 +2,7 @@
 name: cde
 description: The harness integration for agentic development
 user-invocable: false
-allowed-tools: mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_load_prompt, mcp__plugin_gmcc_cde__cde_set_status, mcp__plugin_gmcc_cde__cde_search_file_changes, mcp__plugin_gmcc_cde__rpir_next, mcp__plugin_gmcc_cde__rpir_open_briefing, mcp__plugin_gmcc_cde__rpir_write_brief, mcp__plugin_gmcc_cde__rpir_close_brief, mcp__plugin_gmcc_cde__rpir_load_exploration_brief, mcp__plugin_gmcc_cde__rpir_open_exploration, mcp__plugin_gmcc_cde__rpir_write_explorations, mcp__plugin_gmcc_cde__rpir_rank_explorations, mcp__plugin_gmcc_cde__rpir_complete_exploration, mcp__plugin_gmcc_cde__rpir_get_exploration, mcp__plugin_gmcc_cde__rpir_open_clarification, mcp__plugin_gmcc_cde__rpir_write_clarification_questions, mcp__plugin_gmcc_cde__rpir_write_clarification_notes, mcp__plugin_gmcc_cde__rpir_answer_clarification_question, mcp__plugin_gmcc_cde__rpir_seal_clarification, mcp__plugin_gmcc_cde__rpir_finalize_clarification, mcp__plugin_gmcc_cde__rpir_open_care_package, mcp__plugin_gmcc_cde__rpir_write_care_package, mcp__plugin_gmcc_cde__rpir_close_care_package, mcp__plugin_gmcc_cde__rpir_get_clarification, mcp__plugin_gmcc_cde__rpir_get_care_package, mcp__plugin_gmcc_cde__rpir_open_architecture, mcp__plugin_gmcc_cde__rpir_open_architecture_option, mcp__plugin_gmcc_cde__rpir_write_architecture_persistence_changes, mcp__plugin_gmcc_cde__rpir_write_architecture_field_changes, mcp__plugin_gmcc_cde__rpir_write_architecture_general_changes, mcp__plugin_gmcc_cde__rpir_summarize_architecture, mcp__plugin_gmcc_cde__rpir_propose_architecture, mcp__plugin_gmcc_cde__rpir_approve_architecture, mcp__plugin_gmcc_cde__rpir_revise_architecture, mcp__plugin_gmcc_cde__rpir_decide_architecture, mcp__plugin_gmcc_cde__rpir_get_architecture, mcp__plugin_gmcc_cde__rpir_open_review, mcp__plugin_gmcc_cde__rpir_write_reviews, mcp__plugin_gmcc_cde__rpir_rank_reviews, mcp__plugin_gmcc_cde__rpir_complete_review, mcp__plugin_gmcc_cde__rpir_resolve_review_finding, mcp__plugin_gmcc_cde__rpir_get_review, mcp__plugin_gmcc_cde__rpir_search_exploration, mcp__plugin_gmcc_cde__rpir_search_clarification, mcp__plugin_gmcc_cde__rpir_search_architecture, mcp__plugin_gmcc_cde__rpir_search_architecture_option, mcp__plugin_gmcc_cde__rpir_search_review
+allowed-tools: mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_prompt, mcp__plugin_gmcc_cde__cde_rpir_briefing, mcp__plugin_gmcc_cde__cde_rpir_explore, mcp__plugin_gmcc_cde__cde_rpir_clarify, mcp__plugin_gmcc_cde__cde_rpir_architecture, mcp__plugin_gmcc_cde__cde_rpir_review, mcp__plugin_gmcc_cde__cde_rpir_search
 ---
 
 # CDE — Contextual Development Environment
@@ -29,8 +29,19 @@ Spawn a subagent when: work spans multiple steps, tool set is narrower than prim
 
 Specific workflows (lifecycle, phases, roles) are configured outside the harness. The CDE is the general environment they run inside.
 
-## Reference
+## The workflow phases
 
-Detail lives beside this file rather than in it — read it only when it names your situation:
+Each RPIR phase is a skill of its own, carrying that phase's calls and its gate. Load the one the run has reached; do not load the walk:
 
-- `ref/bot_workflows.md` — The workflow machine: phases, gates, who writes what, and the two write channels. Read before driving or debugging a bot/rpi/team run.
+- `gmcc:cde_rpir_briefing` — The BRIEFING phase: the prompt's opinion-free orientation page, sealed before anything else moves.
+- `gmcc:cde_rpir_explore` — The EXPLORE phase: one finding list per explorer, written as the codebase is read.
+- `gmcc:cde_rpir_clarify_open` — The CLARIFY_OPEN phase: rank the whole record, seal the synthesis, author the question suite.
+- `gmcc:cde_rpir_clarify_user` — The CLARIFY_USER phase: the one conversation with the Endotherm, and its recorded answers.
+- `gmcc:cde_rpir_care_package` — The CARE_PACKAGE phase: the clarified intent curated into the package architecture reads.
+- `gmcc:cde_rpir_arch_options` — The ARCH_OPTIONS phase: rival plans written in parallel, one per lens.
+- `gmcc:cde_rpir_architecture` — The ARCHITECTURE phase: the plan, persistence changes first and general changes built over them.
+- `gmcc:cde_rpir_plan_gate` — The PLAN_GATE phase: the Endotherm approves the plan before a stone is cut.
+- `gmcc:cde_rpir_implement` — The IMPLEMENT phase: the approved change landed, only in the files the plan names.
+- `gmcc:cde_rpir_review` — The REVIEW phase: what was built judged against what was asked.
+- `gmcc:cde_rpir_review_fix` — The REVIEW_FIX phase: the settled findings resolved and the rest ruled on.
+- `gmcc:cde_rpir_done` — The DONE phase: the prompt closed and the activation claim released.

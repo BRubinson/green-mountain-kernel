@@ -2,7 +2,7 @@
 name: dope
 description: "Domain Optimized Project Essence: the project's model of itself"
 user-invocable: false
-allowed-tools: mcp__plugin_gmcc_cde__dope_search_global, mcp__plugin_gmcc_cde__dope_search_session, mcp__plugin_gmcc_cde__dope_update_session
+allowed-tools: mcp__plugin_gmcc_cde__cde_dope
 ---
 
 # DOPE — Domain Optimized Project Essence

@@ -1,10 +1,9 @@
 {
   "mcpServers" : {
     "cde" : {
-      "alwaysLoad" : true,
       "args" : [
         "-c",
-        "GM_BIN=\"${GM_FS_ROOT:-$HOME/gmfs}/bin\"; \\\nif [ ! -x \"$GM_BIN/gm_mcp\" ]; then \\\n  echo \"[GMB] gm_mcp missing at $GM_BIN/gm_mcp — run: bash \\\"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\\\"\" >&2; \\\n  exit 1; \\\nfi; exec \"$GM_BIN/gm_mcp\""
+        "GM_MCP=\"${CLAUDE_PLUGIN_ROOT}/bin/gm_mcp\"; \\\nif [ ! -x \"$GM_MCP\" ]; then \\\n  echo \"[GMB] gm_mcp missing at $GM_MCP — this plugin tree was written without build_plugin_binaries.sh\" >&2; \\\n  exit 1; \\\nfi; exec \"$GM_MCP\""
       ],
       "command" : "/bin/sh"
     }

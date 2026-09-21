@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # GM-CDE SessionStart bootstrap. Four jobs only: confirm we're in a git repo,
-# find the right gm_hook binary, and hand the hook payload on stdin to
-# `gm_hook context ensure`. Everything else — identity, paths, env
+# find the plugin's own gm_hook executable, and hand the hook payload on stdin
+# to `gm_hook context ensure`. Everything else — identity, paths, env
 # emission, the artifact home, dope boot sync, the pen sheet — is owned by
 # that binary (`context ensure` + `context env`). This script computes
 # NOTHING the daemon computes, and it does not read the payload: the session
@@ -42,10 +42,14 @@ payload=""
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 GM_PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
 
-# --- 2. Locate gm_hook ------------------------------------------------------
-HOOK_BIN="${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_hook"
+# --- 2. Locate gm_hook: it ships INSIDE the plugin ----------------------------
+# Compiled with the client closure by gmk/scripts/build_plugin_binaries.sh and
+# committed beside this script. The KERNEL it dials still comes from
+# $GM_FS_ROOT/bin/gm_daemon (install_gm.sh); a missing kernel surfaces as the
+# "daemon unavailable" notice below, never as a missing gm_hook.
+HOOK_BIN="$GM_PLUGIN_DIR/bin/gm_hook"
 if [ ! -x "$HOOK_BIN" ]; then
-    echo "[GMB] gm_hook binary missing at $HOOK_BIN — run 'bash $GM_PLUGIN_DIR/scripts/install_gm.sh', then restart the session"
+    echo "[GMB] gm_hook missing at $HOOK_BIN — this plugin tree was written without build_plugin_binaries.sh"
     exit 0
 fi
 
@@ -56,6 +60,17 @@ if [ $? -ne 0 ]; then
     warnings="$warnings
 [GMB] daemon unavailable — context not ensured (run 'bash $GM_PLUGIN_DIR/scripts/install_gm.sh' or /gm_daemon, then 'gm_hook context ensure')"
 fi
+
+# --- 3b. Version drift: the plugin names one kernel version; a different
+# non-BETA kernel on disk is a downloaded release that fell behind or ran ahead.
+PLUGIN_V="$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$GM_PLUGIN_DIR/.claude-plugin/plugin.json" 2>/dev/null | head -1)"
+KERNEL_V="$(cat "${GM_FS_ROOT:-$HOME/gmfs}/bin/.gm_version" 2>/dev/null || true)"
+case "$KERNEL_V" in
+    ""|none|*-BETA) ;;
+    "$PLUGIN_V") ;;
+    *) warnings="$warnings
+[GMB] kernel $KERNEL_V active but plugin is v$PLUGIN_V — run /gmcc:gm_install (or 'bash $GM_PLUGIN_DIR/scripts/install_gm.sh')" ;;
+esac
 
 # --- 4. Cheatsheet into hook stdout (automatic; the agent never runs it) ----
 "$HOOK_BIN" pen-sheet 2>/dev/null || true

@@ -27,13 +27,15 @@ with no pen tool is a missing door to report. See the `kernel` skill.
 ├── commands/gm_*.md               # All GM commands
 ├── agents/*.md                    # Native agent defs (gmcc:code-explorer, briefer, …) — identity + pen contract
 ├── prompts/gmcc_agent_*.md        # Crunch/maw agent prompts (the bot roles live in agents/)
-├── scripts/gm_session_startup.sh         # SessionStart hook script
-├── scripts/gm_hook.sh                    # Every non-SessionStart hook; event as argv, payload to `gm_hook hook`
-├── scripts/install_gm.sh          # Fetches the newest daemon-v* release; stages + activates it
+├── scripts/gm_session_startup.sh         # SessionStart hook script; runs bin/gm_hook
+├── bin/gm_mcp                            # The pen server, compiled with the client closure; .mcp.json execs it
+├── bin/gm_hook                           # The shell client (context ensure/env, call passthrough)
+├── bin/src/gm_{mcp,hook}.swift           # Their generated mains; built by gmk/scripts/build_plugin_binaries.sh
+├── hooks/bin/gm_hook_<event>             # One compiled executable per hooked event (PreToolUse, PostToolUse, SubagentStart)
+├── hooks/src/gm_hook_<event>.swift       # Its generated main; same builder
+├── scripts/install_gm.sh          # Installs the kernel app + stages gm_kernel/gm_daemon into $GM_FS_ROOT/bin
 ├── scripts/gm_releases.sh         # The release-store contract (staging, activation, rollback)
-├── scripts/check_gm_stale.sh      # SessionStart health warning (local only — never hits the network)
-├── scripts/run_mcp.sh             # Launches gm_mcp for the pen server
-└── hooks/hooks.json               # Hook configuration (SessionStart, SubagentStart, PostToolUse)
+└── hooks/hooks.json               # Hook configuration (SessionStart, SubagentStart, PreToolUse, PostToolUse)
 ```
 
 **The plugin ships no Swift sources.** The packages live in `gmk/` in the
@@ -45,7 +47,7 @@ of the plugin payload, so installing the plugin does not distribute them.
 ```
 ~/gmfs/                                                       # $GM_FS_ROOT — ONE root (NOT in git)
 ├── bin/
-│   ├── {gm_daemon, gm_mcp, gm_hook}                          # symlinks -> releases/active/*
+│   ├── gm_kernel, gm_daemon                                  # symlinks -> releases/active/gm_kernel (gm_mcp/gm_hook ship in the plugin)
 │   ├── .gm_version                                           # active version ("50.0.1" or "50.0.1-BETA")
 │   └── releases/
 │       ├── active -> downloads/50.0.1
@@ -144,11 +146,10 @@ junctions (registry), `daemon_event` (append-only audit log).
 Key reads, all pen tools:
 
 ```
-cde_load_prompt          full content + artifacts + kbite codes + change summary
-rpir_next                the workflow's phase, uuid bundle and blockers, no uuid needed
-cde_search_file_changes  recorded edits for a prompt (or a session, or one path)
-projects_search          projects, instances and sessions by name or id
-rpir_search_*            full text over past explorations, clarifications, plans, reviews
+cde_prompt op load          full content + artifacts + kbite codes + change summary
+cde_prompt op file_changes  recorded edits for a prompt (or a session, or one path)
+cde_session op search       projects, instances and sessions by name or id
+cde_rpir_search             full text over past explorations, clarifications, plans, reviews
 ```
 
 A session-wide prompt listing, an artifact listing and a cross-report
@@ -157,8 +158,8 @@ shell to the kernel — the PreToolUse hook denies it.
 
 ### Optimistic concurrency (`expected_version`)
 
-Every mutation (`projects_update_session`, `cde_set_status`, every pen
-write) carries `expected_version` — the row
+Every mutation (`cde_session` op `update`, `cde_prompt` op `set_status`,
+every pen write) carries `expected_version` — the row
 version the edit was based on. Capture `version` from the previous
 create/get/mutation (a fresh create returns `version: 0`; each mutation
 returns the incremented version). A stale version yields

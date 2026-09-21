@@ -9,14 +9,16 @@
 # ── THE STORE ────────────────────────────────────────────────────────────────
 #
 #   $GM_FS_ROOT/bin/
-#   ├── gm_daemon  -> releases/active/gm_daemon      RELATIVE symlinks
-#   ├── gm_mcp     -> releases/active/gm_mcp
-#   ├── gm_hook    -> releases/active/gm_hook
+#   ├── gm_kernel  -> releases/active/gm_kernel      the ONE staged Mach-O
+#   ├── gm_daemon  -> releases/active/gm_kernel      the ONE entry point; argv[0] selects it
 #   ├── .gm_version                                  the ACTIVE version string
 #   └── releases/
 #       ├── active -> downloads/50.0.1               or local/50.0.1-BETA
-#       ├── downloads/50.0.1/{gm_daemon,gm_mcp,gm_hook,manifest.json,SHA256SUMS}
-#       └── local/50.0.1-BETA/{gm_daemon,gm_mcp,gm_hook,manifest.json,SHA256SUMS}
+#       ├── downloads/50.0.1/{gm_kernel,manifest.json,SHA256SUMS}
+#       └── local/50.0.1-BETA/{gm_kernel,manifest.json,SHA256SUMS}
+#
+#   gm_mcp and gm_hook are NOT here: they ship inside the plugin (plugins/gmcc/bin),
+#   compiled with the client closure, and never pass through this store.
 #
 # WHY SYMLINKS RATHER THAN COPIES INTO bin/. Three reasons, in order of how much
 # they bite:
@@ -85,14 +87,14 @@ GM_RELEASES_SH=1
 #   GM_MACHO       what gets STAGED, hashed, lipo-checked and tarred. One file.
 #   GM_ENTRYPOINTS what gets SYMLINKED in $GM_BIN. Names, not files.
 #
-# The entry-point names are load-bearing rather than cosmetic. `hooks.json`,
-# `settings.json`, `.mcp.json` and `check_gm_stale.sh` each resolve a binary BY
-# NAME, and the kernel dispatches on `basename(argv[0])` — so the symlink name is
-# what selects the personality. A staged kernel whose symlinks are missing is not
-# a degraded install; it is a hook that cannot launch.
-# MultiCallBinaryContractTests asserts this list and the dispatcher agree.
+# The entry-point name is load-bearing rather than cosmetic. `DaemonClient`
+# autostarts `bin/gm_daemon` by NAME and the kernel resolves its personality
+# from `basename(argv[0])` (GmPersonality) — so the symlink name is what selects
+# the headless host. A staged kernel whose symlink is missing is not a degraded
+# install; it is a writer nothing can start. GmPersonality.entrypoints is the
+# Swift side of this list; keep them equal by hand.
 GM_MACHO="gm_kernel"
-GM_ENTRYPOINTS="gm_daemon gm_mcp gm_hook"
+GM_ENTRYPOINTS="gm_daemon"
 
 # Kept as the union for the paths that genuinely mean "everything in $GM_BIN":
 # the quarantine strip and the staleness stat do not care which is a real file.
@@ -220,11 +222,17 @@ gm_stage_dir() {
 # is UNCHANGED. Releases before the one-Mach-O bundle carried a copy at
 # Contents/Helpers, which is read only when MacOS has no kernel.
 #
-# ## Do not re-sign what comes out
+# ## Re-sign ONLY what does not verify on its own
 #
-# A binary copied out of a signed bundle keeps its signature, and re-signing it
-# here would replace a Developer ID signature with whatever this machine happens
-# to hold — usually nothing.
+# A Mach-O signed on its own (build-dmg.sh's Developer ID pass, or the linker's
+# ad-hoc signature under CODE_SIGNING_ALLOWED=NO) keeps a valid signature when
+# copied out, and re-signing it would replace a Developer ID with whatever this
+# machine holds — usually nothing. A Mach-O signed AS PART OF ITS BUNDLE (what
+# Xcode ⌘R produces) seals the bundle's Info.plist into its CodeDirectory;
+# copied out, that seal fails and the kernel answers the exec with SIGKILL —
+# exit 137, no output, and every hook, pane and MCP server on that root dies
+# silently. So the copy is verified standalone, and only a failing one is
+# re-signed ad-hoc, before the manifest records its bytes.
 gm_stage_from_bundle() {
     _app="$1"; _channel="$2"; _version="$3"; _sha="${4:-unknown}"
     _helper="$_app/Contents/MacOS/$GM_MACHO"
@@ -239,6 +247,15 @@ gm_stage_from_bundle() {
     _dir="$(gm_stage_dir "$_channel" "$_version")" || return 1
     # -p so the executable bit survives; gm_staged_binaries tests for it.
     cp -p "$_helper" "$_dir/$GM_MACHO" || return 1
+
+    if ! codesign --verify --strict "$_dir/$GM_MACHO" >/dev/null 2>&1; then
+        codesign --force --sign - --preserve-metadata=identifier,entitlements \
+            "$_dir/$GM_MACHO" >/dev/null 2>&1 || return 1
+        codesign --verify --strict "$_dir/$GM_MACHO" >/dev/null 2>&1 || {
+            echo "[GMB] ERROR: $GM_MACHO from $_app does not verify even after an ad-hoc re-sign" >&2
+            return 1; }
+        echo "[GMB] re-signed $GM_MACHO ad-hoc: its bundle-sealed signature does not verify standalone" >&2
+    fi
 
     _arches="$(lipo -archs "$_dir/$GM_MACHO" 2>/dev/null | tr ' ' ',')"
     gm_write_manifest "$_dir" "$_version" "$_channel" "$_sha" "${_arches:-unknown}" || return 1
@@ -416,8 +433,8 @@ gm_installed_version() {
 # serving the OLD build from a deleted-but-open file, which presents as an
 # install that silently did nothing.
 gm_retire_daemon() {
-    [ -x "$GM_BIN/gm_hook" ] || return 0
-    "$GM_BIN/gm_hook" call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
+    [ -x "$GM_BIN/$GM_MACHO" ] || return 0
+    "$GM_BIN/$GM_MACHO" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
     echo "[GMB] retired the running kernel (if any) — the next client call autostarts the new build"
 }
 
@@ -444,10 +461,10 @@ gm_retire_daemon() {
 # makes this correct — the lock is what the next writer actually needs.
 gm_stop_kernel_and_wait() {
     _timeout="${1:-3}"
-    [ -x "$GM_BIN/gm_hook" ] || return 0
+    [ -x "$GM_BIN/$GM_MACHO" ] || return 0
 
     # Nothing listening means nothing to stop; not an error.
-    "$GM_BIN/gm_hook" call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
+    "$GM_BIN/$GM_MACHO" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
 
     # POLL THE LOCK OWNER, NEVER A VERB.
     #

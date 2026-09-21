@@ -3,12 +3,28 @@
 # Regenerate plugins/gmcc from the agentics bridge, then sync the marketplace
 # manifest's version to match.
 #
-# TWO STEPS AND TWO OWNERS, on purpose. `gm_kernel bridge` owns everything
-# INSIDE the plugin directory and refuses to touch anything outside it — which is
-# why it cannot bump `.claude-plugin/marketplace.json`, a repo-ROOT file in a
-# different `.claude-plugin/` directory than the plugin's own. Confusing those
-# two directories is the trap that makes a "delete the plugin" step delete the
-# marketplace manifest, so the split is a guard rather than an inconvenience.
+# THREE STEPS AND THREE OWNERS, on purpose. `gm_kernel bridge` owns every TEXT
+# file INSIDE the plugin directory and refuses to touch anything outside it —
+# which is why it cannot bump `.claude-plugin/marketplace.json`, a repo-ROOT
+# file in a different `.claude-plugin/` directory than the plugin's own.
+# Confusing those two directories is the trap that makes a "delete the plugin"
+# step delete the marketplace manifest, so the split is a guard rather than an
+# inconvenience. `build_plugin_binaries.sh` owns the compiled executables
+# (`hooks/bin/*` and `bin/gm_*`): the writer renders text and swaps the whole
+# tree, so they are produced AFTER the swap, from the generated mains the
+# writer just emitted.
+#
+# THE ROSTER IS WRITTEN HERE TOO, and it is the one file the bridge writes
+# outside the plugin directory: `--roster-out` reflects the @Generable tool
+# declarations into CdeToolRoster.generated.swift, which is SOURCE. It rides the
+# gmcc emit ALONE — the gmbeta alias below reflects the same declarations, so a
+# second write is the same bytes over the same file.
+#
+# A ROSTER THAT MOVED IS NOT SERVED BY THE KERNEL THAT JUST WROTE IT: that
+# binary was compiled against the PREVIOUS roster, so its served list and the
+# grants in the tree it just emitted disagree. This exits 3 in that case instead
+# of finishing, and the caller is expected to build again and re-run —
+# rebuild_local.sh does exactly that. GM_ROSTER_MOVED_OK=1 carries on regardless.
 #
 #   bash gmk/scripts/generate_plugin.sh            # regenerate + bump
 #   bash gmk/scripts/generate_plugin.sh --check    # report only, change nothing
@@ -30,6 +46,7 @@ CHECK=""
 
 PLUGIN="$REPO/plugins/gmcc"
 MARKETPLACE="$REPO/.claude-plugin/marketplace.json"
+ROSTER="$REPO/gmk/Sources/API/Shared/GmKernelCoreShared/Protocol/CdeToolRoster.generated.swift"
 VERSION="$(tr -d '[:space:]' < "$REPO/gmk/VERSION")"
 
 echo "[GMB] repo:    $REPO"
@@ -44,8 +61,21 @@ echo "[GMB] version: $VERSION (from gmk/VERSION)"
     echo "[GMB] GM_KERNEL_BIN is required (the kernel that generates the plugin); rebuild_local.sh and xcode_phase.sh set it" >&2
     exit 2; }
 BRIDGE=("$GM_KERNEL_BIN" bridge)
+echo "[GMB] roster:  $ROSTER"
+roster_sha() { shasum -a 256 "$ROSTER" 2>/dev/null | cut -d' ' -f1; }
+ROSTER_BEFORE="$(roster_sha)"
 # shellcheck disable=SC2086
-"${BRIDGE[@]}" $CHECK "$PLUGIN"
+"${BRIDGE[@]}" $CHECK --roster-out "$ROSTER" "$PLUGIN"
+ROSTER_AFTER="$(roster_sha)"
+
+if [ -z "$CHECK" ] && [ "$ROSTER_BEFORE" != "$ROSTER_AFTER" ]; then
+    if [ "${GM_ROSTER_MOVED_OK:-0}" = "1" ]; then
+        echo "[GMB] roster moved; carrying on because GM_ROSTER_MOVED_OK=1"
+    else
+        echo "[GMB] roster MOVED — the staged kernel serves the previous roster; rebuild" >&2
+        exit 3
+    fi
+fi
 
 # THE gmbeta ALIAS TREE. A second emit of the SAME bridge under a different
 # plugin NAME, so a beta/test GMVibes pane can load the working tree through
@@ -58,6 +88,10 @@ BRIDGE=("$GM_KERNEL_BIN" bridge)
 # NO MARKETPLACE ENTRY. marketplace.json lists only `gmcc`; gmbeta exists purely
 # as a --plugin-dir target and is gitignored (plugins/gmbeta/). So this emit
 # deliberately does NOT touch the manifest or the version bump below.
+#
+# NO --roster-out EITHER. The roster is reflected from the same declarations
+# whatever the plugin is called, so a second write is the same bytes — and it
+# would land after the moved-roster check above had already passed.
 GMBETA="$REPO/plugins/gmbeta"
 echo "[GMB] gmbeta alias -> $GMBETA"
 # shellcheck disable=SC2086
@@ -72,6 +106,15 @@ if [ -n "$CHECK" ]; then
     fi
     exit 0
 fi
+
+# THE PLUGIN'S EXECUTABLES — the hook events, gm_mcp and gm_hook. Compiled once
+# for gmcc and COPIED into gmbeta: the bytes carry no plugin name, and a second
+# compile buys nothing.
+bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/build_plugin_binaries.sh" "$PLUGIN"
+rm -rf "$GMBETA/hooks/bin"
+cp -R "$PLUGIN/hooks/bin" "$GMBETA/hooks/bin"
+rm -f "$GMBETA"/bin/gm_* "$GMBETA/bin/.source_sha256"
+cp "$PLUGIN"/bin/gm_* "$PLUGIN/bin/.source_sha256" "$GMBETA/bin/"
 
 # ONE VERSION, WRITTEN TO BOTH MANIFESTS FROM ONE SOURCE. plugin.json gets it
 # from GmVersion.current inside the generator; marketplace.json gets it here.

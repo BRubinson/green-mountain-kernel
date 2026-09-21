@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- THE BAKED ROOT. This is what makes the environment a property of the
+	     BITS rather than of whatever shell happened to launch the app.
+
+	     It lives in a real Info.plist rather than an INFOPLIST_KEY_* build
+	     setting because that prefix is a DECLARED ALLOW-LIST: Xcode silently
+	     drops keys it does not recognise, so INFOPLIST_KEY_GMFSRoot builds
+	     cleanly and produces a bundle with no such key — the app then falls
+	     through to ~/gmfs and writes PRODUCTION while believing it is isolated.
+	     Verified empirically, not assumed.
+
+	     GENERATE_INFOPLIST_FILE stays YES; Xcode merges the generated keys into
+	     this file, so LSUIElement and friends are still managed as build
+	     settings. -->
+	<key>GMFSRoot</key>
+	<string>$(GM_FS_ROOT_BAKED)</string>
+	<!-- FOR DISPLAY ONLY. Nothing resolves a path from this. A label that can
+	     disagree with the root would be a second source of truth, which is the
+	     exact failure the baked root exists to remove. -->
+	<key>GMEnvironment</key>
+	<string>$(GM_ENV)</string>
+	<!-- No plugin directory is baked. The plugin a pane loads is a property of
+	     the ENVIRONMENT: DevPluginDir resolves it at runtime from the root this
+	     kernel holds (<root>/repos/<repo>/plugins/gmbeta), where the seed
+	     generated it from the staged kernel. -->
+</dict>
+</plist>

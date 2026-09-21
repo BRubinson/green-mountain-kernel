@@ -1,6 +1,6 @@
 ---
 name: release-dmg
-description: Build the gm_kernel macOS app (the GM Vibes UI — gmk/Sources/gm_kernel/Vibes plus the gmk/gmVibes/ bundle payload in this monorepo) into a DMG, and either hand it over as a local build or ship it as the unified gm_kernel release, which carries the CLI inside the bundle. Use when the user wants to cut a release, ship a new DMG, upload a build to GitHub, or distribute the app.
+description: Build the gm_kernel macOS app (the GM Vibes UI — gmk/Sources/UX/Apps/Vibes, sources and bundle payload together in this monorepo) into a DMG, and either hand it over as a local build or ship it as the unified gm_kernel release, which carries the CLI inside the bundle. Use when the user wants to cut a release, ship a new DMG, upload a build to GitHub, or distribute the app.
 ---
 
 # release-dmg

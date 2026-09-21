@@ -27,11 +27,11 @@ derives its prefix from the `package`, which is why every generated type is
 ```bash
 brew install protobuf swift-protobuf
 cd gmk
-protoc --swift_out=Sources/GmITerm2Client/Generated \
+protoc --swift_out=Sources/API/Clients/ITerm2Client/Generated \
        --swift_opt=Visibility=Internal --proto_path=proto proto/api.proto
 ```
 
-Versions that produced the committed `Sources/GmITerm2Client/Generated/api.pb.swift`:
+Versions that produced the committed `Sources/API/Clients/ITerm2Client/Generated/api.pb.swift`:
 
 | | |
 |---|---|
@@ -52,7 +52,7 @@ exactly this reason. If you upgrade one side, regenerate against the other.
 generated lines become exported API of the kernel module. Everything under
 `gmk/Sources` is one module, so `Internal` does not hide the types from the
 Vibes layer; what keeps the Vibes layer off protobuf types is the convention
-that only files under `Sources/GmITerm2Client/` write `import SwiftProtobuf`,
+that only files under `Sources/API/Clients/ITerm2Client/` write `import SwiftProtobuf`,
 which `MEMBER_IMPORT_VISIBILITY` makes visible per file. The hand-written
 façade (`ITerm2Launcher.swift`) and its value types are the surface the rest of
 the tree is meant to use.

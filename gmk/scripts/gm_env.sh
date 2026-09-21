@@ -110,6 +110,7 @@ env_create() {
     GM_ENV="$_env" GM_FS_ROOT="$_root" bash "$SCRIPT_DIR/rebuild_local.sh" --fast
 
     env_seed_repo "$_env" "$_root"
+    env_seed_plugin "$_env" "$_root"
     echo "[GMB] $_env ready. Point a session at it with:  export GM_FS_ROOT=$_root"
 }
 
@@ -155,14 +156,16 @@ env_seed_repo() {
     # would be a second source of truth for instance identity — which is
     # md5(absolute repo path) and must agree with what a real session computes.
     # Hence the subshell cd: $PWD IS the argument.
-    _hook="$_root/bin/gm_hook"
+    # The client personality of the staged kernel: `gm_kernel hook …`. The
+    # store carries no gm_hook symlink; that executable ships in the plugin.
+    _hook="$_root/bin/gm_kernel"
     if [ -x "$_hook" ]; then
         echo "[GMB] registering the clone"
         # Errors are SHOWN, not swallowed. These calls were previously
         # redirected to /dev/null, which turned a permanent wire-shape bug into
         # a soft "declined" note that read like a transient hiccup for as long
         # as it took someone to check the database and find it empty.
-        if ! ( cd "$_dest" && GM_FS_ROOT="$_root" "$_hook" context ensure >/dev/null ); then
+        if ! ( cd "$_dest" && GM_FS_ROOT="$_root" "$_hook" hook context ensure >/dev/null ); then
             echo "[GMB] note: context ensure declined; register by opening a session there"
         fi
         if [ -f "$_dest/.gmcc/scope.doped.json" ]; then
@@ -173,7 +176,7 @@ env_seed_repo() {
             # copy of a reconciliation that has to agree about revisions. So
             # this validates the tree and says plainly that a session boot is
             # what populates it.
-            if GM_FS_ROOT="$_root" "$_hook" call DOPE_READ_REPO \
+            if GM_FS_ROOT="$_root" "$_hook" hook call DOPE_READ_REPO \
                 --json "{\"dir_path\":\"$_dest\"}" >/dev/null; then
                 echo "[GMB] dope tree valid; it ingests on the first session boot there"
             else
@@ -181,8 +184,40 @@ env_seed_repo() {
             fi
         fi
     else
-        echo "[GMB] note: no gm_hook staged at $_hook — skipping registration"
+        echo "[GMB] note: no kernel staged at $_hook — skipping registration"
     fi
+}
+
+# The environment's OWN plugin, generated INTO its clone by the kernel it just
+# staged, so the plugin a pane loads and the kernel it dials match by
+# construction. The app resolves this path at runtime (DevPluginDir); nothing
+# is baked. `plugins/gmbeta` is excluded in the clone's own .git/info/exclude,
+# so the clone stays clean whatever its .gitignore says.
+env_seed_plugin() {
+    _env="$1"; _root="$2"
+    _name="$(basename "$REPO_ROOT")"
+    _dest="$_root/repos/$_name"
+    _plug="$_dest/plugins/gmbeta"
+    _kernel="$_root/bin/gm_kernel"
+    [ -x "$_kernel" ] || { echo "[GMB] note: no kernel staged at $_kernel — skipping the environment plugin"; return 0; }
+    [ -d "$_dest/.git" ] || { echo "[GMB] note: no clone at $_dest — skipping the environment plugin"; return 0; }
+    grep -qx 'plugins/gmbeta/' "$_dest/.git/info/exclude" 2>/dev/null \
+        || echo 'plugins/gmbeta/' >> "$_dest/.git/info/exclude"
+    echo "[GMB] generating the environment plugin -> $_plug"
+    GM_BRIDGE_PLUGIN_NAME=gmbeta "$_kernel" bridge "$_plug" >/dev/null \
+        || { echo "[GMB] ERROR: gm_kernel bridge failed for $_plug" >&2; exit 1; }
+    # Compiled once in the working tree by generate_plugin.sh; copied here when
+    # the sources match, compiled here when they do not.
+    GM_PLUGIN_BIN_CACHE="$REPO_ROOT/plugins/gmcc" bash "$SCRIPT_DIR/build_plugin_binaries.sh" "$_plug"
+    # `gmbeta` in a shell pane: $GM_FS_ROOT/bin is first on its PATH.
+    cat > "$_root/bin/gmbeta" <<EOF
+#!/bin/sh
+# Launch Claude Code against THIS environment's kernel and plugin. Written by gm_env.sh seed.
+export GM_FS_ROOT="$_root"
+exec claude --plugin-dir "$_plug" "\$@"
+EOF
+    chmod 755 "$_root/bin/gmbeta"
+    echo "[GMB] environment plugin ready; \`gmbeta\` shim at $_root/bin/gmbeta"
 }
 
 # A refresh is a create over an existing root. Deliberately the SAME code path:
@@ -217,19 +252,32 @@ env_seed() {
     # place — the kernel's codesign cache answers a rewritten inode with
     # SIGKILL — so a changed build re-stages its whole version directory and
     # gm_activate's symlink swap is what makes that safe.
+    #
+    # The comparison is against the BUNDLE's bytes as recorded at the last
+    # stage, not against the staged file: an Xcode-signed executable is
+    # re-signed ad-hoc on the way out (see gm_stage_from_bundle), so the staged
+    # bytes never equal the bundle's and a byte comparison would re-stage on
+    # every ⌘R.
+    _stage="$(gm_stage_dir local "$_version")"
     _new_sha="$(shasum -a 256 "$_built" | awk '{print $1}')"
     _old_sha=""
-    [ -e "$GM_BIN/$GM_MACHO" ] && _old_sha="$(shasum -a 256 "$GM_BIN/$GM_MACHO" 2>/dev/null | awk '{print $1}')"
+    [ -e "$GM_BIN/$GM_MACHO" ] && [ -f "$_stage/.bundle_sha256" ] \
+        && _old_sha="$(cat "$_stage/.bundle_sha256")"
     if [ "$_new_sha" = "$_old_sha" ]; then
         echo "[GMB] staged kernel already matches the build — skipping stage"
     else
-        rm -rf "$(gm_stage_dir local "$_version")"
+        rm -rf "$_stage"
         _src_sha="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
-        gm_stage_from_bundle "$_app" local "$_version" "$_src_sha" >/dev/null
+        gm_stage_from_bundle "$_app" local "$_version" "$_src_sha" >/dev/null \
+            || { echo "[GMB] ERROR: staging the kernel out of $_app failed" >&2; exit 1; }
+        "$_stage/$GM_MACHO" --version >/dev/null \
+            || { echo "[GMB] ERROR: the staged $GM_MACHO does not run (exit $?) — refusing to activate it" >&2; exit 1; }
         gm_activate local "$_version"
+        printf '%s\n' "$_new_sha" > "$_stage/.bundle_sha256"
     fi
 
     env_seed_repo "$_env" "$_root"
+    env_seed_plugin "$_env" "$_root"
 
     # If registration autostarted a HEADLESS kernel, stop it now: the incoming
     # app takes a headless holder over by SIGTERM-and-wait, and paying that
@@ -239,7 +287,7 @@ env_seed() {
         _holder_bundle="$(sed -n '3p' "$_root/daemon.pid" 2>/dev/null)"
         if [ -z "$_holder_bundle" ] && _pid="$(env_live_pid "$_root")"; then
             echo "[GMB] stopping the autostarted headless kernel (pid $_pid)"
-            GM_FS_ROOT="$_root" "$_root/bin/gm_hook" call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
+            GM_FS_ROOT="$_root" "$_root/bin/gm_kernel" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
         fi
     fi
     echo "[GMB] seed $_env done"
@@ -262,7 +310,7 @@ env_run() {
     # would make every run test something slightly different.
     if [ -d "$_root/bin/releases" ]; then
         ln -sfn "$_root/bin/releases" "$_run/bin/releases"
-        for _n in gm_kernel gm_daemon gm_mcp gm_hook; do
+        for _n in gm_kernel gm_daemon; do
             [ -e "$_root/bin/$_n" ] && ln -sfn "$_root/bin/$_n" "$_run/bin/$_n"
         done
     fi
@@ -274,7 +322,7 @@ env_run() {
     GM_FS_ROOT="$_run" "$@"
     _rc=$?
     set -e
-    GM_FS_ROOT="$_run" "$_run/bin/gm_hook" call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
+    GM_FS_ROOT="$_run" "$_run/bin/gm_kernel" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
     rm -rf "$_run"
     return $_rc
 }
@@ -303,8 +351,9 @@ env_doctor() {
     echo "root        : $_root"
     echo "exists      : $([ -d "$_root" ] && echo yes || echo NO)"
     echo "db          : $([ -f "$_root/gm.db" ] && echo yes || echo no)"
-    echo "binaries    : $([ -x "$_root/bin/gm_hook" ] && echo yes || echo NO)"
+    echo "binaries    : $([ -x "$_root/bin/gm_kernel" ] && echo yes || echo NO)"
     echo "version     : $(cat "$_root/bin/.gm_version" 2>/dev/null || echo none)"
+    echo "plugin      : $(ls -d "$_root"/repos/*/plugins/gmbeta 2>/dev/null | head -n1 || true)"
     if _pid="$(env_live_pid "$_root")"; then
         echo "daemon      : running (pid $_pid)"
     else
@@ -320,7 +369,7 @@ env_destroy() {
     _env="$1"; guard_not_prod "$_env" destroy
     _root="$(env_root "$_env")" || exit 2
     [ -d "$_root" ] || { echo "[GMB] $_root does not exist"; return 0; }
-    GM_FS_ROOT="$_root" "$_root/bin/gm_hook" call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
+    GM_FS_ROOT="$_root" "$_root/bin/gm_kernel" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
     rm -rf "$_root"
     echo "[GMB] removed $_root"
 }

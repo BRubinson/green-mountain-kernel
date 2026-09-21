@@ -2,7 +2,7 @@
 name: kbite
 description: Pre-indexed external knowledge
 user-invocable: false
-allowed-tools: mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest
+allowed-tools: mcp__plugin_gmcc_cde__cde_kbite
 ---
 
 ## KBite — Pre-Indexed External Knowledge

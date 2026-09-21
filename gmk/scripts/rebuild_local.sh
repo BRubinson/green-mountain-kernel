@@ -109,63 +109,83 @@ else
     echo "[GMB] lint skipped (--no-lint)"
 fi
 
-# --- build -------------------------------------------------------------------
+# --- build and stage ---------------------------------------------------------
 # One target, one bundle. Build identity is stamped by the VERSION build rule
 # inside the build graph, so there is no shell step left to forget.
-echo "[GMB]   gm_xcb build $BUILD_CONFIG ($ARCH)"
-# shellcheck disable=SC2086
-gm_xcb build "$BUILD_CONFIG" $ARCH MARKETING_VERSION="$VERSION" -quiet
-
-# --- stage -------------------------------------------------------------------
+#
 # ONE STAGING PATH. Both routes yield an app bundle whose executable at
 # Contents/MacOS/gm_kernel IS the CLI: the plain build's product, or the
 # signed archive `--app` produces — the SAME bytes the DMG ships and publish
-# promotes.
-if [ "$BUILD_APP" = 1 ]; then
-    echo "[GMB] archiving the app ($BUILD_CONFIG) — its executable becomes the staged CLI"
-    UNIVERSAL_FLAG=""
-    [ "$ARCH_CHOICE" = "universal" ] && UNIVERSAL_FLAG="--universal"
+# promotes. A function because the roster-moved path below runs it twice.
+build_and_stage() {
+    echo "[GMB]   gm_xcb build $BUILD_CONFIG ($ARCH)"
     # shellcheck disable=SC2086
-    bash "$SCRIPT_DIR/build-dmg.sh" --config "$BUILD_CONFIG" $UNIVERSAL_FLAG "$VERSION"
-    APP="$GMK/build/$GM_APP_NAME.xcarchive/Products/Applications/$GM_APP_NAME.app"
-else
-    APP="$(gm_xcb_app "$BUILD_CONFIG")"
-fi
-[ -d "$APP" ] || die "no app bundle at $APP"
+    gm_xcb build "$BUILD_CONFIG" $ARCH MARKETING_VERSION="$VERSION" -quiet
 
-# The bundle's baked root must match the store being staged into. Compared
-# against $GM_FS_ROOT, never against the env name: the root being WRITTEN is
-# the only thing worth comparing to.
-BAKED="$(gm_app_baked "$APP")" || exit 1
-read -r BAKED_ENV BAKED_ROOT <<<"$BAKED"
-if [ "${BAKED_ROOT/#\~/$HOME}" != "$GM_FS_ROOT" ]; then
-    echo "[GMB] ERROR: the app bakes '$BAKED_ENV' -> '$BAKED_ROOT'" >&2
-    echo "             but this run stages into $GM_FS_ROOT." >&2
-    echo "       That app would write one database while sitting beside another's" >&2
-    echo "       binaries. Refusing." >&2
-    exit 1
-fi
+    if [ "$BUILD_APP" = 1 ]; then
+        echo "[GMB] archiving the app ($BUILD_CONFIG) — its executable becomes the staged CLI"
+        UNIVERSAL_FLAG=""
+        [ "$ARCH_CHOICE" = "universal" ] && UNIVERSAL_FLAG="--universal"
+        # shellcheck disable=SC2086
+        bash "$SCRIPT_DIR/build-dmg.sh" --config "$BUILD_CONFIG" $UNIVERSAL_FLAG "$VERSION"
+        APP="$GMK/build/$GM_APP_NAME.xcarchive/Products/Applications/$GM_APP_NAME.app"
+    else
+        APP="$(gm_xcb_app "$BUILD_CONFIG")"
+    fi
+    [ -d "$APP" ] || die "no app bundle at $APP"
 
-# Staged fresh every time: the directory is removed and rebuilt, so a binary
-# that stopped being produced cannot linger and get shipped.
-rm -rf "$(gm_stage_dir local "$STAGE_VERSION")"
-STAGE="$(gm_stage_from_bundle "$APP" local "$STAGE_VERSION" "$BUILD_SHA" | tail -1)"
-[ -f "$STAGE/$GM_MACHO" ] || die "staging from $APP produced nothing"
+    # The bundle's baked root must match the store being staged into. Compared
+    # against $GM_FS_ROOT, never against the env name: the root being WRITTEN is
+    # the only thing worth comparing to.
+    BAKED="$(gm_app_baked "$APP")" || exit 1
+    read -r BAKED_ENV BAKED_ROOT <<<"$BAKED"
+    if [ "${BAKED_ROOT/#\~/$HOME}" != "$GM_FS_ROOT" ]; then
+        echo "[GMB] ERROR: the app bakes '$BAKED_ENV' -> '$BAKED_ROOT'" >&2
+        echo "             but this run stages into $GM_FS_ROOT." >&2
+        echo "       That app would write one database while sitting beside another's" >&2
+        echo "       binaries. Refusing." >&2
+        exit 1
+    fi
 
-# NEVER STRIPPED, NEVER RE-SIGNED. The plain build carries the linker's ad-hoc
-# signature and the --app build the Developer ID's; either is verified as-is.
-# Stripping would invalidate the first and re-signing would destroy the second.
-codesign --verify --strict "$STAGE/$GM_MACHO" || die "$GM_MACHO in $STAGE has no valid signature"
-echo "[GMB] staged $STAGE  ($GM_MACHO [$(lipo -archs "$STAGE/$GM_MACHO" 2>/dev/null || echo '?')], signature verified)"
-echo "         entry points (symlinked at activation): $GM_ENTRYPOINTS"
+    # Staged fresh every time: the directory is removed and rebuilt, so a binary
+    # that stopped being produced cannot linger and get shipped.
+    rm -rf "$(gm_stage_dir local "$STAGE_VERSION")"
+    STAGE="$(gm_stage_from_bundle "$APP" local "$STAGE_VERSION" "$BUILD_SHA" | tail -1)"
+    [ -f "$STAGE/$GM_MACHO" ] || die "staging from $APP produced nothing"
+
+    # NEVER STRIPPED, NEVER RE-SIGNED HERE. The plain build carries the linker's
+    # ad-hoc signature and the --app build the Developer ID's; either verifies
+    # standalone and is staged as-is. Stripping would invalidate the first and
+    # re-signing would destroy the second. Only a bundle-sealed Xcode signature
+    # is re-signed, and gm_stage_from_bundle does that before the manifest is
+    # written.
+    codesign --verify --strict "$STAGE/$GM_MACHO" || die "$GM_MACHO in $STAGE has no valid signature"
+    echo "[GMB] staged $STAGE  ($GM_MACHO [$(lipo -archs "$STAGE/$GM_MACHO" 2>/dev/null || echo '?')], signature verified)"
+    echo "         entry points (symlinked at activation): $GM_ENTRYPOINTS"
+}
+
+build_and_stage
 
 # --- generate the plugin -----------------------------------------------------
 # THE PLUGIN IS PART OF THE BUILD: `gm_kernel bridge` on the exact binary just
 # staged emits plugins/gmcc, so the plugin on disk always reflects these bits.
 # generate_plugin.sh owns the marketplace bump; it runs even with --no-activate
 # because the plugin is working-tree content.
+#
+# EXIT 3 MEANS THE ROSTER MOVED. The kernel just staged was compiled against the
+# previous roster, so it cannot serve the one the bridge has written: build over
+# the new source, restage, and generate once more. ONCE — a roster that moves on
+# the second pass is a generator that is not converging, and the exit propagates.
 echo "[GMB] generating the plugin from the staged kernel..."
-GM_KERNEL_BIN="$STAGE/$GM_MACHO" bash "$SCRIPT_DIR/generate_plugin.sh"
+GEN_RC=0
+GM_KERNEL_BIN="$STAGE/$GM_MACHO" bash "$SCRIPT_DIR/generate_plugin.sh" || GEN_RC=$?
+if [ "$GEN_RC" -eq 3 ]; then
+    echo "[GMB] roster moved — rebuilding so the staged kernel serves it"
+    build_and_stage
+    GM_KERNEL_BIN="$STAGE/$GM_MACHO" bash "$SCRIPT_DIR/generate_plugin.sh"
+elif [ "$GEN_RC" -ne 0 ]; then
+    exit "$GEN_RC"
+fi
 
 # --- activate ----------------------------------------------------------------
 if [ "$ACTIVATE" -eq 1 ]; then

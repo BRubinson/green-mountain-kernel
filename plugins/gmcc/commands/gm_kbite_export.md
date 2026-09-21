@@ -1,7 +1,7 @@
 ---
 description: Export one digested kbite to a portable gmcc_kbite zip
 argument-hint: <kbite_code> [output_dir]
-allowed-tools: Read, Bash, Glob, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest
+allowed-tools: Read, Bash, Glob, mcp__plugin_gmcc_cde__cde_kbite
 ---
 
 Export one digested kbite to a portable `gmcc_kbite` zip.

@@ -1,7 +1,7 @@
 ---
 description: Define a relationship between two kbites for cross-referencing
 argument-hint: <kbite_from> <kbite_to> <relationship>
-allowed-tools: Read, Write, Bash, Glob, mcp__plugin_gmcc_cde__kbite_search, mcp__plugin_gmcc_cde__kbite_open_maw, mcp__plugin_gmcc_cde__kbite_digest
+allowed-tools: Read, Write, Bash, Glob, mcp__plugin_gmcc_cde__cde_kbite
 ---
 
 Define a relationship between two kbites for cross-referencing.

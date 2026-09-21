@@ -37,7 +37,6 @@
 		A17E00042FDCB00000DAF751 /* VERSION in Sources */ = {isa = PBXBuildFile; fileRef = A17E00032FDCB00000DAF751 /* VERSION */; };
 		A17E000C2FDCB00000DAF751 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A17E00092FDCB00000DAF751 /* GRDB */; };
 		A17E000D2FDCB00000DAF751 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = A17E000A2FDCB00000DAF751 /* SwiftProtobuf */; };
-		A17E000E2FDCB00000DAF751 /* ClaudeForFoundationModels in Frameworks */ = {isa = PBXBuildFile; productRef = A17E000B2FDCB00000DAF751 /* ClaudeForFoundationModels */; };
 		A17E00172FDCB00000DAF751 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A17E00162FDCB00000DAF751 /* GRDB */; };
 /* End PBXBuildFile section */
 
@@ -87,7 +86,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		1B4010732FDCA09200DAF751 /* gm_kernel.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; name = gm_kernel.app; path = gm_kernel.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		1B4010732FDCA09200DAF751 /* gm_kernel.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = gm_kernel.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A17E00032FDCB00000DAF751 /* VERSION */ = {isa = PBXFileReference; lastKnownFileType = text; path = VERSION; sourceTree = "<group>"; };
 		A17E00112FDCB00000DAF751 /* GmKernelTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GmKernelTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -96,200 +95,199 @@
 		A17E00022FDCB00000DAF751 /* Exceptions for "Sources" folder in "GmKernelTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				"GmDaemon/ChewedArtifact.swift",
-				"GmDaemon/DopeAreaTable.swift",
-				"GmDaemon/PersistedEvent.swift",
-				"GmDaemon/Persistence/Entities/ActiveKbiteRecords.swift",
-				"GmDaemon/Persistence/Entities/AgentRegistrationRecord.swift",
-				"GmDaemon/Persistence/Entities/ArchitectureRecords.swift",
-				"GmDaemon/Persistence/Entities/BaseRecordFields.swift",
-				"GmDaemon/Persistence/Entities/BotWorkflowRecords.swift",
-				"GmDaemon/Persistence/Entities/BriefingRecord.swift",
-				"GmDaemon/Persistence/Entities/ClarificationRecords.swift",
-				"GmDaemon/Persistence/Entities/ConfigRecord.swift",
-				"GmDaemon/Persistence/Entities/DiagramDopeRecords.swift",
-				"GmDaemon/Persistence/Entities/DiagramDrawingRecords.swift",
-				"GmDaemon/Persistence/Entities/DiagramRecords.swift",
-				"GmDaemon/Persistence/Entities/DopeCogRecords.swift",
-				"GmDaemon/Persistence/Entities/DopePersistenceRecords.swift",
-				"GmDaemon/Persistence/Entities/DopeProvenanceRecord.swift",
-				"GmDaemon/Persistence/Entities/DopeScopeRecord.swift",
-				"GmDaemon/Persistence/Entities/EventRecord.swift",
-				"GmDaemon/Persistence/Entities/ExplorationRecords.swift",
-				"GmDaemon/Persistence/Entities/FileChangeRecords.swift",
-				"GmDaemon/Persistence/Entities/InstanceRecord.swift",
-				"GmDaemon/Persistence/Entities/KbiteRecords.swift",
-				"GmDaemon/Persistence/Entities/KbiteResourceRecords.swift",
-				"GmDaemon/Persistence/Entities/ProjectRecord.swift",
-				"GmDaemon/Persistence/Entities/PromptRecords.swift",
-				"GmDaemon/Persistence/Entities/ReviewRecords.swift",
-				"GmDaemon/Persistence/Entities/SessionRecords.swift",
-				"GmDaemon/Persistence/Entities/TestRunRecords.swift",
-				"GmDaemon/Persistence/Migrations/Migrations.swift",
-				"GmDaemon/Persistence/Migrations/m0001_baseSchema.swift",
-				"GmDaemon/Persistence/Migrations/m0002_clarificationArchitectureLifecycleV2.swift",
-				"GmDaemon/Persistence/Migrations/m0003_searchIndexes.swift",
-				"GmDaemon/Persistence/Migrations/m0004_explorationReviewReports.swift",
-				"GmDaemon/Persistence/Migrations/m0005_purgeLegacyConcepts.swift",
-				"GmDaemon/Persistence/Migrations/m0006_dropDraftPlaceholderSummaries.swift",
-				"GmDaemon/Persistence/Migrations/m0007_dopeDomainModel.swift",
-				"GmDaemon/Persistence/Migrations/m0008_dopeBaseComposableEntities.swift",
-				"GmDaemon/Persistence/Migrations/m0009_dopePropertyBaseOrigin.swift",
-				"GmDaemon/Persistence/Migrations/m0010_diagramDomainModel.swift",
-				"GmDaemon/Persistence/Migrations/m0011_projectPrimaryBranch.swift",
-				"GmDaemon/Persistence/Migrations/m0012_dopePersistenceRenameAndSoftDelete.swift",
-				"GmDaemon/Persistence/Migrations/m0013_dopeScopeTierLadder.swift",
-				"GmDaemon/Persistence/Migrations/m0014_dopeCogElement.swift",
-				"GmDaemon/Persistence/Migrations/m0015_dopeSearchIndexes.swift",
-				"GmDaemon/Persistence/Migrations/m0016_diagramDopeScopeBinding.swift",
-				"GmDaemon/Persistence/Migrations/m0017_relationshipTargetAndDropMaskKind.swift",
-				"GmDaemon/Persistence/Migrations/m0018_diagramDopeScopePersistenceLayer.swift",
-				"GmDaemon/Persistence/Migrations/m0019_cogHullsAndPersistenceOwner.swift",
-				"GmDaemon/Persistence/Migrations/m0020_dopeElementProvenance.swift",
-				"GmDaemon/Persistence/Migrations/m0021_diagramVocabularyAndTierCollapse.swift",
-				"GmDaemon/Persistence/Migrations/m0022_promptQualifiedDiagram.swift",
-				"GmDaemon/Persistence/Migrations/m0023_agentBriefing.swift",
-				"GmDaemon/Persistence/Migrations/m0024_diagramStudio.swift",
-				"GmDaemon/Persistence/Migrations/m0025_dynamicWorkflows.swift",
-				"GmDaemon/Persistence/Migrations/m0026_claudeSessionAttribution.swift",
-				"GmDaemon/Persistence/Migrations/m0027_ckfsToGmfs.swift",
-				"GmDaemon/Persistence/Migrations/m0028_promptLifecycleCollapse.swift",
-				"GmDaemon/Persistence/Migrations/m0029_testRunLock.swift",
-				"GmDaemon/Persistence/Migrations/m0030_retiredRootConfigValues.swift",
-				"GmDaemon/Persistence/Store/Repositories/AgentRegistrationRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/ArchitectureRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/ArtifactRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/BotWorkflowRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/BriefingRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/CatalogSearchRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/ClarificationRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/ClaudeSessionBindingRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/ConfigRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/ContextRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/DiagramRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/DiagramStudioRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/DopeCogRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/DopePromoteRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/DopeProvenanceRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/DopeRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/DopeSearchRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/EventRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/ExplorationRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/FileChangeRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/FindingRankRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/GitStateRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/KbiteArchiveRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/KbiteRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/KbiteResourceRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/ListingRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/ProjectRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/PromptDiagramRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/PromptRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/RepositoryContext.swift",
-				"GmDaemon/Persistence/Store/Repositories/ReviewRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/SearchRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/SessionRepository.swift",
-				"GmDaemon/Persistence/Store/Repositories/TestRunRepository.swift",
-				"GmDaemon/Persistence/Store/Store+AgentRegistration.swift",
-				"GmDaemon/Persistence/Store/Store+Architecture.swift",
-				"GmDaemon/Persistence/Store/Store+Artifact.swift",
-				"GmDaemon/Persistence/Store/Store+Backup.swift",
-				"GmDaemon/Persistence/Store/Store+BotWorkflow.swift",
-				"GmDaemon/Persistence/Store/Store+Briefing.swift",
-				"GmDaemon/Persistence/Store/Store+CatalogSearch.swift",
-				"GmDaemon/Persistence/Store/Store+Clarification.swift",
-				"GmDaemon/Persistence/Store/Store+Config.swift",
-				"GmDaemon/Persistence/Store/Store+Context.swift",
-				"GmDaemon/Persistence/Store/Store+Diagram.swift",
-				"GmDaemon/Persistence/Store/Store+DiagramRepoVerbs.swift",
-				"GmDaemon/Persistence/Store/Store+DiagramStudio.swift",
-				"GmDaemon/Persistence/Store/Store+Dope.swift",
-				"GmDaemon/Persistence/Store/Store+DopeCog.swift",
-				"GmDaemon/Persistence/Store/Store+DopePromote.swift",
-				"GmDaemon/Persistence/Store/Store+DopeProvenance.swift",
-				"GmDaemon/Persistence/Store/Store+DopeRepoVerbs.swift",
-				"GmDaemon/Persistence/Store/Store+DopeSearch.swift",
-				"GmDaemon/Persistence/Store/Store+Event.swift",
-				"GmDaemon/Persistence/Store/Store+Exploration.swift",
-				"GmDaemon/Persistence/Store/Store+FileChange.swift",
-				"GmDaemon/Persistence/Store/Store+GitState.swift",
-				"GmDaemon/Persistence/Store/Store+Kbite.swift",
-				"GmDaemon/Persistence/Store/Store+KbiteArchive.swift",
-				"GmDaemon/Persistence/Store/Store+KbiteResource.swift",
-				"GmDaemon/Persistence/Store/Store+Listing.swift",
-				"GmDaemon/Persistence/Store/Store+Project.swift",
-				"GmDaemon/Persistence/Store/Store+Prompt.swift",
-				"GmDaemon/Persistence/Store/Store+PromptDiagram.swift",
-				"GmDaemon/Persistence/Store/Store+Review.swift",
-				"GmDaemon/Persistence/Store/Store+Search.swift",
-				"GmDaemon/Persistence/Store/Store+Session.swift",
-				"GmDaemon/Persistence/Store/Store+TestRun.swift",
-				"GmDaemon/Persistence/Store/Store.swift",
-				"GmDaemon/Persistence/Store/StoreBoundary.swift",
-				"GmDaemon/Persistence/Store/StoreCore.swift",
-				"GmDaemon/WorkflowGates.swift",
-				"GmDaemonSdk/Client/BriefingWait.swift",
-				"GmDaemonSdk/Client/ClientContext.swift",
-				"GmDaemonSdk/Client/DaemonClient+API.swift",
-				"GmDaemonSdk/Client/DaemonClient.swift",
-				"GmDaemonSdk/Client/DaemonEventSubscription.swift",
-				"GmDaemonSdk/Client/GmVerbCaller.swift",
-				"GmDaemonSdk/Client/PromptResolver.swift",
-				"GmDaemonSdk/Diagram/DiagramContainment.swift",
-				"GmDaemonSdk/Diagram/DiagramDocument.swift",
-				"GmDaemonSdk/Diagram/DiagramLevel.swift",
-				"GmDaemonSdk/Diagram/DiagramMutation.swift",
-				"GmDaemonSdk/Diagram/DiagramPayload.swift",
-				"GmDaemonSdk/Diagram/DiagramStorage.swift",
-				"GmDaemonSdk/Diagram/DiagramStrokeCodec.swift",
-				"GmDaemonSdk/Diagram/DiagramTree.swift",
-				"GmDaemonSdk/Diagram/DiagramTreeReducer.swift",
-				"GmDaemonSdk/Dope/DopeBootSync.swift",
-				"GmDaemonSdk/Dope/DopeCode.swift",
-				"GmDaemonSdk/Dope/DopeCogDocument.swift",
-				"GmDaemonSdk/Dope/DopeCogElement.swift",
-				"GmDaemonSdk/Dope/DopeCogProjection.swift",
-				"GmDaemonSdk/Dope/DopeDocument.swift",
-				"GmDaemonSdk/Dope/DopeLevel.swift",
-				"GmDaemonSdk/Dope/DopeMerge.swift",
-				"GmDaemonSdk/Dope/DopeOverlay.swift",
-				"GmDaemonSdk/Dope/DopeProjection.swift",
-				"GmDaemonSdk/Dope/DopePromotion.swift",
-				"GmDaemonSdk/Dope/DopeRepoSandbox.swift",
-				"GmDaemonSdk/Dope/DopeTree.swift",
-				"GmDaemonSdk/Dope/DopeValidator.swift",
-				"GmDaemonSdk/Dope/DopeVocabulary.swift",
-				"GmDaemonSdk/Environment/GmEnvironment.swift",
-				"GmDaemonSdk/GitHead.swift",
-				"GmDaemonSdk/Hook/HookLogic.swift",
-				"GmDaemonSdk/Hook/HookRunner.swift",
-				"GmDaemonSdk/InstanceIdentity.swift",
-				"GmDaemonSdk/Kbite/KbiteArchive.swift",
-				"GmDaemonSdk/Paths.swift",
-				"GmDaemonSdk/Protocol/CdePaging.swift",
-				"GmDaemonSdk/Protocol/CdeSheet.swift",
-				"GmDaemonSdk/Protocol/Envelope.swift",
-				"GmDaemonSdk/Protocol/GmJsonValue.swift",
-				"GmDaemonSdk/Protocol/Messages.swift",
-				"GmDaemonSdk/Protocol/Rows.swift",
-				"GmDaemonSdk/Protocol/VerbLedger.swift",
-				"GmDaemonSdk/Protocol/VerbRegistry.swift",
-				"GmDaemonSdk/Protocol/WireCodec.swift",
-				"GmDaemonSdk/Protocol/WorkflowSpec.swift",
-				"GmDaemonSdk/RepoRelativePath.swift",
-				"GmDaemonSdk/StoreError.swift",
-				"GmDaemonSdk/StructuredPatch.swift",
+				AgenticsCore/Feedback/GmHook.swift,
+				AgenticsCore/Feedback/GmHookHandlers.swift,
+				AgenticsCore/Feedback/HookLogic.swift,
+				API/Clients/GmKernelCoreClient/GmKernelClient/BriefingWait.swift,
+				API/Clients/GmKernelCoreClient/GmKernelClient/DaemonClient.swift,
+				API/Clients/GmKernelCoreClient/GmKernelClient/DaemonEventSubscription.swift,
+				API/Clients/GmKernelCoreClient/GmKernelClient/PromptResolver.swift,
+				API/Servers/GmKernelCoreServer/GmDaemon/ChewedArtifact.swift,
+				API/Servers/GmKernelCoreServer/GmDaemon/DopeAreaTable.swift,
+				API/Servers/GmKernelCoreServer/GmDaemon/PersistedEvent.swift,
+				API/Servers/GmKernelCoreServer/GmDaemon/WorkflowGates.swift,
+				API/Shared/GmKernelCoreShared/Diagram/DiagramContainment.swift,
+				API/Shared/GmKernelCoreShared/Diagram/DiagramDocument.swift,
+				API/Shared/GmKernelCoreShared/Diagram/DiagramLevel.swift,
+				API/Shared/GmKernelCoreShared/Diagram/DiagramMutation.swift,
+				API/Shared/GmKernelCoreShared/Diagram/DiagramPayload.swift,
+				API/Shared/GmKernelCoreShared/Diagram/DiagramStorage.swift,
+				API/Shared/GmKernelCoreShared/Diagram/DiagramStrokeCodec.swift,
+				API/Shared/GmKernelCoreShared/Diagram/DiagramTree.swift,
+				API/Shared/GmKernelCoreShared/Diagram/DiagramTreeReducer.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeBootSync.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeCode.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeCogDocument.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeCogElement.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeCogProjection.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeDocument.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeLevel.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeMerge.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeOverlay.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeProjection.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopePromotion.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeRepoSandbox.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeTree.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeValidator.swift,
+				API/Shared/GmKernelCoreShared/Dope/DopeVocabulary.swift,
+				API/Shared/GmKernelCoreShared/Environment/ClientContext.swift,
+				API/Shared/GmKernelCoreShared/Environment/GmEnvironment.swift,
+				API/Shared/GmKernelCoreShared/GitHead.swift,
+				API/Shared/GmKernelCoreShared/InstanceIdentity.swift,
+				API/Shared/GmKernelCoreShared/Kbite/KbiteArchive.swift,
+				API/Shared/GmKernelCoreShared/Paths.swift,
+				API/Shared/GmKernelCoreShared/Protocol/CdePaging.swift,
+				API/Shared/GmKernelCoreShared/Protocol/CdeSheet.swift,
+				API/Shared/GmKernelCoreShared/Protocol/CdeToolRoster.generated.swift,
+				API/Shared/GmKernelCoreShared/Protocol/CdeToolSpec.swift,
+				API/Shared/GmKernelCoreShared/Protocol/Envelope.swift,
+				API/Shared/GmKernelCoreShared/Protocol/GmJsonValue.swift,
+				API/Shared/GmKernelCoreShared/Protocol/GmVerbCaller.swift,
+				"API/Shared/GmKernelCoreShared/Protocol/GmVerbCaller+API.swift",
+				API/Shared/GmKernelCoreShared/Protocol/Messages.swift,
+				API/Shared/GmKernelCoreShared/Protocol/Rows.swift,
+				API/Shared/GmKernelCoreShared/Protocol/VerbLedger.swift,
+				API/Shared/GmKernelCoreShared/Protocol/VerbRegistry.swift,
+				API/Shared/GmKernelCoreShared/Protocol/WireCodec.swift,
+				API/Shared/GmKernelCoreShared/Protocol/WorkflowSpec.swift,
+				API/Shared/GmKernelCoreShared/RepoRelativePath.swift,
+				API/Shared/GmKernelCoreShared/StoreError.swift,
+				API/Shared/GmKernelCoreShared/StructuredPatch.swift,
+				Persistence/Entities/ActiveKbiteRecords.swift,
+				Persistence/Entities/AgentRegistrationRecord.swift,
+				Persistence/Entities/ArchitectureRecords.swift,
+				Persistence/Entities/BaseRecordFields.swift,
+				Persistence/Entities/BotWorkflowRecords.swift,
+				Persistence/Entities/BriefingRecord.swift,
+				Persistence/Entities/ClarificationRecords.swift,
+				Persistence/Entities/ConfigRecord.swift,
+				Persistence/Entities/DiagramDopeRecords.swift,
+				Persistence/Entities/DiagramDrawingRecords.swift,
+				Persistence/Entities/DiagramRecords.swift,
+				Persistence/Entities/DopeCogRecords.swift,
+				Persistence/Entities/DopePersistenceRecords.swift,
+				Persistence/Entities/DopeProvenanceRecord.swift,
+				Persistence/Entities/DopeScopeRecord.swift,
+				Persistence/Entities/EventRecord.swift,
+				Persistence/Entities/ExplorationRecords.swift,
+				Persistence/Entities/FileChangeRecords.swift,
+				Persistence/Entities/InstanceRecord.swift,
+				Persistence/Entities/KbiteRecords.swift,
+				Persistence/Entities/KbiteResourceRecords.swift,
+				Persistence/Entities/ProjectRecord.swift,
+				Persistence/Entities/PromptRecords.swift,
+				Persistence/Entities/ReviewRecords.swift,
+				Persistence/Entities/SessionRecords.swift,
+				Persistence/Entities/TestRunRecords.swift,
+				Persistence/Migrations/m0001_baseSchema.swift,
+				Persistence/Migrations/m0002_clarificationArchitectureLifecycleV2.swift,
+				Persistence/Migrations/m0003_searchIndexes.swift,
+				Persistence/Migrations/m0004_explorationReviewReports.swift,
+				Persistence/Migrations/m0005_purgeLegacyConcepts.swift,
+				Persistence/Migrations/m0006_dropDraftPlaceholderSummaries.swift,
+				Persistence/Migrations/m0007_dopeDomainModel.swift,
+				Persistence/Migrations/m0008_dopeBaseComposableEntities.swift,
+				Persistence/Migrations/m0009_dopePropertyBaseOrigin.swift,
+				Persistence/Migrations/m0010_diagramDomainModel.swift,
+				Persistence/Migrations/m0011_projectPrimaryBranch.swift,
+				Persistence/Migrations/m0012_dopePersistenceRenameAndSoftDelete.swift,
+				Persistence/Migrations/m0013_dopeScopeTierLadder.swift,
+				Persistence/Migrations/m0014_dopeCogElement.swift,
+				Persistence/Migrations/m0015_dopeSearchIndexes.swift,
+				Persistence/Migrations/m0016_diagramDopeScopeBinding.swift,
+				Persistence/Migrations/m0017_relationshipTargetAndDropMaskKind.swift,
+				Persistence/Migrations/m0018_diagramDopeScopePersistenceLayer.swift,
+				Persistence/Migrations/m0019_cogHullsAndPersistenceOwner.swift,
+				Persistence/Migrations/m0020_dopeElementProvenance.swift,
+				Persistence/Migrations/m0021_diagramVocabularyAndTierCollapse.swift,
+				Persistence/Migrations/m0022_promptQualifiedDiagram.swift,
+				Persistence/Migrations/m0023_agentBriefing.swift,
+				Persistence/Migrations/m0024_diagramStudio.swift,
+				Persistence/Migrations/m0025_dynamicWorkflows.swift,
+				Persistence/Migrations/m0026_claudeSessionAttribution.swift,
+				Persistence/Migrations/m0027_ckfsToGmfs.swift,
+				Persistence/Migrations/m0028_promptLifecycleCollapse.swift,
+				Persistence/Migrations/m0029_testRunLock.swift,
+				Persistence/Migrations/m0030_retiredRootConfigValues.swift,
+				Persistence/Migrations/Migrations.swift,
+				Persistence/Store/Repositories/AgentRegistrationRepository.swift,
+				Persistence/Store/Repositories/ArchitectureRepository.swift,
+				Persistence/Store/Repositories/ArtifactRepository.swift,
+				Persistence/Store/Repositories/BotWorkflowRepository.swift,
+				Persistence/Store/Repositories/BriefingRepository.swift,
+				Persistence/Store/Repositories/CatalogSearchRepository.swift,
+				Persistence/Store/Repositories/ClarificationRepository.swift,
+				Persistence/Store/Repositories/ClaudeSessionBindingRepository.swift,
+				Persistence/Store/Repositories/ConfigRepository.swift,
+				Persistence/Store/Repositories/ContextRepository.swift,
+				Persistence/Store/Repositories/DiagramRepository.swift,
+				Persistence/Store/Repositories/DiagramStudioRepository.swift,
+				Persistence/Store/Repositories/DopeCogRepository.swift,
+				Persistence/Store/Repositories/DopePromoteRepository.swift,
+				Persistence/Store/Repositories/DopeProvenanceRepository.swift,
+				Persistence/Store/Repositories/DopeRepository.swift,
+				Persistence/Store/Repositories/DopeSearchRepository.swift,
+				Persistence/Store/Repositories/EventRepository.swift,
+				Persistence/Store/Repositories/ExplorationRepository.swift,
+				Persistence/Store/Repositories/FileChangeRepository.swift,
+				Persistence/Store/Repositories/FindingRankRepository.swift,
+				Persistence/Store/Repositories/GitStateRepository.swift,
+				Persistence/Store/Repositories/KbiteArchiveRepository.swift,
+				Persistence/Store/Repositories/KbiteRepository.swift,
+				Persistence/Store/Repositories/KbiteResourceRepository.swift,
+				Persistence/Store/Repositories/ListingRepository.swift,
+				Persistence/Store/Repositories/ProjectRepository.swift,
+				Persistence/Store/Repositories/PromptDiagramRepository.swift,
+				Persistence/Store/Repositories/PromptRepository.swift,
+				Persistence/Store/Repositories/RepositoryContext.swift,
+				Persistence/Store/Repositories/ReviewRepository.swift,
+				Persistence/Store/Repositories/SearchRepository.swift,
+				Persistence/Store/Repositories/SessionRepository.swift,
+				Persistence/Store/Repositories/TestRunRepository.swift,
+				Persistence/Store/Store.swift,
+				"Persistence/Store/Store+AgentRegistration.swift",
+				"Persistence/Store/Store+Architecture.swift",
+				"Persistence/Store/Store+Artifact.swift",
+				"Persistence/Store/Store+Backup.swift",
+				"Persistence/Store/Store+BotWorkflow.swift",
+				"Persistence/Store/Store+Briefing.swift",
+				"Persistence/Store/Store+CatalogSearch.swift",
+				"Persistence/Store/Store+Clarification.swift",
+				"Persistence/Store/Store+Config.swift",
+				"Persistence/Store/Store+Context.swift",
+				"Persistence/Store/Store+Diagram.swift",
+				"Persistence/Store/Store+DiagramRepoVerbs.swift",
+				"Persistence/Store/Store+DiagramStudio.swift",
+				"Persistence/Store/Store+Dope.swift",
+				"Persistence/Store/Store+DopeCog.swift",
+				"Persistence/Store/Store+DopePromote.swift",
+				"Persistence/Store/Store+DopeProvenance.swift",
+				"Persistence/Store/Store+DopeRepoVerbs.swift",
+				"Persistence/Store/Store+DopeSearch.swift",
+				"Persistence/Store/Store+Event.swift",
+				"Persistence/Store/Store+Exploration.swift",
+				"Persistence/Store/Store+FileChange.swift",
+				"Persistence/Store/Store+GitState.swift",
+				"Persistence/Store/Store+Kbite.swift",
+				"Persistence/Store/Store+KbiteArchive.swift",
+				"Persistence/Store/Store+KbiteResource.swift",
+				"Persistence/Store/Store+Listing.swift",
+				"Persistence/Store/Store+Project.swift",
+				"Persistence/Store/Store+Prompt.swift",
+				"Persistence/Store/Store+PromptDiagram.swift",
+				"Persistence/Store/Store+Review.swift",
+				"Persistence/Store/Store+Search.swift",
+				"Persistence/Store/Store+Session.swift",
+				"Persistence/Store/Store+TestRun.swift",
+				Persistence/Store/StoreBoundary.swift,
+				Persistence/Store/StoreCore.swift,
+				Util/BashWritePaths.swift,
 			);
 			target = A17E00102FDCB00000DAF751 /* GmKernelTests */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		1B4010752FDCA09200DAF751 /* gmVibes */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = gmVibes;
-			sourceTree = "<group>";
-		};
 		A17E00012FDCB00000DAF751 /* Sources */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -313,7 +311,6 @@
 			files = (
 				A17E000C2FDCB00000DAF751 /* GRDB in Frameworks */,
 				A17E000D2FDCB00000DAF751 /* SwiftProtobuf in Frameworks */,
-				A17E000E2FDCB00000DAF751 /* ClaudeForFoundationModels in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -333,7 +330,6 @@
 			children = (
 				A17E00012FDCB00000DAF751 /* Sources */,
 				A17E00152FDCB00000DAF751 /* GmKernelTests */,
-				1B4010752FDCA09200DAF751 /* gmVibes */,
 				A17E00032FDCB00000DAF751 /* VERSION */,
 				1B4010742FDCA09200DAF751 /* Products */,
 			);
@@ -366,13 +362,11 @@
 			);
 			fileSystemSynchronizedGroups = (
 				A17E00012FDCB00000DAF751 /* Sources */,
-				1B4010752FDCA09200DAF751 /* gmVibes */,
 			);
 			name = gm_kernel;
 			packageProductDependencies = (
 				A17E00092FDCB00000DAF751 /* GRDB */,
 				A17E000A2FDCB00000DAF751 /* SwiftProtobuf */,
-				A17E000B2FDCB00000DAF751 /* ClaudeForFoundationModels */,
 			);
 			productName = gm_kernel;
 			productReference = 1B4010732FDCA09200DAF751 /* gm_kernel.app */;
@@ -432,7 +426,6 @@
 			packageReferences = (
 				A17E00062FDCB00000DAF751 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 				A17E00072FDCB00000DAF751 /* XCRemoteSwiftPackageReference "swift-protobuf" */,
-				A17E00082FDCB00000DAF751 /* XCLocalSwiftPackageReference "gmClaudeForFoundationModels" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1B4010742FDCA09200DAF751 /* Products */;
@@ -588,7 +581,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -649,7 +642,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -679,10 +672,9 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				GM_BUNDLE_SUFFIX = .test;
-				GM_DEV_PLUGIN_DIR = "$(SRCROOT)/../plugins/gmbeta";
 				GM_ENV = test;
 				GM_FS_ROOT_BAKED = "~/test_gmfs";
-				INFOPLIST_FILE = gmVibes/Info.plist;
+				INFOPLIST_FILE = Sources/UX/Apps/Vibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "gm_kernel opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -721,7 +713,7 @@
 				GM_BUNDLE_SUFFIX = "";
 				GM_ENV = prod;
 				GM_FS_ROOT_BAKED = "~/gmfs";
-				INFOPLIST_FILE = gmVibes/Info.plist;
+				INFOPLIST_FILE = Sources/UX/Apps/Vibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "gm_kernel opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -788,7 +780,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MACOSX_DEPLOYMENT_TARGET = 27.0;
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
@@ -817,10 +809,9 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				GM_BUNDLE_SUFFIX = .beta;
-				GM_DEV_PLUGIN_DIR = "$(SRCROOT)/../plugins/gmbeta";
 				GM_ENV = beta;
 				GM_FS_ROOT_BAKED = "~/beta_gmfs";
-				INFOPLIST_FILE = gmVibes/Info.plist;
+				INFOPLIST_FILE = Sources/UX/Apps/Vibes/Info.plist;
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSAppleEventsUsageDescription = "gm_kernel opens iTerm2 windows for your prompts and asks iTerm2 for an API cookie.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -984,13 +975,6 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		A17E00082FDCB00000DAF751 /* XCLocalSwiftPackageReference "gmClaudeForFoundationModels" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = gmClaudeForFoundationModels;
-		};
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCRemoteSwiftPackageReference section */
 		A17E00062FDCB00000DAF751 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -1020,10 +1004,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A17E00072FDCB00000DAF751 /* XCRemoteSwiftPackageReference "swift-protobuf" */;
 			productName = SwiftProtobuf;
-		};
-		A17E000B2FDCB00000DAF751 /* ClaudeForFoundationModels */ = {
-			isa = XCSwiftPackageProductDependency;
-			productName = ClaudeForFoundationModels;
 		};
 		A17E00162FDCB00000DAF751 /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;

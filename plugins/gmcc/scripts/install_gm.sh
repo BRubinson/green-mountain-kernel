@@ -2,8 +2,9 @@
 #
 # install_gm.sh — THE FRONT DOOR for everyone who is not editing the sources.
 #
-# Fetches the newest published `gm_kernel-v*` release, verifies every checksum,
-# stages it under the release store, activates the binaries and installs the app.
+# Fetches the `gm_kernel-v*` release whose version matches this plugin's own
+# (.claude-plugin/plugin.json), verifies every checksum, stages it under the
+# release store, activates the binaries and installs the app.
 #
 # ── IT UPGRADES THE WHOLE SYSTEM, NOT HALF OF IT ─────────────────────────────
 #
@@ -30,28 +31,30 @@
 # cache to find the repo would run `git rev-parse --show-toplevel` and, on a
 # machine whose $HOME is itself a git repository, get a confident WRONG answer
 # pointing at the home directory. There is no reliable climb, so this script does
-# not attempt one: it needs no repo, reads no VERSION file from disk, and asks
-# GitHub what the newest release is.
+# not attempt one: it needs no repo and reads no VERSION file from disk. The one
+# file it reads is the plugin's own manifest, which sits beside it.
 #
-# ── WHY "LATEST" RATHER THAN A PIN ───────────────────────────────────────────
+# ── WHY THE PLUGIN'S VERSION RATHER THAN "LATEST" ────────────────────────────
 #
-# The plugin carries no runtime version. If it did, that number would be a second
-# thing to bump on every release and it could silently disagree with gmk/VERSION.
-# Asking for the newest `daemon-v*` release means the plugin cannot drift from
-# what was actually published.
+# The bridge stamps `.claude-plugin/plugin.json` from gmk/VERSION, the same
+# number the release is tagged with. So the plugin a session loads names exactly
+# one kernel, and installing that one is what keeps the hooks, the pens and the
+# daemon they dial at a single version. `--latest` is the escape hatch for a
+# plugin tree whose release has not been published yet.
 #
-# TAG NAMESPACE MATTERS HERE. The repo's history contains more than one kind of
-# release tag, so GitHub's own "latest release" is the wrong question — it would
-# happily hand back an app-only release cut under the retired `gmvibes-v*`
-# namespace. This filters by prefix, newest `gm_kernel-v*` first, and falls back
-# to the retired `daemon-v*` namespace so a machine pointed at an older release
-# still installs rather than being told nothing is published.
+# TAG NAMESPACE MATTERS FOR --latest. The repo's history contains more than one
+# kind of release tag, so GitHub's own "latest release" is the wrong question —
+# it would happily hand back an app-only release cut under the retired
+# `gmvibes-v*` namespace. This filters by prefix, newest `gm_kernel-v*` first,
+# and falls back to the retired `daemon-v*` namespace so a machine pointed at an
+# older release still installs rather than being told nothing is published.
 #
 # Usage:
-#   install_gm.sh                   # install/upgrade binaries + app
+#   install_gm.sh                   # install/upgrade binaries + app to the plugin's version
 #   install_gm.sh --check           # report only; exit 1 if an install is needed
 #   install_gm.sh --force           # reinstall even if that version is active
 #   install_gm.sh --version 50.0.1  # install one specific version
+#   install_gm.sh --latest          # the newest published release instead of the plugin's
 #   install_gm.sh --no-app          # binaries only; never touch /Applications
 #   install_gm.sh --app             # the app only; leave the binaries alone
 #
@@ -71,6 +74,7 @@ API="https://api.github.com/repos/$RELEASE_REPO"
 
 MODE="install"
 WANT=""
+WANT_LATEST=0
 DO_BINARIES=1
 DO_APP=1
 while [ $# -gt 0 ]; do
@@ -78,6 +82,7 @@ while [ $# -gt 0 ]; do
         --check)   MODE="check" ;;
         --force)   MODE="force" ;;
         --version) shift; WANT="$1"; [ -n "$WANT" ] || { echo "[GMB] --version needs a value" >&2; exit 2; } ;;
+        --latest)  WANT_LATEST=1 ;;
         --no-app)  DO_APP=0 ;;
         --app)     DO_BINARIES=0 ;;
         "") ;;
@@ -88,6 +93,14 @@ done
 
 gm_resolve_fs_root
 INSTALLED="$(gm_installed_version)"
+
+# gm_plugin_version — the version this plugin tree was generated for, from the
+# manifest beside this script. Empty when the tree has no manifest.
+gm_plugin_version() {
+    _pj="$(dirname "$SCRIPT_DIR")/.claude-plugin/plugin.json"
+    [ -f "$_pj" ] || return 1
+    sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$_pj" | head -1
+}
 
 # ── Resolve which version to install ─────────────────────────────────────────
 #
@@ -126,8 +139,13 @@ resolve_latest() {
 }
 
 FOUND_PREFIX="$GM_TAG_PREFIX"
+PLUGIN_V=""
+[ "$WANT_LATEST" -eq 1 ] || PLUGIN_V="$(gm_plugin_version || true)"
 if [ -n "$WANT" ]; then
     VERSION="$WANT"
+elif [ -n "$PLUGIN_V" ]; then
+    VERSION="$PLUGIN_V"
+    echo "[GMB] plugin is v$VERSION — installing the matching release"
 else
     echo "[GMB] asking $RELEASE_REPO for the newest release..."
     RESOLVED="$(resolve_latest || true)"
@@ -276,11 +294,11 @@ fi
 
 if [ "$MODE" = "check" ]; then
     if [ "$INSTALLED" = "none" ]; then
-        echo "[GMB] binaries not installed — newest published is v$VERSION"
+        echo "[GMB] binaries not installed — wanted is v$VERSION"
     else
-        echo "[GMB] binaries $INSTALLED active, newest published is v$VERSION"
+        echo "[GMB] binaries $INSTALLED active, wanted is v$VERSION"
     fi
-    echo "[GMB] $GM_APP_NAME $APP_INSTALLED installed, newest published is $VERSION"
+    echo "[GMB] $GM_APP_NAME $APP_INSTALLED installed, wanted is $VERSION"
     if [ "$BIN_WORK" -eq 0 ] && [ "$APP_WORK" -eq 0 ]; then
         echo "      everything is current"
         exit 0
@@ -325,6 +343,12 @@ fetch_asset() {
       The release exists but the asset does not, or the network is unreachable.
       With a checkout, build instead: bash gmk/scripts/rebuild_local.sh
 EOF
+        if [ -n "$PLUGIN_V" ] && [ "$VERSION" = "$PLUGIN_V" ]; then
+            cat >&2 <<EOF
+      This plugin names v$VERSION and that release may not be published yet.
+      For the newest published release instead: bash $SCRIPT_DIR/install_gm.sh --latest
+EOF
+        fi
         return 1
     fi
     if ! ( cd "$TMP" && shasum -a 256 -c "$_name.sha256" >/dev/null 2>&1 ); then
