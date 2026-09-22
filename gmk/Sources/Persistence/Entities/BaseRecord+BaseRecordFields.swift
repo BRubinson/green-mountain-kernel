@@ -1,10 +1,10 @@
 // Shared read-only surface for records carrying the BaseEntity columns.
-// Read sugar only — no write path exists on records by design.
 //
-// wireRow() is nullary and total by default, and parameterized only for the six
-// composed wire rows whose extra data comes from another query. Every injected
-// child is a LABELLED argument with NO default, because a default re-opens the
-// silent-omission hole. A record with no 1:1 wire twin stays decoder-only.
+// A table's decode type is its record, declared with TableRecord and
+// SnakeCaseDecoded in that table's entity file alongside its associations.
+// Records are FetchableRecord only: no PersistableRecord, and no deleteAll,
+// deleteOne or updateAll, which the no_record_bulk_write lint rule enforces.
+// Every write routes through StoreCore so the version gate stays single-sourced.
 // `db` never enters Entities/, so records stay flat and decodable from a row.
 
 import Foundation
@@ -15,6 +15,9 @@ import GRDB
 /// `extension FetchableRecord where Self: Codable` here, so a query struct
 /// added inside a repository cannot silently inherit a decoding strategy from
 /// a file nobody opened.
+///
+/// A scope read through `including(optional:)` or `including(required:)`
+/// inherits the PARENT's strategy, so every joined child declares this itself.
 protocol SnakeCaseDecoded: Codable, FetchableRecord {
     // no requirements: conformance IS the opt-in
 }
@@ -81,12 +84,3 @@ extension BaseRecordFields {
         return try fetchAll(db, sql: sql, arguments: arguments)
     }
 }
-
-// MARK: - Records not on the decode path
-//
-// Each record here is read through a projection or a probe rather than decoded
-// whole: daemon_config as a key/value fold; file_change and its neighbours as
-// one heterogeneous projection join; the cog subtype tables through a runtime
-// DopeCogElementSpec pick; keyword as a single-column fetch; and the junction
-// tables only as EXISTS probes or as joins projecting the PARENT's columns.
-// They exist for schema-drift coverage, not for decoding.

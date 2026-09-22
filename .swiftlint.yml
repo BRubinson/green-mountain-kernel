@@ -222,3 +222,10 @@ custom_rules:
     match_kinds: [keyword]
     message: "Use #filePath or #fileID."
     severity: error
+  no_record_bulk_write:
+    name: "No bulk write through TableRecord"
+    regex: '\b(deleteAll|deleteOne|updateAll)\s*\('
+    excluded_match_kinds: [comment, doccomment, string]
+    excluded: ".*/Persistence/Store/StoreCore\\.swift"
+    message: "TableRecord grants deleteAll/deleteOne/updateAll with no PersistableRecord. Every write routes through StoreCore.insertBase/updateBase/deleteBase so the version gate and appendEvent stay single-sourced."
+    severity: error
