@@ -33,11 +33,11 @@ struct ClaudeSessionBindingRepository: RepositoryContext {
             arguments: [StoreCore.newUuid(), now, now, claudeSessionId, sessionUuid]
         )
         guard
-            let uuid = try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM claude_session_binding WHERE claude_session_id = ?",
-                arguments: [claudeSessionId]
-            )
+            let uuid =
+                try ClaudeSessionBindingRecord
+                .filter(ClaudeSessionBindingRecord.Columns.claudeSessionId == claudeSessionId)
+                .select(ClaudeSessionBindingRecord.Columns.uuid, as: String.self)
+                .fetchOne(db)
         else {
             throw StoreError.corruptState(
                 entity: "claude_session_binding",
@@ -51,10 +51,9 @@ struct ClaudeSessionBindingRepository: RepositoryContext {
     /// this conversation was never pinned — the caller decides whether that is
     /// somebody else's repo (silent) or dead capture in a known one (loud).
     func resolveSession(claudeSessionId: String) throws -> String? {
-        try String.fetchOne(
-            db,
-            sql: "SELECT session_uuid FROM claude_session_binding WHERE claude_session_id = ?",
-            arguments: [claudeSessionId]
-        )
+        try ClaudeSessionBindingRecord
+            .filter(ClaudeSessionBindingRecord.Columns.claudeSessionId == claudeSessionId)
+            .select(ClaudeSessionBindingRecord.Columns.sessionUuid, as: String.self)
+            .fetchOne(db)
     }
 }

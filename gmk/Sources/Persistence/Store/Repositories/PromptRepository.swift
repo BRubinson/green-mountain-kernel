@@ -8,13 +8,7 @@ struct PromptRepository: RepositoryContext {
     let core: StoreCore
 
     func create(_ req: PromptCreateRequest) throws -> PromptRow {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM session WHERE uuid = ?",
-                arguments: [req.sessionUuid]
-            ) != nil
-        else {
+        guard try SessionRecord.exists(db, key: ["uuid": req.sessionUuid]) else {
             throw StoreError.notFound(entity: "session", key: req.sessionUuid)
         }
         // Atomic under the single writer: MAX+1 inside the write
@@ -35,11 +29,11 @@ struct PromptRepository: RepositoryContext {
         var gmfsPath = req.gmfsRelativeStoragePath ?? ""
         if gmfsPath.isEmpty {
             let sessionPath =
-                try String.fetchOne(
-                    db,
-                    sql: "SELECT gmfs_relative_storage_path FROM session WHERE uuid = ?",
-                    arguments: [req.sessionUuid]
-                ) ?? ""
+                try SessionRecord
+                .all()
+                .withUuid(req.sessionUuid)
+                .select(SessionRecord.Columns.gmfsRelativeStoragePath, as: String.self)
+                .fetchOne(db) ?? ""
             if !sessionPath.isEmpty {
                 // A4: the name is slugged (forward-only, lossy) so the
                 // stored path — which the MemoryWatcher matches by exact
@@ -68,11 +62,11 @@ struct PromptRepository: RepositoryContext {
         )
         // Seed prompt kbites from the session registry (create-time-only
         // inheritance, same rule as the context chain).
-        let sessionKbites = try String.fetchAll(
-            db,
-            sql: "SELECT kbite_uuid FROM session_active_kbite WHERE session_uuid = ?",
-            arguments: [req.sessionUuid]
-        )
+        let sessionKbites =
+            try SessionActiveKbiteRecord
+            .filter(SessionActiveKbiteRecord.Columns.sessionUuid == req.sessionUuid)
+            .select(SessionActiveKbiteRecord.Columns.kbiteUuid, as: String.self)
+            .fetchAll(db)
         for kbiteUuid in sessionKbites {
             try core.insertBase(
                 db,
@@ -105,13 +99,7 @@ struct PromptRepository: RepositoryContext {
     /// optional-filter contract as Store+Listing).
     func list(_ req: PromptListRequest) throws -> PromptListResponse {
         if let sessionUuid = req.sessionUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM session WHERE uuid = ?",
-                    arguments: [sessionUuid]
-                ) != nil
-            else {
+            guard try SessionRecord.exists(db, key: ["uuid": sessionUuid]) else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
             }
         }
@@ -137,7 +125,7 @@ struct PromptRepository: RepositoryContext {
             .select(Column("code"), as: String.self)
             .fetchAll(db)
         let changeSummary = try SessionRepository(db: db, core: core)
-            .changeSummary(where: "prompt_uuid = ?", arguments: [req.promptUuid])
+            .changeSummary(promptUuid: req.promptUuid)
         return PromptGetResponse(
             prompt: prompt,
             artifacts: artifacts,
@@ -150,11 +138,12 @@ struct PromptRepository: RepositoryContext {
     /// editable only while status == draft.
     func updateContent(_ req: PromptUpdateContentRequest) throws -> PromptRow {
         guard
-            let statusRaw = try String.fetchOne(
-                db,
-                sql: "SELECT status FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            )
+            let statusRaw =
+                try PromptRecord
+                .all()
+                .withUuid(req.promptUuid)
+                .select(PromptRecord.Columns.status, as: String.self)
+                .fetchOne(db)
         else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
@@ -196,18 +185,11 @@ struct PromptRepository: RepositoryContext {
     /// Clarify and architecture verbs never touch prompt.status.
     /// Activation claim and workflow close ride this same write transaction.
     func setStatus(_ req: PromptSetStatusRequest) throws -> PromptRow {
-        guard
-            let head = try Row.fetchOne(
-                db,
-                sql: "SELECT status, created_at, session_uuid FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            )
-        else {
+        guard let head = try PromptRecord.fetch(db, uuid: req.promptUuid) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
-        let statusRaw: String = head["status"]
-        guard let from = PromptStatus(rawValue: statusRaw) else {
-            throw StoreError.corruptState(entity: "prompt", detail: "status '\(statusRaw)'")
+        guard let from = PromptStatus(rawValue: head.status) else {
+            throw StoreError.corruptState(entity: "prompt", detail: "status '\(head.status)'")
         }
         guard from.allowedNext.contains(req.status) else {
             throw StoreError.invalidTransition(
@@ -241,7 +223,7 @@ struct PromptRepository: RepositoryContext {
         // pointer, and `done` releases the PROMPT's claim whichever instance
         // calls it. The claim is taken at `initiated`, so briefing, exploration
         // and architecture all run under it.
-        let sessionUuid: String = head["session_uuid"]
+        let sessionUuid = head.sessionUuid
         if req.status == .initiated, let clientKey = req.clientKey {
             try SessionRepository(db: db, core: core)
                 .claimActivation(

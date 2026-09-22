@@ -40,21 +40,3 @@ extension PromptQualifiedDiagramRecord {
     static let prompt = belongsTo(PromptRecord.self).forKey("prompt")
     static let diagram = belongsTo(DiagramRecord.self).forKey("diagram")
 }
-
-extension PromptQualifiedDiagramRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    func wireRow() -> PromptQualifiedDiagramRow {
-        PromptQualifiedDiagramRow(
-            uuid: uuid,
-            promptUuid: promptUuid,
-            diagramUuid: diagramUuid,
-            renderedPath: renderedPath,
-            renderedRevision: renderedRevision,
-            renderFingerprint: renderFingerprint,
-            qualification: qualification,
-            version: version,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

@@ -9,25 +9,11 @@ struct DiagramStudioRepository: RepositoryContext {
     let core: StoreCore
 
     func diagramSearch(_ req: DiagramSearchRequest, pattern: FTS5Pattern?) throws -> DiagramSearchResponse {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM project WHERE uuid = ?",
-                arguments: [req.projectUuid]
-            ) != nil
-        else {
+        guard try ProjectRecord.all().withUuid(req.projectUuid).fetchCount(db) > 0 else {
             throw StoreError.notFound(entity: "project", key: req.projectUuid)
         }
         if let sessionUuid = req.sessionUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM session WHERE uuid = ?",
-                    arguments: [sessionUuid]
-                ) != nil
-            else {
-                throw StoreError.notFound(entity: "session", key: sessionUuid)
-            }
+            try diagram.requireSession(uuid: sessionUuid)
         }
         let limit = min(max(req.limit ?? 50, 1), 500)
 

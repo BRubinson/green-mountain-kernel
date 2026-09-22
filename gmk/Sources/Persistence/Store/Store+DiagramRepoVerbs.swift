@@ -40,15 +40,8 @@ extension Store {
             let document: DiagramDocument
         }
         let (root, projected, knownRevisions): (String, [Projected], [String: Int64]) = try boundaryRead { db in
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM session WHERE uuid = ?",
-                    arguments: [req.sessionUuid]
-                ) != nil
-            else {
-                throw StoreError.notFound(entity: "session", key: req.sessionUuid)
-            }
+            let diagrams = DiagramRepository(db: db, core: self.core)
+            try diagrams.requireSession(uuid: req.sessionUuid)
             let root = try self.instanceRoot(db, sessionUuid: req.sessionUuid)
             let rows = try DiagramWithOwner.request()
                 .filter(DiagramRecord.Columns.tier == DiagramTier.session.rawValue)
@@ -70,17 +63,9 @@ extension Store {
                 }
             // EVERY session row, any visibility — the prune gate below may
             // only delete a file the db demonstrably subsumes.
-            var knownRevisions: [String: Int64] = [:]
-            for row in try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT code, revision FROM diagram
-                     WHERE tier = ? AND session_uuid = ?
-                    """,
-                arguments: [DiagramTier.session.rawValue, req.sessionUuid]
-            ) {
-                knownRevisions[row["code"]] = row["revision"]
-            }
+            let knownRevisions = try diagrams.sessionDiagramRevisions(
+                sessionUuid: req.sessionUuid
+            )
             return (root, projected, knownRevisions)
         }
 
@@ -178,15 +163,7 @@ extension Store {
         }
         // Phase 1 — root.
         let root = try boundaryRead { db -> String in
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM session WHERE uuid = ?",
-                    arguments: [req.sessionUuid]
-                ) != nil
-            else {
-                throw StoreError.notFound(entity: "session", key: req.sessionUuid)
-            }
+            try DiagramRepository(db: db, core: self.core).requireSession(uuid: req.sessionUuid)
             return try self.instanceRoot(db, sessionUuid: req.sessionUuid)
         }
 
@@ -290,24 +267,11 @@ extension Store {
     ) throws -> Bool {
         guard diagram.visibility == DiagramVisibility.public.rawValue else { return false }
         guard document.version > diagram.revision else { return false }
-        try db.execute(
-            sql: """
-                UPDATE diagram
-                   SET name = ?, description = ?, dope_scope_code = ?,
-                       revision = ?, updated_at = ?
-                 WHERE uuid = ? AND revision < ?
-                """,
-            arguments: [
-                document.name, document.description,
-                document.dopeScopeCode, document.version,
-                Store.isoNow(), diagram.uuid, document.version,
-            ]
-        )
-        guard db.changesCount > 0 else { return false }
-        try db.execute(
-            sql: "DELETE FROM diagram_element WHERE diagram_uuid = ?",
-            arguments: [diagram.uuid]
-        )
+        let diagrams = DiagramRepository(db: db, core: core)
+        guard try diagrams.landIngestedDiagram(uuid: diagram.uuid, document: document) else {
+            return false
+        }
+        try diagrams.deleteDiagramElements(diagramUuid: diagram.uuid)
         try insertDocumentElements(db, diagramUuid: diagram.uuid, document: document)
         guard let refreshed = try fetchDiagram(db, uuid: diagram.uuid) else {
             throw StoreError.corruptState(entity: "diagram", detail: "vanished during ingest")
@@ -433,14 +397,12 @@ extension Store {
         for element in document.elements {
             try insert(element, parentUuid: nil, prefix: "")
         }
+        let diagrams = DiagramRepository(db: db, core: core)
         for target in connectorTargets {
             guard let resolved = uuidByPath[target.path] else { continue }
-            try db.execute(
-                sql: """
-                    UPDATE diagram_connector SET target_element_uuid = ?
-                     WHERE element_uuid = ?
-                    """,
-                arguments: [resolved, target.elementUuid]
+            try diagrams.setConnectorTarget(
+                elementUuid: target.elementUuid,
+                targetElementUuid: resolved
             )
         }
     }

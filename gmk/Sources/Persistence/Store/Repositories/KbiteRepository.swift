@@ -11,8 +11,10 @@ struct KbiteRepository: RepositoryContext {
 
     func listKbites(_ req: KbiteListRequest) throws -> KbiteListResponse {
         if req.all == true {
-            let rows = try Row.fetchAll(db, sql: "SELECT uuid, code FROM kbite ORDER BY code")
-            return KbiteListResponse(kbites: rows.map { KbiteRef(uuid: $0["uuid"], code: $0["code"]) })
+            let records = try KbiteRecord.order(KbiteRecord.Columns.code).fetchAll(db)
+            return KbiteListResponse(
+                kbites: records.map { KbiteRef(uuid: $0.uuid, code: $0.code) }
+            )
         }
         let scopes = try ancestorScopes(scope: req.scope, ownerUuid: req.ownerUuid)
         var seen: Set<String> = []
@@ -34,13 +36,9 @@ struct KbiteRepository: RepositoryContext {
         let kbiteUuid = try context.ensureKbite(code: req.code)
         let level = req.scope.rawValue
         let exists =
-            try Row.fetchOne(
-                db,
-                sql: """
-                    SELECT 1 FROM \(level)_active_kbite WHERE \(level)_uuid = ? AND kbite_uuid = ?
-                    """,
-                arguments: [req.ownerUuid, kbiteUuid]
-            ) != nil
+            try Table("\(level)_active_kbite")
+            .filter(Column("\(level)_uuid") == req.ownerUuid && Column("kbite_uuid") == kbiteUuid)
+            .fetchCount(db) > 0
         if !exists {
             try core.insertBase(
                 db,
@@ -65,11 +63,11 @@ struct KbiteRepository: RepositoryContext {
     func removeKbite(_ req: KbiteRemoveRequest) throws -> KbiteRemoveResponse {
         try requireScopeOwner(scope: req.scope, ownerUuid: req.ownerUuid)
         guard
-            let kbiteUuid = try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM kbite WHERE code = ?",
-                arguments: [req.code]
-            )
+            let kbiteUuid =
+                try KbiteRecord
+                .filter(KbiteRecord.Columns.code == req.code)
+                .select(KbiteRecord.Columns.uuid, as: String.self)
+                .fetchOne(db)
         else {
             return KbiteRemoveResponse(removed: false)
         }
@@ -159,11 +157,10 @@ struct KbiteRepository: RepositoryContext {
             }
             guard let parent else { break }
             guard
-                let parentUuid = try String.fetchOne(
-                    db,
-                    sql: "SELECT \(parent.column) FROM \(current.scope.rawValue) WHERE uuid = ?",
-                    arguments: [current.uuid]
-                )
+                let parentUuid = try Table(current.scope.rawValue)
+                    .filter(Column("uuid") == current.uuid)
+                    .select(Column(parent.column), as: String.self)
+                    .fetchOne(db)
             else {
                 throw StoreError.notFound(entity: current.scope.rawValue, key: current.uuid)
             }
@@ -176,13 +173,7 @@ struct KbiteRepository: RepositoryContext {
     /// Mutations verify the owner row exists so a typo'd uuid surfaces as
     /// NOT_FOUND instead of a silently empty registry.
     private func requireScopeOwner(scope: KbiteScope, ownerUuid: String) throws {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM \(scope.rawValue) WHERE uuid = ?",
-                arguments: [ownerUuid]
-            ) != nil
-        else {
+        guard try Table(scope.rawValue).filter(Column("uuid") == ownerUuid).fetchCount(db) > 0 else {
             throw StoreError.notFound(entity: scope.rawValue, key: ownerUuid)
         }
     }

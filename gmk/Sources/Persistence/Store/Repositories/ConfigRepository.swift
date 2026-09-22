@@ -11,11 +11,8 @@ struct ConfigRepository: RepositoryContext {
     func pathsGet() throws -> PathsGetResponse {
         let config = try Dictionary(
             uniqueKeysWithValues:
-                Row.fetchAll(
-                    db,
-                    sql: "SELECT config_key, config_value FROM daemon_config"
-                )
-                .map { ($0["config_key"] as String, $0["config_value"] as String) }
+                DaemonConfigRecord.fetchAll(db)
+                .map { ($0.configKey, $0.configValue) }
         )
         func value(_ key: ConfigKey, fallback: String) -> String {
             config[key.rawValue] ?? fallback
@@ -57,11 +54,10 @@ struct ConfigRepository: RepositoryContext {
         // Upsert without version threading: config keys are singletons
         // owned by the daemon; last write wins (still audited via the
         // event trail).
-        if try Row.fetchOne(
-            db,
-            sql: "SELECT 1 FROM daemon_config WHERE config_key = ?",
-            arguments: [req.key.rawValue]
-        ) != nil {
+        if try DaemonConfigRecord
+            .filter(DaemonConfigRecord.Columns.configKey == req.key.rawValue)
+            .fetchCount(db) > 0
+        {
             try db.execute(
                 sql: """
                     UPDATE daemon_config
@@ -89,19 +85,17 @@ struct ConfigRepository: RepositoryContext {
     }
 
     func configValue(_ key: ConfigKey) throws -> String? {
-        try String.fetchOne(
-            db,
-            sql: "SELECT config_value FROM daemon_config WHERE config_key = ?",
-            arguments: [key.rawValue]
-        )
+        try DaemonConfigRecord
+            .filter(DaemonConfigRecord.Columns.configKey == key.rawValue)
+            .select(DaemonConfigRecord.Columns.configValue, as: String.self)
+            .fetchOne(db)
     }
 
     /// MemoryWatcher's reverse lookup: prompt by its gmfs folder path.
     func promptUuid(byStoragePath path: String) throws -> String? {
-        try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM prompt WHERE gmfs_relative_storage_path = ?",
-            arguments: [path]
-        )
+        try PromptRecord
+            .filter(PromptRecord.Columns.gmfsRelativeStoragePath == path)
+            .select(PromptRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
     }
 }

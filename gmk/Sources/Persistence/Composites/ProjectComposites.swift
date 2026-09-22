@@ -85,6 +85,72 @@ struct SessionLineage: FetchableRecord, Decodable {
     }
 }
 
+/// The file-change tally one scope surfaces: how many changes it holds, how
+/// many distinct files they touched, and the total line span of their ranges.
+///
+/// The ranges ride a LEFT JOIN so a change carrying none still counts and its
+/// span contributes zero. The aggregate carries no GROUP BY, so an empty scope
+/// still yields one row of zeroes.
+struct ChangeRollup: FetchableRecord, Decodable {
+    var changeCount: Int
+    var distinctFiles: Int
+    var totalLineSpan: Int
+
+    static func request(sessionUuid: String) -> QueryInterfaceRequest<Self> {
+        Self.base().filter(FileChangeRecord.Columns.sessionUuid == sessionUuid)
+    }
+
+    static func request(promptUuid: String) -> QueryInterfaceRequest<Self> {
+        Self.base().filter(FileChangeRecord.Columns.promptUuid == promptUuid)
+    }
+
+    static func tally(
+        _ range: TableAlias<FileChangeRangeRecord>
+    ) -> [any SQLSelectable] {
+        [
+            count(distinct: FileChangeRecord.Columns.uuid).forKey("changeCount"),
+            count(distinct: FileChangeRecord.Columns.sessionFileUuid).forKey("distinctFiles"),
+            (sum(
+                range[FileChangeRangeRecord.Columns.lineEnd]
+                    - range[FileChangeRangeRecord.Columns.lineStart] + 1
+            ) ?? 0)
+            .forKey("totalLineSpan"),
+        ]
+    }
+
+    private static func base() -> QueryInterfaceRequest<Self> {
+        let range = TableAlias<FileChangeRangeRecord>()
+        return
+            FileChangeRecord
+            .joining(optional: FileChangeRecord.ranges.aliased(range))
+            .select(Self.tally(range))
+            .asRequest(of: Self.self)
+    }
+}
+
+/// The same tally split per prompt, for one session's whole change history.
+///
+/// `promptUuid` is optional because a change captured outside any activation
+/// claim is attributed to no prompt, and that group is a legitimate row.
+struct PromptChangeRollup: FetchableRecord, Decodable {
+    var promptUuid: String?
+    var changeCount: Int
+    var distinctFiles: Int
+    var totalLineSpan: Int
+
+    static func request(sessionUuid: String) -> QueryInterfaceRequest<Self> {
+        let range = TableAlias<FileChangeRangeRecord>()
+        return
+            FileChangeRecord
+            .filter(FileChangeRecord.Columns.sessionUuid == sessionUuid)
+            .joining(optional: FileChangeRecord.ranges.aliased(range))
+            .select([FileChangeRecord.Columns.promptUuid.forKey("promptUuid")] + ChangeRollup.tally(range))
+            .group(FileChangeRecord.Columns.promptUuid)
+            .order(FileChangeRecord.Columns.promptUuid)
+            .asRequest(of: Self.self)
+    }
+}
+
 extension DerivableRequest {
     /// Keeps only the rows whose own `prompt_uuid` belongs to this session. A
     /// nil session reads every prompt's rows, the way the unscoped listing does.

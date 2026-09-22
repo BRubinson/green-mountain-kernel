@@ -25,13 +25,7 @@ struct ExplorationRepository: RepositoryContext {
         agentType: String,
         agentId: String?
     ) throws -> (uuid: String, created: Bool) {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                arguments: [promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
         }
         guard let agent = ExplorationAgentType(rawValue: agentType) else {
@@ -65,14 +59,13 @@ struct ExplorationRepository: RepositoryContext {
                 )
             }
         }
-        if let existing = try String.fetchOne(
-            db,
-            sql: """
-                SELECT uuid FROM exploration_summary WHERE prompt_uuid = ? AND agent_type = ?
-                ORDER BY created_at DESC, id DESC LIMIT 1
-                """,
-            arguments: [promptUuid, agentType]
-        ) {
+        if let existing =
+            try Self.newestFirst
+            .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
+            .filter(ExplorationSummaryRecord.Columns.agentType == agentType)
+            .select(ExplorationSummaryRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+        {
             return (existing, false)
         }
         let uuid = try core.insertBase(
@@ -227,13 +220,7 @@ struct ExplorationRepository: RepositoryContext {
     /// Refused once the synthesis row is complete — ranking a sealed set
     /// would shift the sub-100 contract; reopen the synthesis first.
     func rank(_ req: ExploreRankRequest) throws -> ExploreRankResponse {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
         if let synthesis = try fetchSummary(
@@ -347,32 +334,15 @@ struct ExplorationRepository: RepositoryContext {
     }
 
     func get(_ req: ExploreGetRequest) throws -> ExploreGetResponse {
-        guard
-            try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
-        var request =
-            ExplorationSummaryRecord
-            .all()
+        var request = Self.synthesisFirst
             .filter(ExplorationSummaryRecord.Columns.promptUuid == req.promptUuid)
         if let agentType = req.agentType {
             request = request.filter(ExplorationSummaryRecord.Columns.agentType == agentType)
         }
-        // synthesis first, then alphabetical — the seal row leads the render.
-        let summaries =
-            try request
-            .order(
-                ExplorationSummaryRecord.Columns.agentType
-                    != ExplorationAgentType.synthesis.rawValue,
-                ExplorationSummaryRecord.Columns.agentType
-            )
-            .fetchAll(db)
-            .map { $0.dto() }
+        let summaries = try request.fetchAll(db).map { $0.dto() }
         guard !summaries.isEmpty else {
             throw StoreError.summaryAbsent(
                 entity: "exploration",
@@ -449,37 +419,42 @@ struct ExplorationRepository: RepositoryContext {
         return summary
     }
 
-    func fetchSummary(uuid: String) throws -> ExplorationSummaryRow? {
-        try ExplorationSummaryRecord
-            .fetchAll(
-                db,
-                where: "uuid = ?",
-                arguments: [uuid]
+    /// exploration_summary newest first — the create-or-return and the
+    /// (prompt, agent type) point fetch both take the most recent row.
+    private static var newestFirst: QueryInterfaceRequest<ExplorationSummaryRecord> {
+        ExplorationSummaryRecord
+            .all()
+            .order(ExplorationSummaryRecord.Columns.createdAt.desc, Column("id").desc)
+    }
+
+    /// The render order: the synthesis seal row leads, then alphabetical.
+    private static var synthesisFirst: QueryInterfaceRequest<ExplorationSummaryRecord> {
+        ExplorationSummaryRecord
+            .all()
+            .order(
+                ExplorationSummaryRecord.Columns.agentType
+                    != ExplorationAgentType.synthesis.rawValue,
+                ExplorationSummaryRecord.Columns.agentType
             )
-            .first?
-            .dto()
+    }
+
+    func fetchSummary(uuid: String) throws -> ExplorationSummaryRow? {
+        try ExplorationSummaryRecord.all().withUuid(uuid).fetchOne(db)?.dto()
     }
 
     func fetchSummary(byPrompt promptUuid: String, agentType: String) throws -> ExplorationSummaryRow? {
-        try ExplorationSummaryRecord
-            .fetchAll(
-                db,
-                where: "prompt_uuid = ? AND agent_type = ?",
-                arguments: [promptUuid, agentType],
-                orderBy: "created_at DESC, id DESC"
-            )
-            .first?
+        try Self.newestFirst
+            .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
+            .filter(ExplorationSummaryRecord.Columns.agentType == agentType)
+            .fetchOne(db)?
             .dto()
     }
 
     func fetchSummaries(byPrompt promptUuid: String) throws -> [ExplorationSummaryRow] {
-        try ExplorationSummaryRecord.fetchAll(
-            db,
-            where: "prompt_uuid = ?",
-            arguments: [promptUuid],
-            orderBy: "agent_type != 'synthesis', agent_type"
-        )
-        .map { $0.dto() }
+        try Self.synthesisFirst
+            .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
+            .fetchAll(db)
+            .map { $0.dto() }
     }
 
     /// Explicit ordering: unranked (NULL) rows sort FIRST — the resume

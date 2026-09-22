@@ -17,11 +17,36 @@ struct FindingRankRepository: RepositoryContext {
     /// (cross-summary smuggling check) — one bad pair rejects everything.
     /// Rows update via updateBase at their in-transaction current versions
     /// (the clarifyFinalize prompt-version idiom).
-    func applyRankBatch(
-        table: String,
-        parentColumn: String,
+    func applyRankBatch<T: BaseRecordFields & Rankable & ParentKeyed>(
+        _ type: T.Type,
         summaryUuid: String,
         ratings: [FindingRating]
+    ) throws {
+        try validate(ratings) { findingUuid in
+            try type.all().forParent(summaryUuid).withUuid(findingUuid).fetchCount(db) > 0
+        } rejection: { findingUuid in
+            "finding \(findingUuid) does not belong to summary \(summaryUuid)"
+        }
+        for pair in ratings {
+            guard let version = try currentVersion(type, uuid: pair.findingUuid) else {
+                throw StoreError.notFound(entity: T.databaseTableName, key: pair.findingUuid)
+            }
+            try core.updateBase(
+                db,
+                table: T.databaseTableName,
+                uuid: pair.findingUuid,
+                expectedVersion: version,
+                set: ["finding_rating": pair.rating]
+            )
+        }
+    }
+
+    /// The shared pre-flight: non-empty, no duplicate uuid, every rating in
+    /// range, and each finding accepted by the caller's membership test.
+    private func validate(
+        _ ratings: [FindingRating],
+        belongs: (String) throws -> Bool,
+        rejection: (String) -> String
     ) throws {
         guard !ratings.isEmpty else {
             throw StoreError.badRequest(detail: "rank batch is empty")
@@ -36,45 +61,29 @@ struct FindingRankRepository: RepositoryContext {
                     detail: "finding_rating must be 0–999 (got \(pair.rating) for \(pair.findingUuid))"
                 )
             }
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM \(table) WHERE uuid = ? AND \(parentColumn) = ?",
-                    arguments: [pair.findingUuid, summaryUuid]
-                ) != nil
-            else {
-                throw StoreError.badRequest(
-                    detail: "finding \(pair.findingUuid) does not belong to summary \(summaryUuid)"
-                )
+            guard try belongs(pair.findingUuid) else {
+                throw StoreError.badRequest(detail: rejection(pair.findingUuid))
             }
-        }
-        for pair in ratings {
-            guard
-                let version = try Int64.fetchOne(
-                    db,
-                    sql: "SELECT version FROM \(table) WHERE uuid = ?",
-                    arguments: [pair.findingUuid]
-                )
-            else {
-                throw StoreError.notFound(entity: table, key: pair.findingUuid)
-            }
-            try core.updateBase(
-                db,
-                table: table,
-                uuid: pair.findingUuid,
-                expectedVersion: version,
-                set: ["finding_rating": pair.rating]
-            )
         }
     }
 
-    /// The unranked findings of one summary, for the caller's completion gate.
-    func unrankedCount<T: Rankable>(
+    /// The row's version as the transaction currently sees it, for updateBase.
+    private func currentVersion<T: BaseRecordFields & TableRecord>(
         _ type: T.Type,
-        parent: Column,
+        uuid: String
+    ) throws -> Int64? {
+        try type.all()
+            .withUuid(uuid)
+            .select(Column("version"), as: Int64.self)
+            .fetchOne(db)
+    }
+
+    /// The unranked findings of one summary, for the caller's completion gate.
+    func unrankedCount<T: Rankable & ParentKeyed>(
+        _ type: T.Type,
         summaryUuid: String
     ) throws -> Int {
-        try type.filter(parent == summaryUuid).unranked().fetchCount(db)
+        try type.all().forParent(summaryUuid).unranked().fetchCount(db)
     }
 
     // MARK: - Prompt-scoped (m0025 per-agent exploration summaries)
@@ -85,34 +94,14 @@ struct FindingRankRepository: RepositoryContext {
     /// Same all-or-nothing validation as applyRankBatch; the membership check
     /// walks the summary join instead of one parent uuid.
     func applyPromptRankBatch(promptUuid: String, ratings: [FindingRating]) throws {
-        guard !ratings.isEmpty else {
-            throw StoreError.badRequest(detail: "rank batch is empty")
-        }
-        var seen = Set<String>()
-        for pair in ratings {
-            guard seen.insert(pair.findingUuid).inserted else {
-                throw StoreError.badRequest(detail: "duplicate finding in rank batch: \(pair.findingUuid)")
-            }
-            guard (0...999).contains(pair.rating) else {
-                throw StoreError.badRequest(
-                    detail: "finding_rating must be 0–999 (got \(pair.rating) for \(pair.findingUuid))"
-                )
-            }
-            guard
-                try promptFindings(promptUuid).withUuid(pair.findingUuid).fetchCount(db) > 0
-            else {
-                throw StoreError.badRequest(
-                    detail: "finding \(pair.findingUuid) does not belong to prompt \(promptUuid)"
-                )
-            }
+        try validate(ratings) { findingUuid in
+            try promptFindings(promptUuid).withUuid(findingUuid).fetchCount(db) > 0
+        } rejection: { findingUuid in
+            "finding \(findingUuid) does not belong to prompt \(promptUuid)"
         }
         for pair in ratings {
             guard
-                let version = try Int64.fetchOne(
-                    db,
-                    sql: "SELECT version FROM exploration_finding WHERE uuid = ?",
-                    arguments: [pair.findingUuid]
-                )
+                let version = try currentVersion(ExplorationFindingRecord.self, uuid: pair.findingUuid)
             else {
                 throw StoreError.notFound(entity: "exploration_finding", key: pair.findingUuid)
             }

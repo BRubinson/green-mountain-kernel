@@ -383,7 +383,7 @@ struct DopeCogRepository: RepositoryContext {
         else {
             throw StoreError.notFound(entity: "dope_cog", key: cogUuid)
         }
-        return row.wireRow()
+        return row.dto()
     }
 
     private func owningCogUuid(elementUuid: String) throws -> String {
@@ -414,7 +414,7 @@ struct DopeCogRepository: RepositoryContext {
         else {
             throw StoreError.notFound(entity: "dope_cog_element", key: elementUuid)
         }
-        return row.wireRow()
+        return row.dto()
     }
 
     private func hydrateCog(_ composite: DopeCogWithElements) throws -> DopeCogNode {

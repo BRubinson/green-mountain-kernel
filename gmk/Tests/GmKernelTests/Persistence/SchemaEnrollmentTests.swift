@@ -15,12 +15,11 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
     /// or lost shows up as a decode failure naming its table. A record whose
     /// `databaseTableName` has drifted fails earlier, at `columns(in:)`.
     func testEveryRecordMatchesItsTable() throws {
-        let mirrors = SchemaEnrollment.records.filter { $0.kind == .mirror }
-        XCTAssertEqual(mirrors.count, 71, "a table mirror left the roster or never joined it")
+        XCTAssertEqual(SchemaEnrollment.records.count, 72, "a table mirror left the roster or never joined it")
 
         try env.readOnlyDatabase()
             .read { db in
-                for entry in mirrors {
+                for entry in SchemaEnrollment.records {
                     let columns = try db.columns(in: entry.table)
                     XCTAssertFalse(columns.isEmpty, entry.table)
                     XCTAssertNoThrow(try entry.decode(Self.fabricatedRow(for: columns)), entry.table)
@@ -33,7 +32,7 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
     /// GRDB traps rather than throwing when inference finds none or several, so
     /// this reads the `foreign_key_list` pragma and never prepares a request.
     func testEveryAssociationResolvesItsForeignKey() throws {
-        XCTAssertEqual(SchemaEnrollment.associations.count, 150, "an association left the roster or never joined it")
+        XCTAssertEqual(SchemaEnrollment.associations.count, 152, "an association left the roster or never joined it")
 
         try env.readOnlyDatabase()
             .read { db in
@@ -66,7 +65,7 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
 
     /// Every composite's canonical request compiles against the live schema.
     func testEveryCompositeRequestCompiles() throws {
-        XCTAssertEqual(SchemaEnrollment.composites.count, 45, "a composite left the roster or never joined it")
+        XCTAssertEqual(SchemaEnrollment.composites.count, 48, "a composite left the roster or never joined it")
 
         try env.readOnlyDatabase()
             .read { db in

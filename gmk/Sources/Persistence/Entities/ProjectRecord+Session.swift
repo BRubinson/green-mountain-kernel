@@ -58,4 +58,6 @@ extension SessionRecord {
     .forKey("activeKbites")
 
     static let briefings = hasMany(AgentBriefingRecord.self).forKey("briefings")
+
+    static let claudeBindings = hasMany(ClaudeSessionBindingRecord.self).forKey("claudeBindings")
 }

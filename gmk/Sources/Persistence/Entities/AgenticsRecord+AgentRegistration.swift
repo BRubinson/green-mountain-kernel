@@ -46,24 +46,3 @@ struct AgentRegistrationRecord: BaseRecordFields, TableRecord {
         case workflowPhase = "workflow_phase"
     }
 }
-
-extension AgentRegistrationRecord {
-    /// db → wire. Total and nullary: every field is already on the row.
-    func wireRow() -> AgentRegistrationRow {
-        AgentRegistrationRow(
-            uuid: uuid,
-            version: version,
-            agentId: agentId,
-            claudeSessionId: claudeSessionId,
-            claudeTurnId: claudeTurnId,
-            sessionUuid: sessionUuid,
-            promptUuid: promptUuid,
-            agentType: agentType,
-            role: role,
-            methodology: methodology,
-            workflowPhase: workflowPhase,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

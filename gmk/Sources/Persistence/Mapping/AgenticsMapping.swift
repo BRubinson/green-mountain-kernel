@@ -133,6 +133,69 @@ extension ArchitectureGeneralChangeRecord {
     }
 }
 
+extension ArchitectureSummaryRecord {
+    func dto() -> ArchitectureSummaryRow {
+        ArchitectureSummaryRow(
+            uuid: uuid,
+            version: version,
+            promptUuid: promptUuid,
+            body: body,
+            status: status,
+            decisionRationale: decisionRationale,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+extension ArchitectureOptionRecord {
+    func dto() -> ArchitectureOptionRow {
+        ArchitectureOptionRow(
+            uuid: uuid,
+            version: version,
+            architectureSummaryUuid: architectureSummaryUuid,
+            agentName: agentName,
+            agentId: agentId,
+            body: body,
+            status: status,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+extension ClarificationSummaryRecord {
+    func dto() -> ClarificationSummaryRow {
+        ClarificationSummaryRow(
+            uuid: uuid,
+            version: version,
+            promptUuid: promptUuid,
+            status: status,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+extension InternalClarificationNoteRecord {
+    /// weight narrows Int64 (the column type) to the wire's Int, explicitly
+    /// and non-truncating.
+    func dto() -> ClarificationNoteRow {
+        ClarificationNoteRow(
+            uuid: uuid,
+            version: version,
+            clarificationSummaryUuid: clarificationSummaryUuid,
+            body: body,
+            confusedEntityUuid: confusedEntityUuid,
+            confusedEntityType: confusedEntityType,
+            weight: weight.map(Int.init),
+            questionUuid: questionUuid,
+            agentId: agentId,
+            agentName: agentName
+        )
+    }
+}
+
 extension ExplorationSummaryRecord {
     func dto() -> ExplorationSummaryRow {
         ExplorationSummaryRow(
@@ -313,6 +376,56 @@ extension CarePackageExplorationRefRecord {
             filePath: filePath,
             sourceFindingUuid: sourceFindingUuid,
             seq: Int(seq)
+        )
+    }
+}
+
+extension AgentRegistrationRecord {
+    /// Total and nullary: every field is already on the row.
+    func dto() -> AgentRegistrationRow {
+        AgentRegistrationRow(
+            uuid: uuid,
+            version: version,
+            agentId: agentId,
+            claudeSessionId: claudeSessionId,
+            claudeTurnId: claudeTurnId,
+            sessionUuid: sessionUuid,
+            promptUuid: promptUuid,
+            agentType: agentType,
+            role: role,
+            methodology: methodology,
+            workflowPhase: workflowPhase,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+extension PromptArtifactRecord {
+    func dto() -> ArtifactRow {
+        ArtifactRow(
+            uuid: uuid,
+            promptUuid: promptUuid,
+            filePath: filePath,
+            note: note,
+            createdAt: createdAt
+        )
+    }
+}
+
+extension PromptQualifiedDiagramRecord {
+    func dto() -> PromptQualifiedDiagramRow {
+        PromptQualifiedDiagramRow(
+            uuid: uuid,
+            promptUuid: promptUuid,
+            diagramUuid: diagramUuid,
+            renderedPath: renderedPath,
+            renderedRevision: renderedRevision,
+            renderFingerprint: renderFingerprint,
+            qualification: qualification,
+            version: version,
+            createdAt: createdAt,
+            updatedAt: updatedAt
         )
     }
 }

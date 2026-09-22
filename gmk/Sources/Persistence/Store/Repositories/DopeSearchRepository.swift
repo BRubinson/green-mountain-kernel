@@ -80,7 +80,7 @@ struct DopeSearchRepository: RepositoryContext {
                     .filter(DopeScopeRecord.Columns.scopeType == baseTier.rawValue)
                     .filter(DopeScopeRecord.Columns.code == scope.code)
                     .fetchAll(db)
-                    .map { $0.wireRow() }
+                    .map { $0.dto() }
             }
             let baseTree = try baseRows.first.map { try dope.fetchDopeTree(scope: $0) }
             let merged = DopeOverlay.resolve(base: baseTree, overlay: overlayTree)
@@ -145,7 +145,7 @@ struct DopeSearchRepository: RepositoryContext {
                 )
                 .order(DopeScopeRecord.Columns.code)
                 .fetchAll(db)
-                .map { $0.wireRow() }
+                .map { $0.dto() }
         case .session:
             guard let sessionUuid = req.sessionUuid else {
                 throw StoreError.badRequest(detail: "--scope session requires --session-uuid")
@@ -158,7 +158,7 @@ struct DopeSearchRepository: RepositoryContext {
                 .filter(DopeScopeRecord.Columns.sessionUuid == sessionUuid)
                 .order(DopeScopeRecord.Columns.code)
                 .fetchAll(db)
-                .map { $0.wireRow() }
+                .map { $0.dto() }
         case .project:
             // A nil project_uuid means EVERY project, matching the precedent on
             // the same message: `DopeSearchRequest.sources` already reads nil as
@@ -168,7 +168,7 @@ struct DopeSearchRepository: RepositoryContext {
                     try DopeScopeRecord
                     .order(DopeScopeRecord.Columns.projectUuid, DopeScopeRecord.Columns.code)
                     .fetchAll(db)
-                    .map { $0.wireRow() }
+                    .map { $0.dto() }
             }
             guard try ProjectRecord.all().withUuid(projectUuid).fetchCount(db) > 0 else {
                 throw StoreError.notFound(entity: "project", key: projectUuid)
@@ -178,7 +178,7 @@ struct DopeSearchRepository: RepositoryContext {
                 .filter(DopeScopeRecord.Columns.projectUuid == projectUuid)
                 .order(DopeScopeRecord.Columns.code)
                 .fetchAll(db)
-                .map { $0.wireRow() }
+                .map { $0.dto() }
         }
     }
 

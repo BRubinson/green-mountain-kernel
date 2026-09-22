@@ -244,40 +244,14 @@ extension Store {
         }
         let expectedRevision = adopt ? scopeBefore.revision : incoming - 1
         return try boundary { db in
-            try db.execute(
-                sql: """
-                    UPDATE dope_scope
-                       SET revision = ?,
-                           name = ?,
-                           description = ?,
-                           version = version + (CASE WHEN name IS NOT ? OR description IS NOT ?
-                                                     THEN 1 ELSE 0 END),
-                           updated_at = ?
-                     WHERE uuid = ? AND revision = ?
-                    """,
-                arguments: [
-                    incoming,
-                    bundle.main.scope.name, bundle.main.scope.description,
-                    bundle.main.scope.name, bundle.main.scope.description,
-                    Store.isoNow(), req.scopeUuid, expectedRevision,
-                ]
-            )
-            if db.changesCount == 0 {
-                guard
-                    let actual = try Int64.fetchOne(
-                        db,
-                        sql: "SELECT revision FROM dope_scope WHERE uuid = ?",
-                        arguments: [req.scopeUuid]
-                    )
-                else {
-                    throw StoreError.notFound(entity: "dope_scope", key: req.scopeUuid)
-                }
-                throw StoreError.revisionConflict(
+            try DopeRepository(db: db, core: self.core)
+                .applyIngestedScope(
                     scopeUuid: req.scopeUuid,
-                    expected: expectedRevision,
-                    actual: actual
+                    incoming: incoming,
+                    expectedRevision: expectedRevision,
+                    name: bundle.main.scope.name,
+                    description: bundle.main.scope.description
                 )
-            }
 
             try self.wipeDopeTree(db, scopeUuid: req.scopeUuid)
             let counts = try self.insertDopeTree(

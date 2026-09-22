@@ -13,10 +13,7 @@ struct SessionRepository: RepositoryContext {
             throw StoreError.notFound(entity: "session", key: req.sessionUuid)
         }
         let prompts = try fetchPromptStubs(sessionUuid: req.sessionUuid)
-        let changeSummary = try changeSummary(
-            where: "session_uuid = ?",
-            arguments: [req.sessionUuid]
-        )
+        let changeSummary = try changeSummary(sessionUuid: req.sessionUuid)
         let promptChanges = try promptChangeSummaries(sessionUuid: req.sessionUuid)
         return SessionGetResponse(
             session: session,
@@ -48,11 +45,12 @@ struct SessionRepository: RepositoryContext {
                 )
             }
             guard
-                let owner = try String.fetchOne(
-                    db,
-                    sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
-                    arguments: [activePromptUuid]
-                )
+                let owner =
+                    try PromptRecord
+                    .all()
+                    .withUuid(activePromptUuid)
+                    .select(PromptRecord.Columns.sessionUuid, as: String.self)
+                    .fetchOne(db)
             else {
                 throw StoreError.notFound(entity: "prompt", key: activePromptUuid)
             }
@@ -144,27 +142,24 @@ struct SessionRepository: RepositoryContext {
     /// pid + start time, so liveness is checkable server-side; unknown key
     /// shapes are left alone (they can't lie about liveness we can't check).
     func evictDeadActivations(sessionUuid: String) throws {
-        let rows = try Row.fetchAll(
-            db,
-            sql: "SELECT uuid, client_key FROM prompt_activation WHERE session_uuid = ?",
-            arguments: [sessionUuid]
-        )
-        for row in rows where !Store.clientKeyLooksAlive(row["client_key"]) {
+        let claims =
+            try PromptActivationRecord
+            .filter(PromptActivationRecord.Columns.sessionUuid == sessionUuid)
+            .fetchAll(db)
+        for claim in claims where !Store.clientKeyLooksAlive(claim.clientKey) {
             try db.execute(
                 sql: "DELETE FROM prompt_activation WHERE uuid = ?",
-                arguments: [row["uuid"] as String]
+                arguments: [claim.uuid]
             )
         }
     }
 
     func fetchActivations(sessionUuid: String) throws -> [PromptActivationRow] {
-        try PromptActivationRecord.fetchAll(
-            db,
-            where: "session_uuid = ?",
-            arguments: [sessionUuid],
-            orderBy: "created_at"
-        )
-        .map { $0.dto() }
+        try PromptActivationRecord
+            .filter(PromptActivationRecord.Columns.sessionUuid == sessionUuid)
+            .orderedByCreatedAt()
+            .fetchAll(db)
+            .map { $0.dto() }
     }
 
     /// The attribution ladder shared by file-change auto-attribution and the
@@ -257,58 +252,21 @@ struct SessionRepository: RepositoryContext {
             .reduce(into: [:]) { $0[$1.summary.promptUuid] = $1.dto() }
     }
 
-    /// One grouped aggregation: file_change row count, distinct files touched,
-    /// and total line span from the joined ranges.
-    func changeSummary(
-        where condition: String,
-        arguments: StatementArguments
-    ) throws -> ChangeSummary {
-        let row = try Row.fetchOne(
-            db,
-            sql: """
-                SELECT
-                    COUNT(DISTINCT fc.uuid) AS change_count,
-                    COUNT(DISTINCT fc.session_file_uuid) AS distinct_files,
-                    COALESCE(SUM(r.line_end - r.line_start + 1), 0) AS total_line_span
-                FROM file_change fc
-                LEFT JOIN file_change_range r ON r.file_change_uuid = fc.uuid
-                WHERE fc.\(condition)
-                """,
-            arguments: arguments
-        )
-        return ChangeSummary(
-            changeCount: row?["change_count"] ?? 0,
-            distinctFiles: row?["distinct_files"] ?? 0,
-            totalLineSpan: row?["total_line_span"] ?? 0
-        )
+    /// One session's whole change tally, ranges folded in.
+    func changeSummary(sessionUuid: String) throws -> ChangeSummary {
+        try ChangeRollup.request(sessionUuid: sessionUuid).fetchOne(db)?.dto() ?? Self.noChanges
+    }
+
+    /// One prompt's change tally, the same shape narrowed to its attribution.
+    func changeSummary(promptUuid: String) throws -> ChangeSummary {
+        try ChangeRollup.request(promptUuid: promptUuid).fetchOne(db)?.dto() ?? Self.noChanges
     }
 
     func promptChangeSummaries(sessionUuid: String) throws -> [PromptChangeSummary] {
-        try Row.fetchAll(
-            db,
-            sql: """
-                SELECT
-                    fc.prompt_uuid AS prompt_uuid,
-                    COUNT(DISTINCT fc.uuid) AS change_count,
-                    COUNT(DISTINCT fc.session_file_uuid) AS distinct_files,
-                    COALESCE(SUM(r.line_end - r.line_start + 1), 0) AS total_line_span
-                FROM file_change fc
-                LEFT JOIN file_change_range r ON r.file_change_uuid = fc.uuid
-                WHERE fc.session_uuid = ?
-                GROUP BY fc.prompt_uuid
-                ORDER BY fc.prompt_uuid
-                """,
-            arguments: [sessionUuid]
-        )
-        .map { row in
-            PromptChangeSummary(
-                promptUuid: row["prompt_uuid"],
-                summary: ChangeSummary(
-                    changeCount: row["change_count"] ?? 0,
-                    distinctFiles: row["distinct_files"] ?? 0,
-                    totalLineSpan: row["total_line_span"] ?? 0
-                )
-            )
-        }
+        try PromptChangeRollup.request(sessionUuid: sessionUuid)
+            .fetchAll(db)
+            .map { $0.dto() }
     }
+
+    private static let noChanges = ChangeSummary(changeCount: 0, distinctFiles: 0, totalLineSpan: 0)
 }

@@ -18,13 +18,7 @@ struct FileChangeRepository: RepositoryContext {
         // A dangling prompt reference must be a typed NOT_FOUND, not the
         // opaque FK DB_ERROR the insert below would produce.
         if let promptUuid = req.promptUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                    arguments: [promptUuid]
-                ) != nil
-            else {
+            guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
                 throw StoreError.notFound(entity: "prompt", key: promptUuid)
             }
         }
@@ -47,18 +41,7 @@ struct FileChangeRepository: RepositoryContext {
         // It runs before the ensure chain on purpose: ensureProject and
         // ensureInstance CREATE rows, so after them every repo looks booted and
         // the loud/silent distinction below collapses.
-        var boundSessionUuid: String?
-        if let claudeSessionId = req.claudeSessionId {
-            boundSessionUuid = try claudeSessionBinding.resolveSession(
-                claudeSessionId: claudeSessionId
-            )
-            guard boundSessionUuid != nil else {
-                throw StoreError.hookUnbound(
-                    claudeSessionId: claudeSessionId,
-                    booted: try bootedInstanceUuid(req) != nil
-                )
-            }
-        }
+        let boundSessionUuid = try resolveBinding(req)
         let context = ContextRepository(db: db, core: core)
         let (projectUuid, _) = try context.ensureProject(req.project)
         let (instanceUuid, _) = try context.ensureInstance(req.instance, projectUuid: projectUuid)
@@ -108,20 +91,7 @@ struct FileChangeRepository: RepositoryContext {
         // machine's doctrine — last_served_phase is observability only and
         // stales between bot-next calls): a handful of indexed point
         // queries in the same transaction.
-        var workflowPhase: String?
-        if let promptUuid = attributedPromptUuid {
-            let workflows = BotWorkflowRepository(db: db, core: core)
-            if let workflow = try workflows.fetchActive(promptUuid: promptUuid),
-                let variant = BotVariant(rawValue: workflow.variant)
-            {
-                workflowPhase =
-                    try workflows.derivePhase(
-                        workflow: workflow,
-                        variant: variant
-                    )
-                    .0.rawValue
-            }
-        }
+        let workflowPhase = try attributedPromptUuid.flatMap(derivedWorkflowPhase(promptUuid:))
         // The FK is satisfied by CONSTRUCTION rather than by precondition: an
         // agent whose registration is missing gets one invented from this
         // payload (loudly), so no agent's change is ever dropped for want of
@@ -188,22 +158,7 @@ struct FileChangeRepository: RepositoryContext {
         // The size budget on append-only history: a regenerated file can
         // produce thousands of hunks and megabytes of body, and nothing
         // trims file_change_range afterwards.
-        var rangeUuids: [String] = []
-        for range in req.ranges.prefix(FileChangeLimits.maxRangesPerChange) {
-            let rangeUuid = try core.insertBase(
-                db,
-                table: "file_change_range",
-                extra: [
-                    "file_change_uuid": fileChangeUuid,
-                    "line_start": range.lineStart,
-                    "line_end": range.lineEnd,
-                    "changed_content": range.changedContent.map {
-                        String($0.prefix(FileChangeLimits.maxChangedContentCharacters))
-                    },
-                ]
-            )
-            rangeUuids.append(rangeUuid)
-        }
+        let rangeUuids = try insertRanges(fileChangeUuid: fileChangeUuid, req.ranges)
 
         // Item 4: session_uuid in the payload lets GMVibes route the
         // event to one session instead of invalidating all of them.
@@ -228,6 +183,52 @@ struct FileChangeRepository: RepositoryContext {
         )
     }
 
+    /// The Claude conversation's pinned session, or a typed refusal. nil when
+    /// the payload names no conversation at all.
+    private func resolveBinding(_ req: FileChangeAdd) throws -> String? {
+        guard let claudeSessionId = req.claudeSessionId else { return nil }
+        guard
+            let bound = try claudeSessionBinding.resolveSession(claudeSessionId: claudeSessionId)
+        else {
+            throw StoreError.hookUnbound(
+                claudeSessionId: claudeSessionId,
+                booted: try bootedInstanceUuid(req) != nil
+            )
+        }
+        return bound
+    }
+
+    /// The phase the prompt's active workflow derives right now, or nil when
+    /// no active workflow answers.
+    private func derivedWorkflowPhase(promptUuid: String) throws -> String? {
+        let workflows = BotWorkflowRepository(db: db, core: core)
+        guard let workflow = try workflows.fetchActive(promptUuid: promptUuid),
+            let variant = BotVariant(rawValue: workflow.variant)
+        else { return nil }
+        return try workflows.derivePhase(workflow: workflow, variant: variant).0.rawValue
+    }
+
+    /// The size budget on append-only history: a regenerated file can produce
+    /// thousands of hunks and megabytes of body, and nothing trims
+    /// file_change_range afterwards.
+    private func insertRanges(fileChangeUuid: String, _ ranges: [ChangeRange]) throws -> [String] {
+        try ranges.prefix(FileChangeLimits.maxRangesPerChange)
+            .map { range in
+                try core.insertBase(
+                    db,
+                    table: "file_change_range",
+                    extra: [
+                        "file_change_uuid": fileChangeUuid,
+                        "line_start": range.lineStart,
+                        "line_end": range.lineEnd,
+                        "changed_content": range.changedContent.map {
+                            String($0.prefix(FileChangeLimits.maxChangedContentCharacters))
+                        },
+                    ]
+                )
+            }
+    }
+
     // MARK: - Attribution
 
     /// The prompt a change belongs to, resolved from ONE session and nothing
@@ -239,11 +240,13 @@ struct FileChangeRepository: RepositoryContext {
     /// changes land in the new branch's session attributed to the old branch's
     /// prompt, with no signal.
     func resolveAttributedPrompt(sessionUuid: String) throws -> String? {
-        let workflowPrompts = try String.fetchAll(
-            db,
-            sql: "SELECT prompt_uuid FROM bot_workflow WHERE session_uuid = ? AND status = 'active'",
-            arguments: [sessionUuid]
-        )
+        let workflowPrompts =
+            try BotWorkflowRecord
+            .all()
+            .filter(BotWorkflowRecord.Columns.sessionUuid == sessionUuid)
+            .filter(BotWorkflowRecord.Columns.status == "active")
+            .select(BotWorkflowRecord.Columns.promptUuid, as: String.self)
+            .fetchAll(db)
         if workflowPrompts.count == 1 { return workflowPrompts[0] }
         // Fallback when no single active workflow answers: the session's one
         // RUNNING prompt. `initiated` covers everything between start and
@@ -252,11 +255,13 @@ struct FileChangeRepository: RepositoryContext {
         // two started prompts would file changes against the wrong one in an
         // append-only db. The active bot_workflow row above is the precise path
         // and normally answers.
-        let running = try String.fetchAll(
-            db,
-            sql: "SELECT uuid FROM prompt WHERE session_uuid = ? AND status = ?",
-            arguments: [sessionUuid, PromptStatus.initiated.rawValue]
-        )
+        let running =
+            try PromptRecord
+            .all()
+            .filter(PromptRecord.Columns.sessionUuid == sessionUuid)
+            .filter(PromptRecord.Columns.status == PromptStatus.initiated.rawValue)
+            .select(PromptRecord.Columns.uuid, as: String.self)
+            .fetchAll(db)
         if running.count == 1 { return running[0] }
         return nil
     }
@@ -294,17 +299,20 @@ struct FileChangeRepository: RepositoryContext {
     /// the event exists for.
     private func bootedInstanceUuid(_ req: FileChangeAdd) throws -> String? {
         guard
-            let projectUuid = try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM project WHERE code = ?",
-                arguments: [req.project.code]
-            )
+            let projectUuid =
+                try ProjectRecord
+                .all()
+                .filter(ProjectRecord.Columns.code == req.project.code)
+                .select(ProjectRecord.Columns.uuid, as: String.self)
+                .fetchOne(db)
         else { return nil }
-        return try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM instance WHERE project_uuid = ? AND name = ?",
-            arguments: [projectUuid, req.instance.name]
-        )
+        return
+            try InstanceRecord
+            .all()
+            .filter(InstanceRecord.Columns.projectUuid == projectUuid)
+            .filter(InstanceRecord.Columns.name == req.instance.name)
+            .select(InstanceRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
     }
 
     /// The existing row for a (tool call, file) pair, as the response a fresh
@@ -325,11 +333,13 @@ struct FileChangeRepository: RepositoryContext {
                 .fetchOne(db)
         else { return nil }
         let fileChangeUuid = pair.fileChange.uuid
-        let rangeUuids = try String.fetchAll(
-            db,
-            sql: "SELECT uuid FROM file_change_range WHERE file_change_uuid = ? ORDER BY id",
-            arguments: [fileChangeUuid]
-        )
+        let rangeUuids =
+            try FileChangeRangeRecord
+            .all()
+            .filter(FileChangeRangeRecord.Columns.fileChangeUuid == fileChangeUuid)
+            .order(Column("id"))
+            .select(FileChangeRangeRecord.Columns.uuid, as: String.self)
+            .fetchAll(db)
         return FileChangeAddResponse(
             sessionFileUuid: pair.sessionFile.uuid,
             fileChangeUuid: fileChangeUuid,
@@ -344,13 +354,7 @@ struct FileChangeRepository: RepositoryContext {
     func list(_ req: FileChangeListRequest) throws -> FileChangeListResponse {
         var request = FileChangeWithRanges.request(relativePath: req.relativePath)
         if let sessionUuid = req.sessionUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM session WHERE uuid = ?",
-                    arguments: [sessionUuid]
-                ) != nil
-            else {
+            guard try SessionRecord.exists(db, key: ["uuid": sessionUuid]) else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
             }
             request = request.filter(FileChangeRecord.Columns.sessionUuid == sessionUuid)
@@ -379,11 +383,14 @@ struct FileChangeRepository: RepositoryContext {
     ) throws -> String {
         // Deleted files stay as rows marked inactive; anything else re-activates.
         let active = changeKind == .delete ? 0 : 1
-        if let existing = try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM session_file WHERE session_uuid = ? AND relative_path = ?",
-            arguments: [sessionUuid, relativePath]
-        ) {
+        if let existing =
+            try SessionFileRecord
+            .all()
+            .filter(SessionFileRecord.Columns.sessionUuid == sessionUuid)
+            .filter(SessionFileRecord.Columns.relativePath == relativePath)
+            .select(SessionFileRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+        {
             try db.execute(
                 sql: "UPDATE session_file SET active = ?, version = version + 1, updated_at = ? WHERE uuid = ?",
                 arguments: [active, Store.isoNow(), existing]

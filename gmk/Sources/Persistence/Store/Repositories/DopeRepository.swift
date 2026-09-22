@@ -23,7 +23,7 @@ struct DopeRepository: RepositoryContext {
     // MARK: - Row + scope helpers
 
     func fetchDopeScope(uuid: String) throws -> DopeScopeRow? {
-        try DopeScopeRecord.all().withUuid(uuid).fetchOne(db).map { $0.wireRow() }
+        try DopeScopeRecord.all().withUuid(uuid).fetchOne(db).map { $0.dto() }
     }
 
     /// Advance the whole-tree content counter WITHOUT bumping the scope row's
@@ -125,7 +125,7 @@ struct DopeRepository: RepositoryContext {
                 key: nodeUuid
             )
         }
-        return row.wireRow()
+        return row.dto()
     }
 
     /// The scope → persistence hop every owner walk starts from, unordered
@@ -307,7 +307,7 @@ struct DopeRepository: RepositoryContext {
             existing = existing.filter(DopeScopeRecord.Columns.promptUuid == promptUuid)
         }
         if let row = try existing.fetchOne(db) {
-            return DopeScopeResponse(scope: row.wireRow(), created: false)
+            return DopeScopeResponse(scope: row.dto(), created: false)
         }
 
         // The chain-non-null tier ladder: a session-tier scope fills its
@@ -355,7 +355,7 @@ struct DopeRepository: RepositoryContext {
                     detail: "no SESSION_INSTANCE scope with code '\(req.code)' to clone from"
                 )
             }
-            _ = try copyDopeTree(from: baseRow.wireRow(), into: uuid)
+            _ = try copyDopeTree(from: baseRow.dto(), into: uuid)
         }
 
         guard let scope = try fetchDopeScope(uuid: uuid) else {
@@ -416,7 +416,7 @@ struct DopeRepository: RepositoryContext {
             try request
             .order(DopeScopeRecord.Columns.code)
             .fetchAll(db)
-            .map { $0.wireRow() }
+            .map { $0.dto() }
     }
 
     /// Project-tier scope candidates.
@@ -443,7 +443,7 @@ struct DopeRepository: RepositoryContext {
             try request
             .order(DopeScopeRecord.Columns.code)
             .fetchAll(db)
-            .map { $0.wireRow() }
+            .map { $0.dto() }
     }
 
     // MARK: - List (v12; picker enumeration — never a PROMPT/SESSION_INSTANCE union)
@@ -612,7 +612,7 @@ struct DopeRepository: RepositoryContext {
                 .filter(DopeScopeRecord.Columns.code == scope.code)
                 .order(DopeScopeRecord.Columns.code)
                 .fetchAll(db)
-                .map { $0.wireRow() }
+                .map { $0.dto() }
         }
         return try dopeScopeCandidates(
             sessionUuid: try scope.requireSessionUuid(),
@@ -1169,6 +1169,54 @@ struct DopeRepository: RepositoryContext {
             properties: counts.properties,
             enums: counts.enums,
             options: counts.options
+        )
+    }
+
+    /// Ingest's revision gate and scope-field adoption, in one guarded UPDATE.
+    ///
+    /// The WHERE carries `expectedRevision`, so a concurrent writer loses the
+    /// race cleanly; the CASE bumps `version` only when name or description
+    /// actually move, leaving a pure tree ingest's optimistic lock alone.
+    func applyIngestedScope(
+        scopeUuid: String,
+        incoming: Int64,
+        expectedRevision: Int64,
+        name: String,
+        description: String
+    ) throws {
+        try db.execute(
+            sql: """
+                UPDATE dope_scope
+                   SET revision = ?,
+                       name = ?,
+                       description = ?,
+                       version = version + (CASE WHEN name IS NOT ? OR description IS NOT ?
+                                                 THEN 1 ELSE 0 END),
+                       updated_at = ?
+                 WHERE uuid = ? AND revision = ?
+                """,
+            arguments: [
+                incoming,
+                name, description,
+                name, description,
+                Store.isoNow(), scopeUuid, expectedRevision,
+            ]
+        )
+        guard db.changesCount == 0 else { return }
+        guard
+            let actual =
+                try DopeScopeRecord
+                .all()
+                .withUuid(scopeUuid)
+                .select(DopeScopeRecord.Columns.revision, as: Int64.self)
+                .fetchOne(db)
+        else {
+            throw StoreError.notFound(entity: "dope_scope", key: scopeUuid)
+        }
+        throw StoreError.revisionConflict(
+            scopeUuid: scopeUuid,
+            expected: expectedRevision,
+            actual: actual
         )
     }
 

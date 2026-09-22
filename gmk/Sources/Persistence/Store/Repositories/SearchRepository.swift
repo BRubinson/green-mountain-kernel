@@ -9,13 +9,7 @@ struct SearchRepository: RepositoryContext {
 
     func search(_ req: SearchRequest, pattern: FTS5Pattern) throws -> SearchResponse {
         if let sessionUuid = req.sessionUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM session WHERE uuid = ?",
-                    arguments: [sessionUuid]
-                ) != nil
-            else {
+            guard try SessionRecord.exists(db, key: ["uuid": sessionUuid]) else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
             }
         }

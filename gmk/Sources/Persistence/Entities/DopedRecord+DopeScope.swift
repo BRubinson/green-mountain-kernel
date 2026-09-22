@@ -63,30 +63,3 @@ extension DopeScopeRecord {
         .forKey("cogs")
     static let provenance = hasMany(DopeElementProvenanceRecord.self).forKey("provenance")
 }
-
-extension DopeScopeRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    ///
-    /// Every parameter is passed explicitly, including the three the wire
-    /// init defaults (projectUuid, instanceUuid, deletedOn). Omitting
-    /// `deletedOn` here would COMPILE and would quietly un-delete every
-    /// tombstoned dope node for all 14 readers of this row.
-    func wireRow() -> DopeScopeRow {
-        DopeScopeRow(
-            uuid: uuid,
-            version: version,
-            projectUuid: projectUuid,
-            instanceUuid: instanceUuid,
-            sessionUuid: sessionUuid,
-            promptUuid: promptUuid,
-            scopeType: scopeType,
-            code: code,
-            name: name,
-            description: description,
-            revision: revision,
-            deletedOn: deletedOn,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

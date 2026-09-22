@@ -41,19 +41,3 @@ extension ArchitectureSummaryRecord {
         .order(Column("seq"))
         .forKey("generalChanges")
 }
-
-extension ArchitectureSummaryRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    func wireRow() -> ArchitectureSummaryRow {
-        ArchitectureSummaryRow(
-            uuid: uuid,
-            version: version,
-            promptUuid: promptUuid,
-            body: body,
-            status: status,
-            decisionRationale: decisionRationale,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

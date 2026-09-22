@@ -29,14 +29,13 @@ struct PromptDiagramRepository: RepositoryContext {
         // UNIQUE(prompt_uuid, diagram_uuid): re-qualifying REPLACES the
         // reading in place, keeping the row uuid stable so anything
         // pointing at it still points at it.
-        if let existing = try String.fetchOne(
-            db,
-            sql: """
-                SELECT uuid FROM prompt_qualified_diagram
-                WHERE prompt_uuid = ? AND diagram_uuid = ?
-                """,
-            arguments: [req.promptUuid, req.diagramUuid]
-        ) {
+        if let existing =
+            try PromptQualifiedDiagramRecord
+            .filter(PromptQualifiedDiagramRecord.Columns.promptUuid == req.promptUuid)
+            .filter(PromptQualifiedDiagramRecord.Columns.diagramUuid == req.diagramUuid)
+            .select(PromptQualifiedDiagramRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+        {
             try db.execute(
                 sql: """
                     UPDATE prompt_qualified_diagram
@@ -102,13 +101,7 @@ struct PromptDiagramRepository: RepositoryContext {
     }
 
     func list(_ req: PromptDiagramListRequest) throws -> PromptDiagramListResponse {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
         // Empty is a normal answer here (the prompt has attached no
@@ -127,56 +120,37 @@ struct PromptDiagramRepository: RepositoryContext {
         promptUuid: String,
         diagramUuid: String?
     ) throws {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                arguments: [promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
         }
         guard let diagramUuid else { return }
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM diagram WHERE uuid = ?",
-                arguments: [diagramUuid]
-            ) != nil
-        else {
+        guard try DiagramRecord.exists(db, key: ["uuid": diagramUuid]) else {
             throw StoreError.notFound(entity: "diagram", key: diagramUuid)
         }
     }
 
     func fetchRow(uuid: String) throws -> PromptQualifiedDiagramRow? {
-        try PromptQualifiedDiagramRecord.fetchOne(
-            db,
-            sql: "\(Self.qualifiedDiagramSelect) WHERE uuid = ?",
-            arguments: [uuid]
-        )?
-        .wireRow()
+        try PromptQualifiedDiagramRecord.all().withUuid(uuid).fetchOne(db)?.dto()
     }
 
     func fetchRows(
         promptUuid: String,
         diagramUuid: String?
     ) throws -> [PromptQualifiedDiagramRow] {
-        var sql = "\(Self.qualifiedDiagramSelect) WHERE prompt_uuid = ?"
-        var arguments: [any DatabaseValueConvertible] = [promptUuid]
+        var request =
+            PromptQualifiedDiagramRecord
+            .filter(PromptQualifiedDiagramRecord.Columns.promptUuid == promptUuid)
         if let diagramUuid {
-            sql += " AND diagram_uuid = ?"
-            arguments.append(diagramUuid)
+            request = request.filter(
+                PromptQualifiedDiagramRecord.Columns.diagramUuid == diagramUuid
+            )
         }
-        sql += " ORDER BY created_at, id"
+        // `id` orders the tie-break: it is a column even though no Record
+        // exposes it as a property.
         return
-            try PromptQualifiedDiagramRecord
-            .fetchAll(db, sql: sql, arguments: StatementArguments(arguments))
-            .map { $0.wireRow() }
+            try request
+            .order(PromptQualifiedDiagramRecord.Columns.createdAt, Column("id"))
+            .fetchAll(db)
+            .map { $0.dto() }
     }
-
-    private static let qualifiedDiagramSelect = """
-        SELECT uuid, prompt_uuid, diagram_uuid, rendered_path, rendered_revision,
-               render_fingerprint, qualification, version, created_at, updated_at, id
-        FROM prompt_qualified_diagram
-        """
 }

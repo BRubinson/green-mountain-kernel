@@ -21,23 +21,15 @@ struct ClarificationRepository: RepositoryContext {
     /// an agent does deliberately, never a side effect of moving a status.
     @discardableResult
     func ensureSummary(promptUuid: String) throws -> (uuid: String, created: Bool) {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                arguments: [promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
         }
-        if let existing = try String.fetchOne(
-            db,
-            sql: """
-                SELECT uuid FROM clarification_summary WHERE prompt_uuid = ?
-                ORDER BY created_at DESC, id DESC LIMIT 1
-                """,
-            arguments: [promptUuid]
-        ) {
+        if let existing =
+            try Self.newestFirst
+            .filter(ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
+            .select(ClarificationSummaryRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+        {
             return (existing, false)
         }
         let uuid = try core.insertBase(
@@ -166,13 +158,7 @@ struct ClarificationRepository: RepositoryContext {
             }
         }
         if let questionUuid = req.questionUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM user_clarification_question WHERE uuid = ?",
-                    arguments: [questionUuid]
-                ) != nil
-            else {
+            guard try UserClarificationQuestionRecord.exists(db, key: ["uuid": questionUuid]) else {
                 throw StoreError.notFound(entity: "user_clarification_question", key: questionUuid)
             }
         }
@@ -242,11 +228,11 @@ struct ClarificationRepository: RepositoryContext {
                 )
             }
             let valid = try Set(
-                String.fetchAll(
-                    db,
-                    sql: "SELECT uuid FROM user_clarification_option WHERE question_uuid = ?",
-                    arguments: [req.questionUuid]
-                )
+                UserClarificationOptionRecord
+                    .all()
+                    .filter(UserClarificationOptionRecord.Columns.questionUuid == req.questionUuid)
+                    .select(UserClarificationOptionRecord.Columns.uuid, as: String.self)
+                    .fetchAll(db)
             )
             for optionUuid in selections where !valid.contains(optionUuid) {
                 throw StoreError.badRequest(
@@ -309,14 +295,16 @@ struct ClarificationRepository: RepositoryContext {
             )
         }
         let openCount =
-            try Int.fetchOne(
-                db,
-                sql: """
-                    SELECT COUNT(*) FROM user_clarification_question
-                    WHERE clarification_summary_uuid = ? AND status = 'open'
-                    """,
-                arguments: [req.summaryUuid]
-            ) ?? 0
+            try UserClarificationQuestionRecord
+            .all()
+            .filter(
+                UserClarificationQuestionRecord.Columns.clarificationSummaryUuid == req.summaryUuid
+            )
+            .filter(
+                UserClarificationQuestionRecord.Columns.status
+                    == ClarificationRowStatus.open.rawValue
+            )
+            .fetchCount(db)
         guard openCount == 0 else {
             throw StoreError.invalidEntityTransition(
                 entity: "clarification",
@@ -329,11 +317,9 @@ struct ClarificationRepository: RepositoryContext {
         // ready one at finalize — the clarified intent lives only there, and
         // sailing past finalize without it strands the architects.
         let package = try fetchPackage(bySummary: req.summaryUuid)
-        if let variantRaw = try String.fetchOne(
-            db,
-            sql: "SELECT variant FROM bot_workflow WHERE prompt_uuid = ? AND status = 'active'",
-            arguments: [summary.promptUuid]
-        ),
+        let workflow = try BotWorkflowRepository(db: db, core: core)
+            .fetchActive(promptUuid: summary.promptUuid)
+        if let variantRaw = workflow?.variant,
             let variant = BotVariant(rawValue: variantRaw),
             WorkflowSpec.phases(for: variant).contains(.carePackage)
         {
@@ -378,13 +364,7 @@ struct ClarificationRepository: RepositoryContext {
     }
 
     func get(_ req: ClarifyGetRequest) throws -> ClarifyGetResponse {
-        guard
-            try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
         guard let summary = try fetchSummary(byPrompt: req.promptUuid) else {
@@ -538,11 +518,12 @@ struct ClarificationRepository: RepositoryContext {
             }
             // Denormalize the brief exactly like briefing complete does.
             guard
-                let brief = try Row.fetchOne(
-                    db,
-                    sql: "SELECT resource_file_summary FROM kbite_resource_file WHERE uuid = ?",
-                    arguments: [fileUuid]
-                )
+                let brief =
+                    try KbiteResourceFileRecord
+                    .all()
+                    .withUuid(fileUuid)
+                    .select(KbiteResourceFileRecord.Columns.resourceFileSummary, as: String.self)
+                    .fetchOne(db)
             else {
                 throw StoreError.notFound(entity: "kbite_resource_file", key: fileUuid)
             }
@@ -552,7 +533,7 @@ struct ClarificationRepository: RepositoryContext {
                 extra: [
                     "care_package_uuid": req.packageUuid,
                     "kbite_resource_file_uuid": fileUuid,
-                    "brief": brief["resource_file_summary"] as String?,
+                    "brief": brief,
                     "seq": try nextRefSeq(in: CarePackageKbiteRefRecord.self, packageUuid: req.packageUuid),
                 ]
             )
@@ -566,13 +547,7 @@ struct ClarificationRepository: RepositoryContext {
                 )
             }
             if let source = req.sourceFindingUuid {
-                guard
-                    try Row.fetchOne(
-                        db,
-                        sql: "SELECT 1 FROM exploration_finding WHERE uuid = ?",
-                        arguments: [source]
-                    ) != nil
-                else {
+                guard try ExplorationFindingRecord.exists(db, key: ["uuid": source]) else {
                     throw StoreError.notFound(entity: "exploration_finding", key: source)
                 }
             }
@@ -633,13 +608,7 @@ struct ClarificationRepository: RepositoryContext {
                 key: package.clarificationSummaryUuid
             )
         }
-        guard
-            let sessionUuid = try String.fetchOne(
-                db,
-                sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
-                arguments: [summary.promptUuid]
-            )
-        else {
+        guard let sessionUuid = try owningSession(promptUuid: summary.promptUuid) else {
             throw StoreError.notFound(entity: "prompt", key: summary.promptUuid)
         }
         let scope =
@@ -677,13 +646,7 @@ struct ClarificationRepository: RepositoryContext {
     }
 
     func packageGet(_ req: CarePackageGetRequest) throws -> CarePackageResponse {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
         guard let summary = try fetchSummary(byPrompt: req.promptUuid) else {
@@ -784,36 +747,38 @@ struct ClarificationRepository: RepositoryContext {
     /// Item 3 helper shared by the clarify/arch mutation paths: prompt-scoped
     /// writes advance session recency without bumping the session version.
     func touchSessionForPrompt(promptUuid: String) throws {
-        if let sessionUuid = try String.fetchOne(
-            db,
-            sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
-            arguments: [promptUuid]
-        ) {
+        if let sessionUuid = try owningSession(promptUuid: promptUuid) {
             try core.touchSession(db, uuid: sessionUuid)
         }
     }
 
+    /// The session a prompt hangs from; nil when the prompt is gone.
+    private func owningSession(promptUuid: String) throws -> String? {
+        try PromptRecord
+            .all()
+            .withUuid(promptUuid)
+            .select(PromptRecord.Columns.sessionUuid, as: String.self)
+            .fetchOne(db)
+    }
+
+    /// clarification_summary newest first — the create-or-return and both
+    /// point fetches take the most recent row for their key.
+    private static var newestFirst: QueryInterfaceRequest<ClarificationSummaryRecord> {
+        ClarificationSummaryRecord
+            .all()
+            .order(ClarificationSummaryRecord.Columns.createdAt.desc, Column("id").desc)
+    }
+
     func fetchSummary(uuid: String) throws -> ClarificationSummaryRow? {
-        try fetchSummary(where: "uuid = ?", key: uuid)
+        try fetchSummary(matching: ClarificationSummaryRecord.Columns.uuid == uuid)
     }
 
     func fetchSummary(byPrompt promptUuid: String) throws -> ClarificationSummaryRow? {
-        try fetchSummary(where: "prompt_uuid = ?", key: promptUuid)
+        try fetchSummary(matching: ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
     }
 
-    private func fetchSummary(
-        where condition: String,
-        key: String
-    ) throws -> ClarificationSummaryRow? {
-        try ClarificationSummaryRecord
-            .fetchAll(
-                db,
-                where: condition,
-                arguments: [key],
-                orderBy: "created_at DESC, id DESC"
-            )
-            .first?
-            .wireRow()
+    private func fetchSummary(matching predicate: SQLExpression) throws -> ClarificationSummaryRow? {
+        try Self.newestFirst.filter(predicate).fetchOne(db)?.dto()
     }
 
     private func fetchQuestion(uuid: String) throws -> ClarificationQuestionRow? {
@@ -848,25 +813,23 @@ struct ClarificationRepository: RepositoryContext {
     }
 
     private func fetchNote(uuid: String) throws -> ClarificationNoteRow? {
-        try InternalClarificationNoteRecord
-            .fetchAll(
-                db,
-                where: "uuid = ?",
-                arguments: [uuid]
-            )
-            .first?
-            .wireRow()
+        try InternalClarificationNoteRecord.all().withUuid(uuid).fetchOne(db)?.dto()
     }
 
     func fetchNotes(summaryUuid: String) throws -> [ClarificationNoteRow] {
         // weight polarity: critical (low) first; unweighted last.
-        try InternalClarificationNoteRecord.fetchAll(
-            db,
-            where: "clarification_summary_uuid = ?",
-            arguments: [summaryUuid],
-            orderBy: "weight IS NULL, weight, id"
-        )
-        .map { $0.wireRow() }
+        try InternalClarificationNoteRecord
+            .all()
+            .filter(
+                InternalClarificationNoteRecord.Columns.clarificationSummaryUuid == summaryUuid
+            )
+            .order(
+                InternalClarificationNoteRecord.Columns.weight == nil,
+                InternalClarificationNoteRecord.Columns.weight,
+                Column("id")
+            )
+            .fetchAll(db)
+            .map { $0.dto() }
     }
 
     private func fetchPackage(uuid: String) throws -> CarePackageRow? {

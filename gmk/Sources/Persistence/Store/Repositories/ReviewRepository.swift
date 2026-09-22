@@ -12,23 +12,15 @@ struct ReviewRepository: RepositoryContext {
     /// Idempotent; called ONLY by REVIEW_OPEN — never by setPromptStatus.
     @discardableResult
     func ensureSummary(promptUuid: String) throws -> (uuid: String, created: Bool) {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                arguments: [promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
         }
-        if let existing = try String.fetchOne(
-            db,
-            sql: """
-                SELECT uuid FROM review_summary WHERE prompt_uuid = ?
-                ORDER BY created_at DESC, id DESC LIMIT 1
-                """,
-            arguments: [promptUuid]
-        ) {
+        if let existing =
+            try Self.newestFirst
+            .filter(ReviewSummaryRecord.Columns.promptUuid == promptUuid)
+            .select(ReviewSummaryRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+        {
             return (existing, false)
         }
         let uuid = try core.insertBase(
@@ -129,14 +121,12 @@ struct ReviewRepository: RepositoryContext {
     func rank(_ req: ReviewRankRequest) throws -> ReviewRankResponse {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .reviewing, verb: "rank")
         try findingRank.applyRankBatch(
-            table: "review_finding",
-            parentColumn: "review_summary_uuid",
+            ReviewFindingRecord.self,
             summaryUuid: req.summaryUuid,
             ratings: req.ratings
         )
         let unranked = try findingRank.unrankedCount(
             ReviewFindingRecord.self,
-            parent: Column("review_summary_uuid"),
             summaryUuid: req.summaryUuid
         )
         try core.appendEvent(
@@ -227,7 +217,6 @@ struct ReviewRepository: RepositoryContext {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .reviewing, verb: "complete")
         let unranked = try findingRank.unrankedCount(
             ReviewFindingRecord.self,
-            parent: Column("review_summary_uuid"),
             summaryUuid: req.summaryUuid
         )
         guard unranked == 0 else {
@@ -302,13 +291,7 @@ struct ReviewRepository: RepositoryContext {
     }
 
     func get(_ req: ReviewGetRequest) throws -> ReviewGetResponse {
-        guard
-            try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
         guard
@@ -367,27 +350,24 @@ struct ReviewRepository: RepositoryContext {
         return summary
     }
 
+    /// review_summary newest first — the create-or-return and both point
+    /// fetches take the most recent row for their key.
+    private static var newestFirst: QueryInterfaceRequest<ReviewSummaryRecord> {
+        ReviewSummaryRecord
+            .all()
+            .order(ReviewSummaryRecord.Columns.createdAt.desc, Column("id").desc)
+    }
+
     func fetchSummary(uuid: String) throws -> ReviewSummaryRow? {
-        try fetchSummary(where: "uuid = ?", key: uuid)
+        try fetchSummary(matching: ReviewSummaryRecord.Columns.uuid == uuid)
     }
 
     func fetchSummary(byPrompt promptUuid: String) throws -> ReviewSummaryRow? {
-        try fetchSummary(where: "prompt_uuid = ?", key: promptUuid)
+        try fetchSummary(matching: ReviewSummaryRecord.Columns.promptUuid == promptUuid)
     }
 
-    private func fetchSummary(
-        where condition: String,
-        key: String
-    ) throws -> ReviewSummaryRow? {
-        try ReviewSummaryRecord
-            .fetchAll(
-                db,
-                where: condition,
-                arguments: [key],
-                orderBy: "created_at DESC, id DESC"
-            )
-            .first?
-            .dto()
+    private func fetchSummary(matching predicate: SQLExpression) throws -> ReviewSummaryRow? {
+        try Self.newestFirst.filter(predicate).fetchOne(db)?.dto()
     }
 
     /// Same explicit ordering contract as ExplorationRepository.fetchFindings:

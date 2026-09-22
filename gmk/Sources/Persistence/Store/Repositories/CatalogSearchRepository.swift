@@ -67,7 +67,7 @@ struct CatalogSearchRepository: RepositoryContext {
                 instanceMatch || parentUuids.contains(InstanceRecord.Columns.uuid)
             )
         }
-        let instances = try instanceRequest.fetchAll(db).map { $0.wireRow() }
+        let instances = try instanceRequest.fetchAll(db).map { $0.dto() }
 
         return CatalogSearchResponse(instances: instances, sessions: sessions)
     }

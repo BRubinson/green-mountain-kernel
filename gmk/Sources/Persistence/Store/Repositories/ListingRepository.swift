@@ -9,29 +9,19 @@ struct ListingRepository: RepositoryContext {
     let core: StoreCore
 
     func listProjects() throws -> ProjectListResponse {
-        let records = try ProjectRecord.fetchAll(db, sql: "SELECT * FROM project ORDER BY code")
-        return ProjectListResponse(projects: records.map { $0.wireRow() })
+        let records = try ProjectRecord.order(ProjectRecord.Columns.code).fetchAll(db)
+        return ProjectListResponse(projects: records.map { $0.dto() })
     }
 
     func listInstances(_ req: InstanceListRequest) throws -> InstanceListResponse {
-        var sql = "SELECT * FROM instance"
-        var arguments: StatementArguments = []
+        var request = InstanceRecord.order(InstanceRecord.Columns.code, InstanceRecord.Columns.name)
         if let projectUuid = req.projectUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM project WHERE uuid = ?",
-                    arguments: [projectUuid]
-                ) != nil
-            else {
+            guard try ProjectRecord.exists(db, key: ["uuid": projectUuid]) else {
                 throw StoreError.notFound(entity: "project", key: projectUuid)
             }
-            sql += " WHERE project_uuid = ?"
-            arguments = [projectUuid]
+            request = request.filter(InstanceRecord.Columns.projectUuid == projectUuid)
         }
-        sql += " ORDER BY code, name"
-        let records = try InstanceRecord.fetchAll(db, sql: sql, arguments: arguments)
-        return InstanceListResponse(instances: records.map { $0.wireRow() })
+        return InstanceListResponse(instances: try request.fetchAll(db).map { $0.dto() })
     }
 
     func listSessions(_ req: SessionListRequest) throws -> SessionListResponse {

@@ -8,19 +8,8 @@ import GRDB
 /// missing from here is a type nothing checks. Sorted by domain, then table.
 enum SchemaEnrollment {
 
-    /// How an entry reaches the database.
-    enum Kind {
-        /// One record per table, decoded from `SELECT *`.
-        case mirror
-        /// A record decoded from a join or a prefetch rather than one table.
-        case composed
-        /// A typed decoder for a projected result set, keyed to no table.
-        case projection
-    }
-
     struct RecordEntry: Sendable {
         let table: String
-        let kind: Kind
         let decode: @Sendable (Row) throws -> Void
     }
 
@@ -46,12 +35,7 @@ enum SchemaEnrollment {
     /// A record whose table name comes from the record itself: a name that has
     /// drifted from the schema fails at `columns(in:)` rather than decoding.
     private static func mirror<R: BaseRecordFields>(_: R.Type) -> RecordEntry {
-        RecordEntry(table: R.databaseTableName, kind: .mirror) { _ = try R(row: $0) }
-    }
-
-    /// A projection names the table it reads over; its shape is the query's.
-    private static func projection<R: SnakeCaseDecoded>(_: R.Type, over table: String) -> RecordEntry {
-        RecordEntry(table: table, kind: .projection) { _ = try R(row: $0) }
+        RecordEntry(table: R.databaseTableName) { _ = try R(row: $0) }
     }
 
     /// A join association: `origin` is the table carrying the foreign key and
@@ -121,6 +105,7 @@ enum SchemaEnrollment {
         mirror(CarePackageExplorationRefRecord.self),
         mirror(CarePackageKbiteRefRecord.self),
         mirror(ClarificationSummaryRecord.self),
+        mirror(ClaudeSessionBindingRecord.self),
         mirror(ExplorationFindingRecord.self),
         mirror(ExplorationSummaryRecord.self),
         mirror(FileChangeRecord.self),
@@ -181,9 +166,6 @@ enum SchemaEnrollment {
         mirror(ProjectRecord.self),
         mirror(PromptRecord.self),
         mirror(SessionRecord.self),
-
-        projection(KbiteResourceFileStubRecord.self, over: "kbite_resource_file"),
-        projection(SessionStubRecord.self, over: "session"),
     ]
 
     /// One entry per `static let` association declared on a record.
@@ -311,6 +293,7 @@ enum SchemaEnrollment {
             from: "care_package",
             to: "clarification_summary"
         ),
+        join(ClaudeSessionBindingRecord.session, key: "session", from: "claude_session_binding", to: "session"),
         join(ExplorationFindingRecord.summary, key: "summary", from: "exploration_finding", to: "exploration_summary"),
         prefetch(
             ExplorationSummaryRecord.findings,
@@ -627,6 +610,12 @@ enum SchemaEnrollment {
         prefetch(SessionRecord.fileChanges, key: "fileChanges", from: "file_change", to: "session"),
         prefetch(SessionRecord.activeKbites, key: "activeKbites", from: "session_active_kbite", to: "kbite"),
         prefetch(SessionRecord.briefings, key: "briefings", from: "agent_briefing", to: "session"),
+        prefetch(
+            SessionRecord.claudeBindings,
+            key: "claudeBindings",
+            from: "claude_session_binding",
+            to: "session"
+        ),
     ]
 
     /// A composite's canonical request, compiled the way a multi-row fetch
@@ -736,6 +725,9 @@ enum SchemaEnrollment {
         },
         composite(ReviewReport.self, "ReviewReport") { ReviewReport.request(sessionUuid: nil) },
         composite(ReviewReport.self, "ReviewReport(sessionUuid:)") { ReviewReport.request(sessionUuid: "s") },
+        composite(ChangeRollup.self, "ChangeRollup(sessionUuid:)") { ChangeRollup.request(sessionUuid: "s") },
+        composite(ChangeRollup.self, "ChangeRollup(promptUuid:)") { ChangeRollup.request(promptUuid: "p") },
+        composite(PromptChangeRollup.self, "PromptChangeRollup") { PromptChangeRollup.request(sessionUuid: "s") },
         composite(PromptSummary.self, "PromptSummary") { PromptSummary.request(sessionUuid: nil) },
         composite(PromptSummary.self, "PromptSummary(sessionUuid:)") { PromptSummary.request(sessionUuid: "s") },
         composite(SessionLineage.self, "SessionLineage") { SessionLineage.request(sessionUuid: "s") },

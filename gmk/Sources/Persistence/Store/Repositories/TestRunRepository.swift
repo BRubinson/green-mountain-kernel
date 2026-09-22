@@ -25,14 +25,11 @@ struct TestRunRepository: RepositoryContext {
     /// the wrong tree".
     func suiteList(_ req: TestSuiteListRequest) throws -> TestSuiteListResponse {
         guard
-            let instance = try InstanceRecord.fetchOne(
-                db,
-                sql: """
-                    SELECT * FROM instance WHERE project_uuid = ?
-                     ORDER BY created_at ASC LIMIT 1
-                    """,
-                arguments: [req.projectUuid]
-            )
+            let instance =
+                try InstanceRecord
+                .filter(InstanceRecord.Columns.projectUuid == req.projectUuid)
+                .orderedByCreatedAt()
+                .fetchOne(db)
         else {
             throw StoreError.notFound(entity: "instance", key: "project \(req.projectUuid)")
         }
@@ -242,15 +239,13 @@ struct TestRunRepository: RepositoryContext {
         guard let project = req.projectUuid else {
             throw StoreError.badRequest(detail: "TEST_RUN_STATUS needs run_uuid or project_uuid")
         }
-        let rows = try Row.fetchAll(
-            db,
-            sql: """
-                SELECT * FROM test_run WHERE project_uuid = ?
-                 ORDER BY created_at DESC LIMIT ?
-                """,
-            arguments: [project, min(max(req.limit ?? 20, 1), 200)]
-        )
-        return TestRunResponse(runs: rows.map(summary(from:)))
+        let rows =
+            try TestRunRecord
+            .filter(TestRunRecord.Columns.projectUuid == project)
+            .order(TestRunRecord.Columns.createdAt.desc)
+            .limit(min(max(req.limit ?? 20, 1), 200))
+            .fetchAll(db)
+        return TestRunResponse(runs: rows.map { $0.dto() })
     }
 
     // MARK: - Liveness
@@ -296,13 +291,7 @@ struct TestRunRepository: RepositoryContext {
     /// An unknown project is NOT_FOUND rather than a silently-open lock. A typo
     /// in a uuid must not read as "go ahead, nobody is testing that".
     private func requireProject(_ projectUuid: String) throws {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM project WHERE uuid = ?",
-                arguments: [projectUuid]
-            ) != nil
-        else {
+        guard try ProjectRecord.exists(db, key: ["uuid": projectUuid]) else {
             throw StoreError.notFound(entity: "project", key: projectUuid)
         }
     }
@@ -325,36 +314,18 @@ struct TestRunRepository: RepositoryContext {
     }
 
     private func cell(projectUuid: String) throws -> ProjectTestLockRecord? {
-        try ProjectTestLockRecord.fetchOne(
-            db,
-            sql: "SELECT * FROM project_test_lock WHERE project_uuid = ?",
-            arguments: [projectUuid]
-        )
+        try ProjectTestLockRecord
+            .filter(ProjectTestLockRecord.Columns.projectUuid == projectUuid)
+            .fetchOne(db)
     }
 
     private func requireCell(uuid: String) throws -> ProjectTestLockRecord {
-        guard
-            let row = try ProjectTestLockRecord.fetchOne(
-                db,
-                sql: "SELECT * FROM project_test_lock WHERE uuid = ?",
-                arguments: [uuid]
-            )
-        else {
-            throw StoreError.notFound(entity: "project_test_lock", key: uuid)
-        }
-        return row
+        try ProjectTestLockRecord.require(db, uuid: uuid)
     }
 
     private func run(uuid: String?) throws -> TestRunSummary? {
         guard let uuid else { return nil }
-        guard
-            let row = try Row.fetchOne(
-                db,
-                sql: "SELECT * FROM test_run WHERE uuid = ?",
-                arguments: [uuid]
-            )
-        else { return nil }
-        return summary(from: row)
+        return try TestRunRecord.fetch(db, uuid: uuid)?.dto()
     }
 
     private func abandon(runUuid: String) throws {
@@ -377,11 +348,9 @@ struct TestRunRepository: RepositoryContext {
         summary: String?
     ) throws {
         guard
-            let current = try Int64.fetchOne(
-                db,
-                sql: "SELECT version FROM test_run WHERE uuid = ?",
-                arguments: [runUuid]
-            )
+            let current = try TestRunRecord.all().withUuid(runUuid)
+                .select(TestRunRecord.Columns.version, as: Int64.self)
+                .fetchOne(db)
         else {
             throw StoreError.notFound(entity: "test_run", key: runUuid)
         }
@@ -424,34 +393,6 @@ struct TestRunRepository: RepositoryContext {
             version: cell.version,
             run: run,
             reclaimed: reclaimed
-        )
-    }
-
-    private func summary(from row: Row) -> TestRunSummary {
-        TestRunSummary(
-            uuid: row["uuid"],
-            projectUuid: row["project_uuid"],
-            instanceUuid: row["instance_uuid"],
-            sessionUuid: row["session_uuid"],
-            agentId: row["agent_id"],
-            runRoot: row["run_root"],
-            suiteId: row["suite_id"],
-            gitSha: row["git_sha"],
-            gitBranch: row["git_branch"],
-            // An unknown state on the wire is reported as abandoned rather than
-            // crashing the read: the column carries no CHECK by design, so a
-            // row written by newer bits must degrade rather than poison a list.
-            state: TestRunState(rawValue: row["state"] ?? "") ?? .abandoned,
-            doneKind: TestDoneKind(rawValue: row["done_kind"] ?? "") ?? .process,
-            doneCondition: row["done_condition"] ?? "{}",
-            doneHint: row["done_hint"],
-            startedAt: row["started_at"],
-            finishedAt: row["finished_at"],
-            exitCode: (row["exit_code"] as Int?).map { Int32($0) },
-            summary: row["summary"],
-            createdAt: row["created_at"],
-            updatedAt: row["updated_at"],
-            version: row["version"]
         )
     }
 }

@@ -38,20 +38,3 @@ struct ArchitectureOptionRecord: BaseRecordFields, TableRecord {
 extension ArchitectureOptionRecord {
     static let summary = belongsTo(ArchitectureSummaryRecord.self).forKey("summary")
 }
-
-extension ArchitectureOptionRecord {
-    /// db → wire.
-    func wireRow() -> ArchitectureOptionRow {
-        ArchitectureOptionRow(
-            uuid: uuid,
-            version: version,
-            architectureSummaryUuid: architectureSummaryUuid,
-            agentName: agentName,
-            agentId: agentId,
-            body: body,
-            status: status,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

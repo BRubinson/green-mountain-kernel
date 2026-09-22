@@ -5,6 +5,40 @@
 
 import Foundation
 
+extension ProjectRecord {
+    /// db → wire.
+    func dto() -> ProjectRow {
+        ProjectRow(
+            uuid: uuid,
+            version: version,
+            gitRepoName: gitRepoName,
+            code: code,
+            name: name,
+            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
+            primaryProjectBranch: primaryProjectBranch,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+extension InstanceRecord {
+    /// db → wire.
+    func dto() -> InstanceRow {
+        InstanceRow(
+            uuid: uuid,
+            version: version,
+            projectUuid: projectUuid,
+            code: code,
+            name: name,
+            absoluteFileSystemPath: absoluteFileSystemPath,
+            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
 extension SessionSummary {
     /// db → wire.
     func dto() -> SessionStub {
@@ -137,6 +171,31 @@ extension ReviewReport {
             sub100FindingCount: sub100FindingCount,
             unrankedFindingCount: unrankedFindingCount,
             openFindingCount: openFindingCount
+        )
+    }
+}
+
+extension ChangeRollup {
+    /// db → wire.
+    func dto() -> ChangeSummary {
+        ChangeSummary(
+            changeCount: changeCount,
+            distinctFiles: distinctFiles,
+            totalLineSpan: totalLineSpan
+        )
+    }
+}
+
+extension PromptChangeRollup {
+    /// db → wire.
+    func dto() -> PromptChangeSummary {
+        PromptChangeSummary(
+            promptUuid: promptUuid,
+            summary: ChangeSummary(
+                changeCount: changeCount,
+                distinctFiles: distinctFiles,
+                totalLineSpan: totalLineSpan
+            )
         )
     }
 }

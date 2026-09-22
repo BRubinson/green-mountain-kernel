@@ -47,20 +47,3 @@ extension InstanceRecord {
     )
     .forKey("activeKbites")
 }
-
-extension InstanceRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    func wireRow() -> InstanceRow {
-        InstanceRow(
-            uuid: uuid,
-            version: version,
-            projectUuid: projectUuid,
-            code: code,
-            name: name,
-            absoluteFileSystemPath: absoluteFileSystemPath,
-            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

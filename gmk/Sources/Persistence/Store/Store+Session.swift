@@ -91,16 +91,12 @@ extension Store {
             )
     }
 
-    func changeSummary(
-        _ db: Database,
-        where condition: String,
-        arguments: StatementArguments
-    ) throws -> ChangeSummary {
-        try SessionRepository(db: db, core: core)
-            .changeSummary(
-                where: condition,
-                arguments: arguments
-            )
+    func changeSummary(_ db: Database, sessionUuid: String) throws -> ChangeSummary {
+        try SessionRepository(db: db, core: core).changeSummary(sessionUuid: sessionUuid)
+    }
+
+    func changeSummary(_ db: Database, promptUuid: String) throws -> ChangeSummary {
+        try SessionRepository(db: db, core: core).changeSummary(promptUuid: promptUuid)
     }
 
     func promptChangeSummaries(_ db: Database, sessionUuid: String) throws -> [PromptChangeSummary] {

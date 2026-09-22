@@ -46,6 +46,6 @@ struct ProjectRepository: RepositoryContext {
     }
 
     func fetchRow(uuid: String) throws -> ProjectRow? {
-        try ProjectRecord.fetch(db, uuid: uuid)?.wireRow()
+        try ProjectRecord.fetch(db, uuid: uuid)?.dto()
     }
 }

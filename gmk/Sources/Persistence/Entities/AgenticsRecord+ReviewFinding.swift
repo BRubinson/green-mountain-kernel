@@ -9,7 +9,7 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `review_finding` table. Columns map via convertFromSnakeCase.
-struct ReviewFindingRecord: BaseRecordFields, TableRecord, Rankable {
+struct ReviewFindingRecord: BaseRecordFields, TableRecord, Rankable, ParentKeyed {
     static let databaseTableName = "review_finding"
     var uuid: String
     var version: Int64
@@ -47,5 +47,6 @@ struct ReviewFindingRecord: BaseRecordFields, TableRecord, Rankable {
 }
 
 extension ReviewFindingRecord {
+    static let parentColumn = Column("review_summary_uuid")
     static let summary = belongsTo(ReviewSummaryRecord.self).forKey("summary")
 }

@@ -49,20 +49,3 @@ extension ProjectRecord {
 
     static let dopeScopes = hasMany(DopeScopeRecord.self).forKey("dopeScopes")
 }
-
-extension ProjectRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    func wireRow() -> ProjectRow {
-        ProjectRow(
-            uuid: uuid,
-            version: version,
-            gitRepoName: gitRepoName,
-            code: code,
-            name: name,
-            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
-            primaryProjectBranch: primaryProjectBranch,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

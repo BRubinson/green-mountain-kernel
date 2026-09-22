@@ -13,23 +13,15 @@ struct ArchitectureRepository: RepositoryContext {
     /// clarifying → architecting create-on-enter (suppressed for legacy).
     @discardableResult
     func ensureSummary(promptUuid: String) throws -> (uuid: String, created: Bool) {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                arguments: [promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
         }
-        if let existing = try String.fetchOne(
-            db,
-            sql: """
-                SELECT uuid FROM architecture_summary WHERE prompt_uuid = ?
-                ORDER BY created_at DESC, id DESC LIMIT 1
-                """,
-            arguments: [promptUuid]
-        ) {
+        if let existing =
+            try Self.newestFirst
+            .filter(ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
+            .select(ArchitectureSummaryRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+        {
             return (existing, false)
         }
         let uuid = try core.insertBase(
@@ -133,16 +125,7 @@ struct ArchitectureRepository: RepositoryContext {
     }
 
     func fieldAdd(_ req: ArchFieldAddRequest) throws -> ArchFieldAddResponse {
-        guard
-            let parent = try Row.fetchOne(
-                db,
-                sql: "SELECT architecture_summary_uuid FROM architecture_persistence_change WHERE uuid = ?",
-                arguments: [req.persistenceChangeUuid]
-            )
-        else {
-            throw StoreError.notFound(entity: "architecture_persistence_change", key: req.persistenceChangeUuid)
-        }
-        let summaryUuid: String = parent["architecture_summary_uuid"]
+        let summaryUuid = try parentSummaryUuid(persistenceChangeUuid: req.persistenceChangeUuid)
         let summary = try requireSummary(uuid: summaryUuid, at: .drafting, verb: "field-add")
         try requireDecisionBeforeExpansion(summaryUuid: summaryUuid, verb: "field-add")
         let changeKind = try validatedChangeKind(req.changeKind, defaulting: "add")
@@ -285,13 +268,7 @@ struct ArchitectureRepository: RepositoryContext {
         }
         var superseded: ArchitectureOptionRow?
         if let supersedesUuid = req.supersedesOptionUuid {
-            guard
-                let old = try fetchOptions(
-                    where: "uuid = ?",
-                    arguments: [supersedesUuid]
-                )
-                .first
-            else {
+            guard let old = try fetchOption(uuid: supersedesUuid) else {
                 throw StoreError.notFound(entity: "architecture_option", key: supersedesUuid)
             }
             guard old.architectureSummaryUuid == req.summaryUuid else {
@@ -301,12 +278,14 @@ struct ArchitectureRepository: RepositoryContext {
             }
             superseded = old
         }
-        if try Row.fetchOne(
-            db,
-            sql:
-                "SELECT 1 FROM architecture_option WHERE architecture_summary_uuid = ? AND agent_name = ? AND uuid != ?",
-            arguments: [req.summaryUuid, agentName, superseded?.uuid ?? ""]
-        ) != nil {
+        let collisions =
+            try ArchitectureOptionRecord
+            .all()
+            .filter(ArchitectureOptionRecord.Columns.architectureSummaryUuid == req.summaryUuid)
+            .filter(ArchitectureOptionRecord.Columns.agentName == agentName)
+            .filter(ArchitectureOptionRecord.Columns.uuid != (superseded?.uuid ?? ""))
+            .fetchCount(db)
+        if collisions > 0 {
             // A persona may replace ITS OWN proposal (the superseded row is
             // excluded above); colliding with a live sibling persona is still
             // refused.
@@ -338,29 +317,10 @@ struct ArchitectureRepository: RepositoryContext {
                 set: ["status": "rejected"]
             )
             if wasSelected {
-                guard
-                    let summaryVersion = try Int64.fetchOne(
-                        db,
-                        sql: "SELECT version FROM architecture_summary WHERE uuid = ?",
-                        arguments: [req.summaryUuid]
-                    )
-                else {
-                    throw StoreError.notFound(entity: "architecture_summary", key: req.summaryUuid)
-                }
-                let existing =
-                    try String.fetchOne(
-                        db,
-                        sql: "SELECT decision_rationale FROM architecture_summary WHERE uuid = ?",
-                        arguments: [req.summaryUuid]
-                    ) ?? ""
-                let stamp = "revised \(StoreCore.isoNow()): option \(superseded.uuid) superseded by \(uuid)"
-                let appended = existing.isEmpty ? stamp : existing + "\n" + stamp
-                try core.updateBase(
-                    db,
-                    table: "architecture_summary",
-                    uuid: req.summaryUuid,
-                    expectedVersion: summaryVersion,
-                    set: ["decision_rationale": appended]
+                try carryOverSelection(
+                    summaryUuid: req.summaryUuid,
+                    from: superseded.uuid,
+                    to: uuid
                 )
             }
         }
@@ -375,22 +335,36 @@ struct ArchitectureRepository: RepositoryContext {
             ])
         )
         try clarification.touchSessionForPrompt(promptUuid: summary.promptUuid)
-        guard let row = try fetchOptions(where: "uuid = ?", arguments: [uuid]).first else {
+        guard let row = try fetchOption(uuid: uuid) else {
             throw StoreError.notFound(entity: "architecture_option", key: uuid)
         }
         return ArchOptionRowResponse(option: row)
     }
 
+    /// A superseded selection rides over to its successor, with the move
+    /// appended to the summary's rationale so the record keeps both rows.
+    private func carryOverSelection(summaryUuid: String, from: String, to: String) throws {
+        let version = try summaryVersion(uuid: summaryUuid)
+        let existing =
+            try ArchitectureSummaryRecord
+            .all()
+            .withUuid(summaryUuid)
+            .select(ArchitectureSummaryRecord.Columns.decisionRationale, as: String.self)
+            .fetchOne(db) ?? ""
+        let stamp = "revised \(StoreCore.isoNow()): option \(from) superseded by \(to)"
+        try core.updateBase(
+            db,
+            table: "architecture_summary",
+            uuid: summaryUuid,
+            expectedVersion: version,
+            set: ["decision_rationale": existing.isEmpty ? stamp : existing + "\n" + stamp]
+        )
+    }
+
     /// Atomically stamp one option selected, reject its siblings, and record
     /// the rationale on the summary. expectedVersion targets the OPTION row.
     func decide(_ req: ArchDecideRequest) throws -> ArchDecideResponse {
-        guard
-            let winner = try fetchOptions(
-                where: "uuid = ?",
-                arguments: [req.optionUuid]
-            )
-            .first
-        else {
+        guard let winner = try fetchOption(uuid: req.optionUuid) else {
             throw StoreError.notFound(entity: "architecture_option", key: req.optionUuid)
         }
         let summary = try requireSummary(
@@ -409,10 +383,12 @@ struct ArchitectureRepository: RepositoryContext {
             expectedVersion: req.expectedVersion,
             set: ["status": "selected"]
         )
-        for sibling in try fetchOptions(
-            where: "architecture_summary_uuid = ? AND uuid != ?",
-            arguments: [winner.architectureSummaryUuid, req.optionUuid]
-        ) {
+        let siblings = try fetchOptions(
+            matching: ArchitectureOptionRecord.Columns.architectureSummaryUuid
+                == winner.architectureSummaryUuid
+                && ArchitectureOptionRecord.Columns.uuid != req.optionUuid
+        )
+        for sibling in siblings {
             try core.updateBase(
                 db,
                 table: "architecture_option",
@@ -421,23 +397,11 @@ struct ArchitectureRepository: RepositoryContext {
                 set: ["status": "rejected"]
             )
         }
-        guard
-            let summaryVersion = try Int64.fetchOne(
-                db,
-                sql: "SELECT version FROM architecture_summary WHERE uuid = ?",
-                arguments: [winner.architectureSummaryUuid]
-            )
-        else {
-            throw StoreError.notFound(
-                entity: "architecture_summary",
-                key: winner.architectureSummaryUuid
-            )
-        }
         try core.updateBase(
             db,
             table: "architecture_summary",
             uuid: winner.architectureSummaryUuid,
-            expectedVersion: summaryVersion,
+            expectedVersion: try summaryVersion(uuid: winner.architectureSummaryUuid),
             set: ["decision_rationale": rationale]
         )
         try core.appendEvent(
@@ -458,21 +422,12 @@ struct ArchitectureRepository: RepositoryContext {
         }
         return ArchDecideResponse(
             summary: updatedSummary,
-            options: try fetchOptions(
-                where: "architecture_summary_uuid = ?",
-                arguments: [winner.architectureSummaryUuid]
-            )
+            options: try fetchOptions(summaryUuid: winner.architectureSummaryUuid)
         )
     }
 
     func get(_ req: ArchGetRequest) throws -> ArchGetResponse {
-        guard
-            try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
         guard let summary = try fetchSummary(byPrompt: req.promptUuid) else {
@@ -509,10 +464,7 @@ struct ArchitectureRepository: RepositoryContext {
             orderingRespected = nil
         }
 
-        let allOptions = try fetchOptions(
-            where: "architecture_summary_uuid = ?",
-            arguments: [summary.uuid]
-        )
+        let allOptions = try fetchOptions(summaryUuid: summary.uuid)
 
         // THE UNNARROWED REQUEST IS THE HISTORICAL RESPONSE, BYTE FOR BYTE.
         // No new key is emitted at all, so a peer built against the old
@@ -643,6 +595,27 @@ struct ArchitectureRepository: RepositoryContext {
         }
     }
 
+    /// The summary one persistence change hangs from.
+    private func parentSummaryUuid(persistenceChangeUuid: String) throws -> String {
+        guard
+            let uuid =
+                try ArchitecturePersistenceChangeRecord
+                .all()
+                .withUuid(persistenceChangeUuid)
+                .select(
+                    ArchitecturePersistenceChangeRecord.Columns.architectureSummaryUuid,
+                    as: String.self
+                )
+                .fetchOne(db)
+        else {
+            throw StoreError.notFound(
+                entity: "architecture_persistence_change",
+                key: persistenceChangeUuid
+            )
+        }
+        return uuid
+    }
+
     private func validatedChangeKind(_ raw: String?, defaulting: String) throws -> String {
         guard let raw, !raw.isEmpty else { return defaulting }
         let legal = ["add", "modify", "rename", "delete"]
@@ -654,17 +627,38 @@ struct ArchitectureRepository: RepositoryContext {
         return raw
     }
 
-    func fetchOptions(
-        where condition: String,
-        arguments: StatementArguments
-    ) throws -> [ArchitectureOptionRow] {
-        try ArchitectureOptionRecord.fetchAll(
-            db,
-            where: condition,
-            arguments: arguments,
-            orderBy: "agent_name"
+    func fetchOptions(matching predicate: SQLExpression) throws -> [ArchitectureOptionRow] {
+        try ArchitectureOptionRecord
+            .all()
+            .filter(predicate)
+            .order(ArchitectureOptionRecord.Columns.agentName)
+            .fetchAll(db)
+            .map { $0.dto() }
+    }
+
+    private func fetchOption(uuid: String) throws -> ArchitectureOptionRow? {
+        try fetchOptions(matching: ArchitectureOptionRecord.Columns.uuid == uuid).first
+    }
+
+    private func fetchOptions(summaryUuid: String) throws -> [ArchitectureOptionRow] {
+        try fetchOptions(
+            matching: ArchitectureOptionRecord.Columns.architectureSummaryUuid == summaryUuid
         )
-        .map { $0.wireRow() }
+    }
+
+    /// The summary row's version as this transaction sees it, for updateBase.
+    private func summaryVersion(uuid: String) throws -> Int64 {
+        guard
+            let version =
+                try ArchitectureSummaryRecord
+                .all()
+                .withUuid(uuid)
+                .select(ArchitectureSummaryRecord.Columns.version, as: Int64.self)
+                .fetchOne(db)
+        else {
+            throw StoreError.notFound(entity: "architecture_summary", key: uuid)
+        }
+        return version
     }
 
     // MARK: - Comparison support
@@ -701,17 +695,17 @@ struct ArchitectureRepository: RepositoryContext {
     /// blocks). Empty when the chain is broken — the normalizer then only
     /// applies its lexical rules.
     func instanceRoot(promptUuid: String) throws -> String {
-        try String.fetchOne(
-            db,
-            sql: """
-                SELECT i.absolute_file_system_path
-                FROM prompt p
-                JOIN session s ON s.uuid = p.session_uuid
-                JOIN instance i ON i.uuid = s.instance_uuid
-                WHERE p.uuid = ?
-                """,
-            arguments: [promptUuid]
-        ) ?? ""
+        let instance = TableAlias<InstanceRecord>()
+        return
+            try PromptRecord
+            .all()
+            .withUuid(promptUuid)
+            .joining(
+                required: PromptRecord.session
+                    .joining(required: SessionRecord.instance.aliased(instance))
+            )
+            .select(instance[InstanceRecord.Columns.absoluteFileSystemPath], as: String.self)
+            .fetchOne(db) ?? ""
     }
 
     // MARK: - Transition + fetch helpers
@@ -785,27 +779,24 @@ struct ArchitectureRepository: RepositoryContext {
         return ArchSummaryResponse(summary: updated)
     }
 
+    /// architecture_summary newest first — the create-or-return and both point
+    /// fetches take the most recent row for their key.
+    private static var newestFirst: QueryInterfaceRequest<ArchitectureSummaryRecord> {
+        ArchitectureSummaryRecord
+            .all()
+            .order(ArchitectureSummaryRecord.Columns.createdAt.desc, Column("id").desc)
+    }
+
     func fetchSummary(uuid: String) throws -> ArchitectureSummaryRow? {
-        try fetchSummary(where: "uuid = ?", key: uuid)
+        try fetchSummary(matching: ArchitectureSummaryRecord.Columns.uuid == uuid)
     }
 
     func fetchSummary(byPrompt promptUuid: String) throws -> ArchitectureSummaryRow? {
-        try fetchSummary(where: "prompt_uuid = ?", key: promptUuid)
+        try fetchSummary(matching: ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
     }
 
-    private func fetchSummary(
-        where condition: String,
-        key: String
-    ) throws -> ArchitectureSummaryRow? {
-        try ArchitectureSummaryRecord
-            .fetchAll(
-                db,
-                where: condition,
-                arguments: [key],
-                orderBy: "created_at DESC, id DESC"
-            )
-            .first?
-            .wireRow()
+    private func fetchSummary(matching predicate: SQLExpression) throws -> ArchitectureSummaryRow? {
+        try Self.newestFirst.filter(predicate).fetchOne(db)?.dto()
     }
 
     /// Two statements whatever the change count: the changes and their fields.

@@ -37,17 +37,3 @@ extension ClarificationSummaryRecord {
     static let notes = hasMany(InternalClarificationNoteRecord.self).forKey("notes")
     static let carePackage = hasOne(CarePackageRecord.self).forKey("carePackage")
 }
-
-extension ClarificationSummaryRecord {
-    /// db → wire.
-    func wireRow() -> ClarificationSummaryRow {
-        ClarificationSummaryRow(
-            uuid: uuid,
-            version: version,
-            promptUuid: promptUuid,
-            status: status,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

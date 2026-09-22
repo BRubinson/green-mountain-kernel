@@ -31,21 +31,3 @@ struct DaemonEventRecord: BaseRecordFields, TableRecord {
         case payload
     }
 }
-
-extension DaemonEventRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    ///
-    /// Named `wireNotification` rather than `wireRow` because the wire type is
-    /// EventNotification, not an *Row — and because `id` is genuinely part of
-    /// it. This is the one record that keeps the rowid: it is the SUBSCRIBE
-    /// replay cursor, not an implementation detail.
-    func wireNotification() -> EventNotification {
-        EventNotification(
-            id: id,
-            kind: kind,
-            subjectUuid: subjectUuid,
-            payload: payload,
-            createdAt: createdAt
-        )
-    }
-}

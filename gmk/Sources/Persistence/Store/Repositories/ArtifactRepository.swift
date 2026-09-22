@@ -8,22 +8,18 @@ struct ArtifactRepository: RepositoryContext {
     let core: StoreCore
 
     func add(_ req: ArtifactAddRequest) throws -> ArtifactRow {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            ) != nil
-        else {
+        guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
         // UNIQUE(prompt_uuid, file_path): re-registering the same file
         // updates its note instead of failing.
-        if let existing = try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM prompt_artifact WHERE prompt_uuid = ? AND file_path = ?",
-            arguments: [req.promptUuid, req.filePath]
-        ) {
+        if let existing =
+            try PromptArtifactRecord
+            .filter(PromptArtifactRecord.Columns.promptUuid == req.promptUuid)
+            .filter(PromptArtifactRecord.Columns.filePath == req.filePath)
+            .select(PromptArtifactRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+        {
             try db.execute(
                 sql: """
                     UPDATE prompt_artifact
@@ -65,18 +61,16 @@ struct ArtifactRepository: RepositoryContext {
     }
 
     func fetchRow(uuid: String) throws -> ArtifactRow? {
-        try PromptArtifactRecord.fetch(db, uuid: uuid)?.wireRow()
+        try PromptArtifactRecord.fetch(db, uuid: uuid)?.dto()
     }
 
     func fetchRows(promptUuid: String) throws -> [ArtifactRow] {
         // `id` orders the tie-break: it is a column even though no Record
         // exposes it as a property.
-        try PromptArtifactRecord.fetchAll(
-            db,
-            where: "prompt_uuid = ?",
-            arguments: [promptUuid],
-            orderBy: "created_at, id"
-        )
-        .map { $0.wireRow() }
+        try PromptArtifactRecord
+            .filter(PromptArtifactRecord.Columns.promptUuid == promptUuid)
+            .order(PromptArtifactRecord.Columns.createdAt, Column("id"))
+            .fetchAll(db)
+            .map { $0.dto() }
     }
 }

@@ -33,16 +33,3 @@ struct PromptArtifactRecord: BaseRecordFields, TableRecord {
 extension PromptArtifactRecord {
     static let prompt = belongsTo(PromptRecord.self).forKey("prompt")
 }
-
-extension PromptArtifactRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    func wireRow() -> ArtifactRow {
-        ArtifactRow(
-            uuid: uuid,
-            promptUuid: promptUuid,
-            filePath: filePath,
-            note: note,
-            createdAt: createdAt
-        )
-    }
-}

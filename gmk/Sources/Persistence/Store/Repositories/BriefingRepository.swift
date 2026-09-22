@@ -49,24 +49,19 @@ struct BriefingRepository: RepositoryContext {
         switch (req.promptUuid, req.sessionUuid) {
         case (let prompt?, nil):
             guard
-                let owner = try String.fetchOne(
-                    db,
-                    sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
-                    arguments: [prompt]
-                )
+                let owner =
+                    try PromptRecord
+                    .all()
+                    .withUuid(prompt)
+                    .select(PromptRecord.Columns.sessionUuid, as: String.self)
+                    .fetchOne(db)
             else {
                 throw StoreError.notFound(entity: "prompt", key: prompt)
             }
             sessionUuid = owner
             promptUuid = prompt
         case (nil, let session?):
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM session WHERE uuid = ?",
-                    arguments: [session]
-                ) != nil
-            else {
+            guard try SessionRecord.exists(db, key: ["uuid": session]) else {
                 throw StoreError.notFound(entity: "session", key: session)
             }
             sessionUuid = session
@@ -228,11 +223,12 @@ struct BriefingRepository: RepositoryContext {
         // the file_change policy, adopted here (see the doc comment).
         for (i, fileUuid) in (req.kbiteRefs ?? []).enumerated() {
             guard
-                let brief = try Row.fetchOne(
-                    db,
-                    sql: "SELECT resource_file_summary FROM kbite_resource_file WHERE uuid = ?",
-                    arguments: [fileUuid]
-                )
+                let brief =
+                    try KbiteResourceFileRecord
+                    .all()
+                    .withUuid(fileUuid)
+                    .select(KbiteResourceFileRecord.Columns.resourceFileSummary, as: String.self)
+                    .fetchOne(db)
             else {
                 throw StoreError.notFound(entity: "kbite_resource_file", key: fileUuid)
             }
@@ -242,19 +238,13 @@ struct BriefingRepository: RepositoryContext {
                 extra: [
                     "agent_briefing_uuid": req.briefingUuid,
                     "kbite_resource_file_uuid": fileUuid,
-                    "brief": brief["resource_file_summary"] as String?,
+                    "brief": brief,
                     "seq": i,
                 ]
             )
         }
         for (i, changeUuid) in (req.fileChangeRefs ?? []).enumerated() {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM file_change WHERE uuid = ?",
-                    arguments: [changeUuid]
-                ) != nil
-            else {
+            guard try FileChangeRecord.exists(db, key: ["uuid": changeUuid]) else {
                 throw StoreError.notFound(entity: "file_change", key: changeUuid)
             }
             try core.insertBase(
@@ -341,27 +331,19 @@ struct BriefingRepository: RepositoryContext {
     func list(_ req: BriefingListRequest) throws -> BriefingListResponse {
         let rows: [AgentBriefingRow]
         if let promptUuid = req.promptUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                    arguments: [promptUuid]
-                ) != nil
-            else {
+            guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
                 throw StoreError.notFound(entity: "prompt", key: promptUuid)
             }
-            rows = try fetchBriefings(where: "prompt_uuid = ?", arguments: [promptUuid])
+            rows = try fetchBriefings(
+                matching: AgentBriefingRecord.Columns.promptUuid == promptUuid
+            )
         } else if let sessionUuid = req.sessionUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM session WHERE uuid = ?",
-                    arguments: [sessionUuid]
-                ) != nil
-            else {
+            guard try SessionRecord.exists(db, key: ["uuid": sessionUuid]) else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
             }
-            rows = try fetchBriefings(where: "session_uuid = ?", arguments: [sessionUuid])
+            rows = try fetchBriefings(
+                matching: AgentBriefingRecord.Columns.sessionUuid == sessionUuid
+            )
         } else {
             throw StoreError.badRequest(
                 detail: "briefing list takes --prompt-uuid or --session-uuid"
@@ -441,19 +423,14 @@ struct BriefingRepository: RepositoryContext {
             return row
         }
         if let promptUuid = req.promptUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM prompt WHERE uuid = ?",
-                    arguments: [promptUuid]
-                ) != nil
-            else {
+            guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
                 throw StoreError.notFound(entity: "prompt", key: promptUuid)
             }
-            let rows = try fetchBriefings(
-                where: req.step == nil ? "prompt_uuid = ?" : "prompt_uuid = ? AND briefing_for_step = ?",
-                arguments: req.step == nil ? [promptUuid] : [promptUuid, req.step!]
-            )
+            var predicate = AgentBriefingRecord.Columns.promptUuid == promptUuid
+            if let step = req.step {
+                predicate = predicate && AgentBriefingRecord.Columns.briefingForStep == step
+            }
+            let rows = try fetchBriefings(matching: predicate)
             if rows.isEmpty {
                 throw StoreError.summaryAbsent(entity: "briefing", promptUuid: promptUuid)
             }
@@ -555,31 +532,32 @@ struct BriefingRepository: RepositoryContext {
         ownerSession: String,
         step: String
     ) throws -> AgentBriefingRow? {
+        let forStep = AgentBriefingRecord.Columns.briefingForStep == step
         if let ownerPrompt {
             return try fetchBriefings(
-                where: "prompt_uuid = ? AND briefing_for_step = ?",
-                arguments: [ownerPrompt, step]
+                matching: AgentBriefingRecord.Columns.promptUuid == ownerPrompt && forStep
             )
             .first
         }
         return try fetchBriefings(
-            where: "session_uuid = ? AND prompt_uuid IS NULL AND briefing_for_step = ?",
-            arguments: [ownerSession, step]
+            matching: AgentBriefingRecord.Columns.sessionUuid == ownerSession
+                && AgentBriefingRecord.Columns.promptUuid == nil
+                && forStep
         )
         .first
     }
 
     func fetchBriefing(uuid: String) throws -> AgentBriefingRow? {
-        try fetchBriefings(where: "uuid = ?", arguments: [uuid]).first
+        try fetchBriefings(matching: AgentBriefingRecord.Columns.uuid == uuid).first
     }
 
-    private func fetchBriefings(
-        where condition: String,
-        arguments: StatementArguments
-    ) throws -> [AgentBriefingRow] {
+    private func fetchBriefings(matching predicate: SQLExpression) throws -> [AgentBriefingRow] {
         try AgentBriefingWithRefs.request()
-            .filter(sql: condition, arguments: arguments)
-            .order(sql: "briefing_for_step, created_at")
+            .filter(predicate)
+            .order(
+                AgentBriefingRecord.Columns.briefingForStep,
+                AgentBriefingRecord.Columns.createdAt
+            )
             .fetchAll(db)
             .map { $0.dto() }
     }

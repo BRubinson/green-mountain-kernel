@@ -43,20 +43,3 @@ struct InternalClarificationNoteRecord: BaseRecordFields, TableRecord {
 extension InternalClarificationNoteRecord {
     static let summary = belongsTo(ClarificationSummaryRecord.self).forKey("summary")
 }
-
-extension InternalClarificationNoteRecord {
-    func wireRow() -> ClarificationNoteRow {
-        ClarificationNoteRow(
-            uuid: uuid,
-            version: version,
-            clarificationSummaryUuid: clarificationSummaryUuid,
-            body: body,
-            confusedEntityUuid: confusedEntityUuid,
-            confusedEntityType: confusedEntityType,
-            weight: weight.map(Int.init),
-            questionUuid: questionUuid,
-            agentId: agentId,
-            agentName: agentName
-        )
-    }
-}

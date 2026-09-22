@@ -40,9 +40,13 @@ protocol BaseRecordFields: SnakeCaseDecoded, Sendable {
     var version: Int64 { get }
 }
 
-extension BaseRecordFields {
+/// The by-uuid lookups every record shares, over the query interface rather
+/// than a hand-written SELECT. Constrained rather than folded into
+/// `BaseRecordFields` itself: the protocol stays free of TableRecord, so a
+/// projection decoder can adopt it without claiming to mirror a table.
+extension BaseRecordFields where Self: TableRecord {
     static func fetch(_ db: Database, uuid: String) throws -> Self? {
-        try fetchOne(db, sql: "SELECT * FROM \(databaseTableName) WHERE uuid = ?", arguments: [uuid])
+        try Self.all().withUuid(uuid).fetchOne(db)
     }
 
     static func require(_ db: Database, uuid: String) throws -> Self {
@@ -50,37 +54,5 @@ extension BaseRecordFields {
             throw StoreError.notFound(entity: databaseTableName, key: uuid)
         }
         return row
-    }
-
-    /// Single-row twin of `fetchAll(where:)`, for a lookup keyed by something
-    /// other than uuid (`fetch(_:uuid:)` covers that case).
-    static func fetchOne(
-        _ db: Database,
-        where condition: String,
-        arguments: StatementArguments = StatementArguments()
-    ) throws -> Self? {
-        try fetchOne(
-            db,
-            sql: "SELECT * FROM \(databaseTableName) WHERE \(condition)",
-            arguments: arguments
-        )
-    }
-
-    /// `SELECT * FROM <table> [WHERE …] [ORDER BY …]`, so a converted fetch
-    /// does not re-type the table name the protocol already owns.
-    ///
-    /// NOT for `kbite_resource_file`: its stub reads deliberately project
-    /// `resource_file_content IS NOT NULL AS has_content` to keep ~115 MB of
-    /// content out of the result set. Use KbiteResourceFileStubRecord.
-    static func fetchAll(
-        _ db: Database,
-        where condition: String? = nil,
-        arguments: StatementArguments = StatementArguments(),
-        orderBy: String? = nil
-    ) throws -> [Self] {
-        var sql = "SELECT * FROM \(databaseTableName)"
-        if let condition { sql += " WHERE \(condition)" }
-        if let orderBy { sql += " ORDER BY \(orderBy)" }
-        return try fetchAll(db, sql: sql, arguments: arguments)
     }
 }

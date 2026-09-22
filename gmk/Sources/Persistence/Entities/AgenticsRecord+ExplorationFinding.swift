@@ -11,7 +11,7 @@ import GRDB
 /// Read-side mirror of the `exploration_finding` table (m0025: absorbed
 /// exploration_key_file — a key file is a finding of kind 'key_file' with
 /// file_path set).
-struct ExplorationFindingRecord: BaseRecordFields, TableRecord, Rankable {
+struct ExplorationFindingRecord: BaseRecordFields, TableRecord, Rankable, ParentKeyed {
     static let databaseTableName = "exploration_finding"
     var uuid: String
     var version: Int64
@@ -43,5 +43,6 @@ struct ExplorationFindingRecord: BaseRecordFields, TableRecord, Rankable {
 }
 
 extension ExplorationFindingRecord {
+    static let parentColumn = Column("exploration_summary_uuid")
     static let summary = belongsTo(ExplorationSummaryRecord.self).forKey("summary")
 }

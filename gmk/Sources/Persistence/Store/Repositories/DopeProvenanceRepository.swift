@@ -106,6 +106,45 @@ struct DopeProvenanceRepository: RepositoryContext {
         )
     }
 
+    /// Express one merge resolution IN the base, for each conflicting path.
+    ///
+    /// Take theirs clears the dirty flag, so the next sync takes the file as an
+    /// untouched element would. Take ours re-bases onto the file's CURRENT hash
+    /// while staying dirty, so the local edit is kept and the file is not
+    /// treated as having moved.
+    func recordResolutions(
+        scopeUuid: String,
+        dotPaths: [String],
+        takeOurs: Bool,
+        theirHashes: [String: String]
+    ) throws {
+        let now = Store.isoNow()
+        for dotPath in dotPaths {
+            if takeOurs {
+                try db.execute(
+                    sql: """
+                        UPDATE dope_element_provenance
+                           SET synced_content_hash = ?, locally_modified = 1, updated_at = ?
+                         WHERE dope_scope_uuid = ? AND dot_path = ?
+                        """,
+                    arguments: [
+                        theirHashes[dotPath], now,
+                        scopeUuid, dotPath,
+                    ]
+                )
+            } else {
+                try db.execute(
+                    sql: """
+                        UPDATE dope_element_provenance
+                           SET locally_modified = 0, updated_at = ?
+                         WHERE dope_scope_uuid = ? AND dot_path = ?
+                        """,
+                    arguments: [now, scopeUuid, dotPath]
+                )
+            }
+        }
+    }
+
     /// Resolve a node's dot-path from its uuid, for the level it sits at.
     ///
     /// The merge is addressed by dot-path but the mutation verbs speak in

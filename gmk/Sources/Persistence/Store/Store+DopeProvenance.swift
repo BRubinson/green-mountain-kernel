@@ -132,31 +132,13 @@ extension Store {
         }
 
         try boundary { db in
-            let now = Store.isoNow()
-            for target in targets {
-                if takeOurs {
-                    try db.execute(
-                        sql: """
-                            UPDATE dope_element_provenance
-                               SET synced_content_hash = ?, locally_modified = 1, updated_at = ?
-                             WHERE dope_scope_uuid = ? AND dot_path = ?
-                            """,
-                        arguments: [
-                            theirHashes[target.dotPath], now,
-                            scopeUuid, target.dotPath,
-                        ]
-                    )
-                } else {
-                    try db.execute(
-                        sql: """
-                            UPDATE dope_element_provenance
-                               SET locally_modified = 0, updated_at = ?
-                             WHERE dope_scope_uuid = ? AND dot_path = ?
-                            """,
-                        arguments: [now, scopeUuid, target.dotPath]
-                    )
-                }
-            }
+            try DopeProvenanceRepository(db: db, core: self.core)
+                .recordResolutions(
+                    scopeUuid: scopeUuid,
+                    dotPaths: targets.map(\.dotPath),
+                    takeOurs: takeOurs,
+                    theirHashes: theirHashes
+                )
         }
         return targets.map(\.dotPath)
     }

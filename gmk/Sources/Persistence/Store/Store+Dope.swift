@@ -7,10 +7,6 @@ import GRDB
 
 extension Store {
 
-    static func dopeScopeRow(_ row: Row) throws -> DopeScopeRow {
-        try DopeScopeRecord(row: row).wireRow()
-    }
-
     // MARK: - Verbs
 
     func dopeInit(_ req: DopeInitRequest) throws -> DopeScopeResponse {

@@ -94,11 +94,10 @@ struct KbiteResourceRepository: RepositoryContext {
 
     func getKbite(_ req: KbiteGetRequest) throws -> KbiteGetResponse {
         guard
-            let kbiteRecord = try KbiteRecord.fetchOne(
-                db,
-                where: "code = ?",
-                arguments: [req.code]
-            )
+            let kbiteRecord =
+                try KbiteRecord
+                .filter(KbiteRecord.Columns.code == req.code)
+                .fetchOne(db)
         else {
             throw StoreError.notFound(entity: "kbite", key: req.code)
         }
@@ -216,13 +215,7 @@ struct KbiteResourceRepository: RepositoryContext {
             (table, ownerColumn, ownerTable) =
                 ("resource_file_keyword_junction", "file_uuid", "kbite_resource_file")
         }
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM \(ownerTable) WHERE uuid = ?",
-                arguments: [req.targetUuid]
-            ) != nil
-        else {
+        guard try Table(ownerTable).filter(Column("uuid") == req.targetUuid).fetchCount(db) > 0 else {
             throw StoreError.notFound(entity: ownerTable, key: req.targetUuid)
         }
 
@@ -232,13 +225,7 @@ struct KbiteResourceRepository: RepositoryContext {
             let keyword = ChewedArtifactParser.normalizeKeyword(raw)
             guard !keyword.isEmpty else { continue }
             if req.detach {
-                guard
-                    let keywordUuid = try String.fetchOne(
-                        db,
-                        sql: "SELECT uuid FROM keyword WHERE keyword = ?",
-                        arguments: [keyword]
-                    )
-                else { continue }
+                guard let keywordUuid = try keywordUuid(keyword) else { continue }
                 try db.execute(
                     sql: "DELETE FROM \(table) WHERE \(ownerColumn) = ? AND keyword_uuid = ?",
                     arguments: [req.targetUuid, keywordUuid]
@@ -273,13 +260,18 @@ struct KbiteResourceRepository: RepositoryContext {
 
     // MARK: - Keyword primitives
 
+    /// The shared vocabulary's uuid for one normalized word, absent when the
+    /// word has never been attached.
+    func keywordUuid(_ keyword: String) throws -> String? {
+        try KeywordRecord
+            .filter(KeywordRecord.Columns.keyword == keyword)
+            .select(KeywordRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+    }
+
     /// Upsert the shared vocabulary by normalized text (mirrors ensureKbite).
     func ensureKeyword(_ keyword: String) throws -> String {
-        if let existing = try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM keyword WHERE keyword = ?",
-            arguments: [keyword]
-        ) {
+        if let existing = try keywordUuid(keyword) {
             return existing
         }
         return try core.insertBase(db, table: "keyword", extra: ["keyword": keyword])
@@ -295,11 +287,9 @@ struct KbiteResourceRepository: RepositoryContext {
         keywordUuid: String
     ) throws -> Bool {
         let exists =
-            try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM \(table) WHERE \(ownerColumn) = ? AND keyword_uuid = ?",
-                arguments: [ownerUuid, keywordUuid]
-            ) != nil
+            try Table(table)
+            .filter(Column(ownerColumn) == ownerUuid && Column("keyword_uuid") == keywordUuid)
+            .fetchCount(db) > 0
         guard !exists else { return false }
         try core.insertBase(
             db,

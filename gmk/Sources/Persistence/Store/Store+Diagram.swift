@@ -204,16 +204,7 @@ extension Store {
 
     private func owningDiagramUuid(elementUuid: String) throws -> String {
         try boundaryRead { db in
-            guard
-                let uuid = try String.fetchOne(
-                    db,
-                    sql: "SELECT diagram_uuid FROM diagram_element WHERE uuid = ?",
-                    arguments: [elementUuid]
-                )
-            else {
-                throw StoreError.notFound(entity: "diagram_element", key: elementUuid)
-            }
-            return uuid
+            try DiagramRepository(db: db, core: core).owningDiagramUuid(elementUuid: elementUuid)
         }
     }
 }

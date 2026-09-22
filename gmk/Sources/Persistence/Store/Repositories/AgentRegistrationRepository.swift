@@ -66,7 +66,7 @@ struct AgentRegistrationRepository: RepositoryContext {
 
         if let existing = try fetch(agentId: agentId) {
             guard !assigned.isEmpty else {
-                return AgentRegisterResponse(registration: existing.wireRow(), created: false)
+                return AgentRegisterResponse(registration: existing.dto(), created: false)
             }
             try core.updateBase(
                 db,
@@ -76,14 +76,14 @@ struct AgentRegistrationRepository: RepositoryContext {
                 set: assigned
             )
             return AgentRegisterResponse(
-                registration: try require(agentId: agentId).wireRow(),
+                registration: try require(agentId: agentId).dto(),
                 created: false
             )
         }
         assigned["agent_id"] = agentId
         _ = try core.insertBase(db, table: "agent_registration", extra: assigned)
         return AgentRegisterResponse(
-            registration: try require(agentId: agentId).wireRow(),
+            registration: try require(agentId: agentId).dto(),
             created: true
         )
     }
@@ -132,7 +132,9 @@ struct AgentRegistrationRepository: RepositoryContext {
     // MARK: - Lookup
 
     func fetch(agentId: String) throws -> AgentRegistrationRecord? {
-        try AgentRegistrationRecord.fetchOne(db, where: "agent_id = ?", arguments: [agentId])
+        try AgentRegistrationRecord
+            .filter(AgentRegistrationRecord.Columns.agentId == agentId)
+            .fetchOne(db)
     }
 
     private func require(agentId: String) throws -> AgentRegistrationRecord {
