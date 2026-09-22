@@ -9,7 +9,7 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `daemon_config` table. Columns map via convertFromSnakeCase.
-struct DaemonConfigRecord: BaseRecordFields {
+struct DaemonConfigRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "daemon_config"
     var uuid: String
     var version: Int64
@@ -17,4 +17,13 @@ struct DaemonConfigRecord: BaseRecordFields {
     var updatedAt: String
     var configKey: String
     var configValue: String
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case configKey = "config_key"
+        case configValue = "config_value"
+    }
 }

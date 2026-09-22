@@ -9,8 +9,20 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `diagram_shape_vertex` table. Columns map via convertFromSnakeCase.
-struct DiagramShapeVertexRecord: BaseRecordFields {
+struct DiagramShapeVertexRecord: BaseRecordFields, TableRecord, SeqOrdered {
     static let databaseTableName = "diagram_shape_vertex"
+
+    enum Columns: String, ColumnExpression {
+        case uuid = "uuid"
+        case version = "version"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case shapeElementUuid = "shape_element_uuid"
+        case seq = "seq"
+        case x = "x"
+        case y = "y"
+    }
+
     var uuid: String
     var version: Int64
     var createdAt: String
@@ -19,4 +31,10 @@ struct DiagramShapeVertexRecord: BaseRecordFields {
     var seq: Int64
     var x: Double
     var y: Double
+}
+
+extension DiagramShapeVertexRecord {
+    /// `shape_element_uuid` points at `diagram_drawing_shape.element_uuid`, not
+    /// at its primary key; the schema foreign key carries that mapping.
+    static let shape = belongsTo(DiagramDrawingShapeRecord.self).forKey("shape")
 }

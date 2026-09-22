@@ -11,7 +11,7 @@ import GRDB
 /// Read-side mirror of the `exploration_finding` table (m0025: absorbed
 /// exploration_key_file — a key file is a finding of kind 'key_file' with
 /// file_path set).
-struct ExplorationFindingRecord: BaseRecordFields {
+struct ExplorationFindingRecord: BaseRecordFields, TableRecord, Rankable {
     static let databaseTableName = "exploration_finding"
     var uuid: String
     var version: Int64
@@ -25,6 +25,25 @@ struct ExplorationFindingRecord: BaseRecordFields {
     var agentName: String
     var agentId: String?
     var findingRating: Int64?
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case explorationSummaryUuid = "exploration_summary_uuid"
+        case kind
+        case title
+        case body
+        case filePath = "file_path"
+        case agentName = "agent_name"
+        case agentId = "agent_id"
+        case findingRating = "finding_rating"
+    }
+}
+
+extension ExplorationFindingRecord {
+    static let summary = belongsTo(ExplorationSummaryRecord.self).forKey("summary")
 }
 
 extension ExplorationFindingRecord {

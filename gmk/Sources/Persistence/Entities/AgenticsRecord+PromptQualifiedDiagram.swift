@@ -9,7 +9,7 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `prompt_qualified_diagram` table. Columns map via convertFromSnakeCase.
-struct PromptQualifiedDiagramRecord: BaseRecordFields {
+struct PromptQualifiedDiagramRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "prompt_qualified_diagram"
     var uuid: String
     var version: Int64
@@ -21,6 +21,24 @@ struct PromptQualifiedDiagramRecord: BaseRecordFields {
     var renderedRevision: Int64
     var renderFingerprint: String
     var qualification: String
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case promptUuid = "prompt_uuid"
+        case diagramUuid = "diagram_uuid"
+        case renderedPath = "rendered_path"
+        case renderedRevision = "rendered_revision"
+        case renderFingerprint = "render_fingerprint"
+        case qualification
+    }
+}
+
+extension PromptQualifiedDiagramRecord {
+    static let prompt = belongsTo(PromptRecord.self).forKey("prompt")
+    static let diagram = belongsTo(DiagramRecord.self).forKey("diagram")
 }
 
 extension PromptQualifiedDiagramRecord {

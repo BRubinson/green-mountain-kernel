@@ -33,6 +33,8 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
     /// GRDB traps rather than throwing when inference finds none or several, so
     /// this reads the `foreign_key_list` pragma and never prepares a request.
     func testEveryAssociationResolvesItsForeignKey() throws {
+        XCTAssertEqual(SchemaEnrollment.associations.count, 150, "an association left the roster or never joined it")
+
         try env.readOnlyDatabase()
             .read { db in
                 for entry in SchemaEnrollment.associations {

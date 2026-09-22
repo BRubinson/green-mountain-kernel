@@ -9,7 +9,7 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `kbite_resource` table. Columns map via convertFromSnakeCase.
-struct KbiteResourceRecord: BaseRecordFields {
+struct KbiteResourceRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "kbite_resource"
     var uuid: String
     var version: Int64
@@ -20,6 +20,28 @@ struct KbiteResourceRecord: BaseRecordFields {
     var resourceSummary: String
     var resourceType: String
     var resourceTrust: Int64
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case kbiteUuid = "kbite_uuid"
+        case resourceName = "resource_name"
+        case resourceSummary = "resource_summary"
+        case resourceType = "resource_type"
+        case resourceTrust = "resource_trust"
+    }
+}
+
+extension KbiteResourceRecord {
+    static let kbite = belongsTo(KbiteRecord.self)
+        .forKey("kbite")
+    /// The destination is the full-row Record: a list read must `select()`
+    /// around `resource_file_content` at request time.
+    static let files = hasMany(KbiteResourceFileRecord.self)
+        .order(Column("resource_file_name"))
+        .forKey("files")
 }
 
 extension KbiteResourceRecord {

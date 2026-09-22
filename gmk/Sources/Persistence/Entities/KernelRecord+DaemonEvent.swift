@@ -9,7 +9,7 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `daemon_event` table. Columns map via convertFromSnakeCase.
-struct DaemonEventRecord: BaseRecordFields {
+struct DaemonEventRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "daemon_event"
     var id: Int64
     var uuid: String
@@ -19,6 +19,17 @@ struct DaemonEventRecord: BaseRecordFields {
     var kind: String
     var subjectUuid: String?
     var payload: String?
+
+    enum Columns: String, ColumnExpression {
+        case id
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case kind
+        case subjectUuid = "subject_uuid"
+        case payload
+    }
 }
 
 extension DaemonEventRecord {

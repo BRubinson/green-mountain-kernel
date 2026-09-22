@@ -11,7 +11,7 @@ import GRDB
 /// Read-side mirror of the `agent_briefing` table (m0025 shape: opinion-free
 /// ref set — body/dope_refs/kbite_refs TEXT columns are gone, refs are child
 /// rows). Columns map via convertFromSnakeCase.
-struct AgentBriefingRecord: BaseRecordFields {
+struct AgentBriefingRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "agent_briefing"
     var uuid: String
     var version: Int64
@@ -24,6 +24,32 @@ struct AgentBriefingRecord: BaseRecordFields {
     var agentId: String?
     var dopeScopeUuid: String?
     var dopeScopeRevision: Int64?
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case sessionUuid = "session_uuid"
+        case promptUuid = "prompt_uuid"
+        case briefingForStep = "briefing_for_step"
+        case status
+        case agentId = "agent_id"
+        case dopeScopeUuid = "dope_scope_uuid"
+        case dopeScopeRevision = "dope_scope_revision"
+    }
+}
+
+extension AgentBriefingRecord {
+    static let dopeRefs = hasMany(AgentBriefingDopePersistenceRecord.self)
+        .order(Column("seq"))
+        .forKey("dopeRefs")
+    static let kbiteRefs = hasMany(AgentBriefingDopeKbiteRecord.self)
+        .order(Column("seq"))
+        .forKey("kbiteRefs")
+    static let fileChangeRefs = hasMany(AgentSessionFileChangeRecord.self)
+        .order(Column("seq"))
+        .forKey("fileChangeRefs")
 }
 
 extension AgentBriefingRecord {

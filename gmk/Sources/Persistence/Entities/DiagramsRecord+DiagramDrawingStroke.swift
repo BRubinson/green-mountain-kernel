@@ -9,8 +9,22 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `diagram_drawing_stroke` table. Columns map via convertFromSnakeCase.
-struct DiagramDrawingStrokeRecord: DiagramSubtypeRecord {
+struct DiagramDrawingStrokeRecord: DiagramSubtypeRecord, TableRecord {
     static let databaseTableName = "diagram_drawing_stroke"
+
+    enum Columns: String, ColumnExpression {
+        case uuid = "uuid"
+        case version = "version"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case elementUuid = "element_uuid"
+        case tool = "tool"
+        case strokeColor = "stroke_color"
+        case strokeWidth = "stroke_width"
+        case packedVertices = "packed_vertices"
+        case vertexCount = "vertex_count"
+    }
+
     var uuid: String
     var version: Int64
     var createdAt: String
@@ -21,4 +35,10 @@ struct DiagramDrawingStrokeRecord: DiagramSubtypeRecord {
     var strokeWidth: Double
     var packedVertices: Data?
     var vertexCount: Int64?
+}
+
+extension DiagramDrawingStrokeRecord {
+    static let element = belongsTo(DiagramElementRecord.self).forKey("element")
+
+    static let vertices = hasMany(DiagramStrokeVertexRecord.self).order(Column("seq")).forKey("vertices")
 }

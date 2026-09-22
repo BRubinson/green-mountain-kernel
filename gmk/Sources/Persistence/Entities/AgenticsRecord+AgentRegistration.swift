@@ -14,7 +14,7 @@ import GRDB
 /// Every column but agent_id is optional because the row is written by two
 /// parties that never coordinate — the identity half from a payload, the
 /// authority half from the spawner — and either may arrive first.
-struct AgentRegistrationRecord: BaseRecordFields {
+struct AgentRegistrationRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "agent_registration"
     var uuid: String
     var version: Int64
@@ -29,6 +29,22 @@ struct AgentRegistrationRecord: BaseRecordFields {
     var role: String?
     var methodology: String?
     var workflowPhase: String?
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case agentId = "agent_id"
+        case claudeSessionId = "claude_session_id"
+        case claudeTurnId = "claude_turn_id"
+        case sessionUuid = "session_uuid"
+        case promptUuid = "prompt_uuid"
+        case agentType = "agent_type"
+        case role
+        case methodology
+        case workflowPhase = "workflow_phase"
+    }
 }
 
 extension AgentRegistrationRecord {

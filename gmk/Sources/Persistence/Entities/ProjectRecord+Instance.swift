@@ -9,8 +9,21 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `instance` table. Columns map via convertFromSnakeCase.
-struct InstanceRecord: BaseRecordFields {
+struct InstanceRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "instance"
+
+    enum Columns: String, ColumnExpression {
+        case uuid = "uuid"
+        case version = "version"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case projectUuid = "project_uuid"
+        case code = "code"
+        case name = "name"
+        case absoluteFileSystemPath = "absolute_file_system_path"
+        case gmfsRelativeStoragePath = "gmfs_relative_storage_path"
+    }
+
     var uuid: String
     var version: Int64
     var createdAt: String
@@ -20,6 +33,19 @@ struct InstanceRecord: BaseRecordFields {
     var name: String
     var absoluteFileSystemPath: String
     var gmfsRelativeStoragePath: String
+}
+
+extension InstanceRecord {
+    static let project = belongsTo(ProjectRecord.self).forKey("project")
+
+    static let sessions = hasMany(SessionRecord.self).forKey("sessions")
+
+    static let activeKbites = hasMany(
+        KbiteRecord.self,
+        through: hasMany(InstanceActiveKbiteRecord.self).forKey("instanceActiveKbites"),
+        using: InstanceActiveKbiteRecord.kbite
+    )
+    .forKey("activeKbites")
 }
 
 extension InstanceRecord {

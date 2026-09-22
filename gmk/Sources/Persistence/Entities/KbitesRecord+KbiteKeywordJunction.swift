@@ -9,7 +9,7 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `kbite_keyword_junction` table. Columns map via convertFromSnakeCase.
-struct KbiteKeywordJunctionRecord: BaseRecordFields {
+struct KbiteKeywordJunctionRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "kbite_keyword_junction"
     var uuid: String
     var version: Int64
@@ -17,4 +17,20 @@ struct KbiteKeywordJunctionRecord: BaseRecordFields {
     var updatedAt: String
     var kbiteUuid: String
     var keywordUuid: String
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case kbiteUuid = "kbite_uuid"
+        case keywordUuid = "keyword_uuid"
+    }
+}
+
+extension KbiteKeywordJunctionRecord {
+    static let kbite = belongsTo(KbiteRecord.self)
+        .forKey("kbite")
+    static let keyword = belongsTo(KeywordRecord.self)
+        .forKey("keyword")
 }

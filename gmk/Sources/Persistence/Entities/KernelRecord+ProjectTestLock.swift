@@ -16,7 +16,7 @@ import GRDB
 /// they one table, every re-lock would destroy the record of the previous run —
 /// a deletion by another name, in a db whose whole contract is that it does not
 /// lose history.
-struct ProjectTestLockRecord: BaseRecordFields {
+struct ProjectTestLockRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "project_test_lock"
     var uuid: String
     var version: Int64
@@ -37,4 +37,26 @@ struct ProjectTestLockRecord: BaseRecordFields {
     /// Lease mode ONLY. Never the primary liveness test: a TTL fails toward
     /// HOLDING a stuck lock, which for a mutex is the worst direction.
     var expiresAt: String?
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case projectUuid = "project_uuid"
+        case state
+        case heldByRunUuid = "held_by_run_uuid"
+        case targetInstanceUuid = "target_instance_uuid"
+        case holderKind = "holder_kind"
+        case lockPath = "lock_path"
+        case holderPid = "holder_pid"
+        case claimedAt = "claimed_at"
+        case expiresAt = "expires_at"
+    }
+}
+
+extension ProjectTestLockRecord {
+    static let project = belongsTo(ProjectRecord.self).forKey("project")
+    static let heldByRun = belongsTo(TestRunRecord.self).forKey("heldByRun")
+    static let targetInstance = belongsTo(InstanceRecord.self).forKey("targetInstance")
 }

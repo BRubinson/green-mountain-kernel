@@ -9,7 +9,7 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `dope_scope` table. Columns map via convertFromSnakeCase.
-struct DopeScopeRecord: BaseRecordFields {
+struct DopeScopeRecord: BaseRecordFields, TableRecord, SoftDeletable {
     static let databaseTableName = "dope_scope"
     var uuid: String
     var version: Int64
@@ -28,6 +28,40 @@ struct DopeScopeRecord: BaseRecordFields {
     var promotedFromScopeUuid: String?
     var promotedFromRevision: Int64?
     var promotedFromUpdatedAt: String?
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case projectUuid = "project_uuid"
+        case instanceUuid = "instance_uuid"
+        case sessionUuid = "session_uuid"
+        case promptUuid = "prompt_uuid"
+        case scopeType = "scope_type"
+        case code
+        case name
+        case description
+        case revision
+        case deletedOn = "deleted_on"
+        case promotedFromScopeUuid = "promoted_from_scope_uuid"
+        case promotedFromRevision = "promoted_from_revision"
+        case promotedFromUpdatedAt = "promoted_from_updated_at"
+    }
+}
+
+extension DopeScopeRecord {
+    static let project = belongsTo(ProjectRecord.self).forKey("project")
+    static let instance = belongsTo(InstanceRecord.self).forKey("instance")
+    static let session = belongsTo(SessionRecord.self).forKey("session")
+    static let prompt = belongsTo(PromptRecord.self).forKey("prompt")
+    static let persistences = hasMany(DopePersistenceRecord.self)
+        .order(Column("sort_order"))
+        .forKey("persistences")
+    static let cogs = hasMany(DopeCogRecord.self)
+        .order(Column("sort_order"))
+        .forKey("cogs")
+    static let provenance = hasMany(DopeElementProvenanceRecord.self).forKey("provenance")
 }
 
 extension DopeScopeRecord {

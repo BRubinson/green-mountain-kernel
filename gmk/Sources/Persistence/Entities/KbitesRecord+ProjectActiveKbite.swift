@@ -9,7 +9,7 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `project_active_kbite` table. Columns map via convertFromSnakeCase.
-struct ProjectActiveKbiteRecord: BaseRecordFields {
+struct ProjectActiveKbiteRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "project_active_kbite"
     var uuid: String
     var version: Int64
@@ -17,4 +17,20 @@ struct ProjectActiveKbiteRecord: BaseRecordFields {
     var updatedAt: String
     var projectUuid: String
     var kbiteUuid: String
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case projectUuid = "project_uuid"
+        case kbiteUuid = "kbite_uuid"
+    }
+}
+
+extension ProjectActiveKbiteRecord {
+    static let kbite = belongsTo(KbiteRecord.self)
+        .forKey("kbite")
+    static let project = belongsTo(ProjectRecord.self)
+        .forKey("project")
 }

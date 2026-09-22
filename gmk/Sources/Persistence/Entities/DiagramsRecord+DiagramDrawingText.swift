@@ -9,8 +9,23 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `diagram_drawing_text` table. Columns map via convertFromSnakeCase.
-struct DiagramDrawingTextRecord: DiagramSubtypeRecord {
+struct DiagramDrawingTextRecord: DiagramSubtypeRecord, TableRecord {
     static let databaseTableName = "diagram_drawing_text"
+
+    enum Columns: String, ColumnExpression {
+        case uuid = "uuid"
+        case version = "version"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case elementUuid = "element_uuid"
+        case markdown = "markdown"
+        case width = "width"
+        case height = "height"
+        case fontSize = "font_size"
+        case textColor = "text_color"
+        case backgroundColor = "background_color"
+    }
+
     var uuid: String
     var version: Int64
     var createdAt: String
@@ -22,4 +37,8 @@ struct DiagramDrawingTextRecord: DiagramSubtypeRecord {
     var fontSize: Double
     var textColor: String
     var backgroundColor: String?
+}
+
+extension DiagramDrawingTextRecord {
+    static let element = belongsTo(DiagramElementRecord.self).forKey("element")
 }

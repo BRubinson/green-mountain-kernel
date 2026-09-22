@@ -9,8 +9,23 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `session` table. Columns map via convertFromSnakeCase.
-struct SessionRecord: BaseRecordFields {
+struct SessionRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "session"
+
+    enum Columns: String, ColumnExpression {
+        case uuid = "uuid"
+        case version = "version"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case instanceUuid = "instance_uuid"
+        case code = "code"
+        case name = "name"
+        case backstory = "backstory"
+        case goal = "goal"
+        case status = "status"
+        case gmfsRelativeStoragePath = "gmfs_relative_storage_path"
+    }
+
     var uuid: String
     var version: Int64
     var createdAt: String
@@ -22,6 +37,27 @@ struct SessionRecord: BaseRecordFields {
     var goal: String
     var status: String
     var gmfsRelativeStoragePath: String
+}
+
+extension SessionRecord {
+    static let instance = belongsTo(InstanceRecord.self).forKey("instance")
+
+    static let prompts = hasMany(PromptRecord.self).order(Column("seq")).forKey("prompts")
+
+    static let activations = hasMany(PromptActivationRecord.self).forKey("activations")
+
+    static let files = hasMany(SessionFileRecord.self).forKey("files")
+
+    static let fileChanges = hasMany(FileChangeRecord.self).forKey("fileChanges")
+
+    static let activeKbites = hasMany(
+        KbiteRecord.self,
+        through: hasMany(SessionActiveKbiteRecord.self).forKey("sessionActiveKbites"),
+        using: SessionActiveKbiteRecord.kbite
+    )
+    .forKey("activeKbites")
+
+    static let briefings = hasMany(AgentBriefingRecord.self).forKey("briefings")
 }
 
 extension SessionRecord {

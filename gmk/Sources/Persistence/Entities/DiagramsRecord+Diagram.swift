@@ -9,8 +9,28 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `diagram` table. Columns map via convertFromSnakeCase.
-struct DiagramRecord: BaseRecordFields {
+struct DiagramRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "diagram"
+
+    enum Columns: String, ColumnExpression {
+        case uuid = "uuid"
+        case version = "version"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case projectUuid = "project_uuid"
+        case sessionUuid = "session_uuid"
+        case promptUuid = "prompt_uuid"
+        case tier = "tier"
+        case code = "code"
+        case name = "name"
+        case description = "description"
+        case gmccDiagramPath = "gmcc_diagram_path"
+        case dopeScopeCode = "dope_scope_code"
+        case kbiteCode = "kbite_code"
+        case revision = "revision"
+        case visibility = "visibility"
+    }
+
     var uuid: String
     var version: Int64
     var createdAt: String
@@ -27,6 +47,16 @@ struct DiagramRecord: BaseRecordFields {
     var kbiteCode: String?
     var revision: Int64
     var visibility: String
+}
+
+extension DiagramRecord {
+    static let session = belongsTo(SessionRecord.self).forKey("session")
+
+    static let project = belongsTo(ProjectRecord.self).forKey("project")
+
+    static let prompt = belongsTo(PromptRecord.self).forKey("prompt")
+
+    static let elements = hasMany(DiagramElementRecord.self).order(Column("sort_order")).forKey("elements")
 }
 
 extension DiagramRecord {

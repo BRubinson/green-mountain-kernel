@@ -9,8 +9,21 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `diagram_stroke_vertex` table. Columns map via convertFromSnakeCase.
-struct DiagramStrokeVertexRecord: BaseRecordFields {
+struct DiagramStrokeVertexRecord: BaseRecordFields, TableRecord, SeqOrdered {
     static let databaseTableName = "diagram_stroke_vertex"
+
+    enum Columns: String, ColumnExpression {
+        case uuid = "uuid"
+        case version = "version"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case strokeElementUuid = "stroke_element_uuid"
+        case seq = "seq"
+        case x = "x"
+        case y = "y"
+        case pressure = "pressure"
+    }
+
     var uuid: String
     var version: Int64
     var createdAt: String
@@ -20,4 +33,10 @@ struct DiagramStrokeVertexRecord: BaseRecordFields {
     var x: Double
     var y: Double
     var pressure: Double?
+}
+
+extension DiagramStrokeVertexRecord {
+    /// `stroke_element_uuid` points at `diagram_drawing_stroke.element_uuid`,
+    /// not at its primary key; the schema foreign key carries that mapping.
+    static let stroke = belongsTo(DiagramDrawingStrokeRecord.self).forKey("stroke")
 }

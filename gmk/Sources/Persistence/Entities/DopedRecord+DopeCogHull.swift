@@ -9,7 +9,7 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `dope_cog_hull` table. Columns map via convertFromSnakeCase.
-struct DopeCogHullRecord: BaseRecordFields {
+struct DopeCogHullRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "dope_cog_hull"
     var uuid: String
     var version: Int64
@@ -17,4 +17,17 @@ struct DopeCogHullRecord: BaseRecordFields {
     var updatedAt: String
     var elementUuid: String
     var primaryPath: String
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case elementUuid = "element_uuid"
+        case primaryPath = "primary_path"
+    }
+}
+
+extension DopeCogHullRecord {
+    static let element = belongsTo(DopeCogElementRecord.self).forKey("element")
 }

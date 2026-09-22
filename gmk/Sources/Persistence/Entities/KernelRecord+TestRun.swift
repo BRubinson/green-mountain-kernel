@@ -13,7 +13,7 @@ import GRDB
 /// Nothing here is ever deleted, and the only mutations are the lifecycle
 /// stamps (`state`, `startedAt`, `finishedAt`, `exitCode`, `summary`) on a row
 /// that already exists.
-struct TestRunRecord: BaseRecordFields {
+struct TestRunRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "test_run"
     var uuid: String
     var version: Int64
@@ -44,4 +44,34 @@ struct TestRunRecord: BaseRecordFields {
     var finishedAt: String?
     var exitCode: Int?
     var summary: String?
+
+    enum Columns: String, ColumnExpression {
+        case uuid
+        case version
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case projectUuid = "project_uuid"
+        case instanceUuid = "instance_uuid"
+        case sessionUuid = "session_uuid"
+        case agentId = "agent_id"
+        case runRoot = "run_root"
+        case suiteId = "suite_id"
+        case gitSha = "git_sha"
+        case gitBranch = "git_branch"
+        case state
+        case doneKind = "done_kind"
+        case doneCondition = "done_condition"
+        case doneHint = "done_hint"
+        case startedAt = "started_at"
+        case finishedAt = "finished_at"
+        case exitCode = "exit_code"
+        case summary
+    }
+}
+
+extension TestRunRecord {
+    static let project = belongsTo(ProjectRecord.self).forKey("project")
+    static let instance = belongsTo(InstanceRecord.self).forKey("instance")
+    static let session = belongsTo(SessionRecord.self).forKey("session")
+    static let lock = hasOne(ProjectTestLockRecord.self).forKey("lock")
 }
