@@ -641,9 +641,20 @@ enum SchemaEnrollment {
         }
     }
 
+    /// A composite whose request decodes a bare scalar rather than a record.
+    private static func scalarComposite<V: DatabaseValueConvertible>(
+        _ label: String,
+        request: @escaping @Sendable () -> QueryInterfaceRequest<V>
+    ) -> CompositeEntry {
+        CompositeEntry(label: label) { db in
+            try request().makePreparedRequest(db, forSingleResult: false).statement.sql
+        }
+    }
+
     /// One entry per composite, preparing that composite's canonical request.
     static let composites: [CompositeEntry] = [
         composite(AgentBriefingWithRefs.self, "AgentBriefingWithRefs") { AgentBriefingWithRefs.request() },
+        composite(ArchitectureCounts.self, "ArchitectureCounts") { ArchitectureCounts.request(summaryUuid: "a") },
         composite(ArchPersistenceChangeWithFields.self, "ArchPersistenceChangeWithFields") {
             ArchPersistenceChangeWithFields.request()
         },
@@ -660,10 +671,71 @@ enum SchemaEnrollment {
         composite(ReviewSummaryWithFindings.self, "ReviewSummaryWithFindings") { ReviewSummaryWithFindings.request() },
         composite(TouchedPathSummary.self, "TouchedPathSummary") { TouchedPathSummary.request(promptUuid: "p") },
 
+        composite(DiagramOwnerChain.self, "DiagramOwnerChain.forSession") { DiagramOwnerChain.forSession("s") },
+        composite(DiagramOwnerChain.self, "DiagramOwnerChain.forPrompt") { DiagramOwnerChain.forPrompt("p") },
         composite(DiagramWithOwner.self, "DiagramWithOwner") { DiagramWithOwner.request() },
 
-        composite(KbiteResourceWithFiles.self, "KbiteResourceWithFiles") { KbiteResourceWithFiles.request() },
+        composite(DopeCogWithElements.self, "DopeCogWithElements") { DopeCogWithElements.request() },
+        composite(DopeDomainChildPath.self, "DopeDomainChildPath.entities") { DopeDomainChildPath.entities() },
+        composite(DopeDomainChildPath.self, "DopeDomainChildPath.enums") { DopeDomainChildPath.enums() },
+        composite(DopeDomainChildPath.self, "DopeDomainChildPath.entitiesComposingInside") {
+            DopeDomainChildPath.entitiesComposingInside(persistenceUuid: "d")
+        },
+        composite(DopeDomainGrandchildPath.self, "DopeDomainGrandchildPath.properties") {
+            DopeDomainGrandchildPath.properties()
+        },
+        composite(DopeDomainGrandchildPath.self, "DopeDomainGrandchildPath.options") {
+            DopeDomainGrandchildPath.options()
+        },
+        composite(DopeDomainGrandchildPath.self, "DopeDomainGrandchildPath.propertiesReaching(relationshipTarget)") {
+            DopeDomainGrandchildPath.propertiesReaching(
+                entityUuid: "e",
+                through: DopePersistenceEntityPropertyRecord.relationshipTarget
+            )
+        },
+        composite(DopeDomainGrandchildPath.self, "DopeDomainGrandchildPath.propertiesReaching(baseOriginProperty)") {
+            DopeDomainGrandchildPath.propertiesReaching(
+                entityUuid: "e",
+                through: DopePersistenceEntityPropertyRecord.baseOriginProperty
+            )
+        },
+        composite(DopeDomainGrandchildPath.self, "DopeDomainGrandchildPath.propertiesReachingInto") {
+            DopeDomainGrandchildPath.propertiesReachingInto(persistenceUuid: "d")
+        },
+        composite(DopeDomainGrandchildPath.self, "DopeDomainGrandchildPath.propertiesOriginatingInside") {
+            DopeDomainGrandchildPath.propertiesOriginatingInside(persistenceUuid: "d")
+        },
+        composite(DopeMaterializedOrigin.self, "DopeMaterializedOrigin") {
+            DopeMaterializedOrigin.request(entityUuid: "e")
+        },
+        composite(DopePersistenceCascadeCounts.self, "DopePersistenceCascadeCounts") {
+            DopePersistenceCascadeCounts.request(persistenceUuid: "d")
+        },
+        composite(DopePropertyOrigin.self, "DopePropertyOrigin") { DopePropertyOrigin.request(propertyUuid: "p") },
+        composite(DopeScopeLineage.self, "DopeScopeLineage.forSession") { DopeScopeLineage.forSession("s") },
+        composite(DopeScopePersistenceCount.self, "DopeScopePersistenceCount") {
+            DopeScopePersistenceCount.request(scopeUuid: "s")
+        },
 
+        composite(KbiteCounts.self, "KbiteCounts") { KbiteCounts.request(kbiteUuid: "k") },
+        scalarComposite("KbiteFileKeywords") { KbiteFileKeywords.request(fileUuid: "f") },
+        composite(KbiteResourceWithFiles.self, "KbiteResourceWithFiles") { KbiteResourceWithFiles.request() },
+        composite(KbiteWithResources.self, "KbiteWithResources") { KbiteWithResources.request(code: "c") },
+
+        composite(ArchitectureReport.self, "ArchitectureReport") { ArchitectureReport.request(sessionUuid: nil) },
+        composite(ArchitectureReport.self, "ArchitectureReport(sessionUuid:)") {
+            ArchitectureReport.request(sessionUuid: "s")
+        },
+        composite(ClarificationReport.self, "ClarificationReport") { ClarificationReport.request(sessionUuid: nil) },
+        composite(ClarificationReport.self, "ClarificationReport(sessionUuid:)") {
+            ClarificationReport.request(sessionUuid: "s")
+        },
+        composite(ExplorationReport.self, "ExplorationReport") { ExplorationReport.request(sessionUuid: nil) },
+        composite(ExplorationReport.self, "ExplorationReport(sessionUuid:)") {
+            ExplorationReport.request(sessionUuid: "s")
+        },
+        composite(ReviewReport.self, "ReviewReport") { ReviewReport.request(sessionUuid: nil) },
+        composite(ReviewReport.self, "ReviewReport(sessionUuid:)") { ReviewReport.request(sessionUuid: "s") },
         composite(PromptSummary.self, "PromptSummary") { PromptSummary.request(sessionUuid: nil) },
         composite(PromptSummary.self, "PromptSummary(sessionUuid:)") { PromptSummary.request(sessionUuid: "s") },
         composite(SessionLineage.self, "SessionLineage") { SessionLineage.request(sessionUuid: "s") },

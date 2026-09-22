@@ -23,22 +23,25 @@ enum WorkflowGates {
         var unmet: [String] = []
 
         // (1) planned persistence paths with no file_change row.
+        let change = TableAlias<ArchitecturePersistenceChangeRecord>(name: "pc")
         let untouchedPersistence =
-            try Int.fetchOne(
-                db,
+            try ArchitecturePersistenceChangeRecord
+            .aliased(change)
+            .joining(
+                required: ArchitecturePersistenceChangeRecord.summary
+                    .filter(ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
+            )
+            .filter(
                 sql: """
-                    SELECT COUNT(*)
-                    FROM architecture_persistence_change pc
-                    JOIN architecture_summary s ON s.uuid = pc.architecture_summary_uuid
-                    WHERE s.prompt_uuid = ?
-                      AND NOT EXISTS (
-                          SELECT 1 FROM file_change fc
-                          JOIN session_file sf ON sf.uuid = fc.session_file_uuid
-                          WHERE fc.prompt_uuid = s.prompt_uuid
-                            AND sf.relative_path = pc.file_path)
+                    NOT EXISTS (
+                        SELECT 1 FROM file_change fc
+                        JOIN session_file sf ON sf.uuid = fc.session_file_uuid
+                        WHERE fc.prompt_uuid = ?
+                          AND sf.relative_path = pc.file_path)
                     """,
                 arguments: [promptUuid]
-            ) ?? 0
+            )
+            .fetchCount(db)
         if untouchedPersistence > 0 {
             unmet.append(
                 "\(untouchedPersistence) planned persistence change(s) have no recorded "

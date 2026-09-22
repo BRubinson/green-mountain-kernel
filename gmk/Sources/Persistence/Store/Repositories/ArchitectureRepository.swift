@@ -628,27 +628,17 @@ struct ArchitectureRepository: RepositoryContext {
     /// gate, a Swift store guard by the m0016 cross-table rule. Zero options
     /// = legal direct expansion (bot/rpi flows untouched by construction).
     private func requireDecisionBeforeExpansion(summaryUuid: String, verb: String) throws {
-        let total =
-            try Int.fetchOne(
-                db,
-                sql: "SELECT COUNT(*) FROM architecture_option WHERE architecture_summary_uuid = ?",
-                arguments: [summaryUuid]
-            ) ?? 0
-        guard total > 0 else { return }
-        let selected =
-            try Int.fetchOne(
-                db,
-                sql:
-                    "SELECT COUNT(*) FROM architecture_option WHERE architecture_summary_uuid = ? AND status = 'selected'",
-                arguments: [summaryUuid]
-            ) ?? 0
-        guard selected == 1 else {
+        guard
+            let counts = try ArchitectureCounts.request(summaryUuid: summaryUuid).fetchOne(db),
+            counts.optionCount > 0
+        else { return }
+        guard counts.selectedCount == 1 else {
             throw StoreError.invalidEntityTransition(
                 entity: "architecture",
                 from: "options_undecided",
                 to: verb,
                 reason:
-                    "\(total) option(s) exist with none selected — run arch_decide first; only the selected option expands into change rows"
+                    "\(counts.optionCount) option(s) exist with none selected — run arch_decide first; only the selected option expands into change rows"
             )
         }
     }

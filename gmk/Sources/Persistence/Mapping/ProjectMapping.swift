@@ -81,6 +81,66 @@ extension PromptSummary {
     }
 }
 
+extension ClarificationReport {
+    /// db → wire.
+    func dto() -> ClarificationReportStub {
+        ClarificationReportStub(
+            summaryUuid: summary.uuid,
+            version: summary.version,
+            status: summary.status,
+            questionCount: questionCount,
+            openQuestionCount: openQuestionCount,
+            noteCount: noteCount,
+            carePackageReady: carePackageReady
+        )
+    }
+}
+
+extension ArchitectureReport {
+    /// db → wire.
+    func dto() -> ArchitectureReportStub {
+        ArchitectureReportStub(
+            summaryUuid: summary.uuid,
+            version: summary.version,
+            status: summary.status,
+            persistenceChangeCount: persistenceChangeCount,
+            generalChangeCount: generalChangeCount
+        )
+    }
+}
+
+extension ExplorationReport {
+    /// db → wire. The identity is the pivot's representative row, never one
+    /// agent's own summary.
+    func dto() -> ExplorationReportStub {
+        ExplorationReportStub(
+            summaryUuid: repUuid,
+            version: repVersion,
+            status: repStatus,
+            keyFileCount: keyFileCount,
+            findingCount: findingCount,
+            sub100FindingCount: sub100FindingCount,
+            unrankedFindingCount: unrankedFindingCount
+        )
+    }
+}
+
+extension ReviewReport {
+    /// db → wire.
+    func dto() -> ReviewReportStub {
+        ReviewReportStub(
+            summaryUuid: summary.uuid,
+            version: summary.version,
+            status: summary.status,
+            verdict: summary.verdict,
+            findingCount: findingCount,
+            sub100FindingCount: sub100FindingCount,
+            unrankedFindingCount: unrankedFindingCount,
+            openFindingCount: openFindingCount
+        )
+    }
+}
+
 extension PromptActivationRecord {
     /// db → wire.
     func dto() -> PromptActivationRow {

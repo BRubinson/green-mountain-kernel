@@ -20,20 +20,11 @@ struct BotWorkflowRepository: RepositoryContext {
     /// change — the briefing/explore phases run while the prompt is draft,
     /// exactly as the manual flow always has.
     func start(_ req: PromptStartRequest) throws -> BotWorkflowResponse {
-        guard
-            let prompt = try Row.fetchOne(
-                db,
-                sql: "SELECT session_uuid, status FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            )
-        else {
-            throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
-        }
-        let status: String = prompt["status"]
-        guard status == "draft" else {
+        let prompt = try PromptRecord.require(db, uuid: req.promptUuid)
+        guard prompt.status == "draft" else {
             throw StoreError.invalidEntityTransition(
                 entity: "bot_workflow",
-                from: status,
+                from: prompt.status,
                 to: "start",
                 reason: "PROMPT_START runs on a draft prompt — use PROMPT_RESUME"
             )
@@ -43,7 +34,7 @@ struct BotWorkflowRepository: RepositoryContext {
                 detail: "prompt \(req.promptUuid) already has an active workflow — PROMPT_RESUME it"
             )
         }
-        let sessionUuid: String = prompt["session_uuid"]
+        let sessionUuid = prompt.sessionUuid
         // Moving to a new prompt releases the caller's previous hold —
         // without this, the partial UNIQUE(client_key) WHERE active turns
         // the mainline abandon-A-start-B flow into a raw constraint failure.
@@ -88,20 +79,11 @@ struct BotWorkflowRepository: RepositoryContext {
     /// Adopt whatever evidence exists: fetch-or-create, re-stamp the client
     /// key, change nothing else. Phase is recomputed at every NEXT.
     func resume(_ req: PromptResumeRequest) throws -> BotWorkflowResponse {
-        guard
-            let prompt = try Row.fetchOne(
-                db,
-                sql: "SELECT session_uuid, status FROM prompt WHERE uuid = ?",
-                arguments: [req.promptUuid]
-            )
-        else {
-            throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
-        }
+        let prompt = try PromptRecord.require(db, uuid: req.promptUuid)
         // A done prompt is finished work: new work = a new prompt. Without
         // this guard resume would mint a second, permanently-unclosable
         // active workflow on a closed prompt.
-        let promptStatus: String = prompt["status"]
-        guard promptStatus != "done" else {
+        guard prompt.status != "done" else {
             throw StoreError.invalidEntityTransition(
                 entity: "bot_workflow",
                 from: "done",
@@ -109,7 +91,7 @@ struct BotWorkflowRepository: RepositoryContext {
                 reason: "prompt is done — its workflow is closed; new work is a new prompt"
             )
         }
-        let sessionUuid: String = prompt["session_uuid"]
+        let sessionUuid = prompt.sessionUuid
         if let existing = try fetchActive(promptUuid: req.promptUuid) {
             // Steal the claim honestly: a different instance resuming a
             // stranded run is the normal recovery path.
@@ -333,39 +315,22 @@ struct BotWorkflowRepository: RepositoryContext {
             return []
         case .explore:
             let ready =
-                try Row.fetchOne(
-                    db,
-                    sql: """
-                        SELECT 1 FROM agent_briefing
-                        WHERE prompt_uuid = ? AND briefing_for_step = 'initial' AND status = 'ready'
-                        """,
-                    arguments: [promptUuid]
-                ) != nil
+                try AgentBriefingRecord
+                .filter(AgentBriefingRecord.Columns.promptUuid == promptUuid)
+                .filter(AgentBriefingRecord.Columns.briefingForStep == "initial")
+                .filter(AgentBriefingRecord.Columns.status == "ready")
+                .fetchCount(db) > 0
             return ready ? [] : ["initial briefing not ready"]
         case .clarifyOpen:
             var unmet: [String] = []
             for agent in WorkflowSpec.expectedExplorationAgents(for: variant) {
-                let complete =
-                    try Row.fetchOne(
-                        db,
-                        sql: """
-                            SELECT 1 FROM exploration_summary
-                            WHERE prompt_uuid = ? AND agent_type = ? AND status = 'complete'
-                            """,
-                        arguments: [promptUuid, agent.rawValue]
-                    ) != nil
-                if !complete { unmet.append("exploration summary '\(agent.rawValue)' incomplete") }
+                if try explorationComplete(promptUuid: promptUuid, agentType: agent.rawValue) == false {
+                    unmet.append("exploration summary '\(agent.rawValue)' incomplete")
+                }
             }
-            let sealed =
-                try Row.fetchOne(
-                    db,
-                    sql: """
-                        SELECT 1 FROM exploration_summary
-                        WHERE prompt_uuid = ? AND agent_type = 'synthesis' AND status = 'complete'
-                        """,
-                    arguments: [promptUuid]
-                ) != nil
-            if !sealed { unmet.append("synthesis summary (the prompt-level seal) incomplete") }
+            if try explorationComplete(promptUuid: promptUuid, agentType: "synthesis") == false {
+                unmet.append("synthesis summary (the prompt-level seal) incomplete")
+            }
             return unmet
         case .clarifyUser:
             let status = try clarificationStatus(promptUuid: promptUuid)
@@ -378,28 +343,23 @@ struct BotWorkflowRepository: RepositoryContext {
                 return ["clarification suite not sealed"]
             }
             let open =
-                try Int.fetchOne(
-                    db,
-                    sql: """
-                        SELECT COUNT(*) FROM user_clarification_question q
-                        JOIN clarification_summary s ON s.uuid = q.clarification_summary_uuid
-                        WHERE s.prompt_uuid = ? AND q.status = 'open'
-                        """,
-                    arguments: [promptUuid]
-                ) ?? 0
+                try UserClarificationQuestionRecord
+                .filter(UserClarificationQuestionRecord.Columns.status == "open")
+                .joining(
+                    required: UserClarificationQuestionRecord.summary
+                        .filter(ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
+                )
+                .fetchCount(db)
             return open == 0 ? [] : ["\(open) question(s) still open"]
         case .archOptions, .architecture:
             if phase == .architecture && variant == .team {
                 let options =
-                    try Int.fetchOne(
-                        db,
-                        sql: """
-                            SELECT COUNT(*) FROM architecture_option o
-                            JOIN architecture_summary s ON s.uuid = o.architecture_summary_uuid
-                            WHERE s.prompt_uuid = ?
-                            """,
-                        arguments: [promptUuid]
-                    ) ?? 0
+                    try ArchitectureOptionRecord
+                    .joining(
+                        required: ArchitectureOptionRecord.summary
+                            .filter(ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
+                    )
+                    .fetchCount(db)
                 return options > 0 ? [] : ["no architecture options written yet"]
             }
             let clarifyDone = try clarificationStatus(promptUuid: promptUuid) == "complete"
@@ -412,13 +372,10 @@ struct BotWorkflowRepository: RepositoryContext {
             return unmet
         case .planGate:
             let body =
-                try String.fetchOne(
-                    db,
-                    sql: """
-                        SELECT body FROM architecture_summary WHERE prompt_uuid = ?
-                        """,
-                    arguments: [promptUuid]
-                ) ?? ""
+                try ArchitectureSummaryRecord
+                .filter(ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
+                .select(ArchitectureSummaryRecord.Columns.body, as: String.self)
+                .fetchOne(db) ?? ""
             return body.isEmpty ? ["architecture summary body not written"] : []
         case .implement:
             // ARCHITECTURE APPROVAL IS THE WHOLE GATE. Derivation reads no
@@ -429,34 +386,23 @@ struct BotWorkflowRepository: RepositoryContext {
             // approved the plan before anyone writes code, and the approval
             // check below says exactly that without a weaker second proxy.
             let approved =
-                try Row.fetchOne(
-                    db,
-                    sql: """
-                        SELECT 1 FROM architecture_summary
-                        WHERE prompt_uuid = ? AND status = 'approved'
-                        """,
-                    arguments: [promptUuid]
-                ) != nil
+                try ArchitectureSummaryRecord
+                .filter(ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
+                .filter(ArchitectureSummaryRecord.Columns.status == "approved")
+                .fetchCount(db) > 0
             return approved ? [] : ["architecture not approved"]
         case .review:
             let opened =
-                try Row.fetchOne(
-                    db,
-                    sql: """
-                        SELECT 1 FROM review_summary WHERE prompt_uuid = ?
-                        """,
-                    arguments: [promptUuid]
-                ) != nil
+                try ReviewSummaryRecord
+                .filter(ReviewSummaryRecord.Columns.promptUuid == promptUuid)
+                .fetchCount(db) > 0
             return opened ? [] : ["review summary not opened"]
         case .reviewFix:
             let complete =
-                try Row.fetchOne(
-                    db,
-                    sql: """
-                        SELECT 1 FROM review_summary WHERE prompt_uuid = ? AND status = 'complete'
-                        """,
-                    arguments: [promptUuid]
-                ) != nil
+                try ReviewSummaryRecord
+                .filter(ReviewSummaryRecord.Columns.promptUuid == promptUuid)
+                .filter(ReviewSummaryRecord.Columns.status == "complete")
+                .fetchCount(db) > 0
             return complete ? [] : ["review not complete"]
         case .done:
             return try promptStatus(promptUuid: promptUuid) == "done"
@@ -466,62 +412,40 @@ struct BotWorkflowRepository: RepositoryContext {
 
     private func phaseUuids(workflow: BotWorkflowRow) throws -> BotPhaseUuids {
         let promptUuid = workflow.promptUuid
-        let briefing = try String.fetchOne(
-            db,
-            sql: """
-                SELECT uuid FROM agent_briefing
-                WHERE prompt_uuid = ? AND briefing_for_step = 'initial'
-                ORDER BY created_at DESC, id DESC LIMIT 1
-                """,
-            arguments: [promptUuid]
+        let briefing = try newestUuid(
+            AgentBriefingRecord
+                .filter(AgentBriefingRecord.Columns.promptUuid == promptUuid)
+                .filter(AgentBriefingRecord.Columns.briefingForStep == "initial")
         )
-        let clarification = try String.fetchOne(
-            db,
-            sql: """
-                SELECT uuid FROM clarification_summary WHERE prompt_uuid = ?
-                ORDER BY created_at DESC, id DESC LIMIT 1
-                """,
-            arguments: [promptUuid]
+        let clarification = try newestUuid(
+            ClarificationSummaryRecord
+                .filter(ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
         )
         var package: String?
         if let clarification {
-            package = try String.fetchOne(
-                db,
-                sql: """
-                    SELECT uuid FROM care_package WHERE clarification_summary_uuid = ?
-                    ORDER BY created_at DESC, id DESC LIMIT 1
-                    """,
-                arguments: [clarification]
+            package = try newestUuid(
+                CarePackageRecord
+                    .filter(CarePackageRecord.Columns.clarificationSummaryUuid == clarification)
             )
         }
-        let architecture = try String.fetchOne(
-            db,
-            sql: """
-                SELECT uuid FROM architecture_summary WHERE prompt_uuid = ?
-                ORDER BY created_at DESC, id DESC LIMIT 1
-                """,
-            arguments: [promptUuid]
+        let architecture = try newestUuid(
+            ArchitectureSummaryRecord
+                .filter(ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
         )
-        let review = try String.fetchOne(
-            db,
-            sql: """
-                SELECT uuid FROM review_summary WHERE prompt_uuid = ?
-                ORDER BY created_at DESC, id DESC LIMIT 1
-                """,
-            arguments: [promptUuid]
+        let review = try newestUuid(
+            ReviewSummaryRecord
+                .filter(ReviewSummaryRecord.Columns.promptUuid == promptUuid)
         )
         var exploration: [String: String] = [:]
         // Ascending so the dictionary's last-write-wins lands on the newest
         // summary per agent_type.
-        for row in try Row.fetchAll(
-            db,
-            sql: """
-                SELECT agent_type, uuid FROM exploration_summary WHERE prompt_uuid = ?
-                ORDER BY created_at ASC, id ASC
-                """,
-            arguments: [promptUuid]
-        ) {
-            exploration[row["agent_type"]] = row["uuid"]
+        for summary
+            in try ExplorationSummaryRecord
+            .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
+            .order(Column("created_at"), Column("id"))
+            .fetchAll(db)
+        {
+            exploration[summary.agentType] = summary.uuid
         }
         return BotPhaseUuids(
             promptUuid: promptUuid,
@@ -535,23 +459,39 @@ struct BotWorkflowRepository: RepositoryContext {
         )
     }
 
+    private func explorationComplete(promptUuid: String, agentType: String) throws -> Bool {
+        try ExplorationSummaryRecord
+            .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
+            .filter(ExplorationSummaryRecord.Columns.agentType == agentType)
+            .filter(ExplorationSummaryRecord.Columns.status == "complete")
+            .fetchCount(db) > 0
+    }
+
+    /// Newest first by `created_at` then rowid — the tie-break every uuid
+    /// lookup in this file reads with.
+    private func newestUuid<T: BaseRecordFields>(
+        _ request: QueryInterfaceRequest<T>
+    ) throws -> String? {
+        try request
+            .order(Column("created_at").desc, Column("id").desc)
+            .select(Column("uuid"), as: String.self)
+            .fetchOne(db)
+    }
+
     private func clarificationStatus(promptUuid: String) throws -> String? {
-        try String.fetchOne(
-            db,
-            sql: """
-                SELECT status FROM clarification_summary WHERE prompt_uuid = ?
-                ORDER BY created_at DESC, id DESC LIMIT 1
-                """,
-            arguments: [promptUuid]
-        )
+        try ClarificationSummaryRecord
+            .filter(ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
+            .order(Column("created_at").desc, Column("id").desc)
+            .select(ClarificationSummaryRecord.Columns.status, as: String.self)
+            .fetchOne(db)
     }
 
     private func promptStatus(promptUuid: String) throws -> String? {
-        try String.fetchOne(
-            db,
-            sql: "SELECT status FROM prompt WHERE uuid = ?",
-            arguments: [promptUuid]
-        )
+        try PromptRecord
+            .all()
+            .withUuid(promptUuid)
+            .select(PromptRecord.Columns.status, as: String.self)
+            .fetchOne(db)
     }
 
     // MARK: - Resolution + fetch
@@ -569,23 +509,23 @@ struct BotWorkflowRepository: RepositoryContext {
     ) throws -> BotWorkflowRow {
         if let promptUuid {
             if let row = try fetchActive(promptUuid: promptUuid) { return row }
-            if let closed = try fetchWorkflows(
-                where: "prompt_uuid = ?",
-                arguments: [promptUuid]
-            )
-            .last {
-                return closed
+            if let closed =
+                try workflows
+                .filter(BotWorkflowRecord.Columns.promptUuid == promptUuid)
+                .fetchAll(db)
+                .last
+            {
+                return closed.dto()
             }
             throw StoreError.summaryAbsent(entity: "bot_workflow", promptUuid: promptUuid)
         }
         if let clientKey,
-            let row = try fetchWorkflows(
-                where: "client_key = ? AND status = 'active'",
-                arguments: [clientKey]
-            )
-            .first
+            let row =
+                try activeWorkflows
+                .filter(BotWorkflowRecord.Columns.clientKey == clientKey)
+                .fetchOne(db)
         {
-            return row
+            return row.dto()
         }
         if let sessionUuid {
             if let active = try SessionRepository(db: db, core: core)
@@ -597,11 +537,11 @@ struct BotWorkflowRepository: RepositoryContext {
             {
                 return row
             }
-            let rows = try fetchWorkflows(
-                where: "session_uuid = ? AND status = 'active'",
-                arguments: [sessionUuid]
-            )
-            if rows.count == 1 { return rows[0] }
+            let rows =
+                try activeWorkflows
+                .filter(BotWorkflowRecord.Columns.sessionUuid == sessionUuid)
+                .fetchAll(db)
+            if rows.count == 1 { return rows[0].dto() }
             if rows.count > 1 {
                 throw StoreError.badRequest(
                     detail: "session has \(rows.count) active workflows — pass prompt_uuid"
@@ -614,38 +554,35 @@ struct BotWorkflowRepository: RepositoryContext {
         )
     }
 
+    /// Every `bot_workflow` row, oldest first — the order every resolution
+    /// path below reads in.
+    private var workflows: QueryInterfaceRequest<BotWorkflowRecord> {
+        BotWorkflowRecord.all().orderedByCreatedAt()
+    }
+
+    private var activeWorkflows: QueryInterfaceRequest<BotWorkflowRecord> {
+        workflows.filter(BotWorkflowRecord.Columns.status == "active")
+    }
+
     func fetchActive(promptUuid: String) throws -> BotWorkflowRow? {
-        try fetchWorkflows(
-            where: "prompt_uuid = ? AND status = 'active'",
-            arguments: [promptUuid]
-        )
-        .first
+        try activeWorkflows
+            .filter(BotWorkflowRecord.Columns.promptUuid == promptUuid)
+            .fetchOne(db)?
+            .dto()
     }
 
     private func fetchRow(uuid: String) throws -> BotWorkflowRow? {
-        try fetchWorkflows(where: "uuid = ?", arguments: [uuid]).first
-    }
-
-    private func fetchWorkflows(
-        where condition: String,
-        arguments: StatementArguments
-    ) throws -> [BotWorkflowRow] {
-        try BotWorkflowRecord.fetchAll(
-            db,
-            where: condition,
-            arguments: arguments,
-            orderBy: "created_at"
-        )
-        .map { $0.wireRow() }
+        try BotWorkflowRecord.fetch(db, uuid: uuid)?.dto()
     }
 
     /// The partial UNIQUE(client_key) WHERE active means one instance drives
     /// one workflow at a time: moving to a new prompt releases the old hold.
     private func releaseClientClaim(clientKey: String, except uuid: String?) throws {
-        for row in try fetchWorkflows(
-            where: "client_key = ? AND status = 'active'",
-            arguments: [clientKey]
-        ) where row.uuid != uuid {
+        for row
+            in try activeWorkflows
+            .filter(BotWorkflowRecord.Columns.clientKey == clientKey)
+            .fetchAll(db) where row.uuid != uuid
+        {
             try core.updateBase(
                 db,
                 table: "bot_workflow",

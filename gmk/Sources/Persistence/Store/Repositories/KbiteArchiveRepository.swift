@@ -14,83 +14,27 @@ struct KbiteArchiveRepository: RepositoryContext {
         code: String,
         anonymize: [KbitePrefixRule]
     ) throws -> (document: KbiteExportDocument, fileKeywordCount: Int) {
-        guard
-            let kbiteRow = try Row.fetchOne(
-                db,
-                sql: "SELECT uuid FROM kbite WHERE code = ?",
-                arguments: [code]
-            )
-        else {
+        guard let manifest = try KbiteWithResources.request(code: code).fetchOne(db) else {
             throw StoreError.notFound(entity: "kbite", key: code)
         }
-        let kbiteUuid: String = kbiteRow["uuid"]
-
-        let kbiteKeywords = try String.fetchAll(
-            db,
-            sql: """
-                SELECT kw.keyword FROM keyword kw
-                JOIN kbite_keyword_junction j ON j.keyword_uuid = kw.uuid
-                WHERE j.kbite_uuid = ? ORDER BY kw.keyword
-                """,
-            arguments: [kbiteUuid]
-        )
-
         var fileKeywordCount = 0
         var resources: [KbiteExportDocument.Resource] = []
-        for resourceRow in try Row.fetchAll(
-            db,
-            sql: """
-                SELECT uuid, resource_name, resource_summary, resource_type, resource_trust
-                FROM kbite_resource WHERE kbite_uuid = ? ORDER BY resource_name
-                """,
-            arguments: [kbiteUuid]
-        ) {
-            let resourceUuid: String = resourceRow["uuid"]
+        for resource in manifest.resources {
             var files: [KbiteExportDocument.File] = []
-            for fileRow in try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT uuid, resource_file_name, resource_file_summary, resource_file_content
-                    FROM kbite_resource_file WHERE kbite_resource_uuid = ?
-                    ORDER BY resource_file_name
-                    """,
-                arguments: [resourceUuid]
-            ) {
-                let fileUuid: String = fileRow["uuid"]
-                let keywords = try String.fetchAll(
-                    db,
-                    sql: """
-                        SELECT kw.keyword FROM keyword kw
-                        JOIN resource_file_keyword_junction j ON j.keyword_uuid = kw.uuid
-                        WHERE j.file_uuid = ? ORDER BY kw.keyword
-                        """,
-                    arguments: [fileUuid]
-                )
-                fileKeywordCount += keywords.count
-                let content: String? = fileRow["resource_file_content"]
-                files.append(
-                    KbiteExportDocument.File(
-                        resourceFileName: fileRow["resource_file_name"],
-                        resourceFileSummary: KbiteArchive.scrub(
-                            fileRow["resource_file_summary"],
-                            rules: anonymize
-                        ),
-                        resourceFileContent: content.map {
-                            KbiteArchive.scrub($0, rules: anonymize)
-                        },
-                        keywords: keywords
-                    )
-                )
+            for head in resource.files {
+                let file = try exportFile(head: head, anonymize: anonymize)
+                fileKeywordCount += file.keywords.count
+                files.append(file)
             }
             resources.append(
                 KbiteExportDocument.Resource(
-                    resourceName: resourceRow["resource_name"],
+                    resourceName: resource.resource.resourceName,
                     resourceSummary: KbiteArchive.scrub(
-                        resourceRow["resource_summary"],
+                        resource.resource.resourceSummary,
                         rules: anonymize
                     ),
-                    resourceType: resourceRow["resource_type"],
-                    resourceTrust: resourceRow["resource_trust"],
+                    resourceType: resource.resource.resourceType,
+                    resourceTrust: Int(resource.resource.resourceTrust),
                     files: files
                 )
             )
@@ -98,11 +42,27 @@ struct KbiteArchiveRepository: RepositoryContext {
         let document = KbiteExportDocument(
             code: code,
             exportedAt: Store.isoNow(),
-            sourceKbiteUuid: kbiteUuid,
-            kbiteKeywords: kbiteKeywords,
+            sourceKbiteUuid: manifest.kbite.uuid,
+            kbiteKeywords: manifest.keywords.map(\.keyword),
             resources: resources
         )
         return (document, fileKeywordCount)
+    }
+
+    /// One file's export entry. The content column is read here, a single row
+    /// at a time, and never through the manifest.
+    private func exportFile(
+        head: KbiteResourceFileHead,
+        anonymize: [KbitePrefixRule]
+    ) throws -> KbiteExportDocument.File {
+        let keywords = try KbiteFileKeywords.request(fileUuid: head.uuid).fetchAll(db)
+        let content = try KbiteResourceFileRecord.fetch(db, uuid: head.uuid)?.resourceFileContent
+        return KbiteExportDocument.File(
+            resourceFileName: head.resourceFileName,
+            resourceFileSummary: KbiteArchive.scrub(head.resourceFileSummary, rules: anonymize),
+            resourceFileContent: content.map { KbiteArchive.scrub($0, rules: anonymize) },
+            keywords: keywords
+        )
     }
 
     /// One-transaction import apply — the pre-decoded, pre-validated,
@@ -116,11 +76,10 @@ struct KbiteArchiveRepository: RepositoryContext {
         rehydrated: KbiteExportDocument,
         onCollision: KbiteImportCollision
     ) throws -> KbiteImportResponse {
-        let existing = try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM kbite WHERE code = ?",
-            arguments: [rehydrated.code]
-        )
+        let existing = try KbiteRecord
+            .filter(KbiteRecord.Columns.code == rehydrated.code)
+            .fetchOne(db)?
+            .uuid
         if let existing, onCollision == .skip {
             return KbiteImportResponse(
                 kbiteUuid: existing,
@@ -229,41 +188,17 @@ struct KbiteArchiveRepository: RepositoryContext {
     /// survive (subject_uuid is not FK'd — append-only ethos holds).
     func deleteKbite(_ req: KbiteDeleteRequest) throws -> KbiteDeleteResponse {
         guard
-            let kbiteUuid = try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM kbite WHERE code = ?",
-                arguments: [req.code]
-            )
+            let kbiteUuid = try KbiteRecord
+                .filter(KbiteRecord.Columns.code == req.code)
+                .fetchOne(db)?
+                .uuid
         else {
             throw StoreError.notFound(entity: "kbite", key: req.code)
         }
-        let resources =
-            try Int.fetchOne(
-                db,
-                sql:
-                    "SELECT COUNT(*) FROM kbite_resource WHERE kbite_uuid = ?",
-                arguments: [kbiteUuid]
-            ) ?? 0
-        let files =
-            try Int.fetchOne(
-                db,
-                sql: """
-                    SELECT COUNT(*) FROM kbite_resource_file f
-                    JOIN kbite_resource r ON r.uuid = f.kbite_resource_uuid
-                    WHERE r.kbite_uuid = ?
-                    """,
-                arguments: [kbiteUuid]
-            ) ?? 0
-        var registrations = 0
-        for scope in KbiteScope.allCases {
-            registrations +=
-                try Int.fetchOne(
-                    db,
-                    sql:
-                        "SELECT COUNT(*) FROM \(scope.rawValue)_active_kbite WHERE kbite_uuid = ?",
-                    arguments: [kbiteUuid]
-                ) ?? 0
-        }
+        let counts = try KbiteCounts.request(kbiteUuid: kbiteUuid).fetchOne(db)
+        let resources = counts?.resourceCount ?? 0
+        let files = counts?.fileCount ?? 0
+        let registrations = counts?.registrationCount ?? 0
 
         // CASCADE clears resources/files/junctions/registrations; the
         // FTS AD triggers keep the mirror consistent (recursive ON).

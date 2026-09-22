@@ -198,145 +198,10 @@ struct SessionRepository: RepositoryContext {
         sessionUuid: String?,
         withReports: Bool = false
     ) throws -> [PromptStub] {
-        var clar: [String: ClarificationReportStub] = [:]
-        var arch: [String: ArchitectureReportStub] = [:]
-        var explore: [String: ExplorationReportStub] = [:]
-        var review: [String: ReviewReportStub] = [:]
-        if withReports {
-            let scope =
-                sessionUuid == nil
-                ? ""
-                : "WHERE cs.prompt_uuid IN (SELECT uuid FROM prompt WHERE session_uuid = ?)"
-            let scopeArgs: StatementArguments = sessionUuid.map { [$0] } ?? []
-            // m0025: questions/notes are the split children; the care
-            // package flag surfaces the clarified-intent artifact.
-            for row in try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT cs.prompt_uuid, cs.uuid, cs.version, cs.status,
-                           COUNT(q.uuid) AS q_count,
-                           COALESCE(SUM(q.status = 'open'), 0) AS open_count,
-                           (SELECT COUNT(*) FROM internal_clarification_note n
-                            WHERE n.clarification_summary_uuid = cs.uuid) AS note_count,
-                           EXISTS(SELECT 1 FROM care_package cp
-                                  WHERE cp.clarification_summary_uuid = cs.uuid
-                                    AND cp.status = 'ready') AS package_ready
-                    FROM clarification_summary cs
-                    LEFT JOIN user_clarification_question q
-                        ON q.clarification_summary_uuid = cs.uuid
-                    \(scope)
-                    GROUP BY cs.uuid
-                    """,
-                arguments: scopeArgs
-            ) {
-                clar[row["prompt_uuid"]] = ClarificationReportStub(
-                    summaryUuid: row["uuid"],
-                    version: row["version"],
-                    status: row["status"],
-                    questionCount: row["q_count"],
-                    openQuestionCount: row["open_count"],
-                    noteCount: row["note_count"],
-                    carePackageReady: (row["package_ready"] as Int64) != 0
-                )
-            }
-            for row in try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT cs.prompt_uuid, cs.uuid, cs.version, cs.status,
-                           (SELECT COUNT(*) FROM architecture_persistence_change pc
-                            WHERE pc.architecture_summary_uuid = cs.uuid) AS p_count,
-                           (SELECT COUNT(*) FROM architecture_general_change gc
-                            WHERE gc.architecture_summary_uuid = cs.uuid) AS g_count
-                    FROM architecture_summary cs
-                    \(scope)
-                    """,
-                arguments: scopeArgs
-            ) {
-                arch[row["prompt_uuid"]] = ArchitectureReportStub(
-                    summaryUuid: row["uuid"],
-                    version: row["version"],
-                    status: row["status"],
-                    persistenceChangeCount: row["p_count"],
-                    generalChangeCount: row["g_count"]
-                )
-            }
-            // m0025: summaries are per-agent — the stub aggregates the
-            // PROMPT: counts span every summary; the representative row is
-            // the synthesis (seal) row when present. key_file findings are
-            // path anchors — counted separately, excluded from ranking math.
-            for row in try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT cs.prompt_uuid,
-                           COALESCE(
-                               MAX(CASE WHEN cs.agent_type = 'synthesis' THEN cs.uuid END),
-                               MIN(cs.uuid)) AS rep_uuid,
-                           COALESCE(
-                               MAX(CASE WHEN cs.agent_type = 'synthesis' THEN cs.version END),
-                               0) AS rep_version,
-                           COALESCE(
-                               MAX(CASE WHEN cs.agent_type = 'synthesis' THEN cs.status END),
-                               'exploring') AS rep_status,
-                           (SELECT COALESCE(SUM(f.kind = 'key_file'), 0)
-                            FROM exploration_finding f
-                            JOIN exploration_summary es ON es.uuid = f.exploration_summary_uuid
-                            WHERE es.prompt_uuid = cs.prompt_uuid) AS kf_count,
-                           (SELECT COUNT(*)
-                            FROM exploration_finding f
-                            JOIN exploration_summary es ON es.uuid = f.exploration_summary_uuid
-                            WHERE es.prompt_uuid = cs.prompt_uuid AND f.kind != 'key_file') AS f_count,
-                           (SELECT COALESCE(SUM(f.finding_rating < 100), 0)
-                            FROM exploration_finding f
-                            JOIN exploration_summary es ON es.uuid = f.exploration_summary_uuid
-                            WHERE es.prompt_uuid = cs.prompt_uuid AND f.kind != 'key_file') AS sub100_count,
-                           (SELECT COUNT(*)
-                            FROM exploration_finding f
-                            JOIN exploration_summary es ON es.uuid = f.exploration_summary_uuid
-                            WHERE es.prompt_uuid = cs.prompt_uuid AND f.kind != 'key_file'
-                              AND f.finding_rating IS NULL) AS unranked_count
-                    FROM exploration_summary cs
-                    \(scope)
-                    GROUP BY cs.prompt_uuid
-                    """,
-                arguments: scopeArgs
-            ) {
-                explore[row["prompt_uuid"]] = ExplorationReportStub(
-                    summaryUuid: row["rep_uuid"],
-                    version: row["rep_version"],
-                    status: row["rep_status"],
-                    keyFileCount: row["kf_count"],
-                    findingCount: row["f_count"],
-                    sub100FindingCount: row["sub100_count"],
-                    unrankedFindingCount: row["unranked_count"]
-                )
-            }
-            for row in try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT cs.prompt_uuid, cs.uuid, cs.version, cs.status, cs.verdict,
-                           COUNT(f.uuid) AS f_count,
-                           COALESCE(SUM(f.finding_rating < 100), 0) AS sub100_count,
-                           COUNT(f.uuid) - COUNT(f.finding_rating) AS unranked_count,
-                           COALESCE(SUM(f.status = 'open'), 0) AS open_count
-                    FROM review_summary cs
-                    LEFT JOIN review_finding f ON f.review_summary_uuid = cs.uuid
-                    \(scope)
-                    GROUP BY cs.uuid
-                    """,
-                arguments: scopeArgs
-            ) {
-                review[row["prompt_uuid"]] = ReviewReportStub(
-                    summaryUuid: row["uuid"],
-                    version: row["version"],
-                    status: row["status"],
-                    verdict: row["verdict"],
-                    findingCount: row["f_count"],
-                    sub100FindingCount: row["sub100_count"],
-                    unrankedFindingCount: row["unranked_count"],
-                    openFindingCount: row["open_count"]
-                )
-            }
-        }
+        let clar = withReports ? try clarificationReports(sessionUuid: sessionUuid) : [:]
+        let arch = withReports ? try architectureReports(sessionUuid: sessionUuid) : [:]
+        let explore = withReports ? try explorationReports(sessionUuid: sessionUuid) : [:]
+        let review = withReports ? try reviewReports(sessionUuid: sessionUuid) : [:]
         return try PromptSummary.request(sessionUuid: sessionUuid)
             .fetchAll(db)
             .map { summary in
@@ -352,6 +217,44 @@ struct SessionRepository: RepositoryContext {
                         : nil
                 )
             }
+    }
+
+    /// m0025: questions and notes are the split children; the care package
+    /// flag surfaces the clarified-intent artifact. A prompt carrying more
+    /// than one summary keeps the last row read, as the retired SQL did.
+    private func clarificationReports(
+        sessionUuid: String?
+    ) throws -> [String: ClarificationReportStub] {
+        try ClarificationReport.request(sessionUuid: sessionUuid)
+            .fetchAll(db)
+            .reduce(into: [:]) { $0[$1.summary.promptUuid] = $1.dto() }
+    }
+
+    private func architectureReports(
+        sessionUuid: String?
+    ) throws -> [String: ArchitectureReportStub] {
+        try ArchitectureReport.request(sessionUuid: sessionUuid)
+            .fetchAll(db)
+            .reduce(into: [:]) { $0[$1.summary.promptUuid] = $1.dto() }
+    }
+
+    /// m0025: summaries are per-agent — the stub aggregates the PROMPT, so
+    /// counts span every summary and the representative row is the synthesis
+    /// (seal) row when present.
+    private func explorationReports(
+        sessionUuid: String?
+    ) throws -> [String: ExplorationReportStub] {
+        try ExplorationReport.request(sessionUuid: sessionUuid)
+            .fetchAll(db)
+            .reduce(into: [:]) { $0[$1.promptUuid] = $1.dto() }
+    }
+
+    private func reviewReports(
+        sessionUuid: String?
+    ) throws -> [String: ReviewReportStub] {
+        try ReviewReport.request(sessionUuid: sessionUuid)
+            .fetchAll(db)
+            .reduce(into: [:]) { $0[$1.summary.promptUuid] = $1.dto() }
     }
 
     /// One grouped aggregation: file_change row count, distinct files touched,

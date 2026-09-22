@@ -155,6 +155,7 @@
 				API/Shared/GmKernelCoreShared/StructuredPatch.swift,
 				Persistence/Composites/AgenticsComposites.swift,
 				Persistence/Composites/DiagramsComposites.swift,
+				Persistence/Composites/DopedComposites.swift,
 				Persistence/Composites/KbitesComposites.swift,
 				Persistence/Composites/ProjectComposites.swift,
 				"Persistence/Entities/AgenticsRecord+AgentBriefing.swift",

@@ -191,48 +191,25 @@ struct DiagramRepository: RepositoryContext {
                 promptUuid: nil
             )
         case .session:
-            guard
-                let row = try Row.fetchOne(
-                    db,
-                    sql: """
-                        SELECT s.instance_uuid AS instance_uuid, i.project_uuid AS project_uuid
-                        FROM session s JOIN instance i ON i.uuid = s.instance_uuid
-                        WHERE s.uuid = ?
-                        """,
-                    arguments: [uuid]
-                )
-            else {
+            guard let chain = try DiagramOwnerChain.forSession(uuid).fetchOne(db) else {
                 throw StoreError.notFound(entity: "session", key: uuid)
             }
             return DiagramOwner(
                 tier: .session,
-                projectUuid: row["project_uuid"],
-                instanceUuid: row["instance_uuid"],
+                projectUuid: chain.projectUuid,
+                instanceUuid: chain.instanceUuid,
                 sessionUuid: uuid,
                 promptUuid: nil
             )
         case .prompt:
-            guard
-                let row = try Row.fetchOne(
-                    db,
-                    sql: """
-                        SELECT p.session_uuid AS session_uuid, s.instance_uuid AS instance_uuid,
-                               i.project_uuid AS project_uuid
-                        FROM prompt p
-                        JOIN session s ON s.uuid = p.session_uuid
-                        JOIN instance i ON i.uuid = s.instance_uuid
-                        WHERE p.uuid = ?
-                        """,
-                    arguments: [uuid]
-                )
-            else {
+            guard let chain = try DiagramOwnerChain.forPrompt(uuid).fetchOne(db) else {
                 throw StoreError.notFound(entity: "prompt", key: uuid)
             }
             return DiagramOwner(
                 tier: .prompt,
-                projectUuid: row["project_uuid"],
-                instanceUuid: row["instance_uuid"],
-                sessionUuid: row["session_uuid"],
+                projectUuid: chain.projectUuid,
+                instanceUuid: chain.instanceUuid,
+                sessionUuid: chain.sessionUuid,
                 promptUuid: uuid
             )
         }
@@ -1300,11 +1277,9 @@ struct DiagramRepository: RepositoryContext {
         // Nesting depth is exactly 2 (top-level + children), so the subtree
         // count is self + direct children.
         let children =
-            try Int.fetchOne(
-                db,
-                sql: "SELECT COUNT(*) FROM diagram_element WHERE parent_element_uuid = ?",
-                arguments: [info.uuid]
-            ) ?? 0
+            try DiagramElementRecord
+            .filter(DiagramElementRecord.Columns.parentElementUuid == info.uuid)
+            .fetchCount(db)
         // Plain CASCADE unwinds everything: children via the self-FK, subtype
         // rows via element_uuid, vertex rows via the subtype FKs. No RESTRICT
         // anywhere in the family.

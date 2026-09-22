@@ -269,6 +269,24 @@ extension TouchedPathSummary {
     }
 }
 
+extension BotWorkflowRecord {
+    /// db → wire.
+    func dto() -> BotWorkflowRow {
+        BotWorkflowRow(
+            uuid: uuid,
+            version: version,
+            sessionUuid: sessionUuid,
+            promptUuid: promptUuid,
+            variant: variant,
+            status: status,
+            clientKey: clientKey,
+            lastServedPhase: lastServedPhase,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
 extension CarePackageDopeRefRecord {
     func dto() -> CarePackageDopeRefRow {
         CarePackageDopeRefRow(uuid: uuid, dopeCode: dopeCode, note: note, seq: Int(seq))

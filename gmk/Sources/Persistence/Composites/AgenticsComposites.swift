@@ -155,6 +155,30 @@ struct TouchedPathSummary: FetchableRecord, Decodable {
     }
 }
 
+/// One `architecture_summary` row's option tally: how many options it carries
+/// and how many of them are selected, in one statement.
+///
+/// The selected tally carries its own association key, so GRDB joins
+/// `architecture_option` a second time and the filter narrows only that count.
+struct ArchitectureCounts: FetchableRecord, Decodable {
+    var optionCount: Int
+    var selectedCount: Int
+
+    static func request(summaryUuid: String) -> QueryInterfaceRequest<Self> {
+        ArchitectureSummaryRecord
+            .all()
+            .withUuid(summaryUuid)
+            .annotated(
+                with: ArchitectureSummaryRecord.options.count.forKey("optionCount"),
+                ArchitectureSummaryRecord.options
+                    .filter(ArchitectureOptionRecord.Columns.status == "selected")
+                    .forKey("selectedOptions")
+                    .count.forKey("selectedCount")
+            )
+            .asRequest(of: Self.self)
+    }
+}
+
 /// One `care_package` row with its three ref classes.
 struct CarePackageWithRefs: FetchableRecord, Decodable {
     var carePackage: CarePackageRecord

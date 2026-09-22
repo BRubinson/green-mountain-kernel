@@ -66,7 +66,7 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
 
     /// Every composite's canonical request compiles against the live schema.
     func testEveryCompositeRequestCompiles() throws {
-        XCTAssertEqual(SchemaEnrollment.composites.count, 16, "a composite left the roster or never joined it")
+        XCTAssertEqual(SchemaEnrollment.composites.count, 45, "a composite left the roster or never joined it")
 
         try env.readOnlyDatabase()
             .read { db in

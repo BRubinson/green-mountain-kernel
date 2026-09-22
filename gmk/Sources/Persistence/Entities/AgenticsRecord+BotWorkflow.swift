@@ -37,21 +37,3 @@ struct BotWorkflowRecord: BaseRecordFields, TableRecord {
         case lastServedPhase = "last_served_phase"
     }
 }
-
-extension BotWorkflowRecord {
-    /// db → wire.
-    func wireRow() -> BotWorkflowRow {
-        BotWorkflowRow(
-            uuid: uuid,
-            version: version,
-            sessionUuid: sessionUuid,
-            promptUuid: promptUuid,
-            variant: variant,
-            status: status,
-            clientKey: clientKey,
-            lastServedPhase: lastServedPhase,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

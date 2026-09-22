@@ -98,11 +98,9 @@ struct DiagramStudioRepository: RepositoryContext {
             )
         }
         let elements =
-            try Int.fetchOne(
-                db,
-                sql: "SELECT COUNT(*) FROM diagram_element WHERE diagram_uuid = ?",
-                arguments: [diagram.uuid]
-            ) ?? 0
+            try DiagramElementRecord
+            .filter(DiagramElementRecord.Columns.diagramUuid == diagram.uuid)
+            .fetchCount(db)
         let storagePath = try self.diagram.diagramOwnerStoragePath(diagram: diagram)
         // The durable goodbye rides BEFORE the row drop, carrying the
         // final revision — live galleries/editors drop the card on it.

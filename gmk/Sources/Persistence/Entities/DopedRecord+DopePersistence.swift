@@ -46,4 +46,20 @@ extension DopePersistenceRecord {
     static let enums = hasMany(DopePersistenceEnumRecord.self)
         .order(Column("sort_order"))
         .forKey("enums")
+
+    /// Two-hop reaches, so a domain's whole property and option sets are one
+    /// aggregate each rather than a subselect per level.
+    static let allProperties = hasMany(
+        DopePersistenceEntityPropertyRecord.self,
+        through: entities,
+        using: DopePersistenceEntityRecord.properties
+    )
+    .forKey("allProperties")
+
+    static let allOptions = hasMany(
+        DopePersistenceEnumOptionRecord.self,
+        through: enums,
+        using: DopePersistenceEnumRecord.options
+    )
+    .forKey("allOptions")
 }
