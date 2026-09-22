@@ -35,14 +35,3 @@ struct AgentBriefingDopeKbiteRecord: BaseRecordFields, TableRecord, SeqOrdered {
 extension AgentBriefingDopeKbiteRecord {
     static let briefing = belongsTo(AgentBriefingRecord.self).forKey("briefing")
 }
-
-extension AgentBriefingDopeKbiteRecord {
-    func wireRow() -> AgentBriefingKbiteRefRow {
-        AgentBriefingKbiteRefRow(
-            uuid: uuid,
-            kbiteResourceFileUuid: kbiteResourceFileUuid,
-            brief: brief,
-            seq: Int(seq)
-        )
-    }
-}

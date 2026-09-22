@@ -35,40 +35,13 @@ struct ListingRepository: RepositoryContext {
     }
 
     func listSessions(_ req: SessionListRequest) throws -> SessionListResponse {
-        // Item 1: last_activity_at = latest of the session's own
-        // updated_at, its prompts' updated_at, and its file changes'
-        // created_at — one query, correlated scalar MAXes (a childless
-        // session still sorts by its own recency). ISO-8601 seconds-Z
-        // strings compare lexicographically. Retires GMVibes' client-side
-        // fold over an unfiltered FILE_CHANGE_LIST.
-        var sql = """
-            SELECT s.uuid, s.version, s.instance_uuid, s.code, s.name,
-                   s.gmfs_relative_storage_path, s.created_at, s.updated_at,
-                   MAX(
-                       s.updated_at,
-                       COALESCE((SELECT MAX(p.updated_at) FROM prompt p
-                                 WHERE p.session_uuid = s.uuid), ''),
-                       COALESCE((SELECT MAX(fc.created_at) FROM file_change fc
-                                 WHERE fc.session_uuid = s.uuid), '')
-                   ) AS last_activity_at
-            FROM session s
-            """
-        var arguments: StatementArguments = []
+        var request = SessionSummary.request().order(Column("code"))
         if let instanceUuid = req.instanceUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM instance WHERE uuid = ?",
-                    arguments: [instanceUuid]
-                ) != nil
-            else {
+            guard try InstanceRecord.exists(db, key: ["uuid": instanceUuid]) else {
                 throw StoreError.notFound(entity: "instance", key: instanceUuid)
             }
-            sql += " WHERE s.instance_uuid = ?"
-            arguments = [instanceUuid]
+            request = request.filter(Column("instance_uuid") == instanceUuid)
         }
-        sql += " ORDER BY s.code"
-        let rows = try SessionStubRecord.fetchAll(db, sql: sql, arguments: arguments)
-        return SessionListResponse(sessions: rows.map { $0.wireStub() })
+        return SessionListResponse(sessions: try request.fetchAll(db).map { $0.dto() })
     }
 }

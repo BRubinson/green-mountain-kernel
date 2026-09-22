@@ -35,9 +35,3 @@ struct AgentBriefingDopePersistenceRecord: BaseRecordFields, TableRecord, SeqOrd
 extension AgentBriefingDopePersistenceRecord {
     static let briefing = belongsTo(AgentBriefingRecord.self).forKey("briefing")
 }
-
-extension AgentBriefingDopePersistenceRecord {
-    func wireRow() -> AgentBriefingDopeRefRow {
-        AgentBriefingDopeRefRow(uuid: uuid, dopeCode: dopeCode, brief: brief, seq: Int(seq))
-    }
-}

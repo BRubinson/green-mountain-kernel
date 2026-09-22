@@ -577,42 +577,10 @@ struct BriefingRepository: RepositoryContext {
         where condition: String,
         arguments: StatementArguments
     ) throws -> [AgentBriefingRow] {
-        try AgentBriefingRecord.fetchAll(
-            db,
-            where: condition,
-            arguments: arguments,
-            orderBy: "briefing_for_step, created_at"
-        )
-        .map { record in
-            let dopeRefs =
-                try AgentBriefingDopePersistenceRecord.fetchAll(
-                    db,
-                    where: "agent_briefing_uuid = ?",
-                    arguments: [record.uuid],
-                    orderBy: "seq"
-                )
-                .map { $0.wireRow() }
-            let kbiteRefs =
-                try AgentBriefingDopeKbiteRecord.fetchAll(
-                    db,
-                    where: "agent_briefing_uuid = ?",
-                    arguments: [record.uuid],
-                    orderBy: "seq"
-                )
-                .map { $0.wireRow() }
-            let fileChangeRefs =
-                try AgentSessionFileChangeRecord.fetchAll(
-                    db,
-                    where: "agent_briefing_uuid = ?",
-                    arguments: [record.uuid],
-                    orderBy: "seq"
-                )
-                .map { $0.wireRow() }
-            return record.wireRow(
-                dopeRefs: dopeRefs,
-                kbiteRefs: kbiteRefs,
-                fileChangeRefs: fileChangeRefs
-            )
-        }
+        try AgentBriefingWithRefs.request()
+            .filter(sql: condition, arguments: arguments)
+            .order(sql: "briefing_for_step, created_at")
+            .fetchAll(db)
+            .map { $0.dto() }
     }
 }

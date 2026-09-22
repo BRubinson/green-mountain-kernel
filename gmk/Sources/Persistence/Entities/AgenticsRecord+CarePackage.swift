@@ -45,27 +45,3 @@ extension CarePackageRecord {
         .order(Column("seq"))
         .forKey("explorationRefs")
 }
-
-extension CarePackageRecord {
-    /// db → wire, children injected by the repository.
-    func wireRow(
-        dopeRefs: [CarePackageDopeRefRow],
-        kbiteRefs: [CarePackageKbiteRefRow],
-        explorationRefs: [CarePackageExplorationRefRow]
-    ) -> CarePackageRow {
-        CarePackageRow(
-            uuid: uuid,
-            version: version,
-            clarificationSummaryUuid: clarificationSummaryUuid,
-            clarifiedIntent: clarifiedIntent,
-            status: status,
-            dopeScopeUuid: dopeScopeUuid,
-            dopeScopeRevision: dopeScopeRevision,
-            dopeRefs: dopeRefs,
-            kbiteRefs: kbiteRefs,
-            explorationRefs: explorationRefs,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

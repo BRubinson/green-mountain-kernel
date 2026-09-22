@@ -30,6 +30,36 @@ struct DiagramStudioRepository: RepositoryContext {
             }
         }
         let limit = min(max(req.limit ?? 50, 1), 500)
+
+        let rows: [DiagramWithOwner]
+        if let pattern {
+            rows = try rankedSearch(req, pattern: pattern, limit: limit)
+        } else {
+            var request = DiagramWithOwner.request()
+                .filter(DiagramRecord.Columns.projectUuid == req.projectUuid)
+            if let sessionUuid = req.sessionUuid {
+                request = request.filter(DiagramRecord.Columns.sessionUuid == sessionUuid)
+            }
+            if let visibility = req.visibility {
+                request = request.filter(DiagramRecord.Columns.visibility == visibility)
+            }
+            rows =
+                try request
+                .order(DiagramRecord.Columns.updatedAt.desc, DiagramRecord.Columns.code)
+                .limit(limit)
+                .fetchAll(db)
+        }
+        return DiagramSearchResponse(diagrams: rows.map { $0.dto() })
+    }
+
+    /// bm25 is negative-better; ORDER BY score ascending is rank order (the
+    /// Store+Search convention). The scoring function is callable only on a
+    /// query over the fts table, so this branch spells its own join.
+    private func rankedSearch(
+        _ req: DiagramSearchRequest,
+        pattern: FTS5Pattern,
+        limit: Int
+    ) throws -> [DiagramWithOwner] {
         var conditions = ["d.project_uuid = ?"]
         var args: [any DatabaseValueConvertible] = [req.projectUuid]
         if let sessionUuid = req.sessionUuid {
@@ -40,38 +70,20 @@ struct DiagramStudioRepository: RepositoryContext {
             conditions.append("d.visibility = ?")
             args.append(visibility)
         }
-
-        let rows: [Row]
-        if let pattern {
-            // bm25 is negative-better; ORDER BY score ascending is rank
-            // order (the Store+Search convention).
-            rows = try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT d.*, s.instance_uuid AS instance_uuid
-                      FROM diagram_fts f
-                      JOIN diagram d ON d.id = f.rowid
-                      LEFT JOIN session s ON s.uuid = d.session_uuid
-                     WHERE diagram_fts MATCH ?
-                       AND \(conditions.joined(separator: " AND "))
-                     ORDER BY bm25(diagram_fts, 6.0, 4.0, 1.0)
-                     LIMIT \(limit)
-                    """,
-                arguments: StatementArguments([pattern] + args)
-            )
-        } else {
-            rows = try Row.fetchAll(
-                db,
-                sql: """
-                    \(DiagramRepository.diagramSelect)
-                     WHERE \(conditions.joined(separator: " AND "))
-                     ORDER BY d.updated_at DESC, d.code
-                     LIMIT \(limit)
-                    """,
-                arguments: StatementArguments(args)
-            )
-        }
-        return DiagramSearchResponse(diagrams: try rows.map(DiagramRepository.diagramRow))
+        return try DiagramWithOwner.fetchAll(
+            db,
+            sql: """
+                SELECT d.*, s.instance_uuid AS instanceUuid
+                  FROM diagram_fts f
+                  JOIN diagram d ON d.id = f.rowid
+                  LEFT JOIN session s ON s.uuid = d.session_uuid
+                 WHERE diagram_fts MATCH ?
+                   AND \(conditions.joined(separator: " AND "))
+                 ORDER BY bm25(diagram_fts, 6.0, 4.0, 1.0)
+                 LIMIT \(limit)
+                """,
+            arguments: StatementArguments([pattern] + args)
+        )
     }
 
     func diagramDelete(_ req: DiagramDeleteRequest) throws -> DiagramDeleteResponse {

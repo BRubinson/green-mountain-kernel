@@ -875,53 +875,17 @@ struct ClarificationRepository: RepositoryContext {
     }
 
     private func fetchPackage(uuid: String) throws -> CarePackageRow? {
-        try CarePackageRecord.fetchAll(
-            db,
-            where: "uuid = ?",
-            arguments: [uuid]
-        )
-        .first.map(assemblePackage)
+        try CarePackageWithRefs.request()
+            .filter(CarePackageRecord.Columns.uuid == uuid)
+            .fetchOne(db)?
+            .dto()
     }
 
     private func fetchPackage(bySummary summaryUuid: String) throws -> CarePackageRow? {
-        try CarePackageRecord.fetchAll(
-            db,
-            where: "clarification_summary_uuid = ?",
-            arguments: [summaryUuid]
-        )
-        .first.map(assemblePackage)
-    }
-
-    private func assemblePackage(_ record: CarePackageRecord) throws -> CarePackageRow {
-        let dopeRefs =
-            try CarePackageDopeRefRecord.fetchAll(
-                db,
-                where: "care_package_uuid = ?",
-                arguments: [record.uuid],
-                orderBy: "seq"
-            )
-            .map { $0.wireRow() }
-        let kbiteRefs =
-            try CarePackageKbiteRefRecord.fetchAll(
-                db,
-                where: "care_package_uuid = ?",
-                arguments: [record.uuid],
-                orderBy: "seq"
-            )
-            .map { $0.wireRow() }
-        let explorationRefs =
-            try CarePackageExplorationRefRecord.fetchAll(
-                db,
-                where: "care_package_uuid = ?",
-                arguments: [record.uuid],
-                orderBy: "seq"
-            )
-            .map { $0.wireRow() }
-        return record.wireRow(
-            dopeRefs: dopeRefs,
-            kbiteRefs: kbiteRefs,
-            explorationRefs: explorationRefs
-        )
+        try CarePackageWithRefs.request()
+            .filter(CarePackageRecord.Columns.clarificationSummaryUuid == summaryUuid)
+            .fetchOne(db)?
+            .dto()
     }
 
     private func nextRefSeq(table: String, packageUuid: String) throws -> Int64 {

@@ -46,26 +46,6 @@ struct DiagramRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
-    /// The diagram projection.
-    ///
-    /// INSTANCE is not an ownership tier, but a session-owned diagram still has
-    /// an instance, so `DiagramRow.instanceUuid` is DERIVED here through the
-    /// session join. A project-tier diagram has no single instance and reports
-    /// nil. Every `diagram` read goes through this, so the WHERE clauses need
-    /// `d.` qualification: session shares uuid, code and name.
-    static let diagramSelect = """
-        SELECT d.*, s.instance_uuid AS instance_uuid
-          FROM diagram d LEFT JOIN session s ON s.uuid = d.session_uuid
-        """
-
-    /// diagramSelect is a PROJECTION join, so the fetch stays on Row: the
-    /// record decodes the `d.*` half and the derived `instance_uuid` rides
-    /// alongside it. Throws rather than trapping, so a drifted row cannot take
-    /// the process down through Row's `try!` subscripts.
-    static func diagramRow(_ row: Row) throws -> DiagramRow {
-        try DiagramRecord(row: row).wireRow(instanceUuid: row["instance_uuid"])
-    }
-
     /// The ITEM-tier restriction on a diagram's whole-canvas dope binding.
     ///
     /// A Swift guard rather than a SQL CHECK because it cannot be one: a CHECK
@@ -102,8 +82,10 @@ struct DiagramRepository: RepositoryContext {
     // MARK: - Row + revision helpers
 
     func fetchDiagram(uuid: String) throws -> DiagramRow? {
-        try Row.fetchOne(db, sql: "\(Self.diagramSelect) WHERE d.uuid = ?", arguments: [uuid])
-            .map(Self.diagramRow)
+        try DiagramWithOwner.request()
+            .filter(DiagramRecord.Columns.uuid == uuid)
+            .fetchOne(db)?
+            .dto()
     }
 
     /// Advance the whole-tree content counter WITHOUT bumping the diagram
@@ -273,15 +255,13 @@ struct DiagramRepository: RepositoryContext {
         if let binding = req.dopeScopeCode {
             try validateDiagramScopeBinding(owner: owner, code: binding)
         }
-        if let existing = try Row.fetchOne(
-            db,
-            sql: """
-                \(Self.diagramSelect)
-                 WHERE d.tier = ? AND d.\(owner.ownerColumn) = ? AND d.code = ?
-                """,
-            arguments: [owner.tier.rawValue, owner.ownerUuid, req.code]
-        ) {
-            return DiagramResponse(diagram: try Self.diagramRow(existing), created: false)
+        if let existing = try DiagramWithOwner.request()
+            .filter(DiagramRecord.Columns.tier == owner.tier.rawValue)
+            .filter(Column(owner.ownerColumn) == owner.ownerUuid)
+            .filter(DiagramRecord.Columns.code == req.code)
+            .fetchOne(db)
+        {
+            return DiagramResponse(diagram: existing.dto(), created: false)
         }
         let uuid = try core.insertBase(
             db,
@@ -327,18 +307,14 @@ struct DiagramRepository: RepositoryContext {
             sessionUuid: req.sessionUuid,
             promptUuid: req.promptUuid
         )
-        var sql = """
-            \(Self.diagramSelect)
-             WHERE d.tier = ? AND d.\(owner.ownerColumn) = ?
-            """
-        var args: [any DatabaseValueConvertible] = [owner.tier.rawValue, owner.ownerUuid]
+        var request = DiagramWithOwner.request()
+            .filter(DiagramRecord.Columns.tier == owner.tier.rawValue)
+            .filter(Column(owner.ownerColumn) == owner.ownerUuid)
         if let visibility = req.visibility {
-            sql += " AND d.visibility = ?"
-            args.append(visibility)
+            request = request.filter(DiagramRecord.Columns.visibility == visibility)
         }
-        sql += " ORDER BY d.code"
-        let rows = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(args))
-        return DiagramListResponse(diagrams: try rows.map(Self.diagramRow))
+        let rows = try request.order(DiagramRecord.Columns.code).fetchAll(db)
+        return DiagramListResponse(diagrams: rows.map { $0.dto() })
     }
 
     // MARK: - Get (uuid or owner+code; no cross-tier ladder)
@@ -357,15 +333,15 @@ struct DiagramRepository: RepositoryContext {
                 sessionUuid: req.sessionUuid,
                 promptUuid: req.promptUuid
             )
-            var sql = "\(Self.diagramSelect) WHERE d.tier = ? AND d.\(owner.ownerColumn) = ?"
-            var args: [(any DatabaseValueConvertible)?] = [owner.tier.rawValue, owner.ownerUuid]
+            var request = DiagramWithOwner.request()
+                .filter(DiagramRecord.Columns.tier == owner.tier.rawValue)
+                .filter(Column(owner.ownerColumn) == owner.ownerUuid)
             if let code = req.code {
-                sql += " AND d.code = ?"
-                args.append(code)
+                request = request.filter(DiagramRecord.Columns.code == code)
             }
-            sql += " ORDER BY d.code"
-            let rows = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(args))
-                .map(Self.diagramRow)
+            let rows = try request.order(DiagramRecord.Columns.code)
+                .fetchAll(db)
+                .map { $0.dto() }
             if rows.count > 1 {
                 throw StoreError.badRequest(
                     detail:

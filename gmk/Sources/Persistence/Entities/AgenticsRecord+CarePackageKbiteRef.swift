@@ -35,14 +35,3 @@ struct CarePackageKbiteRefRecord: BaseRecordFields, TableRecord, SeqOrdered {
 extension CarePackageKbiteRefRecord {
     static let carePackage = belongsTo(CarePackageRecord.self).forKey("carePackage")
 }
-
-extension CarePackageKbiteRefRecord {
-    func wireRow() -> CarePackageKbiteRefRow {
-        CarePackageKbiteRefRow(
-            uuid: uuid,
-            kbiteResourceFileUuid: kbiteResourceFileUuid,
-            brief: brief,
-            seq: Int(seq)
-        )
-    }
-}

@@ -33,9 +33,3 @@ struct AgentSessionFileChangeRecord: BaseRecordFields, TableRecord, SeqOrdered {
 extension AgentSessionFileChangeRecord {
     static let briefing = belongsTo(AgentBriefingRecord.self).forKey("briefing")
 }
-
-extension AgentSessionFileChangeRecord {
-    func wireRow() -> AgentBriefingFileChangeRefRow {
-        AgentBriefingFileChangeRefRow(uuid: uuid, fileChangeUuid: fileChangeUuid, seq: Int(seq))
-    }
-}

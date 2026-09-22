@@ -50,19 +50,13 @@ extension Store {
                 throw StoreError.notFound(entity: "session", key: req.sessionUuid)
             }
             let root = try self.instanceRoot(db, sessionUuid: req.sessionUuid)
-            let rows = try Row.fetchAll(
-                db,
-                sql: """
-                    \(DiagramRepository.diagramSelect)
-                     WHERE d.tier = ? AND d.session_uuid = ? AND d.visibility = ?
-                     ORDER BY d.code
-                    """,
-                arguments: [
-                    DiagramTier.session.rawValue, req.sessionUuid,
-                    DiagramVisibility.public.rawValue,
-                ]
-            )
-            let projected = try rows.map(DiagramRepository.diagramRow)
+            let rows = try DiagramWithOwner.request()
+                .filter(DiagramRecord.Columns.tier == DiagramTier.session.rawValue)
+                .filter(DiagramRecord.Columns.sessionUuid == req.sessionUuid)
+                .filter(DiagramRecord.Columns.visibility == DiagramVisibility.public.rawValue)
+                .order(DiagramRecord.Columns.code)
+                .fetchAll(db)
+            let projected = try rows.map { $0.dto() }
                 .map { diagram in
                     Projected(
                         code: diagram.code,
@@ -249,18 +243,12 @@ extension Store {
             for document in documents {
                 do {
                     let existing =
-                        try Row.fetchOne(
-                            db,
-                            sql: """
-                                \(DiagramRepository.diagramSelect)
-                                 WHERE d.tier = ? AND d.session_uuid = ? AND d.code = ?
-                                """,
-                            arguments: [
-                                DiagramTier.session.rawValue, req.sessionUuid,
-                                document.code,
-                            ]
-                        )
-                        .map(DiagramRepository.diagramRow)
+                        try DiagramWithOwner.request()
+                        .filter(DiagramRecord.Columns.tier == DiagramTier.session.rawValue)
+                        .filter(DiagramRecord.Columns.sessionUuid == req.sessionUuid)
+                        .filter(DiagramRecord.Columns.code == document.code)
+                        .fetchOne(db)?
+                        .dto()
                     let landed: Bool
                     if let diagram = existing {
                         landed = try self.ingestReplace(db, document: document, over: diagram)

@@ -51,30 +51,3 @@ extension AgentBriefingRecord {
         .order(Column("seq"))
         .forKey("fileChangeRefs")
 }
-
-extension AgentBriefingRecord {
-    /// db → wire. The children are fetched by the repository and injected —
-    /// the record itself stays a plain single-table mirror.
-    func wireRow(
-        dopeRefs: [AgentBriefingDopeRefRow],
-        kbiteRefs: [AgentBriefingKbiteRefRow],
-        fileChangeRefs: [AgentBriefingFileChangeRefRow]
-    ) -> AgentBriefingRow {
-        AgentBriefingRow(
-            uuid: uuid,
-            version: version,
-            sessionUuid: sessionUuid,
-            promptUuid: promptUuid,
-            briefingForStep: briefingForStep,
-            status: status,
-            agentId: agentId,
-            dopeScopeUuid: dopeScopeUuid,
-            dopeScopeRevision: dopeScopeRevision,
-            dopeRefs: dopeRefs,
-            kbiteRefs: kbiteRefs,
-            fileChangeRefs: fileChangeRefs,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

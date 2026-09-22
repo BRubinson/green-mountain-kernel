@@ -58,33 +58,3 @@ extension DiagramRecord {
 
     static let elements = hasMany(DiagramElementRecord.self).order(Column("sort_order")).forKey("elements")
 }
-
-extension DiagramRecord {
-    /// db → wire, with the derived instance injected.
-    ///
-    /// `instanceUuid` is not a diagram column: DiagramRepository.diagramSelect
-    /// derives it through a LEFT JOIN onto session, so this record decodes the
-    /// `d.*` half and the joined column arrives as a labelled, undefaulted
-    /// parameter. `visibility` is passed explicitly rather than leaning on
-    /// DiagramRow's "PRIVATE" init default.
-    func wireRow(instanceUuid: String?) -> DiagramRow {
-        DiagramRow(
-            uuid: uuid,
-            version: version,
-            tier: tier,
-            projectUuid: projectUuid,
-            instanceUuid: instanceUuid,
-            sessionUuid: sessionUuid,
-            promptUuid: promptUuid,
-            code: code,
-            name: name,
-            description: description,
-            gmccDiagramPath: gmccDiagramPath,
-            dopeScopeCode: dopeScopeCode,
-            revision: revision,
-            visibility: visibility,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

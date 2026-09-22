@@ -35,9 +35,3 @@ struct CarePackageDopeRefRecord: BaseRecordFields, TableRecord, SeqOrdered {
 extension CarePackageDopeRefRecord {
     static let carePackage = belongsTo(CarePackageRecord.self).forKey("carePackage")
 }
-
-extension CarePackageDopeRefRecord {
-    func wireRow() -> CarePackageDopeRefRow {
-        CarePackageDopeRefRow(uuid: uuid, dopeCode: dopeCode, note: note, seq: Int(seq))
-    }
-}

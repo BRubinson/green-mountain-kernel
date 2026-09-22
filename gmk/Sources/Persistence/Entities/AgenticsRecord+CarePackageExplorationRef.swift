@@ -39,16 +39,3 @@ struct CarePackageExplorationRefRecord: BaseRecordFields, TableRecord, SeqOrdere
 extension CarePackageExplorationRefRecord {
     static let carePackage = belongsTo(CarePackageRecord.self).forKey("carePackage")
 }
-
-extension CarePackageExplorationRefRecord {
-    func wireRow() -> CarePackageExplorationRefRow {
-        CarePackageExplorationRefRow(
-            uuid: uuid,
-            curatedTitle: curatedTitle,
-            curatedBody: curatedBody,
-            filePath: filePath,
-            sourceFindingUuid: sourceFindingUuid,
-            seq: Int(seq)
-        )
-    }
-}

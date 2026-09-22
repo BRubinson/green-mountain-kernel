@@ -629,6 +629,23 @@ enum SchemaEnrollment {
         prefetch(SessionRecord.briefings, key: "briefings", from: "agent_briefing", to: "session"),
     ]
 
+    /// A composite's canonical request, compiled the way a multi-row fetch
+    /// compiles it: `forSingleResult: false`, so a prefetch plans its children.
+    private static func composite<C: FetchableRecord>(
+        _: C.Type,
+        _ label: String,
+        request: @escaping @Sendable () -> QueryInterfaceRequest<C>
+    ) -> CompositeEntry {
+        CompositeEntry(label: label) { db in
+            try request().makePreparedRequest(db, forSingleResult: false).statement.sql
+        }
+    }
+
     /// One entry per composite, preparing that composite's canonical request.
-    static let composites: [CompositeEntry] = []
+    static let composites: [CompositeEntry] = [
+        composite(AgentBriefingWithRefs.self, "AgentBriefingWithRefs") { AgentBriefingWithRefs.request() },
+        composite(CarePackageWithRefs.self, "CarePackageWithRefs") { CarePackageWithRefs.request() },
+        composite(DiagramWithOwner.self, "DiagramWithOwner") { DiagramWithOwner.request() },
+        composite(SessionSummary.self, "SessionSummary") { SessionSummary.request() },
+    ]
 }
