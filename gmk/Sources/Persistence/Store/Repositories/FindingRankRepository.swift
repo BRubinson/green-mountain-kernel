@@ -68,16 +68,13 @@ struct FindingRankRepository: RepositoryContext {
         }
     }
 
-    func unrankedCount(
-        table: String,
-        parentColumn: String,
+    /// The unranked findings of one summary, for the caller's completion gate.
+    func unrankedCount<T: Rankable>(
+        _ type: T.Type,
+        parent: Column,
         summaryUuid: String
     ) throws -> Int {
-        try Int.fetchOne(
-            db,
-            sql: "SELECT COUNT(*) FROM \(table) WHERE \(parentColumn) = ? AND finding_rating IS NULL",
-            arguments: [summaryUuid]
-        ) ?? 0
+        try type.filter(parent == summaryUuid).unranked().fetchCount(db)
     }
 
     // MARK: - Prompt-scoped (m0025 per-agent exploration summaries)
@@ -102,15 +99,7 @@ struct FindingRankRepository: RepositoryContext {
                 )
             }
             guard
-                try Row.fetchOne(
-                    db,
-                    sql: """
-                        SELECT 1 FROM exploration_finding f
-                        JOIN exploration_summary s ON s.uuid = f.exploration_summary_uuid
-                        WHERE f.uuid = ? AND s.prompt_uuid = ?
-                        """,
-                    arguments: [pair.findingUuid, promptUuid]
-                ) != nil
+                try promptFindings(promptUuid).withUuid(pair.findingUuid).fetchCount(db) > 0
             else {
                 throw StoreError.badRequest(
                     detail: "finding \(pair.findingUuid) does not belong to prompt \(promptUuid)"
@@ -138,17 +127,20 @@ struct FindingRankRepository: RepositoryContext {
     }
 
     /// Unranked findings across ALL of the prompt's exploration summaries —
-    /// the synthesis-complete (seal) gate.
+    /// the synthesis-complete (seal) gate. key_file findings are path anchors,
+    /// never ranked.
     func promptUnrankedCount(promptUuid: String) throws -> Int {
-        try Int.fetchOne(
-            db,
-            sql: """
-                SELECT COUNT(*) FROM exploration_finding f
-                JOIN exploration_summary s ON s.uuid = f.exploration_summary_uuid
-                WHERE s.prompt_uuid = ? AND f.finding_rating IS NULL
-                  AND f.kind != 'key_file'
-                """,
-            arguments: [promptUuid]
-        ) ?? 0
+        try promptFindings(promptUuid)
+            .unranked()
+            .filter(ExplorationFindingRecord.Columns.kind != ExplorationFindingKind.keyFile.rawValue)
+            .fetchCount(db)
+    }
+
+    /// Every exploration finding of one prompt, whichever summary carries it.
+    private func promptFindings(_ promptUuid: String) -> QueryInterfaceRequest<ExplorationFindingRecord> {
+        ExplorationFindingRecord.joining(
+            required: ExplorationFindingRecord.summary
+                .filter(Column("prompt_uuid") == promptUuid)
+        )
     }
 }

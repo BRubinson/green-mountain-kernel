@@ -257,6 +257,18 @@ extension CarePackageWithRefs {
     }
 }
 
+extension TouchedPathSummary {
+    /// db → wire.
+    func dto() -> UnplannedChangeRow {
+        UnplannedChangeRow(
+            path: path,
+            changeCount: changeCount,
+            firstChangedAt: firstChangedAt,
+            lastChangedAt: lastChangedAt
+        )
+    }
+}
+
 extension CarePackageDopeRefRecord {
     func dto() -> CarePackageDopeRefRow {
         CarePackageDopeRefRow(uuid: uuid, dopeCode: dopeCode, note: note, seq: Int(seq))

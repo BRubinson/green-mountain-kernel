@@ -685,29 +685,9 @@ struct ArchitectureRepository: RepositoryContext {
     private func touchedPaths(
         promptUuid: String
     ) throws -> [String: UnplannedChangeRow] {
-        let rows = try Row.fetchAll(
-            db,
-            sql: """
-                SELECT sf.relative_path AS path,
-                       COUNT(DISTINCT fc.uuid) AS change_count,
-                       MIN(fc.created_at) AS first_changed_at,
-                       MAX(fc.created_at) AS last_changed_at
-                FROM file_change fc
-                JOIN session_file sf ON sf.uuid = fc.session_file_uuid
-                WHERE fc.prompt_uuid = ?
-                GROUP BY sf.relative_path
-                """,
-            arguments: [promptUuid]
-        )
         var byPath: [String: UnplannedChangeRow] = [:]
-        for row in rows {
-            let entry = UnplannedChangeRow(
-                path: row["path"],
-                changeCount: row["change_count"],
-                firstChangedAt: row["first_changed_at"],
-                lastChangedAt: row["last_changed_at"]
-            )
-            byPath[entry.path] = entry
+        for summary in try TouchedPathSummary.request(promptUuid: promptUuid).fetchAll(db) {
+            byPath[summary.path] = summary.dto()
         }
         return byPath
     }

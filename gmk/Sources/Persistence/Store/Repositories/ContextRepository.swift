@@ -53,26 +53,14 @@ struct ContextRepository: RepositoryContext {
 
     /// Read-only resolution — never creates rows.
     func getContext(_ req: ContextGetRequest) throws -> ContextGetResponse {
-        let projectUuid = try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM project WHERE code = ?",
-            arguments: [req.projectCode]
-        )
+        let projectUuid = try self.projectUuid(code: req.projectCode)
         var instanceUuid: String?
         if let projectUuid {
-            instanceUuid = try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM instance WHERE project_uuid = ? AND name = ?",
-                arguments: [projectUuid, req.instanceName]
-            )
+            instanceUuid = try self.instanceUuid(projectUuid: projectUuid, name: req.instanceName)
         }
         var sessionUuid: String?
         if let instanceUuid {
-            sessionUuid = try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM session WHERE instance_uuid = ? AND code = ?",
-                arguments: [instanceUuid, req.sessionCode]
-            )
+            sessionUuid = try self.sessionUuid(instanceUuid: instanceUuid, code: req.sessionCode)
         }
         var kbiteCodes: [String] = []
         if let sessionUuid {
@@ -94,14 +82,38 @@ struct ContextRepository: RepositoryContext {
         )
     }
 
+    // MARK: - Identity lookups (shared by the read and the ensure chain)
+
+    /// A project is identified by its code, an instance by its name inside one
+    /// project, and a session by its code inside one instance — the same three
+    /// keys CONTEXT_GET resolves and the ensure chain tests before inserting.
+    func projectUuid(code: String) throws -> String? {
+        try ProjectRecord
+            .filter(ProjectRecord.Columns.code == code)
+            .select(ProjectRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+    }
+
+    func instanceUuid(projectUuid: String, name: String) throws -> String? {
+        try InstanceRecord
+            .filter(InstanceRecord.Columns.projectUuid == projectUuid)
+            .filter(InstanceRecord.Columns.name == name)
+            .select(InstanceRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+    }
+
+    func sessionUuid(instanceUuid: String, code: String) throws -> String? {
+        try SessionRecord
+            .filter(SessionRecord.Columns.instanceUuid == instanceUuid)
+            .filter(SessionRecord.Columns.code == code)
+            .select(SessionRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+    }
+
     // MARK: - Ensure chain (shared with addFileChange)
 
     func ensureProject(_ ctx: ProjectContext) throws -> (uuid: String, created: Bool) {
-        if let existing = try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM project WHERE code = ?",
-            arguments: [ctx.code]
-        ) {
+        if let existing = try projectUuid(code: ctx.code) {
             return (existing, false)
         }
         let uuid = try core.insertBase(
@@ -124,11 +136,7 @@ struct ContextRepository: RepositoryContext {
         _ ctx: InstanceContext,
         projectUuid: String
     ) throws -> (uuid: String, created: Bool) {
-        if let existing = try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM instance WHERE project_uuid = ? AND name = ?",
-            arguments: [projectUuid, ctx.name]
-        ) {
+        if let existing = try instanceUuid(projectUuid: projectUuid, name: ctx.name) {
             return (existing, false)
         }
         let uuid = try core.insertBase(
@@ -157,11 +165,7 @@ struct ContextRepository: RepositoryContext {
         _ ctx: SessionContext,
         instanceUuid: String
     ) throws -> (uuid: String, created: Bool) {
-        if let existing = try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM session WHERE instance_uuid = ? AND code = ?",
-            arguments: [instanceUuid, ctx.code]
-        ) {
+        if let existing = try sessionUuid(instanceUuid: instanceUuid, code: ctx.code) {
             return (existing, false)
         }
         let uuid = try core.insertBase(
@@ -192,11 +196,12 @@ struct ContextRepository: RepositoryContext {
 
     /// Upsert a kbite row by code, returning its uuid.
     func ensureKbite(code: String) throws -> String {
-        if let existing = try String.fetchOne(
-            db,
-            sql: "SELECT uuid FROM kbite WHERE code = ?",
-            arguments: [code]
-        ) {
+        if let existing =
+            try KbiteRecord
+            .filter(KbiteRecord.Columns.code == code)
+            .select(KbiteRecord.Columns.uuid, as: String.self)
+            .fetchOne(db)
+        {
             return existing
         }
         return try core.insertBase(db, table: "kbite", extra: ["code": code])

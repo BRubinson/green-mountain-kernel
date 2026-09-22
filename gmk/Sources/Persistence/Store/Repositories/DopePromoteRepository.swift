@@ -19,24 +19,13 @@ struct DopePromoteRepository: RepositoryContext {
     func promote(_ req: DopePromoteRequest) throws -> DopePromoteResponse {
 
         guard
-            let lineage = try Row.fetchOne(
-                db,
-                sql: """
-                    SELECT s.code AS session_code, i.project_uuid AS project_uuid,
-                           p.primary_project_branch AS primary_branch
-                      FROM session s
-                      JOIN instance i ON i.uuid = s.instance_uuid
-                      JOIN project  p ON p.uuid = i.project_uuid
-                     WHERE s.uuid = ?
-                    """,
-                arguments: [req.sessionUuid]
-            )
+            let lineage = try SessionLineage.request(sessionUuid: req.sessionUuid).fetchOne(db)
         else {
             throw StoreError.notFound(entity: "session", key: req.sessionUuid)
         }
-        let sessionCode: String = lineage["session_code"]
-        let projectUuid: String = lineage["project_uuid"]
-        let primaryBranch: String = lineage["primary_branch"]
+        let sessionCode = lineage.sessionCode
+        let projectUuid = lineage.projectUuid
+        let primaryBranch = lineage.primaryBranch
 
         // session.code IS the slugged branch (GitHead.sessionCode), so the
         // branch match is a pure db comparison — no git read, and no new

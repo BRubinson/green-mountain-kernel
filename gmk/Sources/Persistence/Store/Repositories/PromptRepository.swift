@@ -20,11 +20,12 @@ struct PromptRepository: RepositoryContext {
         // Atomic under the single writer: MAX+1 inside the write
         // transaction; UNIQUE(session_uuid, seq) is the backstop.
         let seq =
-            (try Int64.fetchOne(
+            try nextSeq(
                 db,
-                sql: "SELECT COALESCE(MAX(seq), 0) FROM prompt WHERE session_uuid = ?",
-                arguments: [req.sessionUuid]
-            ) ?? 0) + 1
+                in: PromptRecord.self,
+                parent: Column("session_uuid"),
+                uuid: req.sessionUuid
+            ) + 1
         let code = req.code ?? "p\(seq)"
         // Item 7: derive the gmfs folder daemon-side when the caller
         // doesn't supply one — the session row (same transaction) already
@@ -282,6 +283,6 @@ struct PromptRepository: RepositoryContext {
     // MARK: - Shared fetch helper
 
     func fetchRow(uuid: String) throws -> PromptRow? {
-        try PromptRecord.fetch(db, uuid: uuid)?.wireRow()
+        try PromptRecord.fetch(db, uuid: uuid)?.dto()
     }
 }

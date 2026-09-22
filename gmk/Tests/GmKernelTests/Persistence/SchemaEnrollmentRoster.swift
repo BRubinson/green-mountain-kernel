@@ -654,13 +654,23 @@ enum SchemaEnrollment {
         composite(FileChangeWithRanges.self, "FileChangeWithRanges") {
             FileChangeWithRanges.request(relativePath: nil)
         },
+        composite(FileChangeWithSessionFile.self, "FileChangeWithSessionFile") {
+            FileChangeWithSessionFile.request(toolUseId: "t", sessionUuid: "s", relativePath: "p")
+        },
         composite(ReviewSummaryWithFindings.self, "ReviewSummaryWithFindings") { ReviewSummaryWithFindings.request() },
+        composite(TouchedPathSummary.self, "TouchedPathSummary") { TouchedPathSummary.request(promptUuid: "p") },
 
         composite(DiagramWithOwner.self, "DiagramWithOwner") { DiagramWithOwner.request() },
 
         composite(KbiteResourceWithFiles.self, "KbiteResourceWithFiles") { KbiteResourceWithFiles.request() },
 
+        composite(PromptSummary.self, "PromptSummary") { PromptSummary.request(sessionUuid: nil) },
+        composite(PromptSummary.self, "PromptSummary(sessionUuid:)") { PromptSummary.request(sessionUuid: "s") },
+        composite(SessionLineage.self, "SessionLineage") { SessionLineage.request(sessionUuid: "s") },
         composite(SessionSummary.self, "SessionSummary") { SessionSummary.request() },
+        composite(SessionSummary.self, "SessionSummary(instance:projectUuid:)") {
+            SessionSummary.request(instance: TableAlias<InstanceRecord>(), projectUuid: "p")
+        },
         composite(SessionWithActivations.self, "SessionWithActivations") { SessionWithActivations.request() },
     ]
 }

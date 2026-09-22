@@ -135,8 +135,8 @@ struct ReviewRepository: RepositoryContext {
             ratings: req.ratings
         )
         let unranked = try findingRank.unrankedCount(
-            table: "review_finding",
-            parentColumn: "review_summary_uuid",
+            ReviewFindingRecord.self,
+            parent: Column("review_summary_uuid"),
             summaryUuid: req.summaryUuid
         )
         try core.appendEvent(
@@ -226,8 +226,8 @@ struct ReviewRepository: RepositoryContext {
     func complete(_ req: ReviewCompleteRequest) throws -> ReviewSummaryResponse {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .reviewing, verb: "complete")
         let unranked = try findingRank.unrankedCount(
-            table: "review_finding",
-            parentColumn: "review_summary_uuid",
+            ReviewFindingRecord.self,
+            parent: Column("review_summary_uuid"),
             summaryUuid: req.summaryUuid
         )
         guard unranked == 0 else {

@@ -13,15 +13,10 @@ struct GitStateRepository: RepositoryContext {
             throw StoreError.notFound(entity: "session", key: req.sessionUuid)
         }
         let instanceRoot =
-            try String.fetchOne(
-                db,
-                sql: """
-                    SELECT i.absolute_file_system_path
-                    FROM session s JOIN instance i ON i.uuid = s.instance_uuid
-                    WHERE s.uuid = ?
-                    """,
-                arguments: [req.sessionUuid]
-            ) ?? ""
+            try InstanceRecord
+            .joining(required: InstanceRecord.sessions.withUuid(req.sessionUuid))
+            .select(InstanceRecord.Columns.absoluteFileSystemPath, as: String.self)
+            .fetchOne(db) ?? ""
         let (headState, currentCode, currentBranch) = Store.headSummary(repoRoot: instanceRoot)
         return SessionResolveResponse(
             session: session,
@@ -36,37 +31,24 @@ struct GitStateRepository: RepositoryContext {
         _ req: InstanceCurrentSessionRequest
     ) throws -> InstanceCurrentSessionResponse {
         guard
-            let instanceRoot = try String.fetchOne(
-                db,
-                sql: "SELECT absolute_file_system_path FROM instance WHERE uuid = ?",
-                arguments: [req.instanceUuid]
-            )
+            let instanceRoot =
+                try InstanceRecord
+                .all()
+                .withUuid(req.instanceUuid)
+                .select(InstanceRecord.Columns.absoluteFileSystemPath, as: String.self)
+                .fetchOne(db)
         else {
             throw StoreError.notFound(entity: "instance", key: req.instanceUuid)
         }
         let (headState, currentCode, currentBranch) = Store.headSummary(repoRoot: instanceRoot)
         var stub: SessionStub?
         if let code = currentCode {
-            // Same column list + last_activity_at shape as SESSION_LIST.
-            if let row = try SessionStubRecord.fetchOne(
-                db,
-                sql: """
-                    SELECT s.uuid, s.version, s.instance_uuid, s.code, s.name,
-                           s.gmfs_relative_storage_path, s.created_at, s.updated_at,
-                           MAX(
-                               s.updated_at,
-                               COALESCE((SELECT MAX(p.updated_at) FROM prompt p
-                                         WHERE p.session_uuid = s.uuid), ''),
-                               COALESCE((SELECT MAX(fc.created_at) FROM file_change fc
-                                         WHERE fc.session_uuid = s.uuid), '')
-                           ) AS last_activity_at
-                    FROM session s
-                    WHERE s.instance_uuid = ? AND s.code = ?
-                    """,
-                arguments: [req.instanceUuid, code]
-            ) {
-                stub = row.wireStub()
-            }
+            stub =
+                try SessionSummary.request()
+                .filter(SessionRecord.Columns.instanceUuid == req.instanceUuid)
+                .filter(SessionRecord.Columns.code == code)
+                .fetchOne(db)?
+                .dto()
         }
         return InstanceCurrentSessionResponse(
             session: stub,

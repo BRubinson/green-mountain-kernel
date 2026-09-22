@@ -107,7 +107,7 @@ struct SessionRepository: RepositoryContext {
 
     func fetchRow(uuid: String) throws -> SessionRow? {
         try SessionWithActivations.request()
-            .filter(SessionRecord.Columns.uuid == uuid)
+            .withUuid(uuid)
             .fetchOne(db)?
             .dto()
     }
@@ -198,23 +198,6 @@ struct SessionRepository: RepositoryContext {
         sessionUuid: String?,
         withReports: Bool = false
     ) throws -> [PromptStub] {
-        let sql: String
-        let arguments: StatementArguments
-        if let sessionUuid {
-            sql = """
-                SELECT uuid, session_uuid, seq, code, name, status, version,
-                       gmfs_relative_storage_path, created_at, updated_at
-                FROM prompt WHERE session_uuid = ? ORDER BY seq
-                """
-            arguments = [sessionUuid]
-        } else {
-            sql = """
-                SELECT uuid, session_uuid, seq, code, name, status, version,
-                       gmfs_relative_storage_path, created_at, updated_at
-                FROM prompt ORDER BY session_uuid, seq
-                """
-            arguments = []
-        }
         var clar: [String: ClarificationReportStub] = [:]
         var arch: [String: ArchitectureReportStub] = [:]
         var explore: [String: ExplorationReportStub] = [:]
@@ -354,18 +337,11 @@ struct SessionRepository: RepositoryContext {
                 )
             }
         }
-        return try Row.fetchAll(db, sql: sql, arguments: arguments)
-            .map { row in
-                let uuid: String = row["uuid"]
-                return PromptStub(
-                    uuid: uuid,
-                    sessionUuid: row["session_uuid"],
-                    seq: row["seq"],
-                    code: row["code"],
-                    name: row["name"],
-                    status: row["status"],
-                    version: row["version"],
-                    gmfsRelativeStoragePath: row["gmfs_relative_storage_path"],
+        return try PromptSummary.request(sessionUuid: sessionUuid)
+            .fetchAll(db)
+            .map { summary in
+                let uuid = summary.prompt.uuid
+                return summary.dto(
                     reports: withReports
                         ? PromptReportsStub(
                             clarification: clar[uuid],
@@ -373,9 +349,7 @@ struct SessionRepository: RepositoryContext {
                             exploration: explore[uuid],
                             review: review[uuid]
                         )
-                        : nil,
-                    createdAt: row["created_at"],
-                    updatedAt: row["updated_at"]
+                        : nil
                 )
             }
     }

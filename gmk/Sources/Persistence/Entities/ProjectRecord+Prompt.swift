@@ -71,31 +71,3 @@ extension PromptRecord {
 
     static let reviewSummaries = hasMany(ReviewSummaryRecord.self).forKey("reviewSummaries")
 }
-
-extension PromptRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    ///
-    /// PromptRow IS field-for-field identical to this record, so the prompt
-    /// row assembly the original plan filed under "stays hand-assembled" was
-    /// a clean 1:1 all along. What genuinely stays hand-assembled is
-    /// PromptGetResponse and PromptStub (the latter folds four grouped report
-    /// aggregations over computed columns).
-    func wireRow() -> PromptRow {
-        PromptRow(
-            uuid: uuid,
-            version: version,
-            sessionUuid: sessionUuid,
-            seq: seq,
-            code: code,
-            name: name,
-            backstory: backstory,
-            goal: goal,
-            detail: detail,
-            command: command,
-            status: status,
-            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

@@ -27,20 +27,3 @@ struct SessionStubRecord: SnakeCaseDecoded {
     var updatedAt: String
     var lastActivityAt: String
 }
-
-extension SessionStubRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    func wireStub() -> SessionStub {
-        SessionStub(
-            uuid: uuid,
-            version: version,
-            instanceUuid: instanceUuid,
-            code: code,
-            name: name,
-            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
-            createdAt: createdAt,
-            updatedAt: updatedAt,
-            lastActivityAt: lastActivityAt
-        )
-    }
-}

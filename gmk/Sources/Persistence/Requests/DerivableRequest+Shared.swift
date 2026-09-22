@@ -61,12 +61,18 @@ extension DerivableRequest where RowDecoder: ParentKeyed {
     }
 }
 
-extension DerivableRequest where RowDecoder: BaseRecordFields {
-    /// Keeps only the row carrying this uuid.
+extension DerivableRequest {
+    /// Keeps only the row the request's own table carries this uuid on.
+    ///
+    /// Unconstrained by RowDecoder so it survives `asRequest(of:)`: a composite
+    /// decodes to a struct that is no Record, and the filter belongs to the
+    /// base table either way.
     func withUuid(_ uuid: String) -> Self {
         filter(Column("uuid") == uuid)
     }
+}
 
+extension DerivableRequest where RowDecoder: BaseRecordFields {
     /// Orders the rows by `created_at`, ascending.
     func orderedByCreatedAt() -> Self {
         order(Column("created_at"))

@@ -108,6 +108,53 @@ struct FileChangeWithRanges: FetchableRecord, Decodable {
     }
 }
 
+/// One `file_change` row with the `session_file` it changed, keyed the way the
+/// dedup lookup asks: a (tool call, path) pair inside one session.
+struct FileChangeWithSessionFile: FetchableRecord, Decodable {
+    var fileChange: FileChangeRecord
+    var sessionFile: SessionFileRecord
+
+    static func request(
+        toolUseId: String,
+        sessionUuid: String,
+        relativePath: String
+    ) -> QueryInterfaceRequest<Self> {
+        let file = TableAlias<SessionFileRecord>()
+        return
+            FileChangeRecord
+            .filter(FileChangeRecord.Columns.toolUseId == toolUseId)
+            .including(required: FileChangeRecord.sessionFile.aliased(file))
+            .filter(file[SessionFileRecord.Columns.sessionUuid] == sessionUuid)
+            .filter(file[SessionFileRecord.Columns.relativePath] == relativePath)
+            .asRequest(of: Self.self)
+    }
+}
+
+/// Every distinct path one prompt's file changes touched, with the change count
+/// and the first/last timestamps — one grouped read, never one per path.
+struct TouchedPathSummary: FetchableRecord, Decodable {
+    var path: String
+    var changeCount: Int
+    var firstChangedAt: String
+    var lastChangedAt: String
+
+    static func request(promptUuid: String) -> QueryInterfaceRequest<Self> {
+        let file = TableAlias<SessionFileRecord>()
+        return
+            FileChangeRecord
+            .joining(required: FileChangeRecord.sessionFile.aliased(file))
+            .filter(FileChangeRecord.Columns.promptUuid == promptUuid)
+            .group(file[SessionFileRecord.Columns.relativePath])
+            .select(
+                file[SessionFileRecord.Columns.relativePath].forKey("path"),
+                count(distinct: FileChangeRecord.Columns.uuid).forKey("changeCount"),
+                min(FileChangeRecord.Columns.createdAt).forKey("firstChangedAt"),
+                max(FileChangeRecord.Columns.createdAt).forKey("lastChangedAt")
+            )
+            .asRequest(of: Self.self)
+    }
+}
+
 /// One `care_package` row with its three ref classes.
 struct CarePackageWithRefs: FetchableRecord, Decodable {
     var carePackage: CarePackageRecord

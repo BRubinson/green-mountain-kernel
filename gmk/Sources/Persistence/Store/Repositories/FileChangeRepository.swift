@@ -316,25 +316,22 @@ struct FileChangeRepository: RepositoryContext {
         relativePath: String
     ) throws -> FileChangeAddResponse? {
         guard
-            let row = try Row.fetchOne(
-                db,
-                sql: """
-                    SELECT fc.uuid AS file_change_uuid, sf.uuid AS session_file_uuid
-                    FROM file_change fc
-                    JOIN session_file sf ON sf.uuid = fc.session_file_uuid
-                    WHERE fc.tool_use_id = ? AND sf.session_uuid = ? AND sf.relative_path = ?
-                    """,
-                arguments: [toolUseId, sessionUuid, relativePath]
-            )
+            let pair =
+                try FileChangeWithSessionFile.request(
+                    toolUseId: toolUseId,
+                    sessionUuid: sessionUuid,
+                    relativePath: relativePath
+                )
+                .fetchOne(db)
         else { return nil }
-        let fileChangeUuid: String = row["file_change_uuid"]
+        let fileChangeUuid = pair.fileChange.uuid
         let rangeUuids = try String.fetchAll(
             db,
             sql: "SELECT uuid FROM file_change_range WHERE file_change_uuid = ? ORDER BY id",
             arguments: [fileChangeUuid]
         )
         return FileChangeAddResponse(
-            sessionFileUuid: row["session_file_uuid"],
+            sessionFileUuid: pair.sessionFile.uuid,
             fileChangeUuid: fileChangeUuid,
             rangeUuids: rangeUuids,
             deduplicated: true

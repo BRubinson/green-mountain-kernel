@@ -193,16 +193,4 @@ extension Store {
         }
     }
 
-    func unrankedCount(
-        _ db: Database,
-        table: String,
-        parentColumn: String,
-        summaryUuid: String
-    ) throws -> Int {
-        try Int.fetchOne(
-            db,
-            sql: "SELECT COUNT(*) FROM \(table) WHERE \(parentColumn) = ? AND finding_rating IS NULL",
-            arguments: [summaryUuid]
-        ) ?? 0
-    }
 }
