@@ -1,0 +1,22 @@
+// GENERATED-then-maintained: read-side Record structs mirroring the live db
+// schema (sqlite_master truth). Deliberately FetchableRecord ONLY — never
+// PersistableRecord: all writes route through Store.insertBase/updateBase/
+// deleteBase so the version-gate and BaseEntity defaults stay single-sourced.
+// Timestamps are TEXT ISO-8601 Z strings (lexicographic ordering contract) —
+// never Date.
+
+import Foundation
+import GRDB
+
+/// Read-side mirror of the `file_change_range` table. Columns map via convertFromSnakeCase.
+struct FileChangeRangeRecord: BaseRecordFields {
+    static let databaseTableName = "file_change_range"
+    var uuid: String
+    var version: Int64
+    var createdAt: String
+    var updatedAt: String
+    var fileChangeUuid: String
+    var lineStart: Int64
+    var lineEnd: Int64
+    var changedContent: String?
+}
