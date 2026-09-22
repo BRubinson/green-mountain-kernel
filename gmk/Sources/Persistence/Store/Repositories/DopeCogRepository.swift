@@ -78,13 +78,9 @@ struct DopeCogRepository: RepositoryContext {
     func dopeCogDelete(_ req: DopeCogDeleteRequest) throws -> DopeCogDeleteResponse {
         let scope = try cogOwningScope(cogUuid: req.uuid)
         let elements =
-            try Int.fetchOne(
-                db,
-                sql: """
-                    SELECT COUNT(*) FROM dope_cog_element WHERE dope_cog_uuid = ?
-                    """,
-                arguments: [req.uuid]
-            ) ?? 0
+            try DopeCogElementRecord
+            .filter(DopeCogElementRecord.Columns.dopeCogUuid == req.uuid)
+            .fetchCount(db)
 
         if req.soft == true {
             guard scope.tier?.isOverlay == true else {
@@ -131,13 +127,7 @@ struct DopeCogRepository: RepositoryContext {
     ) throws -> DopeCogElementResponse {
         try DopeCode.validateCode(req.code, field: "cog element code")
         let spec = try DopeCogElementSpec.spec(for: req.elementType)
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT uuid FROM dope_cog WHERE uuid = ?",
-                arguments: [req.cogUuid]
-            ) != nil
-        else {
+        guard try DopeCogRecord.all().withUuid(req.cogUuid).fetchCount(db) > 0 else {
             throw StoreError.notFound(entity: "dope_cog", key: req.cogUuid)
         }
         let scope = try cogOwningScope(cogUuid: req.cogUuid)
@@ -154,15 +144,7 @@ struct DopeCogRepository: RepositoryContext {
                     + " and cannot be top-level"
             )
         case (.some(let parent), _):
-            guard
-                let parentType = try String.fetchOne(
-                    db,
-                    sql: """
-                        SELECT element_type FROM dope_cog_element WHERE uuid = ?
-                        """,
-                    arguments: [parent]
-                )
-            else {
+            guard let parentType = try elementType(uuid: parent) else {
                 throw StoreError.notFound(entity: "dope_cog_element", key: parent)
             }
             guard let allowed = spec.allowedParentTypes,
@@ -236,15 +218,7 @@ struct DopeCogRepository: RepositoryContext {
     func dopeCogElementUpdate(
         _ req: DopeCogElementUpdateRequest
     ) throws -> DopeCogElementResponse {
-        guard
-            let typeRaw = try String.fetchOne(
-                db,
-                sql: """
-                    SELECT element_type FROM dope_cog_element WHERE uuid = ?
-                    """,
-                arguments: [req.uuid]
-            )
-        else {
+        guard let typeRaw = try elementType(uuid: req.uuid) else {
             throw StoreError.notFound(entity: "dope_cog_element", key: req.uuid)
         }
         let spec = try DopeCogElementSpec.spec(for: typeRaw)
@@ -313,13 +287,9 @@ struct DopeCogRepository: RepositoryContext {
         // lookup reads, and the area counter still has to be advanced.
         let cogUuid = try owningCogUuid(elementUuid: req.uuid)
         let children =
-            try Int.fetchOne(
-                db,
-                sql: """
-                    SELECT COUNT(*) FROM dope_cog_element WHERE parent_element_uuid = ?
-                    """,
-                arguments: [req.uuid]
-            ) ?? 0
+            try DopeCogElementRecord
+            .filter(DopeCogElementRecord.Columns.parentElementUuid == req.uuid)
+            .fetchCount(db)
         if req.soft == true {
             guard scope.tier?.isOverlay == true else {
                 throw StoreError.badRequest(
@@ -368,18 +338,12 @@ struct DopeCogRepository: RepositoryContext {
         guard try dope.fetchDopeScope(uuid: req.scopeUuid) != nil else {
             throw StoreError.notFound(entity: "dope_scope", key: req.scopeUuid)
         }
-        var sql = "SELECT * FROM dope_cog WHERE dope_scope_uuid = ?"
-        var args: [(any DatabaseValueConvertible)?] = [req.scopeUuid]
+        var request = Self.cogsOfScope(req.scopeUuid)
         if let code = req.code {
-            sql += " AND code = ?"
-            args.append(code)
+            request = request.filter(DopeCogRecord.Columns.code == code)
         }
-        sql += " ORDER BY sort_order, code"
-        let cogs = try DopeCogRecord.fetchAll(db, sql: sql, arguments: StatementArguments(args))
         return DopeCogGetResponse(
-            cogs: try cogs.map { row in
-                try hydrateCog(row: row)
-            }
+            cogs: try request.fetchAll(db).map { try hydrateCog($0) }
         )
     }
 
@@ -387,28 +351,35 @@ struct DopeCogRepository: RepositoryContext {
     /// transaction — the repo write path needs cogs alongside the
     /// persistence tree. Extracted from dopeCogGet rather than duplicated.
     func fetchDopeCogs(scopeUuid: String) throws -> [DopeCogNode] {
-        let rows = try DopeCogRecord.fetchAll(
-            db,
-            where: "dope_scope_uuid = ?",
-            arguments: [scopeUuid],
-            orderBy: "sort_order, code"
-        )
-        return try rows.map { try hydrateCog(row: $0) }
+        try Self.cogsOfScope(scopeUuid).fetchAll(db).map { try hydrateCog($0) }
+    }
+
+    /// One scope's cogs with their elements prefetched: two statements for the
+    /// whole area, never an element query per cog.
+    private static func cogsOfScope(
+        _ scopeUuid: String
+    ) -> QueryInterfaceRequest<DopeCogWithElements> {
+        DopeCogWithElements.request()
+            .filter(DopeCogRecord.Columns.dopeScopeUuid == scopeUuid)
+            .order(DopeCogRecord.Columns.sortOrder, DopeCogRecord.Columns.code)
     }
 
     // MARK: - Helpers
 
+    private func elementType(uuid: String) throws -> String? {
+        try DopeCogElementRecord
+            .all()
+            .withUuid(uuid)
+            .select(DopeCogElementRecord.Columns.elementType, as: String.self)
+            .fetchOne(db)
+    }
+
     private func cogOwningScope(cogUuid: String) throws -> DopeScopeRow {
         guard
-            let row = try DopeScopeRecord.fetchOne(
-                db,
-                sql: """
-                    SELECT s.* FROM dope_scope s
-                    JOIN dope_cog c ON c.dope_scope_uuid = s.uuid
-                    WHERE c.uuid = ?
-                    """,
-                arguments: [cogUuid]
-            )
+            let row =
+                try DopeScopeRecord
+                .joining(required: DopeScopeRecord.cogs.unordered().withUuid(cogUuid))
+                .fetchOne(db)
         else {
             throw StoreError.notFound(entity: "dope_cog", key: cogUuid)
         }
@@ -417,13 +388,12 @@ struct DopeCogRepository: RepositoryContext {
 
     private func owningCogUuid(elementUuid: String) throws -> String {
         guard
-            let uuid = try String.fetchOne(
-                db,
-                sql: """
-                    SELECT dope_cog_uuid FROM dope_cog_element WHERE uuid = ?
-                    """,
-                arguments: [elementUuid]
-            )
+            let uuid =
+                try DopeCogElementRecord
+                .all()
+                .withUuid(elementUuid)
+                .select(DopeCogElementRecord.Columns.dopeCogUuid, as: String.self)
+                .fetchOne(db)
         else {
             throw StoreError.notFound(entity: "dope_cog_element", key: elementUuid)
         }
@@ -432,38 +402,24 @@ struct DopeCogRepository: RepositoryContext {
 
     private func elementOwningScope(elementUuid: String) throws -> DopeScopeRow {
         guard
-            let row = try DopeScopeRecord.fetchOne(
-                db,
-                sql: """
-                    SELECT s.* FROM dope_scope s
-                    JOIN dope_cog c ON c.dope_scope_uuid = s.uuid
-                    JOIN dope_cog_element e ON e.dope_cog_uuid = c.uuid
-                    WHERE e.uuid = ?
-                    """,
-                arguments: [elementUuid]
-            )
+            let row =
+                try DopeScopeRecord
+                .joining(
+                    required: DopeScopeRecord.cogs.unordered()
+                        .joining(
+                            required: DopeCogRecord.elements.unordered().withUuid(elementUuid)
+                        )
+                )
+                .fetchOne(db)
         else {
             throw StoreError.notFound(entity: "dope_cog_element", key: elementUuid)
         }
         return row.wireRow()
     }
 
-    private func hydrateCog(row: DopeCogRecord) throws -> DopeCogNode {
-        let elements = try DopeCogElementRecord.fetchAll(
-            db,
-            where: "dope_cog_uuid = ?",
-            arguments: [row.uuid],
-            orderBy: "sort_order, code"
-        )
-        return DopeCogNode(
-            uuid: row.uuid,
-            version: row.version,
-            code: row.code,
-            name: row.name,
-            description: row.description,
-            sortOrder: Int(row.sortOrder),
-            deletedOn: row.deletedOn,
-            elements: try elements.map { try hydrateElement(row: $0) }
+    private func hydrateCog(_ composite: DopeCogWithElements) throws -> DopeCogNode {
+        composite.cog.dto(
+            elements: try composite.elements.map { try hydrateElement(row: $0) }
         )
     }
 
@@ -489,19 +445,9 @@ struct DopeCogRepository: RepositoryContext {
             else { return nil }
             return subtype[field.dbColumn]
         }
-        return DopeCogElementNode(
-            uuid: row.uuid,
-            version: row.version,
-            elementType: row.elementType,
-            code: row.code,
-            name: row.name,
-            description: row.description,
-            sortOrder: Int(row.sortOrder),
-            parentElementUuid: row.parentElementUuid,
-            dopeScopeCode: row.dopeScopeCode,
+        return row.dto(
             primaryPath: subtypeValue(.primaryPath),
-            dopePersistenceCode: subtypeValue(.dopePersistenceCode),
-            deletedOn: row.deletedOn
+            dopePersistenceCode: subtypeValue(.dopePersistenceCode)
         )
     }
 
@@ -509,10 +455,12 @@ struct DopeCogRepository: RepositoryContext {
         uuid: String,
         revision: Int64
     ) throws -> DopeCogResponse {
-        guard let row = try DopeCogRecord.fetch(db, uuid: uuid) else {
+        guard
+            let composite = try DopeCogWithElements.request().withUuid(uuid).fetchOne(db)
+        else {
             throw StoreError.notFound(entity: "dope_cog", key: uuid)
         }
-        return DopeCogResponse(cog: try hydrateCog(row: row), revision: revision)
+        return DopeCogResponse(cog: try hydrateCog(composite), revision: revision)
     }
 
     private func fetchCogElementResponse(

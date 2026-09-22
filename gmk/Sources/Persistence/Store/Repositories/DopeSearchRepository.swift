@@ -75,14 +75,11 @@ struct DopeSearchRepository: RepositoryContext {
                 )
             } else {
                 baseRows =
-                    try DopeScopeRecord.fetchAll(
-                        db,
-                        sql: """
-                            SELECT * FROM dope_scope
-                             WHERE project_uuid = ? AND scope_type = ? AND code = ?
-                            """,
-                        arguments: [scope.projectUuid, baseTier.rawValue, scope.code]
-                    )
+                    try DopeScopeRecord
+                    .filter(DopeScopeRecord.Columns.projectUuid == scope.projectUuid)
+                    .filter(DopeScopeRecord.Columns.scopeType == baseTier.rawValue)
+                    .filter(DopeScopeRecord.Columns.code == scope.code)
+                    .fetchAll(db)
                     .map { $0.wireRow() }
             }
             let baseTree = try baseRows.first.map { try dope.fetchDopeTree(scope: $0) }
@@ -127,47 +124,40 @@ struct DopeSearchRepository: RepositoryContext {
                 throw StoreError.badRequest(detail: "--scope prompt requires --prompt-uuid")
             }
             guard
-                let sessionUuid = try String.fetchOne(
-                    db,
-                    sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
-                    arguments: [promptUuid]
-                )
+                let sessionUuid =
+                    try PromptRecord
+                    .all()
+                    .withUuid(promptUuid)
+                    .select(PromptRecord.Columns.sessionUuid, as: String.self)
+                    .fetchOne(db)
             else {
                 throw StoreError.notFound(entity: "prompt", key: promptUuid)
             }
             return
-                try DopeScopeRecord.fetchAll(
-                    db,
-                    sql: """
-                        SELECT * FROM dope_scope
-                         WHERE (session_uuid = ? AND scope_type = 'SESSION_INSTANCE')
-                            OR (prompt_uuid = ? AND scope_type = 'SESSION_INSTANCE_ITEM')
-                         ORDER BY code
-                        """,
-                    arguments: [sessionUuid, promptUuid]
+                try DopeScopeRecord
+                .filter(
+                    (DopeScopeRecord.Columns.sessionUuid == sessionUuid
+                        && DopeScopeRecord.Columns.scopeType
+                            == DopeScopeType.sessionInstance.rawValue)
+                        || (DopeScopeRecord.Columns.promptUuid == promptUuid
+                            && DopeScopeRecord.Columns.scopeType
+                                == DopeScopeType.sessionInstanceItem.rawValue)
                 )
+                .order(DopeScopeRecord.Columns.code)
+                .fetchAll(db)
                 .map { $0.wireRow() }
         case .session:
             guard let sessionUuid = req.sessionUuid else {
                 throw StoreError.badRequest(detail: "--scope session requires --session-uuid")
             }
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM session WHERE uuid = ?",
-                    arguments: [sessionUuid]
-                ) != nil
-            else {
+            guard try SessionRecord.all().withUuid(sessionUuid).fetchCount(db) > 0 else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
             }
             return
-                try DopeScopeRecord.fetchAll(
-                    db,
-                    sql: """
-                        SELECT * FROM dope_scope WHERE session_uuid = ? ORDER BY code
-                        """,
-                    arguments: [sessionUuid]
-                )
+                try DopeScopeRecord
+                .filter(DopeScopeRecord.Columns.sessionUuid == sessionUuid)
+                .order(DopeScopeRecord.Columns.code)
+                .fetchAll(db)
                 .map { $0.wireRow() }
         case .project:
             // A nil project_uuid means EVERY project, matching the precedent on
@@ -175,31 +165,19 @@ struct DopeSearchRepository: RepositoryContext {
             // "every arm".
             guard let projectUuid = req.projectUuid else {
                 return
-                    try DopeScopeRecord.fetchAll(
-                        db,
-                        sql: """
-                            SELECT * FROM dope_scope ORDER BY project_uuid, code
-                            """
-                    )
+                    try DopeScopeRecord
+                    .order(DopeScopeRecord.Columns.projectUuid, DopeScopeRecord.Columns.code)
+                    .fetchAll(db)
                     .map { $0.wireRow() }
             }
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT 1 FROM project WHERE uuid = ?",
-                    arguments: [projectUuid]
-                ) != nil
-            else {
+            guard try ProjectRecord.all().withUuid(projectUuid).fetchCount(db) > 0 else {
                 throw StoreError.notFound(entity: "project", key: projectUuid)
             }
             return
-                try DopeScopeRecord.fetchAll(
-                    db,
-                    sql: """
-                        SELECT * FROM dope_scope WHERE project_uuid = ? ORDER BY code
-                        """,
-                    arguments: [projectUuid]
-                )
+                try DopeScopeRecord
+                .filter(DopeScopeRecord.Columns.projectUuid == projectUuid)
+                .order(DopeScopeRecord.Columns.code)
+                .fetchAll(db)
                 .map { $0.wireRow() }
         }
     }

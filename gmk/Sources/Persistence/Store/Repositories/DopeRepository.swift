@@ -23,8 +23,7 @@ struct DopeRepository: RepositoryContext {
     // MARK: - Row + scope helpers
 
     func fetchDopeScope(uuid: String) throws -> DopeScopeRow? {
-        try DopeScopeRecord.fetchOne(db, sql: "SELECT * FROM dope_scope WHERE uuid = ?", arguments: [uuid])
-            .map { $0.wireRow() }
+        try DopeScopeRecord.all().withUuid(uuid).fetchOne(db).map { $0.wireRow() }
     }
 
     /// Advance the whole-tree content counter WITHOUT bumping the scope row's
@@ -53,73 +52,74 @@ struct DopeRepository: RepositoryContext {
             sql: "UPDATE dope_scope SET revision = revision + 1, updated_at = ? WHERE uuid = ?",
             arguments: [Store.isoNow(), scopeUuid]
         )
-        guard
-            let revision = try Int64.fetchOne(
-                db,
-                sql: "SELECT revision FROM dope_scope WHERE uuid = ?",
-                arguments: [scopeUuid]
-            )
-        else {
+        guard let revision = try scopeRevision(scopeUuid: scopeUuid) else {
             throw StoreError.notFound(entity: "dope_scope", key: scopeUuid)
         }
         return revision
     }
 
+    private func scopeRevision(scopeUuid: String) throws -> Int64? {
+        try DopeScopeRecord
+            .all()
+            .withUuid(scopeUuid)
+            .select(DopeScopeRecord.Columns.revision, as: Int64.self)
+            .fetchOne(db)
+    }
+
     /// Session-keyed twin of the promptUuid variant in Store+Architecture —
     /// dope's repo verbs are scope-addressed and scopes hang off sessions.
     func instanceRoot(sessionUuid: String) throws -> String {
-        try String.fetchOne(
-            db,
-            sql: """
-                SELECT i.absolute_file_system_path
-                FROM session s
-                JOIN instance i ON i.uuid = s.instance_uuid
-                WHERE s.uuid = ?
-                """,
-            arguments: [sessionUuid]
-        ) ?? ""
+        try InstanceRecord
+            .joining(required: InstanceRecord.sessions.withUuid(sessionUuid))
+            .select(InstanceRecord.Columns.absoluteFileSystemPath, as: String.self)
+            .fetchOne(db) ?? ""
     }
 
-    /// Resolve the scope that owns a node at `level`. The join chains are the
-    /// registry's parent links spelled out as SQL.
+    /// Resolve the scope that owns a node at `level`, walking the registry's
+    /// parent links as associations.
     func dopeOwningScope(level: DopeLevel, nodeUuid: String) throws -> DopeScopeRow {
-        let sql: String
+        let request: QueryInterfaceRequest<DopeScopeRecord>
         switch level {
         case .scope:
-            sql = "SELECT s.* FROM dope_scope s WHERE s.uuid = ?"
+            request = DopeScopeRecord.all().withUuid(nodeUuid)
         case .persistence:
-            sql = """
-                SELECT s.* FROM dope_persistence d
-                JOIN dope_scope s ON s.uuid = d.dope_scope_uuid WHERE d.uuid = ?
-                """
+            request = DopeScopeRecord.joining(
+                required: Self.persistences.withUuid(nodeUuid)
+            )
         case .entity:
-            sql = """
-                SELECT s.* FROM dope_persistence_entity e
-                JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                JOIN dope_scope s ON s.uuid = d.dope_scope_uuid WHERE e.uuid = ?
-                """
+            request = DopeScopeRecord.joining(
+                required: Self.persistences.joining(
+                    required: DopePersistenceRecord.entities.unordered().withUuid(nodeUuid)
+                )
+            )
         case .property:
-            sql = """
-                SELECT s.* FROM dope_persistence_entity_property p
-                JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                JOIN dope_scope s ON s.uuid = d.dope_scope_uuid WHERE p.uuid = ?
-                """
+            request = DopeScopeRecord.joining(
+                required: Self.persistences.joining(
+                    required: DopePersistenceRecord.entities.unordered()
+                        .joining(
+                            required: DopePersistenceEntityRecord.properties.unordered()
+                                .withUuid(nodeUuid)
+                        )
+                )
+            )
         case .enumeration:
-            sql = """
-                SELECT s.* FROM dope_persistence_enum n
-                JOIN dope_persistence d ON d.uuid = n.dope_persistence_uuid
-                JOIN dope_scope s ON s.uuid = d.dope_scope_uuid WHERE n.uuid = ?
-                """
+            request = DopeScopeRecord.joining(
+                required: Self.persistences.joining(
+                    required: DopePersistenceRecord.enums.unordered().withUuid(nodeUuid)
+                )
+            )
         case .option:
-            sql = """
-                SELECT s.* FROM dope_persistence_enum_option o
-                JOIN dope_persistence_enum n ON n.uuid = o.dope_persistence_enum_uuid
-                JOIN dope_persistence d ON d.uuid = n.dope_persistence_uuid
-                JOIN dope_scope s ON s.uuid = d.dope_scope_uuid WHERE o.uuid = ?
-                """
+            request = DopeScopeRecord.joining(
+                required: Self.persistences.joining(
+                    required: DopePersistenceRecord.enums.unordered()
+                        .joining(
+                            required: DopePersistenceEnumRecord.options.unordered()
+                                .withUuid(nodeUuid)
+                        )
+                )
+            )
         }
-        guard let row = try DopeScopeRecord.fetchOne(db, sql: sql, arguments: [nodeUuid]) else {
+        guard let row = try request.fetchOne(db) else {
             throw StoreError.notFound(
                 entity: DopeLevelSpec.spec(for: level).table,
                 key: nodeUuid
@@ -127,6 +127,10 @@ struct DopeRepository: RepositoryContext {
         }
         return row.wireRow()
     }
+
+    /// The scope → persistence hop every owner walk starts from, unordered
+    /// because it is a filter here and never a result set.
+    private static let persistences = DopeScopeRecord.persistences.unordered()
 
     // internal: the promotion machine emits DOPE_CHANGE too.
     func recordDopeChange(
@@ -192,11 +196,7 @@ struct DopeRepository: RepositoryContext {
     ) throws -> (stamped: Int64?, current: Int64?, drifted: Bool, ghosts: [String]) {
         // No scope -> no drift, no ghosts.
         guard let scopeUuid else { return (stampedRevision, nil, false, []) }
-        let current = try Int64.fetchOne(
-            db,
-            sql: "SELECT revision FROM dope_scope WHERE uuid = ?",
-            arguments: [scopeUuid]
-        )
+        let current = try scopeRevision(scopeUuid: scopeUuid)
         let drifted: Bool = {
             guard let stamped = stampedRevision, let current else { return false }
             return stamped != current
@@ -220,45 +220,52 @@ struct DopeRepository: RepositoryContext {
         let segs = path.split(separator: ".").map(String.init)
         guard !segs.isEmpty, segs.count <= 4 else { return false }
         guard
-            let persistenceUuid = try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM dope_persistence WHERE dope_scope_uuid = ? AND code = ?",
-                arguments: [scopeUuid, segs[0]]
-            )
+            let persistenceUuid =
+                try DopePersistenceRecord
+                .filter(DopePersistenceRecord.Columns.dopeScopeUuid == scopeUuid)
+                .filter(DopePersistenceRecord.Columns.code == segs[0])
+                .select(DopePersistenceRecord.Columns.uuid, as: String.self)
+                .fetchOne(db)
         else { return false }
         if segs.count == 1 { return true }
 
-        if segs[1] == "enums" {
+        if segs[1] == DopeCode.reservedEnumSegment {
             guard segs.count >= 3 else { return false }
             guard
-                let enumUuid = try String.fetchOne(
-                    db,
-                    sql: "SELECT uuid FROM dope_persistence_enum WHERE dope_persistence_uuid = ? AND code = ?",
-                    arguments: [persistenceUuid, segs[2]]
-                )
+                let enumUuid =
+                    try DopePersistenceEnumRecord
+                    .filter(
+                        DopePersistenceEnumRecord.Columns.dopePersistenceUuid == persistenceUuid
+                    )
+                    .filter(DopePersistenceEnumRecord.Columns.code == segs[2])
+                    .select(DopePersistenceEnumRecord.Columns.uuid, as: String.self)
+                    .fetchOne(db)
             else { return false }
             if segs.count == 3 { return true }
-            return try Row.fetchOne(
-                db,
-                sql: "SELECT 1 FROM dope_persistence_enum_option WHERE dope_persistence_enum_uuid = ? AND code = ?",
-                arguments: [enumUuid, segs[3]]
-            ) != nil
+            return try DopePersistenceEnumOptionRecord
+                .filter(DopePersistenceEnumOptionRecord.Columns.dopePersistenceEnumUuid == enumUuid)
+                .filter(DopePersistenceEnumOptionRecord.Columns.code == segs[3])
+                .fetchCount(db) > 0
         }
 
         guard
-            let entityUuid = try String.fetchOne(
-                db,
-                sql: "SELECT uuid FROM dope_persistence_entity WHERE dope_persistence_uuid = ? AND code = ?",
-                arguments: [persistenceUuid, segs[1]]
-            )
+            let entityUuid =
+                try DopePersistenceEntityRecord
+                .filter(
+                    DopePersistenceEntityRecord.Columns.dopePersistenceUuid == persistenceUuid
+                )
+                .filter(DopePersistenceEntityRecord.Columns.code == segs[1])
+                .select(DopePersistenceEntityRecord.Columns.uuid, as: String.self)
+                .fetchOne(db)
         else { return false }
         if segs.count == 2 { return true }
         guard segs.count == 3 else { return false }
-        return try Row.fetchOne(
-            db,
-            sql: "SELECT 1 FROM dope_persistence_entity_property WHERE dope_persistence_entity_uuid = ? AND code = ?",
-            arguments: [entityUuid, segs[2]]
-        ) != nil
+        return try DopePersistenceEntityPropertyRecord
+            .filter(
+                DopePersistenceEntityPropertyRecord.Columns.dopePersistenceEntityUuid == entityUuid
+            )
+            .filter(DopePersistenceEntityPropertyRecord.Columns.code == segs[2])
+            .fetchCount(db) > 0
     }
 
     // MARK: - Init
@@ -269,22 +276,17 @@ struct DopeRepository: RepositoryContext {
         guard description.count <= 512 else {
             throw StoreError.badRequest(detail: "scope description exceeds 512 characters")
         }
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT uuid FROM session WHERE uuid = ?",
-                arguments: [req.sessionUuid]
-            ) != nil
-        else {
+        guard try SessionRecord.all().withUuid(req.sessionUuid).fetchCount(db) > 0 else {
             throw StoreError.notFound(entity: "session", key: req.sessionUuid)
         }
         if let promptUuid = req.promptUuid {
             guard
-                let owner = try String.fetchOne(
-                    db,
-                    sql: "SELECT session_uuid FROM prompt WHERE uuid = ?",
-                    arguments: [promptUuid]
-                )
+                let owner =
+                    try PromptRecord
+                    .all()
+                    .withUuid(promptUuid)
+                    .select(PromptRecord.Columns.sessionUuid, as: String.self)
+                    .fetchOne(db)
             else {
                 throw StoreError.notFound(entity: "prompt", key: promptUuid)
             }
@@ -296,29 +298,22 @@ struct DopeRepository: RepositoryContext {
         }
 
         let scopeType: DopeScopeType = req.promptUuid == nil ? .sessionInstance : .sessionInstanceItem
-        let existingSql =
-            req.promptUuid == nil
-            ? "SELECT * FROM dope_scope WHERE session_uuid = ? AND scope_type = 'SESSION_INSTANCE' AND code = ?"
-            : "SELECT * FROM dope_scope WHERE session_uuid = ? AND prompt_uuid = ? AND scope_type = 'SESSION_INSTANCE_ITEM' AND code = ?"
-        let existingArgs: StatementArguments =
-            req.promptUuid == nil
-            ? [req.sessionUuid, req.code]
-            : [req.sessionUuid, req.promptUuid, req.code]
-        if let row = try DopeScopeRecord.fetchOne(db, sql: existingSql, arguments: existingArgs) {
+        var existing =
+            DopeScopeRecord
+            .filter(DopeScopeRecord.Columns.sessionUuid == req.sessionUuid)
+            .filter(DopeScopeRecord.Columns.scopeType == scopeType.rawValue)
+            .filter(DopeScopeRecord.Columns.code == req.code)
+        if let promptUuid = req.promptUuid {
+            existing = existing.filter(DopeScopeRecord.Columns.promptUuid == promptUuid)
+        }
+        if let row = try existing.fetchOne(db) {
             return DopeScopeResponse(scope: row.wireRow(), created: false)
         }
 
         // The chain-non-null tier ladder: a session-tier scope fills its
         // own FK and every ancestor uuid, so list/get by any ancestor stays
         // a plain indexed WHERE (m0010 grammar, ported by m0013).
-        guard
-            let lineage = try Row.fetchOne(
-                db,
-                sql: "SELECT i.project_uuid AS p, s.instance_uuid AS i FROM session s "
-                    + "JOIN instance i ON i.uuid = s.instance_uuid WHERE s.uuid = ?",
-                arguments: [req.sessionUuid]
-            )
-        else {
+        guard let lineage = try DopeScopeLineage.forSession(req.sessionUuid).fetchOne(db) else {
             throw StoreError.corruptState(
                 entity: "session",
                 detail: "session \(req.sessionUuid) has no instance->project lineage"
@@ -328,8 +323,8 @@ struct DopeRepository: RepositoryContext {
             db,
             table: "dope_scope",
             extra: [
-                "project_uuid": lineage["p"] as String,
-                "instance_uuid": lineage["i"] as String,
+                "project_uuid": lineage.projectUuid,
+                "instance_uuid": lineage.instanceUuid,
                 "session_uuid": req.sessionUuid,
                 "prompt_uuid": req.promptUuid,
                 "scope_type": scopeType.rawValue,
@@ -347,14 +342,14 @@ struct DopeRepository: RepositoryContext {
                 )
             }
             guard
-                let baseRow = try DopeScopeRecord.fetchOne(
-                    db,
-                    sql: """
-                        SELECT * FROM dope_scope
-                        WHERE session_uuid = ? AND scope_type = 'SESSION_INSTANCE' AND code = ?
-                        """,
-                    arguments: [req.sessionUuid, req.code]
-                )
+                let baseRow =
+                    try DopeScopeRecord
+                    .filter(DopeScopeRecord.Columns.sessionUuid == req.sessionUuid)
+                    .filter(
+                        DopeScopeRecord.Columns.scopeType == DopeScopeType.sessionInstance.rawValue
+                    )
+                    .filter(DopeScopeRecord.Columns.code == req.code)
+                    .fetchOne(db)
             else {
                 throw StoreError.badRequest(
                     detail: "no SESSION_INSTANCE scope with code '\(req.code)' to clone from"
@@ -386,23 +381,11 @@ struct DopeRepository: RepositoryContext {
         sessionUuid: String,
         promptUuid: String?
     ) throws {
-        guard
-            try Row.fetchOne(
-                db,
-                sql: "SELECT uuid FROM session WHERE uuid = ?",
-                arguments: [sessionUuid]
-            ) != nil
-        else {
+        guard try SessionRecord.all().withUuid(sessionUuid).fetchCount(db) > 0 else {
             throw StoreError.notFound(entity: "session", key: sessionUuid)
         }
         if let promptUuid {
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT uuid FROM prompt WHERE uuid = ?",
-                    arguments: [promptUuid]
-                ) != nil
-            else {
+            guard try PromptRecord.all().withUuid(promptUuid).fetchCount(db) > 0 else {
                 throw StoreError.notFound(entity: "prompt", key: promptUuid)
             }
         }
@@ -419,18 +402,20 @@ struct DopeRepository: RepositoryContext {
         promptUuid: String? = nil,
         code: String? = nil
     ) throws -> [DopeScopeRow] {
-        var sql = "SELECT * FROM dope_scope WHERE session_uuid = ? AND scope_type = ?"
-        var args: [(any DatabaseValueConvertible)?] = [sessionUuid, scopeType.rawValue]
+        var request =
+            DopeScopeRecord
+            .filter(DopeScopeRecord.Columns.sessionUuid == sessionUuid)
+            .filter(DopeScopeRecord.Columns.scopeType == scopeType.rawValue)
         if scopeType == .sessionInstanceItem {
-            sql += " AND prompt_uuid = ?"
-            args.append(promptUuid)
+            request = request.filter(DopeScopeRecord.Columns.promptUuid == promptUuid)
         }
         if let code {
-            sql += " AND code = ?"
-            args.append(code)
+            request = request.filter(DopeScopeRecord.Columns.code == code)
         }
-        sql += " ORDER BY code"
-        return try DopeScopeRecord.fetchAll(db, sql: sql, arguments: StatementArguments(args))
+        return
+            try request
+            .order(DopeScopeRecord.Columns.code)
+            .fetchAll(db)
             .map { $0.wireRow() }
     }
 
@@ -446,17 +431,18 @@ struct DopeRepository: RepositoryContext {
         scopeType: DopeScopeType,
         code: String? = nil
     ) throws -> [DopeScopeRow] {
-        var sql = """
-            SELECT * FROM dope_scope
-             WHERE project_uuid = ? AND scope_type = ? AND session_uuid IS NULL
-            """
-        var args: [(any DatabaseValueConvertible)?] = [projectUuid, scopeType.rawValue]
+        var request =
+            DopeScopeRecord
+            .filter(DopeScopeRecord.Columns.projectUuid == projectUuid)
+            .filter(DopeScopeRecord.Columns.scopeType == scopeType.rawValue)
+            .filter(DopeScopeRecord.Columns.sessionUuid == nil)
         if let code {
-            sql += " AND code = ?"
-            args.append(code)
+            request = request.filter(DopeScopeRecord.Columns.code == code)
         }
-        sql += " ORDER BY code"
-        return try DopeScopeRecord.fetchAll(db, sql: sql, arguments: StatementArguments(args))
+        return
+            try request
+            .order(DopeScopeRecord.Columns.code)
+            .fetchAll(db)
             .map { $0.wireRow() }
     }
 
@@ -506,13 +492,7 @@ struct DopeRepository: RepositoryContext {
                     detail: "pass --project-uuid OR --session-uuid, not both"
                 )
             }
-            guard
-                try Row.fetchOne(
-                    db,
-                    sql: "SELECT uuid FROM project WHERE uuid = ?",
-                    arguments: [projectUuid]
-                ) != nil
-            else {
+            guard try ProjectRecord.all().withUuid(projectUuid).fetchCount(db) > 0 else {
                 throw StoreError.notFound(entity: "project", key: projectUuid)
             }
             var projectVia = "base_project"
@@ -604,26 +584,7 @@ struct DopeRepository: RepositoryContext {
         // but a PROJECT_ITEM masks a PROJECT-tier base that has no
         // session at all. Keying both off session_uuid would throw on the
         // project pair.
-        let baseRows: [DopeScopeRow]
-        if baseTier.isSessionOwned {
-            baseRows = try dopeScopeCandidates(
-                sessionUuid: try scope.requireSessionUuid(),
-                scopeType: baseTier,
-                code: scope.code
-            )
-        } else {
-            baseRows =
-                try DopeScopeRecord.fetchAll(
-                    db,
-                    sql: """
-                        SELECT * FROM dope_scope
-                         WHERE project_uuid = ? AND scope_type = ? AND code = ?
-                         ORDER BY code
-                        """,
-                    arguments: [scope.projectUuid, baseTier.rawValue, scope.code]
-                )
-                .map { $0.wireRow() }
-        }
+        let baseRows = try baseScopeRows(of: scope, at: baseTier)
         let baseTree = try baseRows.first.map { try fetchDopeTree(scope: $0) }
         let merged = DopeOverlay.resolve(base: baseTree, overlay: tree)
         return DopeGetResponse(
@@ -636,6 +597,30 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
+    /// The scope an overlay masks: same code, one tier up. A session-owned
+    /// base is addressed through the session, a project-tier one through the
+    /// project, which has no session at all.
+    private func baseScopeRows(
+        of scope: DopeScopeRow,
+        at baseTier: DopeScopeType
+    ) throws -> [DopeScopeRow] {
+        guard baseTier.isSessionOwned else {
+            return
+                try DopeScopeRecord
+                .filter(DopeScopeRecord.Columns.projectUuid == scope.projectUuid)
+                .filter(DopeScopeRecord.Columns.scopeType == baseTier.rawValue)
+                .filter(DopeScopeRecord.Columns.code == scope.code)
+                .order(DopeScopeRecord.Columns.code)
+                .fetchAll(db)
+                .map { $0.wireRow() }
+        }
+        return try dopeScopeCandidates(
+            sessionUuid: try scope.requireSessionUuid(),
+            scopeType: baseTier,
+            code: scope.code
+        )
+    }
+
     /// The dope_persistence row a node lives under — the persistence area's
     /// counter owner. Mirrors dopeOwningScope's join chain, stopping one level
     /// short.
@@ -643,29 +628,42 @@ struct DopeRepository: RepositoryContext {
         level: DopeLevel,
         nodeUuid: String
     ) throws -> String? {
-        let sql: String
+        let column = DopePersistenceEntityRecord.Columns.dopePersistenceUuid
         switch level {
         case .scope: return nil
         case .persistence: return nodeUuid
         case .entity:
-            sql = "SELECT dope_persistence_uuid FROM dope_persistence_entity WHERE uuid = ?"
+            return
+                try DopePersistenceEntityRecord
+                .all()
+                .withUuid(nodeUuid)
+                .select(column, as: String.self)
+                .fetchOne(db)
         case .enumeration:
-            sql = "SELECT dope_persistence_uuid FROM dope_persistence_enum WHERE uuid = ?"
+            return
+                try DopePersistenceEnumRecord
+                .all()
+                .withUuid(nodeUuid)
+                .select(DopePersistenceEnumRecord.Columns.dopePersistenceUuid, as: String.self)
+                .fetchOne(db)
         case .property:
-            sql = """
-                SELECT e.dope_persistence_uuid FROM dope_persistence_entity e
-                JOIN dope_persistence_entity_property p
-                  ON p.dope_persistence_entity_uuid = e.uuid
-                WHERE p.uuid = ?
-                """
+            return
+                try DopePersistenceEntityRecord
+                .joining(
+                    required: DopePersistenceEntityRecord.properties.unordered()
+                        .withUuid(nodeUuid)
+                )
+                .select(column, as: String.self)
+                .fetchOne(db)
         case .option:
-            sql = """
-                SELECT n.dope_persistence_uuid FROM dope_persistence_enum n
-                JOIN dope_persistence_enum_option o ON o.dope_persistence_enum_uuid = n.uuid
-                WHERE o.uuid = ?
-                """
+            return
+                try DopePersistenceEnumRecord
+                .joining(
+                    required: DopePersistenceEnumRecord.options.unordered().withUuid(nodeUuid)
+                )
+                .select(DopePersistenceEnumRecord.Columns.dopePersistenceUuid, as: String.self)
+                .fetchOne(db)
         }
-        return try String.fetchOne(db, sql: sql, arguments: [nodeUuid])
     }
 
     /// Per-area content counters, derived as the max content_revision inside
@@ -703,192 +701,7 @@ struct DopeRepository: RepositoryContext {
         scope: DopeScopeRow,
         forProjection: Bool = false
     ) throws -> DopeScopeTree {
-        // Interpolated, not bound: this is a constant SQL fragment chosen by a
-        // Bool, never user input.
-        let live = forProjection ? "AND %@.deleted_on IS NULL" : ""
-        func alive(_ alias: String) -> String {
-            live.replacingOccurrences(of: "%@", with: alias)
-        }
-        let domainRows = try DopePersistenceRecord.fetchAll(
-            db,
-            sql: """
-                SELECT * FROM dope_persistence WHERE dope_scope_uuid = ?
-                \(forProjection ? "AND deleted_on IS NULL" : "")
-                ORDER BY sort_order, code
-                """,
-            arguments: [scope.uuid]
-        )
-        let entityRows = try DopePersistenceEntityRecord.fetchAll(
-            db,
-            sql: """
-                SELECT e.* FROM dope_persistence_entity e
-                JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                WHERE d.dope_scope_uuid = ? \(alive("e")) \(alive("d"))
-                ORDER BY e.sort_order, e.code
-                """,
-            arguments: [scope.uuid]
-        )
-        let enumRows = try DopePersistenceEnumRecord.fetchAll(
-            db,
-            sql: """
-                SELECT n.* FROM dope_persistence_enum n
-                JOIN dope_persistence d ON d.uuid = n.dope_persistence_uuid
-                WHERE d.dope_scope_uuid = ? \(alive("n")) \(alive("d"))
-                ORDER BY n.sort_order, n.code
-                """,
-            arguments: [scope.uuid]
-        )
-        let optionRows = try DopePersistenceEnumOptionRecord.fetchAll(
-            db,
-            sql: """
-                SELECT o.* FROM dope_persistence_enum_option o
-                JOIN dope_persistence_enum n ON n.uuid = o.dope_persistence_enum_uuid
-                JOIN dope_persistence d ON d.uuid = n.dope_persistence_uuid
-                WHERE d.dope_scope_uuid = ? \(alive("o")) \(alive("n")) \(alive("d"))
-                ORDER BY o.sort_order, o.code
-                """,
-            arguments: [scope.uuid]
-        )
-        let propertyRows = try DopePersistenceEntityPropertyRecord.fetchAll(
-            db,
-            sql: """
-                SELECT p.* FROM dope_persistence_entity_property p
-                JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                WHERE d.dope_scope_uuid = ? \(alive("p")) \(alive("e")) \(alive("d"))
-                ORDER BY p.sort_order, p.code
-                """,
-            arguments: [scope.uuid]
-        )
-
-        // Ref projection maps: uuid → dot-path code.
-        var domainCode: [String: String] = [:]
-        for row in domainRows { domainCode[row.uuid] = row.code }
-        var entityInfo: [String: (domain: String, code: String)] = [:]
-        var entityRef: [String: String] = [:]
-        for row in entityRows {
-            let domain = domainCode[row.dopePersistenceUuid] ?? "?"
-            entityInfo[row.uuid] = (domain, row.code)
-            entityRef[row.uuid] = DopeCode.formatEntityRef(
-                domain: domain,
-                entity: row.code
-            )
-        }
-        var enumRef: [String: String] = [:]
-        for row in enumRows {
-            let domain = domainCode[row.dopePersistenceUuid] ?? "?"
-            enumRef[row.uuid] = DopeCode.formatEnumRef(domain: domain, enumCode: row.code)
-        }
-        var propertyRef: [String: String] = [:]
-        for row in propertyRows {
-            let info = entityInfo[row.dopePersistenceEntityUuid] ?? (domain: "?", code: "?")
-            propertyRef[row.uuid] = DopeCode.formatPropertyRef(
-                domain: info.domain,
-                entity: info.code,
-                property: row.code
-            )
-        }
-
-        // One identity shape over five record types: every dope node table
-        // carries the same BaseEntity columns plus deleted_on.
-        func identity<R: DopeNodeRecord>(_ row: R) -> DopeNodeIdentity {
-            DopeNodeIdentity(
-                uuid: row.uuid,
-                version: row.version,
-                createdAt: row.createdAt,
-                updatedAt: row.updatedAt,
-                deletedOn: row.deletedOn
-            )
-        }
-
-        var propertiesByEntity: [String: [DopePropertyNode]] = [:]
-        for row in propertyRows {
-            let node = DopePropertyNode(
-                identity: identity(row),
-                body: DopePropertyBody(
-                    code: row.code,
-                    name: row.name,
-                    description: row.description,
-                    sortOrder: Int(row.sortOrder),
-                    dataType: row.dataType,
-                    nullable: row.nullable,
-                    isUnique: row.isUnique,
-                    autoIncrement: row.autoIncrement,
-                    textCharLimit: row.textCharLimit.map(Int.init),
-                    enumRef: row.dopePersistenceEnumUuid.flatMap { enumRef[$0] },
-                    relationshipTargetRef: row.relationshipTargetUuid
-                        .flatMap { propertyRef[$0] },
-                    baseOriginRef: row.baseOriginPropertyUuid
-                        .flatMap { propertyRef[$0] }
-                )
-            )
-            propertiesByEntity[row.dopePersistenceEntityUuid, default: []].append(node)
-        }
-        var optionsByEnum: [String: [DopeOptionNode]] = [:]
-        for row in optionRows {
-            optionsByEnum[row.dopePersistenceEnumUuid, default: []]
-                .append(
-                    DopeOptionNode(
-                        identity: identity(row),
-                        body: DopeOptionBody(
-                            code: row.code,
-                            name: row.name,
-                            description: row.description,
-                            sortOrder: Int(row.sortOrder)
-                        )
-                    )
-                )
-        }
-        var entitiesByDomain: [String: [DopeEntityNode]] = [:]
-        for row in entityRows {
-            entitiesByDomain[row.dopePersistenceUuid, default: []]
-                .append(
-                    DopeEntityNode(
-                        identity: identity(row),
-                        body: DopeEntityBody(
-                            code: row.code,
-                            name: row.name,
-                            entityType: row.entityType,
-                            description: row.description,
-                            sortOrder: Int(row.sortOrder),
-                            repoRepresentativeFile: row.repoRepresentativeFile,
-                            baseComposableRef: row.baseComposableUuid
-                                .flatMap { entityRef[$0] }
-                        ),
-                        properties: propertiesByEntity[row.uuid] ?? []
-                    )
-                )
-        }
-        var enumsByDomain: [String: [DopeEnumNode]] = [:]
-        for row in enumRows {
-            enumsByDomain[row.dopePersistenceUuid, default: []]
-                .append(
-                    DopeEnumNode(
-                        identity: identity(row),
-                        body: DopeEnumBody(
-                            code: row.code,
-                            name: row.name,
-                            description: row.description,
-                            sortOrder: Int(row.sortOrder),
-                            repoRepresentativeFile: row.repoRepresentativeFile
-                        ),
-                        options: optionsByEnum[row.uuid] ?? []
-                    )
-                )
-        }
-        let domains = domainRows.map { row in
-            DopePersistenceNode(
-                identity: identity(row),
-                body: DopePersistenceBody(
-                    code: row.code,
-                    name: row.name,
-                    description: row.description,
-                    sortOrder: Int(row.sortOrder)
-                ),
-                entities: entitiesByDomain[row.uuid] ?? [],
-                enums: enumsByDomain[row.uuid] ?? []
-            )
-        }
+        let rows = try dopeTreeRows(scopeUuid: scope.uuid, forProjection: forProjection)
         return DopeScopeTree(
             identity: DopeNodeIdentity(
                 uuid: scope.uuid,
@@ -905,8 +718,214 @@ struct DopeRepository: RepositoryContext {
             promptUuid: scope.promptUuid,
             scopeType: scope.scopeType,
             revision: scope.revision,
-            domains: domains
+            domains: Self.domainNodes(rows, refs: Self.treeRefs(rows))
         )
+    }
+
+    /// The five flat reads behind one tree, each an inner join up to the
+    /// scope. Deliberately five statements grouped in Swift, never per-node
+    /// recursion, and never a prefetch: the folds below need every level as
+    /// one flat list to resolve cross-level refs.
+    private func dopeTreeRows(
+        scopeUuid: String,
+        forProjection live: Bool
+    ) throws -> DopeTreeRows {
+        let inScope = DopePersistenceRecord.Columns.dopeScopeUuid == scopeUuid
+        let domain = DopePersistenceEntityRecord.dopePersistence.notDeleted(live).filter(inScope)
+        let enumDomain = DopePersistenceEnumRecord.dopePersistence.notDeleted(live).filter(inScope)
+        return DopeTreeRows(
+            domains:
+                try DopePersistenceRecord
+                .filter(inScope)
+                .notDeleted(live)
+                .order(
+                    DopePersistenceRecord.Columns.sortOrder,
+                    DopePersistenceRecord.Columns.code
+                )
+                .fetchAll(db),
+            entities:
+                try DopePersistenceEntityRecord
+                .joining(required: domain)
+                .notDeleted(live)
+                .order(
+                    DopePersistenceEntityRecord.Columns.sortOrder,
+                    DopePersistenceEntityRecord.Columns.code
+                )
+                .fetchAll(db),
+            enums:
+                try DopePersistenceEnumRecord
+                .joining(required: enumDomain)
+                .notDeleted(live)
+                .order(
+                    DopePersistenceEnumRecord.Columns.sortOrder,
+                    DopePersistenceEnumRecord.Columns.code
+                )
+                .fetchAll(db),
+            options:
+                try DopePersistenceEnumOptionRecord
+                .joining(
+                    required: DopePersistenceEnumOptionRecord.dopeEnum
+                        .notDeleted(live)
+                        .joining(required: enumDomain)
+                )
+                .notDeleted(live)
+                .order(
+                    DopePersistenceEnumOptionRecord.Columns.sortOrder,
+                    DopePersistenceEnumOptionRecord.Columns.code
+                )
+                .fetchAll(db),
+            properties:
+                try DopePersistenceEntityPropertyRecord
+                .joining(
+                    required: DopePersistenceEntityPropertyRecord.entity
+                        .notDeleted(live)
+                        .joining(required: domain)
+                )
+                .notDeleted(live)
+                .order(
+                    DopePersistenceEntityPropertyRecord.Columns.sortOrder,
+                    DopePersistenceEntityPropertyRecord.Columns.code
+                )
+                .fetchAll(db)
+        )
+    }
+
+    /// The five levels of one tree, flat.
+    private struct DopeTreeRows {
+        var domains: [DopePersistenceRecord]
+        var entities: [DopePersistenceEntityRecord]
+        var enums: [DopePersistenceEnumRecord]
+        var options: [DopePersistenceEnumOptionRecord]
+        var properties: [DopePersistenceEntityPropertyRecord]
+    }
+
+    /// uuid → dot-path code, per level. Cross-level refs are stored as uuids
+    /// and projected as codes, so every ref needs its target's ancestry.
+    private struct DopeTreeRefs {
+        var entity: [String: String] = [:]
+        var dopeEnum: [String: String] = [:]
+        var property: [String: String] = [:]
+    }
+
+    private static func treeRefs(_ rows: DopeTreeRows) -> DopeTreeRefs {
+        var refs = DopeTreeRefs()
+        var domainCode: [String: String] = [:]
+        for row in rows.domains { domainCode[row.uuid] = row.code }
+        var entityInfo: [String: (domain: String, code: String)] = [:]
+        for row in rows.entities {
+            let domain = domainCode[row.dopePersistenceUuid] ?? "?"
+            entityInfo[row.uuid] = (domain, row.code)
+            refs.entity[row.uuid] = DopeCode.formatEntityRef(domain: domain, entity: row.code)
+        }
+        for row in rows.enums {
+            let domain = domainCode[row.dopePersistenceUuid] ?? "?"
+            refs.dopeEnum[row.uuid] = DopeCode.formatEnumRef(domain: domain, enumCode: row.code)
+        }
+        for row in rows.properties {
+            let info = entityInfo[row.dopePersistenceEntityUuid] ?? (domain: "?", code: "?")
+            refs.property[row.uuid] = DopeCode.formatPropertyRef(
+                domain: info.domain,
+                entity: info.code,
+                property: row.code
+            )
+        }
+        return refs
+    }
+
+    private static func domainNodes(
+        _ rows: DopeTreeRows,
+        refs: DopeTreeRefs
+    ) -> [DopePersistenceNode] {
+        var propertiesByEntity: [String: [DopePropertyNode]] = [:]
+        for row in rows.properties {
+            propertiesByEntity[row.dopePersistenceEntityUuid, default: []]
+                .append(
+                    DopePropertyNode(
+                        identity: row.identity(),
+                        body: DopePropertyBody(
+                            code: row.code,
+                            name: row.name,
+                            description: row.description,
+                            sortOrder: Int(row.sortOrder),
+                            dataType: row.dataType,
+                            nullable: row.nullable,
+                            isUnique: row.isUnique,
+                            autoIncrement: row.autoIncrement,
+                            textCharLimit: row.textCharLimit.map(Int.init),
+                            enumRef: row.dopePersistenceEnumUuid.flatMap { refs.dopeEnum[$0] },
+                            relationshipTargetRef: row.relationshipTargetUuid
+                                .flatMap { refs.property[$0] },
+                            baseOriginRef: row.baseOriginPropertyUuid
+                                .flatMap { refs.property[$0] }
+                        )
+                    )
+                )
+        }
+        var optionsByEnum: [String: [DopeOptionNode]] = [:]
+        for row in rows.options {
+            optionsByEnum[row.dopePersistenceEnumUuid, default: []]
+                .append(
+                    DopeOptionNode(
+                        identity: row.identity(),
+                        body: DopeOptionBody(
+                            code: row.code,
+                            name: row.name,
+                            description: row.description,
+                            sortOrder: Int(row.sortOrder)
+                        )
+                    )
+                )
+        }
+        var entitiesByDomain: [String: [DopeEntityNode]] = [:]
+        for row in rows.entities {
+            entitiesByDomain[row.dopePersistenceUuid, default: []]
+                .append(
+                    DopeEntityNode(
+                        identity: row.identity(),
+                        body: DopeEntityBody(
+                            code: row.code,
+                            name: row.name,
+                            entityType: row.entityType,
+                            description: row.description,
+                            sortOrder: Int(row.sortOrder),
+                            repoRepresentativeFile: row.repoRepresentativeFile,
+                            baseComposableRef: row.baseComposableUuid
+                                .flatMap { refs.entity[$0] }
+                        ),
+                        properties: propertiesByEntity[row.uuid] ?? []
+                    )
+                )
+        }
+        var enumsByDomain: [String: [DopeEnumNode]] = [:]
+        for row in rows.enums {
+            enumsByDomain[row.dopePersistenceUuid, default: []]
+                .append(
+                    DopeEnumNode(
+                        identity: row.identity(),
+                        body: DopeEnumBody(
+                            code: row.code,
+                            name: row.name,
+                            description: row.description,
+                            sortOrder: Int(row.sortOrder),
+                            repoRepresentativeFile: row.repoRepresentativeFile
+                        ),
+                        options: optionsByEnum[row.uuid] ?? []
+                    )
+                )
+        }
+        return rows.domains.map { row in
+            DopePersistenceNode(
+                identity: row.identity(),
+                body: DopePersistenceBody(
+                    code: row.code,
+                    name: row.name,
+                    description: row.description,
+                    sortOrder: Int(row.sortOrder)
+                ),
+                entities: entitiesByDomain[row.uuid] ?? [],
+                enums: enumsByDomain[row.uuid] ?? []
+            )
+        }
     }
 
     /// Whole-tree copy between scopes: hydrate, project to identity-free
@@ -1391,11 +1410,12 @@ struct DopeRepository: RepositoryContext {
                     detail: "target property \(relationshipTargetUuid) belongs to a different dope scope"
                 )
             }
-            let targetType = try String.fetchOne(
-                db,
-                sql: "SELECT data_type FROM dope_persistence_entity_property WHERE uuid = ?",
-                arguments: [relationshipTargetUuid]
-            )
+            let targetType =
+                try DopePersistenceEntityPropertyRecord
+                .all()
+                .withUuid(relationshipTargetUuid)
+                .select(DopePersistenceEntityPropertyRecord.Columns.dataType, as: String.self)
+                .fetchOne(db)
             if targetType == DopePropertyDataType.relationship.rawValue {
                 throw StoreError.badRequest(
                     detail:
@@ -1416,41 +1436,27 @@ struct DopeRepository: RepositoryContext {
             // dopeOwningScope proves existence + scope; the origin's
             // data_type, owning entity, and that entity's kind ride in on
             // one join.
-            guard
-                let row = try Row.fetchOne(
-                    db,
-                    sql: """
-                        SELECT p.data_type AS data_type,
-                               e.uuid AS entity_uuid,
-                               e.entity_type AS entity_type
-                          FROM dope_persistence_entity_property p
-                          JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                         WHERE p.uuid = ?
-                        """,
-                    arguments: [origin]
-                )
-            else {
+            guard let row = try DopePropertyOrigin.request(propertyUuid: origin).fetchOne(db) else {
                 throw StoreError.corruptState(
                     entity: "dope_persistence_entity_property",
                     detail: "base origin \(origin) vanished"
                 )
             }
-            let originEntity: String = row["entity_uuid"]
+            let originEntity = row.entityUuid
             // Defense-in-depth only: every base_composable target is
             // type-checked on write and the demotion guard holds it, so this
             // fires only on corrupt or hand-edited rows.
-            guard (row["entity_type"] as String?) == DopeEntityType.baseComposable.rawValue else {
+            guard row.entityType == DopeEntityType.baseComposable.rawValue else {
                 throw StoreError.badRequest(
                     detail:
                         "base origin property \(origin) lives on \(originEntity), which is not a BASE_COMPOSABLE"
                 )
             }
             try requireBaseChainReaches(entityUuid: entityUuid, targetUuid: originEntity)
-            let originType: String = row["data_type"]
-            guard originType == dataType else {
+            guard row.dataType == dataType else {
                 throw StoreError.badRequest(
                     detail:
-                        "base origin property \(origin) is '\(originType)', not '\(dataType)' — a materialized property must keep the origin's data_type"
+                        "base origin property \(origin) is '\(row.dataType)', not '\(dataType)' — a materialized property must keep the origin's data_type"
                 )
             }
         }
@@ -1465,21 +1471,11 @@ struct DopeRepository: RepositoryContext {
         targetUuid: String
     ) throws {
         var seen: Set<String> = []
-        var node: String? =
-            try String.fetchOne(
-                db,
-                sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
-                arguments: [entityUuid]
-            )
+        var node = try baseComposableUuid(of: entityUuid)
         while let current = node {
             if current == targetUuid { return }
             guard seen.insert(current).inserted else { break }
-            node =
-                try String.fetchOne(
-                    db,
-                    sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
-                    arguments: [current]
-                )
+            node = try baseComposableUuid(of: current)
         }
         throw StoreError.badRequest(
             detail:
@@ -1507,11 +1503,12 @@ struct DopeRepository: RepositoryContext {
             }
             // dopeOwningScope proves existence + scope; the TYPE needs its
             // own read.
-            let targetType = try String.fetchOne(
-                db,
-                sql: "SELECT entity_type FROM dope_persistence_entity WHERE uuid = ?",
-                arguments: [target]
-            )
+            let targetType =
+                try DopePersistenceEntityRecord
+                .all()
+                .withUuid(target)
+                .select(DopePersistenceEntityRecord.Columns.entityType, as: String.self)
+                .fetchOne(db)
             guard targetType == DopeEntityType.baseComposable.rawValue else {
                 throw StoreError.badRequest(
                     detail:
@@ -1542,31 +1539,15 @@ struct DopeRepository: RepositoryContext {
         // strands a tag (clear OR re-point); no-op on add (no properties
         // yet) and self-neutralizing when the base is unchanged.
         if let entityUuid {
-            let tagged = try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT p.code AS code, oe.uuid AS origin_entity
-                      FROM dope_persistence_entity_property p
-                      JOIN dope_persistence_entity_property op ON op.uuid = p.base_origin_property_uuid
-                      JOIN dope_persistence_entity oe ON oe.uuid = op.dope_persistence_entity_uuid
-                     WHERE p.dope_persistence_entity_uuid = ?
-                       AND p.base_origin_property_uuid IS NOT NULL
-                    """,
-                arguments: [entityUuid]
-            )
+            let tagged = try DopeMaterializedOrigin.request(entityUuid: entityUuid).fetchAll(db)
             if !tagged.isEmpty {
                 var reachable = Set<String>()
                 var node = baseComposableUuid
                 while let current = node, reachable.insert(current).inserted {
-                    node =
-                        try String.fetchOne(
-                            db,
-                            sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
-                            arguments: [current]
-                        )
+                    node = try self.baseComposableUuid(of: current)
                 }
-                let stranded = tagged.filter { !reachable.contains($0["origin_entity"] as String) }
-                    .map { $0["code"] as String }
+                let stranded = tagged.filter { !reachable.contains($0.originEntityUuid) }
+                    .map(\.code)
                 guard stranded.isEmpty else {
                     throw StoreError.badRequest(
                         detail:
@@ -1600,13 +1581,18 @@ struct DopeRepository: RepositoryContext {
                 }
                 return  // corruption below us; not this mutation's cycle
             }
-            node =
-                try String.fetchOne(
-                    db,
-                    sql: "SELECT base_composable_uuid FROM dope_persistence_entity WHERE uuid = ?",
-                    arguments: [current]
-                )
+            node = try baseComposableUuid(of: current)
         }
+    }
+
+    /// The base one entity composes, or nil. Out-degree is 1, so every chain
+    /// walk here is a pointer-chase over this one hop.
+    private func baseComposableUuid(of entityUuid: String) throws -> String? {
+        try DopePersistenceEntityRecord
+            .all()
+            .withUuid(entityUuid)
+            .select(DopePersistenceEntityRecord.Columns.baseComposableUuid, as: String.self)
+            .fetchOne(db)
     }
 
     /// Dot-paths of the entities composing `entityUuid` (bounded at 5, the
@@ -1614,17 +1600,15 @@ struct DopeRepository: RepositoryContext {
     private func baseComposableReferrers(
         entityUuid: String
     ) throws -> [String] {
-        try String.fetchAll(
-            db,
-            sql: """
-                SELECT d.code || '.' || e.code
-                FROM dope_persistence_entity e
-                JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                WHERE e.base_composable_uuid = ? LIMIT 5
-                """,
-            arguments: [entityUuid]
-        )
+        try DopeDomainChildPath.entities()
+            .filter(DopePersistenceEntityRecord.Columns.baseComposableUuid == entityUuid)
+            .limit(Self.referrerLimit)
+            .fetchAll(db)
+            .map(\.entityDotPath)
     }
+
+    /// Referrer reports name a handful of offenders, never the whole set.
+    private static let referrerLimit = 5
 
     func dopeNodeAdd(_ req: DopeNodeAddRequest) throws -> DopeNodeResponse {
         guard req.level != .scope else {
@@ -1767,108 +1751,10 @@ struct DopeRepository: RepositoryContext {
         }
 
         if req.level == .entity {
-            guard
-                let current = try Row.fetchOne(
-                    db,
-                    sql: "SELECT * FROM dope_persistence_entity WHERE uuid = ?",
-                    arguments: [req.nodeUuid]
-                )
-            else {
-                throw StoreError.notFound(entity: spec.table, key: req.nodeUuid)
-            }
-            // Validate the FINAL (entity_type, base_composable) pair —
-            // either half can change in one call, and the second call of
-            // A.base=B / B.base=A must be the one that gets refused.
-            let finalType =
-                req.fields.entityType
-                ?? DopeEntityType(rawValue: current["entity_type"]) ?? .model
-            var finalBase: String? = current["base_composable_uuid"]
-            if let base = req.fields.baseComposableUuid { finalBase = base }
-            if req.fields.clearBaseComposable == true { finalBase = nil }
-
-            try validateEntityShape(
-                scope: scope,
-                entityUuid: req.nodeUuid,
-                entityType: finalType,
-                baseComposableUuid: finalBase
-            )
-
-            if req.fields.baseComposableUuid != nil || req.fields.clearBaseComposable == true {
-                // updateValue, not subscript: assigning a typed nil to a
-                // dictionary with Optional values REMOVES the key, and the
-                // clear would silently vanish from the UPDATE.
-                set.updateValue(finalBase, forKey: "base_composable_uuid")
-            }
+            try applyEntityUpdate(req, scope: scope, spec: spec, set: &set)
         }
-
         if req.level == .property {
-            guard
-                let current = try Row.fetchOne(
-                    db,
-                    sql: "SELECT * FROM dope_persistence_entity_property WHERE uuid = ?",
-                    arguments: [req.nodeUuid]
-                )
-            else {
-                throw StoreError.notFound(entity: spec.table, key: req.nodeUuid)
-            }
-            let finalDataType: String =
-                req.fields.dataType?.rawValue
-                ?? (current["data_type"] as String)
-            var finalEnum: String? = current["dope_persistence_enum_uuid"]
-            if let enumUuid = req.fields.enumUuid { finalEnum = enumUuid }
-            if req.fields.clearEnum == true { finalEnum = nil }
-            var finalRelated: String? = current["relationship_target_uuid"]
-            if let related = req.fields.relationshipTargetUuid { finalRelated = related }
-            if req.fields.clearRelationshipTarget == true { finalRelated = nil }
-            var finalAutoIncrement = (current["auto_increment"] as Int64?).map { $0 != 0 }
-            if let autoIncrement = req.fields.autoIncrement { finalAutoIncrement = autoIncrement }
-            if req.fields.clearAutoIncrement == true { finalAutoIncrement = nil }
-            var finalCharLimit: Int? = current["text_char_limit"]
-            if let limit = req.fields.textCharLimit { finalCharLimit = limit }
-            if req.fields.clearTextCharLimit == true { finalCharLimit = nil }
-            var finalBaseOrigin: String? = current["base_origin_property_uuid"]
-            if let origin = req.fields.baseOriginPropertyUuid { finalBaseOrigin = origin }
-            if req.fields.clearBaseOrigin == true { finalBaseOrigin = nil }
-
-            try validatePropertyShape(
-                scope: scope,
-                propertyUuid: req.nodeUuid,
-                entityUuid: current["dope_persistence_entity_uuid"],
-                dataType: finalDataType,
-                enumUuid: finalEnum,
-                relationshipTargetUuid: finalRelated,
-                baseOriginPropertyUuid: finalBaseOrigin,
-                autoIncrement: finalAutoIncrement,
-                textCharLimit: finalCharLimit
-            )
-
-            if let dataType = req.fields.dataType { set["data_type"] = dataType.rawValue }
-            if let nullable = req.fields.nullable { set["nullable"] = nullable ? 1 : 0 }
-            if let isUnique = req.fields.isUnique { set["is_unique"] = isUnique ? 1 : 0 }
-            // updateValue throughout, not subscript: a typed-nil subscript
-            // assignment REMOVES the key, so a clear-alone call would
-            // throw emptyUpdate and a combined call would silently skip
-            // the clear (the base_composable_uuid trap, all five sites).
-            if req.fields.autoIncrement != nil || req.fields.clearAutoIncrement == true {
-                set.updateValue(
-                    finalAutoIncrement.map { $0 ? 1 : 0 },
-                    forKey: "auto_increment"
-                )
-            }
-            if req.fields.textCharLimit != nil || req.fields.clearTextCharLimit == true {
-                set.updateValue(finalCharLimit, forKey: "text_char_limit")
-            }
-            if req.fields.enumUuid != nil || req.fields.clearEnum == true {
-                set.updateValue(finalEnum, forKey: "dope_persistence_enum_uuid")
-            }
-            if req.fields.relationshipTargetUuid != nil || req.fields.clearRelationshipTarget == true {
-                set.updateValue(finalRelated, forKey: "relationship_target_uuid")
-            }
-            if req.fields.baseOriginPropertyUuid != nil || req.fields.clearBaseOrigin == true {
-                // updateValue, not subscript — the typed-nil clear trap
-                // (same shape as base_composable_uuid above).
-                set.updateValue(finalBaseOrigin, forKey: "base_origin_property_uuid")
-            }
+            try applyPropertyUpdate(req, scope: scope, spec: spec, set: &set)
         }
 
         guard !set.isEmpty else {
@@ -1912,6 +1798,105 @@ struct DopeRepository: RepositoryContext {
             scopeUuid: scope.uuid,
             revision: revision
         )
+    }
+
+    /// Validate the FINAL (entity_type, base_composable) pair and stage it.
+    /// Either half can change in one call, and the second call of
+    /// A.base=B / B.base=A must be the one that gets refused.
+    private func applyEntityUpdate(
+        _ req: DopeNodeUpdateRequest,
+        scope: DopeScopeRow,
+        spec: DopeLevelSpec,
+        set: inout [String: (any DatabaseValueConvertible)?]
+    ) throws {
+        guard let current = try DopePersistenceEntityRecord.all().withUuid(req.nodeUuid).fetchOne(db)
+        else {
+            throw StoreError.notFound(entity: spec.table, key: req.nodeUuid)
+        }
+        let finalType =
+            req.fields.entityType
+            ?? DopeEntityType(rawValue: current.entityType) ?? .model
+        var finalBase = current.baseComposableUuid
+        if let base = req.fields.baseComposableUuid { finalBase = base }
+        if req.fields.clearBaseComposable == true { finalBase = nil }
+
+        try validateEntityShape(
+            scope: scope,
+            entityUuid: req.nodeUuid,
+            entityType: finalType,
+            baseComposableUuid: finalBase
+        )
+
+        if req.fields.baseComposableUuid != nil || req.fields.clearBaseComposable == true {
+            // updateValue, not subscript: assigning a typed nil to a
+            // dictionary with Optional values REMOVES the key, and the
+            // clear would silently vanish from the UPDATE.
+            set.updateValue(finalBase, forKey: "base_composable_uuid")
+        }
+    }
+
+    /// Validate a property's final shape and stage it. Every clearable column
+    /// goes through updateValue, not subscript: a typed-nil subscript
+    /// assignment REMOVES the key, so a clear-alone call would throw
+    /// emptyUpdate and a combined call would silently skip the clear.
+    private func applyPropertyUpdate(
+        _ req: DopeNodeUpdateRequest,
+        scope: DopeScopeRow,
+        spec: DopeLevelSpec,
+        set: inout [String: (any DatabaseValueConvertible)?]
+    ) throws {
+        guard
+            let current = try DopePersistenceEntityPropertyRecord.all().withUuid(req.nodeUuid).fetchOne(db)
+        else {
+            throw StoreError.notFound(entity: spec.table, key: req.nodeUuid)
+        }
+        let finalDataType = req.fields.dataType?.rawValue ?? current.dataType
+        var finalEnum = current.dopePersistenceEnumUuid
+        if let enumUuid = req.fields.enumUuid { finalEnum = enumUuid }
+        if req.fields.clearEnum == true { finalEnum = nil }
+        var finalRelated = current.relationshipTargetUuid
+        if let related = req.fields.relationshipTargetUuid { finalRelated = related }
+        if req.fields.clearRelationshipTarget == true { finalRelated = nil }
+        var finalAutoIncrement = current.autoIncrement
+        if let autoIncrement = req.fields.autoIncrement { finalAutoIncrement = autoIncrement }
+        if req.fields.clearAutoIncrement == true { finalAutoIncrement = nil }
+        var finalCharLimit = current.textCharLimit.map(Int.init)
+        if let limit = req.fields.textCharLimit { finalCharLimit = limit }
+        if req.fields.clearTextCharLimit == true { finalCharLimit = nil }
+        var finalBaseOrigin = current.baseOriginPropertyUuid
+        if let origin = req.fields.baseOriginPropertyUuid { finalBaseOrigin = origin }
+        if req.fields.clearBaseOrigin == true { finalBaseOrigin = nil }
+
+        try validatePropertyShape(
+            scope: scope,
+            propertyUuid: req.nodeUuid,
+            entityUuid: current.dopePersistenceEntityUuid,
+            dataType: finalDataType,
+            enumUuid: finalEnum,
+            relationshipTargetUuid: finalRelated,
+            baseOriginPropertyUuid: finalBaseOrigin,
+            autoIncrement: finalAutoIncrement,
+            textCharLimit: finalCharLimit
+        )
+
+        if let dataType = req.fields.dataType { set["data_type"] = dataType.rawValue }
+        if let nullable = req.fields.nullable { set["nullable"] = nullable ? 1 : 0 }
+        if let isUnique = req.fields.isUnique { set["is_unique"] = isUnique ? 1 : 0 }
+        if req.fields.autoIncrement != nil || req.fields.clearAutoIncrement == true {
+            set.updateValue(finalAutoIncrement.map { $0 ? 1 : 0 }, forKey: "auto_increment")
+        }
+        if req.fields.textCharLimit != nil || req.fields.clearTextCharLimit == true {
+            set.updateValue(finalCharLimit, forKey: "text_char_limit")
+        }
+        if req.fields.enumUuid != nil || req.fields.clearEnum == true {
+            set.updateValue(finalEnum, forKey: "dope_persistence_enum_uuid")
+        }
+        if req.fields.relationshipTargetUuid != nil || req.fields.clearRelationshipTarget == true {
+            set.updateValue(finalRelated, forKey: "relationship_target_uuid")
+        }
+        if req.fields.baseOriginPropertyUuid != nil || req.fields.clearBaseOrigin == true {
+            set.updateValue(finalBaseOrigin, forKey: "base_origin_property_uuid")
+        }
     }
 
     func dopeNodeDelete(_ req: DopeNodeDeleteRequest) throws -> DopeNodeDeleteResponse {
@@ -2097,137 +2082,58 @@ struct DopeRepository: RepositoryContext {
         level: DopeLevel,
         nodeUuid: String
     ) throws {
-        // A list, not one statement: the base-composable referrer queries
-        // select FROM dope_persistence_entity while the property-ref queries
-        // select FROM dope_persistence_entity_property, so they cannot share an
-        // OR clause.
-        var queries: [(sql: String, args: StatementArguments)] = []
+        // A list, not one request: the base-composable referrer queries read
+        // FROM dope_persistence_entity while the property-ref queries read
+        // FROM dope_persistence_entity_property, so they cannot share a
+        // predicate.
+        let properties = DopeDomainGrandchildPath.self
+        let entities = DopeDomainChildPath.self
+        let propertyColumns = DopePersistenceEntityPropertyRecord.Columns.self
+        var referrers: [String] = []
         switch level {
         case .enumeration:
-            queries.append(
-                (
-                    """
-                    SELECT d.code || '.' || e.code || '.' || p.code
-                    FROM dope_persistence_entity_property p
-                    JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                    JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                    WHERE p.dope_persistence_enum_uuid = ? LIMIT 5
-                    """, [nodeUuid]
-                )
+            referrers += try propertyPaths(
+                properties.properties()
+                    .filter(propertyColumns.dopePersistenceEnumUuid == nodeUuid)
             )
         case .property:
-            queries.append(
-                (
-                    """
-                    SELECT d.code || '.' || e.code || '.' || p.code
-                    FROM dope_persistence_entity_property p
-                    JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                    JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                    WHERE p.relationship_target_uuid = ? LIMIT 5
-                    """, [nodeUuid]
-                )
+            referrers += try propertyPaths(
+                properties.properties()
+                    .filter(propertyColumns.relationshipTargetUuid == nodeUuid)
             )
-            queries.append(
-                (
-                    """
-                    SELECT d.code || '.' || e.code || '.' || p.code
-                    FROM dope_persistence_entity_property p
-                    JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                    JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                    WHERE p.base_origin_property_uuid = ? LIMIT 5
-                    """, [nodeUuid]
-                )
+            referrers += try propertyPaths(
+                properties.properties()
+                    .filter(propertyColumns.baseOriginPropertyUuid == nodeUuid)
             )
         case .entity:
-            queries.append(
-                (
-                    """
-                    SELECT d.code || '.' || e.code || '.' || p.code
-                    FROM dope_persistence_entity_property p
-                    JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                    JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                    JOIN dope_persistence_entity_property tp ON tp.uuid = p.relationship_target_uuid
-                    WHERE tp.dope_persistence_entity_uuid = ?
-                      AND p.dope_persistence_entity_uuid != ? LIMIT 5
-                    """, [nodeUuid, nodeUuid]
+            referrers += try propertyPaths(
+                properties.propertiesReaching(
+                    entityUuid: nodeUuid,
+                    through: DopePersistenceEntityPropertyRecord.relationshipTarget
                 )
             )
-            queries.append(
-                (
-                    """
-                    SELECT d.code || '.' || e.code
-                    FROM dope_persistence_entity e
-                    JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                    WHERE e.base_composable_uuid = ? LIMIT 5
-                    """, [nodeUuid]
-                )
+            referrers += try entityPaths(
+                entities.entities()
+                    .filter(DopePersistenceEntityRecord.Columns.baseComposableUuid == nodeUuid)
             )
-            queries.append(
-                (
-                    """
-                    SELECT d.code || '.' || e.code || '.' || p.code
-                    FROM dope_persistence_entity_property p
-                    JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                    JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                    JOIN dope_persistence_entity_property op ON op.uuid = p.base_origin_property_uuid
-                    WHERE op.dope_persistence_entity_uuid = ?
-                      AND p.dope_persistence_entity_uuid != ? LIMIT 5
-                    """, [nodeUuid, nodeUuid]
+            referrers += try propertyPaths(
+                properties.propertiesReaching(
+                    entityUuid: nodeUuid,
+                    through: DopePersistenceEntityPropertyRecord.baseOriginProperty
                 )
             )
         case .persistence:
-            queries.append(
-                (
-                    """
-                    SELECT d.code || '.' || e.code || '.' || p.code
-                    FROM dope_persistence_entity_property p
-                    JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                    JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                    WHERE d.uuid != ?
-                      AND (p.dope_persistence_enum_uuid IN
-                            (SELECT uuid FROM dope_persistence_enum WHERE dope_persistence_uuid = ?)
-                        OR p.relationship_target_uuid IN
-                            (SELECT pp.uuid FROM dope_persistence_entity_property pp
-                              JOIN dope_persistence_entity ee ON ee.uuid = pp.dope_persistence_entity_uuid
-                             WHERE ee.dope_persistence_uuid = ?))
-                    LIMIT 5
-                    """, [nodeUuid, nodeUuid, nodeUuid]
-                )
+            referrers += try propertyPaths(
+                properties.propertiesReachingInto(persistenceUuid: nodeUuid)
             )
-            queries.append(
-                (
-                    """
-                    SELECT d.code || '.' || e.code
-                    FROM dope_persistence_entity e
-                    JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                    WHERE d.uuid != ?
-                      AND e.base_composable_uuid IN
-                          (SELECT uuid FROM dope_persistence_entity WHERE dope_persistence_uuid = ?)
-                    LIMIT 5
-                    """, [nodeUuid, nodeUuid]
-                )
+            referrers += try entityPaths(
+                entities.entitiesComposingInside(persistenceUuid: nodeUuid)
             )
-            queries.append(
-                (
-                    """
-                    SELECT d.code || '.' || e.code || '.' || p.code
-                    FROM dope_persistence_entity_property p
-                    JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                    JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                    WHERE d.uuid != ?
-                      AND p.base_origin_property_uuid IN
-                          (SELECT pp.uuid FROM dope_persistence_entity_property pp
-                            JOIN dope_persistence_entity ee ON ee.uuid = pp.dope_persistence_entity_uuid
-                           WHERE ee.dope_persistence_uuid = ?)
-                    LIMIT 5
-                    """, [nodeUuid, nodeUuid]
-                )
+            referrers += try propertyPaths(
+                properties.propertiesOriginatingInside(persistenceUuid: nodeUuid)
             )
         case .scope, .option:
             return
-        }
-        let referrers = try queries.flatMap {
-            try String.fetchAll(db, sql: $0.sql, arguments: $0.args)
         }
         guard referrers.isEmpty else {
             throw StoreError.badRequest(
@@ -2237,49 +2143,43 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
+    /// Referrer dot-paths, bounded. `limit` rather than `fetchAll().prefix`:
+    /// the bound belongs to the statement, not to the result.
+    private func propertyPaths(
+        _ request: QueryInterfaceRequest<DopeDomainGrandchildPath>
+    ) throws -> [String] {
+        try request.limit(Self.referrerLimit).fetchAll(db).map(\.propertyDotPath)
+    }
+
+    private func entityPaths(
+        _ request: QueryInterfaceRequest<DopeDomainChildPath>
+    ) throws -> [String] {
+        try request.limit(Self.referrerLimit).fetchAll(db).map(\.entityDotPath)
+    }
+
     private func dopeCascadeCounts(
         level: DopeLevel,
         nodeUuid: String
     ) throws -> DopeTreeCounts {
-        func count(_ sql: String, _ args: StatementArguments = StatementArguments()) throws -> Int {
-            try Int.fetchOne(db, sql: sql, arguments: args) ?? 0
-        }
         switch level {
         case .persistence:
-            let entities = try count(
-                "SELECT COUNT(*) FROM dope_persistence_entity WHERE dope_persistence_uuid = ?",
-                [nodeUuid]
-            )
-            let enums = try count(
-                "SELECT COUNT(*) FROM dope_persistence_enum WHERE dope_persistence_uuid = ?",
-                [nodeUuid]
-            )
-            let options = try count(
-                """
-                SELECT COUNT(*) FROM dope_persistence_enum_option WHERE dope_persistence_enum_uuid IN
-                    (SELECT uuid FROM dope_persistence_enum WHERE dope_persistence_uuid = ?)
-                """,
-                [nodeUuid]
-            )
-            let properties = try count(
-                """
-                SELECT COUNT(*) FROM dope_persistence_entity_property WHERE dope_persistence_entity_uuid IN
-                    (SELECT uuid FROM dope_persistence_entity WHERE dope_persistence_uuid = ?)
-                """,
-                [nodeUuid]
-            )
+            let counts = try DopePersistenceCascadeCounts.request(persistenceUuid: nodeUuid)
+                .fetchOne(db)
             return DopeTreeCounts(
                 domains: 1,
-                entities: entities,
-                properties: properties,
-                enums: enums,
-                options: options
+                entities: counts?.entityCount ?? 0,
+                properties: counts?.propertyCount ?? 0,
+                enums: counts?.enumCount ?? 0,
+                options: counts?.optionCount ?? 0
             )
         case .entity:
-            let properties = try count(
-                "SELECT COUNT(*) FROM dope_persistence_entity_property WHERE dope_persistence_entity_uuid = ?",
-                [nodeUuid]
-            )
+            let properties =
+                try DopePersistenceEntityPropertyRecord
+                .filter(
+                    DopePersistenceEntityPropertyRecord.Columns.dopePersistenceEntityUuid
+                        == nodeUuid
+                )
+                .fetchCount(db)
             return DopeTreeCounts(
                 domains: 0,
                 entities: 1,
@@ -2288,10 +2188,12 @@ struct DopeRepository: RepositoryContext {
                 options: 0
             )
         case .enumeration:
-            let options = try count(
-                "SELECT COUNT(*) FROM dope_persistence_enum_option WHERE dope_persistence_enum_uuid = ?",
-                [nodeUuid]
-            )
+            let options =
+                try DopePersistenceEnumOptionRecord
+                .filter(
+                    DopePersistenceEnumOptionRecord.Columns.dopePersistenceEnumUuid == nodeUuid
+                )
+                .fetchCount(db)
             return DopeTreeCounts(
                 domains: 0,
                 entities: 0,

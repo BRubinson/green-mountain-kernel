@@ -236,6 +236,7 @@
 				"Persistence/Entities/ProjectRecord+SessionStub.swift",
 				Persistence/Mapping/AgenticsMapping.swift,
 				Persistence/Mapping/DiagramsMapping.swift,
+				Persistence/Mapping/DopedMapping.swift,
 				Persistence/Mapping/KbitesMapping.swift,
 				Persistence/Mapping/ProjectMapping.swift,
 				Persistence/Migrations/m0001_baseSchema.swift,

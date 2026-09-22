@@ -19,11 +19,11 @@ struct DopeProvenanceRepository: RepositoryContext {
         // columns. locallyModified is decoded as Bool by GRDB (!= 0), which
         // unifies this site's old `== 1` with the three sibling `!= 0` sites --
         // a no-op on every producible value (the write path stores only 0 or 1).
-        let rows = try DopeElementProvenanceRecord.fetchAll(
-            db,
-            where: "dope_scope_uuid = ?",
-            arguments: [scopeUuid]
-        )
+        let rows =
+            try DopeElementProvenanceRecord
+            .filter(DopeElementProvenanceRecord.Columns.dopeScopeUuid == scopeUuid)
+            .order(DopeElementProvenanceRecord.Columns.dotPath)
+            .fetchAll(db)
         var out: [String: DopeMerge.Base] = [:]
         for row in rows {
             out[row.dotPath] = DopeMerge.Base(
@@ -65,13 +65,10 @@ struct DopeProvenanceRepository: RepositoryContext {
         }
 
         let stale =
-            try String.fetchAll(
-                db,
-                sql: """
-                    SELECT dot_path FROM dope_element_provenance WHERE dope_scope_uuid = ?
-                    """,
-                arguments: [scopeUuid]
-            )
+            try DopeElementProvenanceRecord
+            .filter(DopeElementProvenanceRecord.Columns.dopeScopeUuid == scopeUuid)
+            .select(DopeElementProvenanceRecord.Columns.dotPath, as: String.self)
+            .fetchAll(db)
             .filter { !live.contains($0) }
         for path in stale {
             try db.execute(
@@ -122,72 +119,42 @@ struct DopeProvenanceRepository: RepositoryContext {
         case .scope:
             return nil  // the scope itself is not a merge element
         case .persistence:
-            return try String.fetchOne(
-                db,
-                sql: """
-                    SELECT code FROM dope_persistence WHERE uuid = ?
-                    """,
-                arguments: [nodeUuid]
-            )
+            return
+                try DopePersistenceRecord
+                .all()
+                .withUuid(nodeUuid)
+                .select(DopePersistenceRecord.Columns.code, as: String.self)
+                .fetchOne(db)
         case .entity:
-            return try String.fetchOne(
-                db,
-                sql: """
-                    SELECT d.code || '.' || e.code
-                      FROM dope_persistence_entity e
-                      JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                     WHERE e.uuid = ?
-                    """,
-                arguments: [nodeUuid]
-            )
+            return try DopeDomainChildPath.entities()
+                .withUuid(nodeUuid)
+                .fetchOne(db)?
+                .entityDotPath
         case .property:
-            return try String.fetchOne(
-                db,
-                sql: """
-                    SELECT d.code || '.' || e.code || '.' || p.code
-                      FROM dope_persistence_entity_property p
-                      JOIN dope_persistence_entity e ON e.uuid = p.dope_persistence_entity_uuid
-                      JOIN dope_persistence d ON d.uuid = e.dope_persistence_uuid
-                     WHERE p.uuid = ?
-                    """,
-                arguments: [nodeUuid]
-            )
+            return try DopeDomainGrandchildPath.properties()
+                .withUuid(nodeUuid)
+                .fetchOne(db)?
+                .propertyDotPath
         case .enumeration:
-            return try String.fetchOne(
-                db,
-                sql: """
-                    SELECT d.code || '.enums.' || n.code
-                      FROM dope_persistence_enum n
-                      JOIN dope_persistence d ON d.uuid = n.dope_persistence_uuid
-                     WHERE n.uuid = ?
-                    """,
-                arguments: [nodeUuid]
-            )
+            return try DopeDomainChildPath.enums()
+                .withUuid(nodeUuid)
+                .fetchOne(db)?
+                .enumDotPath
         case .option:
-            return try String.fetchOne(
-                db,
-                sql: """
-                    SELECT d.code || '.enums.' || n.code || '.' || o.code
-                      FROM dope_persistence_enum_option o
-                      JOIN dope_persistence_enum n ON n.uuid = o.dope_persistence_enum_uuid
-                      JOIN dope_persistence d ON d.uuid = n.dope_persistence_uuid
-                     WHERE o.uuid = ?
-                    """,
-                arguments: [nodeUuid]
-            )
+            return try DopeDomainGrandchildPath.options()
+                .withUuid(nodeUuid)
+                .fetchOne(db)?
+                .optionDotPath
         }
     }
 
     /// The dot-paths this session has edited, in order.
     func locallyModifiedPaths(scopeUuid: String) throws -> [String] {
-        try String.fetchAll(
-            db,
-            sql: """
-                SELECT dot_path FROM dope_element_provenance
-                 WHERE dope_scope_uuid = ? AND locally_modified = 1
-                 ORDER BY dot_path
-                """,
-            arguments: [scopeUuid]
-        )
+        try DopeElementProvenanceRecord
+            .filter(DopeElementProvenanceRecord.Columns.dopeScopeUuid == scopeUuid)
+            .filter(DopeElementProvenanceRecord.Columns.locallyModified)
+            .order(DopeElementProvenanceRecord.Columns.dotPath)
+            .select(DopeElementProvenanceRecord.Columns.dotPath, as: String.self)
+            .fetchAll(db)
     }
 }
