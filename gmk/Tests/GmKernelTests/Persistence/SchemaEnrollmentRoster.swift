@@ -644,8 +644,23 @@ enum SchemaEnrollment {
     /// One entry per composite, preparing that composite's canonical request.
     static let composites: [CompositeEntry] = [
         composite(AgentBriefingWithRefs.self, "AgentBriefingWithRefs") { AgentBriefingWithRefs.request() },
+        composite(ArchPersistenceChangeWithFields.self, "ArchPersistenceChangeWithFields") {
+            ArchPersistenceChangeWithFields.request()
+        },
         composite(CarePackageWithRefs.self, "CarePackageWithRefs") { CarePackageWithRefs.request() },
+        composite(ClarificationQuestionWithOptions.self, "ClarificationQuestionWithOptions") {
+            ClarificationQuestionWithOptions.request()
+        },
+        composite(FileChangeWithRanges.self, "FileChangeWithRanges") {
+            FileChangeWithRanges.request(relativePath: nil)
+        },
+        composite(ReviewSummaryWithFindings.self, "ReviewSummaryWithFindings") { ReviewSummaryWithFindings.request() },
+
         composite(DiagramWithOwner.self, "DiagramWithOwner") { DiagramWithOwner.request() },
+
+        composite(KbiteResourceWithFiles.self, "KbiteResourceWithFiles") { KbiteResourceWithFiles.request() },
+
         composite(SessionSummary.self, "SessionSummary") { SessionSummary.request() },
+        composite(SessionWithActivations.self, "SessionWithActivations") { SessionWithActivations.request() },
     ]
 }

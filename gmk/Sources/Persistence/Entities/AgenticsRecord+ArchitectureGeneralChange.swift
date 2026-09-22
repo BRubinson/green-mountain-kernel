@@ -41,20 +41,3 @@ struct ArchitectureGeneralChangeRecord: BaseRecordFields, TableRecord, SeqOrdere
 extension ArchitectureGeneralChangeRecord {
     static let summary = belongsTo(ArchitectureSummaryRecord.self).forKey("summary")
 }
-
-extension ArchitectureGeneralChangeRecord {
-    /// db → wire, with the comparison state injected. See the sibling above
-    /// for why `implementation` is a labelled, un-defaulted parameter.
-    func wireRow(implementation: ChangeImplementationState) -> ArchGeneralChangeRow {
-        ArchGeneralChangeRow(
-            uuid: uuid,
-            seq: seq,
-            filePath: filePath,
-            className: className,
-            reasonBrief: reasonBrief,
-            changeDepth: changeDepth,
-            changeCode: changeCode,
-            implementation: implementation
-        )
-    }
-}

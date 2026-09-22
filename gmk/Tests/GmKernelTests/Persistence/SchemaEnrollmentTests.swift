@@ -66,7 +66,7 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
 
     /// Every composite's canonical request compiles against the live schema.
     func testEveryCompositeRequestCompiles() throws {
-        XCTAssertEqual(SchemaEnrollment.composites.count, 4, "a composite left the roster or never joined it")
+        XCTAssertEqual(SchemaEnrollment.composites.count, 10, "a composite left the roster or never joined it")
 
         try env.readOnlyDatabase()
             .read { db in
@@ -74,6 +74,30 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
                     let sql = try entry.prepare(db)
                     XCTAssertFalse(sql.isEmpty, entry.label)
                 }
+            }
+    }
+
+    /// The resource listing never plans the content column into its main
+    /// statement.
+    ///
+    /// `resource_file_content` is the largest column in the schema and lives one
+    /// `including(all:)` away, so a prefetch downgraded to a join would pull it
+    /// in here. The child statement's own select list is asserted over a live
+    /// fetch in `ComposedReadTests`, which has rows to make the prefetch run.
+    func testResourceListingKeepsContentOutOfItsMainStatement() throws {
+        let entry = try XCTUnwrap(
+            SchemaEnrollment.composites.first { $0.label == "KbiteResourceWithFiles" },
+            "the resource composite left the roster"
+        )
+
+        try env.readOnlyDatabase()
+            .read { db in
+                let sql = try entry.prepare(db)
+                XCTAssertTrue(sql.contains("kbite_resource"), sql)
+                XCTAssertFalse(
+                    sql.contains("resource_file_content"),
+                    "the content column reached the main statement: \(sql)"
+                )
             }
     }
 

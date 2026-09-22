@@ -34,16 +34,3 @@ extension PromptActivationRecord {
     static let session = belongsTo(SessionRecord.self).forKey("session")
     static let prompt = belongsTo(PromptRecord.self).forKey("prompt")
 }
-
-extension PromptActivationRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    func wireRow() -> PromptActivationRow {
-        PromptActivationRow(
-            uuid: uuid,
-            sessionUuid: sessionUuid,
-            promptUuid: promptUuid,
-            clientKey: clientKey,
-            createdAt: createdAt
-        )
-    }
-}

@@ -345,8 +345,7 @@ struct FileChangeRepository: RepositoryContext {
     /// supplied-but-unknown uuid is a typed NOT_FOUND, never a silent empty
     /// list (the same optional-filter contract as Store+Listing).
     func list(_ req: FileChangeListRequest) throws -> FileChangeListResponse {
-        var conditions: [String] = []
-        var arguments: [(any DatabaseValueConvertible)?] = []
+        var request = FileChangeWithRanges.request(relativePath: req.relativePath)
         if let sessionUuid = req.sessionUuid {
             guard
                 try Row.fetchOne(
@@ -357,82 +356,20 @@ struct FileChangeRepository: RepositoryContext {
             else {
                 throw StoreError.notFound(entity: "session", key: sessionUuid)
             }
-            conditions.append("fc.session_uuid = ?")
-            arguments.append(sessionUuid)
+            request = request.filter(FileChangeRecord.Columns.sessionUuid == sessionUuid)
         }
         if let promptUuid = req.promptUuid {
-            conditions.append("fc.prompt_uuid = ?")
-            arguments.append(promptUuid)
+            request = request.filter(FileChangeRecord.Columns.promptUuid == promptUuid)
         }
-        if let relativePath = req.relativePath {
-            conditions.append("sf.relative_path = ?")
-            arguments.append(relativePath)
-        }
-        let whereClause = conditions.isEmpty ? "" : "WHERE " + conditions.joined(separator: " AND ")
         let limit = min(max(req.limit ?? 200, 1), 10_000)
-        let rows = try Row.fetchAll(
-            db,
-            sql: """
-                SELECT fc.uuid, fc.session_uuid, fc.prompt_uuid, fc.change_kind, fc.created_at,
-                       fc.agent_id, fc.agent_name, fc.workflow_phase, fc.origin,
-                       fc.claude_session_id, fc.claude_turn_id, fc.tool_use_id, fc.tool_name,
-                       fc.agent_type, fc.permission_mode, fc.duration_ms, fc.transcript_path,
-                       fc.agent_registration_uuid,
-                       sf.relative_path
-                FROM file_change fc
-                JOIN session_file sf ON sf.uuid = fc.session_file_uuid
-                \(whereClause)
-                ORDER BY fc.id DESC
-                LIMIT \(limit)
-                """,
-            arguments: StatementArguments(arguments)
-        )
-        // One IN(...) prefetch of all ranges grouped in memory — 2
-        // statements total, not one per returned row (251 at limit 250).
-        let uuids = rows.map { $0["uuid"] as String }
-        var rangesByChange: [String: [ChangeRangeRow]] = [:]
-        if !uuids.isEmpty {
-            let placeholders = Array(repeating: "?", count: uuids.count).joined(separator: ", ")
-            for row in try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT file_change_uuid, line_start, line_end FROM file_change_range
-                    WHERE file_change_uuid IN (\(placeholders)) ORDER BY id
-                    """,
-                arguments: StatementArguments(uuids)
-            ) {
-                let changeUuid: String = row["file_change_uuid"]
-                rangesByChange[changeUuid, default: []]
-                    .append(
-                        ChangeRangeRow(lineStart: row["line_start"], lineEnd: row["line_end"])
-                    )
-            }
-        }
-        let changes = rows.map { row -> FileChangeRow in
-            let uuid: String = row["uuid"]
-            return FileChangeRow(
-                uuid: uuid,
-                sessionUuid: row["session_uuid"],
-                promptUuid: row["prompt_uuid"],
-                relativePath: row["relative_path"],
-                changeKind: row["change_kind"],
-                agentId: row["agent_id"],
-                agentName: row["agent_name"],
-                workflowPhase: row["workflow_phase"],
-                origin: row["origin"],
-                claudeSessionId: row["claude_session_id"],
-                claudeTurnId: row["claude_turn_id"],
-                toolUseId: row["tool_use_id"],
-                toolName: row["tool_name"],
-                agentType: row["agent_type"],
-                permissionMode: row["permission_mode"],
-                durationMs: row["duration_ms"],
-                transcriptPath: row["transcript_path"],
-                agentRegistrationUuid: row["agent_registration_uuid"],
-                createdAt: row["created_at"],
-                ranges: rangesByChange[uuid] ?? []
-            )
-        }
+        // The ranges ride one IN(...) prefetch — 2 statements total, not one
+        // per returned row (251 at limit 250).
+        let changes =
+            try request
+            .order(Column("id").desc)
+            .limit(limit)
+            .fetchAll(db)
+            .map { $0.dto() }
         return FileChangeListResponse(changes: changes)
     }
 

@@ -59,26 +59,3 @@ extension SessionRecord {
 
     static let briefings = hasMany(AgentBriefingRecord.self).forKey("briefings")
 }
-
-extension SessionRecord {
-    /// db → wire, with the activation registry injected.
-    ///
-    /// Parameterized because activations are a second query against
-    /// prompt_activation. Labelled and un-defaulted deliberately: SessionRow's
-    /// own init defaults `activations` to [], so a nullary wireRow() that
-    /// forgot them would compile and silently report every session as
-    /// unclaimed.
-    func wireRow(activations: [PromptActivationRow]) -> SessionRow {
-        SessionRow(
-            uuid: uuid,
-            version: version,
-            code: code,
-            name: name,
-            backstory: backstory,
-            goal: goal,
-            createdAt: createdAt,
-            updatedAt: updatedAt,
-            activations: activations
-        )
-    }
-}

@@ -126,16 +126,15 @@ struct PromptRepository: RepositoryContext {
         }
         let artifacts = try ArtifactRepository(db: db, core: core)
             .fetchRows(promptUuid: req.promptUuid)
-        let kbiteCodes = try String.fetchAll(
-            db,
-            sql: """
-                SELECT k.code FROM kbite k
-                JOIN prompt_active_kbite j ON j.kbite_uuid = k.uuid
-                WHERE j.prompt_uuid = ?
-                ORDER BY k.code
-                """,
-            arguments: [req.promptUuid]
-        )
+        let kbiteCodes =
+            try KbiteRecord
+            .joining(
+                required: KbiteRecord.promptActivations
+                    .filter(Column("prompt_uuid") == req.promptUuid)
+            )
+            .order(Column("code"))
+            .select(Column("code"), as: String.self)
+            .fetchAll(db)
         let changeSummary = try SessionRepository(db: db, core: core)
             .changeSummary(where: "prompt_uuid = ?", arguments: [req.promptUuid])
         return PromptGetResponse(

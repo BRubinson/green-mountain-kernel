@@ -37,20 +37,3 @@ struct ReviewSummaryRecord: BaseRecordFields, TableRecord {
 extension ReviewSummaryRecord {
     static let findings = hasMany(ReviewFindingRecord.self).forKey("findings")
 }
-
-extension ReviewSummaryRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    func wireRow() -> ReviewSummaryRow {
-        ReviewSummaryRow(
-            uuid: uuid,
-            version: version,
-            promptUuid: promptUuid,
-            status: status,
-            verdict: verdict,
-            overview: overview,
-            agentId: agentId,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

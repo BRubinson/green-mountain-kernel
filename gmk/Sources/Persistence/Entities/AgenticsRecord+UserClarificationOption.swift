@@ -33,9 +33,3 @@ struct UserClarificationOptionRecord: BaseRecordFields, TableRecord, SeqOrdered 
 extension UserClarificationOptionRecord {
     static let question = belongsTo(UserClarificationQuestionRecord.self).forKey("question")
 }
-
-extension UserClarificationOptionRecord {
-    func wireRow() -> ClarificationOptionRow {
-        ClarificationOptionRow(uuid: uuid, seq: seq, body: body)
-    }
-}

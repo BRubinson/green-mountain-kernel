@@ -119,7 +119,7 @@ struct ReviewRepository: RepositoryContext {
             ])
         )
         try clarification.touchSessionForPrompt(promptUuid: summary.promptUuid)
-        guard let row = try fetchFindings(where: "uuid = ?", arguments: [uuid]).first else {
+        guard let row = try fetchFindings(matching: ReviewFindingRecord.Columns.uuid == uuid).first else {
             throw StoreError.notFound(entity: "review_finding", key: uuid)
         }
         return ReviewFindingRowResponse(finding: row)
@@ -166,8 +166,7 @@ struct ReviewRepository: RepositoryContext {
     func resolve(_ req: ReviewResolveRequest) throws -> ReviewFindingRowResponse {
         guard
             let row = try fetchFindings(
-                where: "uuid = ?",
-                arguments: [req.findingUuid]
+                matching: ReviewFindingRecord.Columns.uuid == req.findingUuid
             )
             .first
         else {
@@ -212,8 +211,7 @@ struct ReviewRepository: RepositoryContext {
         }
         guard
             let updated = try fetchFindings(
-                where: "uuid = ?",
-                arguments: [req.findingUuid]
+                matching: ReviewFindingRecord.Columns.uuid == req.findingUuid
             )
             .first
         else {
@@ -313,17 +311,20 @@ struct ReviewRepository: RepositoryContext {
         else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
-        guard let summary = try fetchSummary(byPrompt: req.promptUuid) else {
+        guard
+            let composed = try ReviewSummaryWithFindings.request()
+                .filter(ReviewSummaryRecord.Columns.promptUuid == req.promptUuid)
+                .order(ReviewSummaryRecord.Columns.createdAt.desc, Column("id").desc)
+                .fetchOne(db)
+        else {
             throw StoreError.summaryAbsent(
                 entity: "review",
                 promptUuid: req.promptUuid
             )
         }
+        let summary = composed.summary.dto()
         let window = try Store.ratingWindow(full: req.full, min: req.ratingMin, max: req.ratingMax)
-        let all = try fetchFindings(
-            where: "review_summary_uuid = ?",
-            arguments: [summary.uuid]
-        )
+        let all = composed.findings.map { $0.dto() }
         var full: [ReviewFindingRow] = []
         var stubs: [ReviewFindingStub] = []
         for row in all {
@@ -386,21 +387,21 @@ struct ReviewRepository: RepositoryContext {
                 orderBy: "created_at DESC, id DESC"
             )
             .first?
-            .wireRow()
+            .dto()
     }
 
     /// Same explicit ordering contract as ExplorationRepository.fetchFindings:
     /// unranked first, then rating ascending, then id.
-    private func fetchFindings(
-        where condition: String,
-        arguments: StatementArguments
-    ) throws -> [ReviewFindingRow] {
-        try ReviewFindingRecord.fetchAll(
-            db,
-            where: condition,
-            arguments: arguments,
-            orderBy: "finding_rating IS NOT NULL, finding_rating, id"
-        )
-        .map { $0.wireRow() }
+    private func fetchFindings(matching predicate: SQLExpression) throws -> [ReviewFindingRow] {
+        try ReviewFindingRecord
+            .all()
+            .filter(predicate)
+            .order(
+                ReviewFindingRecord.Columns.findingRating != nil,
+                ReviewFindingRecord.Columns.findingRating,
+                Column("id")
+            )
+            .fetchAll(db)
+            .map { $0.dto() }
     }
 }

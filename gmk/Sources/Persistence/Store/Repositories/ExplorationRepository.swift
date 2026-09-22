@@ -129,8 +129,9 @@ struct ExplorationRepository: RepositoryContext {
             repoRoot: try architecture.instanceRoot(promptUuid: summary.promptUuid)
         )
         if let existing = try fetchFindings(
-            where: "exploration_summary_uuid = ? AND kind = 'key_file' AND file_path = ?",
-            arguments: [req.summaryUuid, path]
+            matching: ExplorationFindingRecord.Columns.explorationSummaryUuid == req.summaryUuid
+                && ExplorationFindingRecord.Columns.kind == ExplorationFindingKind.keyFile.rawValue
+                && ExplorationFindingRecord.Columns.filePath == path
         )
         .first {
             return ExploreKeyFileAddResponse(keyFile: keyFileView(existing), created: false)
@@ -158,7 +159,10 @@ struct ExplorationRepository: RepositoryContext {
             ])
         )
         try clarification.touchSessionForPrompt(promptUuid: summary.promptUuid)
-        guard let row = try fetchFindings(where: "uuid = ?", arguments: [uuid]).first else {
+        guard
+            let row = try fetchFindings(matching: ExplorationFindingRecord.Columns.uuid == uuid)
+                .first
+        else {
             throw StoreError.notFound(entity: "exploration_finding", key: uuid)
         }
         return ExploreKeyFileAddResponse(keyFile: keyFileView(row), created: true)
@@ -208,7 +212,10 @@ struct ExplorationRepository: RepositoryContext {
             ])
         )
         try clarification.touchSessionForPrompt(promptUuid: summary.promptUuid)
-        guard let row = try fetchFindings(where: "uuid = ?", arguments: [uuid]).first else {
+        guard
+            let row = try fetchFindings(matching: ExplorationFindingRecord.Columns.uuid == uuid)
+                .first
+        else {
             throw StoreError.notFound(entity: "exploration_finding", key: uuid)
         }
         return ExploreFindingRowResponse(finding: row)
@@ -349,21 +356,23 @@ struct ExplorationRepository: RepositoryContext {
         else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
-        var condition = "prompt_uuid = ?"
-        var args: StatementArguments = [req.promptUuid]
+        var request =
+            ExplorationSummaryRecord
+            .all()
+            .filter(ExplorationSummaryRecord.Columns.promptUuid == req.promptUuid)
         if let agentType = req.agentType {
-            condition += " AND agent_type = ?"
-            _ = args.append(contentsOf: [agentType])
+            request = request.filter(ExplorationSummaryRecord.Columns.agentType == agentType)
         }
         // synthesis first, then alphabetical — the seal row leads the render.
         let summaries =
-            try ExplorationSummaryRecord.fetchAll(
-                db,
-                where: condition,
-                arguments: args,
-                orderBy: "agent_type != 'synthesis', agent_type"
+            try request
+            .order(
+                ExplorationSummaryRecord.Columns.agentType
+                    != ExplorationAgentType.synthesis.rawValue,
+                ExplorationSummaryRecord.Columns.agentType
             )
-            .map { $0.wireRow() }
+            .fetchAll(db)
+            .map { $0.dto() }
         guard !summaries.isEmpty else {
             throw StoreError.summaryAbsent(
                 entity: "exploration",
@@ -371,10 +380,10 @@ struct ExplorationRepository: RepositoryContext {
             )
         }
         let summaryUuids = summaries.map(\.uuid)
-        let placeholders = summaryUuids.map { _ in "?" }.joined(separator: ",")
         let all = try fetchFindings(
-            where: "exploration_summary_uuid IN (\(placeholders))",
-            arguments: StatementArguments(summaryUuids)
+            matching:
+                summaryUuids
+                .contains(ExplorationFindingRecord.Columns.explorationSummaryUuid)
         )
         let window = try Store.ratingWindow(full: req.full, min: req.ratingMin, max: req.ratingMax)
         var keyFiles: [ExplorationKeyFileRow] = []
@@ -448,7 +457,7 @@ struct ExplorationRepository: RepositoryContext {
                 arguments: [uuid]
             )
             .first?
-            .wireRow()
+            .dto()
     }
 
     func fetchSummary(byPrompt promptUuid: String, agentType: String) throws -> ExplorationSummaryRow? {
@@ -460,7 +469,7 @@ struct ExplorationRepository: RepositoryContext {
                 orderBy: "created_at DESC, id DESC"
             )
             .first?
-            .wireRow()
+            .dto()
     }
 
     func fetchSummaries(byPrompt promptUuid: String) throws -> [ExplorationSummaryRow] {
@@ -470,21 +479,21 @@ struct ExplorationRepository: RepositoryContext {
             arguments: [promptUuid],
             orderBy: "agent_type != 'synthesis', agent_type"
         )
-        .map { $0.wireRow() }
+        .map { $0.dto() }
     }
 
     /// Explicit ordering: unranked (NULL) rows sort FIRST — the resume
     /// work-queue can't be missed — then by rating ascending, then id.
-    private func fetchFindings(
-        where condition: String,
-        arguments: StatementArguments
-    ) throws -> [ExplorationFindingRow] {
-        try ExplorationFindingRecord.fetchAll(
-            db,
-            where: condition,
-            arguments: arguments,
-            orderBy: "finding_rating IS NOT NULL, finding_rating, id"
-        )
-        .map { $0.wireRow() }
+    private func fetchFindings(matching predicate: SQLExpression) throws -> [ExplorationFindingRow] {
+        try ExplorationFindingRecord
+            .all()
+            .filter(predicate)
+            .order(
+                ExplorationFindingRecord.Columns.findingRating != nil,
+                ExplorationFindingRecord.Columns.findingRating,
+                Column("id")
+            )
+            .fetchAll(db)
+            .map { $0.dto() }
     }
 }

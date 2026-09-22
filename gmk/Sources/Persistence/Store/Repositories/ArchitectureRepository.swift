@@ -91,12 +91,12 @@ struct ArchitectureRepository: RepositoryContext {
             repoRoot: try instanceRoot(promptUuid: summary.promptUuid)
         )
         let seq =
-            (try Int64.fetchOne(
+            try nextSeq(
                 db,
-                sql:
-                    "SELECT COALESCE(MAX(seq), 0) FROM architecture_persistence_change WHERE architecture_summary_uuid = ?",
-                arguments: [req.summaryUuid]
-            ) ?? 0) + 1
+                in: ArchitecturePersistenceChangeRecord.self,
+                parent: Column("architecture_summary_uuid"),
+                uuid: req.summaryUuid
+            ) + 1
         let uuid = try core.insertBase(
             db,
             table: "architecture_persistence_change",
@@ -153,12 +153,12 @@ struct ArchitectureRepository: RepositoryContext {
             throw StoreError.badRequest(detail: "--renamed-from is required with --change-kind rename")
         }
         let seq =
-            (try Int64.fetchOne(
+            try nextSeq(
                 db,
-                sql:
-                    "SELECT COALESCE(MAX(seq), 0) FROM architecture_persistence_field_change WHERE persistence_change_uuid = ?",
-                arguments: [req.persistenceChangeUuid]
-            ) ?? 0) + 1
+                in: ArchitecturePersistenceFieldChangeRecord.self,
+                parent: Column("persistence_change_uuid"),
+                uuid: req.persistenceChangeUuid
+            ) + 1
         let uuid = try core.insertBase(
             db,
             table: "architecture_persistence_field_change",
@@ -210,12 +210,12 @@ struct ArchitectureRepository: RepositoryContext {
             repoRoot: try instanceRoot(promptUuid: summary.promptUuid)
         )
         let seq =
-            (try Int64.fetchOne(
+            try nextSeq(
                 db,
-                sql:
-                    "SELECT COALESCE(MAX(seq), 0) FROM architecture_general_change WHERE architecture_summary_uuid = ?",
-                arguments: [req.summaryUuid]
-            ) ?? 0) + 1
+                in: ArchitectureGeneralChangeRecord.self,
+                parent: Column("architecture_summary_uuid"),
+                uuid: req.summaryUuid
+            ) + 1
         let uuid = try core.insertBase(
             db,
             table: "architecture_general_change",
@@ -838,50 +838,45 @@ struct ArchitectureRepository: RepositoryContext {
             .wireRow()
     }
 
+    /// Two statements whatever the change count: the changes and their fields.
     private func fetchPersistenceChanges(
         summaryUuid: String,
         touched: [String: UnplannedChangeRow]
     ) throws -> [ArchPersistenceChangeRow] {
-        try ArchitecturePersistenceChangeRecord.fetchAll(
-            db,
-            where: "architecture_summary_uuid = ?",
-            arguments: [summaryUuid],
-            orderBy: "seq"
-        )
-        .map { record in
-            record.wireRow(
-                fields: try fetchFieldChanges(changeUuid: record.uuid),
-                implementation: implementationState(for: record.filePath, touched: touched)
+        try ArchPersistenceChangeWithFields.request()
+            .filter(
+                ArchitecturePersistenceChangeRecord.Columns.architectureSummaryUuid == summaryUuid
             )
-        }
+            .fetchAll(db)
+            .map {
+                $0.dto(
+                    implementation: implementationState(for: $0.change.filePath, touched: touched)
+                )
+            }
     }
 
     private func fetchFieldChanges(
         changeUuid: String
     ) throws -> [ArchPersistenceFieldChangeRow] {
-        try ArchitecturePersistenceFieldChangeRecord.fetchAll(
-            db,
-            where: "persistence_change_uuid = ?",
-            arguments: [changeUuid],
-            orderBy: "seq"
-        )
-        .map { $0.wireRow() }
+        try ArchitecturePersistenceFieldChangeRecord
+            .all()
+            .filter(
+                ArchitecturePersistenceFieldChangeRecord.Columns.persistenceChangeUuid == changeUuid
+            )
+            .orderedBySeq()
+            .fetchAll(db)
+            .map { $0.dto() }
     }
 
     private func fetchGeneralChanges(
         summaryUuid: String,
         touched: [String: UnplannedChangeRow]
     ) throws -> [ArchGeneralChangeRow] {
-        try ArchitectureGeneralChangeRecord.fetchAll(
-            db,
-            where: "architecture_summary_uuid = ?",
-            arguments: [summaryUuid],
-            orderBy: "seq"
-        )
-        .map { record in
-            record.wireRow(
-                implementation: implementationState(for: record.filePath, touched: touched)
-            )
-        }
+        try ArchitectureGeneralChangeRecord
+            .all()
+            .filter(ArchitectureGeneralChangeRecord.Columns.architectureSummaryUuid == summaryUuid)
+            .orderedBySeq()
+            .fetchAll(db)
+            .map { $0.dto(implementation: implementationState(for: $0.filePath, touched: touched)) }
     }
 }

@@ -90,12 +90,12 @@ struct ClarificationRepository: RepositoryContext {
             throw StoreError.badRequest(detail: "question is empty")
         }
         let seq =
-            (try Int64.fetchOne(
+            try nextSeq(
                 db,
-                sql:
-                    "SELECT COALESCE(MAX(seq), 0) FROM user_clarification_question WHERE clarification_summary_uuid = ?",
-                arguments: [req.summaryUuid]
-            ) ?? 0) + 1
+                in: UserClarificationQuestionRecord.self,
+                parent: Column("clarification_summary_uuid"),
+                uuid: req.summaryUuid
+            ) + 1
         let uuid = try core.insertBase(
             db,
             table: "user_clarification_question",
@@ -529,7 +529,7 @@ struct ClarificationRepository: RepositoryContext {
                     "care_package_uuid": req.packageUuid,
                     "dope_code": code,
                     "note": req.note,
-                    "seq": try nextRefSeq(table: "care_package_dope_ref", packageUuid: req.packageUuid),
+                    "seq": try nextRefSeq(in: CarePackageDopeRefRecord.self, packageUuid: req.packageUuid),
                 ]
             )
         case .kbite:
@@ -553,7 +553,7 @@ struct ClarificationRepository: RepositoryContext {
                     "care_package_uuid": req.packageUuid,
                     "kbite_resource_file_uuid": fileUuid,
                     "brief": brief["resource_file_summary"] as String?,
-                    "seq": try nextRefSeq(table: "care_package_kbite_ref", packageUuid: req.packageUuid),
+                    "seq": try nextRefSeq(in: CarePackageKbiteRefRecord.self, packageUuid: req.packageUuid),
                 ]
             )
         case .exploration:
@@ -586,7 +586,7 @@ struct ClarificationRepository: RepositoryContext {
                     "file_path": req.filePath,
                     "source_finding_uuid": req.sourceFindingUuid,
                     "seq": try nextRefSeq(
-                        table: "care_package_exploration_ref",
+                        in: CarePackageExplorationRefRecord.self,
                         packageUuid: req.packageUuid
                     ),
                 ]
@@ -817,39 +817,34 @@ struct ClarificationRepository: RepositoryContext {
     }
 
     private func fetchQuestion(uuid: String) throws -> ClarificationQuestionRow? {
-        try fetchQuestions(where: "uuid = ?", key: uuid).first
+        try fetchQuestions(matching: UserClarificationQuestionRecord.Columns.uuid == uuid).first
     }
 
     func fetchQuestions(summaryUuid: String) throws -> [ClarificationQuestionRow] {
-        try fetchQuestions(where: "clarification_summary_uuid = ?", key: summaryUuid)
+        try fetchQuestions(
+            matching: UserClarificationQuestionRecord.Columns.clarificationSummaryUuid == summaryUuid
+        )
     }
 
-    private func fetchQuestions(
-        where condition: String,
-        key: String
-    ) throws -> [ClarificationQuestionRow] {
-        try UserClarificationQuestionRecord.fetchAll(
-            db,
-            where: condition,
-            arguments: [key],
-            orderBy: "seq"
-        )
-        .map { record in
-            let options =
-                try UserClarificationOptionRecord.fetchAll(
-                    db,
-                    where: "question_uuid = ?",
-                    arguments: [record.uuid],
-                    orderBy: "seq"
-                )
-                .map { $0.wireRow() }
-            let selected = try String.fetchAll(
-                db,
-                sql: "SELECT option_uuid FROM user_clarification_answer WHERE question_uuid = ? ORDER BY id",
-                arguments: [record.uuid]
+    /// Three statements whatever the question count: the questions, their
+    /// options, and one batched pass over the selection junction grouped in
+    /// memory.
+    private func fetchQuestions(matching predicate: SQLExpression) throws -> [ClarificationQuestionRow] {
+        let questions = try ClarificationQuestionWithOptions.request().filter(predicate).fetchAll(db)
+        guard !questions.isEmpty else { return [] }
+        var selected: [String: [String]] = [:]
+        let answers =
+            try UserClarificationAnswerRecord
+            .filter(
+                questions.map(\.questionRow.uuid)
+                    .contains(UserClarificationAnswerRecord.Columns.questionUuid)
             )
-            return record.wireRow(options: options, selectedOptionUuids: selected)
+            .order(Column("id"))
+            .fetchAll(db)
+        for answer in answers {
+            selected[answer.questionUuid, default: []].append(answer.optionUuid)
         }
+        return questions.map { $0.dto(selectedOptionUuids: selected[$0.questionRow.uuid] ?? []) }
     }
 
     private func fetchNote(uuid: String) throws -> ClarificationNoteRow? {
@@ -888,11 +883,7 @@ struct ClarificationRepository: RepositoryContext {
             .dto()
     }
 
-    private func nextRefSeq(table: String, packageUuid: String) throws -> Int64 {
-        (try Int64.fetchOne(
-            db,
-            sql: "SELECT COALESCE(MAX(seq), 0) FROM \(table) WHERE care_package_uuid = ?",
-            arguments: [packageUuid]
-        ) ?? 0) + 1
+    private func nextRefSeq<T: TableRecord>(in type: T.Type, packageUuid: String) throws -> Int64 {
+        try nextSeq(db, in: type, parent: Column("care_package_uuid"), uuid: packageUuid) + 1
     }
 }

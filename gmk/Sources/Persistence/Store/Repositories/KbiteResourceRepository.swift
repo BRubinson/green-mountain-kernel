@@ -102,40 +102,23 @@ struct KbiteResourceRepository: RepositoryContext {
         else {
             throw StoreError.notFound(entity: "kbite", key: req.code)
         }
-        let kbite = kbiteRecord.wireRow()
-        var resources: [KbiteResourceRow] = []
-        for row in try KbiteResourceRecord.fetchAll(
-            db,
-            where: "kbite_uuid = ?",
-            arguments: [kbite.uuid],
-            orderBy: "resource_name"
-        ) {
-            // DELIBERATELY not a SELECT * over kbite_resource_file: the
-            // computed has_content keeps ~115 MB of resource_file_content out
-            // of this read. See KbiteResourceFileStubRecord.
-            let stubs =
-                try KbiteResourceFileStubRecord.fetchAll(
-                    db,
-                    sql: """
-                        SELECT uuid, resource_file_name, resource_file_summary,
-                               resource_file_content IS NOT NULL AS has_content
-                        FROM kbite_resource_file WHERE kbite_resource_uuid = ?
-                        ORDER BY resource_file_name
-                        """,
-                    arguments: [row.uuid]
-                )
-                .map { $0.wireStub() }
-            resources.append(row.wireRow(files: stubs))
-        }
-        let keywords = try String.fetchAll(
-            db,
-            sql: """
-                SELECT kw.keyword FROM keyword kw
-                JOIN kbite_keyword_junction j ON j.keyword_uuid = kw.uuid
-                WHERE j.kbite_uuid = ? ORDER BY kw.keyword
-                """,
-            arguments: [kbite.uuid]
-        )
+        let kbite = kbiteRecord.dto()
+        // The prefetch projects `resource_file_content IS NOT NULL` rather than
+        // selecting the column, keeping ~115 MB out of this read.
+        let resources =
+            try KbiteResourceWithFiles.request()
+            .filter(Column("kbite_uuid") == kbite.uuid)
+            .order(Column("resource_name"))
+            .fetchAll(db)
+            .map { $0.dto() }
+        let keywordAlias = TableAlias<KeywordRecord>()
+        let keywords =
+            try KbiteKeywordJunctionRecord
+            .filter(Column("kbite_uuid") == kbite.uuid)
+            .joining(required: KbiteKeywordJunctionRecord.keyword.aliased(keywordAlias))
+            .order(keywordAlias["keyword"])
+            .select(keywordAlias["keyword"], as: String.self)
+            .fetchAll(db)
         return KbiteGetResponse(kbite: kbite, resources: resources, keywords: keywords)
     }
 
@@ -146,7 +129,7 @@ struct KbiteResourceRepository: RepositoryContext {
         guard let row = try KbiteResourceFileRecord.fetch(db, uuid: req.fileUuid) else {
             throw StoreError.notFound(entity: "kbite_resource_file", key: req.fileUuid)
         }
-        return KbiteFileGetResponse(file: row.wireRow())
+        return KbiteFileGetResponse(file: row.dto())
     }
 
     /// FTS5 query, bm25-ranked (name ≫ summary ≫ content, smaller = better),

@@ -21,3 +21,33 @@ extension SessionSummary {
         )
     }
 }
+
+extension SessionWithActivations {
+    /// db → wire.
+    func dto() -> SessionRow {
+        SessionRow(
+            uuid: session.uuid,
+            version: session.version,
+            code: session.code,
+            name: session.name,
+            backstory: session.backstory,
+            goal: session.goal,
+            createdAt: session.createdAt,
+            updatedAt: session.updatedAt,
+            activations: activations.map { $0.dto() }
+        )
+    }
+}
+
+extension PromptActivationRecord {
+    /// db → wire.
+    func dto() -> PromptActivationRow {
+        PromptActivationRow(
+            uuid: uuid,
+            sessionUuid: sessionUuid,
+            promptUuid: promptUuid,
+            clientKey: clientKey,
+            createdAt: createdAt
+        )
+    }
+}

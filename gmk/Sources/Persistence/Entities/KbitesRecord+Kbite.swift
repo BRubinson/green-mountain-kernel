@@ -47,16 +47,3 @@ extension KbiteRecord {
     static let promptActivations = hasMany(PromptActiveKbiteRecord.self)
         .forKey("promptActivations")
 }
-
-extension KbiteRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    func wireRow() -> KbiteRow {
-        KbiteRow(
-            uuid: uuid,
-            version: version,
-            code: code,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

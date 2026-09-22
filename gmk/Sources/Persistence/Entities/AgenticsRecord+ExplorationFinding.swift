@@ -45,25 +45,3 @@ struct ExplorationFindingRecord: BaseRecordFields, TableRecord, Rankable {
 extension ExplorationFindingRecord {
     static let summary = belongsTo(ExplorationSummaryRecord.self).forKey("summary")
 }
-
-extension ExplorationFindingRecord {
-    /// db → wire.
-    ///
-    /// findingRating narrows Int64 (the column type) to the wire's Int. The
-    /// old `row["finding_rating"]` subscript inferred Int straight from the
-    /// target type; this makes the conversion explicit and non-truncating.
-    func wireRow() -> ExplorationFindingRow {
-        ExplorationFindingRow(
-            uuid: uuid,
-            version: version,
-            explorationSummaryUuid: explorationSummaryUuid,
-            kind: kind,
-            title: title,
-            body: body,
-            filePath: filePath,
-            agentName: agentName,
-            agentId: agentId,
-            findingRating: findingRating.map(Int.init)
-        )
-    }
-}

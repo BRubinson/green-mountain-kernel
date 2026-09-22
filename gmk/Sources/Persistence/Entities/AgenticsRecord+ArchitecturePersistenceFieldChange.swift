@@ -53,28 +53,3 @@ struct ArchitecturePersistenceFieldChangeRecord: BaseRecordFields, TableRecord, 
 extension ArchitecturePersistenceFieldChangeRecord {
     static let change = belongsTo(ArchitecturePersistenceChangeRecord.self).forKey("change")
 }
-
-extension ArchitecturePersistenceFieldChangeRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    ///
-    /// nullable / isForeignKey / isIndexed are decoded as Bool by GRDB, so the
-    /// three `(row[...] as Int64) != 0` casts this retires now happen once in
-    /// the decoder instead of once per field here.
-    func wireRow() -> ArchPersistenceFieldChangeRow {
-        ArchPersistenceFieldChangeRow(
-            uuid: uuid,
-            seq: seq,
-            fieldName: fieldName,
-            changeReason: changeReason,
-            changePurpose: changePurpose,
-            dataType: dataType,
-            nullable: nullable,
-            isForeignKey: isForeignKey,
-            fkTarget: fkTarget,
-            isIndexed: isIndexed,
-            changeKind: changeKind,
-            renamedFrom: renamedFrom,
-            dopePropertyRef: dopePropertyRef
-        )
-    }
-}

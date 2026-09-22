@@ -44,28 +44,3 @@ extension ArchitecturePersistenceChangeRecord {
         .forKey("fields")
     static let summary = belongsTo(ArchitectureSummaryRecord.self).forKey("summary")
 }
-
-extension ArchitecturePersistenceChangeRecord {
-    /// db → wire, with the children and the comparison state injected.
-    ///
-    /// Parameterized because neither comes from this table: `fields` is a
-    /// second query, and `implementation` is computed against the file-change
-    /// trail. Both are labelled and un-defaulted on purpose — a default here
-    /// would let a caller silently drop them.
-    func wireRow(
-        fields: [ArchPersistenceFieldChangeRow],
-        implementation: ChangeImplementationState
-    ) -> ArchPersistenceChangeRow {
-        ArchPersistenceChangeRow(
-            uuid: uuid,
-            seq: seq,
-            className: className,
-            filePath: filePath,
-            reasonBrief: reasonBrief,
-            changeKind: changeKind,
-            dopeRef: dopeRef,
-            fields: fields,
-            implementation: implementation
-        )
-    }
-}

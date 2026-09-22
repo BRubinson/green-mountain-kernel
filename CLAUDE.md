@@ -21,7 +21,7 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 ## Do not re-derive these wrongly
 
 ### Build and tests
-- The test bundle's membership-exception list in `project.pbxproj` names files ONE BY ONE (244 today; folder entries are inert). A new file under `API/Shared/GmKernelCoreShared`, `API/Servers/GmKernelCoreServer`, `Persistence` or `GmKernelCoreClient/GmKernelClient` must be added by hand or the test bundle fails to link.
+- The test bundle's membership-exception list in `project.pbxproj` names files ONE BY ONE (246 today; folder entries are inert). A new file under `API/Shared/GmKernelCoreShared`, `API/Servers/GmKernelCoreServer`, `Persistence` or `GmKernelCoreClient/GmKernelClient` must be added by hand or the test bundle fails to link.
 - A folder move made behind Xcode's back DROPS every exception under the old path, silently. Dump the list first, remap, write back, assert each entry resolves on disk, re-record the count here.
 - No `TEST_HOST`: a hosted app boots a second writer inside the suite. No fallback to `~/gmfs/bin`: discovery is `GM_TEST_KERNEL_BIN` or `BUILT_PRODUCTS_DIR`, copied into a temp root.
 - `Paths.root` is one `static let` per process. Run ids must be short: `sun_path` is 104 bytes and an overrun is a listener that never binds.

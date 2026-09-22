@@ -22,15 +22,3 @@ struct KbiteResourceFileStubRecord: SnakeCaseDecoded {
     var resourceFileSummary: String
     var hasContent: Bool
 }
-
-extension KbiteResourceFileStubRecord {
-    /// db → wire.
-    func wireStub() -> KbiteResourceFileStub {
-        KbiteResourceFileStub(
-            uuid: uuid,
-            resourceFileName: resourceFileName,
-            resourceFileSummary: resourceFileSummary,
-            hasContent: hasContent
-        )
-    }
-}

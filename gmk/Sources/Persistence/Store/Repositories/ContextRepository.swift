@@ -76,16 +76,15 @@ struct ContextRepository: RepositoryContext {
         }
         var kbiteCodes: [String] = []
         if let sessionUuid {
-            kbiteCodes = try String.fetchAll(
-                db,
-                sql: """
-                    SELECT k.code FROM kbite k
-                    JOIN session_active_kbite j ON j.kbite_uuid = k.uuid
-                    WHERE j.session_uuid = ?
-                    ORDER BY k.code
-                    """,
-                arguments: [sessionUuid]
-            )
+            kbiteCodes =
+                try KbiteRecord
+                .joining(
+                    required: KbiteRecord.sessionActivations
+                        .filter(Column("session_uuid") == sessionUuid)
+                )
+                .order(Column("code"))
+                .select(Column("code"), as: String.self)
+                .fetchAll(db)
         }
         return ContextGetResponse(
             projectUuid: projectUuid,

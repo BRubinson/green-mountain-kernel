@@ -45,26 +45,3 @@ extension UserClarificationQuestionRecord {
     static let answers = hasMany(UserClarificationAnswerRecord.self).forKey("answers")
     static let summary = belongsTo(ClarificationSummaryRecord.self).forKey("summary")
 }
-
-extension UserClarificationQuestionRecord {
-    /// db → wire. Options + selections are fetched by the repository and
-    /// injected — the record stays a plain single-table mirror.
-    func wireRow(
-        options: [ClarificationOptionRow],
-        selectedOptionUuids: [String]
-    ) -> ClarificationQuestionRow {
-        ClarificationQuestionRow(
-            uuid: uuid,
-            version: version,
-            clarificationSummaryUuid: clarificationSummaryUuid,
-            seq: seq,
-            question: question,
-            status: status,
-            answerText: answerText,
-            agentId: agentId,
-            agentName: agentName,
-            options: options,
-            selectedOptionUuids: selectedOptionUuids
-        )
-    }
-}

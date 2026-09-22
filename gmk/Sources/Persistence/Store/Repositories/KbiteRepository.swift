@@ -14,24 +14,13 @@ struct KbiteRepository: RepositoryContext {
             let rows = try Row.fetchAll(db, sql: "SELECT uuid, code FROM kbite ORDER BY code")
             return KbiteListResponse(kbites: rows.map { KbiteRef(uuid: $0["uuid"], code: $0["code"]) })
         }
-        let scopes = try resolveAncestorScopes(scope: req.scope, ownerUuid: req.ownerUuid)
+        let scopes = try ancestorScopes(scope: req.scope, ownerUuid: req.ownerUuid)
         var seen: Set<String> = []
         var refs: [KbiteRef] = []
-        for (level, uuid) in scopes {
-            let rows = try Row.fetchAll(
-                db,
-                sql: """
-                    SELECT k.uuid, k.code FROM kbite k
-                    JOIN \(level)_active_kbite j ON j.kbite_uuid = k.uuid
-                    WHERE j.\(level)_uuid = ?
-                    """,
-                arguments: [uuid]
-            )
-            for row in rows {
-                let kbiteUuid: String = row["uuid"]
-                if seen.insert(kbiteUuid).inserted {
-                    refs.append(KbiteRef(uuid: kbiteUuid, code: row["code"]))
-                }
+        for (scope, uuid) in scopes {
+            for record in try activeKbites(scope: scope, ownerUuid: uuid)
+            where seen.insert(record.uuid).inserted {
+                refs.append(KbiteRef(uuid: record.uuid, code: record.code))
             }
         }
         return KbiteListResponse(kbites: refs.sorted { $0.code < $1.code })
@@ -103,15 +92,62 @@ struct KbiteRepository: RepositoryContext {
         return KbiteRemoveResponse(removed: removed)
     }
 
+    // MARK: - Registry reads
+
+    /// The kbites one scope owner has registered, ordered by code.
+    private func activeKbites(scope: KbiteScope, ownerUuid: String) throws -> [KbiteRecord] {
+        let kbites = KbiteRecord.order(Column("code"))
+        switch scope {
+        case .project:
+            return
+                try kbites.joining(
+                    required: KbiteRecord.projectActivations
+                        .filter(Column("project_uuid") == ownerUuid)
+                )
+                .fetchAll(db)
+        case .instance:
+            return
+                try kbites.joining(
+                    required: KbiteRecord.instanceActivations
+                        .filter(Column("instance_uuid") == ownerUuid)
+                )
+                .fetchAll(db)
+        case .session:
+            return
+                try kbites.joining(
+                    required: KbiteRecord.sessionActivations
+                        .filter(Column("session_uuid") == ownerUuid)
+                )
+                .fetchAll(db)
+        case .prompt:
+            return
+                try kbites.joining(
+                    required: KbiteRecord.promptActivations
+                        .filter(Column("prompt_uuid") == ownerUuid)
+                )
+                .fetchAll(db)
+        }
+    }
+
     // MARK: - Scope resolution
 
-    /// The owner's own scope plus every ancestor scope+uuid, walked up the
-    /// prompt → session → instance → project FK columns.
+    /// `ancestorScopes` spelled with the level as its raw string, for callers
+    /// outside this repository.
     func resolveAncestorScopes(
         scope: KbiteScope,
         ownerUuid: String
     ) throws -> [(level: String, uuid: String)] {
-        var scopes: [(level: String, uuid: String)] = [(scope.rawValue, ownerUuid)]
+        try ancestorScopes(scope: scope, ownerUuid: ownerUuid)
+            .map { (level: $0.scope.rawValue, uuid: $0.uuid) }
+    }
+
+    /// The owner's own scope plus every ancestor scope+uuid, walked up the
+    /// prompt → session → instance → project FK columns.
+    private func ancestorScopes(
+        scope: KbiteScope,
+        ownerUuid: String
+    ) throws -> [(scope: KbiteScope, uuid: String)] {
+        var scopes: [(scope: KbiteScope, uuid: String)] = [(scope, ownerUuid)]
         var current = (scope: scope, uuid: ownerUuid)
         while true {
             let parent: (scope: KbiteScope, column: String)?
@@ -131,7 +167,7 @@ struct KbiteRepository: RepositoryContext {
             else {
                 throw StoreError.notFound(entity: current.scope.rawValue, key: current.uuid)
             }
-            scopes.append((parent.scope.rawValue, parentUuid))
+            scopes.append((parent.scope, parentUuid))
             current = (parent.scope, parentUuid)
         }
         return scopes

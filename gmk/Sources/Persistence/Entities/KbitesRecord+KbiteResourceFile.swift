@@ -44,21 +44,3 @@ extension KbiteResourceFileRecord {
     )
     .forKey("keywords")
 }
-
-extension KbiteResourceFileRecord {
-    /// db → wire.
-    ///
-    /// This is the FULL-CONTENT read (KBITE_FILE_GET, one file by uuid) and is
-    /// the only place resource_file_content is meant to be loaded. The stub
-    /// listing path deliberately uses KbiteResourceFileStubRecord instead.
-    func wireRow() -> KbiteResourceFileRow {
-        KbiteResourceFileRow(
-            uuid: uuid,
-            kbiteResourceUuid: kbiteResourceUuid,
-            resourceFileName: resourceFileName,
-            resourceFileSummary: resourceFileSummary,
-            resourceFileContent: resourceFileContent,
-            createdAt: createdAt
-        )
-    }
-}

@@ -39,20 +39,3 @@ struct ExplorationSummaryRecord: BaseRecordFields, TableRecord {
 extension ExplorationSummaryRecord {
     static let findings = hasMany(ExplorationFindingRecord.self).forKey("findings")
 }
-
-extension ExplorationSummaryRecord {
-    /// db → wire.
-    func wireRow() -> ExplorationSummaryRow {
-        ExplorationSummaryRow(
-            uuid: uuid,
-            version: version,
-            promptUuid: promptUuid,
-            agentType: agentType,
-            agentId: agentId,
-            status: status,
-            overview: overview,
-            createdAt: createdAt,
-            updatedAt: updatedAt
-        )
-    }
-}

@@ -106,8 +106,10 @@ struct SessionRepository: RepositoryContext {
     // MARK: - Shared fetch helpers
 
     func fetchRow(uuid: String) throws -> SessionRow? {
-        try SessionRecord.fetch(db, uuid: uuid)?
-            .wireRow(activations: try fetchActivations(sessionUuid: uuid))
+        try SessionWithActivations.request()
+            .filter(SessionRecord.Columns.uuid == uuid)
+            .fetchOne(db)?
+            .dto()
     }
 
     // MARK: - Activation registry (v21)
@@ -162,7 +164,7 @@ struct SessionRepository: RepositoryContext {
             arguments: [sessionUuid],
             orderBy: "created_at"
         )
-        .map { $0.wireRow() }
+        .map { $0.dto() }
     }
 
     /// The attribution ladder shared by file-change auto-attribution and the

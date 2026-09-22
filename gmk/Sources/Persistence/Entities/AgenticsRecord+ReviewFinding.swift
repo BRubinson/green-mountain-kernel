@@ -49,26 +49,3 @@ struct ReviewFindingRecord: BaseRecordFields, TableRecord, Rankable {
 extension ReviewFindingRecord {
     static let summary = belongsTo(ReviewSummaryRecord.self).forKey("summary")
 }
-
-extension ReviewFindingRecord {
-    /// db → wire. Replicates the retired hand mapper exactly.
-    ///
-    /// lineStart/lineEnd/findingRating narrow Int64 (the column type) to the
-    /// wire's Int, explicitly and non-truncating.
-    func wireRow() -> ReviewFindingRow {
-        ReviewFindingRow(
-            uuid: uuid,
-            version: version,
-            reviewSummaryUuid: reviewSummaryUuid,
-            kind: kind,
-            title: title,
-            body: body,
-            filePath: filePath,
-            lineStart: lineStart.map(Int.init),
-            lineEnd: lineEnd.map(Int.init),
-            agentName: agentName,
-            findingRating: findingRating.map(Int.init),
-            status: status
-        )
-    }
-}

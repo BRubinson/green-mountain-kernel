@@ -43,19 +43,3 @@ extension KbiteResourceRecord {
         .order(Column("resource_file_name"))
         .forKey("files")
 }
-
-extension KbiteResourceRecord {
-    /// db → wire, with the file stubs injected (a second, deliberately
-    /// content-free query). resourceTrust narrows Int64 to the wire's Int.
-    func wireRow(files: [KbiteResourceFileStub]) -> KbiteResourceRow {
-        KbiteResourceRow(
-            uuid: uuid,
-            kbiteUuid: kbiteUuid,
-            resourceName: resourceName,
-            resourceSummary: resourceSummary,
-            resourceType: resourceType,
-            resourceTrust: Int(resourceTrust),
-            files: files
-        )
-    }
-}

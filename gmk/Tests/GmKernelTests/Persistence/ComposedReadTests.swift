@@ -1,4 +1,5 @@
 import Foundation
+import GRDB
 import XCTest
 
 /// The composed reads, driven end to end over the wire.
@@ -117,6 +118,14 @@ final class ComposedReadTests: KernelBackedTestCase {
     /// so neither can be exercised with a fabricated uuid. Opens a maw under the
     /// run root, writes one chewed artifact naming one raw file, and digests.
     private func makeKbiteFileUuid(_ label: String) throws -> String {
+        let kbite = try makeDigestedKbite(label)
+        let resource = try XCTUnwrap(kbite.resources.first, "digest wrote no resource")
+        return try XCTUnwrap(resource.files.first, "digest wrote no file row").uuid
+    }
+
+    /// The same fixture, handed back whole for the cases that read the resource
+    /// listing itself rather than borrowing one file uuid out of it.
+    private func makeDigestedKbite(_ label: String) throws -> KbiteGetResponse {
         let code = "tk_\(label)_\(String(UUID().uuidString.prefix(6)).lowercased())"
         let maw = env.root
             .appendingPathComponent("kbites", isDirectory: true)
@@ -165,9 +174,7 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
         XCTAssertEqual(digest.fileCount, 1, "the chewed artifact named one file")
 
-        let kbite = try env.send(.kbiteGet, KbiteGetRequest(code: code), KbiteGetResponse.self)
-        let resource = try XCTUnwrap(kbite.resources.first, "digest wrote no resource")
-        return try XCTUnwrap(resource.files.first, "digest wrote no file row").uuid
+        return try env.send(.kbiteGet, KbiteGetRequest(code: code), KbiteGetResponse.self)
     }
 
     /// One ref of each kind, in the order the package's three prefetches carry
@@ -423,5 +430,227 @@ final class ComposedReadTests: KernelBackedTestCase {
             "a PROJECT-tier diagram has no session, so no instance"
         )
         XCTAssertEqual(projectTree.projectUuid, fixture.context.projectUuid)
+    }
+
+    /// building → answering, on the summary version the question write left.
+    private func sealClarification(promptUuid: String, summaryUuid: String) throws {
+        let current = try env.send(
+            .clarifyGet,
+            ClarifyGetRequest(promptUuid: promptUuid),
+            ClarifyGetResponse.self
+        )
+        _ = try env.send(
+            .clarifySeal,
+            ClarifySealRequest(summaryUuid: summaryUuid, expectedVersion: current.summary.version),
+            ClarifySummaryResponse.self
+        )
+    }
+
+    // MARK: - ClarificationQuestionWithOptions
+
+    /// The option prefetch plus the selection that rides beside it.
+    ///
+    /// `options` and `selectedOptionUuids` reach the row by different paths —
+    /// one prefetch, one answer junction — so a composite that mis-keys either
+    /// still answers the other. Two options make the seq ordering an assertion,
+    /// and selecting the SECOND makes the selection one too.
+    func testClarifyGetComposesQuestionOptionsAndSelection() throws {
+        let fixture = try makeFixture("clarq")
+        let prompt = try makePrompt(fixture.context.sessionUuid, "clarify fixture")
+
+        let opened = try env.send(
+            .clarifyOpen,
+            ClarifyOpenRequest(promptUuid: prompt.uuid),
+            ClarifySummaryResponse.self
+        )
+        XCTAssertTrue(opened.created)
+
+        let written = try env.send(
+            .clarifyQuestionAdd,
+            ClarifyQuestionAddRequest(
+                summaryUuid: opened.summary.uuid,
+                question: "which shape does the read return?",
+                options: ["option alpha", "option beta"]
+            ),
+            ClarifyQuestionRowResponse.self
+        )
+        XCTAssertEqual(
+            written.question.options.map(\.body),
+            ["option alpha", "option beta"],
+            "the option children decoded empty or out of seq order at write"
+        )
+        let chosen = try XCTUnwrap(written.question.options.last, "the question kept no options")
+
+        try sealClarification(promptUuid: prompt.uuid, summaryUuid: opened.summary.uuid)
+
+        _ = try env.send(
+            .clarifyAnswer,
+            ClarifyAnswerRequest(
+                questionUuid: written.question.uuid,
+                expectedVersion: written.question.version,
+                selectedOptionUuids: [chosen.uuid]
+            ),
+            ClarifyQuestionRowResponse.self
+        )
+
+        let read = try env.send(
+            .clarifyGet,
+            ClarifyGetRequest(promptUuid: prompt.uuid),
+            ClarifyGetResponse.self
+        )
+        let question = try XCTUnwrap(
+            read.questions.first { $0.uuid == written.question.uuid },
+            "CLARIFY_GET lost the question it was just given"
+        )
+
+        XCTAssertEqual(
+            question.options.map(\.body),
+            ["option alpha", "option beta"],
+            "the option children decoded empty or out of seq order"
+        )
+        XCTAssertEqual(question.options.map(\.seq), [1, 2])
+        XCTAssertEqual(
+            question.selectedOptionUuids,
+            [chosen.uuid],
+            "the answer junction decoded empty or selected the wrong option"
+        )
+    }
+
+    // MARK: - ArchPersistenceChangeWithFields
+
+    /// One persistence change with its two field children, in seq order.
+    ///
+    /// The change row is reachable on its own, so a field prefetch that decodes
+    /// empty leaves the read looking healthy. Two fields written in order make
+    /// both the presence and the ordering assertions rather than coincidences.
+    func testArchitectureGetComposesPersistenceChangeFields() throws {
+        let fixture = try makeFixture("arch")
+        let prompt = try makePrompt(fixture.context.sessionUuid, "architecture fixture")
+
+        let opened = try env.send(
+            .archOpen,
+            ArchOpenRequest(promptUuid: prompt.uuid),
+            ArchSummaryResponse.self
+        )
+        XCTAssertTrue(opened.created)
+
+        let change = try env.send(
+            .archPersistAdd,
+            ArchPersistAddRequest(
+                summaryUuid: opened.summary.uuid,
+                className: "KbiteResourceFileHead",
+                filePath: "Sources/Persistence/Composites/KbitesComposites.swift",
+                reasonBrief: "project the content column out of the listing"
+            ),
+            ArchPersistAddResponse.self
+        )
+
+        for name in ["has_content", "resource_file_name"] {
+            _ = try env.send(
+                .archFieldAdd,
+                ArchFieldAddRequest(
+                    persistenceChangeUuid: change.change.uuid,
+                    fieldName: name,
+                    dataType: "TEXT",
+                    changeReason: "the composed read needs it",
+                    changePurpose: "decoded by the projection",
+                    nullable: false
+                ),
+                ArchFieldAddResponse.self
+            )
+        }
+
+        let read = try env.send(
+            .archGet,
+            ArchGetRequest(promptUuid: prompt.uuid),
+            ArchGetResponse.self
+        )
+        let persistence = try XCTUnwrap(
+            read.persistenceChanges.first { $0.uuid == change.change.uuid },
+            "ARCH_GET lost the persistence change it was just given"
+        )
+
+        XCTAssertEqual(persistence.className, "KbiteResourceFileHead")
+        XCTAssertEqual(
+            persistence.fields.map(\.fieldName),
+            ["has_content", "resource_file_name"],
+            "the field children decoded empty or out of seq order"
+        )
+        XCTAssertEqual(persistence.fields.map(\.seq), [1, 2])
+    }
+
+    // MARK: - KbiteResourceWithFiles
+
+    /// The projected child: heads in the listing, content only on the file get.
+    ///
+    /// `hasContent` is computed by the association's select, so a projection
+    /// that lost its `forKey` fails to decode and one that read the wrong
+    /// expression reports false for a file that has a body. The trace proves
+    /// the ~115 MB column is named nowhere but inside that test.
+    func testKbiteResourceListProjectsHeadsAndFileGetCarriesContent() throws {
+        let kbite = try makeDigestedKbite("res")
+        let resource = try XCTUnwrap(kbite.resources.first, "digest wrote no resource")
+        let head = try XCTUnwrap(resource.files.first, "the file children decoded empty")
+
+        XCTAssertEqual(resource.files.count, 1)
+        XCTAssertEqual(head.resourceFileName, "notes.md")
+        XCTAssertTrue(head.hasContent, "the digested file has a body, so the projection must say so")
+
+        let file =
+            try env.send(
+                .kbiteFileGet,
+                KbiteFileGetRequest(fileUuid: head.uuid),
+                KbiteFileGetResponse.self
+            )
+            .file
+        XCTAssertEqual(file.uuid, head.uuid)
+        XCTAssertEqual(file.kbiteResourceUuid, resource.uuid)
+        XCTAssertEqual(
+            file.resourceFileContent,
+            "the note body",
+            "KBITE_FILE_GET is the only door to the content column"
+        )
+
+        try assertResourceContentIsOnlyProbed()
+    }
+
+    /// Both statements of the resource composite, captured off a live fetch.
+    ///
+    /// `including(all:)` plans its children in a SECOND statement that no
+    /// prepared request exposes, so the only public door to that SQL is a
+    /// trace over a fetch that has parent rows to prefetch for.
+    private func assertResourceContentIsOnlyProbed() throws {
+        var statements: [String] = []
+        try env.readOnlyDatabase()
+            .read { db in
+                db.trace { event in
+                    if case .statement(let statement) = event { statements.append(statement.sql) }
+                }
+                _ = try KbiteResourceWithFiles.request().fetchAll(db)
+            }
+
+        let main = try XCTUnwrap(
+            statements.first { $0.contains("FROM \"kbite_resource\"") },
+            "the composite ran no statement over kbite_resource: \(statements)"
+        )
+        XCTAssertFalse(
+            main.contains("resource_file_content"),
+            "the content column reached the main statement: \(main)"
+        )
+
+        let prefetch = try XCTUnwrap(
+            statements.first { $0.contains("FROM \"kbite_resource_file\"") },
+            "the prefetch statement never ran: \(statements)"
+        )
+        let unquoted = prefetch.replacingOccurrences(of: "\"", with: "")
+        XCTAssertEqual(
+            unquoted.components(separatedBy: "resource_file_content").count - 1,
+            1,
+            "the content column is named more than once in the child select: \(prefetch)"
+        )
+        XCTAssertTrue(
+            unquoted.contains("resource_file_content IS NOT NULL"),
+            "the child select reads the content column instead of probing it: \(prefetch)"
+        )
     }
 }
