@@ -43,13 +43,9 @@ extension Store {
             let diagrams = DiagramRepository(db: db, core: self.core)
             try diagrams.requireSession(uuid: req.sessionUuid)
             let root = try self.instanceRoot(db, sessionUuid: req.sessionUuid)
-            let rows = try DiagramWithOwner.request()
-                .filter(DiagramRecord.Columns.tier == DiagramTier.session.rawValue)
-                .filter(DiagramRecord.Columns.sessionUuid == req.sessionUuid)
-                .filter(DiagramRecord.Columns.visibility == DiagramVisibility.public.rawValue)
-                .order(DiagramRecord.Columns.code)
-                .fetchAll(db)
-            let projected = try rows.map { $0.dto() }
+            let rows = try diagrams.publicSessionDiagrams(sessionUuid: req.sessionUuid)
+            let projected =
+                try rows
                 .map { diagram in
                     Projected(
                         code: diagram.code,
@@ -219,13 +215,8 @@ extension Store {
             var skipped: [String] = []
             for document in documents {
                 do {
-                    let existing =
-                        try DiagramWithOwner.request()
-                        .filter(DiagramRecord.Columns.tier == DiagramTier.session.rawValue)
-                        .filter(DiagramRecord.Columns.sessionUuid == req.sessionUuid)
-                        .filter(DiagramRecord.Columns.code == document.code)
-                        .fetchOne(db)?
-                        .dto()
+                    let existing = try DiagramRepository(db: db, core: self.core)
+                        .sessionDiagram(sessionUuid: req.sessionUuid, code: document.code)
                     let landed: Bool
                     if let diagram = existing {
                         landed = try self.ingestReplace(db, document: document, over: diagram)

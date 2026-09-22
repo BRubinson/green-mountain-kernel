@@ -662,6 +662,196 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
+    // MARK: - ReviewSummaryWithFindings
+
+    /// The finding prefetch, its ordering, and the window partition over it.
+    ///
+    /// A mis-keyed prefetch decodes EMPTY and REVIEW_GET still answers with a
+    /// healthy-looking summary, so the children have to be read back. Three
+    /// findings — one unranked, one inside the default window, one outside —
+    /// make the ordering and the full/stub split assertions rather than
+    /// coincidences.
+    func testReviewGetComposesFindingsInRankOrder() throws {
+        let fixture = try makeFixture("rev")
+        let prompt = try makePrompt(fixture.context.sessionUuid, "review fixture")
+
+        let opened = try env.send(
+            .reviewOpen,
+            ReviewOpenRequest(promptUuid: prompt.uuid),
+            ReviewSummaryResponse.self
+        )
+        XCTAssertTrue(opened.created)
+
+        let titles = ["the kept finding", "the ignored finding", "the unranked finding"]
+        let written = try titles.map { title in
+            try env.send(
+                .reviewFindingAdd,
+                ReviewFindingAddRequest(
+                    summaryUuid: opened.summary.uuid,
+                    kind: .regressionRisk,
+                    title: title,
+                    body: "written by the composed read",
+                    agentName: "composed"
+                ),
+                ReviewFindingRowResponse.self
+            )
+            .finding
+        }
+
+        _ = try env.send(
+            .reviewRank,
+            ReviewRankRequest(
+                summaryUuid: opened.summary.uuid,
+                ratings: [
+                    FindingRating(findingUuid: written[0].uuid, rating: 40),
+                    FindingRating(findingUuid: written[1].uuid, rating: 500),
+                ]
+            ),
+            ReviewRankResponse.self
+        )
+
+        let read = try env.send(
+            .reviewGet,
+            ReviewGetRequest(promptUuid: prompt.uuid),
+            ReviewGetResponse.self
+        )
+
+        XCTAssertEqual(
+            read.findings.map(\.title),
+            ["the unranked finding", "the kept finding"],
+            "the finding children decoded empty, or unranked-first ordering was lost"
+        )
+        XCTAssertEqual(read.findings.map(\.findingRating), [nil, 40])
+        XCTAssertEqual(
+            read.findingStubs.map(\.title),
+            ["the ignored finding"],
+            "the window partition kept a finding it should have stubbed"
+        )
+        XCTAssertEqual(read.findingStubs.map(\.findingRating), [500])
+    }
+
+    // MARK: - FileChangeWithRanges
+
+    /// The range prefetch under a LIMIT, read back through FILE_CHANGE_LIST.
+    ///
+    /// The listing orders newest first and limits, so the prefetch's children
+    /// have to belong to the limited parent set rather than the whole table.
+    /// Three ranges on the newest change make the insertion ordering an
+    /// assertion, and the older change on the same path proves the limit.
+    func testFileChangeListCarriesOnlyTheNewestChangeRanges() throws {
+        let fixture = try makeFixture("fcl")
+        let prompt = try makePrompt(fixture.context.sessionUuid, "file change fixture")
+
+        _ = try addFileChange(fixture, promptUuid: prompt.uuid, path: "Sources/First.swift", ranges: [(1, 4)])
+        _ = try addFileChange(fixture, promptUuid: prompt.uuid, path: "Sources/Other.swift", ranges: [(7, 9)])
+        let newest = try addFileChange(
+            fixture,
+            promptUuid: prompt.uuid,
+            path: "Sources/First.swift",
+            ranges: [(30, 33), (10, 12), (20, 22)]
+        )
+
+        let changes =
+            try env.send(
+                .fileChangeList,
+                FileChangeListRequest(sessionUuid: fixture.context.sessionUuid, limit: 1),
+                FileChangeListResponse.self
+            )
+            .changes
+
+        XCTAssertEqual(changes.count, 1, "the limit reached the parent rows, not the prefetched children")
+        let change = try XCTUnwrap(changes.first)
+        XCTAssertEqual(change.uuid, newest.fileChangeUuid, "FILE_CHANGE_LIST returned the wrong newest row")
+        XCTAssertEqual(change.relativePath, "Sources/First.swift", "the joined path annotation decoded wrong")
+        XCTAssertEqual(
+            change.ranges.map { [$0.lineStart, $0.lineEnd] },
+            [[30, 33], [10, 12], [20, 22]],
+            "the range children decoded empty, out of insertion order, or belong to another change"
+        )
+    }
+
+    /// One `file_change` at a path with the ranges the case names.
+    private func addFileChange(
+        _ fixture: Fixture,
+        promptUuid: String,
+        path: String,
+        ranges: [(Int, Int)]
+    ) throws -> FileChangeAddResponse {
+        try env.send(
+            .fileChangeAdd,
+            FileChangeAdd(
+                project: fixture.project,
+                instance: fixture.instance,
+                session: fixture.session,
+                promptUuid: promptUuid,
+                relativePath: path,
+                changeKind: .edit,
+                ranges: ranges.map { ChangeRange(lineStart: $0.0, lineEnd: $0.1) },
+                origin: FileChangeOrigin.manual
+            ),
+            FileChangeAddResponse.self
+        )
+    }
+
+    // MARK: - DopeCogWithElements
+
+    /// The cog's element prefetch, read back through DOPE_COG_GET.
+    ///
+    /// The elements are ordered by `sort_order` then `code`, so writing the
+    /// second element with the LOWER sort order makes the ordering an
+    /// assertion rather than insertion order showing through.
+    func testDopeCogGetComposesItsElementsInSortOrder() throws {
+        let fixture = try makeFixture("cog")
+
+        let scope =
+            try env.send(
+                .dopeInit,
+                DopeInitRequest(
+                    sessionUuid: fixture.context.sessionUuid,
+                    code: "cog_scope",
+                    name: "cog scope"
+                ),
+                DopeScopeResponse.self
+            )
+            .scope
+
+        let cog = try env.send(
+            .dopeCogAdd,
+            DopeCogAddRequest(scopeUuid: scope.uuid, code: "shape", name: "the shape"),
+            DopeCogResponse.self
+        )
+
+        for (code, sortOrder) in [("second_hull", 2), ("first_hull", 1)] {
+            _ = try env.send(
+                .dopeCogElementAdd,
+                DopeCogElementAddRequest(
+                    cogUuid: cog.cog.uuid,
+                    elementType: DopeCogElementType.hull.rawValue,
+                    code: code,
+                    name: code,
+                    sortOrder: sortOrder,
+                    primaryPath: "Sources/\(code)"
+                ),
+                DopeCogElementResponse.self
+            )
+        }
+
+        let cogs =
+            try env.send(
+                .dopeCogGet,
+                DopeCogGetRequest(scopeUuid: scope.uuid, code: "shape"),
+                DopeCogGetResponse.self
+            )
+            .cogs
+
+        let read = try XCTUnwrap(cogs.first { $0.uuid == cog.cog.uuid }, "DOPE_COG_GET lost the cog it minted")
+        XCTAssertEqual(
+            read.elements.map(\.code),
+            ["first_hull", "second_hull"],
+            "the element children decoded empty or out of sort order"
+        )
+    }
+
     // MARK: - Statement budgets
 
     /// What each composed read costs in SELECT statements, and that the cost
@@ -788,7 +978,7 @@ final class ComposedReadTests: KernelBackedTestCase {
         let counts = try [one, two]
             .map { uuid -> Int in
                 try selectStatements { db in
-                    _ =
+                    let briefings =
                         try AgentBriefingWithRefs.request()
                         .filter(AgentBriefingRecord.Columns.uuid == uuid)
                         .order(
@@ -796,6 +986,10 @@ final class ComposedReadTests: KernelBackedTestCase {
                             AgentBriefingRecord.Columns.createdAt
                         )
                         .fetchAll(db)
+                    XCTAssertFalse(
+                        briefings.isEmpty,
+                        "the briefing request matched no row: a prefetch GRDB skips is not a budget"
+                    )
                 }
                 .count
             }
@@ -831,10 +1025,14 @@ final class ComposedReadTests: KernelBackedTestCase {
         _ = try addOneRefOfEachKind(packageUuid: packageUuid, kbiteFileUuid: kbiteFileUuid)
 
         let read: (Database) throws -> Void = { db in
-            _ =
+            let composed =
                 try CarePackageWithRefs.request()
                 .filter(CarePackageRecord.Columns.uuid == packageUuid)
                 .fetchOne(db)
+            XCTAssertNotNil(
+                composed,
+                "the care package request matched no row: a prefetch GRDB skips is not a budget"
+            )
         }
         let withOne = try selectStatements(read).count
         _ = try env.send(
@@ -885,7 +1083,10 @@ final class ComposedReadTests: KernelBackedTestCase {
                     UserClarificationQuestionRecord.Columns.clarificationSummaryUuid == summaryUuid
                 )
                 .fetchAll(db)
-            guard !questions.isEmpty else { return }
+            XCTAssertFalse(
+                questions.isEmpty,
+                "the question request matched no row: a prefetch GRDB skips is not a budget"
+            )
             _ =
                 try UserClarificationAnswerRecord
                 .filter(
@@ -938,13 +1139,17 @@ final class ComposedReadTests: KernelBackedTestCase {
         try addArchField(changeUuid: change.change.uuid, named: "first_field")
 
         let read: (Database) throws -> Void = { db in
-            _ =
+            let changes =
                 try ArchPersistenceChangeWithFields.request()
                 .filter(
                     ArchitecturePersistenceChangeRecord.Columns.architectureSummaryUuid
                         == summaryUuid
                 )
                 .fetchAll(db)
+            XCTAssertFalse(
+                changes.isEmpty,
+                "the persistence change request matched no row: a prefetch GRDB skips is not a budget"
+            )
         }
         let withOne = try selectStatements(read).count
         try addArchField(changeUuid: change.change.uuid, named: "second_field")
@@ -987,11 +1192,15 @@ final class ComposedReadTests: KernelBackedTestCase {
             .map { kbite -> Int in
                 let kbiteUuid = kbite.kbite.uuid
                 return try selectStatements { db in
-                    _ =
+                    let resources =
                         try KbiteResourceWithFiles.request()
                         .filter(Column("kbite_uuid") == kbiteUuid)
                         .order(Column("resource_name"))
                         .fetchAll(db)
+                    XCTAssertFalse(
+                        resources.isEmpty,
+                        "the resource request matched no row: a prefetch GRDB skips is not a budget"
+                    )
                 }
                 .count
             }

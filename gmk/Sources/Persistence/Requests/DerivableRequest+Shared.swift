@@ -79,6 +79,41 @@ extension DerivableRequest where RowDecoder: BaseRecordFields {
     }
 }
 
+extension DerivableRequest {
+    /// Keeps only the rows whose own `prompt_uuid` belongs to this session. A
+    /// nil session reads every prompt's rows, the way the unscoped listing does.
+    ///
+    /// The column is spelled as a string because four summary tables carry it,
+    /// so no one `Columns` case names it for every request this reaches.
+    func forSessionPrompts(_ sessionUuid: String?) -> Self {
+        guard let sessionUuid else { return self }
+        return filter(
+            PromptRecord
+                .select(PromptRecord.Columns.uuid)
+                .filter(PromptRecord.Columns.sessionUuid == sessionUuid)
+                .contains(Column("prompt_uuid"))
+        )
+    }
+}
+
+/// Request builders over the kbite tables that decode something other than a
+/// composite, so they belong to the request vocabulary rather than Composites.
+enum KbiteRequests {
+    /// The shared-vocabulary keywords tagged on one resource file.
+    ///
+    /// The junction is the root because the file side of the read is already
+    /// in hand: only the words are missing.
+    static func fileKeywords(fileUuid: String) -> QueryInterfaceRequest<String> {
+        let keyword = TableAlias<KeywordRecord>()
+        return
+            ResourceFileKeywordJunctionRecord
+            .filter(ResourceFileKeywordJunctionRecord.Columns.fileUuid == fileUuid)
+            .joining(required: ResourceFileKeywordJunctionRecord.keyword.aliased(keyword))
+            .order(keyword[KeywordRecord.Columns.keyword])
+            .select(keyword[KeywordRecord.Columns.keyword], as: String.self)
+    }
+}
+
 /// Selections that carry SQL no association can express.
 enum SqlAnnotations {
     /// A session's recency: the latest of its own `updated_at`, its prompts'

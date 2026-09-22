@@ -9,11 +9,14 @@ import XCTest
 /// daemon actually migrated, not against a hand-kept copy of it.
 final class SchemaEnrollmentTests: KernelBackedTestCase {
 
-    /// One mirror record per table, and every one of them decodes a full row.
+    /// One mirror record per table, decoding two fabricated rows.
     ///
-    /// The row is fabricated from `columns(in:)`, so a column the schema gained
-    /// or lost shows up as a decode failure naming its table. A record whose
-    /// `databaseTableName` has drifted fails earlier, at `columns(in:)`.
+    /// PROVES three drifts, each a decode failure naming its table: a column the
+    /// record declares that the table LOST, cross-affinity type drift, and
+    /// nullability drift (the second row NULLs every column the schema calls
+    /// nullable). DOES NOT PROVE a column the table GAINED — `Decodable` ignores
+    /// keys it never asks for — and the fabricated values assume primitive
+    /// property types: a `Date` or `RawRepresentable` property fails on "1".
     func testEveryRecordMatchesItsTable() throws {
         XCTAssertEqual(SchemaEnrollment.records.count, 72, "a table mirror left the roster or never joined it")
 
@@ -23,8 +26,72 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
                     let columns = try db.columns(in: entry.table)
                     XCTAssertFalse(columns.isEmpty, entry.table)
                     XCTAssertNoThrow(try entry.decode(Self.fabricatedRow(for: columns)), entry.table)
+                    XCTAssertNoThrow(
+                        try entry.decode(Self.nullableRow(for: columns)),
+                        "\(entry.table): a nullable column is declared non-optional"
+                    )
                 }
             }
+    }
+
+    /// The roster's three fences, counted against the Sources tree itself.
+    ///
+    /// The `count ==` literals compare against a hand-written array, so an
+    /// omission moves neither side. This counts the declarations on disk, which
+    /// is the only side an author actually edits.
+    func testRosterCountsMatchTheSourceTree() throws {
+        let entities = try Self.entitiesDirectory()
+        var tables = 0
+        var associations = 0
+        for url in try Self.swiftFiles(under: entities) {
+            let source = try String(contentsOf: url, encoding: .utf8)
+            tables += Self.matchCount(of: #"static let databaseTableName"#, in: source)
+            associations += Self.matchCount(
+                of: #"static let [A-Za-z0-9_]+ = (hasMany|hasOne|belongsTo)"#,
+                in: source
+            )
+        }
+        XCTAssertEqual(
+            SchemaEnrollment.records.count,
+            tables,
+            "Entities declares \(tables) tables; the roster enrolls \(SchemaEnrollment.records.count)"
+        )
+        XCTAssertEqual(
+            SchemaEnrollment.associations.count,
+            associations,
+            "Entities declares \(associations) associations; "
+                + "the roster enrolls \(SchemaEnrollment.associations.count)"
+        )
+    }
+
+    // MARK: - Source tree
+
+    /// `Sources/Persistence/Entities`, found by walking up from this file.
+    private static func entitiesDirectory() throws -> URL {
+        let suffix = "gmk/Sources/Persistence/Entities"
+        var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        while directory.path != "/" {
+            let candidate = directory.appendingPathComponent(suffix, isDirectory: true)
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory),
+                isDirectory.boolValue
+            {
+                return candidate
+            }
+            directory = directory.deletingLastPathComponent()
+        }
+        throw XCTSkip("no \(suffix) above \(#filePath): the fence needs the checkout it was built from")
+    }
+
+    private static func swiftFiles(under directory: URL) throws -> [URL] {
+        try FileManager.default
+            .contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+            .filter { $0.pathExtension == "swift" }
+    }
+
+    private static func matchCount(of pattern: String, in source: String) -> Int {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return 0 }
+        return regex.numberOfMatches(in: source, range: NSRange(source.startIndex..., in: source))
     }
 
     /// Every association's foreign key resolves to exactly one candidate.
@@ -32,7 +99,7 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
     /// GRDB traps rather than throwing when inference finds none or several, so
     /// this reads the `foreign_key_list` pragma and never prepares a request.
     func testEveryAssociationResolvesItsForeignKey() throws {
-        XCTAssertEqual(SchemaEnrollment.associations.count, 152, "an association left the roster or never joined it")
+        XCTAssertEqual(SchemaEnrollment.associations.count, 154, "an association left the roster or never joined it")
 
         try env.readOnlyDatabase()
             .read { db in
@@ -107,6 +174,20 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
         var values: [String: (any DatabaseValueConvertible)?] = [:]
         for column in columns {
             values[column.name] = dummy(forDeclaredType: column.type)
+        }
+        return Row(values)
+    }
+
+    /// The same row with every nullable column NULL, so a record declaring one
+    /// of them non-optional throws rather than waiting for the first real row.
+    ///
+    /// A primary key keeps its value: SQLite reports an INTEGER PRIMARY KEY
+    /// rowid alias as nullable, and no row ever carries NULL there.
+    private static func nullableRow(for columns: [ColumnInfo]) -> Row {
+        var values: [String: (any DatabaseValueConvertible)?] = [:]
+        for column in columns {
+            let keepsValue = column.isNotNull || column.primaryKeyIndex > 0
+            values[column.name] = keepsValue ? dummy(forDeclaredType: column.type) : nil
         }
         return Row(values)
     }

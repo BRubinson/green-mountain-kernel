@@ -151,20 +151,6 @@ struct PromptChangeRollup: FetchableRecord, Decodable {
     }
 }
 
-extension DerivableRequest {
-    /// Keeps only the rows whose own `prompt_uuid` belongs to this session. A
-    /// nil session reads every prompt's rows, the way the unscoped listing does.
-    fileprivate func forSessionPrompts(_ sessionUuid: String?) -> Self {
-        guard let sessionUuid else { return self }
-        return filter(
-            PromptRecord
-                .select(PromptRecord.Columns.uuid)
-                .filter(PromptRecord.Columns.sessionUuid == sessionUuid)
-                .contains(Column("prompt_uuid"))
-        )
-    }
-}
-
 /// One clarification summary carried with the counts its listing stub reads.
 ///
 /// `summary` names no column and no scope, so GRDB decodes it from the base

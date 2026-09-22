@@ -176,6 +176,29 @@ struct DiagramRepository: RepositoryContext {
         return uuid
     }
 
+    /// Every PUBLIC SESSION-tier diagram of a session, in code order — the
+    /// rows the repo projection writes out as files.
+    func publicSessionDiagrams(sessionUuid: String) throws -> [DiagramRow] {
+        try DiagramWithOwner.request()
+            .filter(DiagramRecord.Columns.tier == DiagramTier.session.rawValue)
+            .filter(DiagramRecord.Columns.sessionUuid == sessionUuid)
+            .filter(DiagramRecord.Columns.visibility == DiagramVisibility.public.rawValue)
+            .order(DiagramRecord.Columns.code)
+            .fetchAll(db)
+            .map { $0.dto() }
+    }
+
+    /// One SESSION-tier diagram by code, ANY visibility — ingest has to see a
+    /// PRIVATE row in order to refuse landing a file over it.
+    func sessionDiagram(sessionUuid: String, code: String) throws -> DiagramRow? {
+        try DiagramWithOwner.request()
+            .filter(DiagramRecord.Columns.tier == DiagramTier.session.rawValue)
+            .filter(DiagramRecord.Columns.sessionUuid == sessionUuid)
+            .filter(DiagramRecord.Columns.code == code)
+            .fetchOne(db)?
+            .dto()
+    }
+
     /// Every SESSION-tier diagram's revision by code, any visibility — the
     /// repo prune gate may only delete a file the db demonstrably subsumes.
     func sessionDiagramRevisions(sessionUuid: String) throws -> [String: Int64] {

@@ -117,19 +117,3 @@ struct KbiteCounts: FetchableRecord, Decodable {
             .asRequest(of: Self.self)
     }
 }
-
-/// The shared-vocabulary keywords tagged on one resource file.
-///
-/// The junction is the root because the file side of the read is already in
-/// hand: only the words are missing.
-enum KbiteFileKeywords {
-    static func request(fileUuid: String) -> QueryInterfaceRequest<String> {
-        let keyword = TableAlias<KeywordRecord>()
-        return
-            ResourceFileKeywordJunctionRecord
-            .filter(ResourceFileKeywordJunctionRecord.Columns.fileUuid == fileUuid)
-            .joining(required: ResourceFileKeywordJunctionRecord.keyword.aliased(keyword))
-            .order(keyword[KeywordRecord.Columns.keyword])
-            .select(keyword[KeywordRecord.Columns.keyword], as: String.self)
-    }
-}

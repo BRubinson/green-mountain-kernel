@@ -438,6 +438,18 @@ enum SchemaEnrollment {
             to: "dope_persistence"
         ),
         prefetch(DopePersistenceRecord.enums, key: "enums", from: "dope_persistence_enum", to: "dope_persistence"),
+        prefetch(
+            DopePersistenceRecord.allProperties,
+            key: "allProperties",
+            from: "dope_persistence_entity_property",
+            to: "dope_persistence_entity"
+        ),
+        prefetch(
+            DopePersistenceRecord.allOptions,
+            key: "allOptions",
+            from: "dope_persistence_enum_option",
+            to: "dope_persistence_enum"
+        ),
         join(
             DopePersistenceEntityRecord.dopePersistence,
             key: "dopePersistence",
@@ -620,13 +632,21 @@ enum SchemaEnrollment {
 
     /// A composite's canonical request, compiled the way a multi-row fetch
     /// compiles it: `forSingleResult: false`, so a prefetch plans its children.
+    ///
+    /// The fetch runs too: compiling proves the SQL valid, and only decoding a
+    /// result set runs the composite's own `Decodable`, where a property name
+    /// colliding with a column, a prefetch key that stopped matching its
+    /// `forKey` or a drifted annotation alias actually fails.
     private static func composite<C: FetchableRecord>(
         _: C.Type,
         _ label: String,
         request: @escaping @Sendable () -> QueryInterfaceRequest<C>
     ) -> CompositeEntry {
         CompositeEntry(label: label) { db in
-            try request().makePreparedRequest(db, forSingleResult: false).statement.sql
+            let built = request()
+            let sql = try built.makePreparedRequest(db, forSingleResult: false).statement.sql
+            _ = try built.fetchAll(db)
+            return sql
         }
     }
 
@@ -636,7 +656,10 @@ enum SchemaEnrollment {
         request: @escaping @Sendable () -> QueryInterfaceRequest<V>
     ) -> CompositeEntry {
         CompositeEntry(label: label) { db in
-            try request().makePreparedRequest(db, forSingleResult: false).statement.sql
+            let built = request()
+            let sql = try built.makePreparedRequest(db, forSingleResult: false).statement.sql
+            _ = try built.fetchAll(db)
+            return sql
         }
     }
 
@@ -707,7 +730,7 @@ enum SchemaEnrollment {
         },
 
         composite(KbiteCounts.self, "KbiteCounts") { KbiteCounts.request(kbiteUuid: "k") },
-        scalarComposite("KbiteFileKeywords") { KbiteFileKeywords.request(fileUuid: "f") },
+        scalarComposite("KbiteRequests.fileKeywords") { KbiteRequests.fileKeywords(fileUuid: "f") },
         composite(KbiteResourceWithFiles.self, "KbiteResourceWithFiles") { KbiteResourceWithFiles.request() },
         composite(KbiteWithResources.self, "KbiteWithResources") { KbiteWithResources.request(code: "c") },
 

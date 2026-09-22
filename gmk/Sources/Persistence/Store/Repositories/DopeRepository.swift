@@ -407,6 +407,10 @@ struct DopeRepository: RepositoryContext {
             .filter(DopeScopeRecord.Columns.sessionUuid == sessionUuid)
             .filter(DopeScopeRecord.Columns.scopeType == scopeType.rawValue)
         if scopeType == .sessionInstanceItem {
+            // `== nil` compiles to IS NULL, which MATCHES the prompt-less rows.
+            // The retired SQL bound a nil parameter, where `= NULL` matched
+            // nothing; nil means "no candidates" and has to stay that way.
+            guard let promptUuid else { return [] }
             request = request.filter(DopeScopeRecord.Columns.promptUuid == promptUuid)
         }
         if let code {

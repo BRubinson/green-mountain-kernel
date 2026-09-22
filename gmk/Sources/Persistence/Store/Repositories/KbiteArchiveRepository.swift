@@ -55,7 +55,7 @@ struct KbiteArchiveRepository: RepositoryContext {
         head: KbiteResourceFileHead,
         anonymize: [KbitePrefixRule]
     ) throws -> KbiteExportDocument.File {
-        let keywords = try KbiteFileKeywords.request(fileUuid: head.uuid).fetchAll(db)
+        let keywords = try KbiteRequests.fileKeywords(fileUuid: head.uuid).fetchAll(db)
         let content = try KbiteResourceFileRecord.fetch(db, uuid: head.uuid)?.resourceFileContent
         return KbiteExportDocument.File(
             resourceFileName: head.resourceFileName,
