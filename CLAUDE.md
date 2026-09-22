@@ -22,6 +22,7 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 
 ### Build and tests
 - The test bundle's membership-exception list in `project.pbxproj` names files ONE BY ONE (248 today; folder entries are inert). A new file under `API/Shared/GmKernelCoreShared`, `API/Servers/GmKernelCoreServer`, `Persistence` or `GmKernelCoreClient/GmKernelClient` must be added by hand or the test bundle fails to link.
+- New files under `gmk/Tests/GmKernelTests` need no pbxproj entry (synchronized group, no exception set).
 - A folder move made behind Xcode's back DROPS every exception under the old path, silently. Dump the list first, remap, write back, assert each entry resolves on disk, re-record the count here.
 - No `TEST_HOST`: a hosted app boots a second writer inside the suite. No fallback to `~/gmfs/bin`: discovery is `GM_TEST_KERNEL_BIN` or `BUILT_PRODUCTS_DIR`, copied into a temp root.
 - `Paths.root` is one `static let` per process. Run ids must be short: `sun_path` is 104 bytes and an overrun is a listener that never binds.
@@ -75,6 +76,11 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 - Dropping an inline UNIQUE/CHECK means the 12-step table rebuild: copy `id` explicitly (FTS5 keys on rowid), recreate the AFTER triggers, keep `legacy_alter_table = ON` across renames. All three fail silently.
 - Bump `GmWireProtocol.version` (now 30) only for a new message type, a renamed field or a removed enum case. Additive optional fields never bump. `wire_keys.py` output is gated by nothing.
 - `TX_BATCH` uses a deny-list of control verbs; `checkpointTruncate` and the four-phase repo verbs refuse to compose. No session-scoped begin/commit. The in-process boundary buys no throughput.
+- `Persistence/Entities` holds exactly one `TableRecord` per table and nothing else; `Persistence/Composites` holds `FetchableRecord`+`Decodable` composites of Records with a `static request` builder each; `Persistence/Mapping` is the only place a persistence type and a wire Row meet (`func dto()`). No wire type gains a GRDB conformance and no custom `init(from:)` is written on one for the database's sake: `WireCodec` decodes the same types from JSON on the client.
+- `TableRecord` is conformed per Record in its entity file, never on `BaseRecordFields`; Records never gain `PersistableRecord`; SwiftLint `no_record_bulk_write` fences `deleteAll`/`deleteOne`/`updateAll` outside `StoreCore.swift`.
+- Every association and aggregate carries an explicit `forKey` equal to the property it decodes into (snake_case tables pluralize into illegal identifiers); a composite's root-record property must not share a name with a column of its table (GRDB resolves the column first and decodes the record out of it); nested `including(optional:/required:)` scopes inherit the parent's decoding strategy, so joined child types declare `SnakeCaseDecoded` themselves.
+- `dope_persistence_entity_property` and `diagram_connector` carry explicit `ForeignKey`; GRDB fatalErrors on ambiguous inference. Every Record, association and composite request is enrolled by hand in `SchemaEnrollmentRoster.swift` (fenced counts) or it is unverified; `ComposedReadTests` proves prefetches over the wire because an empty db cannot exercise one.
+- `withUuid`/`orderedBySeq`/`notDeleted` are `DerivableRequest` methods: spell them `Record.all().withUuid(x)`; there is no static form.
 
 ### CDE surface
 - Server key `cde`, 14 served / 11 grantable; the three `*_not_supported` tools are served so a refusal is discoverable, never granted. `rosterProblems()` is bidirectional at generation and at startup.

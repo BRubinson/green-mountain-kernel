@@ -125,7 +125,10 @@ final class ComposedReadTests: KernelBackedTestCase {
 
     /// The same fixture, handed back whole for the cases that read the resource
     /// listing itself rather than borrowing one file uuid out of it.
-    private func makeDigestedKbite(_ label: String) throws -> KbiteGetResponse {
+    private func makeDigestedKbite(
+        _ label: String,
+        files: [String] = ["notes.md"]
+    ) throws -> KbiteGetResponse {
         let code = "tk_\(label)_\(String(UUID().uuidString.prefix(6)).lowercased())"
         let maw = env.root
             .appendingPathComponent("kbites", isDirectory: true)
@@ -142,12 +145,17 @@ final class ComposedReadTests: KernelBackedTestCase {
         let axis = maw.appendingPathComponent("primary/documentation", isDirectory: true)
         let sources = axis.appendingPathComponent("demo", isDirectory: true)
         try FileManager.default.createDirectory(at: sources, withIntermediateDirectories: true)
-        try "the note body"
-            .write(
-                to: sources.appendingPathComponent("notes.md"),
-                atomically: true,
-                encoding: .utf8
-            )
+        for name in files {
+            try "the note body"
+                .write(
+                    to: sources.appendingPathComponent(name),
+                    atomically: true,
+                    encoding: .utf8
+                )
+        }
+        // The File cell is a real path and the header is canonical: a grouped
+        // row or a backticked name leaves the file index silently empty.
+        let rows = files.map { "| \($0) | md | a note |" }.joined(separator: "\n")
         try """
         # Chewed: demo
 
@@ -155,7 +163,7 @@ final class ComposedReadTests: KernelBackedTestCase {
 
         | File | Type | Description |
         |------|------|-------------|
-        | notes.md | md | a note |
+        \(rows)
 
         ## 4. Keywords
 
@@ -172,7 +180,7 @@ final class ComposedReadTests: KernelBackedTestCase {
             KbiteDigestRequest(code: code, kbiteOpenPath: maw.path),
             KbiteDigestResponse.self
         )
-        XCTAssertEqual(digest.fileCount, 1, "the chewed artifact named one file")
+        XCTAssertEqual(digest.fileCount, files.count, "the chewed artifact named \(files.count) files")
 
         return try env.send(.kbiteGet, KbiteGetRequest(code: code), KbiteGetResponse.self)
     }
@@ -651,6 +659,409 @@ final class ComposedReadTests: KernelBackedTestCase {
         XCTAssertTrue(
             unquoted.contains("resource_file_content IS NOT NULL"),
             "the child select reads the content column instead of probing it: \(prefetch)"
+        )
+    }
+
+    // MARK: - Statement budgets
+
+    /// What each composed read costs in SELECT statements, and that the cost
+    /// does not move when a second child row is written.
+    ///
+    /// The count is taken on the test-side READ-ONLY handle by issuing the
+    /// SAME request the repository issues, so what is proven is the request,
+    /// not the kernel serving the verb: the kernel is another process. Each
+    /// read is measured at one child and at two, because a budget alone
+    /// passes a prefetch that degraded into a per-child query.
+    func testComposedReadsHoldTheirStatementBudgets() throws {
+        try assertBriefingBudget()
+        try assertCarePackageBudget()
+        try assertClarifyQuestionBudget()
+        try assertArchitectureBudget()
+        try assertKbiteResourceBudget()
+        try assertSessionBudget()
+    }
+
+    /// The SELECTs one fetch issues, measured on a warmed connection.
+    ///
+    /// The fetch runs twice on the same connection: GRDB introspects a table's
+    /// schema the first time it meets it, and those `sqlite_master` reads would
+    /// otherwise land on whichever measurement ran first and break the very
+    /// comparison this exists for.
+    private func selectStatements(_ fetch: (Database) throws -> Void) throws -> [String] {
+        var captured: [String] = []
+        var capturing = false
+        try env.readOnlyDatabase()
+            .read { db in
+                db.trace { event in
+                    guard capturing, case .statement(let statement) = event else { return }
+                    let sql = statement.sql.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard sql.uppercased().hasPrefix("SELECT"),
+                        !sql.contains("sqlite_master"),
+                        !sql.contains("sqlite_schema")
+                    else { return }
+                    captured.append(sql)
+                }
+                try fetch(db)
+                capturing = true
+                try fetch(db)
+            }
+        return captured
+    }
+
+    /// Under budget with one child, and the same count with two.
+    private func assertBudget(
+        _ read: String,
+        withOneChild: Int,
+        withTwoChildren: Int,
+        budget: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertLessThanOrEqual(
+            withOneChild,
+            budget,
+            "\(read) costs \(withOneChild) statements, over its budget of \(budget)",
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            withOneChild,
+            withTwoChildren,
+            "\(read) grew \(withOneChild) → \(withTwoChildren) on a second child: "
+                + "a prefetch degraded into a per-child query",
+            file: file,
+            line: line
+        )
+    }
+
+    /// One briefing, completed with the ref set the budget is measured over.
+    private func completedBriefing(
+        promptUuid: String,
+        dopeRefs: [String],
+        kbiteFileUuid: String,
+        fileChangeUuid: String
+    ) throws -> String {
+        // "initial" is the only step the kernel knows, so a second briefing
+        // needs a second prompt rather than a second step.
+        let opened = try env.send(
+            .briefingOpen,
+            BriefingOpenRequest(promptUuid: promptUuid, briefingForStep: "initial"),
+            BriefingRowResponse.self
+        )
+        _ = try env.send(
+            .briefingComplete,
+            BriefingCompleteRequest(
+                briefingUuid: opened.briefing.uuid,
+                expectedVersion: opened.briefing.version,
+                dopeRefs: dopeRefs,
+                kbiteRefs: [kbiteFileUuid],
+                fileChangeRefs: [fileChangeUuid]
+            ),
+            BriefingRowResponse.self
+        )
+        return opened.briefing.uuid
+    }
+
+    /// BRIEFING_GET: one root and three prefetches, four statements whatever
+    /// the ref count. The read it replaced ran three queries per briefing.
+    private func assertBriefingBudget() throws {
+        let fixture = try makeFixture("bbud")
+        let kbiteFileUuid = try makeKbiteFileUuid("bbud")
+        let first = try makePrompt(fixture.context.sessionUuid, "briefing budget one")
+        let second = try makePrompt(fixture.context.sessionUuid, "briefing budget two")
+        let firstChange = try makeFileChange(fixture, promptUuid: first.uuid)
+        let secondChange = try makeFileChange(fixture, promptUuid: second.uuid)
+
+        let one = try completedBriefing(
+            promptUuid: first.uuid,
+            dopeRefs: ["agentics.agent_briefing.status"],
+            kbiteFileUuid: kbiteFileUuid,
+            fileChangeUuid: firstChange.fileChangeUuid
+        )
+        let two = try completedBriefing(
+            promptUuid: second.uuid,
+            dopeRefs: ["agentics.agent_briefing.status", "agentics.care_package.status"],
+            kbiteFileUuid: kbiteFileUuid,
+            fileChangeUuid: secondChange.fileChangeUuid
+        )
+
+        let counts = try [one, two]
+            .map { uuid -> Int in
+                try selectStatements { db in
+                    _ =
+                        try AgentBriefingWithRefs.request()
+                        .filter(AgentBriefingRecord.Columns.uuid == uuid)
+                        .order(
+                            AgentBriefingRecord.Columns.briefingForStep,
+                            AgentBriefingRecord.Columns.createdAt
+                        )
+                        .fetchAll(db)
+                }
+                .count
+            }
+        assertBudget(
+            "BRIEFING_GET",
+            withOneChild: counts[0],
+            withTwoChildren: counts[1],
+            budget: 4
+        )
+    }
+
+    /// CARE_PACKAGE_GET: ONE request, four statements — a root and its three
+    /// ref classes. The plan's "4 → 1" counts requests, not statements; the
+    /// win is that neither number moves with the ref count.
+    private func assertCarePackageBudget() throws {
+        let fixture = try makeFixture("pbud")
+        let prompt = try makePrompt(fixture.context.sessionUuid, "care package budget")
+        let kbiteFileUuid = try makeKbiteFileUuid("pbud")
+
+        let summary =
+            try env.send(
+                .clarifyOpen,
+                ClarifyOpenRequest(promptUuid: prompt.uuid),
+                ClarifySummaryResponse.self
+            )
+            .summary
+        let opened = try env.send(
+            .carePackageOpen,
+            CarePackageOpenRequest(summaryUuid: summary.uuid),
+            CarePackageResponse.self
+        )
+        let packageUuid = opened.package.uuid
+        _ = try addOneRefOfEachKind(packageUuid: packageUuid, kbiteFileUuid: kbiteFileUuid)
+
+        let read: (Database) throws -> Void = { db in
+            _ =
+                try CarePackageWithRefs.request()
+                .filter(CarePackageRecord.Columns.uuid == packageUuid)
+                .fetchOne(db)
+        }
+        let withOne = try selectStatements(read).count
+        _ = try env.send(
+            .carePackageRefAdd,
+            CarePackageRefAddRequest(
+                packageUuid: packageUuid,
+                kind: .dope,
+                dopeCode: "agentics.care_package.status",
+                note: "the second dope child"
+            ),
+            CarePackageResponse.self
+        )
+        let withTwo = try selectStatements(read).count
+        assertBudget(
+            "CARE_PACKAGE_GET",
+            withOneChild: withOne,
+            withTwoChildren: withTwo,
+            budget: 4
+        )
+    }
+
+    /// CLARIFY_GET questions: the composite's two statements plus one batched
+    /// pass over the answer junction, grouped in memory. Three whatever the
+    /// question and option counts.
+    private func assertClarifyQuestionBudget() throws {
+        let fixture = try makeFixture("qbud")
+        let prompt = try makePrompt(fixture.context.sessionUuid, "clarify budget")
+        let opened = try env.send(
+            .clarifyOpen,
+            ClarifyOpenRequest(promptUuid: prompt.uuid),
+            ClarifySummaryResponse.self
+        )
+        let summaryUuid = opened.summary.uuid
+        _ = try env.send(
+            .clarifyQuestionAdd,
+            ClarifyQuestionAddRequest(
+                summaryUuid: summaryUuid,
+                question: "one option?",
+                options: ["only"]
+            ),
+            ClarifyQuestionRowResponse.self
+        )
+
+        let read: (Database) throws -> Void = { db in
+            let questions =
+                try ClarificationQuestionWithOptions.request()
+                .filter(
+                    UserClarificationQuestionRecord.Columns.clarificationSummaryUuid == summaryUuid
+                )
+                .fetchAll(db)
+            guard !questions.isEmpty else { return }
+            _ =
+                try UserClarificationAnswerRecord
+                .filter(
+                    questions.map(\.questionRow.uuid)
+                        .contains(UserClarificationAnswerRecord.Columns.questionUuid)
+                )
+                .order(Column("id"))
+                .fetchAll(db)
+        }
+        let withOne = try selectStatements(read).count
+        _ = try env.send(
+            .clarifyQuestionAdd,
+            ClarifyQuestionAddRequest(
+                summaryUuid: summaryUuid,
+                question: "two options?",
+                options: ["alpha", "beta"]
+            ),
+            ClarifyQuestionRowResponse.self
+        )
+        let withTwo = try selectStatements(read).count
+        assertBudget(
+            "CLARIFY_GET questions",
+            withOneChild: withOne,
+            withTwoChildren: withTwo,
+            budget: 3
+        )
+    }
+
+    /// ARCH_GET persistence changes: the changes and their fields, two
+    /// statements whatever the field count.
+    private func assertArchitectureBudget() throws {
+        let fixture = try makeFixture("abud")
+        let prompt = try makePrompt(fixture.context.sessionUuid, "architecture budget")
+        let opened = try env.send(
+            .archOpen,
+            ArchOpenRequest(promptUuid: prompt.uuid),
+            ArchSummaryResponse.self
+        )
+        let summaryUuid = opened.summary.uuid
+        let change = try env.send(
+            .archPersistAdd,
+            ArchPersistAddRequest(
+                summaryUuid: summaryUuid,
+                className: "BudgetRecord",
+                filePath: "Sources/Persistence/Entities/BudgetRecord.swift",
+                reasonBrief: "one change, measured at one field and at two"
+            ),
+            ArchPersistAddResponse.self
+        )
+        try addArchField(changeUuid: change.change.uuid, named: "first_field")
+
+        let read: (Database) throws -> Void = { db in
+            _ =
+                try ArchPersistenceChangeWithFields.request()
+                .filter(
+                    ArchitecturePersistenceChangeRecord.Columns.architectureSummaryUuid
+                        == summaryUuid
+                )
+                .fetchAll(db)
+        }
+        let withOne = try selectStatements(read).count
+        try addArchField(changeUuid: change.change.uuid, named: "second_field")
+        let withTwo = try selectStatements(read).count
+        assertBudget(
+            "ARCH_GET persistence changes",
+            withOneChild: withOne,
+            withTwoChildren: withTwo,
+            budget: 2
+        )
+    }
+
+    private func addArchField(changeUuid: String, named: String) throws {
+        _ = try env.send(
+            .archFieldAdd,
+            ArchFieldAddRequest(
+                persistenceChangeUuid: changeUuid,
+                fieldName: named,
+                dataType: "TEXT",
+                changeReason: "the budget needs a child",
+                changePurpose: "decoded by the prefetch",
+                nullable: false
+            ),
+            ArchFieldAddResponse.self
+        )
+    }
+
+    /// KBITE_GET resources: the resources and their projected file heads, two
+    /// statements whatever the file count.
+    private func assertKbiteResourceBudget() throws {
+        let one = try makeDigestedKbite("kbud1")
+        let two = try makeDigestedKbite("kbud2", files: ["notes.md", "other.md"])
+        XCTAssertEqual(
+            two.resources.first?.files.count,
+            2,
+            "the two-file fixture digested one file, so the comparison proves nothing"
+        )
+
+        let counts = try [one, two]
+            .map { kbite -> Int in
+                let kbiteUuid = kbite.kbite.uuid
+                return try selectStatements { db in
+                    _ =
+                        try KbiteResourceWithFiles.request()
+                        .filter(Column("kbite_uuid") == kbiteUuid)
+                        .order(Column("resource_name"))
+                        .fetchAll(db)
+                }
+                .count
+            }
+        assertBudget(
+            "KBITE_GET resources",
+            withOneChild: counts[0],
+            withTwoChildren: counts[1],
+            budget: 2
+        )
+    }
+
+    /// SESSION_GET's session row: ONE request, two statements — the row and
+    /// its activation registry. The plan's "2 → 1" counts requests.
+    private func assertSessionBudget() throws {
+        let fixture = try makeFixture("sbud")
+        let sessionUuid = fixture.context.sessionUuid
+        let first = try makePrompt(sessionUuid, "session budget one")
+        let second = try makePrompt(sessionUuid, "session budget two")
+        try claimActivation(sessionUuid: sessionUuid, promptUuid: first.uuid, clientKey: "t_c8_one")
+
+        let read: (Database) throws -> Void = { db in
+            _ = try SessionWithActivations.request().withUuid(sessionUuid).fetchOne(db)
+        }
+        let withOne = try selectStatements(read).count
+        try claimActivation(sessionUuid: sessionUuid, promptUuid: second.uuid, clientKey: "t_c8_two")
+        let withTwo = try selectStatements(read).count
+
+        let activations = try env.readOnlyDatabase()
+            .read { db in
+                try SessionWithActivations.request()
+                    .withUuid(sessionUuid)
+                    .fetchOne(db)?
+                    .activations.count ?? 0
+            }
+        XCTAssertEqual(
+            activations,
+            2,
+            "the fixture holds \(activations) claims, so the second measurement is not a second child"
+        )
+        assertBudget(
+            "SESSION_GET session row",
+            withOneChild: withOne,
+            withTwoChildren: withTwo,
+            budget: 2
+        )
+    }
+
+    /// One activation claim. The key is not a `claude:pid:start` triple, so
+    /// the liveness sweep treats it as alive and leaves it in place.
+    private func claimActivation(
+        sessionUuid: String,
+        promptUuid: String,
+        clientKey: String
+    ) throws {
+        let session =
+            try env.send(
+                .sessionGet,
+                SessionGetRequest(sessionUuid: sessionUuid),
+                SessionGetResponse.self
+            )
+            .session
+        _ = try env.send(
+            .sessionUpdate,
+            SessionUpdateRequest(
+                sessionUuid: sessionUuid,
+                expectedVersion: session.version,
+                activePromptUuid: promptUuid,
+                clientKey: clientKey
+            ),
+            SessionRow.self
         )
     }
 }
