@@ -18,7 +18,19 @@ enum StatusHandler {
         startedAt: String,
         startedDate: Date
     ) throws -> HandlerResult {
-        let response = StatusResponse(
+        try okResult(.status, head, response(store: store, startedAt: startedAt, startedDate: startedDate))
+    }
+
+    /// Builds the status payload; the one composition both the STATUS verb and in-process hosts use.
+    ///
+    /// - Parameters:
+    ///   - store: The persistence store.
+    ///   - startedAt: ISO-8601 timestamp of daemon startup.
+    ///   - startedDate: The Date object for startup time.
+    /// - Returns: The daemon status response.
+    /// - Throws: Persistence errors from the schema, count or event-id reads.
+    static func response(store: Store, startedAt: String, startedDate: Date) throws -> StatusResponse {
+        StatusResponse(
             daemonPid: getpid(),
             protocolVersion: GmWireProtocol.version,
             socketPath: Paths.socket.path,
@@ -35,6 +47,5 @@ enum StatusHandler {
             writerRole: KernelVitalsSource.writerRole,
             writerBundlePath: KernelVitalsSource.writerBundlePath
         )
-        return try okResult(.status, head, response)
     }
 }

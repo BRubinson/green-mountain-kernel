@@ -1,13 +1,10 @@
 import Foundation
 import Observation
 
-/// App-wide daemon liveness plus the single event subscription.
+/// App-wide kernel health for the process that hosts it.
 ///
-/// Health comes from the probe (STATUS + PING with autostart off), never from the subscription
-/// alone: a quiet healthy stream is indistinguishable from a hung one, so event consumption is
-/// raced against a 30s status watchdog. The loop probes, consumes events until the stream
-/// drops, then re-probes; nothing here autostarts. DAEMON_START is unreceivable while down, so
-/// green is re-inferred from the next successful probe.
+/// Health is up once the store is installed; there is nothing to probe. Events arrive from the
+/// store's post-commit fan-out via routeInProcess; vitals are sampled from the process.
 @Observable @MainActor
 final class DaemonConnectionModel {
     enum Health: Equatable {
@@ -23,7 +20,8 @@ final class DaemonConnectionModel {
 
     private(set) var health: Health = .unknown
     private(set) var status: StatusResponse?
-    private(set) var ping: PingResponse?
+    /// Process vitals sampled locally; nil until the first sample.
+    private(set) var vitals: KernelVitalsReport?
     /// Bumped on every down→up transition and on a capped replay (resync barrier).
     private(set) var generation = 0
 
@@ -39,10 +37,8 @@ final class DaemonConnectionModel {
 
     /// True when THIS process won arbitration and hosts the kernel in-process.
     ///
-    /// Set once by GMVibesServices during its init, before the supervising
-    /// loop's first turn. The on-disk binary check is meaningless in that mode:
-    /// there is no binary to exec, and the store is already open in this
-    /// address space.
+    /// Set once by GMVibesServices during its init. It is the only mode the
+    /// app runs in; a second copy alerts and quits before reaching here.
     var hostsKernelInProcess = false
 
     /// Live session scopes register their prompt uuids so prompt-subject events
@@ -52,35 +48,21 @@ final class DaemonConnectionModel {
     /// routing for a successor scope on the same session.
     private var sessionPrompts: [String: (owner: ObjectIdentifier, prompts: Set<String>)] = [:]
 
-    private let service = GMCCDaemonService.shared
+    /// Kernel start, approximated by model creation: the store installs in the same launch.
+    let startedAt = Date()
+
     private var runTask: Task<Void, Never>?
-    private var probeInFlight = false
-    /// Sticky across probe failures so an intentional `gm daemon stop` keeps
-    /// reading "daemon stopped" instead of a raw socket error from the next
-    /// failed probe.
-    private var intentionalStop = false
 
-    private static let cursorKey = "gmvibes.daemon.lastEventId"
-    private static let cursorStampKey = "gmvibes.daemon.lastEventStamp"
-    /// Replay is served on the daemon's single serial queue; a cursor older
-    /// than this replays a backlog to learn what one resync refetch tells us.
-    private static let cursorMaxAge: TimeInterval = 3600
-    /// Stamp-guard: the cursor timestamp advances only when the id actually
-    /// moved, so a quiet reconnect can't keep refreshing a dead cursor's age.
-    private var lastPersistedCursor: Int64 = 0
-
-    // App-lifetime singleton — the supervising task runs until process exit.
-    // Weak capture so a discarded instance (SwiftUI can re-evaluate app @State)
-    // doesn't leak a probe loop + socket forever.
-    /// Creates a connection model that manages daemon communication.
+    /// Creates the kernel health model and, when asked, its vitals sampler.
     ///
-    /// - Parameter autorun: Whether to start the probe loop immediately; defaults to true.
+    /// - Parameter autorun: Whether to start the 30s vitals sampler immediately; defaults to true.
     init(autorun: Bool = true) {
         if autorun {
             runTask = Task { [weak self] in
                 while !Task.isCancelled {
                     guard let self else { return }
-                    await self.iterate()
+                    self.sampleVitals()
+                    try? await Task.sleep(for: .seconds(30))
                 }
             }
         }
@@ -120,197 +102,40 @@ final class DaemonConnectionModel {
         sessionPrompts.first { $0.value.prompts.contains(uuid) }?.key
     }
 
-    // MARK: - Supervising loop
+    // MARK: - Kernel lifecycle
 
-    /// Performs one supervision loop turn.
-    ///
-    /// Gates on installation, probes for daemon status, and while running consumes
-    /// events raced against the 30s liveness watchdog. Backs off when the subscribe
-    /// path fails fast to prevent hammering a broken daemon.
-    ///
-    /// - Throws: Any error from probing or event consumption.
-    private var fastFailureBackoff: Duration = .seconds(1)
-
-    /// Performs one supervision loop turn.
-    ///
-    /// Gates on installation, probes for daemon status, and while running consumes
-    /// events raced against the 30s liveness watchdog.
-    private func iterate() async {
-        guard hostsKernelInProcess || GMCCDaemonService.isInstalled else {
-            setHealth(.notInstalled)
-            try? await Task.sleep(for: .seconds(5))
-            return
-        }
-        await probe()
-        guard health == .up else {
-            try? await Task.sleep(for: .seconds(2))
-            return
-        }
-        let started = ContinuousClock.now
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask { await self.consumeEvents() }
-            group.addTask {
-                // App-wide 30s liveness watchdog (replaces per-view confirming
-                // polls): a wedged-but-connected daemon fails this probe and
-                // goes red even though the stream never drops.
-                while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(30))
-                    if Task.isCancelled { break }
-                    await self.probe()
-                }
-            }
-            await group.next()  // consumeEvents ended; the watchdog never returns
-            group.cancelAll()
-        }
-        if ContinuousClock.now - started < .seconds(2) {
-            try? await Task.sleep(for: fastFailureBackoff)
-            fastFailureBackoff = min(fastFailureBackoff * 2, .seconds(10))
-        } else {
-            fastFailureBackoff = .seconds(1)
-        }
+    /// Marks the in-process kernel up once its store is installed and resyncs every surface.
+    func markKernelHosted() {
+        setHealth(.up)
+        generation += 1
+        hub.invalidateAll()
+        sampleVitals()
     }
 
-    /// Single-flight STATUS+PING probe.
+    /// Marks the in-process kernel down because hosting it failed.
     ///
-    /// Publishes change-gated; bumps the resync generation only on a genuine
-    /// down→up transition.
-    func probe() async {
-        if probeInFlight { return }
-        probeInFlight = true
-        defer { probeInFlight = false }
-        do {
-            let newStatus = try await service.status()
-            let newPing = try await service.ping()
-            if status != newStatus { status = newStatus }
-            if ping != newPing { ping = newPing }
-            intentionalStop = false
-            let wasUp = health == .up
-            setHealth(.up)
-            if !wasUp {
-                generation += 1
-                hub.invalidateAll()
-            }
-        } catch let error as DaemonError {
-            switch error {
-            case .notInstalled:
-                setHealth(.notInstalled)
-            case .clientTooOld(let daemonVersion):
-                setHealth(.incompatible(daemonVersion: daemonVersion))
-            default:
-                setHealth(
-                    .down(
-                        reason: intentionalStop ? "Daemon stopped" : error.userMessage,
-                        intentional: intentionalStop
-                    )
-                )
-            }
-        } catch {
-            setHealth(
-                .down(
-                    reason: intentionalStop ? "Daemon stopped" : String(describing: error),
-                    intentional: intentionalStop
-                )
-            )
-        }
+    /// - Parameter reason: The failure shown to the user.
+    func markKernelFailed(_ reason: String) {
+        setHealth(.down(reason: reason, intentional: false))
     }
 
-    /// Refreshes daemon status and triggers resync on down-to-up transition.
-    ///
-    /// Alias for probe that updates status, ping, and health.
-    func refreshStatus() async {
-        await probe()
-    }
-
-    /// Starts the daemon process.
-    ///
-    /// Sets health status and probes for connection after starting.
-    func startDaemon() async {
-        setHealth(.starting)
-        intentionalStop = false
-        do {
-            _ = try await service.startDaemon()
-            await probe()
-        } catch let error as DaemonError {
-            switch error {
-            case .notInstalled:
-                setHealth(.notInstalled)
-            case .clientTooOld(let daemonVersion):
-                setHealth(.incompatible(daemonVersion: daemonVersion))
-            default:
-                setHealth(.down(reason: error.userMessage, intentional: false))
-            }
-        } catch {
-            setHealth(.down(reason: String(describing: error), intentional: false))
-        }
-    }
-
-    // MARK: - Event consumption
-
-    /// Consumes events from the daemon until disconnection or cancellation.
-    ///
-    /// Manages cursor replay and fresh subscriptions to avoid re-consuming events.
-    private func consumeEvents() async {
-        // Cursor policy: bounded replay. Resume from the persisted cursor only
-        // when it is fresh AND not ahead of the daemon's event log (a db
-        // re-baseline restarts event ids at 1 — replaying above the log head
-        // would silently match nothing forever). Otherwise subscribe live;
-        // the up-transition's invalidateAll() already resynced surfaces.
-        var sinceId: Int64?
-        let defaults = UserDefaults.standard
-        if let stored = (defaults.object(forKey: Self.cursorKey) as? NSNumber)?.int64Value, stored > 0 {
-            lastPersistedCursor = max(lastPersistedCursor, stored)
-            let stamp = defaults.object(forKey: Self.cursorStampKey) as? Date ?? .distantPast
-            let logHead = status?.lastEventId ?? 0
-            if Date().timeIntervalSince(stamp) < Self.cursorMaxAge, stored <= logHead {
-                sinceId = stored
-            }
-        }
-
-        // The subscription's autostart parameter DEFAULTS TO TRUE; left at the
-        // default, the reconnect loop would resurrect a daemon the user killed
-        // and the red indicator would silently self-heal.
-        let subscription = DaemonEventSubscription(
-            sinceId: sinceId,
-            clientName: "gmvibes-events",
-            autostart: false
+    /// Samples uptime, resident memory and CPU from this process into `vitals`.
+    func sampleVitals() {
+        let report = KernelVitalsReport(
+            uptimeSeconds: Int(Date().timeIntervalSince(startedAt)),
+            residentMemoryBytes: KernelVitalsSource.residentMemoryBytes(),
+            cpuPercent: KernelVitalsSource.cpuPercent()
         )
-        var trailingStop = false
-        var checkedReplayCap = false
-        var eventsSincePersist = 0
-        do {
-            for try await event in subscription.events() {
-                if Task.isCancelled { break }
-                if !checkedReplayCap {
-                    checkedReplayCap = true
-                    if subscription.replayCapped {
-                        // Events between the replayed prefix and the ack horizon
-                        // were dropped by the cap — resync rather than trusting a
-                        // gapped stream.
-                        generation += 1
-                        hub.invalidateAll()
-                    }
-                }
-                // Only a DAEMON_STOP immediately before the stream ends means an
-                // intentional shutdown; a replayed historical one must not stick.
-                trailingStop = (event.kind == DaemonEventKind.daemonStop.rawValue)
-                route(event)
-                eventsSincePersist += 1
-                if eventsSincePersist >= 50 {
-                    persistCursor(subscription.lastEventId)
-                    eventsSincePersist = 0
-                }
-            }
-        } catch {
-            // Stream drop — the supervising loop re-probes and reports health.
-        }
-        persistCursor(subscription.lastEventId)
-        if trailingStop {
-            intentionalStop = true
-            setHealth(.down(reason: "Daemon stopped", intentional: true))
-        } else if !Task.isCancelled && health == .up {
-            setHealth(.down(reason: "Event stream ended", intentional: false))
-        }
+        if vitals != report { vitals = report }
     }
+
+    /// Reads the store's status snapshot (table counts, last event id) on demand.
+    func refreshStatus() async {
+        let newStatus = try? await GMCCDaemonService.shared.status()
+        if status != newStatus { status = newStatus }
+    }
+
+    // MARK: - Event routing
 
     /// The uuid carriers in hand-built event payloads.
     ///
@@ -346,10 +171,9 @@ final class DaemonConnectionModel {
         let currentSessionCode: String?
     }
 
-    /// Routes an in-process event from the daemon.
+    /// Routes an in-process event from the kernel this app hosts.
     ///
-    /// When this app hosts the writer, the store's post-commit fan-out delivers events
-    /// here; in client mode they arrive over the socket. The caller must already be on
+    /// The store's post-commit fan-out delivers events here. The caller must already be on
     /// MainActor since the fan-out fires on the writer thread inside the commit hook.
     ///
     /// - Parameter event: The event notification to route.
@@ -535,22 +359,10 @@ final class DaemonConnectionModel {
 
     // MARK: - Helpers
 
-    /// Persists the event cursor to defaults if newer than previous.
-    ///
-    /// - Parameter id: The event identifier to persist.
-    private func persistCursor(_ id: Int64) {
-        guard id > 0, id > lastPersistedCursor else { return }
-        lastPersistedCursor = id
-        let defaults = UserDefaults.standard
-        defaults.set(id, forKey: Self.cursorKey)
-        defaults.set(Date(), forKey: Self.cursorStampKey)
-    }
-
     /// Updates the health status if changed.
     ///
     /// - Parameter new: The new health status.
     private func setHealth(_ new: Health) {
         if health != new { health = new }
     }
-
 }

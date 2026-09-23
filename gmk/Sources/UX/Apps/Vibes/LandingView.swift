@@ -382,13 +382,6 @@ private struct DaemonGateState: View {
             case .notInstalled:
                 CommandCopyRow(command: Self.remediationCommand)
                     .frame(maxWidth: 480)
-            case .down:
-                Button {
-                    Task { await daemon.startDaemon() }
-                } label: {
-                    Label("Start daemon", systemImage: "play.fill")
-                }
-                .buttonStyle(.glass)
             default:
                 EmptyView()
             }

@@ -18,7 +18,6 @@ struct DaemonStatusPopover: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(4)
-                startButton
             case .notInstalled:
                 // Resolved, never a literal: with three environments a hardcoded root in a
                 // diagnostic is a wrong answer. A declared test/beta root is staged from a
@@ -83,15 +82,19 @@ struct DaemonStatusPopover: View {
     @ViewBuilder
     private var detailRows: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 4) {
+            if let vitals = daemon.vitals {
+                row("Uptime", vitals.uptimeSeconds.map(Self.formatUptime) ?? "—")
+                row("Memory", vitals.residentMemoryBytes.map(KernelVitals.formatBytes) ?? "—")
+                row("CPU", vitals.cpuPercent.map(KernelVitals.formatPercent) ?? "—")
+            }
+            row("Protocol", "v\(GmWireProtocol.version)")
             if let status = daemon.status {
                 row("PID", "\(status.daemonPid)")
-                row("Protocol", "v\(status.protocolVersion)")
                 row("Schema", "v\(status.schemaVersion)")
-                row("Uptime", Self.formatUptime(status.uptimeSeconds))
+                row("Last event", "\(status.lastEventId)")
             }
-            if let ping = daemon.ping {
-                row("Build", "\(ping.buildSha) · \(ping.buildDate)")
-            }
+            row("Build", "\(BuildInfo.sha) · \(BuildInfo.date)")
+            row("Root", Paths.root.path)
         }
         .font(.caption.monospaced())
 
@@ -122,16 +125,6 @@ struct DaemonStatusPopover: View {
             Text(label).foregroundStyle(.secondary)
             Text(value)
         }
-    }
-
-    private var startButton: some View {
-        Button {
-            Task { await daemon.startDaemon() }
-        } label: {
-            Label("Start daemon", systemImage: "play.fill")
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
     }
 
     /// Formats uptime in seconds as a human-readable string.

@@ -1,8 +1,8 @@
 import Foundation
 
-/// App-facing typed error surface.
+/// App-facing typed error surface for errors from the in-process Store.
 ///
-/// Views and stores branch on these cases — never on message text — per the daemon's typed-code contract.
+/// Views and stores branch on these cases — never on message text — per the kernel's typed-code contract.
 nonisolated enum DaemonError: Error, Equatable {
     /// Binary absent at `Paths.binDaemon` — the RESOLVED root's `bin/gm_daemon`,
     /// which is `~/gmfs` only for production. Distinct from a stopped daemon.
@@ -53,43 +53,33 @@ nonisolated enum DaemonError: Error, Equatable {
         }
     }
 
-    /// Converts any error to a daemon error, wrapping if necessary.
+    /// Converts any error from the in-process Store to a daemon error.
+    ///
+    /// Codes not given their own case keep the wire code the kernel would send for them.
+    ///
     /// - Parameter error: The error to convert.
     init(_ error: Error) {
         if let already = error as? DaemonError {
             self = already
             return
         }
-        guard let clientError = error as? DaemonClientError else {
+        guard let storeError = error as? StoreError else {
             self = .transport(String(describing: error))
             return
         }
-        switch clientError {
-        case .unreachable(let message):
-            // "Never installed" and "installed but stopped" are different UI
-            // states; classify before reporting unreachable.
-            if FileManager.default.isExecutableFile(atPath: Paths.binDaemon.path) {
-                self = .unreachable(message)
-            } else {
-                self = .notInstalled
-            }
-        case .protocolMismatch(let message, let daemonVersion):
-            if let daemonVersion, daemonVersion >= GmWireProtocol.version {
-                self = .clientTooOld(daemonVersion: daemonVersion)
-            } else {
-                self = .daemonTooOld(daemonVersion: daemonVersion, message: message)
-            }
-        case .server(let payload):
-            switch payload.code {
-            case .notFound: self = .notFound
-            case .summaryAbsent: self = .summaryAbsent
-            case .versionConflict: self = .versionConflict
-            case .invalidTransition: self = .invalidTransition(reason: payload.message.isEmpty ? nil : payload.message)
-            case .contentLocked: self = .contentLocked
-            default: self = .server(code: payload.codeRaw, message: payload.message)
-            }
-        case .wire(let message):
-            self = .transport(message)
+        switch storeError {
+        case .notFound: self = .notFound
+        case .summaryAbsent: self = .summaryAbsent
+        case .versionConflict, .revisionConflict: self = .versionConflict
+        case .invalidTransition, .invalidEntityTransition:
+            // The wire carried the whole payload message (edge plus reason), and the
+            // views render it verbatim; the bare reason alone would lose the edge.
+            let message = storeError.errorPayload.message
+            self = .invalidTransition(reason: message.isEmpty ? nil : message)
+        case .contentLocked: self = .contentLocked
+        default:
+            let payload = storeError.errorPayload
+            self = .server(code: payload.codeRaw, message: payload.message)
         }
     }
 }

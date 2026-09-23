@@ -73,6 +73,23 @@ final class KernelServices {
         })
     }
 
+    /// The STATUS answer read in-process, built by the same code the STATUS verb uses.
+    ///
+    /// - Returns: The daemon status response.
+    /// - Throws: Persistence errors from the schema, count or event-id reads.
+    func status() throws -> StatusResponse {
+        try server.statusResponse()
+    }
+
+    /// The STATUS read as a closure the app's service actor can hold across its queue hop.
+    ///
+    /// Captures only the server, which is Sendable; this type is not, so it never crosses the
+    /// actor boundary itself.
+    var statusBuilder: @Sendable () throws -> StatusResponse {
+        let server = self.server
+        return { try server.statusResponse() }
+    }
+
     /// Stops serving and closes the database in the correct order.
     ///
     /// Cancels the listener, unsubscribes from post-commit events, records DAEMON_STOP

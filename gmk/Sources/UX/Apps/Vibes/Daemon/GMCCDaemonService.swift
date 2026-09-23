@@ -1,83 +1,80 @@
 import Foundation
 
-/// The single off-main boundary for all daemon verb traffic.
+/// The single off-main boundary for all kernel traffic.
 ///
-/// Both transports conform to `GmVerbCaller`, so `adopt(inProcess:)` swaps the socket for the
-/// in-process caller without touching a wrapper here or any UI source behind it.
-/// The queue is load-bearing on BOTH: `DaemonClient` is blocking POSIX I/O, and in-process the
-/// verb layer is SYNCHRONOUS, so handler, store boundary and SQLite write would run on the
-/// caller's turn and stall MainActor. The probe client has autostart OFF so health checks
-/// report true daemon state; `startDaemon()` is the app's only autostart path.
+/// The kernel lives in this process, so calls go to the Store's facades directly; the queue is
+/// load-bearing because the store boundary is synchronous.
 actor GMCCDaemonService {
     static let shared = GMCCDaemonService()
 
-    /// The socket transport.
+    /// What the kernel hands over: the store every data call goes through, and the STATUS read.
     ///
-    /// Non-nil in CLIENT mode only — in-process there is no file descriptor,
-    /// so there is nothing to redial and nothing to close. ONE object,
-    /// referenced twice: `caller` is what verbs go through and `socketClient`
-    /// is what the redial guard needs. Constructing two would give the app two
-    /// connections and make the guard clear a descriptor the failing call never
-    /// used.
-    private var socketClient: DaemonClient?
-    private var caller: any GmVerbCaller
+    /// Both halves are Sendable, so they cross into this actor without the kernel services
+    /// object, which is not.
+    private struct Installed: Sendable {
+        let store: Store
+        let status: @Sendable () throws -> StatusResponse
+    }
+
+    private var installed: Installed?
+    private var failure: Error?
+    private var waiters: [CheckedContinuation<Installed, Error>] = []
     private let queue = DispatchQueue(label: "gmvibes.daemon.client", qos: .userInitiated)
 
-    /// Creates a daemon service with a socket transport client.
-    init() {
-        let client = DaemonClient(clientName: "gmvibes", autostart: false)
-        self.socketClient = client
-        self.caller = client
+    /// Creates a service with no kernel installed; calls wait until `install` runs.
+    init() {}
+
+    /// Installs the in-process kernel and releases every call waiting for it.
+    ///
+    /// - Parameters:
+    ///   - store: The store this process opened.
+    ///   - status: The STATUS read, built by the same code the STATUS verb uses.
+    func install(store: Store, status: @escaping @Sendable () throws -> StatusResponse) {
+        let kernel = Installed(store: store, status: status)
+        installed = kernel
+        let pending = waiters
+        waiters = []
+        for waiter in pending { waiter.resume(returning: kernel) }
     }
 
-    /// Switch to the in-process transport.
+    /// Records that the kernel failed to start and fails every call waiting for it.
     ///
-    /// Called ONCE, by `GMVibesServices`, after arbitration finds this process
-    /// holds the store. Adoption rather than injection at init because `shared`
-    /// is a static singleton built eagerly, while arbitration happens later
-    /// inside `App.init()`. A second call is a bug — two adoptions means two
-    /// arbitrations, which means something ran the ownership dance twice.
-    ///
-    /// - Parameter newCaller: The in-process caller to replace the socket client.
-    func adopt(inProcess newCaller: any GmVerbCaller) {
-        assert(socketClient != nil, "adopt(inProcess:) called twice")
-        socketClient?.close()
-        socketClient = nil
-        caller = newCaller
+    /// - Parameter failure: The error that prevented the kernel from starting.
+    func install(failure: Error) {
+        self.failure = failure
+        let pending = waiters
+        waiters = []
+        for waiter in pending {
+            waiter.resume(throwing: DaemonError.unreachable(String(describing: failure)))
+        }
     }
 
-    nonisolated static var isInstalled: Bool {
-        FileManager.default.isExecutableFile(atPath: Paths.binDaemon.path)
+    /// Returns the installed kernel, suspending until `install` runs if it has not yet.
+    ///
+    /// - Returns: The installed store and status read.
+    /// - Throws: `DaemonError.unreachable` when the kernel failed to start.
+    private func installedKernel() async throws -> Installed {
+        if let installed { return installed }
+        if let failure { throw DaemonError.unreachable(String(describing: failure)) }
+        return try await withCheckedThrowingContinuation { waiters.append($0) }
     }
 
-    /// Executes a verb body on the dispatch queue with error recovery.
+    /// Runs a Store facade call on the service queue.
     ///
-    /// On transport failure, closes the socket client to force redialing on the next call.
-    /// - Parameter body: A closure that executes a verb call on the caller.
-    /// - Returns: The result of the verb execution.
-    /// - Throws: `DaemonError` wrapping any error from the verb body.
+    /// The store boundary is synchronous, so running it on the caller's turn would stall MainActor.
+    ///
+    /// - Parameter body: A closure that calls a facade on the Store.
+    /// - Returns: The facade's result.
+    /// - Throws: `DaemonError` wrapping any error from the body or kernel installation.
     private func perform<T: Sendable>(
-        _ body: @escaping @Sendable (any GmVerbCaller) throws -> T
+        _ body: @escaping @Sendable (Store) throws -> T
     ) async throws -> T {
-        try await withCheckedThrowingContinuation { continuation in
-            queue.async { [caller, socketClient] in
+        let store = try await installedKernel().store
+        return try await withCheckedThrowingContinuation { continuation in
+            queue.async {
                 do {
-                    continuation.resume(returning: try body(caller))
+                    continuation.resume(returning: try body(store))
                 } catch {
-                    // A transport-level failure leaves a dead fd cached inside
-                    // DaemonClient (nothing closes it on a thrown roundTrip),
-                    // and the next call would skip redialing forever. Force a
-                    // fresh dial; a server-reported domain error means the
-                    // connection itself is healthy.
-                    //
-                    // Guarded on the SOCKET client: in-process there is no fd
-                    // to go stale, and `GmVerbCaller` has no `close()`.
-                    if let socketClient, let clientError = error as? DaemonClientError {
-                        switch clientError {
-                        case .wire, .unreachable, .protocolMismatch: socketClient.close()
-                        case .server: break
-                        }
-                    }
                     continuation.resume(throwing: DaemonError(error))
                 }
             }
@@ -86,35 +83,19 @@ actor GMCCDaemonService {
 
     // MARK: - Infra
 
-    /// Pings the daemon to check connectivity.
-    /// - Returns: The ping response.
-    /// - Throws: `DaemonError` on connection failure.
-    func ping() async throws -> PingResponse { try await perform { try $0.ping() } }
-
-    /// Fetches the daemon's current status.
-    /// - Returns: The status response.
-    /// - Throws: `DaemonError` on connection failure.
-    func status() async throws -> StatusResponse { try await perform { try $0.status() } }
-
-    /// Spawns the daemon or returns its local ping status.
+    /// Fetches the kernel's current status.
     ///
-    /// The only call site permitted to spawn the daemon. In writer mode, returns a local
-    /// ping result instead since the daemon is already running in this process.
-    /// - Returns: The ping response from the launched or local daemon.
-    /// - Throws: `DaemonError` on connection or spawn failure.
-    func startDaemon() async throws -> PingResponse {
-        guard socketClient != nil else {
-            return try await ping()
-        }
+    /// - Returns: The status response.
+    /// - Throws: `DaemonError` when the kernel is unavailable or the status read fails.
+    func status() async throws -> StatusResponse {
+        let status = try await installedKernel().status
         return try await withCheckedThrowingContinuation { continuation in
             queue.async {
-                let launcher = DaemonClient(clientName: "gmvibes-launch", autostart: true)
                 do {
-                    continuation.resume(returning: try launcher.ping())
+                    continuation.resume(returning: try status())
                 } catch {
                     continuation.resume(throwing: DaemonError(error))
                 }
-                launcher.close()
             }
         }
     }
@@ -217,7 +198,7 @@ actor GMCCDaemonService {
             expectedVersion: request.expectedVersion,
             primaryProjectBranch: request.primaryProjectBranch
         )
-        return try await perform { try $0.updateProject(req).project }
+        return try await perform { try $0.updateProject(req) }
     }
 
     /// Updates a session's name, backstory or goal.
@@ -534,12 +515,8 @@ actor GMCCDaemonService {
 
     // MARK: - Dope (wire v12, read + init only)
 
-    // Exactly four wrappers, deliberately: v0 is read-only-plus-init, and the
-    // narrow boundary is itself the enforcement against reaching for the
-    // kit’s in-process Store+Dope/DopeRepoSandbox (the kit ships the
-    // daemon's server side inside this binary — bypassing the single-writer
-    // daemon is one import away and forbidden). The remaining unwrapped verbs
-    // are a four-line copy each when a prompt legitimately needs them.
+    // The app's dope surface is read-plus-init only; the narrow boundary is the
+    // enforcement, so widen it one wrapper at a time when a prompt needs a write.
 
     /// Lists dope scopes available in a session or for a prompt.
     ///

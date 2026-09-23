@@ -316,6 +316,14 @@ final class Server: @unchecked Sendable {
 
     // MARK: - Dispatch
 
+    /// Builds the STATUS payload from this server's start time, exactly as the STATUS verb answers it.
+    ///
+    /// - Returns: The daemon status response.
+    /// - Throws: Persistence errors from the schema, count or event-id reads.
+    func statusResponse() throws -> StatusResponse {
+        try StatusHandler.response(store: store, startedAt: startedAt, startedDate: startedDate)
+    }
+
     /// Routes one decoded NDJSON line to the appropriate handler.
     ///
     /// Handshake is DIRECTIONAL: newer client = daemon stale (self-exit for

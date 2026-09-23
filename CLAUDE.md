@@ -56,7 +56,7 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 ### Kernel and roots
 - Never rename `daemon.pid` or `daemon.sock`: a differently named lock is a different lock, and two writers share one db.
 - Never delete the headless `gm_kernel daemon` personality. Hooks, SSH and CI `posix_spawn` it; a GUI binary spawned there is an untracked second writer.
-- Takeover of a headless holder is SIGTERM and poll, never SIGKILL. A second app COPY gets client mode, no fight.
+- Takeover of a headless holder is SIGTERM and poll, never SIGKILL. A second app COPY alerts and quits before it can open the db, no fight; the app has no client mode.
 - The root is a property of the bits: `Bundle.main["GMFSRoot"]`, then `$GM_FS_ROOT` (CLI only), then `~/gmfs`. A LaunchServices app inherits no environment.
 - `INFOPLIST_KEY_GMFSRoot` DOES NOT WORK (Xcode drops it; the bundle falls through to production). The key lives in `Sources/UX/Apps/Vibes/Info.plist`; `build-dmg.sh` asserts it with `plutil`.
 - Never add an `<EnvironmentVariables>` block to a scheme, and never build a second root selected only by `$GM_FS_ROOT`. `--env` and an inherited `GM_FS_ROOT` refuse to coexist.
@@ -68,7 +68,7 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 - `Paths.assertContained` throws outside `$GM_FS_ROOT` or the working repo. The one exception is `ITerm.writeProfile`; it is not precedent.
 - "sandbox" is a homonym: `DopeRepoSandbox`, `ENABLE_APP_SANDBOX = NO` and `HookScriptTests.Sandbox` are live; `.gmcc_sandbox` is retired.
 - `GmPersonality` resolves from `argv[0]` then `gm_`+`argv[1]`; `gm_daemon` is the only release-store symlink and `DaemonClient.autostart()` spawns it BY NAME. A bare `gm_kernel` in a shell prints usage; only inside a bundle does a no-arg launch open the app.
-- The `GMCCDaemonService` trampoline is load-bearing in-process (the verb layer is synchronous). Event subscribers run inside the commit hook: hand off immediately, never call back into the store.
+- The app never dials the socket or dispatches an envelope: `GMCCDaemonService` calls Store facades directly, and its queue hop is load-bearing because the store boundary is synchronous. `DaemonClient`, `GmVerbCaller` and `KernelVerbCaller` belong to hooks, MCP, the CLI and the tests. Event subscribers run inside the commit hook: hand off immediately, never call back into the store.
 - ⌘Q closes windows; only the menu bar's two-step quit stops the kernel. Nothing app-side is tested; arbitration, takeover and termination rest on hand-running in `~/test_gmfs`.
 
 ### Persistence and wire

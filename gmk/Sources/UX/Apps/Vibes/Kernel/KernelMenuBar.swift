@@ -1,35 +1,12 @@
 import AppKit
 import SwiftUI
 
-/// Which role the answering kernel holds over the database.
-///
-/// Mapped from the wire's `writer_role` string here rather than imported from
-/// the kit, so this view's inputs stay three plain values: an unrecognised role
-/// degrades to `.unknown` instead of asserting, because a menu bar that cannot
-/// name the role is still better than one that refuses to draw.
+/// Which role this process holds over the database.
 enum KernelRole: Equatable, Sendable {
+    /// This process took the lock and serves the database.
     case writer
-    /// Another copy of the app owns the store. `holderPid` is the owning
-    /// process, `bundlePath` the bundle it was launched from — both optional
-    /// because a kernel that has not answered yet knows neither.
-    case client(holderPid: Int32?, bundlePath: String?)
+    /// This process won the lock but the database failed to open, so nobody is serving.
     case unknown
-
-    /// Creates a role from the wire's `writer_role` string.
-    ///
-    /// Unrecognised roles degrade to `.unknown` so the UI can still render.
-    ///
-    /// - Parameters:
-    ///   - writerRole: The role string from the wire ("writer", "client", or unknown).
-    ///   - holderPid: The owning process ID when role is "client".
-    ///   - bundlePath: The owning bundle path when role is "client".
-    init(writerRole: String?, holderPid: Int32?, bundlePath: String?) {
-        switch writerRole {
-        case "writer": self = .writer
-        case "client": self = .client(holderPid: holderPid, bundlePath: bundlePath)
-        default: self = .unknown
-        }
-    }
 }
 
 /// The menu bar dropdown's content.
@@ -47,10 +24,6 @@ struct KernelMenuBarContent: View {
     let buildSha: String?
     let onNewWindow: () -> Void
     let onQuit: () -> Void
-    /// Client mode only: bring the kernel that actually owns the store to the
-    /// front. nil when the owner cannot be activated (unknown bundle, or this
-    /// kernel is the writer), and the row is absent rather than disabled.
-    var onActivateHolder: (() -> Void)?
 
     /// Two-step quit, in place.
     ///
@@ -63,22 +36,19 @@ struct KernelMenuBarContent: View {
     /// Creates the menu bar dropdown view with all required state and callbacks.
     ///
     /// - Parameters:
-    ///   - role: The kernel's current role (writer or client).
+    ///   - role: The kernel's current role (writer, or unknown when the database failed to open).
     ///   - vitals: Live kernel vitals (uptime, memory, CPU).
     ///   - protocolVersion: Wire protocol version, or `nil` if unknown.
     ///   - buildSha: Build identifier, or `nil` if unknown.
     ///   - onNewWindow: Callback to open a new window.
     ///   - onQuit: Callback to quit the kernel.
-    ///   - onActivateHolder: Callback to bring the writer kernel to front
-    ///     (client mode only), or `nil` if not applicable.
     init(
         role: KernelRole,
         vitals: KernelVitals,
         protocolVersion: Int? = nil,
         buildSha: String? = nil,
         onNewWindow: @escaping () -> Void,
-        onQuit: @escaping () -> Void,
-        onActivateHolder: (() -> Void)? = nil
+        onQuit: @escaping () -> Void
     ) {
         self.role = role
         self.vitals = vitals
@@ -86,17 +56,11 @@ struct KernelMenuBarContent: View {
         self.buildSha = buildSha
         self.onNewWindow = onNewWindow
         self.onQuit = onQuit
-        self.onActivateHolder = onActivateHolder
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             roleRow
-            if case .client = role, let onActivateHolder {
-                menuRow("Activate the running kernel", systemImage: "arrow.up.left.square") {
-                    onActivateHolder()
-                }
-            }
 
             Divider()
             vitalRows
@@ -125,9 +89,8 @@ struct KernelMenuBarContent: View {
 
     // MARK: - Role
 
-    /// FIRST row, and deliberately so: client mode IS the mitigation for a
-    /// second copy of the app opening the same database, and a mitigation the
-    /// user cannot see mitigates nothing.
+    /// FIRST row, and deliberately so: a kernel that won the lock but serves
+    /// nothing must be visible the moment the panel opens.
     ///
     /// It gets the colour, the weight and the top of the panel.
     @ViewBuilder
@@ -164,19 +127,11 @@ struct KernelMenuBarContent: View {
         .accessibilityLabel(roleSentence)
         .help(roleSentence)
         .background(roleColor.opacity(0.14), in: .rect(cornerRadius: 7))
-        .overlay {
-            // Only client mode gets a border. Writer mode is the expected
-            // state and must not shout at the user every time they look.
-            if case .client = role {
-                RoundedRectangle(cornerRadius: 7).strokeBorder(roleColor.opacity(0.55), lineWidth: 1)
-            }
-        }
     }
 
     private var roleTitle: String {
         switch role {
         case .writer: return "WRITER"
-        case .client: return "CLIENT MODE"
         case .unknown: return "ROLE UNKNOWN"
         }
     }
@@ -184,7 +139,6 @@ struct KernelMenuBarContent: View {
     private var roleSymbol: String {
         switch role {
         case .writer: return "lock.fill"
-        case .client: return "exclamationmark.triangle.fill"
         case .unknown: return "questionmark.circle"
         }
     }
@@ -192,7 +146,6 @@ struct KernelMenuBarContent: View {
     private var roleColor: Color {
         switch role {
         case .writer: return .green
-        case .client: return .orange
         case .unknown: return .gray
         }
     }
@@ -201,19 +154,12 @@ struct KernelMenuBarContent: View {
         switch role {
         case .writer:
             return "This kernel owns the database."
-        case .client(let pid, let path):
-            // The sentence the user has to be able to read off the screen:
-            // which process owns the store, and which bundle it came from.
-            let who = pid.map { "pid \($0)" } ?? "another kernel"
-            let where_ = path ?? "path unknown"
-            return "the database is owned by \(who) (\(where_))"
         case .unknown:
-            return "The kernel has not reported a role yet."
+            return "The lock is held but the database failed to open."
         }
     }
 
-    /// Title and detail as one sentence: "CLIENT MODE — the database is owned
-    /// by pid 4213 (/Applications/GMVibes.app)".
+    /// Title and detail as one sentence: "WRITER — This kernel owns the database.".
     private var roleSentence: String {
         guard let detail = roleDetail else { return roleTitle }
         return "\(roleTitle) — \(detail)"

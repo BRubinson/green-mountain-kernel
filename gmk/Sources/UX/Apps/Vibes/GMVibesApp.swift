@@ -56,19 +56,20 @@ private struct GMVibesScenes: App {
 
     /// Initializes the app scenes with services and vitals.
     ///
-    /// NO SECOND POLLER: `DaemonConnectionModel` runs the health watchdog and
-    /// keeps `ping` current, so the vitals sampler READS that rather than
-    /// opening its own connection. One socket, one cadence, and no chance of
-    /// the menu bar disagreeing with the status pill. ORDER IS FIXED HERE AND
+    /// NO SECOND SAMPLER: `DaemonConnectionModel` samples the process vitals
+    /// on one cadence, so the menu bar READS that rather than measuring on its
+    /// own, and it can never disagree with the status pill. ORDER IS FIXED HERE AND
     /// MUST NOT BE TIDIED: `GMVibesServices()` ARBITRATES DATABASE OWNERSHIP on
-    /// its first line — flock, migrate, bind the socket, or degrade to client
-    /// mode — so it must exist before anything that reads from it.
+    /// its first line — flock, migrate, bind the socket, or alert and quit when
+    /// another app copy already holds it — so it must exist before anything that
+    /// reads from it.
     init() {
         // ORDER IS FIXED HERE AND MUST NOT BE TIDIED. `GMVibesServices()` ARBITRATES DATABASE
-        // OWNERSHIP on its first line — flock, migrate, bind the socket, or degrade to client
-        // mode — so it must exist before anything that reads from it. `KernelVitals` takes its
-        // report source as a closure because a `@State` default cannot reference another
-        // `@State` property, which is what forces both into this initialiser.
+        // OWNERSHIP on its first line — flock, migrate, bind the socket, or alert and quit when
+        // another app copy already holds it — so it must exist before anything that reads from
+        // it. `KernelVitals` takes its report source as a closure because a `@State` default
+        // cannot reference another `@State` property, which is what forces both into this
+        // initialiser.
         let services = GMVibesServices()
         _services = State(initialValue: services)
         _vitals = State(initialValue: KernelVitals(report: { services.vitalsReport }))
@@ -110,12 +111,7 @@ private struct GMVibesScenes: App {
                 // reason quitting lives here and not on ⌘Q: this process owns
                 // the database for every hook and MCP session on the machine.
                 // `applicationShouldTerminate` runs the ordered shutdown.
-                onQuit: { NSApp.terminate(nil) },
-                // Non-nil only when another APP COPY holds the store. The row
-                // is absent rather than disabled when this is nil, which is
-                // right for the writer (nothing to activate) and for a headless
-                // holder (no window to raise).
-                onActivateHolder: services.activateHolder
+                onQuit: { NSApp.terminate(nil) }
             )
         } label: {
             // NO `.renderingMode(.original)` here — template rendering is the
@@ -125,8 +121,8 @@ private struct GMVibesScenes: App {
         }
         // `.window`, not the default `.menu`. AppKit's menu style renders only
         // menu items and would drop the role row's colour and layout — the one
-        // thing that has to be unmissable, because client mode is the mitigation
-        // for a second copy and a mitigation nobody can see is cosmetic.
+        // thing that has to be unmissable, because the role row is how a user
+        // learns the database failed to open, and a warning nobody can see is cosmetic.
         .menuBarExtraStyle(.window)
 
         // THE window type. Every window navigates the whole app via WindowNav;

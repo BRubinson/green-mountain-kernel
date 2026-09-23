@@ -6,8 +6,10 @@ import SwiftUI
 /// modifier at every scene root — adding a service later is zero call-site
 /// churn.
 ///
-/// Views keep their existing granular @Environment bindings (GMVibesEnvironment
-/// / FileTreeStore / DaemonConnectionModel / CatalogStore).
+/// The kernel is hosted in this process; a second app copy alerts and quits
+/// before it can touch the database. Views keep their existing granular
+/// @Environment bindings (GMVibesEnvironment / FileTreeStore /
+/// DaemonConnectionModel / CatalogStore).
 @Observable @MainActor
 final class GMVibesServices {
     let env: GMVibesEnvironment
@@ -24,23 +26,16 @@ final class GMVibesServices {
     let diagramCatalog: DiagramCatalogStore
     let launchColors: LaunchColorRegistry
 
-    /// THE KERNEL, when this process is the one holding it.
+    /// THE KERNEL, hosted in this process.
     ///
-    /// nil means client mode: another kernel owns the store and we read over the
-    /// socket, exactly as this app always did. Non-nil means we took the flock,
-    /// opened the database, migrated it and are serving — and every verb call
-    /// below skips the socket entirely.
+    /// nil only when we won the lock and could not open the database. Non-nil
+    /// means we took the flock, opened and migrated the database and are serving.
     private let kernel: KernelServices?
-
-    /// The holder, when we are NOT it.
-    ///
-    /// Drives the menu bar's client-mode row.
-    private let kernelHolder: KernelOwnership.Holder?
 
     /// Set when we won the lock and then could not open the database — a
     /// schema written by newer bits is the case that reaches this.
     ///
-    /// Distinct from client mode because here NOBODY is serving.
+    /// Here NOBODY is serving.
     private let kernelFailure: Error?
 
     /// Our row in the store's post-commit subscriber table, released on
@@ -49,26 +44,33 @@ final class GMVibesServices {
     /// Writer mode only.
     private var kernelEventToken: UUID?
 
-    /// Creates the services container, including kernel arbitration.
-    /// - Throws: Never; kernel failure is stored, not thrown.
+    /// Creates the services container, hosting the kernel or quitting when another copy holds it.
+    ///
+    /// A losing copy alerts and exits before touching the database; a lock won
+    /// with a database that fails to open is stored, not thrown.
     init() {
         // ARBITRATION IS THE FIRST THING THAT HAPPENS, before any stored
         // property that could reach the database. `KernelOwnership.acquire`
         // takes the flock before anything can open the store, and a losing
         // process cannot open it at all — there is no expression that does.
         var services: KernelServices?
-        var holder: KernelOwnership.Holder?
         var failure: Error?
         switch KernelHostRole.arbitrate(log: { NSLog("[gm_kernel] %@", $0) }) {
         case .writer(let hosted):
             services = hosted
         case .client(let who):
-            holder = who
+            // Never fight the holder and never touch its database: say who owns it and leave.
+            let alert = NSAlert()
+            alert.messageText = "GMVibes is already running"
+            alert.informativeText =
+                "The database is owned by pid \(who.pid) (\(who.bundlePath ?? who.executablePath)). "
+                + "Use that copy of GMVibes."
+            alert.runModal()
+            exit(0)
         case .failed(let error):
             failure = error
         }
         kernel = services
-        kernelHolder = holder
         kernelFailure = failure
 
         env = GMVibesEnvironment()
@@ -91,7 +93,14 @@ final class GMVibesServices {
             // MainActor scope that created the model, so the autorun loop's
             // first turn already sees it.
             daemon.hostsKernelInProcess = true
-            Task { await GMCCDaemonService.shared.adopt(inProcess: kernel.verbCaller) }
+            // The store and the status closure are Sendable; the kernel object is not,
+            // so only those two halves are handed to the actor.
+            let store = kernel.store
+            let status = kernel.statusBuilder
+            Task {
+                await GMCCDaemonService.shared.install(store: store, status: status)
+                self.daemon.markKernelHosted()
+            }
             kernelEventToken = kernel.store.subscribeToEvents { [weak self] event in
                 // FAN-OUT RUNS ON GRDB'S WRITER THREAD, inside the commit hook. Hand off
                 // immediately and touch nothing here: blocking stalls the single writer for
@@ -102,74 +111,28 @@ final class GMVibesServices {
                     self?.daemon.routeInProcess(notification)
                 }
             }
+        } else if let failure {
+            Task { await GMCCDaemonService.shared.install(failure: failure) }
+            daemon.markKernelFailed(String(describing: failure))
         }
     }
 
     // MARK: - The app target's window onto the kernel
     //
     // A FACADE, not `public let daemon`. Exposing `DaemonConnectionModel` would make an
-    // entire observable model part of this module's public surface to serve four scalars
-    // off the latest ping. These properties are the whole of what `GMVibesApp` needs.
+    // entire observable model part of this module's public surface to serve four scalars.
+    // These properties are the whole of what `GMVibesApp` needs.
 
-    /// Vitals as the answering kernel last reported them, or nil before the
-    /// first ping.
+    /// Vitals as the in-process kernel last sampled them, or nil before the first sample.
     ///
     /// Shaped for `KernelVitals(report:)`.
-    var vitalsReport: KernelVitalsReport? {
-        guard let ping = daemon.ping else { return nil }
-        return KernelVitalsReport(
-            uptimeSeconds: ping.uptimeSeconds,
-            residentMemoryBytes: ping.residentMemoryBytes,
-            cpuPercent: ping.cpuPercent
-        )
-    }
+    var vitalsReport: KernelVitalsReport? { daemon.vitals }
 
-    /// Who holds the database.
+    /// Whether this process serves the database.
     ///
-    /// Answered locally when arbitration already knows, so the menu bar
-    /// does not read `.unknown` for the first second of its own kernel's
-    /// life. In CLIENT mode the wire is the authority; `writerRole` and
-    /// `writerBundlePath` are additive optionals, so a kernel without them
-    /// answers nil and reads `.unknown`. No polling: `DaemonConnectionModel`
-    /// runs the single health watchdog.
-    var kernelRole: KernelRole {
-        if kernel != nil { return .writer }
-        if let kernelHolder {
-            return .client(
-                holderPid: kernelHolder.pid,
-                bundlePath: kernelHolder.bundlePath
-            )
-        }
-        guard let ping = daemon.ping else { return .unknown }
-        return KernelRole(
-            writerRole: ping.writerRole,
-            holderPid: ping.daemonPid,
-            bundlePath: ping.writerBundlePath
-        )
-    }
-
-    /// Bring the kernel that actually owns the store to the front.
-    ///
-    /// nil unless we are a client of ANOTHER APP COPY with a known bundle —
-    /// there is nothing to activate when we are the writer, and a headless
-    /// holder has no window to raise. `KernelMenuBarContent` renders the row
-    /// only when this is non-nil, so the absent case is already handled there
-    /// as an absent row rather than a disabled one.
-    var activateHolder: (() -> Void)? {
-        guard let kernelHolder, let bundlePath = kernelHolder.bundlePath else { return nil }
-        let pid = kernelHolder.pid
-        return {
-            // By pid first: it names the exact process holding the lock. The
-            // bundle path is the fallback for a holder that has gone away
-            // between the pidfile read and the click, where launching the app
-            // is the useful thing to do anyway.
-            if let running = NSRunningApplication(processIdentifier: pid) {
-                running.activate(options: [.activateAllWindows])
-            } else {
-                NSWorkspace.shared.open(URL(fileURLWithPath: bundlePath))
-            }
-        }
-    }
+    /// `.writer` when the kernel is hosted here, `.unknown` when the lock was
+    /// won but the database failed to open.
+    var kernelRole: KernelRole { kernel != nil ? .writer : .unknown }
 
     /// True when this process owns the database.
     ///
@@ -179,8 +142,7 @@ final class GMVibesServices {
 
     /// Stop the kernel, in order, before the process goes away.
     ///
-    /// A no-op in client mode: a client holds no lock and owns no database, and quitting it
-    /// must not disturb the kernel that does.
+    /// A no-op when the database failed to open: there is no kernel to stop.
     ///
     /// The dirty-draft flush is NOT passed in here. The ordering is flush (awaited, bounded)
     /// and THEN stop the kernel, and `GMVibesAppDelegate.applicationShouldTerminate` owns
@@ -194,8 +156,11 @@ final class GMVibesServices {
         kernel.shutdown()
     }
 
-    var protocolVersion: Int? { daemon.ping?.protocolVersion }
-    var buildSha: String? { daemon.ping?.buildSha }
+    /// The wire protocol version this binary speaks.
+    var protocolVersion: Int? { GmWireProtocol.version }
+
+    /// The commit this binary was built from.
+    var buildSha: String? { BuildInfo.sha }
 }
 
 extension View {
