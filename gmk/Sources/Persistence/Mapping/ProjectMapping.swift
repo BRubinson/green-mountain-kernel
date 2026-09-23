@@ -105,28 +105,26 @@ extension PromptRecord {
             updatedAt: updatedAt
         )
     }
-}
 
-extension PromptSummary {
-    /// Wire projection of this prompt summary with optional enriched reports.
+    /// Wire stub of this prompt with optional enriched reports.
     ///
     /// `reports` is the enrichment PROMPT_LIST attaches only when asked, so
     /// nil here keeps "not requested" distinct from "none exists".
     ///
     /// - Parameter reports: The optional report enrichment.
-    /// - Returns: The wire stub of this prompt summary.
+    /// - Returns: The wire stub of this prompt.
     func dto(reports: PromptReportsStub?) -> PromptStub {
         PromptStub(
-            uuid: prompt.uuid,
-            sessionUuid: prompt.sessionUuid,
-            seq: prompt.seq,
-            code: prompt.code,
-            name: prompt.name,
-            status: prompt.status,
-            version: prompt.version,
-            gmfsRelativeStoragePath: prompt.gmfsRelativeStoragePath,
-            createdAt: prompt.createdAt,
-            updatedAt: prompt.updatedAt,
+            uuid: uuid,
+            sessionUuid: sessionUuid,
+            seq: seq,
+            code: code,
+            name: name,
+            status: status,
+            version: version,
+            gmfsRelativeStoragePath: gmfsRelativeStoragePath,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
             reports: reports
         )
     }

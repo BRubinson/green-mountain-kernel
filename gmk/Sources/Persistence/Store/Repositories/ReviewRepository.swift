@@ -21,7 +21,9 @@ struct ReviewRepository: RepositoryContext {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
         }
         if let existing =
-            try Self.newestFirst
+            try ReviewSummaryRecord
+            .all()
+            .newestFirst()
             .filter(ReviewSummaryRecord.Columns.promptUuid == promptUuid)
             .select(ReviewSummaryRecord.Columns.uuid, as: String.self)
             .fetchOne(db)
@@ -335,7 +337,7 @@ struct ReviewRepository: RepositoryContext {
         guard
             let composed = try ReviewSummaryWithFindings.request()
                 .filter(ReviewSummaryRecord.Columns.promptUuid == req.promptUuid)
-                .order(ReviewSummaryRecord.Columns.createdAt.desc, Column("id").desc)
+                .newestFirst()
                 .fetchOne(db)
         else {
             throw StoreError.summaryAbsent(
@@ -395,14 +397,6 @@ struct ReviewRepository: RepositoryContext {
         return summary
     }
 
-    /// review_summary newest first — the create-or-return and both point
-    /// fetches take the most recent row for their key.
-    private static var newestFirst: QueryInterfaceRequest<ReviewSummaryRecord> {
-        ReviewSummaryRecord
-            .all()
-            .order(ReviewSummaryRecord.Columns.createdAt.desc, Column("id").desc)
-    }
-
     /// Fetches a review summary by its uuid.
     /// - Parameter uuid: The review summary uuid.
     /// - Returns: The review summary row, or nil if not found.
@@ -424,7 +418,7 @@ struct ReviewRepository: RepositoryContext {
     /// - Returns: The most recent matching summary row, or nil if not found.
     /// - Throws: Any database error during the fetch.
     private func fetchSummary(matching predicate: SQLExpression) throws -> ReviewSummaryRow? {
-        try Self.newestFirst.filter(predicate).fetchOne(db)?.dto()
+        try ReviewSummaryRecord.all().newestFirst().filter(predicate).fetchOne(db)?.dto()
     }
 
     /// Fetches findings matching a predicate, ordered by rank status, rating, id.

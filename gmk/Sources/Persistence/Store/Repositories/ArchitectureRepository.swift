@@ -25,7 +25,9 @@ struct ArchitectureRepository: RepositoryContext {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
         }
         if let existing =
-            try Self.newestFirst
+            try ArchitectureSummaryRecord
+            .all()
+            .newestFirst()
             .filter(ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
             .select(ArchitectureSummaryRecord.Columns.uuid, as: String.self)
             .fetchOne(db)
@@ -492,21 +494,24 @@ struct ArchitectureRepository: RepositoryContext {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
-        guard let summary = try fetchSummary(byPrompt: req.promptUuid) else {
+        // One request, five statements: the summary with its persistence
+        // changes, their fields, its general changes and its options.
+        guard let root = try ArchitectureWithChanges.request(promptUuid: req.promptUuid).fetchOne(db)
+        else {
             // A6: prompt exists — discriminated SUMMARY_ABSENT (gm arch open).
             throw StoreError.summaryAbsent(
                 entity: "architecture",
                 promptUuid: req.promptUuid
             )
         }
+        let summary = root.summary.dto()
         let touched = try touchedPaths(promptUuid: req.promptUuid)
         // PERSISTENCE IS NEVER NARROWED AND NEVER PAGED. It is the
         // persistence-first contract, and it is what a clipped response ate
         // silently — so it comes back whole in every form of this response.
-        let persistence = try fetchPersistenceChanges(summaryUuid: summary.uuid, touched: touched)
-        // The UNPAGED general set. Every derived verdict below is computed
-        // from it, so asking for one page can never change an audit answer.
-        let allGeneral = try fetchGeneralChanges(summaryUuid: summary.uuid, touched: touched)
+        // The general set is UNPAGED too. Every derived verdict below is
+        // computed from it, so asking for one page can never change an audit answer.
+        let (persistence, allGeneral) = plannedChanges(of: root, touched: touched)
 
         // Scope drift: this prompt's touched paths absent from the plan.
         let plannedPaths = Set(persistence.map(\.filePath) + allGeneral.map(\.filePath))
@@ -526,7 +531,7 @@ struct ArchitectureRepository: RepositoryContext {
             orderingRespected = nil
         }
 
-        let allOptions = try fetchOptions(summaryUuid: summary.uuid)
+        let allOptions = root.options.map { $0.dto() }
 
         // THE UNNARROWED REQUEST IS THE HISTORICAL RESPONSE, BYTE FOR BYTE.
         // No new key is emitted at all, so a peer built against the old
@@ -916,14 +921,6 @@ struct ArchitectureRepository: RepositoryContext {
         return ArchSummaryResponse(summary: updated)
     }
 
-    /// architecture_summary newest first — the create-or-return and both point
-    /// fetches take the most recent row for their key.
-    private static var newestFirst: QueryInterfaceRequest<ArchitectureSummaryRecord> {
-        ArchitectureSummaryRecord
-            .all()
-            .order(ArchitectureSummaryRecord.Columns.createdAt.desc, Column("id").desc)
-    }
-
     /// Fetches an architecture summary by uuid.
     ///
     /// - Parameter uuid: The summary uuid.
@@ -948,7 +945,26 @@ struct ArchitectureRepository: RepositoryContext {
     /// - Returns: The newest matching summary, or nil if none found.
     /// - Throws: Database errors.
     private func fetchSummary(matching predicate: SQLExpression) throws -> ArchitectureSummaryRow? {
-        try Self.newestFirst.filter(predicate).fetchOne(db)?.dto()
+        try ArchitectureSummaryRecord.all().newestFirst().filter(predicate).fetchOne(db)?.dto()
+    }
+
+    /// Maps a root's two change lists to wire rows carrying their implementation state.
+    ///
+    /// - Parameters:
+    ///   - root: The architecture with its prefetched changes.
+    ///   - touched: The prompt's touched paths, which decide implementation state.
+    /// - Returns: The persistence changes and the general changes, each in `seq` order.
+    private func plannedChanges(
+        of root: ArchitectureWithChanges,
+        touched: [String: UnplannedChangeRow]
+    ) -> (persistence: [ArchPersistenceChangeRow], general: [ArchGeneralChangeRow]) {
+        let persistence = root.persistenceChanges.map {
+            $0.dto(implementation: implementationState(for: $0.change.filePath, touched: touched))
+        }
+        let general = root.generalChanges.map {
+            $0.dto(implementation: implementationState(for: $0.filePath, touched: touched))
+        }
+        return (persistence, general)
     }
 
     /// Fetches persistence changes with their fields and implementation state.

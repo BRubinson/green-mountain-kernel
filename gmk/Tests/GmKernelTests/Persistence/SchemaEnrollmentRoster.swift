@@ -716,11 +716,21 @@ enum SchemaEnrollment {
         },
         composite(ReviewSummaryWithFindings.self, "ReviewSummaryWithFindings") { ReviewSummaryWithFindings.request() },
         composite(TouchedPathSummary.self, "TouchedPathSummary") { TouchedPathSummary.request(promptUuid: "p") },
+        composite(ClarificationWithChildren.self, "ClarificationWithChildren") {
+            ClarificationWithChildren.request(promptUuid: "p")
+        },
+        composite(ArchitectureWithChanges.self, "ArchitectureWithChanges") {
+            ArchitectureWithChanges.request(promptUuid: "p")
+        },
+        composite(ExplorationWithFindings.self, "ExplorationWithFindings") {
+            ExplorationWithFindings.request(promptUuid: "p", agentType: nil)
+        },
 
-        composite(DiagramOwnerChain.self, "DiagramOwnerChain.forSession") { DiagramOwnerChain.forSession("s") },
-        composite(DiagramOwnerChain.self, "DiagramOwnerChain.forPrompt") { DiagramOwnerChain.forPrompt("p") },
         composite(DiagramWithOwner.self, "DiagramWithOwner") { DiagramWithOwner.request() },
 
+        composite(DopeCogElementWithSubtypes.self, "DopeCogElementWithSubtypes") {
+            DopeCogElementWithSubtypes.request()
+        },
         composite(DopeCogWithElements.self, "DopeCogWithElements") { DopeCogWithElements.request() },
         composite(DopeDomainChildPath.self, "DopeDomainChildPath.entities") { DopeDomainChildPath.entities() },
         composite(DopeDomainChildPath.self, "DopeDomainChildPath.enums") { DopeDomainChildPath.enums() },
@@ -758,7 +768,6 @@ enum SchemaEnrollment {
             DopePersistenceCascadeCounts.request(persistenceUuid: "d")
         },
         composite(DopePropertyOrigin.self, "DopePropertyOrigin") { DopePropertyOrigin.request(propertyUuid: "p") },
-        composite(DopeScopeLineage.self, "DopeScopeLineage.forSession") { DopeScopeLineage.forSession("s") },
         composite(DopeScopePersistenceCount.self, "DopeScopePersistenceCount") {
             DopeScopePersistenceCount.request(scopeUuid: "s")
         },
@@ -785,9 +794,12 @@ enum SchemaEnrollment {
         composite(ChangeRollup.self, "ChangeRollup(sessionUuid:)") { ChangeRollup.request(sessionUuid: "s") },
         composite(ChangeRollup.self, "ChangeRollup(promptUuid:)") { ChangeRollup.request(promptUuid: "p") },
         composite(PromptChangeRollup.self, "PromptChangeRollup") { PromptChangeRollup.request(sessionUuid: "s") },
-        composite(PromptSummary.self, "PromptSummary") { PromptSummary.request(sessionUuid: nil) },
-        composite(PromptSummary.self, "PromptSummary(sessionUuid:)") { PromptSummary.request(sessionUuid: "s") },
-        composite(SessionLineage.self, "SessionLineage") { SessionLineage.request(sessionUuid: "s") },
+        composite(PromptRecord.self, "PromptRequests.listed") { PromptRequests.listed(sessionUuid: nil) },
+        composite(PromptRecord.self, "PromptRequests.listed(sessionUuid:)") {
+            PromptRequests.listed(sessionUuid: "s")
+        },
+        composite(SessionLineage.self, "SessionLineage(sessionUuid:)") { SessionLineage.request(sessionUuid: "s") },
+        composite(SessionLineage.self, "SessionLineage(promptUuid:)") { SessionLineage.request(promptUuid: "p") },
         composite(SessionSummary.self, "SessionSummary") { SessionSummary.request() },
         composite(SessionSummary.self, "SessionSummary(instance:projectUuid:)") {
             SessionSummary.request(instance: TableAlias<InstanceRecord>(), projectUuid: "p")

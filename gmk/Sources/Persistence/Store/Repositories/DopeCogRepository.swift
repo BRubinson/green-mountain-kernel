@@ -406,7 +406,8 @@ struct DopeCogRepository: RepositoryContext {
 
     /// Fetches a scope's cogs with elements prefetched in a single request.
     ///
-    /// Uses two statements for the whole area, never an element query per cog.
+    /// Uses two statements for the whole area, never an element query per cog;
+    /// the subtype columns ride the element prefetch's joins.
     ///
     /// - Parameter scopeUuid: The scope UUID to fetch cogs from.
     /// - Returns: A request that fetches cogs with their elements prefetched.
@@ -498,44 +499,20 @@ struct DopeCogRepository: RepositoryContext {
     /// - Throws: `StoreError` errors on element hydration failure.
     private func hydrateCog(_ composite: DopeCogWithElements) throws -> DopeCogNode {
         composite.cog.dto(
-            elements: try composite.elements.map { try hydrateElement(row: $0) }
+            elements: try composite.elements.map { try hydrateElement($0) }
         )
     }
 
-    /// Converts a cog element database record to a node, loading type-specific fields.
+    /// Converts a cog element with its subtype rows to a node.
     ///
-    /// Spec-driven field selection: subtype table columns differ per type, so all reads
-    /// are performed dynamically from the cog spec.
+    /// Both subtype rows ride the element read as LEFT JOINs; the spec names
+    /// which one the element type owns, and the other is ignored.
     ///
-    /// - Parameter row: The cog element database record.
+    /// - Parameter element: The cog element with its subtype rows.
     /// - Returns: A hydrated cog element node with type-specific fields.
-    /// - Throws: `StoreError` errors on subtype fetch failure.
-    private func hydrateElement(row: DopeCogElementRecord) throws -> DopeCogElementNode {
-        let spec = try DopeCogElementSpec.spec(for: row.elementType)
-        // Spec-driven, like the writer: the subtype table's columns differ per
-        // type, so selecting primary_path unconditionally throws "no such
-        // column" for any other type. THIS one stays on Row, and it is the
-        // documented floor of the Record conversion: both the table
-        // (spec.subtypeTable) and the column (field.dbColumn) are computed at
-        // runtime from the cog spec, which no static Record type can express.
-        // It is the last hasColumn() in the Database layer.
-        let subtype = try Row.fetchOne(
-            db,
-            sql: """
-                SELECT * FROM \(spec.subtypeTable) WHERE element_uuid = ?
-                """,
-            arguments: [row.uuid]
-        )
-        func subtypeValue(_ field: DopeCogField) -> String? {
-            guard spec.ownedFields.contains(field), let subtype,
-                subtype.hasColumn(field.dbColumn)
-            else { return nil }
-            return subtype[field.dbColumn]
-        }
-        return row.dto(
-            primaryPath: subtypeValue(.primaryPath),
-            dopePersistenceCode: subtypeValue(.dopePersistenceCode)
-        )
+    /// - Throws: `StoreError` when the element type has no spec.
+    private func hydrateElement(_ element: DopeCogElementWithSubtypes) throws -> DopeCogElementNode {
+        element.dto(spec: try DopeCogElementSpec.spec(for: element.element.elementType))
     }
 
     /// Fetches a cog and builds a response with its revision.
@@ -568,11 +545,11 @@ struct DopeCogRepository: RepositoryContext {
         uuid: String,
         revision: Int64
     ) throws -> DopeCogElementResponse {
-        guard let row = try DopeCogElementRecord.fetch(db, uuid: uuid) else {
+        guard let element = try DopeCogElementWithSubtypes.request().withUuid(uuid).fetchOne(db) else {
             throw StoreError.notFound(entity: "dope_cog_element", key: uuid)
         }
         return DopeCogElementResponse(
-            element: try hydrateElement(row: row),
+            element: try hydrateElement(element),
             revision: revision
         )
     }

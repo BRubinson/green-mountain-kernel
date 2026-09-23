@@ -67,7 +67,9 @@ struct ExplorationRepository: RepositoryContext {
             }
         }
         if let existing =
-            try Self.newestFirst
+            try ExplorationSummaryRecord
+            .all()
+            .newestFirst()
             .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
             .filter(ExplorationSummaryRecord.Columns.agentType == agentType)
             .select(ExplorationSummaryRecord.Columns.uuid, as: String.self)
@@ -378,24 +380,31 @@ struct ExplorationRepository: RepositoryContext {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
-        var request = Self.synthesisFirst
-            .filter(ExplorationSummaryRecord.Columns.promptUuid == req.promptUuid)
-        if let agentType = req.agentType {
-            request = request.filter(ExplorationSummaryRecord.Columns.agentType == agentType)
-        }
-        let summaries = try request.fetchAll(db).map { $0.dto() }
+        // One request, two statements: the summaries and their findings.
+        let roots =
+            try ExplorationWithFindings.request(
+                promptUuid: req.promptUuid,
+                agentType: req.agentType
+            )
+            .fetchAll(db)
+        let summaries = roots.map { $0.summary.dto() }
         guard !summaries.isEmpty else {
             throw StoreError.summaryAbsent(
                 entity: "exploration",
                 promptUuid: req.promptUuid
             )
         }
-        let summaryUuids = summaries.map(\.uuid)
-        let all = try fetchFindings(
-            matching:
-                summaryUuids
-                .contains(ExplorationFindingRecord.Columns.explorationSummaryUuid)
-        )
+        // Merged across summaries in the order one statement gave them:
+        // unranked first, then rating ascending, then insertion order.
+        let all =
+            roots
+            .flatMap(\.findings)
+            .sorted { lhs, rhs in
+                let lhsKey = (lhs.finding.findingRating == nil ? 0 : 1, lhs.finding.findingRating ?? 0, lhs.rowId)
+                let rhsKey = (rhs.finding.findingRating == nil ? 0 : 1, rhs.finding.findingRating ?? 0, rhs.rowId)
+                return lhsKey < rhsKey
+            }
+            .map { $0.finding.dto() }
         let window = try Store.ratingWindow(full: req.full, min: req.ratingMin, max: req.ratingMax)
         var keyFiles: [ExplorationKeyFileRow] = []
         var full: [ExplorationFindingRow] = []
@@ -473,25 +482,6 @@ struct ExplorationRepository: RepositoryContext {
         return summary
     }
 
-    /// exploration_summary newest first — the create-or-return and the
-    /// (prompt, agent type) point fetch both take the most recent row.
-    private static var newestFirst: QueryInterfaceRequest<ExplorationSummaryRecord> {
-        ExplorationSummaryRecord
-            .all()
-            .order(ExplorationSummaryRecord.Columns.createdAt.desc, Column("id").desc)
-    }
-
-    /// The render order: the synthesis seal row leads, then alphabetical.
-    private static var synthesisFirst: QueryInterfaceRequest<ExplorationSummaryRecord> {
-        ExplorationSummaryRecord
-            .all()
-            .order(
-                ExplorationSummaryRecord.Columns.agentType
-                    != ExplorationAgentType.synthesis.rawValue,
-                ExplorationSummaryRecord.Columns.agentType
-            )
-    }
-
     /// Fetches a summary by UUID.
     ///
     /// - Parameter uuid: The summary identifier.
@@ -509,7 +499,9 @@ struct ExplorationRepository: RepositoryContext {
     /// - Returns: The most recent summary row, or nil if not found.
     /// - Throws: Database errors.
     func fetchSummary(byPrompt promptUuid: String, agentType: String) throws -> ExplorationSummaryRow? {
-        try Self.newestFirst
+        try ExplorationSummaryRecord
+            .all()
+            .newestFirst()
             .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
             .filter(ExplorationSummaryRecord.Columns.agentType == agentType)
             .fetchOne(db)?
@@ -524,7 +516,9 @@ struct ExplorationRepository: RepositoryContext {
     /// - Returns: An array of summary rows in render order.
     /// - Throws: Database errors.
     func fetchSummaries(byPrompt promptUuid: String) throws -> [ExplorationSummaryRow] {
-        try Self.synthesisFirst
+        try ExplorationSummaryRecord
+            .all()
+            .synthesisFirst()
             .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
             .fetchAll(db)
             .map { $0.dto() }

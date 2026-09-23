@@ -65,38 +65,82 @@ struct SessionWithActivations: FetchableRecord, Decodable {
     }
 }
 
-/// One session's lineage keys, gathered across the two tiers above it.
+/// One row's identity lineage: the session, its code, its instance, its
+/// project and that project's primary branch, reachable from a session or
+/// from a prompt.
 ///
-/// The branch a promotion is allowed from is configured on the project, so the
-/// predicate needs the session's code, its project and that project's primary
-/// branch together; each is annotated under the key its property carries.
+/// The promotion guard, the dope scope tier ladder and the diagram owner
+/// chain each read a subset; one join serves all three, each key annotated
+/// under the property it decodes into.
 struct SessionLineage: FetchableRecord, Decodable {
+    var sessionUuid: String
     var sessionCode: String
+    var instanceUuid: String
     var projectUuid: String
     var primaryBranch: String
 
-    /// Fetches a session's lineage keys joined from instance and project.
+    /// Fetches a session's lineage joined from instance and project.
     /// - Parameter sessionUuid: The session to fetch lineage for.
-    /// - Returns: A request that fetches the session code, project UUID, and
-    ///   primary branch.
+    /// - Returns: A request that fetches the five lineage keys.
     static func request(sessionUuid: String) -> QueryInterfaceRequest<Self> {
+        let session = TableAlias<SessionRecord>()
         let instance = TableAlias<InstanceRecord>()
         let project = TableAlias<ProjectRecord>()
         return
             SessionRecord
-            .all()
+            .aliased(session)
             .withUuid(sessionUuid)
             .joining(
                 required: SessionRecord.instance
                     .aliased(instance)
                     .joining(required: InstanceRecord.project.aliased(project))
             )
-            .select(
-                SessionRecord.Columns.code.forKey("sessionCode"),
-                instance[InstanceRecord.Columns.projectUuid].forKey("projectUuid"),
-                project[ProjectRecord.Columns.primaryProjectBranch].forKey("primaryBranch")
-            )
+            .select(Self.selection(session: session, instance: instance, project: project))
             .asRequest(of: Self.self)
+    }
+
+    /// Fetches a prompt's lineage joined from session, instance and project.
+    /// - Parameter promptUuid: The prompt to fetch lineage for.
+    /// - Returns: A request that fetches the five lineage keys.
+    static func request(promptUuid: String) -> QueryInterfaceRequest<Self> {
+        let session = TableAlias<SessionRecord>()
+        let instance = TableAlias<InstanceRecord>()
+        let project = TableAlias<ProjectRecord>()
+        return
+            PromptRecord
+            .all()
+            .withUuid(promptUuid)
+            .joining(
+                required: PromptRecord.session
+                    .aliased(session)
+                    .joining(
+                        required: SessionRecord.instance
+                            .aliased(instance)
+                            .joining(required: InstanceRecord.project.aliased(project))
+                    )
+            )
+            .select(Self.selection(session: session, instance: instance, project: project))
+            .asRequest(of: Self.self)
+    }
+
+    /// The five keys under the property names they decode into.
+    /// - Parameters:
+    ///   - session: The session table alias.
+    ///   - instance: The instance table alias.
+    ///   - project: The project table alias.
+    /// - Returns: The selections for one lineage row.
+    private static func selection(
+        session: TableAlias<SessionRecord>,
+        instance: TableAlias<InstanceRecord>,
+        project: TableAlias<ProjectRecord>
+    ) -> [any SQLSelectable] {
+        [
+            session[SessionRecord.Columns.uuid].forKey("sessionUuid"),
+            session[SessionRecord.Columns.code].forKey("sessionCode"),
+            session[SessionRecord.Columns.instanceUuid].forKey("instanceUuid"),
+            instance[InstanceRecord.Columns.projectUuid].forKey("projectUuid"),
+            project[ProjectRecord.Columns.primaryProjectBranch].forKey("primaryBranch"),
+        ]
     }
 }
 
@@ -411,37 +455,6 @@ struct ReviewReport: FetchableRecord, Decodable {
             .annotated(with: Self.counts)
             .forSessionPrompts(sessionUuid)
             .group(ReviewSummaryRecord.Columns.uuid)
-            .asRequest(of: Self.self)
-    }
-}
-
-/// The prompt row the listing surfaces, ordered the way its scope reads.
-///
-/// `prompt` names no column and no scope, so GRDB decodes it from the base
-/// row through `PromptRecord.init(row:)`. The report enrichment PROMPT_LIST
-/// can attach is not part of this shape: it is four grouped aggregations over
-/// other tables, folded in by the caller, never a per-row subquery.
-struct PromptSummary: FetchableRecord, Decodable {
-    var prompt: PromptRecord
-
-    /// Fetches prompts in a session, or all prompts if session is nil.
-    ///
-    /// When `sessionUuid` is nil, `seq` is not unique across sessions, so
-    /// ordering uses the session UUID as a secondary sort.
-    /// - Parameter sessionUuid: The session to filter by, or nil for all
-    ///   sessions.
-    /// - Returns: A request that fetches the prompt row.
-    static func request(sessionUuid: String?) -> QueryInterfaceRequest<Self> {
-        guard let sessionUuid else {
-            return
-                PromptRecord
-                .order(PromptRecord.Columns.sessionUuid, PromptRecord.Columns.seq)
-                .asRequest(of: Self.self)
-        }
-        return
-            PromptRecord
-            .filter(PromptRecord.Columns.sessionUuid == sessionUuid)
-            .orderedBySeq()
             .asRequest(of: Self.self)
     }
 }

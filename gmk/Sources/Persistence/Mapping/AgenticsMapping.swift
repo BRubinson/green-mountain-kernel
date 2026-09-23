@@ -59,15 +59,13 @@ extension AgentSessionFileChangeRecord {
 }
 
 extension ClarificationQuestionWithOptions {
-    /// Converts a question with options to a wire row.
+    /// Converts a question with options and selections to a wire row.
     ///
-    /// The selections are a junction read the caller batches across questions,
-    /// so they arrive labelled and un-defaulted rather than as a second query
-    /// hidden behind a default.
+    /// The selections ride the composite's own answers prefetch, in the
+    /// insertion order the junction was written.
     ///
-    /// - Parameter selectedOptionUuids: The selected option identifiers.
     /// - Returns: A wire representation of the question with options and selections.
-    func dto(selectedOptionUuids: [String]) -> ClarificationQuestionRow {
+    func dto() -> ClarificationQuestionRow {
         ClarificationQuestionRow(
             uuid: questionRow.uuid,
             version: questionRow.version,
@@ -79,7 +77,7 @@ extension ClarificationQuestionWithOptions {
             agentId: questionRow.agentId,
             agentName: questionRow.agentName,
             options: options.map { $0.dto() },
-            selectedOptionUuids: selectedOptionUuids
+            selectedOptionUuids: answers.map(\.optionUuid)
         )
     }
 }

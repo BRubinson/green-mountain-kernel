@@ -29,24 +29,161 @@ struct AgentBriefingWithRefs: FetchableRecord, Decodable {
     }
 }
 
-/// One `user_clarification_question` row with its options, in two statements
-/// rather than one option query per question.
+/// One `user_clarification_question` row with its options and its answer
+/// selections, in three statements rather than one query per question.
 struct ClarificationQuestionWithOptions: FetchableRecord, Decodable {
     /// NOT `question`: the base row carries a TEXT column of that name, and a
     /// key matching a column wins over the base-row decode, so the record
     /// would be JSON-decoded out of the question text.
     var questionRow: UserClarificationQuestionRecord
     var options: [UserClarificationOptionRecord]
+    var answers: [UserClarificationAnswerRecord]
 
-    /// Fetches a clarification question with its options.
+    /// The answer prefetch, in insertion order, spelled once for the
+    /// standalone request and for the clarification root that nests it.
+    static let orderedAnswers = UserClarificationQuestionRecord.answers.order(Column("id"))
+
+    /// Fetches a clarification question with its options and selections.
     /// - Returns: A request that fetches questions ordered by sequence with
-    ///   options.
+    ///   options and answers.
     static func request() -> QueryInterfaceRequest<Self> {
         UserClarificationQuestionRecord
             .all()
             .orderedBySeq()
             .including(all: UserClarificationQuestionRecord.options)
+            .including(all: Self.orderedAnswers)
             .asRequest(of: Self.self)
+    }
+}
+
+/// One prompt's clarification, whole: the newest summary, its questions with
+/// options and selections, its notes, and its care package with refs.
+///
+/// Eight statements whatever the child counts: the summary joined to its care
+/// package, then one prefetch each for questions, options, answers, notes and
+/// the three ref classes. Every child rides the order its retired fetcher used.
+struct ClarificationWithChildren: FetchableRecord, Decodable {
+    var summary: ClarificationSummaryRecord
+    var questions: [ClarificationQuestionWithOptions]
+    var notes: [InternalClarificationNoteRecord]
+    var carePackage: CarePackageWithRefs?
+
+    /// Fetches a prompt's newest clarification with every child.
+    /// - Parameter promptUuid: The prompt whose clarification to fetch.
+    /// - Returns: A request that fetches the newest summary for the prompt.
+    static func request(promptUuid: String) -> QueryInterfaceRequest<Self> {
+        ClarificationSummaryRecord
+            .filter(ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
+            .newestFirst()
+            .including(
+                all: ClarificationSummaryRecord.questions
+                    .including(all: UserClarificationQuestionRecord.options)
+                    .including(all: ClarificationQuestionWithOptions.orderedAnswers)
+            )
+            .including(
+                all: ClarificationSummaryRecord.notes
+                    .order(
+                        InternalClarificationNoteRecord.Columns.weight == nil,
+                        InternalClarificationNoteRecord.Columns.weight,
+                        Column("id")
+                    )
+            )
+            .including(
+                optional: ClarificationSummaryRecord.carePackage
+                    .including(all: CarePackageRecord.dopeRefs)
+                    .including(all: CarePackageRecord.kbiteRefs)
+                    .including(all: CarePackageRecord.explorationRefs)
+            )
+            .asRequest(of: Self.self)
+    }
+}
+
+/// One prompt's architecture, whole: the newest summary, its persistence
+/// changes with fields, its general changes and its options.
+///
+/// Five statements whatever the child counts. Options ride `agent_name`
+/// order and both change lists ride `seq`, as their retired fetchers did.
+struct ArchitectureWithChanges: FetchableRecord, Decodable {
+    var summary: ArchitectureSummaryRecord
+    var persistenceChanges: [ArchPersistenceChangeWithFields]
+    var generalChanges: [ArchitectureGeneralChangeRecord]
+    var options: [ArchitectureOptionRecord]
+
+    /// Fetches a prompt's newest architecture with every child.
+    /// - Parameter promptUuid: The prompt whose architecture to fetch.
+    /// - Returns: A request that fetches the newest summary for the prompt.
+    static func request(promptUuid: String) -> QueryInterfaceRequest<Self> {
+        ArchitectureSummaryRecord
+            .filter(ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
+            .newestFirst()
+            .including(
+                all: ArchitectureSummaryRecord.persistenceChanges
+                    .including(all: ArchitecturePersistenceChangeRecord.fields.orderedBySeq())
+            )
+            .including(all: ArchitectureSummaryRecord.generalChanges)
+            .including(
+                all: ArchitectureSummaryRecord.options.order(ArchitectureOptionRecord.Columns.agentName)
+            )
+            .asRequest(of: Self.self)
+    }
+}
+
+/// One `exploration_finding` row carried with its rowid.
+///
+/// Records carry no rowid, but EXPLORE_GET merges findings across per-agent
+/// summaries in the order one statement gave them (unranked first, rating,
+/// then insertion), so the tie-break rides the prefetch as an annotation.
+struct ExplorationFindingRanked: FetchableRecord, Decodable {
+    var finding: ExplorationFindingRecord
+    var rowId: Int64
+
+    /// The findings prefetch with its rowid annotated and its read order applied.
+    static let ordered =
+        ExplorationSummaryRecord.findings
+        .annotated(with: Column("id").forKey("rowId"))
+        .order(
+            ExplorationFindingRecord.Columns.findingRating != nil,
+            ExplorationFindingRecord.Columns.findingRating,
+            Column("id")
+        )
+}
+
+/// One per-agent `exploration_summary` row with its findings.
+///
+/// Two statements whatever the finding count. The request lists a prompt's
+/// summaries with the synthesis seal row first, then alphabetical by agent.
+struct ExplorationWithFindings: FetchableRecord, Decodable {
+    var summary: ExplorationSummaryRecord
+    var findings: [ExplorationFindingRanked]
+
+    /// Fetches a prompt's exploration summaries with their findings.
+    /// - Parameters:
+    ///   - promptUuid: The prompt whose summaries to fetch.
+    ///   - agentType: One agent type to narrow to, or nil for every summary.
+    /// - Returns: A request that fetches the summaries in render order.
+    static func request(promptUuid: String, agentType: String?) -> QueryInterfaceRequest<Self> {
+        var request =
+            ExplorationSummaryRecord
+            .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
+        if let agentType {
+            request = request.filter(ExplorationSummaryRecord.Columns.agentType == agentType)
+        }
+        return
+            request
+            .synthesisFirst()
+            .including(all: ExplorationFindingRanked.ordered)
+            .asRequest(of: Self.self)
+    }
+}
+
+extension DerivableRequest where RowDecoder == ExplorationSummaryRecord {
+    /// The render order: the synthesis seal row leads, then alphabetical.
+    /// - Returns: A request with the synthesis summary first.
+    func synthesisFirst() -> Self {
+        order(
+            ExplorationSummaryRecord.Columns.agentType != ExplorationAgentType.synthesis.rawValue,
+            ExplorationSummaryRecord.Columns.agentType
+        )
     }
 }
 

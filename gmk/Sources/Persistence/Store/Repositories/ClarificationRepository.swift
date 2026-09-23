@@ -30,7 +30,9 @@ struct ClarificationRepository: RepositoryContext {
             throw StoreError.notFound(entity: "prompt", key: promptUuid)
         }
         if let existing =
-            try Self.newestFirst
+            try ClarificationSummaryRecord
+            .all()
+            .newestFirst()
             .filter(ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
             .select(ClarificationSummaryRecord.Columns.uuid, as: String.self)
             .fetchOne(db)
@@ -398,7 +400,10 @@ struct ClarificationRepository: RepositoryContext {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
         }
-        guard let summary = try fetchSummary(byPrompt: req.promptUuid) else {
+        // One request, eight statements: the summary with its questions,
+        // options, answers, notes and care package refs.
+        guard let root = try ClarificationWithChildren.request(promptUuid: req.promptUuid).fetchOne(db)
+        else {
             // A6: the prompt EXISTS (guard above) — this absence is a
             // discriminated SUMMARY_ABSENT, not NOT_FOUND: open a summary.
             throw StoreError.summaryAbsent(
@@ -406,9 +411,10 @@ struct ClarificationRepository: RepositoryContext {
                 promptUuid: req.promptUuid
             )
         }
-        let package = try fetchPackage(bySummary: summary.uuid)
-        let questions = try fetchQuestions(summaryUuid: summary.uuid)
-        let allNotes = try fetchNotes(summaryUuid: summary.uuid)
+        let summary = root.summary.dto()
+        let package = root.carePackage?.dto()
+        let questions = root.questions.map { $0.dto() }
+        let allNotes = root.notes.map { $0.dto() }
         let staleness: CarePackageStaleness? = try package.map { pkg in
             let s = try dope.scopeStaleness(
                 scopeUuid: pkg.dopeScopeUuid,
@@ -826,14 +832,6 @@ struct ClarificationRepository: RepositoryContext {
             .fetchOne(db)
     }
 
-    /// clarification_summary newest first — the create-or-return and both
-    /// point fetches take the most recent row for their key.
-    private static var newestFirst: QueryInterfaceRequest<ClarificationSummaryRecord> {
-        ClarificationSummaryRecord
-            .all()
-            .order(ClarificationSummaryRecord.Columns.createdAt.desc, Column("id").desc)
-    }
-
     /// Fetches a clarification summary by uuid.
     /// - Parameter uuid: The clarification summary uuid.
     /// - Returns: The summary row, or nil if not found.
@@ -855,7 +853,7 @@ struct ClarificationRepository: RepositoryContext {
     /// - Returns: The newest matching summary row, or nil if not found.
     /// - Throws: Database errors.
     private func fetchSummary(matching predicate: SQLExpression) throws -> ClarificationSummaryRow? {
-        try Self.newestFirst.filter(predicate).fetchOne(db)?.dto()
+        try ClarificationSummaryRecord.all().newestFirst().filter(predicate).fetchOne(db)?.dto()
     }
 
     /// Fetches a clarification question by uuid.
@@ -878,28 +876,17 @@ struct ClarificationRepository: RepositoryContext {
 
     /// Fetches questions matching a predicate with their options and selections.
     ///
-    /// Uses three statements: questions, their options, and a batched pass over
-    /// answer selections grouped in memory.
+    /// Three statements whatever the counts: questions, their options and
+    /// their answer selections, all riding the composite's prefetches.
     ///
     /// - Parameter predicate: An SQL expression to filter the questions.
     /// - Returns: An array of question rows with options and selections populated.
     /// - Throws: Database errors.
     private func fetchQuestions(matching predicate: SQLExpression) throws -> [ClarificationQuestionRow] {
-        let questions = try ClarificationQuestionWithOptions.request().filter(predicate).fetchAll(db)
-        guard !questions.isEmpty else { return [] }
-        var selected: [String: [String]] = [:]
-        let answers =
-            try UserClarificationAnswerRecord
-            .filter(
-                questions.map(\.questionRow.uuid)
-                    .contains(UserClarificationAnswerRecord.Columns.questionUuid)
-            )
-            .order(Column("id"))
+        try ClarificationQuestionWithOptions.request()
+            .filter(predicate)
             .fetchAll(db)
-        for answer in answers {
-            selected[answer.questionUuid, default: []].append(answer.optionUuid)
-        }
-        return questions.map { $0.dto(selectedOptionUuids: selected[$0.questionRow.uuid] ?? []) }
+            .map { $0.dto() }
     }
 
     /// Fetches an internal note by uuid.

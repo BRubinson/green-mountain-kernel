@@ -363,7 +363,7 @@ struct DiagramRepository: RepositoryContext {
                 promptUuid: nil
             )
         case .session:
-            guard let chain = try DiagramOwnerChain.forSession(uuid).fetchOne(db) else {
+            guard let chain = try SessionLineage.request(sessionUuid: uuid).fetchOne(db) else {
                 throw StoreError.notFound(entity: "session", key: uuid)
             }
             return DiagramOwner(
@@ -374,7 +374,7 @@ struct DiagramRepository: RepositoryContext {
                 promptUuid: nil
             )
         case .prompt:
-            guard let chain = try DiagramOwnerChain.forPrompt(uuid).fetchOne(db) else {
+            guard let chain = try SessionLineage.request(promptUuid: uuid).fetchOne(db) else {
                 throw StoreError.notFound(entity: "prompt", key: uuid)
             }
             return DiagramOwner(

@@ -52,9 +52,9 @@ struct KbiteResourceWithFiles: FetchableRecord, Decodable {
     }
 }
 
-/// One kbite with everything the export manifest names: its own keyword
-/// vocabulary and its resources down to file heads.
+/// One kbite whole: its keyword vocabulary and its resources down to file heads.
 ///
+/// Four statements; KBITE_GET and the export manifest both read it.
 /// The file heads are the point. An archive walks every file of every
 /// resource, and a manifest selecting `resource_file_content` would hold the
 /// largest column in the schema in memory for the whole export; the writer
@@ -74,6 +74,7 @@ struct KbiteWithResources: FetchableRecord, Decodable {
             .including(all: KbiteRecord.keywords.order(Column("keyword")))
             .including(
                 all: KbiteRecord.resources
+                    .order(Column("resource_name"))
                     .including(all: KbiteResourceWithFiles.fileHeads)
             )
             .asRequest(of: Self.self)

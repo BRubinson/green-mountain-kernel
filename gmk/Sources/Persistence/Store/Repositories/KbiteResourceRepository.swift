@@ -113,32 +113,17 @@ struct KbiteResourceRepository: RepositoryContext {
     /// - Returns: Kbite with resources, files, and keywords.
     /// - Throws: `StoreError.notFound` if the kbite code does not exist.
     func getKbite(_ req: KbiteGetRequest) throws -> KbiteGetResponse {
-        guard
-            let kbiteRecord =
-                try KbiteRecord
-                .filter(KbiteRecord.Columns.code == req.code)
-                .fetchOne(db)
-        else {
+        // One request, four statements. The file prefetch projects
+        // `resource_file_content IS NOT NULL` rather than selecting the
+        // column, keeping ~115 MB out of this read.
+        guard let manifest = try KbiteWithResources.request(code: req.code).fetchOne(db) else {
             throw StoreError.notFound(entity: "kbite", key: req.code)
         }
-        let kbite = kbiteRecord.dto()
-        // The prefetch projects `resource_file_content IS NOT NULL` rather than
-        // selecting the column, keeping ~115 MB out of this read.
-        let resources =
-            try KbiteResourceWithFiles.request()
-            .filter(Column("kbite_uuid") == kbite.uuid)
-            .order(Column("resource_name"))
-            .fetchAll(db)
-            .map { $0.dto() }
-        let keywordAlias = TableAlias<KeywordRecord>()
-        let keywords =
-            try KbiteKeywordJunctionRecord
-            .filter(Column("kbite_uuid") == kbite.uuid)
-            .joining(required: KbiteKeywordJunctionRecord.keyword.aliased(keywordAlias))
-            .order(keywordAlias["keyword"])
-            .select(keywordAlias["keyword"], as: String.self)
-            .fetchAll(db)
-        return KbiteGetResponse(kbite: kbite, resources: resources, keywords: keywords)
+        return KbiteGetResponse(
+            kbite: manifest.kbite.dto(),
+            resources: manifest.resources.map { $0.dto() },
+            keywords: manifest.keywords.map(\.keyword)
+        )
     }
 
     /// Fetches a single resource file with its content by UUID.

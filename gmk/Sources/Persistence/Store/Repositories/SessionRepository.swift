@@ -240,11 +240,11 @@ struct SessionRepository: RepositoryContext {
         let arch = withReports ? try architectureReports(sessionUuid: sessionUuid) : [:]
         let explore = withReports ? try explorationReports(sessionUuid: sessionUuid) : [:]
         let review = withReports ? try reviewReports(sessionUuid: sessionUuid) : [:]
-        return try PromptSummary.request(sessionUuid: sessionUuid)
+        return try PromptRequests.listed(sessionUuid: sessionUuid)
             .fetchAll(db)
-            .map { summary in
-                let uuid = summary.prompt.uuid
-                return summary.dto(
+            .map { prompt in
+                let uuid = prompt.uuid
+                return prompt.dto(
                     reports: withReports
                         ? PromptReportsStub(
                             clarification: clar[uuid],

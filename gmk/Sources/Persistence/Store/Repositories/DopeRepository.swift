@@ -367,7 +367,7 @@ struct DopeRepository: RepositoryContext {
         // The chain-non-null tier ladder: a session-tier scope fills its
         // own FK and every ancestor uuid, so list/get by any ancestor stays
         // a plain indexed WHERE (m0010 grammar, ported by m0013).
-        guard let lineage = try DopeScopeLineage.forSession(req.sessionUuid).fetchOne(db) else {
+        guard let lineage = try SessionLineage.request(sessionUuid: req.sessionUuid).fetchOne(db) else {
             throw StoreError.corruptState(
                 entity: "session",
                 detail: "session \(req.sessionUuid) has no instance->project lineage"

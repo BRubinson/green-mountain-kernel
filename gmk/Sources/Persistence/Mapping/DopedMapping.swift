@@ -102,31 +102,29 @@ extension DopeCogRecord {
     }
 }
 
-extension DopeCogElementRecord {
-    /// Converts the element record to a wire node with resolved subtypes.
+extension DopeCogElementWithSubtypes {
+    /// Converts the element and its subtype rows to a wire node.
     ///
-    /// The two subtype values are read separately because the column set
-    /// differs per element type.
+    /// The spec decides which subtype value the element type owns; a joined
+    /// row for a type that does not own it is ignored.
     ///
-    /// - Parameters:
-    ///   - primaryPath: The resolved primary-type subtype value.
-    ///   - dopePersistenceCode: The resolved dope-persistence-type subtype
-    ///     value.
+    /// - Parameter spec: The element type's spec, naming its owned fields.
     /// - Returns: A `DopeCogElementNode` representing this element.
-    func dto(primaryPath: String?, dopePersistenceCode: String?) -> DopeCogElementNode {
+    func dto(spec: DopeCogElementSpec) -> DopeCogElementNode {
         DopeCogElementNode(
-            uuid: uuid,
-            version: version,
-            elementType: elementType,
-            code: code,
-            name: name,
-            description: description,
-            sortOrder: Int(sortOrder),
-            parentElementUuid: parentElementUuid,
-            dopeScopeCode: dopeScopeCode,
-            primaryPath: primaryPath,
-            deletedOn: deletedOn,
-            dopePersistenceCode: dopePersistenceCode
+            uuid: element.uuid,
+            version: element.version,
+            elementType: element.elementType,
+            code: element.code,
+            name: element.name,
+            description: element.description,
+            sortOrder: Int(element.sortOrder),
+            parentElementUuid: element.parentElementUuid,
+            dopeScopeCode: element.dopeScopeCode,
+            primaryPath: spec.ownedFields.contains(.primaryPath) ? hull?.primaryPath : nil,
+            deletedOn: element.deletedOn,
+            dopePersistenceCode: spec.ownedFields.contains(.dopePersistenceCode)
+                ? persistenceOwner?.dopePersistenceCode : nil
         )
     }
 }

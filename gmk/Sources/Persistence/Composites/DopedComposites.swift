@@ -36,50 +36,56 @@ struct DopePersistenceCascadeCounts: FetchableRecord, Decodable {
     }
 }
 
+/// One `dope_cog_element` row with whichever subtype row its type owns.
+///
+/// The two spec-chosen columns ride LEFT JOINs on the element read instead
+/// of one statement per element; the mapping consults the spec to ignore a
+/// joined row the element type does not own.
+struct DopeCogElementWithSubtypes: FetchableRecord, Decodable {
+    var element: DopeCogElementRecord
+    var hull: DopeCogHullRecord?
+    var persistenceOwner: DopeCogPersistenceOwnerRecord?
+
+    /// Widens an element request with the two optional subtype joins.
+    ///
+    /// Spelled once for the standalone read and for the cog prefetch that
+    /// nests it.
+    /// - Parameter request: The element request or association to widen.
+    /// - Returns: The same request with both subtype rows joined.
+    static func joined<R: DerivableRequest>(_ request: R) -> R
+    where R.RowDecoder == DopeCogElementRecord {
+        request
+            .including(optional: DopeCogElementRecord.hull)
+            .including(optional: DopeCogElementRecord.persistenceOwner)
+    }
+
+    /// Fetches one element with its subtype rows.
+    ///
+    /// - Returns: A query to fetch elements with their subtype rows.
+    static func request() -> QueryInterfaceRequest<Self> {
+        joined(DopeCogElementRecord.all()).asRequest(of: Self.self)
+    }
+}
+
 /// One `dope_cog` row with its elements, in two statements rather than one
 /// element query per cog.
 ///
 /// The prefetch is unfiltered: a cog element's `deleted_on` rides out on the
 /// wire node, because a whiteout is only meaningful to the masking resolver if
-/// it is visible.
+/// it is visible. The subtype columns ride the element prefetch's two joins.
 struct DopeCogWithElements: FetchableRecord, Decodable {
     var cog: DopeCogRecord
-    var elements: [DopeCogElementRecord]
+    var elements: [DopeCogElementWithSubtypes]
 
-    /// Fetches a cog and its elements.
+    /// Fetches a cog and its elements with their subtype rows.
     ///
     /// - Returns: A query to fetch the cog with its elements.
     static func request() -> QueryInterfaceRequest<Self> {
         DopeCogRecord
             .including(
-                all: DopeCogRecord.elements
-                    .order(Column("sort_order"), Column("code"))
-            )
-            .asRequest(of: Self.self)
-    }
-}
-
-/// The chain-non-null tier ladder a session-tier dope scope fills on insert:
-/// every ancestor uuid, so a later list or get by any ancestor stays an
-/// indexed WHERE.
-struct DopeScopeLineage: FetchableRecord, Decodable {
-    var projectUuid: String
-    var instanceUuid: String
-
-    /// Fetches the project and instance lineage for a session.
-    ///
-    /// - Parameter uuid: The session UUID.
-    /// - Returns: A query to fetch the session's ancestor identifiers.
-    static func forSession(_ uuid: String) -> QueryInterfaceRequest<Self> {
-        let instance = TableAlias<InstanceRecord>()
-        return
-            SessionRecord
-            .all()
-            .withUuid(uuid)
-            .joining(required: SessionRecord.instance.aliased(instance))
-            .select(
-                instance[InstanceRecord.Columns.projectUuid].forKey("projectUuid"),
-                SessionRecord.Columns.instanceUuid.forKey("instanceUuid")
+                all: DopeCogElementWithSubtypes.joined(
+                    DopeCogRecord.elements.order(Column("sort_order"), Column("code"))
+                )
             )
             .asRequest(of: Self.self)
     }

@@ -909,6 +909,11 @@ final class ComposedReadTests: KernelBackedTestCase {
             ["first_hull", "second_hull"],
             "the element children decoded empty or out of sort order"
         )
+        XCTAssertEqual(
+            read.elements.map(\.primaryPath),
+            ["Sources/first_hull", "Sources/second_hull"],
+            "the hull subtype join did not decode onto the element node"
+        )
     }
 
     // MARK: - Statement budgets
@@ -925,8 +930,13 @@ final class ComposedReadTests: KernelBackedTestCase {
         try assertBriefingBudget()
         try assertCarePackageBudget()
         try assertClarifyQuestionBudget()
+        try assertClarifyRootBudget()
         try assertArchitectureBudget()
+        try assertArchitectureRootBudget()
+        try assertExplorationRootBudget()
+        try assertDopeCogBudget()
         try assertKbiteResourceBudget()
+        try assertKbiteRootBudget()
         try assertSessionBudget()
     }
 
@@ -1139,10 +1149,10 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
-    /// Verifies CLARIFY_GET questions use three statements total.
+    /// Verifies the question composite uses three statements total.
     ///
-    /// Two statements for the composite plus one batched pass over the answer
-    /// junction, grouped in memory, regardless of question/option counts.
+    /// The questions, their options and their answer selections, regardless
+    /// of question/option counts.
     ///
     /// - Throws: Any assertion or database error.
     private func assertClarifyQuestionBudget() throws {
@@ -1175,14 +1185,6 @@ final class ComposedReadTests: KernelBackedTestCase {
                 questions.isEmpty,
                 "the question request matched no row: a prefetch GRDB skips is not a budget"
             )
-            _ =
-                try UserClarificationAnswerRecord
-                .filter(
-                    questions.map(\.questionRow.uuid)
-                        .contains(UserClarificationAnswerRecord.Columns.questionUuid)
-                )
-                .order(Column("id"))
-                .fetchAll(db)
         }
         let withOne = try selectStatements(read).count
         _ = try env.send(
@@ -1200,6 +1202,258 @@ final class ComposedReadTests: KernelBackedTestCase {
             withOneChild: withOne,
             withTwoChildren: withTwo,
             budget: 3
+        )
+    }
+
+    /// Verifies CLARIFY_GET's root uses eight statements whatever the child counts.
+    ///
+    /// The summary joined to its care package, then one prefetch each for
+    /// questions, options, answers, notes and the three ref classes.
+    ///
+    /// - Throws: Any assertion or database error.
+    private func assertClarifyRootBudget() throws {
+        let fixture = try makeFixture("cbud")
+        let prompt = try makePrompt(fixture.context.sessionUuid, "clarify root budget")
+        let kbiteFileUuid = try makeKbiteFileUuid("cbud")
+        let summaryUuid =
+            try env.send(
+                .clarifyOpen,
+                ClarifyOpenRequest(promptUuid: prompt.uuid),
+                ClarifySummaryResponse.self
+            )
+            .summary.uuid
+        let package = try env.send(
+            .carePackageOpen,
+            CarePackageOpenRequest(summaryUuid: summaryUuid),
+            CarePackageResponse.self
+        )
+        _ = try addOneRefOfEachKind(packageUuid: package.package.uuid, kbiteFileUuid: kbiteFileUuid)
+        func addQuestionAndNote(_ label: String) throws {
+            _ = try env.send(
+                .clarifyQuestionAdd,
+                ClarifyQuestionAddRequest(summaryUuid: summaryUuid, question: "\(label)?", options: ["only"]),
+                ClarifyQuestionRowResponse.self
+            )
+            _ = try env.send(
+                .clarifyNoteAdd,
+                ClarifyNoteAddRequest(summaryUuid: summaryUuid, body: "note \(label)"),
+                ClarifyNoteRowResponse.self
+            )
+        }
+        try addQuestionAndNote("one")
+
+        let read: (Database) throws -> Void = { db in
+            let root = try ClarificationWithChildren.request(promptUuid: prompt.uuid).fetchOne(db)
+            XCTAssertNotNil(root, "the clarification root matched no row: a prefetch GRDB skips is not a budget")
+            XCTAssertNotNil(root?.carePackage, "the care package did not decode through the hasOne join")
+            XCTAssertEqual(root?.carePackage?.dopeRefs.count, 1, "the nested ref prefetch decoded empty")
+        }
+        let withOne = try selectStatements(read).count
+        try addQuestionAndNote("two")
+        let withTwo = try selectStatements(read).count
+        assertBudget(
+            "CLARIFY_GET root",
+            withOneChild: withOne,
+            withTwoChildren: withTwo,
+            budget: 8
+        )
+    }
+
+    /// Verifies ARCH_GET's root uses five statements whatever the child counts.
+    ///
+    /// The summary, its persistence changes, their fields, its general
+    /// changes and its options.
+    ///
+    /// - Throws: Any assertion or database error.
+    private func assertArchitectureRootBudget() throws {
+        let fixture = try makeFixture("rbud")
+        let prompt = try makePrompt(fixture.context.sessionUuid, "architecture root budget")
+        let summaryUuid =
+            try env.send(
+                .archOpen,
+                ArchOpenRequest(promptUuid: prompt.uuid),
+                ArchSummaryResponse.self
+            )
+            .summary.uuid
+        let change = try env.send(
+            .archPersistAdd,
+            ArchPersistAddRequest(
+                summaryUuid: summaryUuid,
+                className: "RootBudgetRecord",
+                filePath: "Sources/Persistence/Entities/RootBudgetRecord.swift",
+                reasonBrief: "one change, measured at one field and at two"
+            ),
+            ArchPersistAddResponse.self
+        )
+        func addFieldAndGeneral(_ label: String) throws {
+            try addArchField(changeUuid: change.change.uuid, named: "\(label)_field")
+            _ = try env.send(
+                .archGeneralAdd,
+                ArchGeneralAddRequest(
+                    summaryUuid: summaryUuid,
+                    filePath: "Sources/\(label).swift",
+                    reasonBrief: "general \(label)",
+                    changeDepth: .draft,
+                    changeCode: "edit \(label)"
+                ),
+                ArchGeneralAddResponse.self
+            )
+        }
+        try addFieldAndGeneral("one")
+
+        let read: (Database) throws -> Void = { db in
+            let root = try ArchitectureWithChanges.request(promptUuid: prompt.uuid).fetchOne(db)
+            XCTAssertNotNil(root, "the architecture root matched no row: a prefetch GRDB skips is not a budget")
+            XCTAssertEqual(
+                root?.persistenceChanges.first?.fields.isEmpty,
+                false,
+                "the nested field prefetch decoded empty"
+            )
+        }
+        let withOne = try selectStatements(read).count
+        try addFieldAndGeneral("two")
+        let withTwo = try selectStatements(read).count
+        assertBudget(
+            "ARCH_GET root",
+            withOneChild: withOne,
+            withTwoChildren: withTwo,
+            budget: 5
+        )
+    }
+
+    /// Verifies EXPLORE_GET's root uses two statements whatever the finding count.
+    ///
+    /// - Throws: Any assertion or database error.
+    private func assertExplorationRootBudget() throws {
+        let fixture = try makeFixture("ebud")
+        let prompt = try makePrompt(fixture.context.sessionUuid, "exploration root budget")
+        let summaryUuid =
+            try env.send(
+                .exploreOpen,
+                ExploreOpenRequest(promptUuid: prompt.uuid, agentType: "general", agentId: "t"),
+                ExploreSummaryResponse.self
+            )
+            .summary.uuid
+        func addFinding(_ label: String) throws {
+            _ = try env.send(
+                .exploreFindingAdd,
+                ExploreFindingAddRequest(
+                    summaryUuid: summaryUuid,
+                    kind: .other,
+                    title: "finding \(label)",
+                    body: "the budget needs a child",
+                    agentName: "general"
+                ),
+                ExploreFindingRowResponse.self
+            )
+        }
+        try addFinding("one")
+
+        let read: (Database) throws -> Void = { db in
+            let roots = try ExplorationWithFindings.request(promptUuid: prompt.uuid, agentType: nil).fetchAll(db)
+            XCTAssertFalse(roots.isEmpty, "the exploration root matched no row: a prefetch GRDB skips is not a budget")
+            XCTAssertEqual(roots.first?.findings.isEmpty, false, "the findings prefetch decoded empty")
+        }
+        let withOne = try selectStatements(read).count
+        try addFinding("two")
+        let withTwo = try selectStatements(read).count
+        assertBudget(
+            "EXPLORE_GET root",
+            withOneChild: withOne,
+            withTwoChildren: withTwo,
+            budget: 2
+        )
+    }
+
+    /// Verifies DOPE_COG_GET's cog uses two statements whatever the element count.
+    ///
+    /// The cog and its elements with both subtype rows joined; the read it
+    /// replaced ran one statement per element.
+    ///
+    /// - Throws: Any assertion or database error.
+    private func assertDopeCogBudget() throws {
+        let fixture = try makeFixture("gbud")
+        let scope =
+            try env.send(
+                .dopeInit,
+                DopeInitRequest(
+                    sessionUuid: fixture.context.sessionUuid,
+                    code: "gbud_scope",
+                    name: "cog budget scope"
+                ),
+                DopeScopeResponse.self
+            )
+            .scope
+        let cogUuid =
+            try env.send(
+                .dopeCogAdd,
+                DopeCogAddRequest(scopeUuid: scope.uuid, code: "gbud", name: "the budget cog"),
+                DopeCogResponse.self
+            )
+            .cog.uuid
+        func addHull(_ label: String, sortOrder: Int) throws {
+            _ = try env.send(
+                .dopeCogElementAdd,
+                DopeCogElementAddRequest(
+                    cogUuid: cogUuid,
+                    elementType: DopeCogElementType.hull.rawValue,
+                    code: label,
+                    name: label,
+                    sortOrder: sortOrder,
+                    primaryPath: "Sources/\(label)"
+                ),
+                DopeCogElementResponse.self
+            )
+        }
+        try addHull("hull_one", sortOrder: 1)
+
+        let read: (Database) throws -> Void = { db in
+            let cog = try DopeCogWithElements.request().withUuid(cogUuid).fetchOne(db)
+            XCTAssertNotNil(cog, "the cog request matched no row: a prefetch GRDB skips is not a budget")
+            XCTAssertEqual(cog?.elements.first?.hull?.primaryPath, "Sources/hull_one", "the hull join decoded empty")
+        }
+        let withOne = try selectStatements(read).count
+        try addHull("hull_two", sortOrder: 2)
+        let withTwo = try selectStatements(read).count
+        assertBudget(
+            "DOPE_COG_GET cog",
+            withOneChild: withOne,
+            withTwoChildren: withTwo,
+            budget: 2
+        )
+    }
+
+    /// Verifies KBITE_GET's root uses four statements whatever the file count.
+    ///
+    /// The kbite, its keywords, its resources and their projected file heads.
+    ///
+    /// - Throws: Any assertion or database error.
+    private func assertKbiteRootBudget() throws {
+        let one = try makeDigestedKbite("rbud1")
+        let two = try makeDigestedKbite("rbud2", files: ["notes.md", "other.md"])
+        XCTAssertEqual(
+            two.resources.first?.files.count,
+            2,
+            "the two-file fixture digested one file, so the comparison proves nothing"
+        )
+
+        let counts = try [one, two]
+            .map { kbite -> Int in
+                let code = kbite.kbite.code
+                return try selectStatements { db in
+                    let root = try KbiteWithResources.request(code: code).fetchOne(db)
+                    XCTAssertNotNil(
+                        root,
+                        "the kbite root matched no row: a prefetch GRDB skips is not a budget"
+                    )
+                }
+                .count
+            }
+        assertBudget(
+            "KBITE_GET root",
+            withOneChild: counts[0],
+            withTwoChildren: counts[1],
+            budget: 4
         )
     }
 

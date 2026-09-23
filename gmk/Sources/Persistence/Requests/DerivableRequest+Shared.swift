@@ -91,6 +91,38 @@ extension DerivableRequest where RowDecoder: BaseRecordFields {
 }
 
 extension DerivableRequest {
+    /// Orders the rows newest first: `created_at` descending, then rowid descending.
+    ///
+    /// The create-or-return and point fetches of the four summary tables all
+    /// take the most recent row for their key, so the order is spelled once.
+    /// Unconstrained by RowDecoder, like `withUuid`, so a composite request
+    /// can take it after `asRequest(of:)`; the columns belong to the base table.
+    /// - Returns: A request with the newest row first.
+    func newestFirst() -> Self {
+        order(Column("created_at").desc, Column("id").desc)
+    }
+}
+
+/// Request builders over the prompt table that decode the record itself.
+enum PromptRequests {
+    /// The prompts a listing surfaces, in the order its scope reads.
+    ///
+    /// `seq` is unique only inside one session, so the unscoped listing orders
+    /// by session first.
+    /// - Parameter sessionUuid: The session to list, or nil for every prompt.
+    /// - Returns: A request that fetches the prompt rows in listing order.
+    static func listed(sessionUuid: String?) -> QueryInterfaceRequest<PromptRecord> {
+        guard let sessionUuid else {
+            return PromptRecord.order(PromptRecord.Columns.sessionUuid, PromptRecord.Columns.seq)
+        }
+        return
+            PromptRecord
+            .filter(PromptRecord.Columns.sessionUuid == sessionUuid)
+            .orderedBySeq()
+    }
+}
+
+extension DerivableRequest {
     /// Keeps only the rows whose own `prompt_uuid` belongs to this session.
     ///
     /// A nil session reads every prompt's rows, the way the unscoped listing does.
