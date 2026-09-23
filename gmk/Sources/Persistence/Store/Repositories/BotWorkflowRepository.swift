@@ -104,28 +104,7 @@ struct BotWorkflowRepository: RepositoryContext {
         }
         let sessionUuid = prompt.sessionUuid
         if let existing = try fetchActive(promptUuid: req.promptUuid) {
-            // Steal the claim honestly: a different instance resuming a
-            // stranded run is the normal recovery path.
-            if let clientKey = req.clientKey, clientKey != existing.clientKey {
-                try releaseClientClaim(clientKey: clientKey, except: existing.uuid)
-                try core.updateBase(
-                    db,
-                    table: "bot_workflow",
-                    uuid: existing.uuid,
-                    expectedVersion: existing.version,
-                    set: ["client_key": clientKey]
-                )
-                try SessionRepository(db: db, core: core)
-                    .claimActivation(
-                        sessionUuid: sessionUuid,
-                        promptUuid: req.promptUuid,
-                        clientKey: clientKey
-                    )
-            }
-            guard let row = try fetchRow(uuid: existing.uuid) else {
-                throw StoreError.notFound(entity: "bot_workflow", key: existing.uuid)
-            }
-            return BotWorkflowResponse(workflow: row, created: false)
+            return try adoptActive(existing, req: req, sessionUuid: sessionUuid)
         }
         guard let variant = req.variant else {
             throw StoreError.badRequest(
@@ -168,6 +147,44 @@ struct BotWorkflowRepository: RepositoryContext {
             throw StoreError.notFound(entity: "bot_workflow", key: uuid)
         }
         return BotWorkflowResponse(workflow: row, created: true)
+    }
+
+    /// Returns the prompt's active workflow, moving its claim to the resuming caller.
+    ///
+    /// Steal the claim honestly: a different instance resuming a
+    /// stranded run is the normal recovery path.
+    ///
+    /// - Parameters:
+    ///   - existing: The prompt's active workflow.
+    ///   - req: The resume request carrying `promptUuid` and optional `clientKey`.
+    ///   - sessionUuid: The prompt's owning session uuid.
+    /// - Returns: The workflow, flagged as not created.
+    /// - Throws: `StoreError` when the version is stale or the row vanished.
+    private func adoptActive(
+        _ existing: BotWorkflowRow,
+        req: PromptResumeRequest,
+        sessionUuid: String
+    ) throws -> BotWorkflowResponse {
+        if let clientKey = req.clientKey, clientKey != existing.clientKey {
+            try releaseClientClaim(clientKey: clientKey, except: existing.uuid)
+            try core.updateBase(
+                db,
+                table: "bot_workflow",
+                uuid: existing.uuid,
+                expectedVersion: existing.version,
+                set: ["client_key": clientKey]
+            )
+            try SessionRepository(db: db, core: core)
+                .claimActivation(
+                    sessionUuid: sessionUuid,
+                    promptUuid: req.promptUuid,
+                    clientKey: clientKey
+                )
+        }
+        guard let row = try fetchRow(uuid: existing.uuid) else {
+            throw StoreError.notFound(entity: "bot_workflow", key: existing.uuid)
+        }
+        return BotWorkflowResponse(workflow: row, created: false)
     }
 
     /// Derives the current phase and returns its instructions and gate blockers.
@@ -361,62 +378,17 @@ struct BotWorkflowRepository: RepositoryContext {
         case .briefing:
             return []
         case .explore:
-            let ready =
-                try AgentBriefingRecord
-                .filter(AgentBriefingRecord.Columns.promptUuid == promptUuid)
-                .filter(AgentBriefingRecord.Columns.briefingForStep == "initial")
-                .filter(AgentBriefingRecord.Columns.status == "ready")
-                .fetchCount(db) > 0
-            return ready ? [] : ["initial briefing not ready"]
+            return try exploreBlockers(promptUuid: promptUuid)
         case .clarifyOpen:
-            var unmet: [String] = []
-            for agent in WorkflowSpec.expectedExplorationAgents(for: variant) {
-                if try explorationComplete(promptUuid: promptUuid, agentType: agent.rawValue) == false {
-                    unmet.append("exploration summary '\(agent.rawValue)' incomplete")
-                }
-            }
-            if try explorationComplete(promptUuid: promptUuid, agentType: "synthesis") == false {
-                unmet.append("synthesis summary (the prompt-level seal) incomplete")
-            }
-            return unmet
+            return try clarifyOpenBlockers(promptUuid: promptUuid, variant: variant)
         case .clarifyUser:
             let status = try clarificationStatus(promptUuid: promptUuid)
             return status == "answering" || status == "complete"
                 ? [] : ["clarification suite not sealed (status: \(status ?? "absent"))"]
         case .carePackage:
-            guard let status = try clarificationStatus(promptUuid: promptUuid),
-                status == "answering" || status == "complete"
-            else {
-                return ["clarification suite not sealed"]
-            }
-            let open =
-                try UserClarificationQuestionRecord
-                .filter(UserClarificationQuestionRecord.Columns.status == "open")
-                .joining(
-                    required: UserClarificationQuestionRecord.summary
-                        .filter(ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
-                )
-                .fetchCount(db)
-            return open == 0 ? [] : ["\(open) question(s) still open"]
+            return try carePackageBlockers(promptUuid: promptUuid)
         case .archOptions, .architecture:
-            if phase == .architecture && variant == .team {
-                let options =
-                    try ArchitectureOptionRecord
-                    .joining(
-                        required: ArchitectureOptionRecord.summary
-                            .filter(ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
-                    )
-                    .fetchCount(db)
-                return options > 0 ? [] : ["no architecture options written yet"]
-            }
-            let clarifyDone = try clarificationStatus(promptUuid: promptUuid) == "complete"
-            let promptStatus = try promptStatus(promptUuid: promptUuid)
-            var unmet: [String] = []
-            if !clarifyDone { unmet.append("clarification not finalized") }
-            if promptStatus == "draft" || promptStatus == "clarifying" {
-                unmet.append("prompt not yet architecting (\(CdeToolSpec.qualifiedName("cde_prompt")) op set_status)")
-            }
-            return unmet
+            return try architectureBlockers(phase: phase, promptUuid: promptUuid, variant: variant)
         case .planGate:
             let body =
                 try ArchitectureSummaryRecord
@@ -455,6 +427,96 @@ struct BotWorkflowRepository: RepositoryContext {
             return try promptStatus(promptUuid: promptUuid) == "done"
                 ? [] : ["prompt not done (\(CdeToolSpec.qualifiedName("cde_prompt")) op set_status status: done)"]
         }
+    }
+
+    /// Returns the explore phase's entry blockers: the initial briefing must be ready.
+    ///
+    /// - Parameter promptUuid: The prompt UUID.
+    /// - Returns: Blocker messages, empty if the gate is satisfied.
+    /// - Throws: Errors from database queries.
+    private func exploreBlockers(promptUuid: String) throws -> [String] {
+        let ready =
+            try AgentBriefingRecord
+            .filter(AgentBriefingRecord.Columns.promptUuid == promptUuid)
+            .filter(AgentBriefingRecord.Columns.briefingForStep == "initial")
+            .filter(AgentBriefingRecord.Columns.status == "ready")
+            .fetchCount(db) > 0
+        return ready ? [] : ["initial briefing not ready"]
+    }
+
+    /// Returns the clarify-open phase's entry blockers: every exploration and the synthesis sealed.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The prompt UUID.
+    ///   - variant: The workflow variant, which fixes the expected exploration agents.
+    /// - Returns: Blocker messages, empty if the gate is satisfied.
+    /// - Throws: Errors from database queries.
+    private func clarifyOpenBlockers(promptUuid: String, variant: BotVariant) throws -> [String] {
+        var unmet: [String] = []
+        for agent in WorkflowSpec.expectedExplorationAgents(for: variant) {
+            if try explorationComplete(promptUuid: promptUuid, agentType: agent.rawValue) == false {
+                unmet.append("exploration summary '\(agent.rawValue)' incomplete")
+            }
+        }
+        if try explorationComplete(promptUuid: promptUuid, agentType: "synthesis") == false {
+            unmet.append("synthesis summary (the prompt-level seal) incomplete")
+        }
+        return unmet
+    }
+
+    /// Returns the care-package phase's entry blockers: suite sealed and no question left open.
+    ///
+    /// - Parameter promptUuid: The prompt UUID.
+    /// - Returns: Blocker messages, empty if the gate is satisfied.
+    /// - Throws: Errors from database queries.
+    private func carePackageBlockers(promptUuid: String) throws -> [String] {
+        guard let status = try clarificationStatus(promptUuid: promptUuid),
+            status == "answering" || status == "complete"
+        else {
+            return ["clarification suite not sealed"]
+        }
+        let open =
+            try UserClarificationQuestionRecord
+            .filter(UserClarificationQuestionRecord.Columns.status == "open")
+            .joining(
+                required: UserClarificationQuestionRecord.summary
+                    .filter(ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
+            )
+            .fetchCount(db)
+        return open == 0 ? [] : ["\(open) question(s) still open"]
+    }
+
+    /// Returns the entry blockers shared by the arch-options and architecture phases.
+    ///
+    /// - Parameters:
+    ///   - phase: Either `.archOptions` or `.architecture`.
+    ///   - promptUuid: The prompt UUID.
+    ///   - variant: The workflow variant; team architecture gates on written options instead.
+    /// - Returns: Blocker messages, empty if the gate is satisfied.
+    /// - Throws: Errors from database queries.
+    private func architectureBlockers(
+        phase: WorkflowSpec.Phase,
+        promptUuid: String,
+        variant: BotVariant
+    ) throws -> [String] {
+        if phase == .architecture && variant == .team {
+            let options =
+                try ArchitectureOptionRecord
+                .joining(
+                    required: ArchitectureOptionRecord.summary
+                        .filter(ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
+                )
+                .fetchCount(db)
+            return options > 0 ? [] : ["no architecture options written yet"]
+        }
+        let clarifyDone = try clarificationStatus(promptUuid: promptUuid) == "complete"
+        let promptStatus = try promptStatus(promptUuid: promptUuid)
+        var unmet: [String] = []
+        if !clarifyDone { unmet.append("clarification not finalized") }
+        if promptStatus == "draft" || promptStatus == "clarifying" {
+            unmet.append("prompt not yet architecting (\(CdeToolSpec.qualifiedName("cde_prompt")) op set_status)")
+        }
+        return unmet
     }
 
     /// Fetches the newest UUID for each workflow phase entity.

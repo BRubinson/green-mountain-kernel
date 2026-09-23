@@ -289,49 +289,13 @@ struct ArchitectureRepository: RepositoryContext {
         guard !agentName.isEmpty else {
             throw StoreError.badRequest(detail: "agent_name is empty")
         }
-        let body = req.body.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !body.isEmpty else {
-            throw StoreError.badRequest(detail: "option body is empty")
-        }
-        guard body.utf8.count <= Store.maxNarrativeBytes else {
-            throw StoreError.badRequest(
-                detail: "option body exceeds \(Store.maxNarrativeBytes / (1024 * 1024)) MB"
-            )
-        }
-        // The supersede pair travels together — one without the other is a
-        // caller mistake, refused before anything is written.
-        if (req.supersedesOptionUuid == nil) != (req.expectedVersion == nil) {
-            throw StoreError.badRequest(
-                detail: "supersedes_option_uuid and expected_version must be passed together"
-            )
-        }
-        var superseded: ArchitectureOptionRow?
-        if let supersedesUuid = req.supersedesOptionUuid {
-            guard let old = try fetchOption(uuid: supersedesUuid) else {
-                throw StoreError.notFound(entity: "architecture_option", key: supersedesUuid)
-            }
-            guard old.architectureSummaryUuid == req.summaryUuid else {
-                throw StoreError.badRequest(
-                    detail: "option \(supersedesUuid) belongs to a different summary"
-                )
-            }
-            superseded = old
-        }
-        let collisions =
-            try ArchitectureOptionRecord
-            .all()
-            .filter(ArchitectureOptionRecord.Columns.architectureSummaryUuid == req.summaryUuid)
-            .filter(ArchitectureOptionRecord.Columns.agentName == agentName)
-            .filter(ArchitectureOptionRecord.Columns.uuid != (superseded?.uuid ?? ""))
-            .fetchCount(db)
-        if collisions > 0 {
-            // A persona may replace ITS OWN proposal (the superseded row is
-            // excluded above); colliding with a live sibling persona is still
-            // refused.
-            throw StoreError.badRequest(
-                detail: "agent '\(agentName)' already wrote an option for this summary"
-            )
-        }
+        let body = try validatedOptionBody(req.body)
+        let superseded = try supersededOption(req)
+        try refuseOptionCollision(
+            summaryUuid: req.summaryUuid,
+            agentName: agentName,
+            excluding: superseded?.uuid
+        )
         // Insert first, then reject: a failure between the two rolls the whole
         // verb back (one boundary), so no state exists where the old row is
         // rejected and no successor landed.
@@ -378,6 +342,81 @@ struct ArchitectureRepository: RepositoryContext {
             throw StoreError.notFound(entity: "architecture_option", key: uuid)
         }
         return ArchOptionRowResponse(option: row)
+    }
+
+    /// Trims an option body and refuses it when empty or over the narrative size cap.
+    ///
+    /// - Parameter raw: The option body as sent.
+    /// - Returns: The trimmed body.
+    /// - Throws: `StoreError.badRequest` when the body is empty or too large.
+    private func validatedOptionBody(_ raw: String) throws -> String {
+        let body = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty else {
+            throw StoreError.badRequest(detail: "option body is empty")
+        }
+        guard body.utf8.count <= Store.maxNarrativeBytes else {
+            throw StoreError.badRequest(
+                detail: "option body exceeds \(Store.maxNarrativeBytes / (1024 * 1024)) MB"
+            )
+        }
+        return body
+    }
+
+    /// Resolves the option an option-add supersedes, if any.
+    ///
+    /// - Parameter req: The option-add request carrying the optional supersede pair.
+    /// - Returns: The superseded option row, or nil when the request supersedes nothing.
+    /// - Throws: `StoreError.badRequest` on a half pair or foreign summary, `notFound` when absent.
+    private func supersededOption(_ req: ArchOptionAddRequest) throws -> ArchitectureOptionRow? {
+        // The supersede pair travels together — one without the other is a
+        // caller mistake, refused before anything is written.
+        if (req.supersedesOptionUuid == nil) != (req.expectedVersion == nil) {
+            throw StoreError.badRequest(
+                detail: "supersedes_option_uuid and expected_version must be passed together"
+            )
+        }
+        var superseded: ArchitectureOptionRow?
+        if let supersedesUuid = req.supersedesOptionUuid {
+            guard let old = try fetchOption(uuid: supersedesUuid) else {
+                throw StoreError.notFound(entity: "architecture_option", key: supersedesUuid)
+            }
+            guard old.architectureSummaryUuid == req.summaryUuid else {
+                throw StoreError.badRequest(
+                    detail: "option \(supersedesUuid) belongs to a different summary"
+                )
+            }
+            superseded = old
+        }
+        return superseded
+    }
+
+    /// Refuses an option-add when the agent already holds another option on the summary.
+    ///
+    /// - Parameters:
+    ///   - summaryUuid: The architecture summary uuid.
+    ///   - agentName: The normalized agent name.
+    ///   - excluding: The superseded option uuid, which does not count as a collision.
+    /// - Throws: `StoreError.badRequest` when a live option by the same agent exists.
+    private func refuseOptionCollision(
+        summaryUuid: String,
+        agentName: String,
+        excluding: String?
+    ) throws {
+        let collisions =
+            try ArchitectureOptionRecord
+            .all()
+            .filter(ArchitectureOptionRecord.Columns.architectureSummaryUuid == summaryUuid)
+            .filter(ArchitectureOptionRecord.Columns.agentName == agentName)
+            .filter(ArchitectureOptionRecord.Columns.uuid != (excluding ?? ""))
+            .fetchCount(db)
+        if collisions > 0 {
+            // A persona may replace ITS OWN proposal (the superseded row is
+            // excluded above); colliding with a live sibling persona is still
+            // refused.
+            throw StoreError.badRequest(
+                detail: "agent '\(agentName)' already wrote an option for this summary"
+            )
+        }
     }
 
     /// Carries a superseded selection to its successor option.
@@ -519,17 +558,7 @@ struct ArchitectureRepository: RepositoryContext {
             .filter { !plannedPaths.contains($0.path) }
             .sorted { $0.path < $1.path }
 
-        // Persistence-first audit: every persistence path's first touch
-        // must precede every general path's first touch. Vacuously nil
-        // when either side is empty or untouched.
-        let persistenceFirsts = persistence.compactMap(\.implementation.firstChangedAt)
-        let generalFirsts = allGeneral.compactMap(\.implementation.firstChangedAt)
-        let orderingRespected: Bool?
-        if let latestPersistence = persistenceFirsts.max(), let earliestGeneral = generalFirsts.min() {
-            orderingRespected = latestPersistence <= earliestGeneral
-        } else {
-            orderingRespected = nil
-        }
+        let orderingRespected = persistenceFirstRespected(persistence: persistence, general: allGeneral)
 
         let allOptions = root.options.map { $0.dto() }
 
@@ -553,13 +582,80 @@ struct ArchitectureRepository: RepositoryContext {
         let wantEveryOptionBody = req.includeOptions ?? (req.optionUuid == nil)
         let wantEveryChangeCode = req.full ?? (req.changeUuid == nil)
 
+        let (options, optionStubs) = narrowOptions(
+            allOptions,
+            optionUuid: req.optionUuid,
+            wantEveryBody: wantEveryOptionBody
+        )
+        let (window, nextCursor) = try pageGeneralChanges(allGeneral, req: req)
+        let (generalChanges, generalChangeStubs) = projectGeneralChanges(
+            window: window,
+            allGeneral: allGeneral,
+            changeUuid: req.changeUuid,
+            wantEveryCode: wantEveryChangeCode
+        )
+
+        return ArchGetResponse(
+            summary: summary,
+            persistenceChanges: persistence,
+            generalChanges: generalChanges,
+            unplannedChanges: unplanned,
+            orderingRespected: orderingRespected,
+            options: options,
+            optionStubs: optionStubs,
+            generalChangeStubs: generalChangeStubs,
+            changePage: ArchChangePage(
+                limit: req.limit,
+                returned: window.count,
+                totalGeneralChanges: allGeneral.count,
+                nextCursor: nextCursor
+            )
+        )
+    }
+
+    /// Audits that every persistence path was first touched before any general path.
+    ///
+    /// - Parameters:
+    ///   - persistence: The planned persistence changes with their implementation state.
+    ///   - general: The planned general changes with their implementation state.
+    /// - Returns: The audit verdict, nil when either side is empty or untouched.
+    private func persistenceFirstRespected(
+        persistence: [ArchPersistenceChangeRow],
+        general: [ArchGeneralChangeRow]
+    ) -> Bool? {
+        // Persistence-first audit: every persistence path's first touch
+        // must precede every general path's first touch. Vacuously nil
+        // when either side is empty or untouched.
+        let persistenceFirsts = persistence.compactMap(\.implementation.firstChangedAt)
+        let generalFirsts = general.compactMap(\.implementation.firstChangedAt)
+        let orderingRespected: Bool?
+        if let latestPersistence = persistenceFirsts.max(), let earliestGeneral = generalFirsts.min() {
+            orderingRespected = latestPersistence <= earliestGeneral
+        } else {
+            orderingRespected = nil
+        }
+        return orderingRespected
+    }
+
+    /// Narrows the option set to the named body while keeping a stub for every option.
+    ///
+    /// - Parameters:
+    ///   - allOptions: Every option row of the summary.
+    ///   - optionUuid: The one option whose body is wanted, if named.
+    ///   - wantEveryBody: True to return every body and no stubs.
+    /// - Returns: The full option rows and the stub roster, nil when every body is returned.
+    private func narrowOptions(
+        _ allOptions: [ArchitectureOptionRow],
+        optionUuid: String?,
+        wantEveryBody: Bool
+    ) -> (options: [ArchitectureOptionRow], stubs: [ArchitectureOptionStub]?) {
         let options: [ArchitectureOptionRow]
         let optionStubs: [ArchitectureOptionStub]?
-        if wantEveryOptionBody {
+        if wantEveryBody {
             options = allOptions
             optionStubs = nil
         } else {
-            options = req.optionUuid.map { uuid in allOptions.filter { $0.uuid == uuid } } ?? []
+            options = optionUuid.map { uuid in allOptions.filter { $0.uuid == uuid } } ?? []
             // The ROSTER is always complete: a body can be withheld, an
             // option's existence cannot.
             optionStubs = allOptions.map { option in
@@ -573,7 +669,20 @@ struct ArchitectureRepository: RepositoryContext {
                 )
             }
         }
+        return (options, optionStubs)
+    }
 
+    /// Cuts the general-change page selected by the request's cursor and limit.
+    ///
+    /// - Parameters:
+    ///   - allGeneral: Every general change of the summary, in seq order.
+    ///   - req: The get request carrying cursor, limit and change uuid.
+    /// - Returns: The page window and the cursor of the next page, nil on the last page.
+    /// - Throws: `StoreError.badRequest` on a non-numeric cursor or a non-positive limit.
+    private func pageGeneralChanges(
+        _ allGeneral: [ArchGeneralChangeRow],
+        req: ArchGetRequest
+    ) throws -> (window: [ArchGeneralChangeRow], nextCursor: String?) {
         // changeUuid pins one row by identity, so it ignores limit/cursor —
         // "give me this" is not a page.
         var window = allGeneral
@@ -597,14 +706,30 @@ struct ArchitectureRepository: RepositoryContext {
                 }
             }
         }
+        return (window, nextCursor)
+    }
 
+    /// Projects the paged general changes into full rows or excerpted stubs.
+    ///
+    /// - Parameters:
+    ///   - window: The paged general changes.
+    ///   - allGeneral: Every general change of the summary, searched for the pinned uuid.
+    ///   - changeUuid: The one change whose code is wanted, if named.
+    ///   - wantEveryCode: True to return the window whole and no stubs.
+    /// - Returns: The full change rows and the stubs, nil when every code is returned.
+    private func projectGeneralChanges(
+        window: [ArchGeneralChangeRow],
+        allGeneral: [ArchGeneralChangeRow],
+        changeUuid: String?,
+        wantEveryCode: Bool
+    ) -> (changes: [ArchGeneralChangeRow], stubs: [ArchGeneralChangeStub]?) {
         let generalChanges: [ArchGeneralChangeRow]
         let generalChangeStubs: [ArchGeneralChangeStub]?
-        if wantEveryChangeCode {
+        if wantEveryCode {
             generalChanges = window
             generalChangeStubs = nil
         } else {
-            generalChanges = req.changeUuid.map { uuid in allGeneral.filter { $0.uuid == uuid } } ?? []
+            generalChanges = changeUuid.map { uuid in allGeneral.filter { $0.uuid == uuid } } ?? []
             generalChangeStubs = window.map { change in
                 let code = CdeExcerpt.take(change.changeCode)
                 return ArchGeneralChangeStub(
@@ -621,23 +746,7 @@ struct ArchitectureRepository: RepositoryContext {
                 )
             }
         }
-
-        return ArchGetResponse(
-            summary: summary,
-            persistenceChanges: persistence,
-            generalChanges: generalChanges,
-            unplannedChanges: unplanned,
-            orderingRespected: orderingRespected,
-            options: options,
-            optionStubs: optionStubs,
-            generalChangeStubs: generalChangeStubs,
-            changePage: ArchChangePage(
-                limit: req.limit,
-                returned: window.count,
-                totalGeneralChanges: allGeneral.count,
-                nextCursor: nextCursor
-            )
-        )
+        return (generalChanges, generalChangeStubs)
     }
 
     // MARK: - Option guard (m0025)

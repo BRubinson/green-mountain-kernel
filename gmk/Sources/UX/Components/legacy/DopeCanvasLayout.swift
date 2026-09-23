@@ -34,18 +34,7 @@ enum DopeCanvasLayout {
         environment: DiagramRenderEnvironment = .init(),
         metrics: Metrics = .init()
     ) -> [DiagramMutation] {
-        var mutations: [DiagramMutation] = []
-
-        for element in existing {
-            mutations.append(
-                .elementDelete(
-                    DiagramElementDelete(
-                        elementUuid: element.identity.uuid,
-                        expectedVersion: element.identity.version
-                    )
-                )
-            )
-        }
+        var mutations = deletions(of: existing)
 
         mutations.append(
             .elementAdd(
@@ -98,5 +87,20 @@ enum DopeCanvasLayout {
             xCursor += Double(columns) * metrics.xPitch + metrics.domainGap
         }
         return mutations
+    }
+
+    /// Returns one version-pinned element delete per existing element, in input order.
+    ///
+    /// - Parameter existing: The current diagram elements to remove.
+    /// - Returns: The delete mutations for `existing`.
+    private static func deletions(of existing: [DiagramElementNode]) -> [DiagramMutation] {
+        existing.map { element in
+            .elementDelete(
+                DiagramElementDelete(
+                    elementUuid: element.identity.uuid,
+                    expectedVersion: element.identity.version
+                )
+            )
+        }
     }
 }

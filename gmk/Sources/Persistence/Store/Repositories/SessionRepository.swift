@@ -38,6 +38,38 @@ struct SessionRepository: RepositoryContext {
         if let name = req.name { set["name"] = name }
         if let backstory = req.backstory { set["backstory"] = backstory }
         if let goal = req.goal { set["goal"] = goal }
+        let activationTouched = try applyActivationOverride(req)
+        guard !set.isEmpty || activationTouched else {
+            throw StoreError.emptyUpdate(entity: "session")
+        }
+        if !set.isEmpty {
+            try core.updateBase(
+                db,
+                table: "session",
+                uuid: req.sessionUuid,
+                expectedVersion: req.expectedVersion,
+                set: set
+            )
+        }
+        try core.appendEvent(
+            db,
+            kind: .updateSession,
+            subjectUuid: req.sessionUuid,
+            payload: Store.jsonPayload(["fields": set.keys.sorted()])
+        )
+        guard let row = try fetchRow(uuid: req.sessionUuid) else {
+            throw StoreError.notFound(entity: "session", key: req.sessionUuid)
+        }
+        return row
+    }
+
+    /// Applies a session update's activation-claim override, if the request carries one.
+    ///
+    /// - Parameter req: The session update request carrying the claim or clear flag.
+    /// - Returns: Whether the activation registry was touched.
+    /// - Throws: `StoreError.badRequest` on a conflicting pair, missing client key, or foreign
+    ///   prompt; `StoreError.notFound` when the prompt does not exist.
+    private func applyActivationOverride(_ req: SessionUpdateRequest) throws -> Bool {
         // Manual override of the activation claim PROMPT_SET_STATUS
         // normally maintains for the calling instance. Exactly one of
         // the pair; the prompt must belong to this session (a Swift
@@ -87,28 +119,7 @@ struct SessionRepository: RepositoryContext {
             )
             activationTouched = true
         }
-        guard !set.isEmpty || activationTouched else {
-            throw StoreError.emptyUpdate(entity: "session")
-        }
-        if !set.isEmpty {
-            try core.updateBase(
-                db,
-                table: "session",
-                uuid: req.sessionUuid,
-                expectedVersion: req.expectedVersion,
-                set: set
-            )
-        }
-        try core.appendEvent(
-            db,
-            kind: .updateSession,
-            subjectUuid: req.sessionUuid,
-            payload: Store.jsonPayload(["fields": set.keys.sorted()])
-        )
-        guard let row = try fetchRow(uuid: req.sessionUuid) else {
-            throw StoreError.notFound(entity: "session", key: req.sessionUuid)
-        }
-        return row
+        return activationTouched
     }
 
     // MARK: - Shared fetch helpers

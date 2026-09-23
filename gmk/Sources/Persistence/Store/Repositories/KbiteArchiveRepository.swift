@@ -113,67 +113,24 @@ struct KbiteArchiveRepository: RepositoryContext {
         }
 
         let kbites = KbiteResourceRepository(db: db, core: core)
-        let kbiteUuid = try ContextRepository(db: db, core: core).ensureKbite(code: rehydrated.code)
-        // Clean-slate content replace under the stable kbite uuid:
-        // resources cascade to files + file junctions; the kbite-level
-        // keyword junction is cleared explicitly. Registrations survive.
-        try db.execute(
-            sql: "DELETE FROM kbite_resource WHERE kbite_uuid = ?",
-            arguments: [kbiteUuid]
-        )
-        try db.execute(
-            sql: "DELETE FROM kbite_keyword_junction WHERE kbite_uuid = ?",
-            arguments: [kbiteUuid]
-        )
+        let kbiteUuid = try resetKbiteContent(code: rehydrated.code)
 
         var fileCount = 0
         var attachedKeywords: Set<String> = []
         for resource in rehydrated.resources {
-            let resourceUuid = try core.insertBase(
-                db,
-                table: "kbite_resource",
-                extra: [
-                    "kbite_uuid": kbiteUuid,
-                    "resource_name": resource.resourceName,
-                    "resource_summary": resource.resourceSummary,
-                    "resource_type": resource.resourceType,
-                    "resource_trust": resource.resourceTrust,
-                ]
+            fileCount += try importResource(
+                resource,
+                kbiteUuid: kbiteUuid,
+                kbites: kbites,
+                attachedKeywords: &attachedKeywords
             )
-            for file in resource.files {
-                let fileUuid = try core.insertBase(
-                    db,
-                    table: "kbite_resource_file",
-                    extra: [
-                        "kbite_resource_uuid": resourceUuid,
-                        "resource_file_name": file.resourceFileName,
-                        "resource_file_summary": file.resourceFileSummary,
-                        "resource_file_content": file.resourceFileContent,
-                    ]
-                )
-                fileCount += 1
-                for keyword in file.keywords {
-                    let keywordUuid = try kbites.ensureKeyword(keyword)
-                    try kbites.attachKeyword(
-                        table: "resource_file_keyword_junction",
-                        ownerColumn: "file_uuid",
-                        ownerUuid: fileUuid,
-                        keywordUuid: keywordUuid
-                    )
-                    attachedKeywords.insert(keyword)
-                }
-            }
         }
-        for keyword in rehydrated.kbiteKeywords {
-            let keywordUuid = try kbites.ensureKeyword(keyword)
-            try kbites.attachKeyword(
-                table: "kbite_keyword_junction",
-                ownerColumn: "kbite_uuid",
-                ownerUuid: kbiteUuid,
-                keywordUuid: keywordUuid
-            )
-            attachedKeywords.insert(keyword)
-        }
+        try attachKbiteKeywords(
+            rehydrated.kbiteKeywords,
+            kbiteUuid: kbiteUuid,
+            kbites: kbites,
+            attachedKeywords: &attachedKeywords
+        )
 
         // An overwrite is exactly the import/delete cycle the GC exists
         // for — the previous content's keywords must not orphan forever.
@@ -201,6 +158,128 @@ struct KbiteArchiveRepository: RepositoryContext {
             fileCount: fileCount,
             keywordCount: attachedKeywords.count
         )
+    }
+
+    /// Ensures the kbite row exists and clears its content for a fresh import.
+    ///
+    /// - Parameter code: The kbite code being imported.
+    /// - Returns: The stable kbite UUID.
+    /// - Throws: Any database error.
+    private func resetKbiteContent(code: String) throws -> String {
+        let kbiteUuid = try ContextRepository(db: db, core: core).ensureKbite(code: code)
+        // Clean-slate content replace under the stable kbite uuid:
+        // resources cascade to files + file junctions; the kbite-level
+        // keyword junction is cleared explicitly. Registrations survive.
+        try db.execute(
+            sql: "DELETE FROM kbite_resource WHERE kbite_uuid = ?",
+            arguments: [kbiteUuid]
+        )
+        try db.execute(
+            sql: "DELETE FROM kbite_keyword_junction WHERE kbite_uuid = ?",
+            arguments: [kbiteUuid]
+        )
+        return kbiteUuid
+    }
+
+    /// Inserts one imported resource and its files under the kbite.
+    ///
+    /// - Parameters:
+    ///   - resource: The resource entry from the export document.
+    ///   - kbiteUuid: The owning kbite UUID.
+    ///   - kbites: The repository that owns the shared keyword vocabulary.
+    ///   - attachedKeywords: Accumulates every keyword text attached so far.
+    /// - Returns: The number of files inserted for this resource.
+    /// - Throws: Any database error.
+    private func importResource(
+        _ resource: KbiteExportDocument.Resource,
+        kbiteUuid: String,
+        kbites: KbiteResourceRepository,
+        attachedKeywords: inout Set<String>
+    ) throws -> Int {
+        let resourceUuid = try core.insertBase(
+            db,
+            table: "kbite_resource",
+            extra: [
+                "kbite_uuid": kbiteUuid,
+                "resource_name": resource.resourceName,
+                "resource_summary": resource.resourceSummary,
+                "resource_type": resource.resourceType,
+                "resource_trust": resource.resourceTrust,
+            ]
+        )
+        var fileCount = 0
+        for file in resource.files {
+            try importFile(
+                file,
+                resourceUuid: resourceUuid,
+                kbites: kbites,
+                attachedKeywords: &attachedKeywords
+            )
+            fileCount += 1
+        }
+        return fileCount
+    }
+
+    /// Inserts one imported file and attaches its keywords.
+    ///
+    /// - Parameters:
+    ///   - file: The file entry from the export document.
+    ///   - resourceUuid: The owning resource UUID.
+    ///   - kbites: The repository that owns the shared keyword vocabulary.
+    ///   - attachedKeywords: Accumulates every keyword text attached so far.
+    /// - Throws: Any database error.
+    private func importFile(
+        _ file: KbiteExportDocument.File,
+        resourceUuid: String,
+        kbites: KbiteResourceRepository,
+        attachedKeywords: inout Set<String>
+    ) throws {
+        let fileUuid = try core.insertBase(
+            db,
+            table: "kbite_resource_file",
+            extra: [
+                "kbite_resource_uuid": resourceUuid,
+                "resource_file_name": file.resourceFileName,
+                "resource_file_summary": file.resourceFileSummary,
+                "resource_file_content": file.resourceFileContent,
+            ]
+        )
+        for keyword in file.keywords {
+            let keywordUuid = try kbites.ensureKeyword(keyword)
+            try kbites.attachKeyword(
+                table: "resource_file_keyword_junction",
+                ownerColumn: "file_uuid",
+                ownerUuid: fileUuid,
+                keywordUuid: keywordUuid
+            )
+            attachedKeywords.insert(keyword)
+        }
+    }
+
+    /// Attaches the kbite-level keywords from an imported document.
+    ///
+    /// - Parameters:
+    ///   - keywords: The kbite-level keyword texts.
+    ///   - kbiteUuid: The owning kbite UUID.
+    ///   - kbites: The repository that owns the shared keyword vocabulary.
+    ///   - attachedKeywords: Accumulates every keyword text attached so far.
+    /// - Throws: Any database error.
+    private func attachKbiteKeywords(
+        _ keywords: [String],
+        kbiteUuid: String,
+        kbites: KbiteResourceRepository,
+        attachedKeywords: inout Set<String>
+    ) throws {
+        for keyword in keywords {
+            let keywordUuid = try kbites.ensureKeyword(keyword)
+            try kbites.attachKeyword(
+                table: "kbite_keyword_junction",
+                ownerColumn: "kbite_uuid",
+                ownerUuid: kbiteUuid,
+                keywordUuid: keywordUuid
+            )
+            attachedKeywords.insert(keyword)
+        }
     }
 
     /// Deletes a kbite and its resources, files, and keywords.

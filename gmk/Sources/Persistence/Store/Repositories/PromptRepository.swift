@@ -27,6 +27,50 @@ struct PromptRepository: RepositoryContext {
                 uuid: req.sessionUuid
             ) + 1
         let code = req.code ?? "p\(seq)"
+        let gmfsPath = try resolveGmfsPath(for: req, seq: seq)
+        let uuid = try core.insertBase(
+            db,
+            table: "prompt",
+            extra: [
+                "session_uuid": req.sessionUuid,
+                "seq": seq,
+                "code": code,
+                "name": req.name,
+                "backstory": req.backstory,
+                "goal": req.goal,
+                "detail": req.detail,
+                "command": req.command ?? "",
+                "status": PromptStatus.draft.rawValue,
+                "gmfs_relative_storage_path": gmfsPath,
+            ],
+            uuid: req.uuid
+        )
+        try seedPromptKbites(promptUuid: uuid, sessionUuid: req.sessionUuid)
+        // Item 4: payload carries session_uuid so GMVibes can route the
+        // event to one session instead of invalidating all of them.
+        try core.appendEvent(
+            db,
+            kind: .createPrompt,
+            subjectUuid: uuid,
+            payload: Store.jsonPayload(
+                ["seq": seq, "name": req.name, "session_uuid": req.sessionUuid])
+        )
+        // Item 3: prompt writes advance session recency (version untouched).
+        try core.touchSession(db, uuid: req.sessionUuid)
+        guard let row = try fetchRow(uuid: uuid) else {
+            throw StoreError.notFound(entity: "prompt", key: uuid)
+        }
+        return row
+    }
+
+    /// Resolves the gmfs folder a new prompt stores under, deriving it from the session when absent.
+    ///
+    /// - Parameters:
+    ///   - req: The create request, whose supplied path wins when non-empty.
+    ///   - seq: The prompt's per-session sequence number.
+    /// - Returns: The relative storage path, or an empty string when none can be derived.
+    /// - Throws: Any database error while reading the session's path.
+    private func resolveGmfsPath(for req: PromptCreateRequest, seq: Int64) throws -> String {
         // Item 7: derive the gmfs folder daemon-side when the caller
         // doesn't supply one — the session row (same transaction) already
         // carries its own path, and the folder convention is
@@ -49,28 +93,21 @@ struct PromptRepository: RepositoryContext {
                 gmfsPath = "\(sessionPath)/prompts/\(seq)_\(Store.slugStorageSegment(req.name))"
             }
         }
-        let uuid = try core.insertBase(
-            db,
-            table: "prompt",
-            extra: [
-                "session_uuid": req.sessionUuid,
-                "seq": seq,
-                "code": code,
-                "name": req.name,
-                "backstory": req.backstory,
-                "goal": req.goal,
-                "detail": req.detail,
-                "command": req.command ?? "",
-                "status": PromptStatus.draft.rawValue,
-                "gmfs_relative_storage_path": gmfsPath,
-            ],
-            uuid: req.uuid
-        )
+        return gmfsPath
+    }
+
+    /// Copies the session's active kbites onto a newly created prompt.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The new prompt's uuid.
+    ///   - sessionUuid: The session whose kbite registry is inherited.
+    /// - Throws: Any database error during the fetch or inserts.
+    private func seedPromptKbites(promptUuid: String, sessionUuid: String) throws {
         // Seed prompt kbites from the session registry (create-time-only
         // inheritance, same rule as the context chain).
         let sessionKbites =
             try SessionActiveKbiteRecord
-            .filter(SessionActiveKbiteRecord.Columns.sessionUuid == req.sessionUuid)
+            .filter(SessionActiveKbiteRecord.Columns.sessionUuid == sessionUuid)
             .select(SessionActiveKbiteRecord.Columns.kbiteUuid, as: String.self)
             .fetchAll(db)
         for kbiteUuid in sessionKbites {
@@ -78,26 +115,11 @@ struct PromptRepository: RepositoryContext {
                 db,
                 table: "prompt_active_kbite",
                 extra: [
-                    "prompt_uuid": uuid,
+                    "prompt_uuid": promptUuid,
                     "kbite_uuid": kbiteUuid,
                 ]
             )
         }
-        // Item 4: payload carries session_uuid so GMVibes can route the
-        // event to one session instead of invalidating all of them.
-        try core.appendEvent(
-            db,
-            kind: .createPrompt,
-            subjectUuid: uuid,
-            payload: Store.jsonPayload(
-                ["seq": seq, "name": req.name, "session_uuid": req.sessionUuid])
-        )
-        // Item 3: prompt writes advance session recency (version untouched).
-        try core.touchSession(db, uuid: req.sessionUuid)
-        guard let row = try fetchRow(uuid: uuid) else {
-            throw StoreError.notFound(entity: "prompt", key: uuid)
-        }
-        return row
     }
 
     /// Lists prompts for a session or all prompts.

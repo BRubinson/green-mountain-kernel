@@ -50,6 +50,72 @@ struct BriefingRepository: RepositoryContext {
     /// - Throws: `StoreError` when the owner or step is invalid or does not exist.
     func open(_ req: BriefingOpenRequest) throws -> BriefingRowResponse {
         let step = try BriefingStepSpec.validateStep(req.briefingForStep)
+        let (sessionUuid, promptUuid) = try resolveOwner(req)
+
+        // A prompt-owned open also claims the activation for the calling
+        // instance (review finding 5f68f01d): briefings are consumed at the
+        // very start of a run, and the claim is what makes every downstream
+        // agent's zero-uuid pull deterministic.
+        if let promptUuid, let clientKey = req.clientKey {
+            try SessionRepository(db: db, core: core)
+                .claimActivation(
+                    sessionUuid: sessionUuid,
+                    promptUuid: promptUuid,
+                    clientKey: clientKey
+                )
+        }
+
+        if let promptUuid {
+            try initiatePrompt(promptUuid: promptUuid)
+        }
+
+        if let existing = try fetchBriefingRow(
+            ownerPrompt: promptUuid,
+            ownerSession: sessionUuid,
+            step: step
+        ) {
+            return try resetBriefing(
+                existing,
+                step: step,
+                sessionUuid: sessionUuid,
+                promptUuid: promptUuid
+            )
+        }
+
+        let uuid = try core.insertBase(
+            db,
+            table: "agent_briefing",
+            extra: [
+                "session_uuid": sessionUuid,
+                "prompt_uuid": promptUuid,
+                "briefing_for_step": step,
+                "status": "building",
+            ]
+        )
+        try core.appendEvent(
+            db,
+            kind: .briefingChange,
+            subjectUuid: uuid,
+            payload: Store.jsonPayload([
+                "action": "open", "step": step,
+                "session_uuid": sessionUuid, "prompt_uuid": promptUuid,
+            ])
+        )
+        try core.touchSession(db, uuid: sessionUuid)
+        guard let row = try fetchBriefing(uuid: uuid) else {
+            throw StoreError.notFound(entity: "agent_briefing", key: uuid)
+        }
+        return BriefingRowResponse(briefing: row, created: true)
+    }
+
+    /// Resolves the single owner of a briefing open into its session and optional prompt uuid.
+    ///
+    /// - Parameter req: The briefing open request naming exactly one owner.
+    /// - Returns: The owning session uuid and, when prompt-owned, the prompt uuid.
+    /// - Throws: `StoreError` when the owner is missing, ambiguous, or does not exist.
+    private func resolveOwner(
+        _ req: BriefingOpenRequest
+    ) throws -> (sessionUuid: String, promptUuid: String?) {
         let sessionUuid: String
         let promptUuid: String?
         switch (req.promptUuid, req.sessionUuid) {
@@ -77,106 +143,85 @@ struct BriefingRepository: RepositoryContext {
                 detail: "briefing open takes exactly one owner: --prompt-uuid or --session-uuid"
             )
         }
+        return (sessionUuid, promptUuid)
+    }
 
-        // A prompt-owned open also claims the activation for the calling
-        // instance (review finding 5f68f01d): briefings are consumed at the
-        // very start of a run, and the claim is what makes every downstream
-        // agent's zero-uuid pull deterministic.
-        if let promptUuid, let clientKey = req.clientKey {
-            try SessionRepository(db: db, core: core)
-                .claimActivation(
-                    sessionUuid: sessionUuid,
-                    promptUuid: promptUuid,
-                    clientKey: clientKey
-                )
-        }
-
-        // Opening a prompt's briefing is what STARTS it: draft → initiated,
-        // here, and NOT on loading the prompt. Loading is a pure read and has to
-        // stay one, because in an append-only db a read that advances the prompt
-        // is not retractable. A guarded UPDATE rather than a read-then-write: it
-        // is idempotent by construction and cannot race, and it deliberately
-        // avoids setStatus, which checks an expected_version this caller has no
-        // business holding. BRIEFING_OPEN is not a lifecycle verb.
-        if let promptUuid {
-            try db.execute(
-                sql: """
-                    UPDATE prompt
-                       SET status = 'initiated', updated_at = ?, version = version + 1
-                     WHERE uuid = ? AND status = 'draft';
-                    """,
-                arguments: [Store.isoNow(), promptUuid]
-            )
-            if db.changesCount > 0 {
-                try core.appendEvent(
-                    db,
-                    kind: .promptStatusChange,
-                    subjectUuid: promptUuid,
-                    payload: Store.jsonPayload([
-                        "from": PromptStatus.draft.rawValue,
-                        "to": PromptStatus.initiated.rawValue,
-                        "via": "briefing_open",
-                    ])
-                )
-            }
-        }
-
-        if let existing = try fetchBriefingRow(
-            ownerPrompt: promptUuid,
-            ownerSession: sessionUuid,
-            step: step
-        ) {
-            // Reset, never duplicate — and since refs are child rows now,
-            // reset TRUNCATES them: a step's briefing is its CURRENT
-            // briefing, stale refs must not leak into the rebuilt one.
-            try deleteChildren(briefingUuid: existing.uuid)
-            try core.updateBase(
-                db,
-                table: "agent_briefing",
-                uuid: existing.uuid,
-                expectedVersion: existing.version,
-                set: ["status": "building"]
-            )
+    /// Moves a draft prompt to initiated and records the status change when a row moved.
+    ///
+    /// Opening a prompt's briefing is what STARTS it: draft → initiated,
+    /// here, and NOT on loading the prompt. Loading is a pure read and has to
+    /// stay one, because in an append-only db a read that advances the prompt
+    /// is not retractable. A guarded UPDATE rather than a read-then-write: it
+    /// is idempotent by construction and cannot race, and it deliberately
+    /// avoids setStatus, which checks an expected_version this caller has no
+    /// business holding. BRIEFING_OPEN is not a lifecycle verb.
+    ///
+    /// - Parameter promptUuid: The prompt whose briefing is being opened.
+    /// - Throws: `StoreError` on database access failures.
+    private func initiatePrompt(promptUuid: String) throws {
+        try db.execute(
+            sql: """
+                UPDATE prompt
+                   SET status = 'initiated', updated_at = ?, version = version + 1
+                 WHERE uuid = ? AND status = 'draft';
+                """,
+            arguments: [Store.isoNow(), promptUuid]
+        )
+        if db.changesCount > 0 {
             try core.appendEvent(
                 db,
-                kind: .briefingChange,
-                subjectUuid: existing.uuid,
+                kind: .promptStatusChange,
+                subjectUuid: promptUuid,
                 payload: Store.jsonPayload([
-                    "action": "reset", "step": step,
-                    "session_uuid": sessionUuid, "prompt_uuid": promptUuid,
+                    "from": PromptStatus.draft.rawValue,
+                    "to": PromptStatus.initiated.rawValue,
+                    "via": "briefing_open",
                 ])
             )
-            try core.touchSession(db, uuid: sessionUuid)
-            guard let row = try fetchBriefing(uuid: existing.uuid) else {
-                throw StoreError.notFound(entity: "agent_briefing", key: existing.uuid)
-            }
-            return BriefingRowResponse(briefing: row, created: false)
         }
+    }
 
-        let uuid = try core.insertBase(
+    /// Resets an existing briefing row to building, truncating its child refs.
+    ///
+    /// Reset, never duplicate — and since refs are child rows now,
+    /// reset TRUNCATES them: a step's briefing is its CURRENT
+    /// briefing, stale refs must not leak into the rebuilt one.
+    ///
+    /// - Parameters:
+    ///   - existing: The briefing row already held for this (owner, step) pair.
+    ///   - step: The validated briefing step.
+    ///   - sessionUuid: The owning session uuid.
+    ///   - promptUuid: The owning prompt uuid, or nil when session-owned.
+    /// - Returns: The reset briefing row, flagged as not created.
+    /// - Throws: `StoreError` when the version is stale or the row vanished.
+    private func resetBriefing(
+        _ existing: AgentBriefingRow,
+        step: String,
+        sessionUuid: String,
+        promptUuid: String?
+    ) throws -> BriefingRowResponse {
+        try deleteChildren(briefingUuid: existing.uuid)
+        try core.updateBase(
             db,
             table: "agent_briefing",
-            extra: [
-                "session_uuid": sessionUuid,
-                "prompt_uuid": promptUuid,
-                "briefing_for_step": step,
-                "status": "building",
-            ]
+            uuid: existing.uuid,
+            expectedVersion: existing.version,
+            set: ["status": "building"]
         )
         try core.appendEvent(
             db,
             kind: .briefingChange,
-            subjectUuid: uuid,
+            subjectUuid: existing.uuid,
             payload: Store.jsonPayload([
-                "action": "open", "step": step,
+                "action": "reset", "step": step,
                 "session_uuid": sessionUuid, "prompt_uuid": promptUuid,
             ])
         )
         try core.touchSession(db, uuid: sessionUuid)
-        guard let row = try fetchBriefing(uuid: uuid) else {
-            throw StoreError.notFound(entity: "agent_briefing", key: uuid)
+        guard let row = try fetchBriefing(uuid: existing.uuid) else {
+            throw StoreError.notFound(entity: "agent_briefing", key: existing.uuid)
         }
-        return BriefingRowResponse(briefing: row, created: true)
+        return BriefingRowResponse(briefing: row, created: false)
     }
 
     /// building → ready.
@@ -209,62 +254,9 @@ struct BriefingRepository: RepositoryContext {
         // replaces the whole ref set, never appends to it.
         try deleteChildren(briefingUuid: req.briefingUuid)
 
-        var unresolvedDopeRefs: [String] = []
-        for (i, code) in (req.dopeRefs ?? []).enumerated() {
-            try validateDopeRefShape(code)
-            if let scope {
-                let resolves = try dope.dotPathExists(scopeUuid: scope.uuid, path: code)
-                if !resolves { unresolvedDopeRefs.append(code) }
-            }
-            try core.insertBase(
-                db,
-                table: "agent_briefing_dope_persistence",
-                extra: [
-                    "agent_briefing_uuid": req.briefingUuid,
-                    "dope_code": code,
-                    "seq": i,
-                ]
-            )
-        }
-        // Briefs denormalized from the kbite tables at write time:
-        // point-in-time by design. An unknown file uuid is a typed refusal —
-        // the file_change policy, adopted here (see the doc comment).
-        for (i, fileUuid) in (req.kbiteRefs ?? []).enumerated() {
-            guard
-                let brief =
-                    try KbiteResourceFileRecord
-                    .all()
-                    .withUuid(fileUuid)
-                    .select(KbiteResourceFileRecord.Columns.resourceFileSummary, as: String.self)
-                    .fetchOne(db)
-            else {
-                throw StoreError.notFound(entity: "kbite_resource_file", key: fileUuid)
-            }
-            try core.insertBase(
-                db,
-                table: "agent_briefing_dope_kbite",
-                extra: [
-                    "agent_briefing_uuid": req.briefingUuid,
-                    "kbite_resource_file_uuid": fileUuid,
-                    "brief": brief,
-                    "seq": i,
-                ]
-            )
-        }
-        for (i, changeUuid) in (req.fileChangeRefs ?? []).enumerated() {
-            guard try FileChangeRecord.exists(db, key: ["uuid": changeUuid]) else {
-                throw StoreError.notFound(entity: "file_change", key: changeUuid)
-            }
-            try core.insertBase(
-                db,
-                table: "agent_session_file_change",
-                extra: [
-                    "agent_briefing_uuid": req.briefingUuid,
-                    "file_change_uuid": changeUuid,
-                    "seq": i,
-                ]
-            )
-        }
+        let unresolvedDopeRefs = try insertDopeRefs(req, scopeUuid: scope?.uuid)
+        try insertKbiteRefs(req)
+        try insertFileChangeRefs(req)
 
         try core.updateBase(
             db,
@@ -297,6 +289,88 @@ struct BriefingRepository: RepositoryContext {
             briefing: row,
             unresolvedDopeRefs: unresolvedDopeRefs.isEmpty ? nil : unresolvedDopeRefs
         )
+    }
+
+    /// Inserts the request's dope ref child rows and collects the codes that do not resolve.
+    ///
+    /// - Parameters:
+    ///   - req: The briefing completion request carrying the dope refs.
+    ///   - scopeUuid: The session's dope scope uuid, or nil when no scope exists.
+    /// - Returns: The well-formed codes that do not resolve in the scope, in request order.
+    /// - Throws: `StoreError.badRequest` when a code is malformed.
+    private func insertDopeRefs(_ req: BriefingCompleteRequest, scopeUuid: String?) throws -> [String] {
+        var unresolvedDopeRefs: [String] = []
+        for (i, code) in (req.dopeRefs ?? []).enumerated() {
+            try validateDopeRefShape(code)
+            if let scopeUuid {
+                let resolves = try dope.dotPathExists(scopeUuid: scopeUuid, path: code)
+                if !resolves { unresolvedDopeRefs.append(code) }
+            }
+            try core.insertBase(
+                db,
+                table: "agent_briefing_dope_persistence",
+                extra: [
+                    "agent_briefing_uuid": req.briefingUuid,
+                    "dope_code": code,
+                    "seq": i,
+                ]
+            )
+        }
+        return unresolvedDopeRefs
+    }
+
+    /// Inserts the request's kbite ref child rows with their briefs denormalized.
+    ///
+    /// Briefs denormalized from the kbite tables at write time:
+    /// point-in-time by design. An unknown file uuid is a typed refusal —
+    /// the file_change policy, adopted here (see `complete`'s doc comment).
+    ///
+    /// - Parameter req: The briefing completion request carrying the kbite refs.
+    /// - Throws: `StoreError.notFound` when a kbite resource file uuid is unknown.
+    private func insertKbiteRefs(_ req: BriefingCompleteRequest) throws {
+        for (i, fileUuid) in (req.kbiteRefs ?? []).enumerated() {
+            guard
+                let brief =
+                    try KbiteResourceFileRecord
+                    .all()
+                    .withUuid(fileUuid)
+                    .select(KbiteResourceFileRecord.Columns.resourceFileSummary, as: String.self)
+                    .fetchOne(db)
+            else {
+                throw StoreError.notFound(entity: "kbite_resource_file", key: fileUuid)
+            }
+            try core.insertBase(
+                db,
+                table: "agent_briefing_dope_kbite",
+                extra: [
+                    "agent_briefing_uuid": req.briefingUuid,
+                    "kbite_resource_file_uuid": fileUuid,
+                    "brief": brief,
+                    "seq": i,
+                ]
+            )
+        }
+    }
+
+    /// Inserts the request's file-change ref child rows.
+    ///
+    /// - Parameter req: The briefing completion request carrying the file-change refs.
+    /// - Throws: `StoreError.notFound` when a file-change uuid is unknown.
+    private func insertFileChangeRefs(_ req: BriefingCompleteRequest) throws {
+        for (i, changeUuid) in (req.fileChangeRefs ?? []).enumerated() {
+            guard try FileChangeRecord.exists(db, key: ["uuid": changeUuid]) else {
+                throw StoreError.notFound(entity: "file_change", key: changeUuid)
+            }
+            try core.insertBase(
+                db,
+                table: "agent_session_file_change",
+                extra: [
+                    "agent_briefing_uuid": req.briefingUuid,
+                    "file_change_uuid": changeUuid,
+                    "seq": i,
+                ]
+            )
+        }
     }
 
     /// Validates the shape of a dope ref using purely lexical rules.

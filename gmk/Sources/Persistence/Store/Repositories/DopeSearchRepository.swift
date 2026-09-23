@@ -21,48 +21,15 @@ struct DopeSearchRepository: RepositoryContext {
         // 1. Which dope scopes are in range for this search scope?
         let scopes = try searchScopeRows(req: req)
         guard !scopes.isEmpty else { return DopeSearchResponse(hits: []) }
-        let scopeUuids = scopes.map(\.uuid)
-        let placeholders = scopeUuids.map { _ in "?" }.joined(separator: ", ")
+        let query = Self.searchQuery(
+            req: req,
+            pattern: pattern,
+            scopeUuids: scopes.map(\.uuid),
+            limit: limit
+        )
 
-        // Which UNION arms to query. nil or empty means every arm, which is
-        // exactly what the absent field meant before m0028 added it — that
-        // equivalence is what makes `sources` an additive optional rather than
-        // a wire break, so do not "tidy" empty into "no results".
-        //
-        // Driven off allCases rather than a hand-written switch, so a future
-        // DopeSearchSource case is searchable the moment it exists instead of
-        // being silently unreachable.
-        let requested = req.sources.map(Set.init) ?? Set(DopeSearchSource.allCases)
-        let selected = DopeSearchSource.allCases.filter {
-            requested.isEmpty || requested.contains($0)
-        }
-
-        var arms: [String] = []
-        var args: [any DatabaseValueConvertible] = []
-        for source in selected {
-            arms.append(Self.searchArm(source, scopePlaceholders: placeholders))
-            args.append(pattern)
-            args.append(contentsOf: scopeUuids)
-        }
-        let sql =
-            arms.joined(separator: "\nUNION ALL\n")
-            + "\nORDER BY score LIMIT \(limit)"
-
-        var hits = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(args))
-            .map { row in
-                DopeSearchHit(
-                    kind: row["kind"],
-                    subjectUuid: row["subject_uuid"],
-                    scopeUuid: row["scope_uuid"],
-                    scopeCode: row["scope_code"],
-                    scopeType: row["scope_type"],
-                    path: row["path"],
-                    title: row["title"],
-                    excerpt: row["excerpt"],
-                    score: row["score"],
-                    origin: nil
-                )
-            }
+        var hits = try Row.fetchAll(db, sql: query.sql, arguments: query.arguments)
+            .map(Self.searchHit(row:))
 
         guard req.onlyMasks == true else { return DopeSearchResponse(hits: hits) }
 
@@ -117,6 +84,67 @@ struct DopeSearchRepository: RepositoryContext {
             }
         }
         return DopeSearchResponse(hits: hits)
+    }
+
+    /// Assembles the UNION ALL full-text statement and its arguments for a search.
+    ///
+    /// - Parameters:
+    ///   - req: The search request carrying the optional source filter.
+    ///   - pattern: The FTS5 pattern bound once per arm.
+    ///   - scopeUuids: The in-range scope UUIDs bound once per arm.
+    ///   - limit: The clamped row limit.
+    /// - Returns: The SQL text and its positional arguments.
+    private static func searchQuery(
+        req: DopeSearchRequest,
+        pattern: FTS5Pattern,
+        scopeUuids: [String],
+        limit: Int
+    ) -> (sql: String, arguments: StatementArguments) {
+        let placeholders = scopeUuids.map { _ in "?" }.joined(separator: ", ")
+
+        // Which UNION arms to query. nil or empty means every arm, which is
+        // exactly what the absent field meant before m0028 added it — that
+        // equivalence is what makes `sources` an additive optional rather than
+        // a wire break, so do not "tidy" empty into "no results".
+        //
+        // Driven off allCases rather than a hand-written switch, so a future
+        // DopeSearchSource case is searchable the moment it exists instead of
+        // being silently unreachable.
+        let requested = req.sources.map(Set.init) ?? Set(DopeSearchSource.allCases)
+        let selected = DopeSearchSource.allCases.filter {
+            requested.isEmpty || requested.contains($0)
+        }
+
+        var arms: [String] = []
+        var args: [any DatabaseValueConvertible] = []
+        for source in selected {
+            arms.append(Self.searchArm(source, scopePlaceholders: placeholders))
+            args.append(pattern)
+            args.append(contentsOf: scopeUuids)
+        }
+        let sql =
+            arms.joined(separator: "\nUNION ALL\n")
+            + "\nORDER BY score LIMIT \(limit)"
+        return (sql, StatementArguments(args))
+    }
+
+    /// Maps one full-text result row to a search hit with no overlay origin.
+    ///
+    /// - Parameter row: A row produced by one of the UNION arms.
+    /// - Returns: The search hit.
+    private static func searchHit(row: Row) -> DopeSearchHit {
+        DopeSearchHit(
+            kind: row["kind"],
+            subjectUuid: row["subject_uuid"],
+            scopeUuid: row["scope_uuid"],
+            scopeCode: row["scope_code"],
+            scopeType: row["scope_type"],
+            path: row["path"],
+            title: row["title"],
+            excerpt: row["excerpt"],
+            score: row["score"],
+            origin: nil
+        )
     }
 
     /// Returns the dope scopes in range for a search request.

@@ -42,13 +42,58 @@ extension Store {
         guard !isInTransaction else {
             throw StoreError.notComposable(verb: "diagramWriteRepo")
         }
-        // Phase 1 — root + every PUBLIC SESSION-tier tree, in one read.
-        struct Projected {
-            let code: String
-            let revision: Int64
-            let document: DiagramDocument
+        let (root, projected, knownRevisions) = try diagramWriteRepoProjection(req)
+
+        // Phase 3 — gate + write + prune, no db lock held.
+        let directory = diagramRepoDirectory(root: root)
+        let fm = FileManager.default
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        if req.force != true {
+            try diagramRepoFilesAheadGate(projected, directory: directory)
         }
-        let (root, projected, knownRevisions): (String, [Projected], [String: Int64]) = try boundaryRead { db in
+
+        var written: [String] = []
+        for item in projected {
+            let url = directory.appendingPathComponent(
+                DiagramDocumentCodec.fileName(code: item.code)
+            )
+            try DiagramDocumentCodec.encode(item.document).write(to: url, options: .atomic)
+            written.append(item.code)
+        }
+
+        let pruned = pruneDiagramRepoFiles(
+            directory: directory,
+            written: written,
+            knownRevisions: knownRevisions,
+            force: req.force
+        )
+
+        try recordDiagramWriteRepo(req, written: written, pruned: pruned)
+        return DiagramWriteRepoResponse(
+            written: written,
+            pruned: pruned,
+            root: directory.path
+        )
+    }
+
+    /// One PUBLIC diagram projected to its file document, with the revision it was projected at.
+    private struct DiagramRepoProjection {
+        let code: String
+        let revision: Int64
+        let document: DiagramDocument
+    }
+
+    /// Phase 1 of write-repo: root, every PUBLIC SESSION-tier tree, and every session revision.
+    ///
+    /// - Parameter req: The diagram write request naming the session.
+    /// - Returns: The instance root, the projected public diagrams, and each session code's revision.
+    /// - Throws: `StoreError` when the session is missing or a tree cannot be read.
+    private func diagramWriteRepoProjection(
+        _ req: DiagramWriteRepoRequest
+    ) throws -> (String, [DiagramRepoProjection], [String: Int64]) {
+        // Phase 1 — root + every PUBLIC SESSION-tier tree, in one read.
+        try boundaryRead { db in
             let diagrams = DiagramRepository(db: db, core: self.core)
             try diagrams.requireSession(uuid: req.sessionUuid)
             let root = try self.instanceRoot(db, sessionUuid: req.sessionUuid)
@@ -56,7 +101,7 @@ extension Store {
             let projected =
                 try rows
                 .map { diagram in
-                    Projected(
+                    DiagramRepoProjection(
                         code: diagram.code,
                         revision: diagram.revision,
                         // Phase 2 inline — the projection is pure.
@@ -73,41 +118,52 @@ extension Store {
             )
             return (root, projected, knownRevisions)
         }
+    }
 
-        // Phase 3 — gate + write + prune, no db lock held.
-        let directory = diagramRepoDirectory(root: root)
-        let fm = FileManager.default
-        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
-
+    /// Refuses the whole write pass when any target file on disk is stamped ahead of its row.
+    ///
+    /// - Parameters:
+    ///   - projected: The projected diagrams about to be written.
+    ///   - directory: The diagram repo directory.
+    /// - Throws: `StoreError.revisionConflict` for the first file stamped ahead of its row.
+    private func diagramRepoFilesAheadGate(
+        _ projected: [DiagramRepoProjection],
+        directory: URL
+    ) throws {
         // Files-ahead gate BEFORE any write (all-or-nothing like dope's
         // whole-tree swap): one ahead file refuses the whole pass.
-        if req.force != true {
-            for item in projected {
-                let url = directory.appendingPathComponent(
-                    DiagramDocumentCodec.fileName(code: item.code)
-                )
-                if let data = try? Data(contentsOf: url),
-                    let onDisk = DiagramDocumentCodec.peekVersion(data),
-                    onDisk > item.revision
-                {
-                    throw StoreError.revisionConflict(
-                        scopeUuid: item.code,
-                        expected: onDisk,
-                        actual: item.revision
-                    )
-                }
-            }
-        }
-
-        var written: [String] = []
         for item in projected {
             let url = directory.appendingPathComponent(
                 DiagramDocumentCodec.fileName(code: item.code)
             )
-            try DiagramDocumentCodec.encode(item.document).write(to: url, options: .atomic)
-            written.append(item.code)
+            if let data = try? Data(contentsOf: url),
+                let onDisk = DiagramDocumentCodec.peekVersion(data),
+                onDisk > item.revision
+            {
+                throw StoreError.revisionConflict(
+                    scopeUuid: item.code,
+                    expected: onDisk,
+                    actual: item.revision
+                )
+            }
         }
+    }
 
+    /// Removes diagram files not just written that the db demonstrably subsumes.
+    ///
+    /// - Parameters:
+    ///   - directory: The diagram repo directory.
+    ///   - written: The codes written in this pass.
+    ///   - knownRevisions: Every session diagram code's db revision.
+    ///   - force: True to prune every unwritten diagram file regardless of rows or stamps.
+    /// - Returns: The codes whose files were pruned.
+    private func pruneDiagramRepoFiles(
+        directory: URL,
+        written: [String],
+        knownRevisions: [String: Int64],
+        force: Bool
+    ) -> [String] {
+        let fm = FileManager.default
         // Prune ONLY files the db demonstrably subsumes: a session row exists for
         // the code and the file's stamp is not ahead of that row. A file with NO
         // session row, or one stamped AHEAD, is someone else's work and survives
@@ -118,7 +174,7 @@ extension Store {
         where name.hasSuffix(DiagramDocumentCodec.fileSuffix) && !keep.contains(name) {
             let code = String(name.dropLast(DiagramDocumentCodec.fileSuffix.count))
             let url = directory.appendingPathComponent(name)
-            if req.force != true {
+            if force != true {
                 guard let known = knownRevisions[code] else { continue }
                 let onDisk =
                     (try? Data(contentsOf: url))
@@ -128,7 +184,21 @@ extension Store {
             try? fm.removeItem(at: url)
             pruned.append(code)
         }
+        return pruned
+    }
 
+    /// Phase 4 of write-repo: the audit event and session touch, in one write transaction.
+    ///
+    /// - Parameters:
+    ///   - req: The diagram write request naming the session and force flag.
+    ///   - written: The codes written in this pass.
+    ///   - pruned: The codes pruned in this pass.
+    /// - Throws: `StoreError` or database errors from the event append or session touch.
+    private func recordDiagramWriteRepo(
+        _ req: DiagramWriteRepoRequest,
+        written: [String],
+        pruned: [String]
+    ) throws {
         // Phase 4 — audit event only: a projection never bumps revision,
         // which is what makes a repeat run idempotent.
         try boundary { db in
@@ -147,11 +217,6 @@ extension Store {
             )
             try self.touchSession(db, uuid: req.sessionUuid)
         }
-        return DiagramWriteRepoResponse(
-            written: written,
-            pruned: pruned,
-            root: directory.path
-        )
     }
 
     // MARK: - ingest (files → db, strictly forward-only)
@@ -179,6 +244,28 @@ extension Store {
 
         // Phase 3 — read every diagram file (before any write txn opens).
         let directory = diagramRepoDirectory(root: root)
+        let (documents, warnings) = readDiagramRepoFiles(directory: directory)
+        guard !documents.isEmpty else {
+            return DiagramIngestResponse(
+                ingested: [],
+                skipped: [],
+                root: directory.path,
+                warnings: warnings
+            )
+        }
+        return try landIngestedDiagrams(
+            documents,
+            sessionUuid: req.sessionUuid,
+            directory: directory,
+            warnings: warnings
+        )
+    }
+
+    /// Reads every well-formed diagram file in the repo directory, warning on each one skipped.
+    ///
+    /// - Parameter directory: The diagram repo directory.
+    /// - Returns: The decoded documents in file-name order, and one warning per skipped file.
+    private func readDiagramRepoFiles(directory: URL) -> ([DiagramDocument], [String]) {
         var documents: [DiagramDocument] = []
         var warnings: [String] = []
         let names = ((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [])
@@ -208,15 +295,25 @@ extension Store {
             }
             documents.append(document)
         }
-        guard !documents.isEmpty else {
-            return DiagramIngestResponse(
-                ingested: [],
-                skipped: [],
-                root: directory.path,
-                warnings: warnings
-            )
-        }
+        return (documents, warnings)
+    }
 
+    /// Phase 4 of ingest: lands every document under the per-file rules in one transaction.
+    ///
+    /// - Parameters:
+    ///   - documents: The decoded diagram documents to land.
+    ///   - sessionUuid: The session uuid that owns the diagrams.
+    ///   - directory: The diagram repo directory reported back as the root.
+    ///   - warnings: The warnings gathered while reading files, extended with refusals.
+    /// - Returns: The response with ingested and skipped codes, directory path, and warnings.
+    /// - Throws: Non-`StoreError` database errors, which roll the whole transaction back.
+    private func landIngestedDiagrams(
+        _ documents: [DiagramDocument],
+        sessionUuid: String,
+        directory: URL,
+        warnings: [String]
+    ) throws -> DiagramIngestResponse {
+        var warnings = warnings
         // Phase 4 — one transaction, per-file landing rules:
         //   - code matches a PRIVATE row          → skip (never clobber
         //     personal state from the repo);
@@ -230,12 +327,12 @@ extension Store {
             for document in documents {
                 do {
                     let existing = try DiagramRepository(db: db, core: self.core)
-                        .sessionDiagram(sessionUuid: req.sessionUuid, code: document.code)
+                        .sessionDiagram(sessionUuid: sessionUuid, code: document.code)
                     let landed: Bool
                     if let diagram = existing {
                         landed = try self.ingestReplace(db, document: document, over: diagram)
                     } else {
-                        try self.ingestCreate(db, document: document, sessionUuid: req.sessionUuid)
+                        try self.ingestCreate(db, document: document, sessionUuid: sessionUuid)
                         landed = true
                     }
                     if landed {

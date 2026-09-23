@@ -441,13 +441,68 @@ struct ClarificationRepository: RepositoryContext {
                 carePackageStaleness: staleness
             )
         }
+        return narrowedResponse(
+            req,
+            summary: summary,
+            questions: questions,
+            allNotes: allNotes,
+            package: package,
+            staleness: staleness
+        )
+    }
 
+    /// Assembles the narrowed clarification response from the unnarrowed parts.
+    ///
+    /// - Parameters:
+    ///   - req: The narrowed get request carrying the weight ceiling and package flag.
+    ///   - summary: The clarification summary row.
+    ///   - questions: Every question row of the summary.
+    ///   - allNotes: Every note row of the summary, before the weight window.
+    ///   - package: The care package, if one was opened.
+    ///   - staleness: The package's staleness, non-nil exactly when `package` is.
+    /// - Returns: The narrowed response with note and care package stubs where withheld.
+    private func narrowedResponse(
+        _ req: ClarifyGetRequest,
+        summary: ClarificationSummaryRow,
+        questions: [ClarificationQuestionRow],
+        allNotes: [ClarificationNoteRow],
+        package: CarePackageRow?,
+        staleness: CarePackageStaleness?
+    ) -> ClarifyGetResponse {
+        let (notes, noteStubs) = partitionNotes(allNotes, weightMax: req.noteWeightMax)
+
+        // Dropping the package keeps its EXISTENCE visible: carePackage nil
+        // WITH a stub means narrowed away, carePackage nil WITHOUT one means
+        // never opened. The staleness invariant holds either way — it rides
+        // with the package it describes.
+        let keepPackage = req.includeCarePackage ?? true
+        return ClarifyGetResponse(
+            summary: summary,
+            questions: questions,
+            notes: notes,
+            carePackage: keepPackage ? package : nil,
+            carePackageStaleness: keepPackage ? staleness : nil,
+            carePackageStub: keepPackage ? nil : package.map(CarePackageStub.init(package:)),
+            noteStubs: noteStubs
+        )
+    }
+
+    /// Splits notes into full rows within the weight ceiling and stubs for those above it.
+    ///
+    /// - Parameters:
+    ///   - allNotes: Every note row of the summary.
+    ///   - weightMax: The weight ceiling; nil keeps every note full and emits no stubs.
+    /// - Returns: The full notes and the stubs, which are nil when no ceiling was given.
+    private func partitionNotes(
+        _ allNotes: [ClarificationNoteRow],
+        weightMax: Int?
+    ) -> (notes: [ClarificationNoteRow], stubs: [ClarificationNoteStub]?) {
         // Weight window, mirroring the rating windows: an UNWEIGHTED note is
         // always full — the same rule that keeps unranked findings full in
         // EXPLORE_GET, because unrated is a work queue, not a low priority.
         let notes: [ClarificationNoteRow]
         let noteStubs: [ClarificationNoteStub]?
-        if let ceiling = req.noteWeightMax {
+        if let ceiling = weightMax {
             notes = allNotes.filter { ($0.weight ?? Int.min) <= ceiling }
             noteStubs =
                 allNotes
@@ -468,21 +523,7 @@ struct ClarificationRepository: RepositoryContext {
             notes = allNotes
             noteStubs = nil
         }
-
-        // Dropping the package keeps its EXISTENCE visible: carePackage nil
-        // WITH a stub means narrowed away, carePackage nil WITHOUT one means
-        // never opened. The staleness invariant holds either way — it rides
-        // with the package it describes.
-        let keepPackage = req.includeCarePackage ?? true
-        return ClarifyGetResponse(
-            summary: summary,
-            questions: questions,
-            notes: notes,
-            carePackage: keepPackage ? package : nil,
-            carePackageStaleness: keepPackage ? staleness : nil,
-            carePackageStub: keepPackage ? nil : package.map(CarePackageStub.init(package:)),
-            noteStubs: noteStubs
-        )
+        return (notes, noteStubs)
     }
 
     // DELIBERATELY NOT DONE: no `staleness` on CarePackageResponse
@@ -543,74 +584,9 @@ struct ClarificationRepository: RepositoryContext {
             )
         }
         switch req.kind {
-        case .dope:
-            guard let code = req.dopeCode, !code.isEmpty else {
-                throw StoreError.badRequest(detail: "kind dope requires --dope-code")
-            }
-            try core.insertBase(
-                db,
-                table: "care_package_dope_ref",
-                extra: [
-                    "care_package_uuid": req.packageUuid,
-                    "dope_code": code,
-                    "note": req.note,
-                    "seq": try nextRefSeq(in: CarePackageDopeRefRecord.self, packageUuid: req.packageUuid),
-                ]
-            )
-        case .kbite:
-            guard let fileUuid = req.kbiteFileUuid, !fileUuid.isEmpty else {
-                throw StoreError.badRequest(detail: "kind kbite requires --kbite-file-uuid")
-            }
-            // Denormalize the brief exactly like briefing complete does.
-            guard
-                let brief =
-                    try KbiteResourceFileRecord
-                    .all()
-                    .withUuid(fileUuid)
-                    .select(KbiteResourceFileRecord.Columns.resourceFileSummary, as: String.self)
-                    .fetchOne(db)
-            else {
-                throw StoreError.notFound(entity: "kbite_resource_file", key: fileUuid)
-            }
-            try core.insertBase(
-                db,
-                table: "care_package_kbite_ref",
-                extra: [
-                    "care_package_uuid": req.packageUuid,
-                    "kbite_resource_file_uuid": fileUuid,
-                    "brief": brief,
-                    "seq": try nextRefSeq(in: CarePackageKbiteRefRecord.self, packageUuid: req.packageUuid),
-                ]
-            )
-        case .exploration:
-            guard let title = req.curatedTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-                let body = req.curatedBody?.trimmingCharacters(in: .whitespacesAndNewlines),
-                !title.isEmpty, !body.isEmpty
-            else {
-                throw StoreError.badRequest(
-                    detail: "kind exploration requires --title and --body (the curated COPY)"
-                )
-            }
-            if let source = req.sourceFindingUuid {
-                guard try ExplorationFindingRecord.exists(db, key: ["uuid": source]) else {
-                    throw StoreError.notFound(entity: "exploration_finding", key: source)
-                }
-            }
-            try core.insertBase(
-                db,
-                table: "care_package_exploration_ref",
-                extra: [
-                    "care_package_uuid": req.packageUuid,
-                    "curated_title": title,
-                    "curated_body": body,
-                    "file_path": req.filePath,
-                    "source_finding_uuid": req.sourceFindingUuid,
-                    "seq": try nextRefSeq(
-                        in: CarePackageExplorationRefRecord.self,
-                        packageUuid: req.packageUuid
-                    ),
-                ]
-            )
+        case .dope: try insertDopeRef(req)
+        case .kbite: try insertKbiteRef(req)
+        case .exploration: try insertExplorationRef(req)
         }
         // Durable event + session touch like every sibling content verb —
         // GMVibes' care-package pane refreshes off the event stream.
@@ -630,6 +606,92 @@ struct ClarificationRepository: RepositoryContext {
             throw StoreError.notFound(entity: "care_package", key: req.packageUuid)
         }
         return CarePackageResponse(package: updated)
+    }
+
+    /// Validates a dope ref request and inserts the ref at the package's next seq.
+    ///
+    /// - Parameter req: The ref-add request of kind dope.
+    /// - Throws: `StoreError.badRequest` when the dope code is missing or empty.
+    private func insertDopeRef(_ req: CarePackageRefAddRequest) throws {
+        guard let code = req.dopeCode, !code.isEmpty else {
+            throw StoreError.badRequest(detail: "kind dope requires --dope-code")
+        }
+        try core.insertBase(
+            db,
+            table: "care_package_dope_ref",
+            extra: [
+                "care_package_uuid": req.packageUuid,
+                "dope_code": code,
+                "note": req.note,
+                "seq": try nextRefSeq(in: CarePackageDopeRefRecord.self, packageUuid: req.packageUuid),
+            ]
+        )
+    }
+
+    /// Validates a kbite ref request and inserts the ref with the file's brief denormalized.
+    ///
+    /// - Parameter req: The ref-add request of kind kbite.
+    /// - Throws: `StoreError.badRequest` when the file uuid is missing, `notFound` when absent.
+    private func insertKbiteRef(_ req: CarePackageRefAddRequest) throws {
+        guard let fileUuid = req.kbiteFileUuid, !fileUuid.isEmpty else {
+            throw StoreError.badRequest(detail: "kind kbite requires --kbite-file-uuid")
+        }
+        // Denormalize the brief exactly like briefing complete does.
+        guard
+            let brief =
+                try KbiteResourceFileRecord
+                .all()
+                .withUuid(fileUuid)
+                .select(KbiteResourceFileRecord.Columns.resourceFileSummary, as: String.self)
+                .fetchOne(db)
+        else {
+            throw StoreError.notFound(entity: "kbite_resource_file", key: fileUuid)
+        }
+        try core.insertBase(
+            db,
+            table: "care_package_kbite_ref",
+            extra: [
+                "care_package_uuid": req.packageUuid,
+                "kbite_resource_file_uuid": fileUuid,
+                "brief": brief,
+                "seq": try nextRefSeq(in: CarePackageKbiteRefRecord.self, packageUuid: req.packageUuid),
+            ]
+        )
+    }
+
+    /// Validates an exploration ref request and inserts its curated copy.
+    ///
+    /// - Parameter req: The ref-add request of kind exploration.
+    /// - Throws: `StoreError.badRequest` on a missing title or body, `notFound` for an unknown source.
+    private func insertExplorationRef(_ req: CarePackageRefAddRequest) throws {
+        guard let title = req.curatedTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
+            let body = req.curatedBody?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !title.isEmpty, !body.isEmpty
+        else {
+            throw StoreError.badRequest(
+                detail: "kind exploration requires --title and --body (the curated COPY)"
+            )
+        }
+        if let source = req.sourceFindingUuid {
+            guard try ExplorationFindingRecord.exists(db, key: ["uuid": source]) else {
+                throw StoreError.notFound(entity: "exploration_finding", key: source)
+            }
+        }
+        try core.insertBase(
+            db,
+            table: "care_package_exploration_ref",
+            extra: [
+                "care_package_uuid": req.packageUuid,
+                "curated_title": title,
+                "curated_body": body,
+                "file_path": req.filePath,
+                "source_finding_uuid": req.sourceFindingUuid,
+                "seq": try nextRefSeq(
+                    in: CarePackageExplorationRefRecord.self,
+                    packageUuid: req.packageUuid
+                ),
+            ]
+        )
     }
 
     /// Moves a care package from building to ready.

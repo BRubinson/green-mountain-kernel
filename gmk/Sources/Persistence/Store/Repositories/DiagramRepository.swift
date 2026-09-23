@@ -589,93 +589,8 @@ struct DiagramRepository: RepositoryContext {
             )
             .fetchAll(db)
 
-        // Filter-only join: every projected column comes from the subtype
-        // table, the join only narrows to this diagram. The protocol supplies
-        // the `element` association, so the eight call sites name no table.
-        func subtypeRecords<R: DiagramSubtypeRecord>(_: R.Type) throws -> [String: R] {
-            let rows =
-                try R.all()
-                .joining(
-                    required: R.element
-                        .filter(DiagramElementRecord.Columns.diagramUuid == diagram.uuid)
-                )
-                .fetchAll(db)
-            return Dictionary(uniqueKeysWithValues: rows.map { ($0.elementUuid, $0) })
-        }
-        // The vertex fetch CANNOT stay generic. diagram_stroke_vertex has a
-        // `pressure` column and diagram_shape_vertex does not, which the old
-        // shared helper papered over with a row.hasColumn("pressure") guard --
-        // i.e. the distinction was decided by the result set. Under records it
-        // is decided by the schema, which means two concrete functions.
-        func strokeVertices() throws -> [String: [DiagramVertex]] {
-            let rows =
-                try DiagramStrokeVertexRecord.all()
-                .joining(
-                    required: DiagramStrokeVertexRecord.stroke
-                        .joining(
-                            required: DiagramDrawingStrokeRecord.element
-                                .filter(
-                                    DiagramElementRecord.Columns.diagramUuid == diagram.uuid
-                                )
-                        )
-                )
-                .orderedBySeq()
-                .fetchAll(db)
-            var grouped: [String: [DiagramVertex]] = [:]
-            for row in rows {
-                grouped[row.strokeElementUuid, default: []].append(row.vertex())
-            }
-            return grouped
-        }
-        func shapeVertices() throws -> [String: [DiagramVertex]] {
-            let rows =
-                try DiagramShapeVertexRecord.all()
-                .joining(
-                    required: DiagramShapeVertexRecord.shape
-                        .joining(
-                            required: DiagramDrawingShapeRecord.element
-                                .filter(
-                                    DiagramElementRecord.Columns.diagramUuid == diagram.uuid
-                                )
-                        )
-                )
-                .orderedBySeq()
-                .fetchAll(db)
-            var grouped: [String: [DiagramVertex]] = [:]
-            for row in rows {
-                grouped[row.shapeElementUuid, default: []].append(row.vertex())
-            }
-            return grouped
-        }
-        let subtypes = try DiagramSubtypeIndex(
-            layers: subtypeRecords(DiagramDrawingLayerRecord.self),
-            strokes: subtypeRecords(DiagramDrawingStrokeRecord.self),
-            shapes: subtypeRecords(DiagramDrawingShapeRecord.self),
-            scopes: subtypeRecords(DiagramDopeScopePersistenceLayerRecord.self),
-            entities: subtypeRecords(DiagramDopeEntityRecord.self),
-            texts: subtypeRecords(DiagramDrawingTextRecord.self),
-            connectors: subtypeRecords(DiagramConnectorRecord.self),
-            umlNodes: subtypeRecords(DiagramUmlNodeRecord.self),
-            strokeVertexRows: strokeVertices(),
-            shapeVertexRows: shapeVertices()
-        )
-
-        var childrenByParent: [String: [DiagramElementRecord]] = [:]
-        var topLevel: [DiagramElementRecord] = []
-        for row in elementRows {
-            if let parent = row.parentElementUuid {
-                childrenByParent[parent, default: []].append(row)
-            } else {
-                topLevel.append(row)
-            }
-        }
-
-        func node(_ row: DiagramElementRecord) throws -> DiagramElementNode {
-            row.node(
-                payload: try subtypes.payload(for: row),
-                children: try (childrenByParent[row.uuid] ?? []).map(node)
-            )
-        }
+        let subtypes = try fetchSubtypeIndex(diagramUuid: diagram.uuid)
+        let elements = try Self.diagramNodes(elementRows: elementRows, subtypes: subtypes)
 
         return DiagramTree(
             identity: DopeNodeIdentity(
@@ -694,8 +609,144 @@ struct DiagramRepository: RepositoryContext {
             description: diagram.description,
             gmccDiagramPath: diagram.gmccDiagramPath,
             revision: diagram.revision,
-            elements: try topLevel.map(node)
+            elements: elements
         )
+    }
+
+    /// Fetch every subtype row and vertex of one diagram as flat, per-table queries.
+    ///
+    /// - Parameter diagramUuid: The diagram whose element subtypes to fetch.
+    /// - Returns: The subtype rows and vertices keyed by element uuid.
+    /// - Throws: Any database error.
+    private func fetchSubtypeIndex(diagramUuid: String) throws -> DiagramSubtypeIndex {
+        try DiagramSubtypeIndex(
+            layers: subtypeRecords(DiagramDrawingLayerRecord.self, diagramUuid: diagramUuid),
+            strokes: subtypeRecords(DiagramDrawingStrokeRecord.self, diagramUuid: diagramUuid),
+            shapes: subtypeRecords(DiagramDrawingShapeRecord.self, diagramUuid: diagramUuid),
+            scopes: subtypeRecords(
+                DiagramDopeScopePersistenceLayerRecord.self,
+                diagramUuid: diagramUuid
+            ),
+            entities: subtypeRecords(DiagramDopeEntityRecord.self, diagramUuid: diagramUuid),
+            texts: subtypeRecords(DiagramDrawingTextRecord.self, diagramUuid: diagramUuid),
+            connectors: subtypeRecords(DiagramConnectorRecord.self, diagramUuid: diagramUuid),
+            umlNodes: subtypeRecords(DiagramUmlNodeRecord.self, diagramUuid: diagramUuid),
+            strokeVertexRows: strokeVertices(diagramUuid: diagramUuid),
+            shapeVertexRows: shapeVertices(diagramUuid: diagramUuid)
+        )
+    }
+
+    /// Fetch one subtype table's rows for a diagram, keyed by element uuid.
+    ///
+    /// - Parameters:
+    ///   - _: The subtype record type to fetch.
+    ///   - diagramUuid: The diagram whose elements to narrow to.
+    /// - Returns: The subtype rows keyed by element uuid.
+    /// - Throws: Any database error.
+    private func subtypeRecords<R: DiagramSubtypeRecord>(
+        _: R.Type,
+        diagramUuid: String
+    ) throws -> [String: R] {
+        // Filter-only join: every projected column comes from the subtype
+        // table, the join only narrows to this diagram. The protocol supplies
+        // the `element` association, so the eight call sites name no table.
+        let rows =
+            try R.all()
+            .joining(
+                required: R.element
+                    .filter(DiagramElementRecord.Columns.diagramUuid == diagramUuid)
+            )
+            .fetchAll(db)
+        return Dictionary(uniqueKeysWithValues: rows.map { ($0.elementUuid, $0) })
+    }
+
+    // The vertex fetch CANNOT stay generic. diagram_stroke_vertex has a
+    // `pressure` column and diagram_shape_vertex does not, which the old
+    // shared helper papered over with a row.hasColumn("pressure") guard --
+    // i.e. the distinction was decided by the result set. Under records it
+    // is decided by the schema, which means two concrete functions.
+
+    /// Fetch a diagram's stroke vertices in sequence order, grouped by stroke element uuid.
+    ///
+    /// - Parameter diagramUuid: The diagram whose stroke vertices to fetch.
+    /// - Returns: The vertices keyed by stroke element uuid.
+    /// - Throws: Any database error.
+    private func strokeVertices(diagramUuid: String) throws -> [String: [DiagramVertex]] {
+        let rows =
+            try DiagramStrokeVertexRecord.all()
+            .joining(
+                required: DiagramStrokeVertexRecord.stroke
+                    .joining(
+                        required: DiagramDrawingStrokeRecord.element
+                            .filter(
+                                DiagramElementRecord.Columns.diagramUuid == diagramUuid
+                            )
+                    )
+            )
+            .orderedBySeq()
+            .fetchAll(db)
+        var grouped: [String: [DiagramVertex]] = [:]
+        for row in rows {
+            grouped[row.strokeElementUuid, default: []].append(row.vertex())
+        }
+        return grouped
+    }
+
+    /// Fetch a diagram's shape vertices in sequence order, grouped by shape element uuid.
+    ///
+    /// - Parameter diagramUuid: The diagram whose shape vertices to fetch.
+    /// - Returns: The vertices keyed by shape element uuid.
+    /// - Throws: Any database error.
+    private func shapeVertices(diagramUuid: String) throws -> [String: [DiagramVertex]] {
+        let rows =
+            try DiagramShapeVertexRecord.all()
+            .joining(
+                required: DiagramShapeVertexRecord.shape
+                    .joining(
+                        required: DiagramDrawingShapeRecord.element
+                            .filter(
+                                DiagramElementRecord.Columns.diagramUuid == diagramUuid
+                            )
+                    )
+            )
+            .orderedBySeq()
+            .fetchAll(db)
+        var grouped: [String: [DiagramVertex]] = [:]
+        for row in rows {
+            grouped[row.shapeElementUuid, default: []].append(row.vertex())
+        }
+        return grouped
+    }
+
+    /// Fold ordered element rows into a parent/child node tree, preserving row order at each level.
+    ///
+    /// - Parameters:
+    ///   - elementRows: Every element row of the diagram, already in display order.
+    ///   - subtypes: The diagram's subtype index, which supplies each node's payload.
+    /// - Returns: The top-level nodes, each carrying its children.
+    /// - Throws: Any payload decoding error.
+    private static func diagramNodes(
+        elementRows: [DiagramElementRecord],
+        subtypes: DiagramSubtypeIndex
+    ) throws -> [DiagramElementNode] {
+        var childrenByParent: [String: [DiagramElementRecord]] = [:]
+        var topLevel: [DiagramElementRecord] = []
+        for row in elementRows {
+            if let parent = row.parentElementUuid {
+                childrenByParent[parent, default: []].append(row)
+            } else {
+                topLevel.append(row)
+            }
+        }
+
+        func node(_ row: DiagramElementRecord) throws -> DiagramElementNode {
+            row.node(
+                payload: try subtypes.payload(for: row),
+                children: try (childrenByParent[row.uuid] ?? []).map(node)
+            )
+        }
+
+        return try topLevel.map(node)
     }
 
     // MARK: - Binding resolution (read-time, ghost-tolerant)
@@ -1133,16 +1184,7 @@ struct DiagramRepository: RepositoryContext {
                 detail: "pass parentElementUuid OR parentClientRef, not both"
             )
         }
-        var parentUuid = add.parentElementUuid
-        if let ref = add.parentClientRef {
-            guard let resolved = ledger[ref] else {
-                throw StoreError.badRequest(
-                    detail:
-                        "parentClientRef '\(ref)' does not name an earlier elementAdd in this batch"
-                )
-            }
-            parentUuid = resolved
-        }
+        let parentUuid = try resolveAddParentUuid(add: add, ledger: ledger)
         let parent = try parentUuid.map { try fetchElementInfo(uuid: $0) }
         try validateDiagramElementShape(
             diagramUuid: diagram.uuid,
@@ -1155,6 +1197,95 @@ struct DiagramRepository: RepositoryContext {
         // created earlier in THIS batch — the exact parallel of
         // parentClientRef, and why the ref rides on the mutation rather than
         // inside the payload.
+        let payload = try resolveAddPayload(
+            add: add,
+            diagram: diagram,
+            parentUuid: parentUuid,
+            ledger: ledger
+        )
+
+        let code: String
+        if let requested = add.code {
+            try DopeCode.validateCode(requested, field: "element code")
+            code = requested
+        } else {
+            code = try mintElementCode(diagramUuid: diagram.uuid, type: type)
+        }
+        if let description = add.description, description.count > 512 {
+            throw StoreError.badRequest(detail: "element description exceeds 512 characters")
+        }
+        let sortOrder = try addSortOrder(add: add, diagram: diagram, parentUuid: parentUuid)
+        if let scale = add.scale, scale <= 0 {
+            throw StoreError.badRequest(detail: "scale must be > 0")
+        }
+
+        let uuid = try core.insertBase(
+            db,
+            table: "diagram_element",
+            extra: [
+                "diagram_uuid": diagram.uuid,
+                "parent_element_uuid": parentUuid,
+                "element_type": type.rawValue,
+                "code": code,
+                "name": add.name ?? type.defaultName,
+                "description": add.description ?? "",
+                "sort_order": sortOrder,
+                "center_x": add.centerX ?? 0,
+                "center_y": add.centerY ?? 0,
+                "element_z": add.elementZ ?? 0,
+                "scale": add.scale ?? 1,
+            ]
+        )
+        try insertSubtypeRow(elementUuid: uuid, payload: payload)
+        if let ref = add.clientRef { ledger[ref] = uuid }
+        return DiagramMutationResult(
+            index: index,
+            kind: "element_add",
+            clientRef: add.clientRef,
+            uuid: uuid,
+            version: 0
+        )
+    }
+
+    /// Resolve an added element's parent uuid from either a direct uuid or a batch client ref.
+    ///
+    /// - Parameters:
+    ///   - add: The element add request.
+    ///   - ledger: Client ref map of elements added earlier in this batch.
+    /// - Returns: The parent element uuid, or nil for a top-level element.
+    /// - Throws: `StoreError.badRequest` when the client ref names no earlier add in this batch.
+    private func resolveAddParentUuid(
+        add: DiagramElementAdd,
+        ledger: [String: String]
+    ) throws -> String? {
+        var parentUuid = add.parentElementUuid
+        if let ref = add.parentClientRef {
+            guard let resolved = ledger[ref] else {
+                throw StoreError.badRequest(
+                    detail:
+                        "parentClientRef '\(ref)' does not name an earlier elementAdd in this batch"
+                )
+            }
+            parentUuid = resolved
+        }
+        return parentUuid
+    }
+
+    /// Normalize an added element's payload and resolve a connector's target endpoint.
+    ///
+    /// - Parameters:
+    ///   - add: The element add request.
+    ///   - diagram: The diagram row.
+    ///   - parentUuid: The resolved parent uuid of the new element, or nil.
+    ///   - ledger: Client ref map of elements added earlier in this batch.
+    /// - Returns: The payload to store, with a connector's target uuid resolved.
+    /// - Throws: `StoreError.badRequest` on a conflicting, dangling or misplaced target ref.
+    private func resolveAddPayload(
+        add: DiagramElementAdd,
+        diagram: DiagramRow,
+        parentUuid: String?,
+        ledger: [String: String]
+    ) throws -> DiagramElementPayload {
         var payload = DiagramStrokeCodec.normalizedForStorage(add.payload)
         if case .connector(let connector) = payload {
             if connector.targetElementUuid != nil, add.targetClientRef != nil {
@@ -1197,17 +1328,22 @@ struct DiagramRepository: RepositoryContext {
                 detail: "targetClientRef is only meaningful for a connector element"
             )
         }
+        return payload
+    }
 
-        let code: String
-        if let requested = add.code {
-            try DopeCode.validateCode(requested, field: "element code")
-            code = requested
-        } else {
-            code = try mintElementCode(diagramUuid: diagram.uuid, type: type)
-        }
-        if let description = add.description, description.count > 512 {
-            throw StoreError.badRequest(detail: "element description exceeds 512 characters")
-        }
+    /// Choose an added element's sort order: the requested one, else the next among its siblings.
+    ///
+    /// - Parameters:
+    ///   - add: The element add request.
+    ///   - diagram: The diagram row.
+    ///   - parentUuid: The resolved parent uuid of the new element, or nil.
+    /// - Returns: The sort order to store.
+    /// - Throws: Any database error.
+    private func addSortOrder(
+        add: DiagramElementAdd,
+        diagram: DiagramRow,
+        parentUuid: String?
+    ) throws -> Int {
         let sortOrder: Int
         if let requested = add.sortOrder {
             sortOrder = requested
@@ -1223,36 +1359,7 @@ struct DiagramRepository: RepositoryContext {
                     .filter(DiagramElementRecord.Columns.parentElementUuid == nil)
             )
         }
-        if let scale = add.scale, scale <= 0 {
-            throw StoreError.badRequest(detail: "scale must be > 0")
-        }
-
-        let uuid = try core.insertBase(
-            db,
-            table: "diagram_element",
-            extra: [
-                "diagram_uuid": diagram.uuid,
-                "parent_element_uuid": parentUuid,
-                "element_type": type.rawValue,
-                "code": code,
-                "name": add.name ?? type.defaultName,
-                "description": add.description ?? "",
-                "sort_order": sortOrder,
-                "center_x": add.centerX ?? 0,
-                "center_y": add.centerY ?? 0,
-                "element_z": add.elementZ ?? 0,
-                "scale": add.scale ?? 1,
-            ]
-        )
-        try insertSubtypeRow(elementUuid: uuid, payload: payload)
-        if let ref = add.clientRef { ledger[ref] = uuid }
-        return DiagramMutationResult(
-            index: index,
-            kind: "element_add",
-            clientRef: add.clientRef,
-            uuid: uuid,
-            version: 0
-        )
+        return sortOrder
     }
 
     /// Update an element's properties or payload.
@@ -1276,32 +1383,7 @@ struct DiagramRepository: RepositoryContext {
             )
         }
 
-        var set: [String: (any DatabaseValueConvertible)?] = [:]
-        if let code = update.code {
-            try DopeCode.validateCode(code, field: "element code")
-            set["code"] = code
-        }
-        if let name = update.name { set["name"] = name }
-        if let description = update.description {
-            guard description.count <= 512 else {
-                throw StoreError.badRequest(detail: "element description exceeds 512 characters")
-            }
-            set["description"] = description
-        }
-        if let sortOrder = update.sortOrder { set["sort_order"] = sortOrder }
-        if let centerX = update.centerX { set["center_x"] = centerX }
-        if let centerY = update.centerY { set["center_y"] = centerY }
-        if let elementZ = update.elementZ { set["element_z"] = elementZ }
-        if let scale = update.scale {
-            guard scale > 0 else { throw StoreError.badRequest(detail: "scale must be > 0") }
-            set["scale"] = scale
-        }
-        if let newParent = update.parentElementUuid {
-            guard newParent != info.uuid else {
-                throw StoreError.badRequest(detail: "an element cannot parent itself")
-            }
-            set["parent_element_uuid"] = newParent
-        }
+        let set = try elementUpdateSet(update: update, info: info)
 
         // Validate the FINAL (parent, payload) shape — reparent and payload
         // can change in one call.
@@ -1318,27 +1400,7 @@ struct DiagramRepository: RepositoryContext {
         } else if update.parentElementUuid != nil {
             // Reparent without a payload still needs the containment check;
             // fabricate nothing — check the parent-type rule directly.
-            let spec = DiagramElementTypeSpec.spec(for: info.type)
-            guard let allowed = spec.allowedParentTypes else {
-                throw StoreError.badRequest(
-                    detail:
-                        "\(info.type.rawValue) is a top-level element type and cannot be reparented"
-                )
-            }
-            guard let finalParent, allowed.contains(finalParent.type) else {
-                throw StoreError.badRequest(
-                    detail:
-                        "a \(info.type.rawValue) cannot live under a "
-                        + "\(finalParent?.type.rawValue ?? "missing parent") (legal: "
-                        + allowed.map(\.rawValue).sorted().joined(separator: "/") + ")"
-                )
-            }
-            guard finalParent.diagramUuid == diagram.uuid else {
-                throw StoreError.badRequest(
-                    detail:
-                        "parent element \(finalParent.uuid) belongs to a different diagram"
-                )
-            }
+            try validatePayloadlessReparent(info: info, finalParent: finalParent, diagram: diagram)
         }
         guard !set.isEmpty || update.payload != nil else {
             throw StoreError.emptyUpdate(entity: "diagram_element")
@@ -1374,6 +1436,81 @@ struct DiagramRepository: RepositoryContext {
             uuid: info.uuid,
             version: version
         )
+    }
+
+    /// Validate an element update's column fields and collect them as pending assignments.
+    ///
+    /// - Parameters:
+    ///   - update: The element update request.
+    ///   - info: The element's current row info.
+    /// - Returns: The column assignments the update requests.
+    /// - Throws: `StoreError.badRequest` on an invalid code, description, scale or self-parent.
+    private func elementUpdateSet(
+        update: DiagramElementUpdate,
+        info: ElementRowInfo
+    ) throws -> [String: (any DatabaseValueConvertible)?] {
+        var set: [String: (any DatabaseValueConvertible)?] = [:]
+        if let code = update.code {
+            try DopeCode.validateCode(code, field: "element code")
+            set["code"] = code
+        }
+        if let name = update.name { set["name"] = name }
+        if let description = update.description {
+            guard description.count <= 512 else {
+                throw StoreError.badRequest(detail: "element description exceeds 512 characters")
+            }
+            set["description"] = description
+        }
+        if let sortOrder = update.sortOrder { set["sort_order"] = sortOrder }
+        if let centerX = update.centerX { set["center_x"] = centerX }
+        if let centerY = update.centerY { set["center_y"] = centerY }
+        if let elementZ = update.elementZ { set["element_z"] = elementZ }
+        if let scale = update.scale {
+            guard scale > 0 else { throw StoreError.badRequest(detail: "scale must be > 0") }
+            set["scale"] = scale
+        }
+        if let newParent = update.parentElementUuid {
+            guard newParent != info.uuid else {
+                throw StoreError.badRequest(detail: "an element cannot parent itself")
+            }
+            set["parent_element_uuid"] = newParent
+        }
+        return set
+    }
+
+    /// Check the parent-type containment rule for a reparent that carries no payload.
+    ///
+    /// - Parameters:
+    ///   - info: The element's current row info.
+    ///   - finalParent: The final parent's row info, or nil for a top-level placement.
+    ///   - diagram: The diagram row the element belongs to.
+    /// - Throws: `StoreError.badRequest` when the element type or parent forbids the move.
+    private func validatePayloadlessReparent(
+        info: ElementRowInfo,
+        finalParent: ElementRowInfo?,
+        diagram: DiagramRow
+    ) throws {
+        let spec = DiagramElementTypeSpec.spec(for: info.type)
+        guard let allowed = spec.allowedParentTypes else {
+            throw StoreError.badRequest(
+                detail:
+                    "\(info.type.rawValue) is a top-level element type and cannot be reparented"
+            )
+        }
+        guard let finalParent, allowed.contains(finalParent.type) else {
+            throw StoreError.badRequest(
+                detail:
+                    "a \(info.type.rawValue) cannot live under a "
+                    + "\(finalParent?.type.rawValue ?? "missing parent") (legal: "
+                    + allowed.map(\.rawValue).sorted().joined(separator: "/") + ")"
+            )
+        }
+        guard finalParent.diagramUuid == diagram.uuid else {
+            throw StoreError.badRequest(
+                detail:
+                    "parent element \(finalParent.uuid) belongs to a different diagram"
+            )
+        }
     }
 
     /// Delete an element from a diagram.
@@ -1446,58 +1583,7 @@ struct DiagramRepository: RepositoryContext {
         }
 
         if let promotion = update.promotion {
-            let owner: DiagramOwner
-            switch promotion.tier {
-            case .project:
-                owner = try resolveDiagramOwner(
-                    projectUuid: promotion.ownerUuid,
-                    instanceUuid: nil,
-                    sessionUuid: nil,
-                    promptUuid: nil
-                )
-            case .session:
-                owner = try resolveDiagramOwner(
-                    projectUuid: nil,
-                    instanceUuid: nil,
-                    sessionUuid: promotion.ownerUuid,
-                    promptUuid: nil
-                )
-            case .prompt:
-                owner = try resolveDiagramOwner(
-                    projectUuid: nil,
-                    instanceUuid: nil,
-                    sessionUuid: nil,
-                    promptUuid: promotion.ownerUuid
-                )
-            }
-            guard owner.projectUuid == diagram.projectUuid else {
-                throw StoreError.badRequest(
-                    detail:
-                        "promotion target resolves to a different project — a diagram never changes project"
-                )
-            }
-            // Same-code collision at the new tier would trip the partial
-            // unique index mid-UPDATE; pre-check for the friendly message.
-            let finalCode = update.code ?? diagram.code
-            let collisions =
-                try DiagramRecord
-                .filter(DiagramRecord.Columns.tier == owner.tier.rawValue)
-                .filter(Column(owner.ownerColumn) == owner.ownerUuid)
-                .filter(DiagramRecord.Columns.code == finalCode)
-                .filter(DiagramRecord.Columns.uuid != diagram.uuid)
-                .fetchCount(db)
-            if collisions > 0 {
-                throw StoreError.badRequest(
-                    detail:
-                        "a diagram coded '\(finalCode)' already exists at the target tier"
-                )
-            }
-            set["tier"] = owner.tier.rawValue
-            // updateValue, not subscript: typed-nil subscript assignment
-            // REMOVES the key and the NULL-out silently vanishes (the
-            // base_composable_uuid lesson).
-            set.updateValue(owner.sessionUuid, forKey: "session_uuid")
-            set.updateValue(owner.promptUuid, forKey: "prompt_uuid")
+            try applyDiagramPromotion(promotion, diagram: diagram, update: update, set: &set)
         }
 
         // gmcc_diagram_path is legal at EVERY tier: screenshots materialize
@@ -1514,24 +1600,7 @@ struct DiagramRepository: RepositoryContext {
         if let visibility = update.visibility {
             set["visibility"] = visibility.rawValue
         }
-        // The visibility/tier cross-guard, checked on the FINAL state so a
-        // combined promote+set cannot sneak past it in either order: PUBLIC
-        // is legal only on SESSION-tier rows (the dope write-repo gate — a
-        // session resolves to exactly one instance root; other tiers do
-        // not). Demote to PRIVATE first, or promote and stay PRIVATE.
-        let finalTier = (set["tier"] as? String) ?? diagram.tier
-        let finalVisibility = (set["visibility"] as? String) ?? diagram.visibility
-        if finalVisibility == DiagramVisibility.public.rawValue,
-            finalTier != DiagramTier.session.rawValue
-        {
-            throw StoreError.badRequest(
-                detail:
-                    "PUBLIC visibility is legal only on SESSION-tier diagrams "
-                    + "(the repo serialization root comes from the session's "
-                    + "instance) — set --visibility PRIVATE first or keep the "
-                    + "diagram at SESSION tier"
-            )
-        }
+        try validateDiagramVisibility(set: set, diagram: diagram)
 
         guard !set.isEmpty else {
             throw StoreError.emptyUpdate(entity: "diagram")
@@ -1557,6 +1626,112 @@ struct DiagramRepository: RepositoryContext {
             uuid: diagram.uuid,
             version: version
         )
+    }
+
+    /// Resolve a tier promotion and stage its tier and owner columns into the pending update set.
+    ///
+    /// - Parameters:
+    ///   - promotion: The requested tier promotion.
+    ///   - diagram: The diagram row being promoted.
+    ///   - update: The diagram update request, consulted for a code change.
+    ///   - set: The pending column assignments, mutated in-place.
+    /// - Throws: `StoreError.badRequest` on a cross-project target or a code collision at the new tier.
+    private func applyDiagramPromotion(
+        _ promotion: DiagramPromotion,
+        diagram: DiagramRow,
+        update: DiagramRowUpdate,
+        set: inout [String: (any DatabaseValueConvertible)?]
+    ) throws {
+        let owner = try resolvePromotionOwner(promotion)
+        guard owner.projectUuid == diagram.projectUuid else {
+            throw StoreError.badRequest(
+                detail:
+                    "promotion target resolves to a different project — a diagram never changes project"
+            )
+        }
+        // Same-code collision at the new tier would trip the partial
+        // unique index mid-UPDATE; pre-check for the friendly message.
+        let finalCode = update.code ?? diagram.code
+        let collisions =
+            try DiagramRecord
+            .filter(DiagramRecord.Columns.tier == owner.tier.rawValue)
+            .filter(Column(owner.ownerColumn) == owner.ownerUuid)
+            .filter(DiagramRecord.Columns.code == finalCode)
+            .filter(DiagramRecord.Columns.uuid != diagram.uuid)
+            .fetchCount(db)
+        if collisions > 0 {
+            throw StoreError.badRequest(
+                detail:
+                    "a diagram coded '\(finalCode)' already exists at the target tier"
+            )
+        }
+        set["tier"] = owner.tier.rawValue
+        // updateValue, not subscript: typed-nil subscript assignment
+        // REMOVES the key and the NULL-out silently vanishes (the
+        // base_composable_uuid lesson).
+        set.updateValue(owner.sessionUuid, forKey: "session_uuid")
+        set.updateValue(owner.promptUuid, forKey: "prompt_uuid")
+    }
+
+    /// Resolve the owner a promotion names, by the tier it targets.
+    ///
+    /// - Parameter promotion: The requested tier promotion.
+    /// - Returns: The resolved owner for the target tier.
+    /// - Throws: Any owner resolution or database error.
+    private func resolvePromotionOwner(_ promotion: DiagramPromotion) throws -> DiagramOwner {
+        switch promotion.tier {
+        case .project:
+            return try resolveDiagramOwner(
+                projectUuid: promotion.ownerUuid,
+                instanceUuid: nil,
+                sessionUuid: nil,
+                promptUuid: nil
+            )
+        case .session:
+            return try resolveDiagramOwner(
+                projectUuid: nil,
+                instanceUuid: nil,
+                sessionUuid: promotion.ownerUuid,
+                promptUuid: nil
+            )
+        case .prompt:
+            return try resolveDiagramOwner(
+                projectUuid: nil,
+                instanceUuid: nil,
+                sessionUuid: nil,
+                promptUuid: promotion.ownerUuid
+            )
+        }
+    }
+
+    /// Reject a final state that pairs PUBLIC visibility with a non-SESSION tier.
+    ///
+    /// - Parameters:
+    ///   - set: The pending column assignments.
+    ///   - diagram: The diagram row supplying unchanged tier and visibility.
+    /// - Throws: `StoreError.badRequest` when PUBLIC lands on a non-SESSION tier.
+    private func validateDiagramVisibility(
+        set: [String: (any DatabaseValueConvertible)?],
+        diagram: DiagramRow
+    ) throws {
+        // The visibility/tier cross-guard, checked on the FINAL state so a
+        // combined promote+set cannot sneak past it in either order: PUBLIC
+        // is legal only on SESSION-tier rows (the dope write-repo gate — a
+        // session resolves to exactly one instance root; other tiers do
+        // not). Demote to PRIVATE first, or promote and stay PRIVATE.
+        let finalTier = (set["tier"] as? String) ?? diagram.tier
+        let finalVisibility = (set["visibility"] as? String) ?? diagram.visibility
+        if finalVisibility == DiagramVisibility.public.rawValue,
+            finalTier != DiagramTier.session.rawValue
+        {
+            throw StoreError.badRequest(
+                detail:
+                    "PUBLIC visibility is legal only on SESSION-tier diagrams "
+                    + "(the repo serialization root comes from the session's "
+                    + "instance) — set --visibility PRIVATE first or keep the "
+                    + "diagram at SESSION tier"
+            )
+        }
     }
 
     // MARK: - Subtype persistence (whole-row insert / whole-row replace —

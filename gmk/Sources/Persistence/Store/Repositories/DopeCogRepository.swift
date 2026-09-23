@@ -159,58 +159,8 @@ struct DopeCogRepository: RepositoryContext {
         }
         let scope = try cogOwningScope(cogUuid: req.cogUuid)
 
-        // allowedParentTypes is a two-way constraint: nil means top-level
-        // ONLY, and non-nil means parented ONLY. The second half was
-        // unreachable while every type was top-level, so a type that
-        // must be parented could still be created at the root.
-        switch (req.parentElementUuid, spec.allowedParentTypes) {
-        case (nil, .some(let allowed)):
-            throw StoreError.badRequest(
-                detail: "element type '\(spec.type.rawValue)' must be parented under "
-                    + allowed.map(\.rawValue).sorted().joined(separator: " or ")
-                    + " and cannot be top-level"
-            )
-        case (.some(let parent), _):
-            guard let parentType = try elementType(uuid: parent) else {
-                throw StoreError.notFound(entity: "dope_cog_element", key: parent)
-            }
-            guard let allowed = spec.allowedParentTypes,
-                allowed.contains(where: { $0.rawValue == parentType })
-            else {
-                throw StoreError.badRequest(
-                    detail: "element type '\(spec.type.rawValue)' is top-level only "
-                        + "and cannot be parented under '\(parentType)'"
-                )
-            }
-        case (nil, nil):
-            break  // top-level type at top level
-        }
-
-        // Spec-driven rather than a literal special case: PersistenceOwner has
-        // no primary_path at all, so a per-type requiredFields loop is what
-        // lets a second element type exist.
-        var subtypeValues: [String: (any DatabaseValueConvertible)?] = [:]
-        for field in spec.requiredFields.sorted(by: { $0.rawValue < $1.rawValue }) {
-            let supplied: String?
-            switch field {
-            case .primaryPath: supplied = req.primaryPath
-            case .dopePersistenceCode: supplied = req.dopePersistenceCode
-            case .dopeScopeCode: supplied = req.dopeScopeCode
-            }
-            guard let value = supplied, !value.isEmpty else {
-                throw StoreError.badRequest(
-                    detail: "element type '\(spec.type.rawValue)' requires --"
-                        + field.rawValue
-                        .replacingOccurrences(
-                            of: "([a-z0-9])([A-Z])",
-                            with: "$1-$2",
-                            options: .regularExpression
-                        )
-                        .lowercased()
-                )
-            }
-            subtypeValues[field.dbColumn] = value
-        }
+        try validateParent(req, spec: spec)
+        var subtypeValues = try requiredSubtypeValues(req, spec: spec)
 
         let uuid = try core.insertBase(
             db,
@@ -240,6 +190,80 @@ struct DopeCogRepository: RepositoryContext {
             revision: revision
         )
         return try fetchCogElementResponse(uuid: uuid, revision: revision)
+    }
+
+    /// Enforces the spec's two-way parent constraint on a new element.
+    ///
+    /// - Parameters:
+    ///   - req: The element creation request.
+    ///   - spec: The element type's spec.
+    /// - Throws: `StoreError.badRequest` for a disallowed placement; `StoreError.notFound` for a missing parent.
+    private func validateParent(_ req: DopeCogElementAddRequest, spec: DopeCogElementSpec) throws {
+        // allowedParentTypes is a two-way constraint: nil means top-level
+        // ONLY, and non-nil means parented ONLY. The second half was
+        // unreachable while every type was top-level, so a type that
+        // must be parented could still be created at the root.
+        switch (req.parentElementUuid, spec.allowedParentTypes) {
+        case (nil, .some(let allowed)):
+            throw StoreError.badRequest(
+                detail: "element type '\(spec.type.rawValue)' must be parented under "
+                    + allowed.map(\.rawValue).sorted().joined(separator: " or ")
+                    + " and cannot be top-level"
+            )
+        case (.some(let parent), _):
+            guard let parentType = try elementType(uuid: parent) else {
+                throw StoreError.notFound(entity: "dope_cog_element", key: parent)
+            }
+            guard let allowed = spec.allowedParentTypes,
+                allowed.contains(where: { $0.rawValue == parentType })
+            else {
+                throw StoreError.badRequest(
+                    detail: "element type '\(spec.type.rawValue)' is top-level only "
+                        + "and cannot be parented under '\(parentType)'"
+                )
+            }
+        case (nil, nil):
+            break  // top-level type at top level
+        }
+    }
+
+    /// Collects the spec's required subtype fields from the request, keyed by column.
+    ///
+    /// - Parameters:
+    ///   - req: The element creation request.
+    ///   - spec: The element type's spec.
+    /// - Returns: The subtype column values, without the element uuid.
+    /// - Throws: `StoreError.badRequest` when a required field is missing or empty.
+    private func requiredSubtypeValues(
+        _ req: DopeCogElementAddRequest,
+        spec: DopeCogElementSpec
+    ) throws -> [String: (any DatabaseValueConvertible)?] {
+        // Spec-driven rather than a literal special case: PersistenceOwner has
+        // no primary_path at all, so a per-type requiredFields loop is what
+        // lets a second element type exist.
+        var subtypeValues: [String: (any DatabaseValueConvertible)?] = [:]
+        for field in spec.requiredFields.sorted(by: { $0.rawValue < $1.rawValue }) {
+            let supplied: String?
+            switch field {
+            case .primaryPath: supplied = req.primaryPath
+            case .dopePersistenceCode: supplied = req.dopePersistenceCode
+            case .dopeScopeCode: supplied = req.dopeScopeCode
+            }
+            guard let value = supplied, !value.isEmpty else {
+                throw StoreError.badRequest(
+                    detail: "element type '\(spec.type.rawValue)' requires --"
+                        + field.rawValue
+                        .replacingOccurrences(
+                            of: "([a-z0-9])([A-Z])",
+                            with: "$1-$2",
+                            options: .regularExpression
+                        )
+                        .lowercased()
+                )
+            }
+            subtypeValues[field.dbColumn] = value
+        }
+        return subtypeValues
     }
 
     /// Updates an existing cog element.

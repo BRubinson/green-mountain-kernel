@@ -282,11 +282,10 @@ struct ContextRepository: RepositoryContext {
             kbiteUuids.insert(try ensureKbite(code: code))
         }
         if let parent {
-            let inherited = try String.fetchAll(
-                db,
-                sql: "SELECT kbite_uuid FROM \(parent.level)_active_kbite WHERE \(parent.level)_uuid = ?",
-                arguments: [parent.uuid]
-            )
+            let inherited = try Table("\(parent.level)_active_kbite")
+                .filter(Column("\(parent.level)_uuid") == parent.uuid)
+                .select(Column("kbite_uuid"), as: String.self)
+                .fetchAll(db)
             kbiteUuids.formUnion(inherited)
         }
         for kbiteUuid in kbiteUuids.sorted() {

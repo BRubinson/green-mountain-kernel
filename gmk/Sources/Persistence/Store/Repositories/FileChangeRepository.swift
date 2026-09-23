@@ -23,6 +23,88 @@ struct FileChangeRepository: RepositoryContext {
     /// - Returns: The response with session file, file change, and range uuids.
     /// - Throws: `StoreError` for validation failures or database errors.
     func add(_ req: FileChangeAdd) throws -> FileChangeAddResponse {
+        let origin = try validatedOrigin(req)
+        // THE BINDING GATE. A write that names a Claude conversation is
+        // payload-borne, and a payload-borne write resolves through the binding
+        // or not at all; this is the server-side half of the no-op contract.
+        // It runs before the ensure chain on purpose: ensureProject and
+        // ensureInstance CREATE rows, so after them every repo looks booted and
+        // the loud/silent distinction below collapses.
+        let boundSessionUuid = try resolveBinding(req)
+        let (sessionUuid, relativePath) = try ensureContext(req)
+
+        // IDEMPOTENCY, as an explicit already-recorded SUCCESS. The point
+        // query comes before ensureSessionFile because that call bumps
+        // session_file.version — a replay must leave the db byte-identical,
+        // and must not look like a second edit to a subscriber, so it also
+        // appends no event and does not touchSession.
+        if let recorded = try replayedChange(req, sessionUuid: sessionUuid, relativePath: relativePath) {
+            return recorded
+        }
+
+        let sessionFileUuid = try ensureSessionFile(
+            sessionUuid: sessionUuid,
+            relativePath: relativePath,
+            changeKind: req.changeKind
+        )
+        let attribution = try resolveAttribution(
+            req,
+            sessionUuid: sessionUuid,
+            boundSessionUuid: boundSessionUuid
+        )
+
+        let fileChangeUuid: String
+        do {
+            fileChangeUuid = try insertFileChange(
+                req,
+                sessionFileUuid: sessionFileUuid,
+                sessionUuid: sessionUuid,
+                attribution: attribution,
+                origin: origin
+            )
+        } catch let error as DatabaseError
+            where error.resultCode == .SQLITE_CONSTRAINT
+            && error.extendedResultCode == .SQLITE_CONSTRAINT_UNIQUE
+        {
+            // The partial UNIQUE fired after the point query above passed. Map
+            // it to the SAME already-recorded success rather than an error: the
+            // caller asked for this row to exist and it does. SQLite aborts the
+            // statement, not the transaction, so surrounding work stands.
+            // NARROWED TO *_UNIQUE ON PURPOSE. A bare SQLITE_CONSTRAINT also
+            // covers this insert's foreign keys, so the wide form could report a
+            // genuine FK failure as a dedup success. The catch may only ever
+            // mean the thing it claims to mean.
+            guard
+                let recorded = try replayedChange(req, sessionUuid: sessionUuid, relativePath: relativePath)
+            else { throw error }
+            return recorded
+        }
+
+        // The size budget on append-only history: a regenerated file can
+        // produce thousands of hunks and megabytes of body, and nothing
+        // trims file_change_range afterwards.
+        let rangeUuids = try insertRanges(fileChangeUuid: fileChangeUuid, req.ranges)
+        try appendFileChangeEvent(
+            req,
+            fileChangeUuid: fileChangeUuid,
+            sessionUuid: sessionUuid,
+            relativePath: relativePath,
+            rangeCount: rangeUuids.count
+        )
+
+        return FileChangeAddResponse(
+            sessionFileUuid: sessionFileUuid,
+            fileChangeUuid: fileChangeUuid,
+            rangeUuids: rangeUuids
+        )
+    }
+
+    /// Checks the prompt reference and resolves the change's origin against the shared vocabulary.
+    ///
+    /// - Parameter req: The file change request.
+    /// - Returns: The origin to stamp, defaulting to the hook origin.
+    /// - Throws: `StoreError.notFound` for a dangling prompt; `StoreError.badRequest` for an unknown origin.
+    private func validatedOrigin(_ req: FileChangeAdd) throws -> String {
         // A dangling prompt reference must be a typed NOT_FOUND, not the
         // opaque FK DB_ERROR the insert below would produce.
         if let promptUuid = req.promptUuid {
@@ -43,13 +125,15 @@ struct FileChangeRepository: RepositoryContext {
                 detail: "origin must be \(FileChangeOrigin.vocabulary) (got '\(origin)')"
             )
         }
-        // THE BINDING GATE. A write that names a Claude conversation is
-        // payload-borne, and a payload-borne write resolves through the binding
-        // or not at all; this is the server-side half of the no-op contract.
-        // It runs before the ensure chain on purpose: ensureProject and
-        // ensureInstance CREATE rows, so after them every repo looks booted and
-        // the loud/silent distinction below collapses.
-        let boundSessionUuid = try resolveBinding(req)
+        return origin
+    }
+
+    /// Ensures the project, instance and session chain and normalizes the changed path.
+    ///
+    /// - Parameter req: The file change request.
+    /// - Returns: The cwd-derived session uuid and the repo-relative path.
+    /// - Throws: `StoreError` when the chain cannot be ensured or the path lies outside the instance.
+    private func ensureContext(_ req: FileChangeAdd) throws -> (sessionUuid: String, relativePath: String) {
         let context = ContextRepository(db: db, core: core)
         let (projectUuid, _) = try context.ensureProject(req.project)
         let (instanceUuid, _) = try context.ensureInstance(req.instance, projectUuid: projectUuid)
@@ -61,27 +145,43 @@ struct FileChangeRepository: RepositoryContext {
             req.relativePath,
             repoRoot: req.instance.absoluteFileSystemPath
         )
+        return (sessionUuid, relativePath)
+    }
 
-        // IDEMPOTENCY, as an explicit already-recorded SUCCESS. The point
-        // query comes before ensureSessionFile because that call bumps
-        // session_file.version — a replay must leave the db byte-identical,
-        // and must not look like a second edit to a subscriber, so it also
-        // appends no event and does not touchSession.
-        if let toolUseId = req.toolUseId,
-            let recorded = try recordedChange(
-                toolUseId: toolUseId,
-                sessionUuid: sessionUuid,
-                relativePath: relativePath
-            )
-        {
-            return recorded
-        }
-
-        let sessionFileUuid = try ensureSessionFile(
+    /// Returns the already-recorded response for this request's (tool call, file) pair, if any.
+    ///
+    /// - Parameters:
+    ///   - req: The file change request; one without a tool use id never replays.
+    ///   - sessionUuid: The session uuid.
+    ///   - relativePath: The repository-relative file path.
+    /// - Returns: The recorded response, or nil when nothing was recorded.
+    /// - Throws: Database errors during the query.
+    private func replayedChange(
+        _ req: FileChangeAdd,
+        sessionUuid: String,
+        relativePath: String
+    ) throws -> FileChangeAddResponse? {
+        guard let toolUseId = req.toolUseId else { return nil }
+        return try recordedChange(
+            toolUseId: toolUseId,
             sessionUuid: sessionUuid,
-            relativePath: relativePath,
-            changeKind: req.changeKind
+            relativePath: relativePath
         )
+    }
+
+    /// Resolves the prompt, live workflow phase and agent registration a change is stamped with.
+    ///
+    /// - Parameters:
+    ///   - req: The file change request.
+    ///   - sessionUuid: The cwd-derived session uuid.
+    ///   - boundSessionUuid: The conversation's pinned session, if the payload names one.
+    /// - Returns: The attributed prompt uuid, workflow phase, and agent registration uuid.
+    /// - Throws: Database errors during resolution or registration.
+    private func resolveAttribution(
+        _ req: FileChangeAdd,
+        sessionUuid: String,
+        boundSessionUuid: String?
+    ) throws -> (promptUuid: String?, workflowPhase: String?, agentRegistrationUuid: String?) {
         // OPT-IN attribution: an omitted prompt still means deliberately
         // session-scoped for every other caller. Only autoAttribute callers
         // resolve a prompt, and an unresolvable one leaves the change
@@ -115,59 +215,67 @@ struct FileChangeRepository: RepositoryContext {
                 promptUuid: attributedPromptUuid
             )
         )
+        return (attributedPromptUuid, workflowPhase, agentRegistrationUuid)
+    }
 
-        let fileChangeUuid: String
-        do {
-            fileChangeUuid = try core.insertBase(
-                db,
-                table: "file_change",
-                extra: [
-                    "session_file_uuid": sessionFileUuid,
-                    "session_uuid": sessionUuid,
-                    "prompt_uuid": attributedPromptUuid,
-                    "change_kind": req.changeKind.rawValue,
-                    "agent_id": req.agentId,
-                    "agent_name": req.agentName.map(Store.normalizedAgentName),
-                    "workflow_phase": workflowPhase,
-                    "origin": origin,
-                    "claude_session_id": req.claudeSessionId,
-                    "claude_turn_id": req.claudeTurnId,
-                    "tool_use_id": req.toolUseId,
-                    "tool_name": req.toolName,
-                    "agent_type": req.agentType,
-                    "permission_mode": req.permissionMode,
-                    "duration_ms": req.durationMs,
-                    "transcript_path": req.transcriptPath,
-                    "agent_registration_uuid": agentRegistrationUuid,
-                ]
-            )
-        } catch let error as DatabaseError
-            where error.resultCode == .SQLITE_CONSTRAINT
-            && error.extendedResultCode == .SQLITE_CONSTRAINT_UNIQUE
-        {
-            // The partial UNIQUE fired after the point query above passed. Map
-            // it to the SAME already-recorded success rather than an error: the
-            // caller asked for this row to exist and it does. SQLite aborts the
-            // statement, not the transaction, so surrounding work stands.
-            // NARROWED TO *_UNIQUE ON PURPOSE. A bare SQLITE_CONSTRAINT also
-            // covers this insert's foreign keys, so the wide form could report a
-            // genuine FK failure as a dedup success. The catch may only ever
-            // mean the thing it claims to mean.
-            guard let toolUseId = req.toolUseId,
-                let recorded = try recordedChange(
-                    toolUseId: toolUseId,
-                    sessionUuid: sessionUuid,
-                    relativePath: relativePath
-                )
-            else { throw error }
-            return recorded
-        }
+    /// Inserts the file_change row.
+    ///
+    /// - Parameters:
+    ///   - req: The file change request.
+    ///   - sessionFileUuid: The upserted session file uuid.
+    ///   - sessionUuid: The cwd-derived session uuid.
+    ///   - attribution: The resolved prompt, workflow phase, and agent registration.
+    ///   - origin: The validated origin.
+    /// - Returns: The new file change uuid.
+    /// - Throws: `DatabaseError` on constraint violations, which the caller maps.
+    private func insertFileChange(
+        _ req: FileChangeAdd,
+        sessionFileUuid: String,
+        sessionUuid: String,
+        attribution: (promptUuid: String?, workflowPhase: String?, agentRegistrationUuid: String?),
+        origin: String
+    ) throws -> String {
+        try core.insertBase(
+            db,
+            table: "file_change",
+            extra: [
+                "session_file_uuid": sessionFileUuid,
+                "session_uuid": sessionUuid,
+                "prompt_uuid": attribution.promptUuid,
+                "change_kind": req.changeKind.rawValue,
+                "agent_id": req.agentId,
+                "agent_name": req.agentName.map(Store.normalizedAgentName),
+                "workflow_phase": attribution.workflowPhase,
+                "origin": origin,
+                "claude_session_id": req.claudeSessionId,
+                "claude_turn_id": req.claudeTurnId,
+                "tool_use_id": req.toolUseId,
+                "tool_name": req.toolName,
+                "agent_type": req.agentType,
+                "permission_mode": req.permissionMode,
+                "duration_ms": req.durationMs,
+                "transcript_path": req.transcriptPath,
+                "agent_registration_uuid": attribution.agentRegistrationUuid,
+            ]
+        )
+    }
 
-        // The size budget on append-only history: a regenerated file can
-        // produce thousands of hunks and megabytes of body, and nothing
-        // trims file_change_range afterwards.
-        let rangeUuids = try insertRanges(fileChangeUuid: fileChangeUuid, req.ranges)
-
+    /// Appends the FILE_CHANGE event and advances session recency.
+    ///
+    /// - Parameters:
+    ///   - req: The file change request.
+    ///   - fileChangeUuid: The inserted file change uuid.
+    ///   - sessionUuid: The cwd-derived session uuid.
+    ///   - relativePath: The repository-relative file path.
+    ///   - rangeCount: The number of ranges inserted.
+    /// - Throws: Database errors during the append or touch.
+    private func appendFileChangeEvent(
+        _ req: FileChangeAdd,
+        fileChangeUuid: String,
+        sessionUuid: String,
+        relativePath: String,
+        rangeCount: Int
+    ) throws {
         // Item 4: session_uuid in the payload lets GMVibes route the
         // event to one session instead of invalidating all of them.
         try core.appendEvent(
@@ -177,18 +285,12 @@ struct FileChangeRepository: RepositoryContext {
             payload: Store.jsonPayload([
                 "relative_path": relativePath,
                 "change_kind": req.changeKind.rawValue,
-                "ranges": rangeUuids.count,
+                "ranges": rangeCount,
                 "session_uuid": sessionUuid,
             ])
         )
         // Item 3: file-change writes advance session recency.
         try core.touchSession(db, uuid: sessionUuid)
-
-        return FileChangeAddResponse(
-            sessionFileUuid: sessionFileUuid,
-            fileChangeUuid: fileChangeUuid,
-            rangeUuids: rangeUuids
-        )
     }
 
     /// Resolves the Claude conversation's pinned session.

@@ -24,6 +24,19 @@ enum WorkflowGates {
     /// - Returns: Array of human-readable unmet condition descriptions.
     /// - Throws: Database errors from queries.
     static func implementExitUnmet(_ db: Database, promptUuid: String) throws -> [String] {
+        try untouchedPersistenceUnmet(db, promptUuid: promptUuid)
+            + persistenceFirstOrderingUnmet(db, promptUuid: promptUuid)
+            + unrecordedGeneralPlanUnmet(db, promptUuid: promptUuid)
+    }
+
+    /// Reports planned persistence paths that have no recorded `file_change` row.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - promptUuid: The prompt uuid to check.
+    /// - Returns: Zero or one human-readable unmet condition description.
+    /// - Throws: Database errors from queries.
+    private static func untouchedPersistenceUnmet(_ db: Database, promptUuid: String) throws -> [String] {
         var unmet: [String] = []
 
         // (1) planned persistence paths with no file_change row.
@@ -52,6 +65,18 @@ enum WorkflowGates {
                     + "file change (the edit never happened, or the plan is stale)"
             )
         }
+        return unmet
+    }
+
+    /// Reports a general change first touched before the last persistence change was first touched.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - promptUuid: The prompt uuid to check.
+    /// - Returns: Zero or one human-readable unmet condition description.
+    /// - Throws: Database errors from queries.
+    private static func persistenceFirstOrderingUnmet(_ db: Database, promptUuid: String) throws -> [String] {
+        var unmet: [String] = []
 
         // (2) persistence-first ordering, same rule as ARCH_GET: the LAST
         // persistence path to be first touched must not be later than the
@@ -92,6 +117,18 @@ enum WorkflowGates {
                     + "\(CdeToolSpec.qualifiedName("cde_rpir_architecture")) op get"
             )
         }
+        return unmet
+    }
+
+    /// Reports a plan with general change rows while the prompt recorded no file change at all.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - promptUuid: The prompt uuid to check.
+    /// - Returns: Zero or one human-readable unmet condition description.
+    /// - Throws: Database errors from queries.
+    private static func unrecordedGeneralPlanUnmet(_ db: Database, promptUuid: String) throws -> [String] {
+        var unmet: [String] = []
 
         // (3) a plan with general rows and not one recorded change.
         let generalPlanned =

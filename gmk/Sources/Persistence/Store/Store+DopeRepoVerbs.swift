@@ -227,10 +227,32 @@ extension Store {
             return (scope, try self.instanceRoot(db, sessionUuid: try scope.requireSessionUuid()))
         }
 
+        let bundle = try readValidatedDopeIngestBundle(root: req.dirPath ?? ownRoot)
+        let adopt = req.adopt == true
+        let expectedRevision = try dopeIngestExpectedRevision(
+            bundle: bundle,
+            scopeBefore: scopeBefore,
+            adopt: adopt
+        )
+        return try landDopeIngest(
+            scopeUuid: req.scopeUuid,
+            bundle: bundle,
+            scopeBefore: scopeBefore,
+            expectedRevision: expectedRevision,
+            adopt: adopt
+        )
+    }
+
+    /// Phases 3 and 2 of ingest: reads the repo files, then validates the whole tree.
+    ///
+    /// - Parameter root: The instance root whose `.gmcc` tree is read.
+    /// - Returns: The parsed and validated document bundle.
+    /// - Throws: `StoreError.badRequest` when the tree cannot be read or fails validation.
+    private func readValidatedDopeIngestBundle(root: String) throws -> DopeDocumentBundle {
         // Phase 3 — read the files (before the write transaction opens).
         let bundle: DopeDocumentBundle
         do {
-            let sandbox = try DopeRepoSandbox.resolve(instanceRoot: req.dirPath ?? ownRoot)
+            let sandbox = try DopeRepoSandbox.resolve(instanceRoot: root)
             bundle = try sandbox.readBundle().bundle
         } catch let error as DopeRepoSandbox.SandboxError {
             throw StoreError.badRequest(detail: error.description)
@@ -242,10 +264,22 @@ extension Store {
         } catch let error as DopeValidator.BundleError {
             throw StoreError.badRequest(detail: error.description)
         }
+        return bundle
+    }
 
-        // Phase 4 — one transaction: gate revision == file.version - 1 exactly,
-        // ordered wipe, dependency-ordered re-insert. Every child uuid changes,
-        // which is the no-smart-diff consequence.
+    /// Gates the bundle against the target scope and returns the revision the landing must match.
+    ///
+    /// - Parameters:
+    ///   - bundle: The validated document bundle.
+    ///   - scopeBefore: The target scope row as read before the files.
+    ///   - adopt: True for adopt mode; false for the strict `incoming - 1` gate.
+    /// - Returns: The db revision the guarded update must observe.
+    /// - Throws: `StoreError.badRequest` on a scope code mismatch or a backward adopt.
+    private func dopeIngestExpectedRevision(
+        bundle: DopeDocumentBundle,
+        scopeBefore: DopeScopeRow,
+        adopt: Bool
+    ) throws -> Int64 {
         // The file is the whole truth, so scope.doped.json's name and description
         // are APPLIED to the row, and a hand-edit must never be silently reverted
         // by the next write-repo. The row's optimistic lock `version` bumps ONLY
@@ -265,7 +299,6 @@ extension Store {
         // one genuinely destructive direction (a stale checkout clobbering
         // newer db work) and is refused outright.
         let incoming = bundle.main.version
-        let adopt = req.adopt == true
         if adopt {
             guard incoming > scopeBefore.revision else {
                 throw StoreError.badRequest(
@@ -274,37 +307,60 @@ extension Store {
                 )
             }
         }
-        let expectedRevision = adopt ? scopeBefore.revision : incoming - 1
+        return adopt ? scopeBefore.revision : incoming - 1
+    }
+
+    /// Phase 4 of ingest: lands the bundle as the scope's new tree and merge base in one transaction.
+    ///
+    /// - Parameters:
+    ///   - scopeUuid: The target scope uuid.
+    ///   - bundle: The validated document bundle.
+    ///   - scopeBefore: The target scope row as read before the files.
+    ///   - expectedRevision: The db revision the guarded update must observe.
+    ///   - adopt: True for adopt mode; false for strict mode.
+    /// - Returns: The updated scope, element counts, previous revision, and any revision gap crossed.
+    /// - Throws: `StoreError` on a lost revision race or a vanished scope, or database errors.
+    private func landDopeIngest(
+        scopeUuid: String,
+        bundle: DopeDocumentBundle,
+        scopeBefore: DopeScopeRow,
+        expectedRevision: Int64,
+        adopt: Bool
+    ) throws -> DopeIngestResponse {
+        let incoming = bundle.main.version
+        // Phase 4 — one transaction: gate revision == file.version - 1 exactly,
+        // ordered wipe, dependency-ordered re-insert. Every child uuid changes,
+        // which is the no-smart-diff consequence.
         return try boundary { db in
             try DopeRepository(db: db, core: self.core)
                 .applyIngestedScope(
-                    scopeUuid: req.scopeUuid,
+                    scopeUuid: scopeUuid,
                     incoming: incoming,
                     expectedRevision: expectedRevision,
                     name: bundle.main.scope.name,
                     description: bundle.main.scope.description
                 )
 
-            try self.wipeDopeTree(db, scopeUuid: req.scopeUuid)
+            try self.wipeDopeTree(db, scopeUuid: scopeUuid)
             let counts = try self.insertDopeTree(
                 db,
-                scopeUuid: req.scopeUuid,
+                scopeUuid: scopeUuid,
                 domainFiles: bundle.domainFiles
             )
             try self.insertDopeCogs(
                 db,
-                scopeUuid: req.scopeUuid,
+                scopeUuid: scopeUuid,
                 cogFiles: bundle.cogFiles
             )
             // This tree just came FROM the files, so it IS the new merge
             // base: record every element's hash and clear the dirty flags.
             try self.stampProvenanceFromFiles(
                 db,
-                scopeUuid: req.scopeUuid,
+                scopeUuid: scopeUuid,
                 bundle: bundle
             )
 
-            guard let scope = try self.fetchDopeScope(db, uuid: req.scopeUuid) else {
+            guard let scope = try self.fetchDopeScope(db, uuid: scopeUuid) else {
                 throw StoreError.corruptState(entity: "dope_scope", detail: "vanished during ingest")
             }
             let gap = adopt ? (incoming - scopeBefore.revision - 1) : 0
