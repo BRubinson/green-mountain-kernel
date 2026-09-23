@@ -2,12 +2,21 @@ import Foundation
 import GRDB
 
 /// CATALOG_SEARCH data access — tokenized OR name/code search across
-/// instances + sessions. Runs INSIDE a Store-owned transaction; holds no
-/// dbQueue and never self-transacts.
+/// instances + sessions.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts.
 struct CatalogSearchRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Searches the catalog across instances and sessions.
+    ///
+    /// - Parameters:
+    ///   - req: The search request with filters.
+    ///   - tokens: The tokenized search terms.
+    ///   - limit: The maximum results to return.
+    /// - Returns: The search response with instances and sessions.
+    /// - Throws: Error if the search fails.
     func searchCatalog(_ req: CatalogSearchRequest, tokens: [String], limit: Int) throws -> CatalogSearchResponse {
         // OR across tokens × (name, code) for one table; every token is a bound
         // `%token%` pattern — never interpolated into the SQL.

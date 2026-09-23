@@ -17,8 +17,13 @@ struct MarkdownSourceEditor: NSViewRepresentable {
     var query = SearchQuery("")
     var activeOccurrence: Int?
 
+    /// Creates the coordinator for this editor.
+    /// - Returns: A coordinator bound to this editor.
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
+    /// Creates the native scroll view containing the text editor.
+    /// - Parameter context: The SwiftUI context for this representable.
+    /// - Returns: An NSScrollView wrapping the text editor.
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
         scrollView.drawsBackground = false
@@ -71,6 +76,10 @@ struct MarkdownSourceEditor: NSViewRepresentable {
         return scrollView
     }
 
+    /// Updates the text editor when the binding or query changes.
+    /// - Parameters:
+    ///   - _: The scroll view (SwiftUI updates it; unused here).
+    ///   - context: The SwiftUI context for this representable.
     func updateNSView(_: NSScrollView, context: Context) {
         context.coordinator.parent = self
         if context.coordinator.textView?.string != text {
@@ -79,8 +88,16 @@ struct MarkdownSourceEditor: NSViewRepresentable {
         context.coordinator.applyFind(query: query, activeOccurrence: activeOccurrence)
     }
 
-    // Self-size: lay the text out at the proposed content width and report the used
-    // height, so the editor grows to fit inside the host's vertical ScrollView.
+    /// Measures the editor's height for a proposed width.
+    ///
+    /// Lays the text out at the proposed content width and reports the height
+    /// needed, so the editor grows to fit inside the host's vertical scroll view.
+    ///
+    /// - Parameters:
+    ///   - proposal: The proposed size from SwiftUI.
+    ///   - scrollView: The native scroll view (unused; SwiftUI manages sizing).
+    ///   - context: The SwiftUI context for this representable.
+    /// - Returns: The required size with the proposed width and measured height, or nil.
     func sizeThatFits(
         _ proposal: ProposedViewSize,
         nsView scrollView: NSScrollView,
@@ -111,6 +128,8 @@ struct MarkdownSourceEditor: NSViewRepresentable {
             size: NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         )
 
+        /// Creates a coordinator for the given editor.
+        /// - Parameter parent: The markdown source editor this coordinates.
         init(_ parent: MarkdownSourceEditor) {
             self.parent = parent
             super.init()
@@ -122,6 +141,10 @@ struct MarkdownSourceEditor: NSViewRepresentable {
 
         // MARK: Text + styling
 
+        /// Sets the editor text and optionally preserves the selection.
+        /// - Parameters:
+        ///   - string: The text to display.
+        ///   - preservingSelection: Whether to keep the current selection, adjusted to the new text length.
         func setText(_ string: String, preservingSelection: Bool = false) {
             guard let tv = textView else { return }
             let sel = tv.selectedRange()
@@ -135,17 +158,23 @@ struct MarkdownSourceEditor: NSViewRepresentable {
             updateRuler()
         }
 
-        // One whole-line font + color run per logical line (heading → level font + purple;
-        // body → body font + adaptive label color). Idempotent; re-run on every edit so
-        // styling tracks typed "#"s. Does not touch the selection.
+        /// Applies header and body styling to the editor text.
+        ///
+        /// One whole-line font and color run per logical line: heading gets level-based
+        /// font and purple; body gets adaptive label color. Idempotent; re-run on every
+        /// edit so styling tracks typed "#"s. Does not touch the selection.
         func restyle() {
             guard let ts = textView?.textStorage else { return }
             Self.applyStyling(to: ts)
         }
 
-        // Styling is factored out so the detached measuring text storage (see
-        // `height(forWidth:)`) can be styled identically to the live one — per-line
-        // heading fonts change line heights, so the measurement must match the display.
+        /// Applies header and body styling to the given text storage.
+        ///
+        /// Factored out so the detached measuring text storage can be styled identically
+        /// to the live one—per-line heading fonts change line heights, so measurement
+        /// must match display.
+        ///
+        /// - Parameter ts: The text storage to style.
         static func applyStyling(to ts: NSTextStorage) {
             let nsString = ts.string as NSString
             let len = nsString.length
@@ -170,6 +199,7 @@ struct MarkdownSourceEditor: NSViewRepresentable {
             ts.endEditing()
         }
 
+        /// Updates the line-number ruler thickness and redraws it.
         func updateRuler() {
             guard let tv = textView, let ruler else { return }
             let lineCount = max(1, (tv.string as NSString).components(separatedBy: "\n").count)
@@ -178,10 +208,14 @@ struct MarkdownSourceEditor: NSViewRepresentable {
             ruler.needsDisplay = true
         }
 
-        // Lay the text out at a given total width and return the height it needs.
-        // Measures on the DETACHED stack so it never touches the live text view's
-        // geometry — the on-screen width is driven solely by the scroll view's tiling
-        // (`widthTracksTextView` + `autoresizingMask = [.width]`).
+        /// Measures the text height needed for a proposed width.
+        ///
+        /// Lays the text out at a given total width on a detached measuring stack,
+        /// never touching the live text view's geometry. On-screen width is driven
+        /// solely by the scroll view's tiling.
+        ///
+        /// - Parameter width: The total width at which to measure text height.
+        /// - Returns: The height the text needs at this width, including insets.
         func height(forWidth width: CGFloat) -> CGFloat {
             guard let tv = textView else { return parent.minHeight }
             let rulerThickness = ruler?.ruleThickness ?? 0
@@ -204,6 +238,8 @@ struct MarkdownSourceEditor: NSViewRepresentable {
 
         // MARK: Delegate
 
+        /// Handles text changes in the editor.
+        /// - Parameter notification: The text change notification from the text view.
         func textDidChange(_ notification: Notification) {
             guard let tv = notification.object as? NSTextView else { return }
             restyle()
@@ -213,8 +249,13 @@ struct MarkdownSourceEditor: NSViewRepresentable {
             tv.enclosingScrollView?.invalidateIntrinsicContentSize()
         }
 
-        // Select the active find match so it's visible (mirrors the old selectActiveMatch).
-        // Keyed on (literal, occurrence) so it only re-applies when the target changes.
+        /// Selects and scrolls to the active find-in-page match.
+        ///
+        /// Keyed on (literal, occurrence) so it only re-applies when the target changes.
+        ///
+        /// - Parameters:
+        ///   - query: The search query and literal text.
+        ///   - activeOccurrence: The zero-based index of the active match, or nil.
         func applyFind(query: SearchQuery, activeOccurrence: Int?) {
             guard let tv = textView else { return }
             guard query.isActive, let occ = activeOccurrence else { lastFindKey = nil; return }
@@ -238,12 +279,17 @@ struct MarkdownSourceEditor: NSViewRepresentable {
 // even when lines soft-wrap. A trailing empty line (text ends in "\n") is numbered via
 // the layout manager's extra line fragment.
 final class LineNumberRuler: NSRulerView {
+    /// Creates a line-number ruler for the given text view.
+    /// - Parameters:
+    ///   - scrollView: The scroll view this ruler is attached to.
+    ///   - textView: The text view whose lines are numbered.
     init(scrollView: NSScrollView, textView: NSTextView) {
         super.init(scrollView: scrollView, orientation: .verticalRuler)
         clientView = textView
         ruleThickness = 32
     }
 
+    /// This initializer is not supported; use `init(scrollView:textView:)` instead.
     required init(coder _: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     override func drawHashMarksAndLabels(in _: NSRect) {

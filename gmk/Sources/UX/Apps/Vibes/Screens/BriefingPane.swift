@@ -47,6 +47,10 @@ struct BriefingPane: View {
         .foregroundStyle(.secondary)
     }
 
+    /// Builds the view for one briefing item.
+    ///
+    /// - Parameter item: The briefing item to display.
+    /// - Returns: The view for the briefing section.
     @ViewBuilder
     private func section(_ item: PromptPhaseStore.BriefingItem) -> some View {
         let briefing = item.briefing
@@ -95,17 +99,29 @@ struct BriefingPane: View {
 
     // MARK: Bits
 
+    /// Converts an underscore-separated step name to a title-case display string.
+    ///
+    /// - Parameter raw: The raw step name (e.g., "briefing_for_step").
+    /// - Returns: The formatted title (e.g., "Briefing For Step").
     private func stepTitle(_ raw: String) -> String {
         raw.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }
             .joined(separator: " ")
     }
 
+    /// Creates a styled section header view.
+    ///
+    /// - Parameter title: The header text.
+    /// - Returns: A styled text view.
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
     }
 
+    /// Builds a colored status badge for the given status string.
+    ///
+    /// - Parameter status: The status value (e.g., "ready", "building").
+    /// - Returns: A styled badge view.
     @ViewBuilder
     private func statusChip(_ status: String) -> some View {
         let (label, color): (String, Color) =

@@ -9,6 +9,9 @@ extension Migrations {
     // every relationship and origin ref points into. ON DELETE RESTRICT, so the
     // NULL-out steps in wipeDopeTree and dopeNodeDelete precede BOTH property
     // DELETEs. Cross-row shape rules live in validatePropertyShape.
+    /// Registers migration m0009 to add `base_origin_property_uuid` column.
+    ///
+    /// - Parameter migrator: The database migrator to register the migration with.
     static func m0009_dopePropertyBaseOrigin(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0009_dopePropertyBaseOrigin") { db in
             try db.execute(

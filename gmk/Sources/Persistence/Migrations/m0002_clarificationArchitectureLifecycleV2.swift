@@ -2,13 +2,11 @@ import Foundation
 import GRDB
 
 extension Migrations {
-    // m0002 — db-native clarification + architecture entities, prompt lifecycle
-    // v2, daemon_config; the prompt table is rebuilt in place.
-    // Registered with NO foreignKeyChecks: argument — GRDB's default .deferred
-    // IS the official SQLite 12-step. NO PRAGMA may appear in this body:
-    // pragmas are silently ignored inside a transaction, and with FK
-    // enforcement live the prompt rebuild either aborts on file_change's NO
-    // ACTION reference or CASCADE-deletes every prompt_artifact row and commits.
+    /// Registers the m0002 migration for clarification and architecture.
+    ///
+    /// Rebuilds the prompt table, creates clarification, architecture and
+    /// daemon_config tables, and seeds daemon_config with layout defaults.
+    /// - Parameter migrator: The database migrator to register with.
     static func m0002_clarificationArchitectureLifecycleV2(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0002_clarificationArchitectureLifecycleV2") { db in
             // Step 1 — the prompt rebuild, FIRST, while the table has only its

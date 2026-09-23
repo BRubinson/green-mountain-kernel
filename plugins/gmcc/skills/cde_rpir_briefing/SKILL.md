@@ -3,7 +3,7 @@ name: cde_rpir_briefing
 description: "The BRIEFING phase: the prompt's opinion-free orientation page, sealed before anything else moves."
 user-invocable: false
 allowed-tools: mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_dope, mcp__plugin_gmcc_cde__cde_kbite, mcp__plugin_gmcc_cde__cde_prompt, mcp__plugin_gmcc_cde__cde_rpir_briefing
-model: opus
+model: claude-opus-5-5[1m]
 ---
 
 # Workflow Phase

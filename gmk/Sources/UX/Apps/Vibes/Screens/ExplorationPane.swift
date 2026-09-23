@@ -4,12 +4,16 @@ import SwiftUI
 /// every summary (synthesis first) + key files + PARTITIONED findings —
 /// full rows are the sub-threshold/unranked set, rendered IN WIRE ORDER
 /// (unranked first is the daemon's resume-queue contract, never re-sorted),
-/// stubs collapse behind a one-shot full:true widen. All exploration writes
+/// stubs collapse behind a one-shot full:true widen.
+///
+/// All exploration writes
 /// stay bot/CLI-side.
 struct ExplorationPane: View {
     let phase: PromptPhaseStore.Phase<ExploreGetResponse>
     /// Widen the store to full:true — invoked once when the user reveals the
-    /// at/above-threshold stubs. Keeps the pane a pure function of its phase.
+    /// at/above-threshold stubs.
+    ///
+    /// Keeps the pane a pure function of its phase.
     let onRequestFull: () async -> Void
 
     @State private var showLowPriority = false
@@ -39,6 +43,13 @@ struct ExplorationPane: View {
         }
     }
 
+    /// Renders the exploration content from the response.
+    ///
+    /// Displays summaries, key files, and findings partitioned by threshold,
+    /// with toggles for low-priority and tombstone visibility.
+    ///
+    /// - Parameter response: The exploration response.
+    /// - Returns: A view builder rendering the exploration content.
     @ViewBuilder
     private func content(_ response: ExploreGetResponse) -> some View {
         let visible = response.findings.visibleFindings(
@@ -137,6 +148,10 @@ struct ExplorationPane: View {
         }
     }
 
+    /// A disclosure group row displaying one exploration finding.
+    ///
+    /// - Parameter finding: The finding to display.
+    /// - Returns: A view rendering the finding with title, rating, and body.
     private func findingRow(_ finding: ExplorationFindingRow) -> some View {
         DisclosureGroup {
             Text(finding.body)
@@ -161,12 +176,20 @@ struct ExplorationPane: View {
         }
     }
 
+    /// A styled section header text.
+    ///
+    /// - Parameter title: The section title.
+    /// - Returns: A styled text view.
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
     }
 
+    /// A colored chip displaying the exploration status.
+    ///
+    /// - Parameter status: The exploration status (exploring, complete, or nil).
+    /// - Returns: A styled capsule view with status label and color.
     @ViewBuilder
     private func statusChip(_ status: ExplorationStatus?) -> some View {
         let (label, color): (String, Color) =

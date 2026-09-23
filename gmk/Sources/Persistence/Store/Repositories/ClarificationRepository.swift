@@ -2,23 +2,28 @@ import Foundation
 import GRDB
 
 /// CLARIFY_* / CARE_PACKAGE_* data access — the db-native clarification
-/// machine. Runs INSIDE a Store-owned transaction; holds no dbQueue and
-/// never self-transacts.
+/// machine.
 ///
-/// The summary is a slim status machine; questions and internal notes are the
-/// content; the care package is the standalone clarified-intent bundle.
-/// FINALIZE IS A PURE GATE and never writes the prompt row: prompt content is
-/// human input only.
+/// Runs INSIDE Store-owned transaction; holds no dbQueue, never self-transacts.
+/// Summary is a slim status machine; questions and notes are content; care
+/// package is the standalone clarified-intent bundle. FINALIZE IS A PURE GATE,
+/// never writes prompt row (content is human input only).
 struct ClarificationRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
     // MARK: - Shared create-or-return
 
-    /// Idempotent: returns the existing summary or creates one at `building`.
+    /// Returns the existing clarification summary or creates one at `building`.
     ///
-    /// CLARIFY_OPEN is its ONLY caller, so opening a clarification is something
-    /// an agent does deliberately, never a side effect of moving a status.
+    /// Idempotent; CLARIFY_OPEN is its only caller, so opening a clarification
+    /// is something an agent does deliberately, never a side effect of moving
+    /// a status.
+    ///
+    /// - Parameter promptUuid: The prompt this summary belongs to.
+    /// - Returns: A tuple of the summary uuid and a boolean indicating whether
+    ///   it was newly created.
+    /// - Throws: `StoreError.notFound` if the prompt does not exist.
     @discardableResult
     func ensureSummary(promptUuid: String) throws -> (uuid: String, created: Bool) {
         guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
@@ -51,6 +56,10 @@ struct ClarificationRepository: RepositoryContext {
 
     // MARK: - Verbs
 
+    /// Returns the clarification summary for a prompt, creating it if needed.
+    /// - Parameter req: A request with the prompt uuid.
+    /// - Returns: The clarification summary and a flag indicating whether it was newly created.
+    /// - Throws: Errors from `ensureSummary` or when the summary cannot be fetched.
     func open(_ req: ClarifyOpenRequest) throws -> ClarifySummaryResponse {
         let (uuid, created) = try ensureSummary(promptUuid: req.promptUuid)
         guard let summary = try fetchSummary(uuid: uuid) else {
@@ -59,6 +68,10 @@ struct ClarificationRepository: RepositoryContext {
         return ClarifySummaryResponse(summary: summary, created: created)
     }
 
+    /// Adds a question and optional answer choices to a clarification summary.
+    /// - Parameter req: A request with the summary uuid, question text, and optional choice bodies.
+    /// - Returns: The newly added question row.
+    /// - Throws: Errors when the summary is not found, in an invalid state, or the request is malformed.
     func questionAdd(_ req: ClarifyQuestionAddRequest) throws -> ClarifyQuestionRowResponse {
         guard let summary = try fetchSummary(uuid: req.summaryUuid) else {
             throw StoreError.notFound(entity: "clarification_summary", key: req.summaryUuid)
@@ -130,9 +143,15 @@ struct ClarificationRepository: RepositoryContext {
         return ClarifyQuestionRowResponse(question: row)
     }
 
-    /// Notes are writable in ANY summary state — an agent may clarify its own
+    /// Adds an internal note to a clarification summary.
+    ///
+    /// Notes are writable in any summary state — an agent may clarify its own
     /// confusion before sealing, while answering, or attach a note to an
     /// answered question after the fact.
+    ///
+    /// - Parameter req: A request with the summary uuid, note body, optional weight, and entity reference.
+    /// - Returns: The newly added note row.
+    /// - Throws: Errors when the summary is not found or the request is malformed.
     func noteAdd(_ req: ClarifyNoteAddRequest) throws -> ClarifyNoteRowResponse {
         guard let summary = try fetchSummary(uuid: req.summaryUuid) else {
             throw StoreError.notFound(entity: "clarification_summary", key: req.summaryUuid)
@@ -190,11 +209,15 @@ struct ClarificationRepository: RepositoryContext {
         return ClarifyNoteRowResponse(note: row)
     }
 
-    /// Pure child-row update: requires the summary at `answering`, never
-    /// touches its version. Revives a skipped row; skip=true marks skipped.
-    /// A selection replaces the junction rows wholesale; answered requires
-    /// answer_text OR at least one selection (Swift guard — no cross-table
-    /// CHECK, the m0016 rule).
+    /// Updates a question's answer status and content.
+    ///
+    /// Requires the summary at `answering` and never touches its version. A
+    /// selection replaces junction rows wholesale; answered requires answer
+    /// text or at least one option selection.
+    ///
+    /// - Parameter req: A request with the question uuid, answer text, selected option uuids, or skip flag.
+    /// - Returns: The updated question row.
+    /// - Throws: Errors when the question or summary is not found or in an invalid state.
     func answer(_ req: ClarifyAnswerRequest) throws -> ClarifyQuestionRowResponse {
         guard let row = try fetchQuestion(uuid: req.questionUuid) else {
             throw StoreError.notFound(entity: "user_clarification_question", key: req.questionUuid)
@@ -278,10 +301,14 @@ struct ClarificationRepository: RepositoryContext {
         return ClarifyQuestionRowResponse(question: updated)
     }
 
-    /// answering → complete — a PURE GATE. Every question answered or
-    /// skipped; a care package, where one exists, must be ready. Writes
-    /// NOTHING to the prompt row: the finalize→prompt.goal copy is retired
-    /// (zero bot write doors to prompt content).
+    /// Moves a clarification from answering to complete (a pure gate).
+    ///
+    /// Every question must be answered or skipped; a care package, where one
+    /// exists, must be ready. Writes nothing to the prompt row.
+    ///
+    /// - Parameter req: A request with the summary uuid and expected version.
+    /// - Returns: The updated clarification summary.
+    /// - Throws: Errors when the summary is not found, not answering, has open questions, or care package is not ready.
     func finalize(_ req: ClarifyFinalizeRequest) throws -> ClarifyFinalizeResponse {
         guard let summary = try fetchSummary(uuid: req.summaryUuid) else {
             throw StoreError.notFound(entity: "clarification_summary", key: req.summaryUuid)
@@ -363,6 +390,10 @@ struct ClarificationRepository: RepositoryContext {
         return ClarifyFinalizeResponse(summary: updatedSummary)
     }
 
+    /// Fetches the complete clarification state for a prompt.
+    /// - Parameter req: A request with the prompt uuid and optional narrowing parameters.
+    /// - Returns: A response containing the summary, questions, notes, and care package if present.
+    /// - Throws: Errors when the prompt or summary is not found.
     func get(_ req: ClarifyGetRequest) throws -> ClarifyGetResponse {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -454,6 +485,10 @@ struct ClarificationRepository: RepositoryContext {
 
     // MARK: - Care package verbs
 
+    /// Returns the existing care package for a clarification or creates one.
+    /// - Parameter req: A request with the clarification summary uuid.
+    /// - Returns: The care package and a flag indicating whether it was newly created.
+    /// - Throws: Errors when the summary is not found.
     func packageOpen(_ req: CarePackageOpenRequest) throws -> CarePackageResponse {
         guard let summary = try fetchSummary(uuid: req.summaryUuid) else {
             throw StoreError.notFound(entity: "clarification_summary", key: req.summaryUuid)
@@ -485,6 +520,10 @@ struct ClarificationRepository: RepositoryContext {
         return CarePackageResponse(package: package, created: true)
     }
 
+    /// Adds a reference (dope, kbite, or exploration) to a care package.
+    /// - Parameter req: A request with the package uuid and reference details matching the kind.
+    /// - Returns: The updated care package.
+    /// - Throws: Errors when the package is not found, not building, or the request is malformed.
     func packageRefAdd(_ req: CarePackageRefAddRequest) throws -> CarePackageResponse {
         guard let package = try fetchPackage(uuid: req.packageUuid) else {
             throw StoreError.notFound(entity: "care_package", key: req.packageUuid)
@@ -587,8 +626,14 @@ struct ClarificationRepository: RepositoryContext {
         return CarePackageResponse(package: updated)
     }
 
-    /// building → ready. clarifiedIntent is carried ONLY here; the daemon
-    /// stamps the dope scope revision itself (briefing-complete idiom).
+    /// Moves a care package from building to ready.
+    ///
+    /// The clarified intent is carried only here; the daemon stamps the dope
+    /// scope revision itself.
+    ///
+    /// - Parameter req: A request with the package uuid, clarified intent, and expected version.
+    /// - Returns: The updated care package.
+    /// - Throws: Errors when the package is not found or not building.
     func packageComplete(_ req: CarePackageCompleteRequest) throws -> CarePackageResponse {
         guard let package = try fetchPackage(uuid: req.packageUuid) else {
             throw StoreError.notFound(entity: "care_package", key: req.packageUuid)
@@ -645,6 +690,10 @@ struct ClarificationRepository: RepositoryContext {
         return CarePackageResponse(package: updated)
     }
 
+    /// Fetches the care package for a prompt with optional narrowing.
+    /// - Parameter req: A request with the prompt uuid and optional filtering parameters.
+    /// - Returns: A response containing the care package and optionally stubs for narrowed references.
+    /// - Throws: Errors when the prompt, summary, or care package is not found.
     func packageGet(_ req: CarePackageGetRequest) throws -> CarePackageResponse {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -701,6 +750,15 @@ struct ClarificationRepository: RepositoryContext {
 
     // MARK: - Shared transition + fetch helpers
 
+    /// Moves a clarification summary to a new status after validation.
+    /// - Parameters:
+    ///   - summaryUuid: The clarification summary uuid.
+    ///   - expectedVersion: The version the caller last read.
+    ///   - to: The target status.
+    ///   - action: The action name for event logging.
+    ///   - requireFrom: The required current status.
+    /// - Returns: The updated clarification summary.
+    /// - Throws: Errors when the summary is not found or in an invalid state.
     func transition(
         summaryUuid: String,
         expectedVersion: Int64,
@@ -744,15 +802,22 @@ struct ClarificationRepository: RepositoryContext {
         return ClarifySummaryResponse(summary: updated)
     }
 
-    /// Item 3 helper shared by the clarify/arch mutation paths: prompt-scoped
-    /// writes advance session recency without bumping the session version.
+    /// Advances session recency without bumping the session version.
+    ///
+    /// Prompt-scoped writes use this to signal activity on the owning session.
+    ///
+    /// - Parameter promptUuid: The prompt uuid to find its session.
+    /// - Throws: Database errors.
     func touchSessionForPrompt(promptUuid: String) throws {
         if let sessionUuid = try owningSession(promptUuid: promptUuid) {
             try core.touchSession(db, uuid: sessionUuid)
         }
     }
 
-    /// The session a prompt hangs from; nil when the prompt is gone.
+    /// Fetches the session uuid for a prompt.
+    /// - Parameter promptUuid: The prompt uuid.
+    /// - Returns: The session uuid, or nil if the prompt does not exist.
+    /// - Throws: Database errors.
     private func owningSession(promptUuid: String) throws -> String? {
         try PromptRecord
             .all()
@@ -769,31 +834,56 @@ struct ClarificationRepository: RepositoryContext {
             .order(ClarificationSummaryRecord.Columns.createdAt.desc, Column("id").desc)
     }
 
+    /// Fetches a clarification summary by uuid.
+    /// - Parameter uuid: The clarification summary uuid.
+    /// - Returns: The summary row, or nil if not found.
+    /// - Throws: Database errors.
     func fetchSummary(uuid: String) throws -> ClarificationSummaryRow? {
         try fetchSummary(matching: ClarificationSummaryRecord.Columns.uuid == uuid)
     }
 
+    /// Fetches a clarification summary by its associated prompt.
+    /// - Parameter promptUuid: The prompt uuid.
+    /// - Returns: The summary row, or nil if not found.
+    /// - Throws: Database errors.
     func fetchSummary(byPrompt promptUuid: String) throws -> ClarificationSummaryRow? {
         try fetchSummary(matching: ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
     }
 
+    /// Fetches a clarification summary matching a predicate.
+    /// - Parameter predicate: An SQL expression to filter the summary.
+    /// - Returns: The newest matching summary row, or nil if not found.
+    /// - Throws: Database errors.
     private func fetchSummary(matching predicate: SQLExpression) throws -> ClarificationSummaryRow? {
         try Self.newestFirst.filter(predicate).fetchOne(db)?.dto()
     }
 
+    /// Fetches a clarification question by uuid.
+    /// - Parameter uuid: The question uuid.
+    /// - Returns: The question row, or nil if not found.
+    /// - Throws: Database errors.
     private func fetchQuestion(uuid: String) throws -> ClarificationQuestionRow? {
         try fetchQuestions(matching: UserClarificationQuestionRecord.Columns.uuid == uuid).first
     }
 
+    /// Fetches all questions for a clarification summary.
+    /// - Parameter summaryUuid: The clarification summary uuid.
+    /// - Returns: An array of question rows in insertion order.
+    /// - Throws: Database errors.
     func fetchQuestions(summaryUuid: String) throws -> [ClarificationQuestionRow] {
         try fetchQuestions(
             matching: UserClarificationQuestionRecord.Columns.clarificationSummaryUuid == summaryUuid
         )
     }
 
-    /// Three statements whatever the question count: the questions, their
-    /// options, and one batched pass over the selection junction grouped in
-    /// memory.
+    /// Fetches questions matching a predicate with their options and selections.
+    ///
+    /// Uses three statements: questions, their options, and a batched pass over
+    /// answer selections grouped in memory.
+    ///
+    /// - Parameter predicate: An SQL expression to filter the questions.
+    /// - Returns: An array of question rows with options and selections populated.
+    /// - Throws: Database errors.
     private func fetchQuestions(matching predicate: SQLExpression) throws -> [ClarificationQuestionRow] {
         let questions = try ClarificationQuestionWithOptions.request().filter(predicate).fetchAll(db)
         guard !questions.isEmpty else { return [] }
@@ -812,10 +902,18 @@ struct ClarificationRepository: RepositoryContext {
         return questions.map { $0.dto(selectedOptionUuids: selected[$0.questionRow.uuid] ?? []) }
     }
 
+    /// Fetches an internal note by uuid.
+    /// - Parameter uuid: The note uuid.
+    /// - Returns: The note row, or nil if not found.
+    /// - Throws: Database errors.
     private func fetchNote(uuid: String) throws -> ClarificationNoteRow? {
         try InternalClarificationNoteRecord.all().withUuid(uuid).fetchOne(db)?.dto()
     }
 
+    /// Fetches all notes for a clarification summary, ordered by weight and id.
+    /// - Parameter summaryUuid: The clarification summary uuid.
+    /// - Returns: An array of note rows, sorted with critical notes first and unweighted notes last.
+    /// - Throws: Database errors.
     func fetchNotes(summaryUuid: String) throws -> [ClarificationNoteRow] {
         // weight polarity: critical (low) first; unweighted last.
         try InternalClarificationNoteRecord
@@ -832,6 +930,10 @@ struct ClarificationRepository: RepositoryContext {
             .map { $0.dto() }
     }
 
+    /// Fetches a care package by uuid with all its references.
+    /// - Parameter uuid: The care package uuid.
+    /// - Returns: The care package row, or nil if not found.
+    /// - Throws: Database errors.
     private func fetchPackage(uuid: String) throws -> CarePackageRow? {
         try CarePackageWithRefs.request()
             .filter(CarePackageRecord.Columns.uuid == uuid)
@@ -839,6 +941,10 @@ struct ClarificationRepository: RepositoryContext {
             .dto()
     }
 
+    /// Fetches the care package for a clarification summary.
+    /// - Parameter summaryUuid: The clarification summary uuid.
+    /// - Returns: The care package row, or nil if not found.
+    /// - Throws: Database errors.
     private func fetchPackage(bySummary summaryUuid: String) throws -> CarePackageRow? {
         try CarePackageWithRefs.request()
             .filter(CarePackageRecord.Columns.clarificationSummaryUuid == summaryUuid)
@@ -846,6 +952,12 @@ struct ClarificationRepository: RepositoryContext {
             .dto()
     }
 
+    /// Fetches the next sequence number for care package references of a given type.
+    /// - Parameters:
+    ///   - type: The reference record type (dope, kbite, or exploration).
+    ///   - packageUuid: The care package uuid.
+    /// - Returns: The next sequence number to use.
+    /// - Throws: Database errors.
     private func nextRefSeq<T: TableRecord>(in type: T.Type, packageUuid: String) throws -> Int64 {
         try nextSeq(db, in: type, parent: Column("care_package_uuid"), uuid: packageUuid) + 1
     }

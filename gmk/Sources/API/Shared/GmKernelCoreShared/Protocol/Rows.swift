@@ -13,9 +13,10 @@ struct ProjectRow: Codable, Hashable, Sendable {
     let name: String
     let gmfsRelativeStoragePath: String
     /// BASE_DOPED_BRANCH — the branch whose SESSION_INSTANCE dope scope may
-    /// promote into this project's BASE_PROJECT scope. Defaults to "main"
-    /// (m0011 backfills every existing row); user-configured through
-    /// PROJECT_UPDATE or GMVibes' project view.
+    /// promote into this project's BASE_PROJECT scope.
+    ///
+    /// Defaults to "main" (m0011 backfills every existing row); user-configured
+    /// through PROJECT_UPDATE or GMVibes' project view.
     ///
     /// Defaulted rather than Optional so a stale peer that omits the key
     /// still decodes — the additive-OPTIONAL wire convention.
@@ -23,6 +24,17 @@ struct ProjectRow: Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a ProjectRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - gitRepoName: The repository name.
+    ///   - code: The project code.
+    ///   - name: The human-readable name.
+    ///   - gmfsRelativeStoragePath: Path under the gmfs root.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
+    ///   - primaryProjectBranch: The branch for dope promotion; defaults to "main".
     init(
         uuid: String,
         version: Int64,
@@ -30,9 +42,9 @@ struct ProjectRow: Codable, Hashable, Sendable {
         code: String,
         name: String,
         gmfsRelativeStoragePath: String,
-        primaryProjectBranch: String = "main",
         createdAt: String,
-        updatedAt: String
+        updatedAt: String,
+        primaryProjectBranch: String = "main"
     ) {
         self.uuid = uuid
         self.version = version
@@ -45,9 +57,14 @@ struct ProjectRow: Codable, Hashable, Sendable {
         self.updatedAt = updatedAt
     }
 
+    /// Creates a ProjectRow from JSON, defaulting a missing branch to "main".
+    ///
     /// Hand-rolled so an absent `primary_project_branch` decodes to "main"
     /// instead of throwing: GMVibes and any pinned Kit may still be sending
     /// the pre-m0011 shape.
+    ///
+    /// - Parameter decoder: The JSON decoder.
+    /// - Throws: `DecodingError` if any required field is missing or malformed.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.uuid = try c.decode(String.self, forKey: .uuid)
@@ -77,6 +94,17 @@ struct InstanceRow: Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates an InstanceRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - projectUuid: The parent project's identifier.
+    ///   - code: The instance code.
+    ///   - name: The human-readable name.
+    ///   - absoluteFileSystemPath: The instance's absolute file system path.
+    ///   - gmfsRelativeStoragePath: Path under the gmfs root.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
     init(
         uuid: String,
         version: Int64,
@@ -119,6 +147,17 @@ struct SessionStub: Codable, Hashable, Sendable {
     let updatedAt: String
     let lastActivityAt: String
 
+    /// Creates a SessionStub from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - instanceUuid: The parent instance's identifier.
+    ///   - code: The session code.
+    ///   - name: The human-readable name.
+    ///   - gmfsRelativeStoragePath: Path under the gmfs root.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
+    ///   - lastActivityAt: Latest activity timestamp from session, prompts, or file changes.
     init(
         uuid: String,
         version: Int64,
@@ -153,10 +192,22 @@ struct SessionRow: Codable, Hashable, Sendable {
     let updatedAt: String
     /// v21-era additive OPTIONAL field: this session's activation registry —
     /// one entry per running Claude Code instance (client key → prompt).
+    ///
     /// Several prompts are routinely active at once, so this is a LIST, never
     /// a single pointer. nil from a pre-v21 peer.
     let activations: [PromptActivationRow]?
 
+    /// Creates a SessionRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - code: The session code.
+    ///   - name: The human-readable name.
+    ///   - backstory: The session backstory prose.
+    ///   - goal: The session goal prose.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
+    ///   - activations: The list of running Claude Code instances, or nil from pre-v21 peers.
     init(
         uuid: String,
         version: Int64,
@@ -191,6 +242,13 @@ struct PromptActivationRow: Codable, Hashable, Sendable {
     let clientKey: String
     let createdAt: String
 
+    /// Creates a PromptActivationRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - sessionUuid: The parent session's identifier.
+    ///   - promptUuid: The active prompt's identifier.
+    ///   - clientKey: The running Claude Code instance's client key.
+    ///   - createdAt: Activation timestamp in ISO 8601 format.
     init(
         uuid: String,
         sessionUuid: String,
@@ -226,6 +284,22 @@ struct PromptRow: Codable, Hashable, Sendable {
 
     var promptStatus: PromptStatus? { PromptStatus(rawValue: status) }
 
+    /// Creates a PromptRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - sessionUuid: The parent session's identifier.
+    ///   - seq: The sequence number within the session.
+    ///   - code: The prompt code.
+    ///   - name: The human-readable name.
+    ///   - backstory: The prompt backstory prose.
+    ///   - goal: The prompt goal prose.
+    ///   - detail: The prompt detail prose.
+    ///   - command: The execution command.
+    ///   - status: The prompt status (e.g., "active", "done").
+    ///   - gmfsRelativeStoragePath: Path under the gmfs root.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
     init(
         uuid: String,
         version: Int64,
@@ -260,9 +334,10 @@ struct PromptRow: Codable, Hashable, Sendable {
 }
 
 /// Lightweight prompt listing shape (replaces reading the session_data
-/// prompts: list). Carries its parent session uuid so whole-db listings
-/// (PROMPT_LIST with no session filter) stay interpretable — seq is only
-/// unique per session.
+/// prompts: list).
+///
+/// Carries its parent session uuid so whole-db listings (PROMPT_LIST with no
+/// session filter) stay interpretable — seq is only unique per session.
 struct PromptStub: Codable, Hashable, Sendable {
     let uuid: String
     let sessionUuid: String
@@ -279,6 +354,19 @@ struct PromptStub: Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a PromptStub from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - sessionUuid: The parent session's identifier.
+    ///   - seq: The sequence number within the session.
+    ///   - code: The prompt code.
+    ///   - name: The human-readable name.
+    ///   - status: The prompt status.
+    ///   - version: The row version for optimistic locking.
+    ///   - gmfsRelativeStoragePath: Path under the gmfs root.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
+    ///   - reports: Report summaries from the four machines, or nil if not requested.
     init(
         uuid: String,
         sessionUuid: String,
@@ -288,9 +376,9 @@ struct PromptStub: Codable, Hashable, Sendable {
         status: String,
         version: Int64,
         gmfsRelativeStoragePath: String,
-        reports: PromptReportsStub? = nil,
         createdAt: String,
-        updatedAt: String
+        updatedAt: String,
+        reports: PromptReportsStub? = nil
     ) {
         self.uuid = uuid
         self.sessionUuid = sessionUuid
@@ -307,13 +395,21 @@ struct PromptStub: Codable, Hashable, Sendable {
 }
 
 /// The PROMPT_LIST `with_reports` enrichment block: one summary stub per
-/// report machine. A nil member means that summary was never opened.
+/// report machine.
+///
+/// A nil member means that summary was never opened.
 struct PromptReportsStub: Codable, Hashable, Sendable {
     let clarification: ClarificationReportStub?
     let architecture: ArchitectureReportStub?
     let exploration: ExplorationReportStub?
     let review: ReviewReportStub?
 
+    /// Creates a PromptReportsStub from the given report stubs.
+    /// - Parameters:
+    ///   - clarification: Clarification summary stub, or nil if not opened.
+    ///   - architecture: Architecture summary stub, or nil if not opened.
+    ///   - exploration: Exploration summary stub, or nil if not opened.
+    ///   - review: Review summary stub, or nil if not opened.
     init(
         clarification: ClarificationReportStub?,
         architecture: ArchitectureReportStub?,
@@ -339,6 +435,15 @@ struct ExplorationReportStub: Codable, Hashable, Sendable {
     /// Resume signal: >0 means the exploration stalled before ranking.
     let unrankedFindingCount: Int
 
+    /// Creates an ExplorationReportStub from the given scalar values.
+    /// - Parameters:
+    ///   - summaryUuid: The exploration summary's identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - status: The summary status.
+    ///   - keyFileCount: Count of files in the search scope.
+    ///   - findingCount: Total count of findings.
+    ///   - sub100FindingCount: Count of findings with rating below 100.
+    ///   - unrankedFindingCount: Count of findings not yet ranked.
     init(
         summaryUuid: String,
         version: Int64,
@@ -370,6 +475,16 @@ struct ReviewReportStub: Codable, Hashable, Sendable {
     /// Resume signal for the fix loop: unresolved findings.
     let openFindingCount: Int
 
+    /// Creates a ReviewReportStub from the given scalar values.
+    /// - Parameters:
+    ///   - summaryUuid: The review summary's identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - status: The summary status.
+    ///   - verdict: The review verdict, or nil if not yet issued.
+    ///   - findingCount: Total count of findings.
+    ///   - sub100FindingCount: Count of findings with rating below 100.
+    ///   - unrankedFindingCount: Count of findings not yet ranked.
+    ///   - openFindingCount: Count of findings not yet resolved.
     init(
         summaryUuid: String,
         version: Int64,
@@ -391,8 +506,10 @@ struct ReviewReportStub: Codable, Hashable, Sendable {
     }
 }
 
-/// Clarification summary stub for the enrichment block. Carries the summary
-/// version so the caller can mutate immediately without a confirming fetch.
+/// Clarification summary stub for the enrichment block.
+///
+/// Carries the summary version so the caller can mutate immediately without
+/// a confirming fetch.
 struct ClarificationReportStub: Codable, Hashable, Sendable {
     let summaryUuid: String
     let version: Int64
@@ -405,6 +522,15 @@ struct ClarificationReportStub: Codable, Hashable, Sendable {
     /// m0025: whether a ready care package exists (the clarified intent).
     let carePackageReady: Bool
 
+    /// Creates a ClarificationReportStub from the given scalar values.
+    /// - Parameters:
+    ///   - summaryUuid: The clarification summary's identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - status: The summary status.
+    ///   - questionCount: Total count of questions.
+    ///   - openQuestionCount: Count of questions not yet answered.
+    ///   - noteCount: Count of internal notes; defaults to 0.
+    ///   - carePackageReady: Whether a clarified intent package exists; defaults to false.
     init(
         summaryUuid: String,
         version: Int64,
@@ -432,6 +558,13 @@ struct ArchitectureReportStub: Codable, Hashable, Sendable {
     let persistenceChangeCount: Int
     let generalChangeCount: Int
 
+    /// Creates an ArchitectureReportStub from the given scalar values.
+    /// - Parameters:
+    ///   - summaryUuid: The architecture summary's identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - status: The summary status.
+    ///   - persistenceChangeCount: Count of persistence-layer changes.
+    ///   - generalChangeCount: Count of general-layer changes.
     init(
         summaryUuid: String,
         version: Int64,
@@ -447,9 +580,11 @@ struct ArchitectureReportStub: Codable, Hashable, Sendable {
     }
 }
 
-/// One ranked SEARCH result. Stubs-not-content discipline: `excerpt` is a
-/// bounded FTS5 snippet, never a full body; full prompt lineage rides along
-/// so the caller never needs a follow-up fetch to know what it found.
+/// One ranked SEARCH result.
+///
+/// Stubs-not-content discipline: `excerpt` is a bounded FTS5 snippet, never
+/// a full body; full prompt lineage rides along so the caller never needs a
+/// follow-up fetch to know what it found.
 struct SearchHit: Codable, Hashable, Sendable {
     /// Raw kind string (same forward-compat rule as event kinds/error codes).
     let kind: String
@@ -468,6 +603,19 @@ struct SearchHit: Codable, Hashable, Sendable {
     /// bm25-derived; negative, smaller = better; comparable WITHIN a kind only.
     let score: Double
 
+    /// Creates a SearchHit from the given scalar values.
+    /// - Parameters:
+    ///   - kind: The result kind (prompt, question, file path, etc.).
+    ///   - subjectUuid: The matched row's unique identifier.
+    ///   - promptUuid: The containing prompt's identifier.
+    ///   - promptSeq: The prompt's sequence number in its session.
+    ///   - promptName: The prompt's human-readable name.
+    ///   - promptStatus: The prompt's current status.
+    ///   - sessionUuid: The containing session's identifier.
+    ///   - sessionCode: The session's code.
+    ///   - title: A short label for the match.
+    ///   - excerpt: A bounded snippet from the best-matching column.
+    ///   - score: A bm25 relevance score; negative, smaller is better.
     init(
         kind: String,
         subjectUuid: String,
@@ -504,6 +652,13 @@ struct ArtifactRow: Codable, Hashable, Sendable {
     let note: String?
     let createdAt: String
 
+    /// Creates an ArtifactRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - promptUuid: The source prompt's identifier.
+    ///   - filePath: The artifact file path.
+    ///   - note: Optional notes about the artifact.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
     init(uuid: String, promptUuid: String, filePath: String, note: String?, createdAt: String) {
         self.uuid = uuid
         self.promptUuid = promptUuid
@@ -519,6 +674,10 @@ struct ChangeRangeRow: Codable, Hashable, Sendable {
     let lineStart: Int
     let lineEnd: Int
 
+    /// Creates a ChangeRangeRow from the given line boundaries.
+    /// - Parameters:
+    ///   - lineStart: The starting line number (inclusive).
+    ///   - lineEnd: The ending line number (inclusive).
     init(lineStart: Int, lineEnd: Int) {
         self.lineStart = lineStart
         self.lineEnd = lineEnd
@@ -536,8 +695,9 @@ struct FileChangeRow: Codable, Hashable, Sendable {
     let agentName: String?
     /// Server-stamped from the attributed prompt's active bot_workflow.
     let workflowPhase: String?
-    /// `FileChangeOrigin` — provenance honesty (defaulted 'hook'). Rows
-    /// written under a wider vocabulary keep their stored value.
+    /// `FileChangeOrigin` — provenance honesty (defaulted 'hook').
+    ///
+    /// Rows written under a wider vocabulary keep their stored value.
     let origin: String?
     /// The captured tool call. claudeTurnId is Claude Code's TURN id (payload
     /// field `prompt_id`) and is NOT a gmcc prompt uuid.
@@ -551,18 +711,43 @@ struct FileChangeRow: Codable, Hashable, Sendable {
     let transcriptPath: String?
     /// The authoritative link to the identity that made the change; `agentId`
     /// above is the denormalized form for queries that do not want the join.
+    ///
     /// NULL for a PRIMARY write — the primary carries no agent_id at all, and
     /// that absence is the primary/subagent discriminator.
     let agentRegistrationUuid: String?
     let createdAt: String
     let ranges: [ChangeRangeRow]
 
+    /// Creates a FileChangeRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - sessionUuid: The containing session's identifier.
+    ///   - promptUuid: The source prompt's identifier, or nil if not attributed.
+    ///   - relativePath: The file path relative to the repo root.
+    ///   - changeKind: The type of change (create, delete, edit, etc.).
+    ///   - createdAt: Capture timestamp in ISO 8601 format.
+    ///   - ranges: Line ranges affected by the change.
+    ///   - agentId: The agent's identifier, or nil for a primary write.
+    ///   - agentName: The agent's human-readable name.
+    ///   - workflowPhase: The workflow phase at capture time.
+    ///   - origin: The change origin (hook, tool call, etc.); defaults to 'hook'.
+    ///   - claudeSessionId: Claude Code's session identifier.
+    ///   - claudeTurnId: Claude Code's turn identifier (not a gmcc prompt uuid).
+    ///   - toolUseId: The tool use identifier from the transcript.
+    ///   - toolName: The tool being used.
+    ///   - agentType: The agent type (subagent, teammate, etc.).
+    ///   - permissionMode: The permission mode in effect at capture.
+    ///   - durationMs: Duration of the operation in milliseconds.
+    ///   - transcriptPath: Path to the captured transcript.
+    ///   - agentRegistrationUuid: The agent's registration identifier, or nil for primary.
     init(
         uuid: String,
         sessionUuid: String,
         promptUuid: String?,
         relativePath: String,
         changeKind: String,
+        createdAt: String,
+        ranges: [ChangeRangeRow],
         agentId: String? = nil,
         agentName: String? = nil,
         workflowPhase: String? = nil,
@@ -575,9 +760,7 @@ struct FileChangeRow: Codable, Hashable, Sendable {
         permissionMode: String? = nil,
         durationMs: Int? = nil,
         transcriptPath: String? = nil,
-        agentRegistrationUuid: String? = nil,
-        createdAt: String,
-        ranges: [ChangeRangeRow]
+        agentRegistrationUuid: String? = nil
     ) {
         self.uuid = uuid
         self.sessionUuid = sessionUuid
@@ -631,10 +814,27 @@ struct AgentRegistrationRow: Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates an AgentRegistrationRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - agentId: The opaque agent identifier.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
+    ///   - claudeSessionId: Claude Code's session identifier if known.
+    ///   - claudeTurnId: Claude Code's turn identifier if known.
+    ///   - sessionUuid: The gmcc session identifier if known.
+    ///   - promptUuid: The prompt identifier if known.
+    ///   - agentType: The agent type if known.
+    ///   - role: The agent's role if known.
+    ///   - methodology: The agent's methodology if known.
+    ///   - workflowPhase: The workflow phase at creation if known.
     init(
         uuid: String,
         version: Int64,
         agentId: String,
+        createdAt: String,
+        updatedAt: String,
         claudeSessionId: String? = nil,
         claudeTurnId: String? = nil,
         sessionUuid: String? = nil,
@@ -642,9 +842,7 @@ struct AgentRegistrationRow: Codable, Hashable, Sendable {
         agentType: String? = nil,
         role: String? = nil,
         methodology: String? = nil,
-        workflowPhase: String? = nil,
-        createdAt: String,
-        updatedAt: String
+        workflowPhase: String? = nil
     ) {
         self.uuid = uuid
         self.version = version
@@ -669,6 +867,10 @@ struct KbiteRef: Codable, Hashable, Sendable {
     let uuid: String
     let code: String
 
+    /// Creates a KbiteRef from the given identifier and code.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - code: The kbite code.
     init(uuid: String, code: String) {
         self.uuid = uuid
         self.code = code
@@ -682,6 +884,13 @@ struct KbiteRow: Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a KbiteRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - code: The kbite code.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
     init(uuid: String, version: Int64, code: String, createdAt: String, updatedAt: String) {
         self.uuid = uuid
         self.version = version
@@ -702,6 +911,15 @@ struct KbiteResourceRow: Codable, Hashable, Sendable {
     let resourceTrust: Int
     let files: [KbiteResourceFileStub]
 
+    /// Creates a KbiteResourceRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - kbiteUuid: The parent kbite's identifier.
+    ///   - resourceName: The resource name.
+    ///   - resourceSummary: The synthesized analysis of the resource.
+    ///   - resourceType: The resource type.
+    ///   - resourceTrust: The trust level of this resource.
+    ///   - files: The files within this resource.
     init(
         uuid: String,
         kbiteUuid: String,
@@ -729,6 +947,12 @@ struct KbiteResourceFileStub: Codable, Hashable, Sendable {
     let resourceFileSummary: String
     let hasContent: Bool
 
+    /// Creates a KbiteResourceFileStub from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - resourceFileName: The file name.
+    ///   - resourceFileSummary: A summary of the file.
+    ///   - hasContent: True if the file has text content; false for binary/images.
     init(uuid: String, resourceFileName: String, resourceFileSummary: String, hasContent: Bool) {
         self.uuid = uuid
         self.resourceFileName = resourceFileName
@@ -747,6 +971,14 @@ struct KbiteResourceFileRow: Codable, Hashable, Sendable {
     let resourceFileContent: String?
     let createdAt: String
 
+    /// Creates a KbiteResourceFileRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - kbiteResourceUuid: The parent resource's identifier.
+    ///   - resourceFileName: The file name.
+    ///   - resourceFileSummary: A summary of the file.
+    ///   - resourceFileContent: The file content for text files; nil for binary/images.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
     init(
         uuid: String,
         kbiteResourceUuid: String,
@@ -776,6 +1008,16 @@ struct KbiteSearchHit: Codable, Hashable, Sendable {
     let matchedKeywords: [String]
     let score: Double
 
+    /// Creates a KbiteSearchHit from the given scalar values.
+    /// - Parameters:
+    ///   - kbiteCode: The kbite code.
+    ///   - kbiteUuid: The kbite's unique identifier.
+    ///   - resourceName: The resource name within the kbite.
+    ///   - fileUuid: The file's unique identifier.
+    ///   - fileName: The file name.
+    ///   - fileSummary: A summary of the file.
+    ///   - matchedKeywords: Keywords matched in the search.
+    ///   - score: A bm25 relevance score; negative, smaller is better.
     init(
         kbiteCode: String,
         kbiteUuid: String,
@@ -804,6 +1046,11 @@ struct ChangeSummary: Codable, Hashable, Sendable {
     let distinctFiles: Int
     let totalLineSpan: Int
 
+    /// Creates a ChangeSummary from the given counts.
+    /// - Parameters:
+    ///   - changeCount: Total number of changes.
+    ///   - distinctFiles: Count of distinct files affected.
+    ///   - totalLineSpan: Total span of lines affected.
     init(changeCount: Int, distinctFiles: Int, totalLineSpan: Int) {
         self.changeCount = changeCount
         self.distinctFiles = distinctFiles
@@ -816,6 +1063,10 @@ struct PromptChangeSummary: Codable, Hashable, Sendable {
     let promptUuid: String?
     let summary: ChangeSummary
 
+    /// Creates a PromptChangeSummary from the given identifierand summary.
+    /// - Parameters:
+    ///   - promptUuid: The prompt's identifier, or nil if unattributed.
+    ///   - summary: The change summary.
     init(promptUuid: String?, summary: ChangeSummary) {
         self.promptUuid = promptUuid
         self.summary = summary
@@ -834,6 +1085,14 @@ struct ClarificationSummaryRow: Codable, Hashable, Sendable {
 
     var clarificationStatus: ClarificationStatus? { ClarificationStatus(rawValue: status) }
 
+    /// Creates a ClarificationSummaryRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - promptUuid: The parent prompt's identifier.
+    ///   - status: The clarification status.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
     init(
         uuid: String,
         version: Int64,
@@ -851,9 +1110,11 @@ struct ClarificationSummaryRow: Codable, Hashable, Sendable {
     }
 }
 
-/// A user-facing clarification question. The selected answer(s) live in
-/// `selectedOptionUuids` (junction rows) — empty + non-nil answerText means
-/// the user typed a free answer; both may coexist (select AND elaborate).
+/// A user-facing clarification question.
+///
+/// The selected answer(s) live in `selectedOptionUuids` (junction rows) —
+/// empty + non-nil answerText means the user typed a free answer; both may
+/// coexist (select AND elaborate).
 struct ClarificationQuestionRow: Codable, Hashable, Sendable {
     let uuid: String
     let version: Int64
@@ -867,6 +1128,19 @@ struct ClarificationQuestionRow: Codable, Hashable, Sendable {
     let options: [ClarificationOptionRow]
     let selectedOptionUuids: [String]
 
+    /// Creates a ClarificationQuestionRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - clarificationSummaryUuid: The parent clarification summary's identifier.
+    ///   - seq: The sequence number within the summary.
+    ///   - question: The question text.
+    ///   - status: The question status.
+    ///   - answerText: Free-text answer if provided; nil for option-only answers.
+    ///   - agentId: The answering agent's identifier if known.
+    ///   - agentName: The answering agent's human-readable name.
+    ///   - options: The available answer options.
+    ///   - selectedOptionUuids: Uuids of selected options.
     init(
         uuid: String,
         version: Int64,
@@ -899,6 +1173,11 @@ struct ClarificationOptionRow: Codable, Hashable, Sendable {
     let seq: Int64
     let body: String
 
+    /// Creates a ClarificationOptionRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - seq: The sequence number within the question.
+    ///   - body: The option text.
     init(uuid: String, seq: Int64, body: String) {
         self.uuid = uuid
         self.seq = seq
@@ -921,6 +1200,18 @@ struct ClarificationNoteRow: Codable, Hashable, Sendable {
     let agentId: String?
     let agentName: String?
 
+    /// Creates a ClarificationNoteRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - clarificationSummaryUuid: The parent clarification summary's identifier.
+    ///   - body: The note body.
+    ///   - confusedEntityUuid: The entity (finding, question, etc.) being clarified.
+    ///   - confusedEntityType: The type of the confused entity.
+    ///   - weight: Finding rating (0 = critical, 999 = ignore).
+    ///   - questionUuid: The question clarifying this entity, if known.
+    ///   - agentId: The authoring agent's identifier.
+    ///   - agentName: The authoring agent's human-readable name.
     init(
         uuid: String,
         version: Int64,
@@ -949,6 +1240,7 @@ struct ClarificationNoteRow: Codable, Hashable, Sendable {
 // MARK: - Care package (m0025)
 
 /// The standalone clarified-intent bundle on a clarification summary.
+///
 /// NEVER written back to the prompt row — the prompt triple is human input.
 struct CarePackageRow: Codable, Hashable, Sendable {
     let uuid: String
@@ -964,6 +1256,20 @@ struct CarePackageRow: Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a CarePackageRow from the given scalar values and reference lists.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - clarificationSummaryUuid: The parent clarification summary's identifier.
+    ///   - clarifiedIntent: The clarified intent prose.
+    ///   - status: The care package status.
+    ///   - dopeScopeUuid: The dope scope identifier if linked.
+    ///   - dopeScopeRevision: The dope scope revision if linked.
+    ///   - dopeRefs: References to dope entities.
+    ///   - kbiteRefs: References to kbite files.
+    ///   - explorationRefs: References to curated exploration output.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
     init(
         uuid: String,
         version: Int64,
@@ -999,6 +1305,12 @@ struct CarePackageDopeRefRow: Codable, Hashable, Sendable {
     let note: String?
     let seq: Int
 
+    /// Creates a CarePackageDopeRefRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - dopeCode: The dope entity code.
+    ///   - note: Optional note about this reference.
+    ///   - seq: The sequence number within the care package.
     init(uuid: String, dopeCode: String, note: String?, seq: Int) {
         self.uuid = uuid
         self.dopeCode = dopeCode
@@ -1013,6 +1325,12 @@ struct CarePackageKbiteRefRow: Codable, Hashable, Sendable {
     let brief: String?
     let seq: Int
 
+    /// Creates a CarePackageKbiteRefRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - kbiteResourceFileUuid: The referenced kbite file's identifier.
+    ///   - brief: Optional brief note about this reference.
+    ///   - seq: The sequence number within the care package.
     init(uuid: String, kbiteResourceFileUuid: String, brief: String?, seq: Int) {
         self.uuid = uuid
         self.kbiteResourceFileUuid = kbiteResourceFileUuid
@@ -1031,6 +1349,14 @@ struct CarePackageExplorationRefRow: Codable, Hashable, Sendable {
     let sourceFindingUuid: String?
     let seq: Int
 
+    /// Creates a CarePackageExplorationRefRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - curatedTitle: The curated title for this item.
+    ///   - curatedBody: The curated body content.
+    ///   - filePath: The file path this finding relates to, if any.
+    ///   - sourceFindingUuid: The original finding's identifier, if known.
+    ///   - seq: The sequence number within the care package.
     init(
         uuid: String,
         curatedTitle: String,
@@ -1063,15 +1389,25 @@ struct ArchitectureSummaryRow: Codable, Hashable, Sendable {
 
     var architectureStatus: ArchitectureStatus? { ArchitectureStatus(rawValue: status) }
 
+    /// Creates an ArchitectureSummaryRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - promptUuid: The parent prompt's identifier.
+    ///   - body: The architecture summary body prose.
+    ///   - status: The summary status.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
+    ///   - decisionRationale: Why the selected option won; nil if no options ran.
     init(
         uuid: String,
         version: Int64,
         promptUuid: String,
         body: String,
         status: String,
-        decisionRationale: String? = nil,
         createdAt: String,
-        updatedAt: String
+        updatedAt: String,
+        decisionRationale: String? = nil
     ) {
         self.uuid = uuid
         self.version = version
@@ -1092,6 +1428,11 @@ struct ChangeImplementationState: Codable, Hashable, Sendable {
     let firstChangedAt: String?
     let lastChangedAt: String?
 
+    /// Creates a ChangeImplementationState from the given counts and timestamps.
+    /// - Parameters:
+    ///   - fileChangeCount: Number of file changes implementing this planned change.
+    ///   - firstChangedAt: Timestamp of the first implementing change, if any.
+    ///   - lastChangedAt: Timestamp of the latest implementing change, if any.
     init(fileChangeCount: Int, firstChangedAt: String?, lastChangedAt: String?) {
         self.fileChangeCount = fileChangeCount
         self.firstChangedAt = firstChangedAt
@@ -1117,6 +1458,21 @@ struct ArchPersistenceFieldChangeRow: Codable, Hashable, Sendable {
     /// m0025: domain.entity.property dot-path CODE (ghost-legal).
     let dopePropertyRef: String?
 
+    /// Creates an ArchPersistenceFieldChangeRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - seq: The sequence number within the persistence change.
+    ///   - fieldName: The field name.
+    ///   - changeReason: Why the field changed.
+    ///   - changePurpose: The purpose of the change.
+    ///   - dataType: The field's data type.
+    ///   - nullable: True if the field allows null.
+    ///   - isForeignKey: True if this is a foreign key.
+    ///   - fkTarget: The foreign key target table, if applicable.
+    ///   - isIndexed: True if the field is indexed.
+    ///   - changeKind: add|modify|rename|delete.
+    ///   - renamedFrom: Old field name if changeKind == rename.
+    ///   - dopePropertyRef: Domain.entity.property dope code reference.
     init(
         uuid: String,
         seq: Int64,
@@ -1161,16 +1517,27 @@ struct ArchPersistenceChangeRow: Codable, Hashable, Sendable {
     let fields: [ArchPersistenceFieldChangeRow]
     let implementation: ChangeImplementationState
 
+    /// Creates an ArchPersistenceChangeRow from the given scalar and reference values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - seq: The sequence number within the architecture summary.
+    ///   - className: The class/table name being changed.
+    ///   - filePath: The file path for this entity.
+    ///   - reasonBrief: Brief explanation for the change.
+    ///   - fields: The field-level changes.
+    ///   - implementation: The implementation state decoration.
+    ///   - changeKind: add|modify|rename|delete.
+    ///   - dopeRef: Domain.entity dope code reference.
     init(
         uuid: String,
         seq: Int64,
         className: String,
         filePath: String,
         reasonBrief: String,
-        changeKind: String? = nil,
-        dopeRef: String? = nil,
         fields: [ArchPersistenceFieldChangeRow],
-        implementation: ChangeImplementationState
+        implementation: ChangeImplementationState,
+        changeKind: String? = nil,
+        dopeRef: String? = nil
     ) {
         self.uuid = uuid
         self.seq = seq
@@ -1185,8 +1552,10 @@ struct ArchPersistenceChangeRow: Codable, Hashable, Sendable {
 }
 
 /// One methodology's persisted architecture proposal (m0025 pen inversion —
-/// the first architect pen). Only the SELECTED option expands into change
-/// rows; losers persist as feature-graft offers.
+/// the first architect pen).
+///
+/// Only the SELECTED option expands into change rows; losers persist as
+/// feature-graft offers.
 struct ArchitectureOptionRow: Codable, Hashable, Sendable {
     let uuid: String
     let version: Int64
@@ -1198,6 +1567,17 @@ struct ArchitectureOptionRow: Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates an ArchitectureOptionRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - architectureSummaryUuid: The parent architecture summary's identifier.
+    ///   - agentName: The methodology/agent name.
+    ///   - agentId: The agent's identifier, if known.
+    ///   - body: The architecture option prose.
+    ///   - status: The option status.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
     init(
         uuid: String,
         version: Int64,
@@ -1223,8 +1603,10 @@ struct ArchitectureOptionRow: Codable, Hashable, Sendable {
 
 // MARK: - Bot workflow (m0025)
 
-/// The daemon-held workflow state machine row. Phase is DERIVED from db
-/// evidence at every BOT_NEXT; lastServedPhase is observability only.
+/// The daemon-held workflow state machine row.
+///
+/// Phase is DERIVED from db evidence at every BOT_NEXT; lastServedPhase is
+/// observability only.
 struct BotWorkflowRow: Codable, Hashable, Sendable {
     let uuid: String
     let version: Int64
@@ -1237,6 +1619,18 @@ struct BotWorkflowRow: Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a BotWorkflowRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - sessionUuid: The parent session's identifier.
+    ///   - promptUuid: The parent prompt's identifier.
+    ///   - variant: The workflow variant (bot, rpi, team, etc.).
+    ///   - status: The workflow status.
+    ///   - clientKey: The active Claude Code instance's client key, if any.
+    ///   - lastServedPhase: The last workflow phase served; observability only.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
     init(
         uuid: String,
         version: Int64,
@@ -1272,6 +1666,16 @@ struct ArchGeneralChangeRow: Codable, Hashable, Sendable {
     let changeCode: String
     let implementation: ChangeImplementationState
 
+    /// Creates an ArchGeneralChangeRow from the given scalar and reference values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - seq: The sequence number within the architecture summary.
+    ///   - filePath: The file path for this change.
+    ///   - className: The class name being changed, if applicable.
+    ///   - reasonBrief: Brief explanation for the change.
+    ///   - changeDepth: The scope of the change (function, class, file, etc.).
+    ///   - changeCode: A code describing the type of change.
+    ///   - implementation: The implementation state decoration.
     init(
         uuid: String,
         seq: Int64,
@@ -1301,6 +1705,12 @@ struct UnplannedChangeRow: Codable, Hashable, Sendable {
     let firstChangedAt: String
     let lastChangedAt: String
 
+    /// Creates an UnplannedChangeRow from the given scalar values.
+    /// - Parameters:
+    ///   - path: The file path.
+    ///   - changeCount: Total number of changes to the file.
+    ///   - firstChangedAt: Timestamp of the first change.
+    ///   - lastChangedAt: Timestamp of the latest change.
     init(path: String, changeCount: Int, firstChangedAt: String, lastChangedAt: String) {
         self.path = path
         self.changeCount = changeCount
@@ -1316,6 +1726,7 @@ struct ExplorationSummaryRow: Codable, Hashable, Sendable {
     let version: Int64
     let promptUuid: String
     /// m0025: aggressive|conservative|pragmatic|alternative|general|synthesis.
+    ///
     /// The synthesis-type row is the prompt-level seal/synthesis home.
     let agentType: String
     let agentId: String?
@@ -1326,6 +1737,17 @@ struct ExplorationSummaryRow: Codable, Hashable, Sendable {
 
     var explorationStatus: ExplorationStatus? { ExplorationStatus(rawValue: status) }
 
+    /// Creates an ExplorationSummaryRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - promptUuid: The parent prompt's identifier.
+    ///   - agentType: aggressive|conservative|pragmatic|alternative|general|synthesis.
+    ///   - agentId: The agent's identifier, if known.
+    ///   - status: The summary status.
+    ///   - overview: The exploration overview prose.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
     init(
         uuid: String,
         version: Int64,
@@ -1350,8 +1772,10 @@ struct ExplorationSummaryRow: Codable, Hashable, Sendable {
 }
 
 /// One agent briefing (m0025 shape): an opinion-free ref pre-selection a
-/// briefer agent assembles for a phase. The old body/dope_refs/kbite_refs TEXT
-/// columns are gone — refs are typed child rows.
+/// briefer agent assembles for a phase.
+///
+/// The old body/dope_refs/kbite_refs TEXT columns are gone — refs are typed
+/// child rows.
 struct AgentBriefingRow: Codable, Hashable, Sendable {
     let uuid: String
     let version: Int64
@@ -1369,6 +1793,22 @@ struct AgentBriefingRow: Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates an AgentBriefingRow from the given scalar and reference values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - sessionUuid: The parent session's identifier.
+    ///   - promptUuid: The parent prompt's identifier, or nil for task-owned briefings.
+    ///   - briefingForStep: The workflow step this briefing supports.
+    ///   - status: The briefing status.
+    ///   - agentId: The briefing agent's identifier, if known.
+    ///   - dopeScopeUuid: The linked dope scope's identifier, if known.
+    ///   - dopeScopeRevision: The linked dope scope's revision, if known.
+    ///   - dopeRefs: References to dope entities.
+    ///   - kbiteRefs: References to kbite files.
+    ///   - fileChangeRefs: References to recent file changes.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
     init(
         uuid: String,
         version: Int64,
@@ -1409,6 +1849,12 @@ struct AgentBriefingDopeRefRow: Codable, Hashable, Sendable {
     let brief: String?
     let seq: Int
 
+    /// Creates an AgentBriefingDopeRefRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - dopeCode: The dope entity code.
+    ///   - brief: Optional brief note about this reference.
+    ///   - seq: The sequence number within the briefing.
     init(uuid: String, dopeCode: String, brief: String?, seq: Int) {
         self.uuid = uuid
         self.dopeCode = dopeCode
@@ -1423,6 +1869,12 @@ struct AgentBriefingKbiteRefRow: Codable, Hashable, Sendable {
     let brief: String?
     let seq: Int
 
+    /// Creates an AgentBriefingKbiteRefRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - kbiteResourceFileUuid: The referenced kbite file's identifier.
+    ///   - brief: Optional brief note about this reference.
+    ///   - seq: The sequence number within the briefing.
     init(uuid: String, kbiteResourceFileUuid: String, brief: String?, seq: Int) {
         self.uuid = uuid
         self.kbiteResourceFileUuid = kbiteResourceFileUuid
@@ -1436,6 +1888,11 @@ struct AgentBriefingFileChangeRefRow: Codable, Hashable, Sendable {
     let fileChangeUuid: String
     let seq: Int
 
+    /// Creates an AgentBriefingFileChangeRefRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - fileChangeUuid: The referenced file change's identifier.
+    ///   - seq: The sequence number within the briefing.
     init(uuid: String, fileChangeUuid: String, seq: Int) {
         self.uuid = uuid
         self.fileChangeUuid = fileChangeUuid
@@ -1449,6 +1906,12 @@ struct ExplorationKeyFileRow: Codable, Hashable, Sendable {
     let explorationSummaryUuid: String
     let filePath: String
 
+    /// Creates an ExplorationKeyFileRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - explorationSummaryUuid: The parent exploration summary's identifier.
+    ///   - filePath: The key file path.
     init(uuid: String, version: Int64, explorationSummaryUuid: String, filePath: String) {
         self.uuid = uuid
         self.version = version
@@ -1471,6 +1934,18 @@ struct ExplorationFindingRow: Codable, Hashable, Sendable {
     /// nil = unranked (work-in-progress; blocks COMPLETE).
     let findingRating: Int?
 
+    /// Creates an ExplorationFindingRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - explorationSummaryUuid: The parent exploration summary's identifier.
+    ///   - kind: The finding kind/category.
+    ///   - title: The finding title.
+    ///   - body: The finding body prose.
+    ///   - filePath: The file path this finding relates to, if any.
+    ///   - agentName: The finding agent's human-readable name.
+    ///   - agentId: The finding agent's identifier, if known.
+    ///   - findingRating: The finding's rating (0 = critical, 999 = ignore); nil if unranked.
     init(
         uuid: String,
         version: Int64,
@@ -1505,6 +1980,13 @@ struct ExplorationFindingStub: Codable, Hashable, Sendable {
     let findingRating: Int?
     let agentName: String
 
+    /// Creates an ExplorationFindingStub from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - kind: The finding kind/category.
+    ///   - title: The finding title.
+    ///   - findingRating: The finding's rating (0 = critical, 999 = ignore); nil if unranked.
+    ///   - agentName: The finding agent's human-readable name.
     init(uuid: String, kind: String, title: String, findingRating: Int?, agentName: String) {
         self.uuid = uuid
         self.kind = kind
@@ -1530,6 +2012,17 @@ struct ReviewSummaryRow: Codable, Hashable, Sendable {
 
     var reviewStatus: ReviewSummaryStatus? { ReviewSummaryStatus(rawValue: status) }
 
+    /// Creates a ReviewSummaryRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - promptUuid: The parent prompt's identifier.
+    ///   - status: The review status.
+    ///   - verdict: The review verdict, or nil if not yet issued.
+    ///   - overview: The review overview prose.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
+    ///   - agentId: The review agent's identifier, if known.
     init(
         uuid: String,
         version: Int64,
@@ -1537,9 +2030,9 @@ struct ReviewSummaryRow: Codable, Hashable, Sendable {
         status: String,
         verdict: String?,
         overview: String,
-        agentId: String? = nil,
         createdAt: String,
-        updatedAt: String
+        updatedAt: String,
+        agentId: String? = nil
     ) {
         self.uuid = uuid
         self.version = version
@@ -1569,6 +2062,21 @@ struct ReviewFindingRow: Codable, Hashable, Sendable {
     let findingRating: Int?
     let status: String
 
+    /// Creates a ReviewFindingRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - reviewSummaryUuid: The parent review summary's identifier.
+    ///   - kind: The finding kind/category.
+    ///   - title: The finding title.
+    ///   - body: The finding body prose.
+    ///   - filePath: The file path this finding relates to, if any.
+    ///   - lineStart: The starting line number, if applicable.
+    ///   - lineEnd: The ending line number, if applicable.
+    ///   - agentName: The finding agent's human-readable name.
+    ///   - findingRating: The finding's rating (0 = critical, 999 = ignore); nil if unranked.
+    ///   - status: The finding status (e.g., open, resolved).
+    ///   - agentId: The finding agent's identifier, if known.
     init(
         uuid: String,
         version: Int64,
@@ -1580,9 +2088,9 @@ struct ReviewFindingRow: Codable, Hashable, Sendable {
         lineStart: Int?,
         lineEnd: Int?,
         agentName: String,
-        agentId: String? = nil,
         findingRating: Int?,
-        status: String
+        status: String,
+        agentId: String? = nil
     ) {
         self.uuid = uuid
         self.version = version
@@ -1610,6 +2118,14 @@ struct ReviewFindingStub: Codable, Hashable, Sendable {
     let agentName: String
     let status: String
 
+    /// Creates a ReviewFindingStub from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - kind: The finding kind/category.
+    ///   - title: The finding title.
+    ///   - findingRating: The finding's rating (0 = critical, 999 = ignore); nil if unranked.
+    ///   - agentName: The finding agent's human-readable name.
+    ///   - status: The finding status (e.g., open, resolved).
     init(uuid: String, kind: String, title: String, findingRating: Int?, agentName: String, status: String) {
         self.uuid = uuid
         self.kind = kind
@@ -1631,12 +2147,16 @@ struct DopeScopeRow: Codable, Hashable, Sendable {
     /// pre-m0013 peer still decodes — the additive-OPTIONAL wire convention.
     let projectUuid: String
     let instanceUuid: String?
-    /// nil for the two project tiers. Use `requireSessionUuid()` wherever a
-    /// session is structurally required (the repo verbs, touchSession).
+    /// nil for the two project tiers.
+    ///
+    /// Use `requireSessionUuid()` wherever a session is structurally required
+    /// (the repo verbs, touchSession).
     let sessionUuid: String?
     let promptUuid: String?
     let scopeType: String
-    /// Soft delete (m0012/m0013). Reads deliberately do NOT filter on it.
+    /// Soft delete (m0012/m0013).
+    ///
+    /// Reads deliberately do NOT filter on it.
     let deletedOn: String?
     let code: String
     let name: String
@@ -1646,10 +2166,25 @@ struct DopeScopeRow: Codable, Hashable, Sendable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a DopeScopeRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - instanceUuid: The instance identifier in the tier ladder.
+    ///   - sessionUuid: The session identifier in the tier ladder.
+    ///   - promptUuid: The prompt identifier in the tier ladder.
+    ///   - scopeType: The dope scope type.
+    ///   - code: The dope code.
+    ///   - name: The human-readable name.
+    ///   - description: The description prose.
+    ///   - revision: The whole-tree content counter.
+    ///   - deletedOn: Soft-delete timestamp if deleted.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
+    ///   - projectUuid: The project identifier in the tier ladder; defaults to empty.
     init(
         uuid: String,
         version: Int64,
-        projectUuid: String = "",
         instanceUuid: String?,
         sessionUuid: String?,
         promptUuid: String?,
@@ -1660,7 +2195,8 @@ struct DopeScopeRow: Codable, Hashable, Sendable {
         revision: Int64,
         deletedOn: String?,
         createdAt: String,
-        updatedAt: String
+        updatedAt: String,
+        projectUuid: String = ""
     ) {
         self.uuid = uuid
         self.version = version
@@ -1678,7 +2214,13 @@ struct DopeScopeRow: Codable, Hashable, Sendable {
         self.updatedAt = updatedAt
     }
 
-    /// Tolerant decode: a pre-m0013 peer omits the ladder columns entirely.
+    /// Creates a DopeScopeRow from JSON, tolerant of the pre-m0013 wire format.
+    ///
+    /// A pre-m0013 peer omits the ladder columns entirely; this decoder
+    /// provides defaults for backward compatibility.
+    ///
+    /// - Parameter decoder: The JSON decoder.
+    /// - Throws: `DecodingError` if any required field is missing or malformed.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.uuid = try c.decode(String.self, forKey: .uuid)
@@ -1700,9 +2242,14 @@ struct DopeScopeRow: Codable, Hashable, Sendable {
     /// The typed tier, tolerant of the retired SESSION_BASE/PROMPT spellings.
     var tier: DopeScopeType? { DopeScopeType(fromWire: scopeType) }
 
-    /// Session-owned tiers always carry a session. The repo verbs, boot sync
-    /// and touchSession are structurally session-only, so they assert here
-    /// rather than silently no-op on a project-tier scope.
+    /// Session-owned tiers always carry a session.
+    ///
+    /// The repo verbs, boot sync and touchSession are structurally
+    /// session-only, so they assert here rather than silently no-op on a
+    /// project-tier scope.
+    ///
+    /// - Returns: The session UUID.
+    /// - Throws: `StoreError.badRequest` if this scope is not session-tier.
     func requireSessionUuid() throws -> String {
         guard let sessionUuid else {
             throw StoreError.badRequest(
@@ -1727,22 +2274,40 @@ struct DiagramRow: Codable, Hashable, Sendable {
     let description: String
     let gmccDiagramPath: String?
     /// Which dope scope this WHOLE diagram reads and writes through
-    /// (m0016). A ghost-tolerant CODE, resolved at read time, restricted on
-    /// write to the masking tiers.
+    /// (m0016).
     ///
-    /// Distinct from the per-element diagram_dope_scope / diagram_dope_entity
-    /// bindings: those answer "which node does this one shape point at",
-    /// this answers "which scope is this canvas over". Both coexist.
+    /// A ghost-tolerant CODE, resolved at read time, restricted to masking
+    /// tiers. Distinct from per-element diagram_dope_scope bindings (those
+    /// answer "which node?"; this answers "which canvas scope?").
     let dopeScopeCode: String?
     /// The whole-tree content counter (bumpDiagramRevision; never the row's
     /// optimistic-lock version).
     let revision: Int64
     /// PRIVATE (db-only) | PUBLIC (repo-serializable; SESSION tier only).
+    ///
     /// Decodes absent as PRIVATE so pre-m0024 snapshots read unchanged.
     let visibility: String
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a DiagramRow from the given scalar values.
+    /// - Parameters:
+    ///   - uuid: A unique identifier.
+    ///   - version: The row version for optimistic locking.
+    ///   - tier: The dope tier this diagram belongs to.
+    ///   - projectUuid: The project identifier.
+    ///   - instanceUuid: The instance identifier, if applicable.
+    ///   - sessionUuid: The session identifier, if applicable.
+    ///   - promptUuid: The prompt identifier, if applicable.
+    ///   - code: The diagram code.
+    ///   - name: The human-readable name.
+    ///   - description: The description prose.
+    ///   - gmccDiagramPath: Path to the diagram in the gmcc store, if any.
+    ///   - dopeScopeCode: The dope scope this diagram reads/writes through.
+    ///   - revision: The whole-tree content counter.
+    ///   - createdAt: Creation timestamp in ISO 8601 format.
+    ///   - updatedAt: Last update timestamp in ISO 8601 format.
+    ///   - visibility: PRIVATE (default) or PUBLIC (SESSION tier only).
     init(
         uuid: String,
         version: Int64,
@@ -1757,9 +2322,9 @@ struct DiagramRow: Codable, Hashable, Sendable {
         gmccDiagramPath: String?,
         dopeScopeCode: String?,
         revision: Int64,
-        visibility: String = DiagramVisibility.private.rawValue,
         createdAt: String,
-        updatedAt: String
+        updatedAt: String,
+        visibility: String = DiagramVisibility.private.rawValue
     ) {
         self.uuid = uuid
         self.version = version
@@ -1785,6 +2350,10 @@ struct DiagramRow: Codable, Hashable, Sendable {
             dopeScopeCode, revision, visibility, createdAt, updatedAt
     }
 
+    /// Creates a DiagramRow from JSON, defaulting `visibility` for pre-m0024 peers.
+    ///
+    /// - Parameter decoder: The JSON decoder.
+    /// - Throws: `DecodingError` if any required field is missing or malformed.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         uuid = try c.decode(String.self, forKey: .uuid)

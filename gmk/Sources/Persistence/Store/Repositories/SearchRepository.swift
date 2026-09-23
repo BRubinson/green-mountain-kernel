@@ -1,12 +1,24 @@
 import Foundation
 import GRDB
 
-/// SEARCH data access — FTS5 UNION over the bot-report mirrors. Runs INSIDE a
+/// SEARCH data access — FTS5 UNION over the bot-report mirrors.
+///
+/// Runs INSIDE a
 /// Store-owned transaction; holds no dbQueue and never self-transacts.
 struct SearchRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Searches across all indexed entities using full-text search.
+    ///
+    /// Executes a UNION query across all search-enabled kinds (prompt, clarification
+    /// questions/notes, architecture, exploration, and review) and returns ranked hits.
+    ///
+    /// - Parameters:
+    ///   - req: The search request with session scope and kind filters.
+    ///   - pattern: The FTS5 pattern to search for.
+    /// - Returns: A search response containing ranked hit results.
+    /// - Throws: A store error if the session is not found or the query fails.
     func search(_ req: SearchRequest, pattern: FTS5Pattern) throws -> SearchResponse {
         if let sessionUuid = req.sessionUuid {
             guard try SessionRecord.exists(db, key: ["uuid": sessionUuid]) else {
@@ -51,10 +63,17 @@ struct SearchRepository: RepositoryContext {
         )
     }
 
-    /// One UNION arm per kind. Every arm produces the identical column list;
-    /// lineage joins run child → summary → prompt → session. Weights (higher
-    /// = stronger contribution) and the per-kind bias are fixed here —
-    /// keeping a 2 MB change_code hit from outranking a direct goal match.
+    /// Returns the FTS5 UNION arm for a single search kind.
+    ///
+    /// Every arm produces the identical column list; lineage joins run child →
+    /// summary → prompt → session. Weights (higher = stronger contribution) and
+    /// the per-kind bias are fixed here — keeping a 2 MB change_code hit from
+    /// outranking a direct goal match.
+    ///
+    /// - Parameters:
+    ///   - kind: The search entity kind to generate the arm for.
+    ///   - scope: The session scope filter, or empty string for global search.
+    /// - Returns: A SQL SELECT statement that can be used as a UNION arm.
     private static func searchArm(for kind: SearchKind, scope: String) -> String {
         let common = """
             p.uuid AS prompt_uuid, p.seq AS prompt_seq, p.name AS prompt_name,

@@ -1,12 +1,16 @@
 import Foundation
 import GRDB
 
-/// FILE_CHANGE_ADD / FILE_CHANGE_LIST data access. Runs INSIDE a Store-owned
-/// transaction; holds no dbQueue and never self-transacts.
+/// FILE_CHANGE_ADD / FILE_CHANGE_LIST data access.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
+/// self-transacts.
 struct FileChangeRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Records a file change and creates the necessary context records.
+    ///
     /// Ensure the project → instance → session chain exists, then record the
     /// file change: session_file upsert, file_change row, one row per range,
     /// and the FILE_CHANGE daemon_event — all composed by the caller's single
@@ -14,6 +18,10 @@ struct FileChangeRepository: RepositoryContext {
     ///
     /// Two gates run BEFORE any of that: the claude_session_binding gate, and
     /// the (tool call, file) idempotency check.
+    ///
+    /// - Parameter req: The file change request.
+    /// - Returns: The response with session file, file change, and range uuids.
+    /// - Throws: `StoreError` for validation failures or database errors.
     func add(_ req: FileChangeAdd) throws -> FileChangeAddResponse {
         // A dangling prompt reference must be a typed NOT_FOUND, not the
         // opaque FK DB_ERROR the insert below would produce.
@@ -183,8 +191,14 @@ struct FileChangeRepository: RepositoryContext {
         )
     }
 
+    /// Resolves the Claude conversation's pinned session.
+    ///
     /// The Claude conversation's pinned session, or a typed refusal. nil when
     /// the payload names no conversation at all.
+    ///
+    /// - Parameter req: The file change request.
+    /// - Returns: The pinned session uuid, or nil if unbound.
+    /// - Throws: `StoreError.hookUnbound` when the session cannot be resolved.
     private func resolveBinding(_ req: FileChangeAdd) throws -> String? {
         guard let claudeSessionId = req.claudeSessionId else { return nil }
         guard
@@ -198,8 +212,14 @@ struct FileChangeRepository: RepositoryContext {
         return bound
     }
 
+    /// Derives the current workflow phase for a prompt.
+    ///
     /// The phase the prompt's active workflow derives right now, or nil when
     /// no active workflow answers.
+    ///
+    /// - Parameter promptUuid: The prompt uuid.
+    /// - Returns: The derived workflow phase, or nil if not derivable.
+    /// - Throws: Database errors during the query.
     private func derivedWorkflowPhase(promptUuid: String) throws -> String? {
         let workflows = BotWorkflowRepository(db: db, core: core)
         guard let workflow = try workflows.fetchActive(promptUuid: promptUuid),
@@ -208,9 +228,17 @@ struct FileChangeRepository: RepositoryContext {
         return try workflows.derivePhase(workflow: workflow, variant: variant).0.rawValue
     }
 
+    /// Inserts file change ranges up to the configured limit.
+    ///
     /// The size budget on append-only history: a regenerated file can produce
     /// thousands of hunks and megabytes of body, and nothing trims
     /// file_change_range afterwards.
+    ///
+    /// - Parameters:
+    ///   - fileChangeUuid: The file change to associate with the ranges.
+    ///   - ranges: The change ranges to insert.
+    /// - Returns: The uuids of the inserted range records.
+    /// - Throws: Database errors during insertion.
     private func insertRanges(fileChangeUuid: String, _ ranges: [ChangeRange]) throws -> [String] {
         try ranges.prefix(FileChangeLimits.maxRangesPerChange)
             .map { range in
@@ -231,14 +259,20 @@ struct FileChangeRepository: RepositoryContext {
 
     // MARK: - Attribution
 
+    /// Resolves the prompt a change should be attributed to.
+    ///
     /// The prompt a change belongs to, resolved from ONE session and nothing
-    /// else. Both rungs demand a unique answer; a session running two prompts at
-    /// once returns nil, and the change is recorded session-scoped.
-    /// ACCEPTED BEHAVIOUR: for a payload-borne write the session passed here is
-    /// the one the conversation was PINNED to, while the row's own session_uuid
-    /// and session_file stay cwd-derived, so after a mid-session `git checkout`
-    /// changes land in the new branch's session attributed to the old branch's
-    /// prompt, with no signal.
+    /// else.
+    ///
+    /// Both rungs demand a unique answer; nil when a session runs two prompts.
+    /// For a payload-borne write, the session passed here is the pinned one;
+    /// the row's session_uuid and session_file stay cwd-derived — so changes
+    /// land in a new branch attributed to the old branch's prompt, with no
+    /// signal after a mid-session `git checkout`.
+    ///
+    /// - Parameter sessionUuid: The session to resolve the prompt from.
+    /// - Returns: The prompt uuid, or nil if not uniquely resolvable.
+    /// - Throws: Database errors during the query.
     func resolveAttributedPrompt(sessionUuid: String) throws -> String? {
         let workflowPrompts =
             try BotWorkflowRecord
@@ -266,13 +300,21 @@ struct FileChangeRepository: RepositoryContext {
         return nil
     }
 
+    /// Records an unbound payload-borne write in the event log.
+    ///
     /// Durable trace for a refused payload-borne write, appended by
     /// `Store.addFileChange` in its OWN transaction: inside the refused write it
     /// would roll back with it, and a vanishing event is the silence this
-    /// replaces. Only a repo the daemon KNOWS gets one — a PostToolUse hook
-    /// fires in every repo on the machine, so an unknown one producing an
-    /// unbound payload is ordinary, while a known one producing it is dead
-    /// capture.
+    /// replaces.
+    ///
+    /// Only a repo the daemon KNOWS gets one — a PostToolUse hook fires in
+    /// every repo on the machine, so an unknown one producing an unbound
+    /// payload is ordinary, while a known one producing it is dead capture.
+    ///
+    /// - Parameters:
+    ///   - req: The file change request that could not be bound.
+    ///   - claudeSessionId: The unresolvable claude session id.
+    /// - Throws: Database errors during event insertion.
     func recordUnbound(_ req: FileChangeAdd, claudeSessionId: String) throws {
         guard let instanceUuid = try bootedInstanceUuid(req) else { return }
         var payload: [String: Any] = [
@@ -292,11 +334,18 @@ struct FileChangeRepository: RepositoryContext {
         )
     }
 
+    /// Checks whether a repository instance has been initialized.
+    ///
     /// Read-only bootedness: has this repo ever been through CONTEXT_ENSURE?
-    /// Tested at the INSTANCE rather than the session, because a
-    /// branch whose session row is missing is exactly the state an unbound
-    /// payload comes from — calling that "unbooted" would silence the case
-    /// the event exists for.
+    ///
+    /// Tested at the INSTANCE rather than the session, because a branch
+    /// whose session row is missing is exactly the state an unbound payload
+    /// comes from — calling that "unbooted" would silence the case the event
+    /// exists for.
+    ///
+    /// - Parameter req: The file change request.
+    /// - Returns: The instance uuid if booted, nil otherwise.
+    /// - Throws: Database errors during the query.
     private func bootedInstanceUuid(_ req: FileChangeAdd) throws -> String? {
         guard
             let projectUuid =
@@ -315,9 +364,20 @@ struct FileChangeRepository: RepositoryContext {
             .fetchOne(db)
     }
 
+    /// Retrieves the recorded response for a duplicate tool call and file.
+    ///
     /// The existing row for a (tool call, file) pair, as the response a fresh
-    /// write would have produced. The pair — not tool_use_id alone — is the
-    /// unit: one `sed -i a b c` is one tool_use_id and three rows.
+    /// write would have produced.
+    ///
+    /// The pair — not tool_use_id alone — is the unit: one `sed -i a b c`
+    /// is one tool_use_id and three rows.
+    ///
+    /// - Parameters:
+    ///   - toolUseId: The tool use id.
+    ///   - sessionUuid: The session uuid.
+    ///   - relativePath: The repository-relative file path.
+    /// - Returns: The recorded response, or nil if not found.
+    /// - Throws: Database errors during the query.
     private func recordedChange(
         toolUseId: String,
         sessionUuid: String,
@@ -348,9 +408,15 @@ struct FileChangeRepository: RepositoryContext {
         )
     }
 
+    /// Lists file changes matching the request criteria.
+    ///
     /// nil sessionUuid means no session filter (whole-db query); a
     /// supplied-but-unknown uuid is a typed NOT_FOUND, never a silent empty
     /// list (the same optional-filter contract as Store+Listing).
+    ///
+    /// - Parameter req: The list request with filters and limit.
+    /// - Returns: The list response with matched file changes.
+    /// - Throws: `StoreError.notFound` if a specified uuid doesn't exist.
     func list(_ req: FileChangeListRequest) throws -> FileChangeListResponse {
         var request = FileChangeWithRanges.request(relativePath: req.relativePath)
         if let sessionUuid = req.sessionUuid {
@@ -376,6 +442,14 @@ struct FileChangeRepository: RepositoryContext {
 
     // MARK: - session_file upsert
 
+    /// Creates or updates a session file record.
+    ///
+    /// - Parameters:
+    ///   - sessionUuid: The session uuid.
+    ///   - relativePath: The repository-relative file path.
+    ///   - changeKind: The type of change; deleted files are marked inactive.
+    /// - Returns: The session file uuid.
+    /// - Throws: Database errors during insertion or update.
     func ensureSessionFile(
         sessionUuid: String,
         relativePath: String,

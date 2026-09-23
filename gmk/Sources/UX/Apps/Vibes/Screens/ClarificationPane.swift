@@ -10,8 +10,9 @@ import SwiftUI
 struct ClarificationPane: View {
     let phase: PromptPhaseStore.Phase<ClarifyGetResponse>
     /// Held ONLY so the question cards can reach `phases.answers` — the
-    /// per-question draft/version cells every CLARIFY_GET reconciles. The pane
-    /// itself issues nothing through it.
+    /// per-question draft/version cells every CLARIFY_GET reconciles.
+    ///
+    /// The pane itself issues nothing through it.
     let phases: PromptPhaseStore
 
     var body: some View {
@@ -38,6 +39,10 @@ struct ClarificationPane: View {
         }
     }
 
+    /// Renders the clarification response content with status, care package, questions, and notes.
+    ///
+    /// - Parameter response: The clarification response to display.
+    /// - Returns: A view displaying the response content.
     @ViewBuilder
     private func content(_ response: ClarifyGetResponse) -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -87,6 +92,10 @@ struct ClarificationPane: View {
 
     // MARK: Notes
 
+    /// Renders a single internal note row with optional weight indicator.
+    ///
+    /// - Parameter note: The note row to display.
+    /// - Returns: A view displaying the note with weight and body.
     private func noteRow(_ note: ClarificationNoteRow) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: "note.text")
@@ -111,6 +120,10 @@ struct ClarificationPane: View {
     // The per-row status glyph moved to `ClarificationQuestionCard` with the
     // question rows themselves — it is the card's own header now.
 
+    /// Renders a colored status chip for the clarification status.
+    ///
+    /// - Parameter status: The clarification status to display, or nil for unknown.
+    /// - Returns: A capsule-shaped status indicator with text and color.
     @ViewBuilder
     private func statusChip(_ status: ClarificationStatus?) -> some View {
         let (label, color): (String, Color) =

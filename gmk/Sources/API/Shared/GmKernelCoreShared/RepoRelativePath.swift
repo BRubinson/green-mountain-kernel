@@ -2,17 +2,26 @@ import Foundation
 
 /// The repo-relative path normalizer, in the BASE layer because it is purely
 /// lexical and Foundation-only: it touches no database and no filesystem, so
-/// nothing about it is persistence. A second copy of a join key's normalizer
-/// is how two writers start disagreeing about the same string, so `StoreCore`
+/// nothing about it is persistence.
+///
+/// A second copy of a join key's normalizer is how two writers start disagreeing about the same string, so `StoreCore`
 /// and `Store` keep thin forwarders rather than their own.
 enum RepoRelativePath {
 
-    /// The join key contract: architecture change rows and file_change rows
-    /// meet on this string, so both write paths run through this normalizer.
-    /// Purely lexical — it NEVER touches the filesystem, since instance roots
-    /// name paths that are gone and architecture rows name files not yet
-    /// created. A relative path passes through cleaned, an absolute path inside
-    /// the instance root is stripped, and one outside it is rejected.
+    /// Normalizes a path to a repository-relative form.
+    ///
+    /// The join key for architecture and file change rows; both write paths
+    /// run through this normalizer. Purely lexical — never touches the
+    /// filesystem since instance roots name paths that are gone or files not
+    /// yet created. Relative paths are cleaned, absolute paths inside the
+    /// root are stripped to relative, and those outside are rejected.
+    ///
+    /// - Parameters:
+    ///   - raw: The path to normalize.
+    ///   - repoRoot: The instance root path for stripping absolute paths.
+    /// - Returns: The normalized repository-relative path.
+    /// - Throws: `StoreError.badRequest` if the path is empty, contains control
+    ///   characters, escapes the repo root, or resolves to the root itself.
     static func normalizeRepoRelativePath(_ raw: String, repoRoot: String) throws -> String {
         var path = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty else {

@@ -2,13 +2,20 @@ import Foundation
 import GRDB
 
 /// DOPE_SEARCH data access — full-text over the dope tree at one of three
-/// scopes; --only-masks is a post-filter over resolver provenance. Runs
-/// INSIDE a Store-owned transaction; holds no dbQueue and never
+/// scopes; --only-masks is a post-filter over resolver provenance.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
 /// self-transacts.
 struct DopeSearchRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Performs full-text search over the dope tree at the specified scope.
+    /// - Parameters:
+    ///   - req: The search request specifying the scope and optional filters.
+    ///   - pattern: The FTS5 pattern to match against indexed content.
+    /// - Returns: A response containing matching search hits.
+    /// - Throws: `StoreError` if the search fails or required parameters are invalid.
     func search(_ req: DopeSearchRequest, pattern: FTS5Pattern) throws -> DopeSearchResponse {
         let limit = min(max(req.limit ?? 50, 1), 500)
         // 1. Which dope scopes are in range for this search scope?
@@ -112,11 +119,14 @@ struct DopeSearchRepository: RepositoryContext {
         return DopeSearchResponse(hits: hits)
     }
 
-    /// Which scopes a search scope covers. PROMPT means that prompt's own
-    /// overlay plus the session base it reads through; SESSION is the
-    /// session's scopes; PROJECT is every scope in the project — or, when no
-    /// project uuid is supplied, every scope in the DATABASE. That last case is
-    /// what makes `dope_search_global` global.
+    /// Returns the dope scopes in range for a search request.
+    ///
+    /// PROMPT returns that prompt's overlay plus the session base; SESSION
+    /// returns the session's scopes; PROJECT returns every scope in the project
+    /// or every scope in the database if no project UUID is supplied.
+    /// - Parameter req: The search request specifying the scope.
+    /// - Returns: An array of dope scope rows matching the search scope.
+    /// - Throws: `StoreError` if the query fails or required parameters are invalid.
     private func searchScopeRows(req: DopeSearchRequest) throws -> [DopeScopeRow] {
         switch req.scope {
         case .prompt:
@@ -182,9 +192,14 @@ struct DopeSearchRepository: RepositoryContext {
         }
     }
 
-    /// One UNION arm per source table. Every arm produces the identical column
-    /// list, including the dot-path so --only-masks can match resolver
-    /// provenance without a second query.
+    /// Returns a SQL UNION arm for searching one dope source table.
+    ///
+    /// Every arm produces the identical column list, including the dot-path so
+    /// filters can match resolver provenance without a second query.
+    /// - Parameters:
+    ///   - source: The dope source table to search.
+    ///   - scopePlaceholders: Comma-separated placeholder strings for scope UUIDs.
+    /// - Returns: A SQL SELECT statement for this search arm.
     private static func searchArm(
         _ source: DopeSearchSource,
         scopePlaceholders: String

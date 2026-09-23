@@ -1,13 +1,13 @@
 import Foundation
 
 /// Turns what a person types — `10`, `p10`, `fast_startup` — into a prompt
-/// uuid. PURE: it folds over the stubs `PROMPT_LIST` already returns, so it
-/// needs no wire verb, handler or migration. `prompt` declares
-/// `UNIQUE(session_uuid, seq)` and `UNIQUE(session_uuid, code)`, which makes
-/// seq and code single-valued answers rather than best guesses. AMBIGUITY IS
-/// A RESULT, NEVER A GUESS: a substring matching three prompts returns all
-/// three, because picking the first would file work against the wrong prompt
-/// and the append-only db makes that permanent.
+/// uuid.
+///
+/// PURE: it folds over the stubs `PROMPT_LIST` already returns, so it needs no wire verb, handler or migration.
+/// `prompt` declares `UNIQUE(session_uuid, seq)` and `UNIQUE(session_uuid, code)`, which makes seq and code
+/// single-valued answers rather than best guesses. AMBIGUITY IS A RESULT, NEVER A GUESS: a substring matching three
+/// prompts returns all three, because picking the first would file work against the wrong prompt and the append-only db
+/// makes that permanent.
 enum PromptResolver {
 
     /// How a selector matched — surfaced so a caller can tell an exact hit from
@@ -27,11 +27,16 @@ enum PromptResolver {
         case notFound
     }
 
-    /// Resolve `selector` against one session's prompts.
+    /// Resolves a selector string against a list of prompt stubs.
     ///
     /// Precedence is most-specific-first, and each tier is tried to exhaustion
     /// before the next: an exact name must never lose to a substring hit on a
-    /// different prompt.
+    /// different prompt. Matching tiers: sequence number, code, exact name (case
+    /// insensitive), and substring match.
+    /// - Parameters:
+    ///   - selector: The selector string (number, code, or name fragment).
+    ///   - stubs: The prompts to resolve against.
+    /// - Returns: A resolution indicating matched, ambiguous, or not found.
     static func resolve(_ selector: String, in stubs: [PromptStub]) -> Resolution {
         let needle = selector.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !needle.isEmpty else { return .notFound }
@@ -65,6 +70,9 @@ enum PromptResolver {
         return .notFound
     }
 
+    /// Returns an array of stubs sorted by sequence number.
+    /// - Parameter stubs: The prompts to sort.
+    /// - Returns: The sorted prompt stubs in ascending sequence order.
     private static func sortedBySeq(_ stubs: [PromptStub]) -> [PromptStub] {
         stubs.sorted { $0.seq < $1.seq }
     }

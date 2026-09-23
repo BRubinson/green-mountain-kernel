@@ -1,20 +1,29 @@
 import Foundation
 
-/// The ONLY thing in the tree that opens the database for writing. `start`
-/// consumes a `KernelOwnership.Token`, which only a won `flock` can produce, so
-/// "did we take the lock first?" is a question the compiler answers. A second
-/// `Store(path:)` site anywhere is a second writer.
+/// The ONLY thing in the tree that opens the database for writing.
+///
+/// `start` consumes a `KernelOwnership.Token`, which only a won `flock` can
+/// produce, so "did we take the lock first?" is a question the compiler answers.
+/// A second `Store(path:)` site anywhere is a second writer.
 final class KernelWriter {
 
     let store: Store
-    /// Held for the process's lifetime. Never closed deliberately: the kernel
-    /// releasing it at exit is what makes a crash leave no stale lock.
+    /// Held for the process's lifetime.
+    ///
+    /// Never closed deliberately: the kernel releasing it at exit is what makes a
+    /// crash leave no stale lock.
     private let token: KernelOwnership.Token
 
-    /// Open, back up if a migration is pending, migrate, record the start.
-    /// `token` is consumed proof of exclusive ownership; `log` is injected
-    /// because the headless host writes to the daemon log and an app host does
-    /// not.
+    /// Opens the database, migrates if needed, and records the daemon start.
+    ///
+    /// The `token` is proof of exclusive ownership acquired by `flock`. The
+    /// `log` callback is injected because the headless host writes to the
+    /// daemon log, while an app host does not.
+    /// - Parameters:
+    ///   - token: Ownership token proving exclusive lock is held.
+    ///   - log: Callback to record log messages (default: no-op).
+    /// - Returns: The opened kernel writer instance.
+    /// - Throws: `StoreError.corruptState` if the schema is from a newer binary.
     static func start(
         _ token: consuming KernelOwnership.Token,
         log: (String) -> Void = { _ in }
@@ -51,12 +60,12 @@ final class KernelWriter {
         return KernelWriter(store: store, token: consume token)
     }
 
-    /// The kernel serves `MCP_CALL` through the same tool values the stdio pen
-    /// serves, so a roster the bodies disagree with breaks this door too — and
-    /// nobody runs the pen's own startup check on this path. It REPORTS rather
-    /// than refuses: the pen exits because serving a wrong surface is worse
-    /// than serving none, while a kernel that will not boot takes the database,
-    /// the app and every hook with it over a build artifact.
+    /// Reports roster mismatches between the tool definitions and the generated list.
+    ///
+    /// The kernel serves the same tools as the stdio pen, so a mismatch breaks
+    /// MCP_CALL. Reports rather than refuses: the pen exits on a wrong surface,
+    /// but a kernel that will not boot takes the database and every hook with it.
+    /// - Parameter log: Callback to record log messages.
     private static func reportRosterProblems(_ log: (String) -> Void) {
         if let error = CdeToolRoster.rosterDecodeError {
             log("CDE ROSTER: \(CdeToolRoster.generatedPath) does not decode: \(error)")
@@ -66,6 +75,10 @@ final class KernelWriter {
         }
     }
 
+    /// Initializes the writer with a store and ownership token.
+    /// - Parameters:
+    ///   - store: The opened database store.
+    ///   - token: The ownership token held for the process's lifetime.
     private init(store: Store, token: consuming KernelOwnership.Token) {
         self.store = store
         self.token = consume token

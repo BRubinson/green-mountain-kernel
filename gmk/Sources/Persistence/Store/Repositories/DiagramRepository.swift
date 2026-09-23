@@ -1,14 +1,14 @@
 import Foundation
 import GRDB
 
-/// DIAGRAM data access: db-persisted canvases over the dope subsystem. Runs
-/// INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts.
-/// See the facade header in Store+Diagram.swift.
-/// `applyDiagramMutations` is the ONLY mutation body; the granular node verbs
-/// build one-mutation batches over it, so granular and batch semantics cannot
-/// drift. Each batch runs in one transaction, bumps `diagram.revision` once and
-/// emits one DIAGRAM_CHANGE event. dope bindings are TEXT codes resolved at READ
-/// time, and a dangling code is a LEGAL renderable ghost.
+/// DIAGRAM data access: db-persisted canvases over the dope subsystem.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
+/// self-transacts. See Store+Diagram.swift. `applyDiagramMutations` is the ONLY
+/// mutation body; granular node verbs build one-mutation batches over it. Each
+/// batch runs in one transaction, bumps `diagram.revision` once and emits one
+/// DIAGRAM_CHANGE event. Dope bindings are TEXT codes resolved at READ time; a
+/// dangling code is LEGAL and renderable as ghost.
 struct DiagramOwner {
     let tier: DiagramTier
     let projectUuid: String
@@ -43,7 +43,9 @@ struct ElementRowInfo {
 }
 
 /// One diagram's eight subtype maps and two vertex maps, keyed by element
-/// uuid. The element row names its type at RUNTIME, so which map answers for a
+/// uuid.
+///
+/// The element row names its type at RUNTIME, so which map answers for a
 /// given element is a switch no association can replace.
 private struct DiagramSubtypeIndex {
     let layers: [String: DiagramDrawingLayerRecord]
@@ -57,6 +59,11 @@ private struct DiagramSubtypeIndex {
     let strokeVertexRows: [String: [DiagramVertex]]
     let shapeVertexRows: [String: [DiagramVertex]]
 
+    /// The payload for an element by resolving its type-specific subtype row.
+    ///
+    /// - Parameter row: The element row.
+    /// - Returns: The payload union case matching the element's type.
+    /// - Throws: `StoreError.corruptState` if the element type is unknown or has no subtype row.
     func payload(for row: DiagramElementRecord) throws -> DiagramElementPayload {
         let uuid = row.uuid
         guard let type = DiagramElementType(rawValue: row.elementType) else {
@@ -110,6 +117,11 @@ struct DiagramRepository: RepositoryContext {
     /// a base tier is refused, so a canvas cannot be pointed at shared truth by
     /// accident. On READ a code resolving to nothing is a legal ghost, leaving a
     /// base free to evolve out from under a diagram.
+    ///
+    /// - Parameters:
+    ///   - owner: The diagram's owner.
+    ///   - code: The dope scope code to validate.
+    /// - Throws: `StoreError.badRequest` if the code resolves only to base tier(s).
     func validateDiagramScopeBinding(
         owner: DiagramOwner,
         code: String
@@ -135,6 +147,11 @@ struct DiagramRepository: RepositoryContext {
 
     // MARK: - Row + revision helpers
 
+    /// The diagram row with resolved owner chain by uuid.
+    ///
+    /// - Parameter uuid: The diagram uuid.
+    /// - Returns: The diagram row, or `nil` if not found.
+    /// - Throws: Any database error.
     func fetchDiagram(uuid: String) throws -> DiagramRow? {
         try DiagramWithOwner.request()
             .filter(DiagramRecord.Columns.uuid == uuid)
@@ -142,9 +159,14 @@ struct DiagramRepository: RepositoryContext {
             .dto()
     }
 
-    /// Advance the whole-tree content counter WITHOUT bumping the diagram
-    /// row's version — a geometry edit deep in the tree must never invalidate
-    /// a diagram version a GMVibes editor is holding.
+    /// Advance the whole-tree content counter without bumping the diagram row's version.
+    ///
+    /// A geometry edit deep in the tree must never invalidate a diagram version
+    /// a GMVibes editor is holding.
+    ///
+    /// - Parameter diagramUuid: The diagram to bump.
+    /// - Returns: The new revision count.
+    /// - Throws: `StoreError.notFound` if the diagram does not exist.
     @discardableResult
     func bumpDiagramRevision(diagramUuid: String) throws -> Int64 {
         try db.execute(
@@ -162,8 +184,14 @@ struct DiagramRepository: RepositoryContext {
         return revision
     }
 
-    /// The diagram a given element belongs to. The facade's granular node
-    /// verbs need it to build their one-mutation batch.
+    /// The diagram a given element belongs to.
+    ///
+    /// The facade's granular node verbs need it to build their one-mutation
+    /// batch.
+    ///
+    /// - Parameter elementUuid: The element uuid.
+    /// - Returns: The uuid of the element's owning diagram.
+    /// - Throws: `StoreError.notFound` if the element does not exist.
     func owningDiagramUuid(elementUuid: String) throws -> String {
         guard
             let uuid = try DiagramElementRecord.all()
@@ -176,8 +204,13 @@ struct DiagramRepository: RepositoryContext {
         return uuid
     }
 
-    /// Every PUBLIC SESSION-tier diagram of a session, in code order — the
-    /// rows the repo projection writes out as files.
+    /// Every PUBLIC SESSION-tier diagram of a session, in code order.
+    ///
+    /// The rows the repo projection writes out as files.
+    ///
+    /// - Parameter sessionUuid: The session uuid.
+    /// - Returns: The diagrams in code order.
+    /// - Throws: Any database error.
     func publicSessionDiagrams(sessionUuid: String) throws -> [DiagramRow] {
         try DiagramWithOwner.request()
             .filter(DiagramRecord.Columns.tier == DiagramTier.session.rawValue)
@@ -188,8 +221,15 @@ struct DiagramRepository: RepositoryContext {
             .map { $0.dto() }
     }
 
-    /// One SESSION-tier diagram by code, ANY visibility — ingest has to see a
-    /// PRIVATE row in order to refuse landing a file over it.
+    /// One SESSION-tier diagram by code, any visibility.
+    ///
+    /// Ingest must see a PRIVATE row to refuse landing a file over it.
+    ///
+    /// - Parameters:
+    ///   - sessionUuid: The session uuid.
+    ///   - code: The diagram code.
+    /// - Returns: The diagram row, or `nil` if not found.
+    /// - Throws: Any database error.
     func sessionDiagram(sessionUuid: String, code: String) throws -> DiagramRow? {
         try DiagramWithOwner.request()
             .filter(DiagramRecord.Columns.tier == DiagramTier.session.rawValue)
@@ -199,8 +239,13 @@ struct DiagramRepository: RepositoryContext {
             .dto()
     }
 
-    /// Every SESSION-tier diagram's revision by code, any visibility — the
-    /// repo prune gate may only delete a file the db demonstrably subsumes.
+    /// Every SESSION-tier diagram's revision by code, any visibility.
+    ///
+    /// The repo prune gate may only delete a file the db demonstrably subsumes.
+    ///
+    /// - Parameter sessionUuid: The session uuid.
+    /// - Returns: A map from diagram code to its revision.
+    /// - Throws: Any database error.
     func sessionDiagramRevisions(sessionUuid: String) throws -> [String: Int64] {
         let rows =
             try DiagramRecord
@@ -212,14 +257,27 @@ struct DiagramRepository: RepositoryContext {
         return byCode
     }
 
-    /// NOT_FOUND unless the session row exists. The repo verbs' first guard,
-    /// before any instance root is resolved.
+    /// NOT_FOUND unless the session row exists.
+    ///
+    /// The repo verbs' first guard, before any instance root is resolved.
+    ///
+    /// - Parameter uuid: The session uuid to validate.
+    /// - Throws: `StoreError.notFound` if the session does not exist.
     func requireSession(uuid: String) throws {
         guard try SessionRecord.all().withUuid(uuid).fetchCount(db) > 0 else {
             throw StoreError.notFound(entity: "session", key: uuid)
         }
     }
 
+    /// Record a diagram change event with the specified action and metadata.
+    ///
+    /// - Parameters:
+    ///   - diagram: The diagram row.
+    ///   - action: The action name (e.g., `init`, `element_add`).
+    ///   - elementUuid: The element uuid if the action targets an element.
+    ///   - mutationCount: The mutation count for batch operations, or `nil` for single mutations.
+    ///   - revision: The resulting diagram revision.
+    /// - Throws: Any event appending error.
     func recordDiagramChange(
         diagram: DiagramRow,
         action: String,
@@ -253,9 +311,18 @@ struct DiagramRepository: RepositoryContext {
 
     // MARK: - Owner addressing (the chain-non-null tier ladder)
 
-    /// Validate that EXACTLY one owner uuid was passed, that the row exists
-    /// (unknown uuid → NOT_FOUND, the three-way absence discrimination's
-    /// first guard), and derive the full ancestor chain by joins.
+    /// Validate one owner uuid, confirm it exists, and derive the full ancestor chain.
+    ///
+    /// Unknown uuid throws NOT_FOUND as the first guard of three-way absence
+    /// discrimination. Derives the full ancestor chain by joins.
+    ///
+    /// - Parameters:
+    ///   - projectUuid: The project uuid, or `nil`.
+    ///   - instanceUuid: Retired; still accepted to provide clear error.
+    ///   - sessionUuid: The session uuid, or `nil`.
+    ///   - promptUuid: The prompt uuid, or `nil`.
+    /// - Returns: The resolved owner with full ancestor chain.
+    /// - Throws: `StoreError.badRequest` if not exactly one owner is passed; `StoreError.notFound` if the uuid does not exist.
     func resolveDiagramOwner(
         projectUuid: String?,
         instanceUuid: String?,
@@ -322,6 +389,11 @@ struct DiagramRepository: RepositoryContext {
 
     // MARK: - Init
 
+    /// Initialize a diagram with the given properties.
+    ///
+    /// - Parameter req: The initialization request.
+    /// - Returns: The created or existing diagram response.
+    /// - Throws: `StoreError.badRequest` if validation fails.
     func diagramInit(_ req: DiagramInitRequest) throws -> DiagramResponse {
         try DopeCode.validateCode(req.code, field: "diagram code")
         let description = req.description ?? ""
@@ -376,6 +448,11 @@ struct DiagramRepository: RepositoryContext {
 
     // MARK: - List (v12 semantics: one owner, one tier, never a union)
 
+    /// List diagrams owned by a single tier owner.
+    ///
+    /// - Parameter req: The list request.
+    /// - Returns: The matching diagrams, ordered by code.
+    /// - Throws: `StoreError.badRequest` if validation fails.
     func diagramList(_ req: DiagramListRequest) throws -> DiagramListResponse {
         if let visibility = req.visibility, DiagramVisibility(rawValue: visibility) == nil {
             throw StoreError.badRequest(
@@ -401,6 +478,11 @@ struct DiagramRepository: RepositoryContext {
 
     // MARK: - Get (uuid or owner+code; no cross-tier ladder)
 
+    /// Get a diagram with its full tree and binding resolutions.
+    ///
+    /// - Parameter req: The get request.
+    /// - Returns: The diagram tree, binding resolutions, and storage path.
+    /// - Throws: `StoreError.notFound` or `StoreError.diagramAbsent` if not found.
     func diagramGet(_ req: DiagramGetRequest) throws -> DiagramGetResponse {
         let diagram: DiagramRow
         if let diagramUuid = req.diagramUuid {
@@ -456,6 +538,10 @@ struct DiagramRepository: RepositoryContext {
     /// This is the root rendered output is written under. Every tier carries the
     /// column, which is precisely why GMFS storage works at project tier
     /// where an instance checkout did not.
+    ///
+    /// - Parameter diagram: The diagram row.
+    /// - Returns: The relative GMFS storage path, or `nil` if not set or empty.
+    /// - Throws: Any database error.
     func diagramOwnerStoragePath(diagram: DiagramRow) throws -> String? {
         guard let tier = DiagramTier(rawValue: diagram.tier) else { return nil }
         let path: String?
@@ -487,6 +573,11 @@ struct DiagramRepository: RepositoryContext {
     // recursion; ORDER BY element_z, sort_order, code keeps reads and
     // screenshots deterministic)
 
+    /// Fetch the full diagram tree with all elements and their subtypes.
+    ///
+    /// - Parameter diagram: The diagram row to hydrate.
+    /// - Returns: The complete diagram tree with elements hierarchically organized.
+    /// - Throws: Any database or payload decoding error.
     func fetchDiagramTree(diagram: DiagramRow) throws -> DiagramTree {
         let elementRows =
             try DiagramElementRecord
@@ -609,11 +700,19 @@ struct DiagramRepository: RepositoryContext {
 
     // MARK: - Binding resolution (read-time, ghost-tolerant)
 
-    /// One row per dope_scope element, resolved through the EXISTING dope
-    /// ladder against the DIAGRAM row's own session/prompt context: PROMPT
-    /// scope preferred, SESSION_INSTANCE fallback, resolvedVia surfaced. A
-    /// PROJECT/INSTANCE-tier diagram has no session — every binding resolves
-    /// absent by construction. Never an error, never a dope delete guard.
+    /// One row per dope_scope element, resolved against the diagram's context.
+    ///
+    /// Resolves through the EXISTING dope ladder against the DIAGRAM row's own
+    /// session/prompt context. PROMPT scope preferred, SESSION_INSTANCE fallback,
+    /// resolvedVia surfaced. PROJECT/INSTANCE-tier diagram has no session — every
+    /// binding resolves absent by construction. Never an error, never a dope delete
+    /// guard.
+    ///
+    /// - Parameters:
+    ///   - diagram: The diagram row.
+    ///   - tree: The diagram tree with scope elements.
+    /// - Returns: One resolution per dope_scope element in the tree.
+    /// - Throws: Any database error.
     func resolveDiagramBindings(
         diagram: DiagramRow,
         tree: DiagramTree
@@ -690,6 +789,11 @@ struct DiagramRepository: RepositoryContext {
 
     // MARK: - Element validation + code minting
 
+    /// Fetch basic element metadata.
+    ///
+    /// - Parameter uuid: The element uuid.
+    /// - Returns: The element's uuid, diagram uuid, parent element uuid, and type.
+    /// - Throws: `StoreError.notFound` if the element does not exist.
     func fetchElementInfo(uuid: String) throws -> ElementRowInfo {
         let row = try DiagramElementRecord.require(db, uuid: uuid)
         guard let type = DiagramElementType(rawValue: row.elementType) else {
@@ -706,10 +810,18 @@ struct DiagramRepository: RepositoryContext {
         )
     }
 
-    /// Containment + payload shape: the cross-row rules the schema cannot
-    /// see (which parent types may hold which child types), plus code
-    /// validation on binding payloads. Existence of the dope target is
-    /// deliberately NOT checked — dangling is legal.
+    /// Containment + payload shape.
+    ///
+    /// Cross-row rules the schema cannot see (which parent types may hold which
+    /// child types), plus code validation on binding payloads. Dope target
+    /// existence is NOT checked — dangling is legal.
+    ///
+    /// - Parameters:
+    ///   - diagramUuid: The diagram uuid for containment validation.
+    ///   - type: The element type.
+    ///   - parent: The parent element info, or `nil` for top-level elements.
+    ///   - payload: The element payload to validate.
+    /// - Throws: `StoreError.badRequest` if shape validation fails.
     func validateDiagramElementShape(
         diagramUuid: String,
         type: DiagramElementType,
@@ -807,6 +919,13 @@ struct DiagramRepository: RepositoryContext {
     /// tree. Both call DiagramContainment, so the RULE is shared even though
     /// the lookups cannot be — the only way a rule this fiddly stays
     /// identical across the two implementations the parity oracle compares.
+    ///
+    /// - Parameters:
+    ///   - diagramUuid: The diagram uuid.
+    ///   - referrerUuid: The connector element uuid.
+    ///   - parentOfReferrer: The parent of the connector, or `nil` for top-level.
+    ///   - targetUuid: The target element uuid.
+    /// - Throws: `StoreError.badRequest` if the target violates containment rules.
     func validateConnectorTarget(
         diagramUuid: String,
         referrerUuid: String,
@@ -851,15 +970,19 @@ struct DiagramRepository: RepositoryContext {
         }
     }
 
-    /// Mint `stroke_0007`-style codes when an add omits one: MAX numeric suffix
-    /// + 1 per type prefix within the diagram-wide code namespace.
+    /// Mint `stroke_0007`-style codes when an add omits one.
     ///
-    /// The LIKE underscore is ESCAPEd, since it is a single-char wildcard and a
-    /// bare `stroke_%` would also match `strokes9000`. Suffixes are bounded
-    /// before the +1 so a crafted 19-digit code cannot overflow Int and trap the
-    /// single-writer daemon; absurd suffixes are ignored by the mint.
+    /// MAX numeric suffix + 1 per type prefix. LIKE underscore is ESCAPEd to
+    /// match only the intended prefix + digit pattern.
     private static let maxMintedSuffix = 999_999
 
+    /// Generate an element code in type_NNNN format.
+    ///
+    /// - Parameters:
+    ///   - diagramUuid: The diagram uuid for scope.
+    ///   - type: The element type, which determines the prefix.
+    /// - Returns: A generated code in `prefix_NNNN` format.
+    /// - Throws: Any database error.
     private func mintElementCode(
         diagramUuid: String,
         type: DiagramElementType
@@ -880,8 +1003,13 @@ struct DiagramRepository: RepositoryContext {
         return prefix + String(format: "%04d", maxSuffix + 1)
     }
 
-    /// One past the highest `sort_order` among the rows the caller's request
-    /// names, or 0 when it names none — the aggregate returns a row either way.
+    /// One past the highest `sort_order` in the request, or 0 if empty.
+    ///
+    /// The aggregate returns a row either way.
+    ///
+    /// - Parameter request: A request for elements to query.
+    /// - Returns: The next sort order value.
+    /// - Throws: Any database error.
     private func nextSortOrder(_ request: QueryInterfaceRequest<DiagramElementRecord>) throws -> Int {
         try request
             .select(max(DiagramElementRecord.Columns.sortOrder) ?? -1, as: Int.self)
@@ -890,6 +1018,11 @@ struct DiagramRepository: RepositoryContext {
 
     // MARK: - The single write path
 
+    /// Apply a batch of element and diagram mutations.
+    ///
+    /// - Parameter req: The batch request with mutations, diagram uuid, and expected revision.
+    /// - Returns: The final revision and results per mutation.
+    /// - Throws: `StoreError.revisionConflict` or `StoreError.badRequest` on validation failure.
     func diagramBatchApply(_ req: DiagramBatchApplyRequest) throws -> DiagramBatchApplyResponse {
         guard !req.mutations.isEmpty else {
             throw StoreError.badRequest(detail: "batch-apply carried no mutations")
@@ -979,6 +1112,15 @@ struct DiagramRepository: RepositoryContext {
 
     // MARK: - Per-mutation bodies (called ONLY from diagramBatchApply)
 
+    /// Add an element to a diagram.
+    ///
+    /// - Parameters:
+    ///   - diagram: The diagram row.
+    ///   - add: The element add request.
+    ///   - ledger: Client ref map for cross-mutation references, mutated in-place.
+    ///   - index: The mutation index in the batch.
+    /// - Returns: The mutation result with the created element uuid.
+    /// - Throws: Any validation or database error.
     private func applyElementAdd(
         diagram: DiagramRow,
         add: DiagramElementAdd,
@@ -1113,6 +1255,14 @@ struct DiagramRepository: RepositoryContext {
         )
     }
 
+    /// Update an element's properties or payload.
+    ///
+    /// - Parameters:
+    ///   - diagram: The diagram row.
+    ///   - update: The element update request.
+    ///   - index: The mutation index in the batch.
+    /// - Returns: The mutation result.
+    /// - Throws: Any validation or database error.
     private func applyElementUpdate(
         diagram: DiagramRow,
         update: DiagramElementUpdate,
@@ -1226,6 +1376,14 @@ struct DiagramRepository: RepositoryContext {
         )
     }
 
+    /// Delete an element from a diagram.
+    ///
+    /// - Parameters:
+    ///   - diagram: The diagram row.
+    ///   - delete: The element delete request.
+    ///   - index: The mutation index in the batch.
+    /// - Returns: The mutation result.
+    /// - Throws: Any validation or database error.
     private func applyElementDelete(
         diagram: DiagramRow,
         delete: DiagramElementDelete,
@@ -1261,6 +1419,14 @@ struct DiagramRepository: RepositoryContext {
         )
     }
 
+    /// Update the diagram row's metadata.
+    ///
+    /// - Parameters:
+    ///   - diagram: The diagram row.
+    ///   - update: The diagram update request.
+    ///   - index: The mutation index in the batch.
+    /// - Returns: The mutation result.
+    /// - Throws: Any validation or database error.
     private func applyDiagramRowUpdate(
         diagram: DiagramRow,
         update: DiagramRowUpdate,
@@ -1397,6 +1563,12 @@ struct DiagramRepository: RepositoryContext {
     // dispatched through the payload's own switch, so a sixth element type
     // cannot compile without a branch here)
 
+    /// Insert a subtype row for an element.
+    ///
+    /// - Parameters:
+    ///   - elementUuid: The element uuid.
+    ///   - payload: The element payload.
+    /// - Throws: Any database error.
     func insertSubtypeRow(
         elementUuid: String,
         payload: DiagramElementPayload
@@ -1518,9 +1690,16 @@ struct DiagramRepository: RepositoryContext {
         }
     }
 
-    /// Whole-row replacement: subtype rows are owned value rows (the element
-    /// version is the aggregate lock), so a payload update rewrites every
-    /// subtype column and the vertex set — no field patching, no clear flags.
+    /// Whole-row replacement for a subtype row.
+    ///
+    /// Subtype rows are owned value rows; the element version is the aggregate
+    /// lock. A payload update rewrites every subtype column and the vertex set —
+    /// no field patching, no clear flags.
+    ///
+    /// - Parameters:
+    ///   - elementUuid: The element uuid.
+    ///   - payload: The new element payload.
+    /// - Throws: `StoreError.corruptState` if the subtype row is missing.
     private func replaceSubtypeRow(
         elementUuid: String,
         payload: DiagramElementPayload
@@ -1661,9 +1840,18 @@ struct DiagramRepository: RepositoryContext {
         }
     }
 
-    /// Atomic whole-set vertex replacement: DELETE + ordered re-INSERT by
-    /// seq, inside the caller's transaction. Fresh uuids every time — vertex
-    /// rows are BaseEntity rows (user decision) but NOT stable identities.
+    /// Atomic whole-set vertex replacement via DELETE + ordered re-INSERT by seq.
+    ///
+    /// Fresh uuids every time — vertex rows are BaseEntity rows (user decision)
+    /// but NOT stable identities. Runs inside the caller's transaction.
+    ///
+    /// - Parameters:
+    ///   - table: The vertex table name.
+    ///   - parentColumn: The column naming the parent element.
+    ///   - elementUuid: The element uuid.
+    ///   - vertices: The new vertex list.
+    ///   - withPressure: Whether to write pressure values.
+    /// - Throws: Any database error.
     private func replaceVertices(
         table: String,
         parentColumn: String,
@@ -1690,10 +1878,17 @@ struct DiagramRepository: RepositoryContext {
     // MARK: - Repo ingest (the file→db landing statements; the four-phase
     // orchestration around them lives in Store+DiagramRepoVerbs)
 
-    /// Land a document's own columns on an existing row, forward-only: the
-    /// guard is part of the UPDATE, so a writer that got there first wins and
-    /// false means "skipped", not "failed". Deliberately NOT updateBase — a
-    /// repo sync must not invalidate a diagram version an editor is holding.
+    /// Land a document's own columns on an existing row, forward-only.
+    ///
+    /// The guard is part of the UPDATE, so a writer that got there first wins;
+    /// false means "skipped", not "failed". NOT updateBase — a repo sync must
+    /// not invalidate a diagram version an editor is holding.
+    ///
+    /// - Parameters:
+    ///   - uuid: The diagram uuid.
+    ///   - document: The ingested diagram document.
+    /// - Returns: `true` if the row was updated, `false` if skipped due to revision conflict.
+    /// - Throws: Any database error.
     func landIngestedDiagram(uuid: String, document: DiagramDocument) throws -> Bool {
         try db.execute(
             sql: """
@@ -1711,8 +1906,12 @@ struct DiagramRepository: RepositoryContext {
         return db.changesCount > 0
     }
 
-    /// Clear a diagram's whole element tree ahead of a re-ingest. Subtype and
-    /// vertex rows follow through their own CASCADEs.
+    /// Clear a diagram's whole element tree ahead of a re-ingest.
+    ///
+    /// Subtype and vertex rows follow through their own CASCADEs.
+    ///
+    /// - Parameter diagramUuid: The diagram uuid.
+    /// - Throws: Any database error.
     func deleteDiagramElements(diagramUuid: String) throws {
         try db.execute(
             sql: "DELETE FROM diagram_element WHERE diagram_uuid = ?",
@@ -1720,8 +1919,14 @@ struct DiagramRepository: RepositoryContext {
         )
     }
 
-    /// Point an ingested connector at the element its code path resolved to,
-    /// once the whole document's uuids have been minted.
+    /// Point an ingested connector at its resolved target element.
+    ///
+    /// Called once the whole document's uuids have been minted.
+    ///
+    /// - Parameters:
+    ///   - elementUuid: The connector element uuid.
+    ///   - targetElementUuid: The target element uuid.
+    /// - Throws: Any database error.
     func setConnectorTarget(elementUuid: String, targetElementUuid: String) throws {
         try db.execute(
             sql: """

@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `prompt_qualified_diagram` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `prompt_qualified_diagram` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct PromptQualifiedDiagramRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "prompt_qualified_diagram"
     var uuid: String

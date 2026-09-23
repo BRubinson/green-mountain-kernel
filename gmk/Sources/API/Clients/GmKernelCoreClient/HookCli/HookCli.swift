@@ -21,13 +21,18 @@ import Foundation
 
 enum HookCli {
 
-    /// The `gm_hook` personality. Takes argv WITHOUT the program name, so the
-    /// multi-call dispatcher can hand through exactly what the shell passed —
-    /// `gm_hook call BACKUP` has to arrive as `["call", "BACKUP"]` whether it
-    /// came through the `gm_hook` symlink or `gm_kernel hook`.
+    /// Processes hook commands and dispatches to handlers.
     ///
-    /// Never returns: every arm exits, and that is part of the hook contract —
-    /// a hook must not fall through to a caller that might print something.
+    /// The `gm_hook` personality.
+    ///
+    /// Takes argv WITHOUT the program name, so the multi-call dispatcher can
+    /// hand through exactly what the shell passed — `gm_hook call BACKUP` has to
+    /// arrive as `["call", "BACKUP"]` whether it came through the `gm_hook`
+    /// symlink or `gm_kernel hook`. Never returns: every arm exits, and that is
+    /// part of the hook contract — a hook must not fall through to a caller that
+    /// might print something.
+    ///
+    /// - Parameter arguments: The command-line arguments (without program name).
     static func main(_ arguments: [String] = Array(CommandLine.arguments.dropFirst())) -> Never {
         let argv = arguments
 

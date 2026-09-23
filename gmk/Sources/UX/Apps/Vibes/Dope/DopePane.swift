@@ -4,8 +4,10 @@ import AppKit
 /// The ONE dope surface, mounted at both levels: the session view's dope tab
 /// (`promptUuid: nil` — SESSION_BASE) and the prompt editor's phase card
 /// (`promptUuid` set — PROMPT scope preferred, SESSION_BASE fallback with a
-/// visible `resolvedVia` chip). Read-only tree render + a never-writing
-/// Read Repo validation + the one Init write behind a validated sheet.
+/// visible `resolvedVia` chip).
+///
+/// Read-only tree render + a never-writing Read Repo validation + the one
+/// Init write behind a validated sheet.
 struct DopePane: View {
     @Environment(DaemonConnectionModel.self) private var daemon
     let scope: SessionScope
@@ -16,9 +18,10 @@ struct DopePane: View {
     /// Session-scope hosts (the session tab) pass a navigator to the
     /// full-window Doped Viewer; the callback receives the LOADED scope's
     /// code (the diagram workspace is keyed by it). nil hides the button —
-    /// prompt phase cards don't offer the viewer. Passed in rather than read
-    /// from @Environment so the pane stays host-agnostic
-    /// (GlobalToolbarGroup's convention).
+    /// prompt phase cards don't offer the viewer.
+    ///
+    /// Passed in rather than read from @Environment so the pane stays
+    /// host-agnostic (GlobalToolbarGroup's convention).
     var onOpenDiagram: ((String) -> Void)?
 
     @State private var showInit = false
@@ -38,7 +41,9 @@ struct DopePane: View {
     private var promptRows: [DopeScopeRow] { store.promptCandidates(target) }
     /// A PROMPT scope and a SESSION_BASE scope may legitimately share a code;
     /// DOPE_GET resolves prompt-first, so the session row is unreachable by
-    /// code — and a duplicate Picker tag breaks selection. Drop it.
+    /// code — and a duplicate Picker tag breaks selection.
+    ///
+    /// Drop it.
     private var sessionRows: [DopeScopeRow] {
         store.sessionCandidates(target)
             .filter { row in !promptRows.contains { $0.code == row.code } }
@@ -136,11 +141,13 @@ struct DopePane: View {
         }
     }
 
-    /// Menu-style picker over the target's candidates. Plain `Picker` rather
-    /// than the DesignSystem `SegmentedPicker`: scope-code counts are
-    /// unbounded (segments don't scale) and `DopeScopeRow` isn't
-    /// `Identifiable` — `ForEach(id: \.uuid)` avoids touching kit
-    /// sources. The `Automatic` tag restores daemon-side resolution.
+    /// Menu-style picker over the target's candidates.
+    ///
+    /// Plain `Picker` rather than the DesignSystem `SegmentedPicker`:
+    /// scope-code counts are unbounded (segments don't scale) and
+    /// `DopeScopeRow` isn't `Identifiable` — `ForEach(id: \.uuid)` avoids
+    /// touching kit sources. The `Automatic` tag restores daemon-side
+    /// resolution.
     @ViewBuilder
     private var scopePicker: some View {
         Picker(
@@ -174,6 +181,10 @@ struct DopePane: View {
     }
 
     @ViewBuilder
+    /// Returns the main content view, either scrollable or fixed.
+    ///
+    /// - Parameter response: The dope fetch response with scope tree and metadata.
+    /// - Returns: A view hierarchy with the scope tree, optionally wrapped in a scroll view.
     private func loadedContent(_ response: DopeGetResponse) -> some View {
         if scrollable {
             ScrollView {
@@ -187,6 +198,10 @@ struct DopePane: View {
         }
     }
 
+    /// Returns the stacked layout of header, banners, and tree controls.
+    ///
+    /// - Parameter response: The dope fetch response.
+    /// - Returns: A vertical stack view with header, optional banners, and tree.
     private func loadedStack(_ response: DopeGetResponse) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             header(response)
@@ -207,6 +222,10 @@ struct DopePane: View {
         }
     }
 
+    /// Builds the header view showing scope name, code, revision, and action buttons.
+    ///
+    /// - Parameter response: The dope fetch response.
+    /// - Returns: A horizontal stack with scope metadata and controls.
     private func header(_ response: DopeGetResponse) -> some View {
         HStack(spacing: 10) {
             Label(response.tree.body.name, systemImage: "cube.transparent")
@@ -257,8 +276,10 @@ struct DopePane: View {
     }
 
     /// Search over entity/field (and enum/option) names + codes, plus
-    /// expand/collapse-all. While a search is active the tree force-expands
-    /// to keep matches visible, so the broadcast buttons are disabled.
+    /// expand/collapse-all.
+    ///
+    /// While a search is active the tree force-expands to keep matches
+    /// visible, so the broadcast buttons are disabled.
     private var treeControls: some View {
         HStack(spacing: 8) {
             HStack(spacing: 6) {
@@ -314,6 +335,10 @@ struct DopePane: View {
         }
     }
 
+    /// Builds a banner showing repo sync status or drift warnings.
+    ///
+    /// - Parameter read: The repo read response with sync and warning details.
+    /// - Returns: A colored banner view showing status or drift alerts.
     @ViewBuilder
     private func repoResult(_ read: DopeReadRepoResponse) -> some View {
         let drifted = read.drift == true
@@ -333,6 +358,13 @@ struct DopePane: View {
         )
     }
 
+    /// Builds a colored banner with icon and text lines.
+    ///
+    /// - Parameters:
+    ///   - color: The banner color.
+    ///   - icon: The SF symbol name for the icon.
+    ///   - lines: Array of text lines to display.
+    /// - Returns: A banner view with the specified styling.
     private func repoBanner(color: Color, icon: String, lines: [String]) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             ForEach(Array(lines.enumerated()), id: \.offset) { item in
@@ -358,27 +390,51 @@ struct DopePane: View {
 
 /// Expand/collapse-all broadcast: bumping `generation` makes every disclosure
 /// row adopt `expanded` via `onChange`, after which rows toggle independently
-/// again. Value-typed so it rides plain SwiftUI state — no shared model.
+/// again.
+///
+/// Value-typed so it rides plain SwiftUI state — no shared model.
 struct DopeExpansion: Equatable {
     private(set) var generation = 0
     private(set) var expanded = true
 
+    /// Broadcasts an expand or collapse command to all disclosure rows.
+    ///
+    /// Bumps `generation` so every row adopts the new `expanded` value via `onChange`.
+    ///
+    /// - Parameter expanded: Whether to expand or collapse all rows.
     mutating func broadcast(expanded: Bool) {
         generation += 1
         self.expanded = expanded
     }
 }
 
-/// Case-insensitive match over the names + codes dope surfaces to the user.
+/// Case-insensitive match over the names and codes dope surfaces to the user.
+///
+/// - Parameters:
+///   - query: The search query string.
+///   - candidates: Candidate strings to match against.
+/// - Returns: True if any candidate contains the query (case-insensitive).
 private func dopeMatches(_ query: String, _ candidates: String...) -> Bool {
     candidates.contains { $0.localizedCaseInsensitiveContains(query) }
 }
 
+/// Checks if an entity or any of its properties match the search query.
+///
+/// - Parameters:
+///   - entity: The entity node to check.
+///   - query: The search query string.
+/// - Returns: True if the entity or any property matches (case-insensitive).
 private func entityMatches(_ entity: DopeEntityNode, _ query: String) -> Bool {
     dopeMatches(query, entity.body.name, entity.body.code)
         || entity.properties.contains { dopeMatches(query, $0.body.name, $0.body.code) }
 }
 
+/// Checks if an enum or any of its options match the search query.
+///
+/// - Parameters:
+///   - enumNode: The enum node to check.
+///   - query: The search query string.
+/// - Returns: True if the enum or any option matches (case-insensitive).
 private func enumMatches(_ enumNode: DopeEnumNode, _ query: String) -> Bool {
     dopeMatches(query, enumNode.body.name, enumNode.body.code)
         || enumNode.options.contains { dopeMatches(query, $0.body.name, $0.body.code) }
@@ -412,9 +468,11 @@ struct DopeTreeView: View {
     }
 
     /// Base domains are a separate class rendered ABOVE the model domains and
-    /// hidden unless the toggle is on. The toggle is authoritative: the search
-    /// filter runs within each partition and never force-reveals base content,
-    /// so `renderedDomains` — not `visibleDomains` — drives the empty state.
+    /// hidden unless the toggle is on.
+    ///
+    /// The toggle is authoritative: the search filter runs within each
+    /// partition and never force-reveals base content, so `renderedDomains`
+    /// — not `visibleDomains` — drives the empty state.
     private var renderedDomains: [(domain: DopePersistenceNode, isBase: Bool)] {
         let base =
             showBaseDomains
@@ -582,7 +640,9 @@ private struct EntityRow: View {
     }
 
     /// Inherited (non-materialized) base fields, shadow-deduped by the
-    /// catalog. Only computed when revealed — never synthesized by default.
+    /// catalog.
+    ///
+    /// Only computed when revealed — never synthesized by default.
     private var inheritedProperties: [DopeBaseCatalog.InheritedProperty] {
         revealBaseFields ? baseCatalog.inheritedProperties(for: entity) : []
     }
@@ -598,6 +658,10 @@ private struct EntityRow: View {
         DopeCode.formatEntityRef(domain: domainCode, entity: entity.body.code)
     }
 
+    /// Formats the dot-path reference for a property (domain.entity.property).
+    ///
+    /// - Parameter property: The property node.
+    /// - Returns: The formatted property reference string.
     private func propertyRef(_ property: DopePropertyNode) -> String {
         DopeCode.formatPropertyRef(
             domain: domainCode,
@@ -715,9 +779,10 @@ private struct PropertyRow: View {
 
     let property: DopePropertyNode
     let inspector: DopeEnumInspector
-    /// `domain.entity.property` — the dot-path this row copies. Inherited rows
-    /// are handed their ORIGIN path: the field is declared on the base entity
-    /// and does not resolve under the hosting entity's code.
+    /// `domain.entity.property` — the dot-path this row copies.
+    ///
+    /// Inherited rows are handed their ORIGIN path: the field is declared
+    /// on the base entity and does not resolve under the hosting entity's code.
     let ref: String
     var mode: Mode = .local
     @State private var hovering = false
@@ -739,6 +804,10 @@ private struct PropertyRow: View {
         .onHover { hovering = $0 }
     }
 
+    /// Builds the property row view with type, nullable, unique, and enum details.
+    ///
+    /// - Parameter enumNode: Optional enum node if this property references an enum.
+    /// - Returns: A horizontal stack with property metadata and controls.
     private func row(enumNode: DopeEnumNode?) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "circle.fill")
@@ -818,16 +887,21 @@ private struct PropertyRow: View {
     }
 }
 
-/// Copies `ref` to the general pasteboard. The one write this read-only
-/// surface performs — nothing daemon-side is touched.
+/// Copies a dope reference to the general pasteboard.
+///
+/// The one write this read-only surface performs; nothing daemon-side is touched.
+///
+/// - Parameter ref: The dope reference string to copy.
 @MainActor
 private func copyDopeRef(_ ref: String) {
     NSPasteboard.general.clearContents()
     NSPasteboard.general.setString(ref, forType: .string)
 }
 
-/// Trailing copy affordance on entity + property rows: copies the dot-path and
-/// flashes a checkmark so the copy is visibly acknowledged. View state only.
+/// Trailing copy affordance on entity + property rows: copies the dot-path
+/// and flashes a checkmark so the copy is visibly acknowledged.
+///
+/// View state only.
 private struct DopeCopyButton: View {
     let ref: String
     @State private var copied = false

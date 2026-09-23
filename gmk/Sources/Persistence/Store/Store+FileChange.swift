@@ -6,6 +6,11 @@ import GRDB
 // Bodies live in FileChangeRepository; these wrappers own the transaction.
 
 extension Store {
+    /// Records a file change event from a source agent or hook.
+    ///
+    /// - Parameter req: The change request with session, file path, and change kind.
+    /// - Returns: The created file change row.
+    /// - Throws: `StoreError.hookUnbound` when the hook is not bound to a repo.
     func addFileChange(_ req: FileChangeAdd) throws -> FileChangeAddResponse {
         do {
             return try boundary { db in try FileChangeRepository(db: db, core: core).add(req) }
@@ -27,12 +32,26 @@ extension Store {
         }
     }
 
+    /// Fetches file changes for a session, grouped by file and ordered by timestamp.
+    ///
+    /// - Parameter req: The list request with session uuid and optional filter.
+    /// - Returns: The file changes grouped by file path.
+    /// - Throws: Database errors.
     func listFileChanges(_ req: FileChangeListRequest) throws -> FileChangeListResponse {
         try boundaryRead { db in try FileChangeRepository(db: db, core: core).list(req) }
     }
 
     // MARK: - Cross-domain helper forward
 
+    /// Creates or returns a session-scoped file change for path discovery.
+    ///
+    /// - Parameters:
+    ///   - db: The database handle; must be within a transaction.
+    ///   - sessionUuid: The session uuid.
+    ///   - relativePath: The file path relative to the repo root.
+    ///   - changeKind: The type of change (add, modify, delete, etc.).
+    /// - Returns: The file change uuid.
+    /// - Throws: Database errors.
     func ensureSessionFile(
         _ db: Database,
         sessionUuid: String,

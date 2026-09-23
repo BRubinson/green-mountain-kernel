@@ -2,10 +2,20 @@
 
 import Foundation
 
+/// Returns tool guide text for a prompt uuid parameter.
+///
+/// - Parameter tail: The contextual tail describing the prompt.
+/// - Returns: The formatted guide text.
 func promptUuidGuide(_ tail: String) -> String {
     "Which prompt \(tail), by uuid."
 }
 
+/// Returns tool guide text for a summary uuid parameter.
+///
+/// - Parameters:
+///   - verb: The action verb.
+///   - subject: The subject being acted upon.
+/// - Returns: The formatted guide text.
 func summaryUuidGuide(to verb: String, _ subject: String) -> String {
     "Which \(subject) to \(verb), by summary uuid."
 }
@@ -49,6 +59,10 @@ let GM_TOOL_GUIDE_VERSION_CONFLICT = """
 
 let GM_TOOL_NOT_BUILT_SUFFIX = "NOT BUILT YET."
 
+/// Returns a "not built yet" description for a feature.
+///
+/// - Parameter what: The feature being described.
+/// - Returns: The description with the not-built suffix.
 func notBuiltDescription(_ what: String) -> String {
     "\(what). \(GM_TOOL_NOT_BUILT_SUFFIX)"
 }

@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// Dedicated full-text search screen (`Route.search`). Same result list as
-/// the ⌘K palette plus the affordances the overlay has no room for: a
-/// session-scope toggle (SearchRequest.sessionUuid) and SearchKind filter
-/// chips. Seeded with a session uuid when opened from a session's toolbar and
-/// with a query when handed off from the palette's "Show all results".
+/// Dedicated full-text search screen (`Route.search`).
+///
+/// Same result list as the ⌘K palette plus the affordances the overlay has no room for: a session-scope toggle
+/// (SearchRequest.sessionUuid) and SearchKind filter chips. Seeded with a session uuid when opened from a session's
+/// toolbar and with a query when handed off from the palette's "Show all results".
 struct SearchScreen: View {
     let seed: SearchSeed
 
@@ -96,6 +96,11 @@ struct SearchScreen: View {
         .onDisappear { model.cancel() }
     }
 
+    /// Reruns the search with the given query and debounce delay.
+    ///
+    /// - Parameters:
+    ///   - newQuery: The new search query, or nil to use the current query.
+    ///   - debounce: The delay before executing the search (default 300ms).
     private func rerun(query newQuery: String? = nil, debounce: Duration = .milliseconds(300)) {
         selection = nil
         model.schedule(
@@ -106,6 +111,9 @@ struct SearchScreen: View {
         )
     }
 
+    /// Opens a search result in the navigation context.
+    ///
+    /// - Parameter hit: The search result to open.
     private func open(_ hit: SearchHit) {
         guard
             let windowID = catalog.sessionWindowID(

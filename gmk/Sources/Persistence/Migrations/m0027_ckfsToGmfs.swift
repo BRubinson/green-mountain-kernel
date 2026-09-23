@@ -10,6 +10,8 @@ extension Migrations {
     // and ALTER TABLE RENAME COLUMN preserves every row, index and constraint.
     // The daemon_config step renames the KEY and leaves the VALUE untouched:
     // rewriting values would guess at a filesystem layout it cannot see.
+    /// Registers migration m0027: renames CKFS columns to GMFS and updates config keys.
+    /// - Parameter migrator: The database migrator to register this migration with.
     static func m0027_ckfsToGmfs(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0027_ckfsToGmfs") { db in
             let renamed = ["project", "instance", "session", "prompt"]

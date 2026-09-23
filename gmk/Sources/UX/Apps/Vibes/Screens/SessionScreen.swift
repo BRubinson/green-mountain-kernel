@@ -14,9 +14,10 @@ import SwiftUI
 // observation-firewall card projection, keyed scene reconciliation, and
 // tap-to-select wired back to the shared drawing sidebar selection.
 
-/// Which sidebar list is showing. A switch, not a ternary, everywhere this is
-/// consumed: adding a case is a build error instead of silently inheriting
-/// another tab's behavior.
+/// Which sidebar list is showing.
+///
+/// A switch, not a ternary, everywhere this is consumed: adding a case is a
+/// build error instead of silently inheriting another tab's behavior.
 enum SessionTab: String, CaseIterable, Identifiable, Hashable {
     case prompts, diagrams, dope
     var id: String { rawValue }
@@ -47,6 +48,12 @@ struct SessionScreen: View {
 
     private var store: SessionStore { scope.store }
 
+    /// Initializes a SessionScreen with a session window id.
+    ///
+    /// Creates or retrieves the session scope from the shared cache. The scope
+    /// is owned by the window (GMVibesWindow), keyed on the session uuid.
+    ///
+    /// - Parameter windowID: The session window identifier.
     init(windowID: SessionWindowID) {
         self.windowID = windowID
         // Create-or-get is side-effect-safe in init; the refcount lease is the
@@ -165,6 +172,9 @@ struct SessionScreen: View {
         }
     }
 
+    /// Navigates to the specified prompt within the session.
+    ///
+    /// - Parameter uuid: The prompt uuid as a string.
     private func openPrompt(_ uuid: String) {
         guard let target = UUID(uuidString: uuid) else { return }
         var id = windowID
@@ -359,8 +369,10 @@ struct SessionNavigator: View {
 
 // MARK: - Shared prompt-list sidebar (SessionScreen + SessionPromptScreen)
 
-/// The prompt List with the session-identity header. Shared by the session
-/// view's navigator and the prompt editor's (prompts-only) sidebar.
+/// The prompt List with the session-identity header.
+///
+/// Shared by the session view's navigator and the prompt editor's (prompts-only)
+/// sidebar.
 struct SessionPromptListSidebar: View {
     let sessionName: String
     let instanceName: String
@@ -470,10 +482,11 @@ struct PromptNavRow: View {
     }
 }
 
-/// How many diagrams are attached to one prompt. Reads the shared
-/// `DiagramCatalogStore` from the environment rather than threading a count
-/// through four view layers — the store is app-lifetime and the row is the
-/// only thing that wants the number.
+/// How many diagrams are attached to one prompt.
+///
+/// Reads the shared `DiagramCatalogStore` from the environment rather than
+/// threading a count through four view layers — the store is app-lifetime and
+/// the row is the only thing that wants the number.
 ///
 /// Absent (never listed) renders NOTHING, and so does zero: a badge on every
 /// prompt in a session with no diagrams is noise.

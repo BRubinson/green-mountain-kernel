@@ -29,21 +29,25 @@ final class DaemonConnectionModel {
 
     let hub = InvalidationHub()
 
-    /// The route() → checkout-state edge. CHECKOUT_CHANGE's payload carries
-    /// everything the watcher publishes, so the arm applies state directly
-    /// instead of waking a Void-domain subscriber into a round trip. Weak —
-    /// the sink is an app-lifetime singleton, wired once by GMVibesServices.
+    /// The route() → checkout-state edge.
+    ///
+    /// CHECKOUT_CHANGE's payload carries everything the watcher publishes, so
+    /// the arm applies state directly instead of waking a Void-domain subscriber
+    /// into a round trip. Weak — the sink is an app-lifetime singleton, wired
+    /// once by GMVibesServices.
     weak var checkoutSink: CheckoutEventSink?
 
     /// True when THIS process won arbitration and hosts the kernel in-process.
+    ///
     /// Set once by GMVibesServices during its init, before the supervising
-    /// loop's first turn can run (both live in one synchronous MainActor
-    /// scope). The on-disk binary check is meaningless in that mode: there is
-    /// no binary to exec, and the store is already open in this address space.
+    /// loop's first turn. The on-disk binary check is meaningless in that mode:
+    /// there is no binary to exec, and the store is already open in this
+    /// address space.
     var hostsKernelInProcess = false
 
-    /// Live session scopes register their prompt uuids so prompt-subject
-    /// events route to the owning session only; unknown subjects fan out.
+    /// Live session scopes register their prompt uuids so prompt-subject events
+    /// route to the owning session only; unknown subjects fan out.
+    ///
     /// Owner-token guarded: a retired scope's late unregister must not kill
     /// routing for a successor scope on the same session.
     private var sessionPrompts: [String: (owner: ObjectIdentifier, prompts: Set<String>)] = [:]
@@ -68,6 +72,9 @@ final class DaemonConnectionModel {
     // App-lifetime singleton — the supervising task runs until process exit.
     // Weak capture so a discarded instance (SwiftUI can re-evaluate app @State)
     // doesn't leak a probe loop + socket forever.
+    /// Creates a connection model that manages daemon communication.
+    ///
+    /// - Parameter autorun: Whether to start the probe loop immediately; defaults to true.
     init(autorun: Bool = true) {
         if autorun {
             runTask = Task { [weak self] in
@@ -81,6 +88,12 @@ final class DaemonConnectionModel {
 
     // MARK: - Session routing registry
 
+    /// Registers a session and its prompts for event routing.
+    ///
+    /// - Parameters:
+    ///   - sessionUuid: The session identifier.
+    ///   - promptUuids: The prompt identifiers in this session.
+    ///   - owner: The owner identifier for later unregistration.
     func registerSession(_ sessionUuid: String, promptUuids: Set<String>, owner: ObjectIdentifier) {
         let current = sessionPrompts[sessionUuid]
         if current?.owner != owner || current?.prompts != promptUuids {
@@ -88,24 +101,40 @@ final class DaemonConnectionModel {
         }
     }
 
+    /// Unregisters a session if the owner matches.
+    ///
+    /// - Parameters:
+    ///   - sessionUuid: The session identifier.
+    ///   - owner: The owner identifier to verify before unregistration.
     func unregisterSession(_ sessionUuid: String, ifOwnedBy owner: ObjectIdentifier) {
         if sessionPrompts[sessionUuid]?.owner == owner {
             sessionPrompts[sessionUuid] = nil
         }
     }
 
+    /// Returns the session that owns a prompt.
+    ///
+    /// - Parameter uuid: The prompt identifier.
+    /// - Returns: The owning session identifier, or nil if not registered.
     private func owningSession(ofPrompt uuid: String) -> String? {
         sessionPrompts.first { $0.value.prompts.contains(uuid) }?.key
     }
 
     // MARK: - Supervising loop
 
-    /// One loop turn: gate on installed, probe, and while up consume events
-    /// raced against the 30s liveness watchdog. Backs off when the subscribe
-    /// path fails fast (probe ok but SUBSCRIBE rejected) so a broken daemon
-    /// isn't hammered at CPU speed.
+    /// Performs one supervision loop turn.
+    ///
+    /// Gates on installation, probes for daemon status, and while running consumes
+    /// events raced against the 30s liveness watchdog. Backs off when the subscribe
+    /// path fails fast to prevent hammering a broken daemon.
+    ///
+    /// - Throws: Any error from probing or event consumption.
     private var fastFailureBackoff: Duration = .seconds(1)
 
+    /// Performs one supervision loop turn.
+    ///
+    /// Gates on installation, probes for daemon status, and while running consumes
+    /// events raced against the 30s liveness watchdog.
     private func iterate() async {
         guard hostsKernelInProcess || GMCCDaemonService.isInstalled else {
             setHealth(.notInstalled)
@@ -141,8 +170,10 @@ final class DaemonConnectionModel {
         }
     }
 
-    /// Single-flight STATUS+PING probe. Publishes change-gated; bumps the
-    /// resync generation only on a genuine down→up transition.
+    /// Single-flight STATUS+PING probe.
+    ///
+    /// Publishes change-gated; bumps the resync generation only on a genuine
+    /// down→up transition.
     func probe() async {
         if probeInFlight { return }
         probeInFlight = true
@@ -183,12 +214,16 @@ final class DaemonConnectionModel {
         }
     }
 
-    /// Alias for the probe — refreshes status/ping/health (and, on a genuine
-    /// down→up transition, fires the resync barrier).
+    /// Refreshes daemon status and triggers resync on down-to-up transition.
+    ///
+    /// Alias for probe that updates status, ping, and health.
     func refreshStatus() async {
         await probe()
     }
 
+    /// Starts the daemon process.
+    ///
+    /// Sets health status and probes for connection after starting.
     func startDaemon() async {
         setHealth(.starting)
         intentionalStop = false
@@ -211,6 +246,9 @@ final class DaemonConnectionModel {
 
     // MARK: - Event consumption
 
+    /// Consumes events from the daemon until disconnection or cancellation.
+    ///
+    /// Manages cursor replay and fresh subscriptions to avoid re-consuming events.
     private func consumeEvents() async {
         // Cursor policy: bounded replay. Resume from the persisted cursor only
         // when it is fresh AND not ahead of the daemon's event log (a db
@@ -274,11 +312,12 @@ final class DaemonConnectionModel {
         }
     }
 
-    /// The uuid carriers in hand-built event payloads. These payloads are
-    /// JSONSerialization'd snake_case literals (`Store.jsonPayload`), OUTSIDE
-    /// the wire's type system — decoding through `WireCodec.decoder` is what
-    /// maps `sessionUuid` to `"session_uuid"`. A bare `JSONDecoder()` decodes
-    /// to nil silently and routing just quietly stops happening.
+    /// The uuid carriers in hand-built event payloads.
+    ///
+    /// These payloads are JSONSerialization'd snake_case literals
+    /// (`Store.jsonPayload`), OUTSIDE the wire's type system — decoding through
+    /// `WireCodec.decoder` maps `sessionUuid` to `"session_uuid"`. A bare
+    /// `JSONDecoder()` decodes to nil silently and routing stops happening.
     private struct EventPayloadUuids: Decodable {
         let sessionUuid: String?
         let promptUuid: String?
@@ -287,6 +326,10 @@ final class DaemonConnectionModel {
         let projectUuid: String?
     }
 
+    /// Extracts payload uuids from an event notification.
+    ///
+    /// - Parameter event: The event notification.
+    /// - Returns: The decoded payload uuids, or nil if not present or invalid.
     private func payloadUuids(_ event: EventNotification) -> EventPayloadUuids? {
         guard let payload = event.payload, let data = payload.data(using: .utf8) else { return nil }
         return try? WireCodec.decoder.decode(EventPayloadUuids.self, from: data)
@@ -303,17 +346,20 @@ final class DaemonConnectionModel {
         let currentSessionCode: String?
     }
 
-    /// The in-process event door.
+    /// Routes an in-process event from the daemon.
     ///
-    /// In client mode events arrive over the socket as SUBSCRIBE notifications. When this app
-    /// hosts the writer there is no socket: the store's post-commit fan-out delivers the same
-    /// `EventNotification` here, and `route` stays private to the socket read loop.
-    /// The CALLER must already be on MainActor — the fan-out fires on GRDB's writer thread
-    /// inside the commit hook, and UI work there stalls the single writer.
+    /// When this app hosts the writer, the store's post-commit fan-out delivers events
+    /// here; in client mode they arrive over the socket. The caller must already be on
+    /// MainActor since the fan-out fires on the writer thread inside the commit hook.
+    ///
+    /// - Parameter event: The event notification to route.
     func routeInProcess(_ event: EventNotification) {
         route(event)
     }
 
+    /// Routes an event to relevant invalidation subscriptions.
+    ///
+    /// - Parameter event: The event notification to route.
     private func route(_ event: EventNotification) {
         guard let kind = DaemonEventKind(rawValue: event.kind) else {
             return  // forward compat: unknown kinds bump nothing
@@ -489,6 +535,9 @@ final class DaemonConnectionModel {
 
     // MARK: - Helpers
 
+    /// Persists the event cursor to defaults if newer than previous.
+    ///
+    /// - Parameter id: The event identifier to persist.
     private func persistCursor(_ id: Int64) {
         guard id > 0, id > lastPersistedCursor else { return }
         lastPersistedCursor = id
@@ -497,6 +546,9 @@ final class DaemonConnectionModel {
         defaults.set(Date(), forKey: Self.cursorStampKey)
     }
 
+    /// Updates the health status if changed.
+    ///
+    /// - Parameter new: The new health status.
     private func setHealth(_ new: Health) {
         if health != new { health = new }
     }

@@ -4,6 +4,7 @@ import AppKit
 /// App landing page — ForgeApprentice Liquid Glass composition: brand header,
 /// Recent Sessions strip (activity-ranked, checked-out ring), and a
 /// project-organized instance search that navigates to the instance page.
+///
 /// The gate is daemon reachability: down/not-installed states replace the
 /// launcher, and a healthy daemon with an empty db shows the migration state.
 struct LandingView: View {
@@ -70,6 +71,9 @@ struct LandingView: View {
         }
     }
 
+    /// Refreshes the catalog, recent sessions, and checkout watcher state.
+    ///
+    /// Orchestrates a full refresh of all landing view data sources.
     private func refreshAll() async {
         await catalog.refresh()
         recents.refresh(catalog: catalog)
@@ -186,9 +190,11 @@ private struct RecentSessionCardView: View {
 
 /// The landing's bottom section: project rows, each listing ALL its instances
 /// alphabetically, each instance rendering the current + last 2 sessions as
-/// inline blocks. All three levels navigate (project → instance → session).
-/// The traversal is CatalogFilter (the app's one tree walk), derived into
-/// @State per the house rule.
+/// inline blocks.
+///
+/// All three levels navigate (project → instance → session). The traversal is
+/// CatalogFilter (the app's one tree walk), derived into @State per the house
+/// rule.
 private struct InstanceSearchSection: View {
     @Environment(CatalogStore.self) private var catalog
     @Environment(CheckoutWatcher.self) private var checkout
@@ -199,6 +205,9 @@ private struct InstanceSearchSection: View {
     @State private var filtered = FilteredCatalog()
     @State private var activeByInstance: [String: String] = [:]
 
+    /// Applies the current search query to the catalog and updates the filtered state.
+    ///
+    /// Rebuilds the active session mapping and applies the current search filter.
     private func refilter() {
         var active: [String: String] = [:]
         for uuid in catalog.instancesByUuid.keys {
@@ -266,6 +275,11 @@ private struct InstanceSearchSection: View {
         .onChange(of: checkout.stateByInstance) { _, _ in refilter() }
     }
 
+    /// Opens a session window, deriving its ID from the catalog.
+    ///
+    /// - Parameters:
+    ///   - stub: The session stub identifying the session to open.
+    ///   - _: The instance row (unused; present for callback signature compatibility).
     private func openSession(_ stub: SessionStub, _: InstanceRow) {
         // CatalogStore's factory: nil on a malformed uuid ⇒ inert row, never
         // a fabricated identity.
@@ -426,14 +440,14 @@ private struct DaemonGateState: View {
         }
     }
 
-    /// Root-aware: `install_gm.sh` installs the newest published release into `~/gmfs`, which
-    /// is the wrong root and the wrong bits for a declared test/beta root. Those are staged
-    /// from a checkout by `gm_env.sh`.
+    /// Root-aware: `install_gm.sh` installs into `~/gmfs`, the wrong root and bits for
+    /// declared test/beta roots.
     ///
-    /// Keyed on the declared environment label rather than `Paths.isProductionRoot`, because
-    /// the inode comparison reads false on any root whose `gm.db` does not exist yet, which is
-    /// exactly the state this screen shows. `gm_env.sh` refuses `create prod`, so the prod
-    /// label routes to the installer alongside the no-label CLI case.
+    /// Those are staged from a checkout by `gm_env.sh`. Keyed on the declared environment
+    /// label rather than `Paths.isProductionRoot`, because the inode comparison reads false on
+    /// any root whose `gm.db` does not exist yet — exactly this screen's state. `gm_env.sh`
+    /// refuses `create prod`, so the prod label routes to the installer like the no-label
+    /// CLI case.
     private static var remediationCommand: String {
         guard let env = Paths.declaredEnvironmentName, env != "prod" else {
             return "cd ~/Dev/green-mountain-kernel && bash plugins/gmcc/scripts/install_gm.sh"
@@ -468,9 +482,10 @@ private struct EmptyDatabaseState: View {
     /// Root-aware, same family as DaemonGateState.remediationCommand: a bare
     /// `gm_hook context ensure` from a plain shell resolves the PROD binary
     /// with GM_FS_ROOT unset and seeds PRODUCTION's database — while a test
-    /// or beta app keeps showing this screen. Non-prod roots are seeded from
-    /// a checkout by gm_env.sh; "prod" and an undeclared label keep the
-    /// direct command.
+    /// or beta app keeps showing this screen.
+    ///
+    /// Non-prod roots are seeded from a checkout by gm_env.sh; "prod" and an
+    /// undeclared label keep the direct command.
     private static var seedCommand: String {
         guard let env = Paths.declaredEnvironmentName, env != "prod" else {
             return "gm_hook context ensure"

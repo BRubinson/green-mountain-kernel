@@ -3,7 +3,7 @@ name: cde_rpir_implement
 description: "The IMPLEMENT phase: the approved change landed, only in the files the plan names."
 user-invocable: false
 allowed-tools: mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_prompt, mcp__plugin_gmcc_cde__cde_rpir_architecture
-model: opus
+model: claude-opus-5-5[1m]
 ---
 
 # Workflow Phase

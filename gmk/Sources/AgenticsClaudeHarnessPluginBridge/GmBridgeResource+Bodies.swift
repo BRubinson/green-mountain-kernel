@@ -11,8 +11,6 @@ extension GmBridgeResource {
     static let dopedFiles = GmBridgeResource(
         skill: "dope",
         path: "ref/doped_files.md",
-        summary:
-            "How the .gmcc/ dope tree maps to disk, and what a dot-path code resolves to. Read before writing dope or chasing a stale scope.",
         body: #"""
             # DOPED Files — the on-disk `.gmcc` reference
 
@@ -222,14 +220,14 @@ extension GmBridgeResource {
             smart diff, minting fresh child uuids, and it requires the on-disk `version`
             to be **exactly** db revision + 1. If you hand-edited, bump the version by
             one everywhere and let `DOPE_READ_REPO` validate before you go near it.
-            """#
+            """#,
+        summary:
+            "How the .gmcc/ dope tree maps to disk, and what a dot-path code resolves to. Read before writing dope or chasing a stale scope."
     )
 
     static let gmfsDetails = GmBridgeResource(
         skill: "kernel",
         path: "ref/gmfs_details.md",
-        summary:
-            "The gmfs filesystem layout, the three environments, and how paths and roots resolve. Read before touching anything under $GM_FS_ROOT.",
         body: #"""
             # GMFS Detailed Structure Reference
 
@@ -497,13 +495,14 @@ extension GmBridgeResource {
             request rather than performing it — see
             `ref/kbite_awareness.md`. Digested kbite text is db-canonical: load it via
             `kbite_search` / `kbite_file_get`, not from the filesystem.
-            """#
+            """#,
+        summary:
+            "The gmfs filesystem layout, the three environments, and how paths and roots resolve. Read before touching anything under $GM_FS_ROOT."
     )
 
     static let kbiteAwareness = GmBridgeResource(
         skill: "kbite",
         path: "ref/kbite_awareness.md",
-        summary: "What kbites are, how they are searched, and when to reach for one instead of reading files.",
         body: #"""
             # KBite Awareness Reference
 
@@ -555,7 +554,8 @@ extension GmBridgeResource {
             ## KBite System Reference
 
             Full kbite system documentation is in `$GM_PLUGIN_ROOT/skills/gmcc_kbite/SKILL.md`
-            """#
+            """#,
+        summary: "What kbites are, how they are searched, and when to reach for one instead of reading files."
     )
 
     /// Every reference document, in a stable order.
@@ -572,7 +572,7 @@ extension GmBridgePrompt {
             ---
             name: gmcc_agent_kbite_crunch_chew
             description: KBite crunchable analysis agent. Reads raw source materials, builds understanding, correlates to known information, and produces structured chewed analysis files for the kbite system.
-            model: opus
+            model: claude-opus-5-5[1m]
             tools: Glob, Grep, LS, Read, WebFetch, WebSearch
             ---
 

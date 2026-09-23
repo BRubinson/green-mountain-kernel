@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `diagram` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `diagram` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DiagramRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "diagram"
 

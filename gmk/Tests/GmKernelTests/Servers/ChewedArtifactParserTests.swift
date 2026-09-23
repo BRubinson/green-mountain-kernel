@@ -5,9 +5,9 @@ import XCTest
 /// Contents Overview `File` cell was resolved as a path WITHOUT stripping the
 /// backticks chew agents habitually wrap it in, and the inline allowlist
 /// carried `.h` but not `.m`, so every Objective-C body digested empty while
-/// its own header digested fine. Both failures are invisible at digest time —
-/// the row still inserts, the digest still reports success — so they are only
-/// catchable here.
+/// its own header digested fine.
+///
+/// Both failures are invisible at digest time—rows still insert, digest reports success—only catchable here.
 final class ChewedArtifactParserTests: XCTestCase {
 
     // MARK: - File cell is a real path

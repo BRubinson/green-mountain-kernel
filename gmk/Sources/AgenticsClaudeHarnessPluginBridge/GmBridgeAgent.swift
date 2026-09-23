@@ -35,7 +35,7 @@ extension GmBridgeAgent {
             .briefer,
             name: "briefer",
             description: "GMCC briefing agent. Writes the briefing ref set. Never auto-delegate.",
-            model: .opus,
+            model: .opus55OneMillion,
             native: [.read, .grep, .glob],
             tools: [
                 GmAgentTools.cdeInit,
@@ -49,7 +49,7 @@ extension GmBridgeAgent {
             .explorer,
             name: "code-explorer",
             description: "GMCC exploration agent. Writes its own findings. Never auto-delegate.",
-            model: .opus,
+            model: .opus55OneMillion,
             native: [.bash, .read, .grep, .glob, .webFetch, .webSearch],
             tools: [
                 GmAgentTools.cdeInit,
@@ -65,7 +65,7 @@ extension GmBridgeAgent {
             .intentClarifier,
             name: "clarifier",
             description: "GMCC clarification agent. Ranks findings, writes questions. Never auto-delegate.",
-            model: .opus,
+            model: .opus55OneMillion,
             native: [.read, .grep, .glob],
             tools: [
                 GmAgentTools.cdeInit,
@@ -80,7 +80,7 @@ extension GmBridgeAgent {
             .architect,
             name: "code-architect",
             description: "GMCC architecture agent. Writes one architecture option. Never auto-delegate.",
-            model: .opus,
+            model: .opus55OneMillion,
             native: [.bash, .read, .grep, .glob, .webFetch, .webSearch],
             tools: [
                 GmAgentTools.cdeInit,
@@ -98,7 +98,7 @@ extension GmBridgeAgent {
             .implementor,
             name: "implementor",
             description: "GMCC implementation agent. Expands approved architecture into changes. Never auto-delegate.",
-            model: .opus,
+            model: .opus55OneMillion,
             native: [.bash, .read, .write, .edit, .grep, .glob],
             tools: [
                 GmAgentTools.cdeInit,
@@ -113,7 +113,7 @@ extension GmBridgeAgent {
             .reviewer,
             name: "code-quality-reviewer",
             description: "GMCC review agent. Writes review finding rows. Never auto-delegate.",
-            model: .opus,
+            model: .opus55OneMillion,
             native: [.bash, .read, .grep, .glob],
             tools: [
                 GmAgentTools.cdeInit,
@@ -131,7 +131,7 @@ extension GmBridgeAgent {
             .kbiteChewer,
             name: "kbite-chewer",
             description: "GMCC kbite agent. Chews maw resources. Never auto-delegate.",
-            model: .opus,
+            model: .opus55OneMillion,
             native: [.bash, .read, .write, .grep, .glob],
             tools: [GmAgentTools.cdeKbite]
         ),

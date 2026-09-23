@@ -1,7 +1,9 @@
 import Foundation
 import GRDB
 
-/// REVIEW_* data access — the db-native review report machine. Runs INSIDE a
+/// REVIEW_* data access — the db-native review report machine.
+///
+/// Runs INSIDE a
 /// Store-owned transaction; holds no dbQueue and never self-transacts.
 struct ReviewRepository: RepositoryContext {
     let db: Database
@@ -10,6 +12,9 @@ struct ReviewRepository: RepositoryContext {
     // MARK: - Shared create-or-return
 
     /// Idempotent; called ONLY by REVIEW_OPEN — never by setPromptStatus.
+    /// - Parameter promptUuid: The prompt uuid.
+    /// - Returns: A tuple with the summary uuid and whether it was created.
+    /// - Throws: `StoreError.notFound` if the prompt doesn't exist.
     @discardableResult
     func ensureSummary(promptUuid: String) throws -> (uuid: String, created: Bool) {
         guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
@@ -45,6 +50,10 @@ struct ReviewRepository: RepositoryContext {
 
     // MARK: - Verbs
 
+    /// Opens or retrieves a review summary for a prompt.
+    /// - Parameter req: The request with the prompt uuid.
+    /// - Returns: The review summary and whether it was newly created.
+    /// - Throws: `StoreError.notFound` if the prompt doesn't exist.
     func open(_ req: ReviewOpenRequest) throws -> ReviewSummaryResponse {
         let (uuid, created) = try ensureSummary(promptUuid: req.promptUuid)
         guard let summary = try fetchSummary(uuid: uuid) else {
@@ -53,6 +62,10 @@ struct ReviewRepository: RepositoryContext {
         return ReviewSummaryResponse(summary: summary, created: created)
     }
 
+    /// Adds a finding to a review summary.
+    /// - Parameter req: The request with finding details and the summary uuid.
+    /// - Returns: The newly created finding row.
+    /// - Throws: `StoreError.invalidEntityTransition` if summary is not in reviewing status.
     func findingAdd(_ req: ReviewFindingAddRequest) throws -> ReviewFindingRowResponse {
         let summary = try requireSummary(
             uuid: req.summaryUuid,
@@ -118,6 +131,9 @@ struct ReviewRepository: RepositoryContext {
     }
 
     /// Batch rank — same contract and rationale as exploreRank.
+    /// - Parameter req: The request with the summary uuid and rating updates.
+    /// - Returns: The updated summary, count of updated ratings, and unranked count.
+    /// - Throws: `StoreError.invalidEntityTransition` if summary is not in reviewing status.
     func rank(_ req: ReviewRankRequest) throws -> ReviewRankResponse {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .reviewing, verb: "rank")
         try findingRank.applyRankBatch(
@@ -149,10 +165,16 @@ struct ReviewRepository: RepositoryContext {
         )
     }
 
-    /// Record one finding's resolution. Pure child-row update (expectedVersion
-    /// targets the FINDING) and deliberately UNGATED on summary status — see
-    /// the facade header. Edges: open → fixed | accepted | wont_fix, plus
-    /// lateral corrections among the resolved values; never back to open.
+    /// Record one finding's resolution.
+    ///
+    /// Pure child-row update (expectedVersion targets the FINDING) and
+    /// deliberately UNGATED on summary status — see the facade header. Edges:
+    /// open → fixed | accepted | wont_fix, plus lateral corrections among the
+    /// resolved values; never back to open.
+    ///
+    /// - Parameter req: The request with finding uuid, target status, and expected version.
+    /// - Returns: The updated finding row.
+    /// - Throws: `StoreError.invalidEntityTransition` if status change is invalid.
     func resolve(_ req: ReviewResolveRequest) throws -> ReviewFindingRowResponse {
         guard
             let row = try fetchFindings(
@@ -210,9 +232,15 @@ struct ReviewRepository: RepositoryContext {
         return ReviewFindingRowResponse(finding: updated)
     }
 
-    /// reviewing → complete. Refuses while any finding is unranked; requires a
-    /// verdict (validated in Swift ahead of the SQL CHECK for a clean
+    /// Marks a review summary as complete.
+    ///
+    /// Moves state from reviewing → complete. Refuses while any finding is unranked;
+    /// requires a verdict (validated in Swift ahead of the SQL CHECK for a clean
     /// message). overview + verdict are carried only here.
+    ///
+    /// - Parameter req: The request with summary uuid, verdict, overview, and expected version.
+    /// - Returns: The completed review summary.
+    /// - Throws: `StoreError.invalidEntityTransition` if unranked findings exist.
     func complete(_ req: ReviewCompleteRequest) throws -> ReviewSummaryResponse {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .reviewing, verb: "complete")
         let unranked = try findingRank.unrankedCount(
@@ -256,8 +284,14 @@ struct ReviewRepository: RepositoryContext {
         return ReviewSummaryResponse(summary: updated)
     }
 
-    /// complete → reviewing: the revision edge (same preservation contract as
-    /// exploreReopen; the persisted verdict survives until re-complete).
+    /// Reopens a completed review for revision.
+    ///
+    /// Moves state from complete → reviewing. Same preservation contract as
+    /// exploreReopen; the persisted verdict survives until re-complete.
+    ///
+    /// - Parameter req: The request with summary uuid and expected version.
+    /// - Returns: The reopened review summary.
+    /// - Throws: `StoreError.invalidEntityTransition` if summary is not complete.
     func reopen(_ req: ReviewReopenRequest) throws -> ReviewSummaryResponse {
         guard let summary = try fetchSummary(uuid: req.summaryUuid) else {
             throw StoreError.notFound(entity: "review_summary", key: req.summaryUuid)
@@ -290,6 +324,10 @@ struct ReviewRepository: RepositoryContext {
         return ReviewSummaryResponse(summary: updated)
     }
 
+    /// Fetches a review summary with its findings, filtered by rating window.
+    /// - Parameter req: The request with prompt uuid and optional rating filters.
+    /// - Returns: The review summary with full findings and stubbed findings outside the window.
+    /// - Throws: `StoreError.notFound` if prompt not found; `StoreError.summaryAbsent` if no review.
     func get(_ req: ReviewGetRequest) throws -> ReviewGetResponse {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -331,6 +369,13 @@ struct ReviewRepository: RepositoryContext {
 
     // MARK: - Transition + fetch helpers
 
+    /// Fetches a review summary and asserts it is in the required status.
+    /// - Parameters:
+    ///   - uuid: The review summary uuid.
+    ///   - required: The required summary status.
+    ///   - verb: The operation name for error messages.
+    /// - Returns: The review summary row.
+    /// - Throws: `StoreError.notFound` if not found; `StoreError.invalidEntityTransition` if status mismatch.
     private func requireSummary(
         uuid: String,
         at required: ReviewSummaryStatus,
@@ -358,20 +403,38 @@ struct ReviewRepository: RepositoryContext {
             .order(ReviewSummaryRecord.Columns.createdAt.desc, Column("id").desc)
     }
 
+    /// Fetches a review summary by its uuid.
+    /// - Parameter uuid: The review summary uuid.
+    /// - Returns: The review summary row, or nil if not found.
+    /// - Throws: Any database error during the fetch.
     func fetchSummary(uuid: String) throws -> ReviewSummaryRow? {
         try fetchSummary(matching: ReviewSummaryRecord.Columns.uuid == uuid)
     }
 
+    /// Fetches the most recent review summary for a prompt.
+    /// - Parameter promptUuid: The prompt uuid.
+    /// - Returns: The review summary row, or nil if not found.
+    /// - Throws: Any database error during the fetch.
     func fetchSummary(byPrompt promptUuid: String) throws -> ReviewSummaryRow? {
         try fetchSummary(matching: ReviewSummaryRecord.Columns.promptUuid == promptUuid)
     }
 
+    /// Fetches a review summary matching the given predicate.
+    /// - Parameter predicate: The SQL filter expression.
+    /// - Returns: The most recent matching summary row, or nil if not found.
+    /// - Throws: Any database error during the fetch.
     private func fetchSummary(matching predicate: SQLExpression) throws -> ReviewSummaryRow? {
         try Self.newestFirst.filter(predicate).fetchOne(db)?.dto()
     }
 
+    /// Fetches findings matching a predicate, ordered by rank status, rating, id.
+    ///
     /// Same explicit ordering contract as ExplorationRepository.fetchFindings:
     /// unranked first, then rating ascending, then id.
+    ///
+    /// - Parameter predicate: The SQL filter expression.
+    /// - Returns: The ordered list of finding rows matching the predicate.
+    /// - Throws: Any database error during the fetch.
     private func fetchFindings(matching predicate: SQLExpression) throws -> [ReviewFindingRow] {
         try ReviewFindingRecord
             .all()

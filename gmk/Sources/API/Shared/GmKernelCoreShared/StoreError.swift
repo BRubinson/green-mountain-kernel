@@ -1,12 +1,10 @@
 import Foundation
 
-/// Typed domain failures. Handlers never hand-build error payloads — this is
-/// the ONE mapping point from Store outcomes to wire error codes.
+/// Typed domain failures.
 ///
-/// LIVES IN THE BASE LAYER, not beside the Store that throws most of it:
-/// base-layer code throws this, and base-depending-on-middle is a cycle once
-/// the modules separate. It is Foundation-only, so the placement costs
-/// nothing.
+/// Handlers never hand-build — this is the ONE Store→wire mapping point.
+/// Lives in the BASE LAYER (not with Store) since base-depending-on-middle
+/// is a cycle; it is Foundation-only, so placement costs nothing.
 enum StoreError: Error, Sendable {
     case notFound(entity: String, key: String)
     case versionConflict(entity: String, uuid: String, expected: Int64, actual: Int64)
@@ -96,6 +94,10 @@ enum StoreError: Error, Sendable {
             // The open hint is entity-derived. Every summary has a phase tool
             // with an `open` op, so the hint names one — the prefix is spelled
             // once, by the roster, and never here.
+            /// Builds the hint text for opening a summary.
+            ///
+            /// - Parameter tool: The CDE tool name (e.g., "cde_rpir_explore").
+            /// - Returns: The hint text naming the tool and op.
             func openHint(_ tool: String) -> String {
                 "\(CdeToolSpec.qualifiedName(tool)) with op open"
             }

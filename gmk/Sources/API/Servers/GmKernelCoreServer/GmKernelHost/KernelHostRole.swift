@@ -1,13 +1,11 @@
 import Foundation
 
-/// The ARBITRATION RESULT: what THIS process is, decided locally before
-/// anything could open the database. Distinct from `GmVibesCore.KernelRole`,
-/// which is a DISPLAY value for whichever kernel answered the socket.
+/// The ARBITRATION RESULT: what THIS process is, decided locally before DB open.
 ///
-/// `Holder.bundlePath` decides the loser's branch: nil means a HEADLESS holder,
-/// which a person's freshly launched app outranks, so take it over; a bundle
-/// path means another APP COPY, and two GUIs trading a lock is worse than one
-/// being read-only. Client mode is a DEGRADATION, never a refusal.
+/// Distinct from `GmVibesCore.KernelRole` (DISPLAY value for socket responder).
+/// `Holder.bundlePath` decides loser's branch: nil = HEADLESS (outranked by
+/// user's app launch); bundle path = another APP COPY (two GUIs trading lock is
+/// worse than one read-only). Client mode is a DEGRADATION, not refusal.
 enum KernelHostRole: ~Copyable {
 
     /// This process owns the database and is serving.
@@ -22,8 +20,19 @@ enum KernelHostRole: ~Copyable {
     /// refuses loudly so the UI can name the refusal.
     case failed(Error)
 
-    /// Arbitrate. Call ONCE, before anything else can touch the database;
-    /// `takeoverTimeout` bounds the wait for a headless writer to yield.
+    /// Arbitrate.
+    ///
+    /// Call ONCE, before anything else can touch the database; `takeoverTimeout` bounds the wait for a headless writer
+    /// to yield.
+    /// Determines the kernel host role: writer, client, or failed.
+    ///
+    /// Attempts to acquire the lock; if held by another process, decides whether
+    /// to take over (headless) or operate as a client (app).
+    ///
+    /// - Parameters:
+    ///   - takeoverTimeout: Maximum time to wait for a headless holder to shut down; defaults to 5 seconds.
+    ///   - log: A closure called with diagnostic messages; defaults to ignoring messages.
+    /// - Returns: A `KernelHostRole.writer` if lock acquired, `.client` if another process holds it, or `.failed` if an error occurs.
     static func arbitrate(
         takeoverTimeout: TimeInterval = 5,
         log: @escaping (String) -> Void = { _ in }
@@ -54,7 +63,10 @@ enum KernelHostRole: ~Copyable {
         }
     }
 
-    /// One acquisition attempt. `nil` means somebody else has it.
+    /// Attempts to acquire the lock once without retrying or taking over.
+    ///
+    /// - Parameter log: A closure called with diagnostic messages.
+    /// - Returns: A role if acquired or failed; nil if someone else holds the lock.
     private static func acquireOnce(log: @escaping (String) -> Void) -> KernelHostRole? {
         let outcome: KernelOwnership.Outcome
         do {
@@ -77,10 +89,17 @@ enum KernelHostRole: ~Copyable {
         }
     }
 
-    /// SIGTERM a headless holder and wait for the lock. Never SIGKILL: the
-    /// polite signal is what runs `Boot.swift`'s ordered shutdown — checkpoint,
-    /// close, unlink — and is the entire reason this is safe. A timeout falls
-    /// back to client mode rather than escalating.
+    /// Takes over from a headless holder by sending SIGTERM and waiting for the lock.
+    ///
+    /// Never sends SIGKILL; the polite signal runs `Boot.swift`'s ordered shutdown
+    /// (checkpoint, close, unlink) which makes takeover safe. A timeout falls back
+    /// to client mode rather than escalating.
+    ///
+    /// - Parameters:
+    ///   - holder: The current lock holder to signal and wait for.
+    ///   - timeout: Maximum time to wait for the holder to release the lock.
+    ///   - log: A closure called with diagnostic messages.
+    /// - Returns: A `KernelHostRole.writer` if takeover succeeds, or `.client` if timeout or signal fails.
     private static func takeOver(
         from holder: KernelOwnership.Holder,
         timeout: TimeInterval,

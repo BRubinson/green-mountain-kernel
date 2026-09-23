@@ -10,7 +10,9 @@ import Foundation
 /// failure lands in the log rather than an unread stderr.
 enum KernelHost {
 
-    /// Run as the headless writer. Never returns.
+    /// Run as the headless writer.
+    ///
+    /// Never returns.
     static func bootHeadlessAndRun() -> Never {
         let outcome: KernelOwnership.Outcome
         do {

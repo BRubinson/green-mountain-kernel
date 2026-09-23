@@ -1,7 +1,7 @@
 ---
 name: kbite-chewer
 description: GMCC kbite agent. Chews maw resources. Never auto-delegate.
-model: opus
+model: claude-opus-5-5[1m]
 tools: Bash, Read, Write, Grep, Glob, mcp__plugin_gmcc_cde__cde_kbite
 ---
 

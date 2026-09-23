@@ -16,6 +16,10 @@ extension Store {
 
     static let diagramRepoSubdirectory = ".gmcc/diagrams"
 
+    /// Returns the path to the diagram repository directory for a given root.
+    ///
+    /// - Parameter root: The instance root directory path.
+    /// - Returns: A URL pointing to the `.gmcc/diagrams` directory.
     private func diagramRepoDirectory(root: String) -> URL {
         URL(fileURLWithPath: root)
             .appendingPathComponent(Self.diagramRepoSubdirectory, isDirectory: true)
@@ -23,6 +27,11 @@ extension Store {
 
     // MARK: - write-repo
 
+    /// Writes all public session diagrams to disk, then prunes stale files.
+    ///
+    /// - Parameter req: The diagram write request specifying the session and force flag.
+    /// - Returns: The response with written and pruned file codes and directory path.
+    /// - Throws: `StoreError` on validation, composition, revision conflict or I/O failures.
     func diagramWriteRepo(_ req: DiagramWriteRepoRequest) throws -> DiagramWriteRepoResponse {
         // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
         // Phase 3 does filesystem work while holding NO db lock, by design.
@@ -147,6 +156,11 @@ extension Store {
 
     // MARK: - ingest (files → db, strictly forward-only)
 
+    /// Reads all diagram files from disk and ingests them into the database.
+    ///
+    /// - Parameter req: The diagram ingest request specifying the session.
+    /// - Returns: The response with ingested and skipped codes, directory path, and warnings.
+    /// - Throws: `StoreError` on composition, session validation or I/O failures.
     func diagramIngest(_ req: DiagramIngestRequest) throws -> DiagramIngestResponse {
         // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
         // Phase 3 does filesystem work while holding NO db lock, by design.
@@ -198,8 +212,8 @@ extension Store {
             return DiagramIngestResponse(
                 ingested: [],
                 skipped: [],
-                warnings: warnings,
-                root: directory.path
+                root: directory.path,
+                warnings: warnings
             )
         }
 
@@ -242,15 +256,23 @@ extension Store {
             return DiagramIngestResponse(
                 ingested: ingested,
                 skipped: skipped,
-                warnings: warnings,
-                root: directory.path
+                root: directory.path,
+                warnings: warnings
             )
         }
     }
 
     /// Replace a PUBLIC session row's tree in place when the file is newer.
+    ///
     /// Returns false when the document is skipped: a private row, a file at
     /// or behind the db revision, or a revision race lost at the UPDATE.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection within a transaction.
+    ///   - document: The diagram document to ingest.
+    ///   - diagram: The existing diagram row to replace.
+    /// - Returns: True when replaced; false when skipped.
+    /// - Throws: `StoreError` on validation, binding, or database errors.
     private func ingestReplace(
         _ db: Database,
         document: DiagramDocument,
@@ -279,6 +301,12 @@ extension Store {
     }
 
     /// Create a SESSION + PUBLIC row for a document with no row yet.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection within a transaction.
+    ///   - document: The diagram document to ingest.
+    ///   - sessionUuid: The session uuid that owns the new diagram.
+    /// - Throws: `StoreError` on validation, binding, or database errors.
     private func ingestCreate(
         _ db: Database,
         document: DiagramDocument,
@@ -326,10 +354,18 @@ extension Store {
         )
     }
 
+    /// Inserts diagram elements from a document in two passes.
+    ///
     /// Two passes: insert every element (fresh uuids — the locked
     /// no-smart-diff consequence, exactly like dope ingest), THEN resolve
-    /// connector code paths against the freshly minted uuid map. A path
-    /// that resolves to nothing stays NULL — the ghost travels as a ghost.
+    /// connector code paths against the freshly minted uuid map. A path that
+    /// resolves to nothing stays NULL — the ghost travels as a ghost.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection within a transaction.
+    ///   - diagramUuid: The diagram uuid to insert elements into.
+    ///   - document: The diagram document containing the elements to insert.
+    /// - Throws: `StoreError` on validation, shape, or database errors.
     private func insertDocumentElements(
         _ db: Database,
         diagramUuid: String,

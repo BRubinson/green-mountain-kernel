@@ -3,6 +3,10 @@ import Foundation
 final class SocketConnection {
     private var fd: Int32 = -1
 
+    /// Connects to the iTerm2 socket and returns a connection.
+    ///
+    /// - Returns: A connected socket connection.
+    /// - Throws: `ITerm2Error` if the connection fails or socket setup fails.
     static func connect() throws(ITerm2Error) -> SocketConnection {
         let path = Self.socketPath()
         let conn = SocketConnection()
@@ -77,6 +81,10 @@ final class SocketConnection {
         return conn
     }
 
+    /// Checks whether the iTerm2 server is listening on the given path.
+    ///
+    /// - Parameter path: The socket path to check.
+    /// - Returns: `true` if the server is listening, `false` otherwise.
     static func isServerListening(path: String) -> Bool {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }
@@ -103,6 +111,10 @@ final class SocketConnection {
         return result == 0
     }
 
+    /// Sends data through the socket connection.
+    ///
+    /// - Parameter data: The data to send.
+    /// - Throws: `ITerm2Error` if the send operation fails.
     func send(_ data: Data) throws(ITerm2Error) {
         var failure: ITerm2Error?
         data.withUnsafeBytes { buf in
@@ -125,6 +137,11 @@ final class SocketConnection {
         if let failure { throw failure }
     }
 
+    /// Receives a specific number of bytes from the socket.
+    ///
+    /// - Parameter count: The number of bytes to receive.
+    /// - Returns: The received data.
+    /// - Throws: `ITerm2Error` if the receive operation fails.
     func recv(count: Int) throws(ITerm2Error) -> Data {
         guard count > 0 else { return Data() }
         var buffer = Data(count: count)
@@ -152,6 +169,11 @@ final class SocketConnection {
         return buffer
     }
 
+    /// Receives data from the socket until a delimiter is found.
+    ///
+    /// - Parameter delimiter: The byte sequence to stop reading at.
+    /// - Returns: All data received including the delimiter.
+    /// - Throws: `ITerm2Error` if the receive operation fails or buffer overflows.
     func recvUntil(_ delimiter: Data) throws(ITerm2Error) -> Data {
         var accumulated = Data()
         accumulated.reserveCapacity(512)
@@ -185,6 +207,7 @@ final class SocketConnection {
         }
     }
 
+    /// Closes the socket connection.
     func disconnect() {
         if fd >= 0 {
             Darwin.close(fd)
@@ -196,6 +219,9 @@ final class SocketConnection {
         disconnect()
     }
 
+    /// Returns the path to the iTerm2 socket.
+    ///
+    /// - Returns: The socket path, determined by iTerm2 conventions.
     static func socketPath() -> String {
         let appSupport =
             NSSearchPathForDirectoriesInDomains(

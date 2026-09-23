@@ -4,8 +4,9 @@ import Synchronization
 
 /// The transaction-scoped write core: the five shared primitives, the
 /// post-commit event sink, and the shared static contracts.
-/// Holds NO DatabaseQueue and exposes NO verb, and that absence is the point. A
-/// repository handed a `StoreCore` has no path back to `dbQueue.write`, so
+///
+/// Holds NO DatabaseQueue and exposes NO verb, and that absence is the point.
+/// A repository handed a `StoreCore` has no path back to `dbQueue.write`, so
 /// re-entering a transaction is not expressible — and GRDB 7 TRAPS on
 /// re-entrancy, killing the daemon rather than returning an error. The
 /// subscriber table is the only stored state.
@@ -13,34 +14,43 @@ final class StoreCore: Sendable {
 
     /// Post-commit event fan-out, registered via GRDB's
     /// afterNextTransaction(onCommit:), so events fire only for committed
-    /// transactions and never while the db lock is held. A TABLE, not one
-    /// closure: a settable sink lets a second consumer displace the first.
-    /// `emit` runs INSIDE the commit hook on the writer thread: a subscriber
-    /// that blocks stalls the single writer, one that calls back DEADLOCKS, so
-    /// hand off immediately. The mutex is what makes the cross-thread
-    /// subscribe/emit pair provably safe.
+    /// transactions and never while the db lock is held.
+    ///
+    /// A TABLE, not one closure: a sink lets a second consumer displace the
+    /// first. `emit` runs in the commit hook: a blocking subscriber stalls
+    /// the writer, a callback deadlocks. Hand off immediately and use the
+    /// mutex to make cross-thread subscribe/emit provably safe.
     private let subscribers = Mutex<[UUID: @Sendable (PersistedEvent) -> Void]>([:])
 
-    /// Register a post-commit consumer. Returns the token to unsubscribe with.
+    /// Registers a post-commit event consumer and returns its subscription token.
     ///
     /// Subscriptions must be SYMMETRIC: a subscriber that captures `self` and
     /// never unsubscribes outlives whatever it belonged to.
+    ///
+    /// - Parameter sink: A closure called with each committed event after the
+    ///   transaction's post-commit hook.
+    /// - Returns: A token to pass to `unsubscribe(_:)` to stop receiving events.
     func subscribe(_ sink: @escaping @Sendable (PersistedEvent) -> Void) -> UUID {
         let token = UUID()
         subscribers.withLock { $0[token] = sink }
         return token
     }
 
+    /// Removes a subscription from the event fan-out.
+    ///
+    /// - Parameter token: The token returned by `subscribe(_:)`.
     func unsubscribe(_ token: UUID) {
         subscribers.withLock { _ = $0.removeValue(forKey: token) }
     }
 
-    /// Fan out to EVERY subscriber. Called from the commit hook only.
+    /// Broadcasts an event to all registered subscribers.
     ///
-    /// The snapshot-then-call shape is deliberate: a subscriber that
-    /// unsubscribes from inside its own callback would otherwise mutate the
-    /// dictionary being iterated, and holding the lock across the callbacks
-    /// would deadlock that same subscriber.
+    /// Called from the commit hook only. The snapshot-then-call shape is
+    /// deliberate: a subscriber that unsubscribes from inside its own callback
+    /// would otherwise mutate the dictionary being iterated, and holding the
+    /// lock across the callbacks would deadlock that same subscriber.
+    ///
+    /// - Parameter event: The event to broadcast to all subscribers.
     func emit(_ event: PersistedEvent) {
         let sinks = subscribers.withLock { Array($0.values) }
         for sink in sinks { sink(event) }
@@ -55,41 +65,70 @@ final class StoreCore: Sendable {
     // silences Swift 6's conservative Sendable check.
     nonisolated(unsafe) private static let isoFormatter = ISO8601DateFormatter()
 
+    /// Returns the current time as an ISO-8601 timestamp in UTC.
+    ///
+    /// - Returns: A seconds-precision ISO-8601 Z-terminated timestamp.
     static func isoNow() -> String {
         isoFormatter.string(from: Date())
     }
 
-    /// A stamp `offsetSeconds` in the future, in the same format as `isoNow`.
-    /// Used only by the test lock's LEASE mode — the degraded liveness path for
-    /// a holder that cannot keep a file descriptor open. The flock probe is the
-    /// primary test and needs no clock at all.
+    /// Returns an ISO-8601 timestamp offset by the given seconds.
+    ///
+    /// Used only by the test lock's LEASE mode — the degraded liveness path
+    /// for a holder that cannot keep a file descriptor open. The flock probe
+    /// is the primary test and needs no clock at all.
+    ///
+    /// - Parameter offsetSeconds: Seconds to offset from the current time.
+    /// - Returns: A seconds-precision ISO-8601 Z-terminated timestamp.
     static func isoNow(offsetSeconds: Int) -> String {
         isoFormatter.string(from: Date().addingTimeInterval(TimeInterval(offsetSeconds)))
     }
 
-    /// Parse a stamp this type wrote. Returns nil rather than throwing: every
-    /// caller is comparing against a deadline, and an unparseable stamp must
-    /// degrade to "no opinion" rather than to a decision — reading a bad lease
-    /// as expired would break a live holder's lock.
+    /// Parses an ISO-8601 timestamp to a `Date`.
+    ///
+    /// Returns nil rather than throwing: every caller is comparing against a
+    /// deadline, and an unparseable stamp must degrade to "no opinion" rather
+    /// than to a decision — reading a bad lease as expired would break a live
+    /// holder's lock.
+    ///
+    /// - Parameter value: An ISO-8601 timestamp, as written by `isoNow()`.
+    /// - Returns: The parsed date, or nil if the timestamp is malformed.
     static func parseIso(_ value: String) -> Date? {
         isoFormatter.date(from: value)
     }
 
+    /// Generates a new lowercase UUID string.
+    ///
+    /// - Returns: A new randomly generated UUID in lowercase string form.
     static func newUuid() -> String {
         UUID().uuidString.lowercased()
     }
 
-    /// Forwards to `RepoRelativePath.normalize` in the base layer, where the
-    /// normalizer now lives. Kept so every existing call site is unchanged.
+    /// Normalizes a repository-relative path string.
+    ///
+    /// Forwards to `RepoRelativePath.normalize` in the base layer. Kept so
+    /// every existing call site remains unchanged.
+    ///
+    /// - Parameters:
+    ///   - raw: The path string to normalize.
+    ///   - repoRoot: The repository root path.
+    /// - Returns: The normalized path.
+    /// - Throws: `PathError` if the path cannot be normalized.
     static func normalizeRepoRelativePath(_ raw: String, repoRoot: String) throws -> String {
         try RepoRelativePath.normalizeRepoRelativePath(raw, repoRoot: repoRoot)
     }
 
-    /// The storage-path analogue of GitHead.sessionCode: forward-only, lossy,
-    /// NEVER un-slugged. Applied when deriving a prompt's gmfs folder segment
-    /// so names with spaces/slashes can't produce paths the MemoryWatcher's
-    /// exact-match resolution would miss. Case is preserved (lowercasing
-    /// would change more than needed). Existing rows are never rewritten.
+    /// Converts a string to a storage-safe slug.
+    ///
+    /// The storage-path analogue of GitHead.sessionCode: forward-only and
+    /// lossy, NEVER un-slugged. Applied when deriving a prompt's gmfs folder
+    /// segment so names with spaces/slashes can't produce paths the
+    /// MemoryWatcher's exact-match resolution would miss. Case is preserved
+    /// (lowercasing would change more than needed). Existing rows are never
+    /// rewritten.
+    ///
+    /// - Parameter raw: The string to convert to a slug.
+    /// - Returns: A storage-safe slug, or `"prompt"` if the input yields nothing.
     static func slugStorageSegment(_ raw: String) -> String {
         var slug = ""
         for ch in raw {
@@ -118,9 +157,13 @@ final class StoreCore: Sendable {
     /// above it.
     static let findingReadThreshold = 100
 
-    /// daemon_event.payload is documented as JSON — always build it with a
-    /// real serializer so embedded quotes/backslashes in values (file paths!)
-    /// can't produce malformed rows.
+    /// Serializes a dictionary to a JSON payload string.
+    ///
+    /// Builds the payload with a real serializer so embedded quotes and
+    /// backslashes in values (file paths) can't produce malformed rows.
+    ///
+    /// - Parameter object: The dictionary to encode as JSON.
+    /// - Returns: A JSON string, or nil if serialization fails.
     static func jsonPayload(_ object: [String: Any]) -> String? {
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]) else {
             return nil
@@ -130,11 +173,17 @@ final class StoreCore: Sendable {
 
     // MARK: - Write primitives
 
-    /// Advance a session's recency WITHOUT bumping its version — deliberately
-    /// not updateBase. Prompt/file-change writes advancing updated_at must
-    /// never invalidate a session version an editor is holding (spurious
-    /// VERSION_CONFLICTs in the GMVibes session editor). The one place
-    /// updated_at and version are not in lockstep.
+    /// Advances a session's last-activity time without changing its version.
+    ///
+    /// Prompt/file-change writes advancing updated_at must never invalidate
+    /// a session version an editor is holding (spurious VERSION_CONFLICTs in
+    /// the GMVibes session editor). The one place updated_at and version are
+    /// not in lockstep. This operation is deliberately distinct from updateBase.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - uuid: The session's identifier.
+    /// - Throws: A database error if the update fails.
     func touchSession(_ db: Database, uuid: String) throws {
         try db.execute(
             sql: "UPDATE session SET updated_at = ? WHERE uuid = ?",
@@ -142,16 +191,28 @@ final class StoreCore: Sendable {
         )
     }
 
-    /// Insert a row with the five BaseEntity columns plus `extra` columns.
-    /// Returns the row's uuid (freshly generated unless `uuid` is supplied —
-    /// callers pass a gmfs uuid to keep db ↔ gmfs joins trivial).
+    /// Inserts a row with base entity columns and additional custom columns.
+    ///
+    /// Inserts the five BaseEntity columns (uuid, version, created_at,
+    /// updated_at) plus any `extra` columns. Returns the row's uuid, freshly
+    /// generated unless `uuid` is supplied — callers pass a gmfs uuid to keep
+    /// db ↔ gmfs joins trivial.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - table: The target table name.
+    ///   - extra: Additional column values keyed by column name.
+    ///   - uuid: The row's identifier, or nil to generate one.
+    ///   - now: The creation timestamp, or nil to use the current time.
+    /// - Returns: The uuid of the inserted row.
+    /// - Throws: A database error if the insert fails.
     @discardableResult
     func insertBase(
         _ db: Database,
         table: String,
+        extra: [String: (any DatabaseValueConvertible)?],
         uuid: String? = nil,
-        now: String? = nil,
-        extra: [String: (any DatabaseValueConvertible)?]
+        now: String? = nil
     ) throws -> String {
         let rowUuid = uuid ?? StoreCore.newUuid()
         let now = now ?? StoreCore.isoNow()
@@ -164,10 +225,19 @@ final class StoreCore: Sendable {
         return rowUuid
     }
 
-    /// Guarded update — THE optimistic-concurrency primitive. Bumps version
-    /// and updated_at; matches only when the caller's expected version is
-    /// current. Zero rows changed is discriminated (same transaction) into
-    /// NOT_FOUND vs VERSION_CONFLICT.
+    /// Updates a row with optimistic concurrency control.
+    ///
+    /// Bumps version and updated_at; matches only when the caller's expected
+    /// version is current. Zero rows changed is discriminated (same transaction)
+    /// into NOT_FOUND vs VERSION_CONFLICT. This is the primary write primitive.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - table: The target table name.
+    ///   - uuid: The row's identifier.
+    ///   - expectedVersion: The version the caller last read.
+    ///   - set: Column values to update, keyed by column name.
+    /// - Throws: `StoreError.notFound` if the row doesn't exist; `StoreError.versionConflict` if the expected version is stale.
     func updateBase(
         _ db: Database,
         table: String,
@@ -195,11 +265,20 @@ final class StoreCore: Sendable {
         throw StoreError.versionConflict(entity: table, uuid: uuid, expected: expectedVersion, actual: actual)
     }
 
-    /// Guarded delete — the DELETE twin of updateBase, with the same
-    /// zero-rows discrimination into NOT_FOUND vs VERSION_CONFLICT. Nothing
-    /// in the schema deleted a versioned row before dope's granular verbs.
-    /// FK CASCADEs report no count here; callers wanting cascade accounting
-    /// COUNT before deleting, in the same transaction.
+    /// Deletes a row with optimistic concurrency control.
+    ///
+    /// The DELETE twin of updateBase, with the same zero-rows discrimination
+    /// into NOT_FOUND vs VERSION_CONFLICT. Nothing in the schema deleted a
+    /// versioned row before dope's granular verbs. FK CASCADEs report no count
+    /// here; callers wanting cascade accounting COUNT before deleting, in the
+    /// same transaction.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - table: The target table name.
+    ///   - uuid: The row's identifier.
+    ///   - expectedVersion: The version the caller last read.
+    /// - Throws: `StoreError.notFound` if the row doesn't exist; `StoreError.versionConflict` if the expected version is stale.
     func deleteBase(
         _ db: Database,
         table: String,
@@ -223,9 +302,19 @@ final class StoreCore: Sendable {
         throw StoreError.versionConflict(entity: table, uuid: uuid, expected: expectedVersion, actual: actual)
     }
 
-    /// Append a daemon_event row and stage it for the post-commit sink.
+    /// Appends an event to the daemon event log and stages it for broadcast.
+    ///
     /// Append-only: version stays 0 and updated_at == created_at, so
-    /// insertBase's defaults are exactly right.
+    /// insertBase's defaults are exactly right. Staged for the post-commit sink
+    /// to broadcast to all subscribers.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - kind: The event kind to record.
+    ///   - subjectUuid: The subject of the event, or nil if not applicable.
+    ///   - payload: The event payload as JSON, or nil if not applicable.
+    /// - Returns: The uuid of the appended event.
+    /// - Throws: A database error if the insert fails.
     @discardableResult
     func appendEvent(
         _ db: Database,
@@ -239,12 +328,12 @@ final class StoreCore: Sendable {
         let uuid = try insertBase(
             db,
             table: "daemon_event",
-            now: createdAt,
             extra: [
                 "kind": kind.rawValue,
                 "subject_uuid": subjectUuid,
                 "payload": payload,
-            ]
+            ],
+            now: createdAt
         )
         let event = PersistedEvent(
             id: db.lastInsertedRowID,

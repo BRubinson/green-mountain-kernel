@@ -1,12 +1,20 @@
 import Foundation
 
-/// PING — liveness, build identity, and the kernel's own vitals. The
-/// protocol-version handshake runs in Server.dispatch before any handler; this
-/// reports the stamped BuildInfo so staleness is observable.
+/// PING — liveness, build identity, and the kernel's own vitals.
 ///
-/// Vitals and the writer role are measured HERE, by the process that holds the
-/// database, rather than sampled by whoever displays them.
+/// The protocol-version handshake runs in Server.dispatch before any handler;
+/// this reports the stamped BuildInfo so staleness is observable. Vitals and
+/// the writer role are measured HERE, by the process that holds the database,
+/// rather than sampled by whoever displays them.
 enum PingHandler {
+    /// Handles a ping request with daemon vitals.
+    ///
+    /// - Parameters:
+    ///   - head: The message envelope header.
+    ///   - startedAt: ISO-formatted daemon start timestamp.
+    ///   - startedDate: The daemon start date for uptime calculation.
+    /// - Returns: The handler result with ping response.
+    /// - Throws: Wire or encoding errors.
     static func handle(head: EnvelopeHead, startedAt: String, startedDate: Date) throws -> HandlerResult {
         let response = PingResponse(
             daemonPid: getpid(),

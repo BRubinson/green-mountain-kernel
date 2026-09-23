@@ -12,48 +12,69 @@ import GRDB
 
 extension Store {
 
-    /// The repo declares its own suites, so this reads a FILE and never a
-    /// table. That asymmetry is deliberate: the ask was that repo tests be
-    /// configured in the repo, and a manifest living in the db would be a
-    /// second copy that silently disagrees with the checkout the moment the
-    /// repo is cloned into another environment.
+    /// List test suites from the repo manifest file.
+    ///
+    /// The repo declares suites in a file, never in a table, to avoid a second copy that
+    /// silently disagrees when the repo is cloned into another environment.
+    /// - Parameter req: The TEST_SUITE_LIST request.
+    /// - Returns: The test suite list response.
+    /// - Throws: Repository or file reading errors.
     func testSuiteList(_ req: TestSuiteListRequest) throws -> TestSuiteListResponse {
         try boundaryRead { db in
             try TestRunRepository(db: db, core: core).suiteList(req)
         }
     }
 
-    /// Reports the lock, including whether the current holder is already gone.
-    /// Deliberately does NOT reclaim: a read that silently broke somebody
-    /// else's lock would make inspection destructive, which is the same reason
-    /// `BOT_NEXT` stopped advancing prompts.
+    /// Report the test lock status without reclaiming.
+    ///
+    /// Does NOT reclaim; a read that silently broke someone else's lock would make
+    /// inspection destructive.
+    /// - Parameter req: The TEST_LOCK_STATUS request.
+    /// - Returns: The test lock response.
+    /// - Throws: Repository errors.
     func testLockStatus(_ req: TestLockStatusRequest) throws -> TestLockResponse {
         try boundaryRead { db in
             try TestRunRepository(db: db, core: core).lockStatus(req)
         }
     }
 
-    /// Claim the project. Opens the ledger row and takes the cell in ONE
-    /// transaction, so there is no window where a run exists without holding
-    /// the lock it was created for.
+    /// Claim the test lock for a project.
+    ///
+    /// Opens the ledger row and takes the lock in one transaction, so no window exists
+    /// where a run could exist without holding its lock.
+    /// - Parameter req: The TEST_LOCK_ACQUIRE request.
+    /// - Returns: The test lock response.
+    /// - Throws: Repository or lock acquisition errors.
     func testLockAcquire(_ req: TestLockAcquireRequest) throws -> TestLockResponse {
         try boundary { db in
             try TestRunRepository(db: db, core: core).acquire(req)
         }
     }
 
+    /// Release the test lock.
+    /// - Parameter req: The TEST_LOCK_RELEASE request.
+    /// - Returns: The test lock response.
+    /// - Throws: Repository or lock release errors.
     func testLockRelease(_ req: TestLockReleaseRequest) throws -> TestLockResponse {
         try boundary { db in
             try TestRunRepository(db: db, core: core).release(req)
         }
     }
 
+    /// Mark a test run as started.
+    /// - Parameter req: The TEST_RUN_START request.
+    /// - Returns: The test run response.
+    /// - Throws: Repository or run state errors.
     func testRunStart(_ req: TestRunStartRequest) throws -> TestRunResponse {
         try boundary { db in
             try TestRunRepository(db: db, core: core).runStart(req)
         }
     }
 
+    /// Report test run status.
+    /// - Parameter req: The TEST_RUN_STATUS request.
+    /// - Returns: The test run response.
+    /// - Throws: Repository or query errors.
     func testRunStatus(_ req: TestRunStatusRequest) throws -> TestRunResponse {
         try boundaryRead { db in
             try TestRunRepository(db: db, core: core).runStatus(req)

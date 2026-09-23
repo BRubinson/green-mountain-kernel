@@ -60,14 +60,23 @@ enum AgentGmkMission: String, Sendable, Hashable, Codable, CaseIterable {
         }
     }
 
+    /// Retrieves the directive for a workflow phase.
+    /// - Parameter phase: The workflow phase.
+    /// - Returns: The agent directive for the phase.
     func directive(for phase: GmCdeRpirWorkflowPhase) -> AgentGmkDirective {
         phase.directive
     }
 
+    /// Retrieves the base steps for a workflow phase.
+    /// - Parameter phase: The workflow phase.
+    /// - Returns: The step instructions for the phase.
     func baseSteps(for phase: GmCdeRpirWorkflowPhase) -> String {
         phase.directive.steps
     }
 
+    /// Determines the staffing strategy for a workflow phase.
+    /// - Parameter phase: The workflow phase.
+    /// - Returns: The staffing directive string for the phase.
     func staffing(for phase: GmCdeRpirWorkflowPhase) -> String {
         guard writesRecord else { return GM_CDE_STAFF_IN_MIND }
         switch phase {
@@ -94,8 +103,13 @@ enum AgentGmkMission: String, Sendable, Hashable, Codable, CaseIterable {
         }
     }
 
-    /// One phase's line in the mission body: where its instructions live, and who
-    /// staffs it under this mission.
+    /// Renders a mission body line for a workflow phase.
+    ///
+    /// The line shows where the phase's instructions live and who staffs it
+    /// under this mission.
+    ///
+    /// - Parameter phase: The workflow phase.
+    /// - Returns: A formatted citation string for the phase.
     func citation(for phase: GmCdeRpirWorkflowPhase) -> String {
         "`\(phase.rawValue)` — load `gmcc:cde_rpir_\(phase.rawValue)`. \(staffing(for: phase))"
     }

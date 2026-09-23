@@ -3,7 +3,7 @@ name: cde_rpir_arch_options
 description: "The ARCH_OPTIONS phase: rival plans written in parallel, one per lens."
 user-invocable: false
 allowed-tools: mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_rpir_explore, mcp__plugin_gmcc_cde__cde_rpir_clarify, mcp__plugin_gmcc_cde__cde_rpir_architecture
-model: opus
+model: claude-opus-5-5[1m]
 ---
 
 # Workflow Phase

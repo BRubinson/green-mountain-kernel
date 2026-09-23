@@ -10,6 +10,6 @@ struct PersistedEvent: Sendable {
     let createdAt: String
 
     var notification: EventNotification {
-        EventNotification(id: id, kind: kind, subjectUuid: subjectUuid, payload: payload, createdAt: createdAt)
+        EventNotification(id: id, kind: kind, createdAt: createdAt, subjectUuid: subjectUuid, payload: payload)
     }
 }

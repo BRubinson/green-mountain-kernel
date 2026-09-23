@@ -1,10 +1,11 @@
 #!/bin/bash
 #
 # swift_lint_format.sh — lint (default) or format in place (--fix) every authored
-# Swift source under gmk/ with swift-format, then lint it with SwiftLint.
+# Swift source under gmk/ with swift-format, then lint it with SwiftLint, then check
+# doc-comment completeness with swift_doc_check.py.
 #
 # Usage:
-#   swift_lint_format.sh                 # lint; exit 1 on any swift-format finding or SwiftLint error
+#   swift_lint_format.sh                 # lint; exit 1 on any swift-format, doc-check or SwiftLint error
 #   swift_lint_format.sh --fix           # swift-format in place, then lint (SwiftLint never rewrites)
 #   swift_lint_format.sh [--fix] PATH... # restrict to the given files or directories
 #
@@ -115,6 +116,18 @@ else
         echo "[GMB] swiftlint: errors above (warnings do not fail the gate)" >&2
         STATUS=1
     fi
+fi
+
+# Stage 3: every function, init and subscript documents its summary, parameters, return and
+# throws. Findings already in .swift-doc-baseline.json (the pre-gate tree) are suppressed;
+# anything new fails. Style: .claude/skills/swift-doc-comments/SKILL.md
+echo "[GMB] doc-check: checking $COUNT files"
+# shellcheck disable=SC2046
+if python3 "$SCRIPT_DIR/swift_doc_check.py" $(cat "$FILES"); then
+    :
+else
+    echo "[GMB] doc-check: findings above need a hand edit at the reported line" >&2
+    STATUS=1
 fi
 
 exit $STATUS

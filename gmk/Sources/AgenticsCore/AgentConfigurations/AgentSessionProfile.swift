@@ -6,12 +6,11 @@ import FoundationModels
 @available(macOS 27, *)
 extension AgentGmkSessionProfile {
 
-    /// The session profile for this identity: one fixed instruction body and the
-    /// full tool surface. The caller picks the model.
+    /// Language model profile with fixed instructions and all tools.
     ///
-    /// There is no `DynamicInstructions` here any more. The body is a single
-    /// precompiled string, so the framework sees the same instructions for the
-    /// whole session and its key-value cache survives.
+    /// A single precompiled instruction body for the whole session, allowing the
+    /// framework to keep its key-value cache.
+    /// - Returns: A language model profile for this agent session.
     func languageModelProfile() -> some LanguageModelSession.DynamicProfile {
         LanguageModelSession.Profile {
             Instructions(instruction.text)

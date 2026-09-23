@@ -40,6 +40,18 @@ struct GmAgentCdeKbiteArguments: Sendable {
     @Guide(description: "Page budget in bytes.")
     var page_bytes: Int?
 
+    /// Creates kbite tool arguments.
+    ///
+    /// - Parameters:
+    ///   - op: The operation name.
+    ///   - query: Optional search query.
+    ///   - limit: Optional result limit.
+    ///   - kbite_name: Optional kbite name.
+    ///   - maw_path: Optional maw path.
+    ///   - code: Optional kbite code.
+    ///   - kbite_open_path: Optional open path.
+    ///   - cursor: Optional page cursor.
+    ///   - page_bytes: Optional page budget.
     init(
         op: String,
         query: String? = nil,
@@ -77,27 +89,27 @@ struct GmAgentCdeKbiteTool: GmAgentKbiteTool {
         GmAgentToolOp(
             Op.search,
             verbs: [.kbiteSearch],
+            summary: "bm25-ranked kbite file stubs with briefs — read the briefs first.",
             narrowing: CdeNarrowing(
                 parameters: ["cursor", "page_bytes", "limit"],
                 retryWith: "cde_kbite op=search with cursor = page.next_cursor"
             ),
-            requiredParams: ["query"],
-            summary: "bm25-ranked kbite file stubs with briefs — read the briefs first."
+            requiredParams: ["query"]
         ),
         GmAgentToolOp(
             Op.openMaw,
             verbs: [.kbiteMawOpen],
-            requiredParams: ["kbite_name", "maw_path"],
             summary: """
                 Open a maw — the staging directory a kbite's raw sources are \
                 collected into before they are chewed and digested.
-                """
+                """,
+            requiredParams: ["kbite_name", "maw_path"]
         ),
         GmAgentToolOp(
             Op.digest,
             verbs: [.kbiteDigest],
-            requiredParams: ["code", "kbite_open_path"],
-            summary: "Digest a chewed maw into the database and archive its raw sources."
+            summary: "Digest a chewed maw into the database and archive its raw sources.",
+            requiredParams: ["code", "kbite_open_path"]
         ),
     ]
 
@@ -112,5 +124,6 @@ struct GmAgentCdeKbiteTool: GmAgentKbiteTool {
     typealias Arguments = GmAgentCdeKbiteArguments
     typealias Output = String
 
+    /// Creates a cde_kbite tool instance.
     init() {}
 }

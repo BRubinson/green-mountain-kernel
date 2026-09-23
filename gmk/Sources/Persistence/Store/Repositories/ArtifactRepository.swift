@@ -1,12 +1,18 @@
 import Foundation
 import GRDB
 
-/// Data access for prompt_artifact pointers. Runs INSIDE a Store-owned
-/// transaction; holds no dbQueue and never self-transacts.
+/// Data access for prompt_artifact pointers.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
+/// self-transacts.
 struct ArtifactRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Add or update an artifact reference to a prompt.
+    /// - Parameter req: The artifact addition request.
+    /// - Returns: The created or updated artifact row.
+    /// - Throws: Database, not-found, or repository errors.
     func add(_ req: ArtifactAddRequest) throws -> ArtifactRow {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -60,10 +66,18 @@ struct ArtifactRepository: RepositoryContext {
         return row
     }
 
+    /// Fetch an artifact row by UUID.
+    /// - Parameter uuid: The artifact's unique identifier.
+    /// - Returns: The artifact row, or nil if not found.
+    /// - Throws: Database query errors.
     func fetchRow(uuid: String) throws -> ArtifactRow? {
         try PromptArtifactRecord.fetch(db, uuid: uuid)?.dto()
     }
 
+    /// Fetch artifact rows for a prompt.
+    /// - Parameter promptUuid: The prompt's unique identifier.
+    /// - Returns: The artifact rows for the prompt, in creation order.
+    /// - Throws: Database query errors.
     func fetchRows(promptUuid: String) throws -> [ArtifactRow] {
         // `id` orders the tie-break: it is a column even though no Record
         // exposes it as a property.

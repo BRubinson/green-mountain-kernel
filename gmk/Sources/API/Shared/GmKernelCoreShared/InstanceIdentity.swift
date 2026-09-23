@@ -13,6 +13,12 @@ import Foundation
 /// when resolving an instance, so one implementation is what keeps a session
 /// from being filed under two different codes for the same checkout.
 enum InstanceIdentity {
+    /// Derives an instance identifier from repo name and path.
+    ///
+    /// - Parameters:
+    ///   - repoName: The repository name.
+    ///   - absolutePath: The absolute path to the repository.
+    /// - Returns: The instance code in the form `{repoName}_{4 hex digits}`.
     static func code(repoName: String, absolutePath: String) -> String {
         let digest = Insecure.MD5.hash(data: Data(absolutePath.utf8))
         let hex = digest.map { String(format: "%02x", $0) }.joined()

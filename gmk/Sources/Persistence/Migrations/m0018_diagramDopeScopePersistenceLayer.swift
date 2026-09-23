@@ -6,6 +6,12 @@ extension Migrations {
     // 'dope_scope_persistence_layer', and the subtype table renames with it. The
     // value appears in TWO CHECKs and SQLite cannot ALTER a CHECK, so this is a
     // create-copy-drop-rename rebuild on the m0013 precedent.
+    /// Registers the m0018 migration for diagram scope persistence layer renaming.
+    ///
+    /// Renames diagram_element.element_type 'dope_scope' to 'dope_scope_persistence_layer',
+    /// and the subtype table renames with it.
+    ///
+    /// - Parameter migrator: The database migrator to register with.
     static func m0018_diagramDopeScopePersistenceLayer(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0018_diagramDopeScopePersistenceLayer") { db in
             let before = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM diagram_element") ?? -1

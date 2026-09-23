@@ -14,6 +14,10 @@ struct GmBridgePrompt: Equatable, Sendable, GmBridgeFile {
 
     var body: String
 
+    /// Creates a prompt from a name and body.
+    /// - Parameters:
+    ///   - name: The prompt's name without the `.prompt.md` suffix.
+    ///   - body: The markdown body text of the prompt.
     init(name: String, body: String) {
         self.name = name
         self.body = body
@@ -28,6 +32,8 @@ struct GmBridgePrompt: Equatable, Sendable, GmBridgeFile {
 
     var isEmpty: Bool { body.isEmpty }
 
+    /// Returns the prompt body with a trailing newline, or nil if empty.
+    /// - Returns: The prompt body ending with a newline, or nil if the body is empty.
     func contents() -> String? {
         guard !isEmpty else { return nil }
         return body.hasSuffix("\n") ? body : body + "\n"

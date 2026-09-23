@@ -60,9 +60,13 @@ enum GmPersonality: String, CaseIterable, Sendable {
         }
     }
 
+    /// Resolve a personality from command arguments.
+    ///
     /// argv[0] WINS over argv[1]: `gm_hook call BACKUP` arrives with argv[1] ==
-    /// "call", so a subcommand-first rule would dispatch `call` as a
-    /// personality. Returns the personality and the argv it receives.
+    /// "call", so a subcommand-first rule would dispatch `call` as a personality.
+    ///
+    /// - Parameter arguments: The command arguments.
+    /// - Returns: The personality and its argv, or `nil` if not recognized.
     static func resolve(_ arguments: [String]) -> (GmPersonality, [String])? {
         let invokedAs = URL(fileURLWithPath: arguments.first ?? "").lastPathComponent
         if let personality = GmPersonality(rawValue: invokedAs) {
@@ -76,7 +80,11 @@ enum GmPersonality: String, CaseIterable, Sendable {
         return nil
     }
 
-    /// Run this personality with the argv that follows it. Never returns.
+    /// Run this personality with the argv that follows it.
+    ///
+    /// Never returns.
+    ///
+    /// - Parameter argv: The command arguments for this personality.
     func run(_ argv: [String]) -> Never {
         switch self {
         case .daemon:
@@ -111,8 +119,9 @@ enum GmPersonality: String, CaseIterable, Sendable {
         }
     }
 
-    /// The names the release store symlinks at the staged kernel. The Swift
-    /// side of `GM_ENTRYPOINTS` in gm_releases.sh; keep them equal by hand.
+    /// The names the release store symlinks at the staged kernel.
+    ///
+    /// The Swift side of `GM_ENTRYPOINTS` in gm_releases.sh; keep them equal by hand.
     static var entrypoints: [String] {
         allCases.filter { $0.distribution == .releaseStore }.map(\.rawValue)
     }

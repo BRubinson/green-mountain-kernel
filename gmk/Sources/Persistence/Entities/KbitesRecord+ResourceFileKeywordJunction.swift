@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `resource_file_keyword_junction` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `resource_file_keyword_junction` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct ResourceFileKeywordJunctionRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "resource_file_keyword_junction"
     var uuid: String

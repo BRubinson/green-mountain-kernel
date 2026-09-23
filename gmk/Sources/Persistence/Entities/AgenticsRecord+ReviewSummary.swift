@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `review_summary` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `review_summary` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct ReviewSummaryRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "review_summary"
     var uuid: String

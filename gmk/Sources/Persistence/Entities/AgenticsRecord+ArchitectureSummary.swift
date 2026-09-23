@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `architecture_summary` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `architecture_summary` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct ArchitectureSummaryRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "architecture_summary"
     var uuid: String

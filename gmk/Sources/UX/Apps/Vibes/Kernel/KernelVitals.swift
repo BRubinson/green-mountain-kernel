@@ -14,6 +14,12 @@ struct KernelVitalsReport: Equatable, Sendable {
     var residentMemoryBytes: UInt64?
     var cpuPercent: Double?
 
+    /// Creates a kernel vitals report with optional measurements.
+    ///
+    /// - Parameters:
+    ///   - uptimeSeconds: The uptime in seconds, or nil.
+    ///   - residentMemoryBytes: The resident memory in bytes, or nil.
+    ///   - cpuPercent: The CPU percentage, or nil.
     init(
         uptimeSeconds: Int? = nil,
         residentMemoryBytes: UInt64? = nil,
@@ -33,13 +39,12 @@ struct KernelVitalsReading: Equatable, Sendable {
 }
 
 /// The menu bar's vitals sampler: resident footprint, CPU load, uptime, and the display
-/// strings for all three. Unrelated to `MemoryWatcher` in `gmk/gmDaemon`, which watches
-/// prompt `memory/` directories and has nothing to do with RAM.
+/// strings for all three.
 ///
-/// A REPORTED value always wins over a locally sampled one, because the report describes the
-/// kernel that owns the store and in client-only mode that is another process. Showing our
-/// own footprint under the owner's label is a quietly wrong number rather than a missing one.
-/// Local sampling is the fallback that keeps the rows populated before anything has answered.
+/// Unrelated to `MemoryWatcher` in `gmk/gmDaemon`, which watches prompt directories unrelated to RAM.
+/// REPORTED values win over local samples; reports describe the kernel owning the store, another
+/// process in client-only mode. Showing our footprint under the owner's label is wrong, not missing.
+/// Local sampling is fallback.
 @Observable
 @MainActor
 final class KernelVitals {
@@ -59,12 +64,18 @@ final class KernelVitals {
     /// A private serial queue, NOT the cooperative pool and emphatically not
     /// the kernel's serial database queue: a writer-role kernel serializes
     /// every db access on that one lane, and a 2s poll that lands on it turns
-    /// a display refresh into contention with real work. Nothing shared, so
-    /// there is nothing to contend with.
+    /// a display refresh into contention with real work.
+    ///
+    /// Nothing shared, so there is nothing to contend with.
     private let samplingQueue = DispatchQueue(label: "gmvibes.kernel.vitals", qos: .utility)
     private var ticker: DispatchSourceTimer?
     private let cpu = CpuDeltaState()
 
+    /// Creates a vitals sampler with an optional report callback.
+    ///
+    /// - Parameters:
+    ///   - interval: The sampling interval in seconds; default 2.
+    ///   - report: A closure to fetch kernel-reported vitals; default nil.
     init(
         interval: TimeInterval = 2,
         report: @escaping @MainActor () -> KernelVitalsReport? = { nil }
@@ -94,13 +105,15 @@ final class KernelVitals {
         timer.resume()
     }
 
+    /// Stops the vitals sampling timer.
     func stop() {
         ticker?.cancel()
         ticker = nil
     }
 
-    /// One reading now, off the timer's phase — what a surface calls as it
-    /// appears so the first row it shows is not a dash.
+    /// Takes a sample immediately, off the timer's phase.
+    ///
+    /// A surface calls this as it appears so the first row shown is not dashes.
     func sampleNow() {
         samplingQueue.async { [self, cpu] in
             let reading = Self.read(cpu: cpu)
@@ -108,6 +121,9 @@ final class KernelVitals {
         }
     }
 
+    /// Publishes vitals, preferring reported values over local samples.
+    ///
+    /// - Parameter reading: The local sample reading.
     private func publish(_ reading: KernelVitalsReading) {
         let reported = report()
         let memory = reported?.residentMemoryBytes ?? reading.residentMemoryBytes
@@ -133,22 +149,34 @@ final class KernelVitals {
         uptimeSeconds.map(Self.formatUptime) ?? "—"
     }
 
-    /// Decimal MB/GB, matching what Activity Monitor shows for the same
-    /// process — a menu bar that disagrees with Activity Monitor about the
-    /// footprint of the same pid reads as a bug in the kernel, not in the unit.
+    /// Formats byte count as decimal MB or GB.
+    ///
+    /// Matches Activity Monitor's display; a menu bar that disagrees about
+    /// the same process reads as a kernel bug, not a unit issue.
+    ///
+    /// - Parameter bytes: The byte count to format.
+    /// - Returns: A formatted string like "123 MB" or "1.23 GB".
     static func formatBytes(_ bytes: UInt64) -> String {
         let mb = Double(bytes) / 1_000_000
         if mb < 1000 { return "\(Int(mb.rounded())) MB" }
         return String(format: "%.2f GB", mb / 1000)
     }
 
+    /// Formats a CPU percentage value.
+    ///
+    /// - Parameter percent: The percentage value.
+    /// - Returns: A formatted string like "45.3%".
     static func formatPercent(_ percent: Double) -> String {
         String(format: "%.1f%%", max(0, percent))
     }
 
-    /// The same ladder `DaemonStatusPopover` uses, with a day arm on top: a
-    /// menu-bar-resident kernel is expected to run for days, where "51h 12m"
-    /// stops being readable at a glance.
+    /// Formats uptime in days, hours, minutes and seconds.
+    ///
+    /// Adds a day arm (like `DaemonStatusPopover`) since long uptimes
+    /// make hour-only display unreadable at a glance.
+    ///
+    /// - Parameter seconds: The uptime in seconds.
+    /// - Returns: A formatted string like "2d 15h 30m" or "45m 30s".
     static func formatUptime(_ seconds: Int) -> String {
         let days = seconds / 86_400
         let hours = (seconds % 86_400) / 3600
@@ -172,6 +200,10 @@ final class KernelVitals {
         var previousWallTicks: UInt64?
     }
 
+    /// Takes one reading of resident memory and CPU percentage.
+    ///
+    /// - Parameter cpu: The CPU delta state tracker.
+    /// - Returns: A reading with current memory and CPU values.
     private nonisolated static func read(cpu: CpuDeltaState) -> KernelVitalsReading {
         KernelVitalsReading(
             residentMemoryBytes: residentFootprintBytes(),
@@ -179,11 +211,14 @@ final class KernelVitals {
         )
     }
 
-    /// `phys_footprint` rather than `resident_size`: it is the number the
-    /// kernel's own memory limits are enforced against, it counts compressed
-    /// and IOKit-mapped pages, and it is what Activity Monitor's "Memory"
-    /// column shows. `resident_size` omits compressed pages, so it falls as
-    /// pressure rises — exactly backwards for a vitals row.
+    /// Returns the resident footprint in bytes from the Mach task API.
+    ///
+    /// Uses `phys_footprint` rather than `resident_size` because it is what
+    /// the kernel's memory limits are enforced against, counts compressed and
+    /// IOKit-mapped pages, and matches Activity Monitor's "Memory" column.
+    /// `resident_size` omits compressed pages and falls with pressure.
+    ///
+    /// - Returns: The physical footprint in bytes, or nil on error.
     private nonisolated static func residentFootprintBytes() -> UInt64? {
         var info = task_vm_info_data_t()
         var count = mach_msg_type_number_t(
@@ -198,13 +233,13 @@ final class KernelVitals {
         return UInt64(info.phys_footprint)
     }
 
-    /// CPU as a percentage of one core over the interval BETWEEN samples: 100% is one
-    /// saturated core, and a multi-threaded burst legitimately exceeds it.
+    /// Returns the CPU load as a percentage of one core.
     ///
-    /// `proc_pid_rusage` reports CPU consumed cumulatively since launch, so its absolute value
-    /// says nothing about load now. The percentage is a delta of CPU consumed over monotonic
-    /// time elapsed since the previous sample, and the first sample returns nil rather than a
-    /// fabricated 0.
+    /// 100% is one saturated core; multithreaded bursts legitimately exceed it.
+    /// Percentage is a delta between samples; the first sample returns nil.
+    ///
+    /// - Parameter cpu: The CPU delta state tracker.
+    /// - Returns: The CPU percentage, or nil for the first sample or on error.
     private nonisolated static func cpuPercentDelta(cpu: CpuDeltaState) -> Double? {
         // BOTH SIDES OF THE RATIO ARE MACH ABSOLUTE TIME UNITS. `ri_user_time` and
         // `ri_system_time` are documented as nanoseconds and are not: they are mach ticks,
@@ -226,14 +261,12 @@ final class KernelVitals {
         return Double(consumed - previousCpu) / Double(wall - previousWall) * 100
     }
 
-    /// User + system CPU consumed by this process, in mach absolute time units
-    /// (see `cpuPercentDelta` — NOT nanoseconds, whatever the field names say).
+    /// Returns the total CPU ticks (user + system) consumed by this process.
     ///
-    /// `RUSAGE_INFO_V4` with its matching concrete struct rather than
-    /// `RUSAGE_INFO_CURRENT`/`rusage_info_current`: the "current" flavor tracks
-    /// whatever the SDK's newest version happens to be, so it moves under the
-    /// code on an SDK bump. V4 is fixed, and `ri_user_time`/`ri_system_time`
-    /// have been in every flavor since V0.
+    /// Measured in mach absolute time units, not nanoseconds (see
+    /// `cpuPercentDelta`). Uses `RUSAGE_INFO_V4` for stability across SDKs.
+    ///
+    /// - Returns: The total CPU ticks, or nil on error.
     private nonisolated static func cpuTicks() -> UInt64? {
         var info = rusage_info_v4()
         let status = withUnsafeMutablePointer(to: &info) { pointer in

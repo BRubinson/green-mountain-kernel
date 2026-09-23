@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `dope_cog_hull` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `dope_cog_hull` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DopeCogHullRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "dope_cog_hull"
     var uuid: String

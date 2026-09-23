@@ -1,8 +1,10 @@
 import Foundation
 
-/// Pure whole-bundle validation — no db, no filesystem. Collects EVERY
-/// failure and throws once with a numbered list: an agent fixing a large
-/// hand-edited tree needs the whole list, not one error per round trip.
+/// Pure whole-bundle validation — no db, no filesystem.
+///
+/// Collects EVERY failure and throws once with a numbered list: an agent
+/// fixing a large hand-edited tree needs the whole list, not one error per
+/// round trip.
 enum DopeValidator {
 
     struct BundleError: Error, CustomStringConvertible, Sendable {
@@ -14,9 +16,12 @@ enum DopeValidator {
         }
     }
 
-    /// Validates codes, description limits, sibling uniqueness, version
-    /// agreement, the main domain map, data_type coupling, and full ref
-    /// resolvability. Returns normally only on a fully consistent bundle.
+    /// Validates a dope bundle for consistency and completeness.
+    ///
+    /// Checks codes, description limits, sibling uniqueness, version agreement, domain
+    /// map, data_type coupling, and ref resolvability. Collects all failures before throwing.
+    /// - Parameter bundle: The bundle to validate.
+    /// - Throws: `BundleError` containing all validation failures found.
     static func validate(_ bundle: DopeDocumentBundle) throws {
         var errors: [String] = []
 
@@ -312,7 +317,9 @@ enum DopeValidator {
         if !errors.isEmpty { throw BundleError(errors: errors) }
     }
 
-    /// Wire-tree variant: project and validate the identity-free shape.
+    /// Validates a wire-tree by projecting and validating its identity-free shape.
+    /// - Parameter tree: The scope tree to validate.
+    /// - Throws: `BundleError` containing all validation failures found.
     static func validate(_ tree: DopeScopeTree) throws {
         try validate(DopeProjection.documents(from: tree))
     }

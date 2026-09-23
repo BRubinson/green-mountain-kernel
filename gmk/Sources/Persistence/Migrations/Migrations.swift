@@ -11,9 +11,9 @@ import GRDB
 /// file only ORDERS them, and a file missing from `ladder` never runs.
 enum Migrations {
     /// Bump alongside new registerMigration calls.
-    /// Shipped migration bodies are frozen: the migrator keys on the migration
-    /// id and silently skips a changed body on an existing db, so every schema
-    /// change lands as a new registerMigration.
+    ///
+    /// Shipped migration bodies are frozen: the migrator keys on the migration id and silently skips a changed body on
+    /// an existing db, so every schema change lands as a new registerMigration.
     static let currentSchemaVersion = 30
 
     /// The five BaseEntity columns wrapped into every domain table.
@@ -27,8 +27,9 @@ enum Migrations {
         updated_at TEXT NOT NULL
         """
 
-    /// The order the migrator runs in. One entry per file in this directory; a
-    /// step missing here never runs. Append, never reorder.
+    /// The order the migrator runs in.
+    ///
+    /// One entry per file in this directory; a step missing here never runs. Append, never reorder.
     private static let ladder: [@Sendable (inout DatabaseMigrator) -> Void] = [
         m0001_baseSchema,
         m0002_clarificationArchitectureLifecycleV2,

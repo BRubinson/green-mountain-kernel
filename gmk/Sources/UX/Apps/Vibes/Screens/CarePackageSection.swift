@@ -71,8 +71,9 @@ struct CarePackageSection: View {
     // MARK: Dope refs
 
     /// Dot-path chips against the live scope: a ghost is struck through, exactly
-    /// as in BriefingPane, because it is the same chip. The curator's `note` is
-    /// the whole reason a path made the package, so it rides under the chip.
+    /// as in BriefingPane, because it is the same chip.
+    ///
+    /// The curator's `note` is the whole reason a path made the package, so it rides under the chip.
     private var dopeRefs: some View {
         VStack(alignment: .leading, spacing: 5) {
             ForEach(package.dopeRefs, id: \.uuid) { ref in
@@ -115,9 +116,10 @@ struct CarePackageSection: View {
 
     // MARK: Exploration refs
 
-    /// CURATED COPIES. The source finding is never re-read — `sourceFindingUuid`
-    /// is a soft provenance ref that survives source pruning via SET NULL, so its
-    /// presence is worth a dot and its absence is not worth a word.
+    /// CURATED COPIES.
+    ///
+    /// The source finding is never re-read — `sourceFindingUuid` is a soft provenance ref that survives source pruning
+    /// via SET NULL, so its presence is worth a dot and its absence is not worth a word.
     private var explorationRefs: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(package.explorationRefs, id: \.uuid) { ref in
@@ -155,12 +157,18 @@ struct CarePackageSection: View {
 
     // MARK: Bits
 
+    /// Renders a section header label.
+    /// - Parameter title: The header text.
+    /// - Returns: The styled header view.
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
     }
 
+    /// Renders a package status chip.
+    /// - Parameter status: The package status ("ready" or "building").
+    /// - Returns: The styled status chip.
     @ViewBuilder
     private func packageChip(_ status: String) -> some View {
         let (label, color): (String, Color) =

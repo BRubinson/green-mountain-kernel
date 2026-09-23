@@ -67,6 +67,9 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
     // MARK: - Source tree
 
     /// `Sources/Persistence/Entities`, found by walking up from this file.
+    ///
+    /// - Returns: The URL to the Entities directory.
+    /// - Throws: `XCTSkip` if the directory cannot be found above the test file.
     private static func entitiesDirectory() throws -> URL {
         let suffix = "gmk/Sources/Persistence/Entities"
         var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -83,12 +86,23 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
         throw XCTSkip("no \(suffix) above \(#filePath): the fence needs the checkout it was built from")
     }
 
+    /// Lists Swift source files in a directory.
+    ///
+    /// - Parameter directory: The directory to search.
+    /// - Returns: Array of URLs for `.swift` files.
+    /// - Throws: Any file system error.
     private static func swiftFiles(under directory: URL) throws -> [URL] {
         try FileManager.default
             .contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension == "swift" }
     }
 
+    /// Counts regex pattern matches in source code.
+    ///
+    /// - Parameters:
+    ///   - pattern: A regex pattern string.
+    ///   - source: The source code to search.
+    /// - Returns: The number of matches found; 0 if regex compilation fails.
     private static func matchCount(of pattern: String, in source: String) -> Int {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return 0 }
         return regex.numberOfMatches(in: source, range: NSRange(source.startIndex..., in: source))
@@ -170,6 +184,9 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
     // MARK: - Fabrication
 
     /// A row carrying one value per column, typed by declared affinity.
+    ///
+    /// - Parameter columns: The columns to populate.
+    /// - Returns: A `Row` with one fabricated value per column.
     private static func fabricatedRow(for columns: [ColumnInfo]) -> Row {
         var values: [String: (any DatabaseValueConvertible)?] = [:]
         for column in columns {
@@ -178,11 +195,14 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
         return Row(values)
     }
 
-    /// The same row with every nullable column NULL, so a record declaring one
-    /// of them non-optional throws rather than waiting for the first real row.
+    /// A row with every nullable column NULL to test non-null declarations.
     ///
-    /// A primary key keeps its value: SQLite reports an INTEGER PRIMARY KEY
-    /// rowid alias as nullable, and no row ever carries NULL there.
+    /// Primary keys keep their values: SQLite reports an INTEGER PRIMARY KEY
+    /// rowid alias as nullable, but no row ever carries NULL there. A record
+    /// declaring a nullable column as non-optional will throw on this row.
+    ///
+    /// - Parameter columns: The columns to populate.
+    /// - Returns: A `Row` with nulls for nullable columns.
     private static func nullableRow(for columns: [ColumnInfo]) -> Row {
         var values: [String: (any DatabaseValueConvertible)?] = [:]
         for column in columns {
@@ -193,6 +213,9 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
     }
 
     /// SQLite affinity is a prefix rule; BLOB and an undeclared type land on `Data`.
+    ///
+    /// - Parameter declaredType: The column's declared type string.
+    /// - Returns: A value conforming to `DatabaseValueConvertible`.
     private static func dummy(forDeclaredType declaredType: String) -> any DatabaseValueConvertible {
         let type = declaredType.uppercased()
         if type.hasPrefix("INT") { return Int64(1) }
@@ -203,6 +226,13 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
 
     // MARK: - Foreign keys
 
+    /// Retrieves foreign keys for an association's origin table.
+    ///
+    /// - Parameters:
+    ///   - entry: The association entry.
+    ///   - db: The database to query.
+    /// - Returns: Array of foreign keys targeting the entry's destination table.
+    /// - Throws: Any database error.
     private static func foreignKeys(
         for entry: SchemaEnrollment.AssociationEntry,
         in db: Database
@@ -210,6 +240,13 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
         try db.foreignKeys(on: entry.origin).filter { $0.destinationTable == entry.destination }
     }
 
+    /// Checks if an association's foreign key exists and matches its declared columns.
+    ///
+    /// - Parameters:
+    ///   - entry: The association entry.
+    ///   - db: The database to query.
+    /// - Returns: `true` if the foreign key exists and matches the entry's origin columns.
+    /// - Throws: Any database error.
     private static func resolves(_ entry: SchemaEnrollment.AssociationEntry, in db: Database) throws -> Bool {
         let keys = try foreignKeys(for: entry, in: db)
         guard let originColumns = entry.originColumns else { return keys.count == 1 }

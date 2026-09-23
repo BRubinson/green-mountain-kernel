@@ -2,14 +2,13 @@ import Foundation
 import GRDB
 
 extension Migrations {
-    // m0026 — session-bound hook attribution. PRECONDITION: a BACKUP.
-    // claude_session_binding maps Claude Code's conversation uuid to a gmcc
-    // session; agent_registration answers "who is agent X" for an opaque
-    // agent_id; file_change grows the typed payload columns the two resolve
-    // against. Pure ADD — file_change's only CHECK is on change_kind.
-    // claude_turn_id is the naming trap here: the payload calls it prompt_id, but
-    // it is Claude Code's TURN id and has nothing to do with a gmcc prompt uuid.
-    // The new columns are NULL for older rows; nothing can backfill a tool_use_id.
+    /// Registers migration m0026: session-bound hook attribution.
+    ///
+    /// Creates claude_session_binding (maps Claude Code conversation to gmcc session),
+    /// agent_registration (identity for opaque agent_id), and extends file_change with
+    /// typed payload columns. Pure additive; nothing is deleted or changed. Precondition: a BACKUP.
+    ///
+    /// - Parameter migrator: The database migrator.
     static func m0026_claudeSessionAttribution(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0026_claudeSessionAttribution") { db in
             // ---- claude_session_binding: the payload-side attribution key.

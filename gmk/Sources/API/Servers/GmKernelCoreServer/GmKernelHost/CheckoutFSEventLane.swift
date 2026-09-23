@@ -1,24 +1,31 @@
 import Foundation
 
-/// Filesystem events for instance repos' git directories, delivering only paths
-/// ending in /HEAD. Watches the git DIRECTORY, never the repository root, which
-/// would fire on every source file the user saves.
+/// Filesystem events for instance repos' git directories (paths ending /HEAD).
 ///
-/// Lane contract as MemoryWatcher: no Store, no Server; `deliver` hops onto the
-/// server queue, which resolves the head state there and dedupes against its own
-/// per-instance cache, so only a genuine change broadcasts.
+/// Watches git DIRECTORY, not repository root, to avoid firing on every source
+/// file save. Lane contract: no Store, no Server; `deliver` hops to server queue
+/// which resolves head state and dedupes against per-instance cache, so only
+/// genuine changes broadcast.
 final class CheckoutFSEventLane: @unchecked Sendable {
     private let lane = FSEventLane(label: "gmcc.daemon.git", latency: 0.5)
     /// Lane-confined: gitDir → (instanceUuid, repoRoot).
     private var byGitDir: [String: (instanceUuid: String, repoRoot: String)] = [:]
     private let deliver: @Sendable (_ instanceUuid: String, _ repoRoot: String) -> Void
 
+    /// Creates a filesystem event watcher for git directories.
+    ///
+    /// - Parameter deliver: Callback invoked on genuine HEAD changes,
+    ///   receives instance UUID and repo root.
     init(deliver: @escaping @Sendable (String, String) -> Void) {
         self.deliver = deliver
         lane.setHandler { [weak self] paths in self?.handle(paths: paths) }
     }
 
-    /// Pushed by the supervisor. Idempotent via the lane.
+    /// Updates the set of git directories to watch.
+    ///
+    /// Pushed by the supervisor. Idempotent; previous roots are replaced.
+    ///
+    /// - Parameter roots: Array of instance UUID, repo root, and git directory tuples.
     func setRoots(_ roots: [(instanceUuid: String, repoRoot: String, gitDir: String)]) {
         lane.run {
             self.byGitDir = Dictionary(
@@ -29,11 +36,17 @@ final class CheckoutFSEventLane: @unchecked Sendable {
         lane.setPaths(roots.map(\.gitDir))
     }
 
+    /// Stops watching for filesystem events.
     func stop() {
         lane.stop()
     }
 
-    /// Runs on the lane. Only HEAD matters; dedupe per flush window.
+    /// Processes filesystem event paths and delivers changes to interested instances.
+    ///
+    /// Only HEAD file changes trigger deliveries. Runs on the lane; dedupes per
+    /// flush window. Handles nested worktree git directories correctly.
+    ///
+    /// - Parameter paths: Changed paths from the filesystem event.
     private func handle(paths: [String]) {
         var hit: Set<String> = []
         for path in paths {

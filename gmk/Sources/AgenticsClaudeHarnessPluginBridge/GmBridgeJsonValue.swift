@@ -21,6 +21,9 @@ enum GmBridgeJsonValue: Codable, Equatable, Hashable, Sendable {
         "additionalProperties": .bool(false),
     ])
 
+    /// Creates a JSON value by decoding from the given decoder.
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Decoding errors if the data is not valid JSON.
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() {
@@ -40,6 +43,9 @@ enum GmBridgeJsonValue: Codable, Equatable, Hashable, Sendable {
         }
     }
 
+    /// Encodes this JSON value to the given encoder.
+    /// - Parameter encoder: The encoder to write to.
+    /// - Throws: Encoding errors if the value cannot be encoded.
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {

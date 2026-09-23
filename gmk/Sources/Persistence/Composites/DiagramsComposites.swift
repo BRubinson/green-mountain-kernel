@@ -13,8 +13,12 @@ struct DiagramWithOwner: FetchableRecord, Decodable {
     var diagram: DiagramRecord
     var instanceUuid: String?
 
-    /// Every `diagram` read starts here: the LEFT JOIN onto session, with the
-    /// instance annotated onto the root row under the composite's own key.
+    /// Builds a request for diagrams with their instance uuid annotated.
+    ///
+    /// Every diagram read starts here, performing a LEFT JOIN onto session and annotating
+    /// the instance uuid onto the root row under the composite's own key.
+    ///
+    /// - Returns: A request that fetches DiagramWithOwner rows.
     static func request() -> QueryInterfaceRequest<Self> {
         let session = TableAlias<SessionRecord>()
         return
@@ -25,13 +29,18 @@ struct DiagramWithOwner: FetchableRecord, Decodable {
     }
 }
 
-/// The identity chain a diagram owner's uuid resolves to. A session reaches
-/// project through its instance, and a prompt through its session's.
+/// The identity chain a diagram owner's uuid resolves to.
+///
+/// A session reaches project through its instance, and a prompt through its
+/// session's.
 struct DiagramOwnerChain: FetchableRecord, Decodable {
     var sessionUuid: String
     var instanceUuid: String
     var projectUuid: String
 
+    /// Builds a request for the owner chain of a session.
+    /// - Parameter uuid: The session uuid.
+    /// - Returns: A request that fetches the DiagramOwnerChain for the session.
     static func forSession(_ uuid: String) -> QueryInterfaceRequest<Self> {
         let instance = TableAlias<InstanceRecord>()
         return
@@ -47,6 +56,9 @@ struct DiagramOwnerChain: FetchableRecord, Decodable {
             .asRequest(of: Self.self)
     }
 
+    /// Builds a request for the owner chain of a prompt.
+    /// - Parameter uuid: The prompt uuid.
+    /// - Returns: A request that fetches the DiagramOwnerChain for the prompt.
     static func forPrompt(_ uuid: String) -> QueryInterfaceRequest<Self> {
         let session = TableAlias<SessionRecord>()
         let instance = TableAlias<InstanceRecord>()

@@ -24,6 +24,8 @@ enum GmBridgeCli {
         }
     }
 
+    /// Generates the plugin directory from bridge definitions.
+    /// - Parameter arguments: The command-line arguments.
     static func main(_ arguments: [String]) -> Never {
         var args = arguments
         var check = false
@@ -64,10 +66,15 @@ enum GmBridgeCli {
         }
     }
 
-    /// `--check`: render everything, say what would land, and write nothing.
+    /// Reports rendered plugin files without writing.
     ///
-    /// It reports the whole picture where `verify()` would stop at the first
-    /// boot-critical gap and hide the rest.
+    /// Renders everything and says what would land. Reports the whole picture
+    /// where `verify()` would stop at the first boot-critical gap and hide
+    /// the rest.
+    /// - Parameters:
+    ///   - target: The target plugin directory URL.
+    ///   - rosterOut: The roster output path, if any.
+    /// - Throws: Never returns; exits with 0 on success, 1 on error.
     private static func report(target: URL, rosterOut: String?) throws -> Never {
         let (rendered, omitted) = GmBridgeWriter.render()
         let bytes = rendered.reduce(0) { $0 + $1.body.utf8.count }
@@ -111,14 +118,16 @@ enum GmBridgeCli {
         exit(1)
     }
 
-    /// Where `--roster-out` may write: a repo's own generated roster, and
-    /// nothing else.
+    /// Validates and returns the roster output path.
     ///
-    /// The path must END in the roster's repo-relative spelling EXACTLY, and
-    /// what is left above it must be a checkout of this repo. Without the second
-    /// half a caller could mint that tail in any directory on disk and have the
-    /// roster written there, because the first half derives the repo from the
-    /// very path it is checking.
+    /// Only a repo's own generated roster is valid. The path must end in
+    /// the roster's repo-relative spelling exactly, and what is left above
+    /// it must be a checkout of this repo. Without the second half, a caller
+    /// could mint that tail in any directory and have the roster written
+    /// there, because the first half derives the repo from the path itself.
+    /// - Parameter path: The roster output path to validate.
+    /// - Returns: The validated roster file URL.
+    /// - Throws: `RosterOutError` when path validation fails.
     private static func rosterPath(_ path: String) throws -> URL {
         let url = URL(fileURLWithPath: path).standardizedFileURL
         let suffix = "/" + CdeToolRoster.generatedPath
@@ -132,10 +141,13 @@ enum GmBridgeCli {
         return url
     }
 
+    /// Writes a line to standard output.
+    /// - Parameter line: The text to write.
     private static func out(_ line: String) {
         FileHandle.standardOutput.write(Data((line + "\n").utf8))
     }
 
+    /// Prints usage information and exits.
     private static func usage() -> Never {
         FileHandle.standardError.write(
             Data(

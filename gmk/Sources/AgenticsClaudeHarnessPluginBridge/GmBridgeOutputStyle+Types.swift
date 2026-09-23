@@ -23,6 +23,15 @@ enum GmBridgeOutputStyle {
 
         var body: String
 
+        /// Creates an output style file.
+        ///
+        /// - Parameters:
+        ///   - name: The style name (used in the file path).
+        ///   - displayName: The human-readable display name.
+        ///   - description: A description of the style.
+        ///   - keepCodingInstructions: Whether to keep coding instructions.
+        ///   - forceForPlugin: Whether to apply this style automatically for the plugin.
+        ///   - body: The markdown content of the style.
         init(
             name: String,
             displayName: String? = nil,
@@ -47,6 +56,9 @@ enum GmBridgeOutputStyle {
             body.isEmpty
         }
 
+        /// Returns the file contents as a YAML-frontmatter markdown document.
+        ///
+        /// - Returns: The formatted contents, or nil if the body is empty.
         func contents() -> String? {
             guard !isEmpty else { return nil }
 

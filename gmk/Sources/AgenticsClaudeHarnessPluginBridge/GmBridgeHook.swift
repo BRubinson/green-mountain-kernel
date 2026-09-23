@@ -5,21 +5,25 @@ extension GmBridgeHook {
     static let pluginRoot = GmBridgeClaudeTypePath.pluginRoot
 
     /// Where the kernel's binaries live, resolved at hook time rather than at
-    /// generate time: there are three environments, and a hook fired in one
-    /// must reach that root's kernel. A baked `$HOME/gmfs` gives one session two
-    /// databases with no error and no signal.
+    /// generate time.
+    ///
+    /// There are three environments, and a hook fired in one must reach that
+    /// root's kernel. A baked `$HOME/gmfs` gives one session two databases with
+    /// no error and no signal.
     static let binDir = #"${GM_FS_ROOT:-$HOME/gmfs}/bin"#
 
     /// Where the generated hook executables live: inside the plugin itself.
     static let hookBinDir = #"${CLAUDE_PLUGIN_ROOT}/hooks/bin"#
 
-    /// The command that runs one hook executable. SHELL FORM, because exec form
-    /// treats the command as a literal path and cannot expand a variable.
+    /// Generates the shell command to run a hook executable.
     ///
-    /// The `[ -x ]` guard and `exit 0` are the whole contract: a hook that exits
-    /// non-zero BLOCKS the tool call it fired on, and a tree written by
-    /// `gm_kernel bridge` alone (no `build_hook_binaries.sh` after it) has no
-    /// binaries yet. That tree must record nothing, not refuse every `Edit`.
+    /// Shell form (not exec form) because exec treats the command as a literal path
+    /// and cannot expand variables. The `[ -x ]` guard and `exit 0` are the contract:
+    /// a hook that exits non-zero blocks the tool call it fired on. A tree written by
+    /// `gm_kernel bridge` alone has no binaries yet; it records nothing, not refusing every `Edit`.
+    ///
+    /// - Parameter binary: The hook binary name.
+    /// - Returns: The shell command to run the binary.
     static func hookCommand(_ binary: String) -> String {
         #"[ -x "\#(hookBinDir)/\#(binary)" ] || exit 0; exec "\#(hookBinDir)/\#(binary)""#
     }
@@ -58,21 +62,23 @@ extension GmBridgeHook {
     }()
 
     /// `hooks.json`: the SessionStart shell group, plus one group per registry
-    /// entry FOLDED FROM `GmHookEvent`. The event key, the executable name, the
-    /// matcher, the timeout and the async flag all come off the declared type,
-    /// so the manifest cannot name an event the code does not handle.
+    /// entry FOLDED FROM `GmHookEvent`.
+    ///
+    /// The event key, the executable name, the matcher, the timeout and the
+    /// async flag all come off the declared type, so the manifest cannot name
+    /// an event the code does not handle.
     static let current: File = {
         var hooks: [String: [MatcherGroup]] = [
             Lifecycle.sessionStart.code: [
                 MatcherGroup(
-                    matcher: "*",
                     hooks: [
                         // STAYS A SCRIPT. SessionStart accepts only `command` and
                         // `mcp_tool`, and this is where the claude-session binding
                         // every later write depends on is created.
                         Handler(command: "\(pluginRoot)/scripts/gm_session_startup.sh"),
                         Handler(command: staleCheckCommand),
-                    ]
+                    ],
+                    matcher: "*"
                 )
             ]
         ]
@@ -84,14 +90,14 @@ extension GmBridgeHook {
             let hook = event.hook
             hooks[event.rawValue] = [
                 MatcherGroup(
-                    matcher: hook.matcher,
                     hooks: [
                         Handler(
                             command: hookCommand(event.binaryName),
                             timeout: hook.timeout,
                             async: hook.isAsync ? true : nil
                         )
-                    ]
+                    ],
+                    matcher: hook.matcher
                 )
             ]
         }
@@ -99,6 +105,7 @@ extension GmBridgeHook {
     }()
 
     /// `hooks/src/<binary>.swift`: the generated main of one hook executable.
+    ///
     /// The body is one call; everything else is the declared handler type.
     static var sources: [GmBridgeSwiftMain] {
         GmHookEvent.allCases.map { event in

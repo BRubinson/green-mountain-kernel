@@ -170,6 +170,30 @@ extension GmBridgeCommand {
             + GmBridgeMcpTool.tools(in: .rpir).map(Tool.mcp)
     }
 
+    /// Creates a tool definition for a file.
+    ///
+    /// - Parameters:
+    ///   - name: The tool name.
+    ///   - description: The tool description.
+    ///   - whenToUse: When to use this tool, or nil.
+    ///   - argumentHint: Hint for tool arguments, or nil.
+    ///   - arguments: List of argument names.
+    ///   - disableModelInvocation: Whether to disable model invocation.
+    ///   - userInvocable: Whether the tool is user-invocable.
+    ///   - allowed: Allowed tools.
+    ///   - disallowed: Disallowed tools.
+    ///   - model: The model to use, or nil.
+    ///   - effort: The reasoning effort level, or nil.
+    ///   - context: The context level, or nil.
+    ///   - agent: The agent name, or nil.
+    ///   - background: Whether to run in background.
+    ///   - hooks: Hook groups by name.
+    ///   - shell: The shell type, or nil.
+    ///   - metadata: Custom metadata.
+    ///   - license: License information, or nil.
+    ///   - compatibility: Compatibility information, or nil.
+    ///   - body: The tool body/description text.
+    /// - Returns: A File tool definition.
     static func file(
         name: String,
         description: String,

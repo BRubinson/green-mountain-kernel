@@ -14,14 +14,14 @@ import Foundation
 ///     rm [-rf] FILE...              →  deleted
 ///     touch FILE...
 
-/// A DOCUMENTED GAP, recording NOTHING silently: interpreter heredocs,
-/// `make`, `./script.sh`, `git apply`, unbalanced quotes, and any target
-/// spelled with an unexpanded `$VAR` or a glob. Every failure mode of the
-/// parse lands on "record nothing", because an absent row is detectable at a
-/// gate while a wrong row poisons the record. IT IS NOT A DIFF ENGINE: its one
-/// use of git is a PATH-LIMITED `git status --porcelain -- <path>` that
-/// CLASSIFIES a path the command already named, so it CANNOT DISCOVER A PATH
-/// and therefore CANNOT MISATTRIBUTE a parallel agent's edit.
+/// A DOCUMENTED GAP, recording NOTHING silently: interpreter heredocs, `make`,
+/// `./script.sh`, `git apply`, unbalanced quotes, and any target spelled with
+/// an unexpanded `$VAR` or a glob.
+///
+/// Parse failures land on "record nothing": absent rows are detectable, wrong
+/// rows poison the record. IT IS NOT A DIFF ENGINE — the sole git use is `git
+/// status --porcelain -- <path>` that CLASSIFIES paths already named, so it
+/// cannot discover paths or misattribute edits.
 enum BashWritePaths {
     struct Target: Equatable {
         let path: String
@@ -40,10 +40,18 @@ enum BashWritePaths {
     /// generated `rm` list) would be permanent.
     static let maxTargets = 100
 
-    /// Transparent wrappers: the real command is the next word. Ported from
-    /// the write guard's peel loop, which faces the identical problem.
+    /// Transparent wrappers: the real command is the next word.
+    ///
+    /// Ported from the write guard's peel loop, which faces the identical
+    /// problem.
     private static let wrappers: Set<String> = ["env", "command", "nohup", "time", "exec"]
 
+    /// Extracts paths the command writes or deletes.
+    ///
+    /// - Parameters:
+    ///   - command: The command line to parse.
+    ///   - cwd: The current working directory when the command runs.
+    /// - Returns: An array of targets with their write intents; empty if parsing fails.
     static func extract(command: String, cwd: String) -> [Target] {
         guard let segments = BashCommandScanner.segments(command) else { return [] }
         var targets: [Target] = []
@@ -57,8 +65,13 @@ enum BashWritePaths {
         return resolve(targets, cwd: cwd)
     }
 
+    /// Returns words with assignments and wrapper commands removed.
+    ///
     /// Peel leading `NAME=value` assignments and transparent wrappers so
     /// `FOO=1 env sed -i …` reaches the same dispatch as a bare `sed -i …`.
+    ///
+    /// - Parameter words: The words to filter.
+    /// - Returns: Words with leading assignments and wrapper names stripped.
     private static func peeled(_ words: [String]) -> [String] {
         var words = words
         while let first = words.first, isAssignment(first) || wrappers.contains(first) {
@@ -67,9 +80,13 @@ enum BashWritePaths {
         return words
     }
 
-    /// THE ASSIGNMENT TEST LOOKS AT ONE WORD. "contains an `=`" is not the
-    /// test — a `--body "rating=0"` argument contains one, and peeling on
-    /// that would eat the command word.
+    /// True when the word is a shell variable assignment.
+    ///
+    /// "contains an `=`" is not the test — a `--body "rating=0"` argument
+    /// contains one, and peeling on that would eat the command word.
+    ///
+    /// - Parameter word: The word to test.
+    /// - Returns: True if the word is a valid assignment name.
     private static func isAssignment(_ word: String) -> Bool {
         guard let split = word.firstIndex(of: "=") else { return false }
         let name = word[word.startIndex..<split]
@@ -77,6 +94,12 @@ enum BashWritePaths {
         return name.allSatisfy { $0 == "_" || $0.isLetter || $0.isNumber }
     }
 
+    /// Returns paths the command's own arguments will write or delete.
+    ///
+    /// - Parameters:
+    ///   - words: The command and its arguments, with assignments and wrappers removed.
+    ///   - cwd: The current working directory when the command runs.
+    /// - Returns: Targets extracted from the command.
     private static func commandTargets(_ words: [String], cwd: String) -> [Target] {
         guard let command = words.first.map(basename) else { return [] }
         let rest = Array(words.dropFirst())
@@ -128,8 +151,12 @@ enum BashWritePaths {
         }
     }
 
-    /// Non-option arguments. `--` ends option parsing; a lone `-` is stdin,
-    /// never a path.
+    /// Returns non-option arguments.
+    ///
+    /// `--` ends option parsing; a lone `-` is stdin, never a path.
+    ///
+    /// - Parameter words: The words to filter.
+    /// - Returns: Arguments that do not start with `-` or follow option-terminating flags.
     private static func operands(_ words: [String]) -> [String] {
         var out: [String] = []
         var optionsEnded = false
@@ -144,9 +171,17 @@ enum BashWritePaths {
         return out
     }
 
-    /// A copy or move INTO AN EXISTING DIRECTORY writes `DST/basename(SRC)`,
-    /// not DST — recording the directory would file a change against a path
-    /// that is not a file at all.
+    /// Returns destination paths when copying into a directory.
+    ///
+    /// When copying or moving into an existing directory, the actual writes are
+    /// `DST/basename(SRC)`, not DST — recording the directory would file a change
+    /// against a path that is not a file at all.
+    ///
+    /// - Parameters:
+    ///   - sources: The source paths to copy or move.
+    ///   - destination: The target path.
+    ///   - cwd: The current working directory when the command runs.
+    /// - Returns: Paths that will actually be written.
     private static func destinations(
         sources: some Collection<String>,
         destination: String,
@@ -173,14 +208,17 @@ enum BashWritePaths {
         var inPlace: Bool { flags.contains("i") }
     }
 
-    /// The sed/perl option walk. Both take CLUSTERS, which is where a naive
-    /// parser loses the file list and reads the script as a filename. Four
-    /// shapes are handled:
-    ///   - `-e PROGRAM`   the argument is the next word
-    ///   - `-e'PROGRAM'`  the argument is the rest of this word
-    ///   - `-i.bak`       everything from the `.` is a SUFFIX, not more flags
-    ///   - `-i ''`        BSD sed's in-place idiom: the EMPTY next word is the
-    ///                    suffix
+    /// Parses sed and perl option clusters.
+    ///
+    /// Both take CLUSTERS, which is where a naive parser loses the file list
+    /// and reads the script as a filename. Four shapes are handled:
+    /// `-e PROGRAM` (argument is next word), `-e'PROGRAM'` (argument is rest of word),
+    /// `-i.bak` (suffix after the dot), and `-i ''` (BSD sed's in-place idiom).
+    ///
+    /// - Parameters:
+    ///   - words: The command arguments to parse.
+    ///   - argumentTaking: The single-character flags that consume the next word.
+    /// - Returns: The flags found, positional arguments, and whether in-place edit is enabled.
     private static func scanOptions(
         _ words: [String],
         argumentTaking: Set<Character>
@@ -236,18 +274,25 @@ enum BashWritePaths {
         return ParsedOptions(flags: flags, positionals: positionals.filter { !$0.isEmpty })
     }
 
+    /// Returns the final path component.
+    ///
+    /// - Parameter path: The path to extract from.
+    /// - Returns: The basename of the path.
     private static func basename(_ path: String) -> String {
         URL(fileURLWithPath: path).lastPathComponent
     }
 
-    /// Absolutise against the payload's cwd, drop what cannot be a real path,
-    /// and collapse repeats.
+    /// Returns targets resolved and deduplicated.
     ///
-    /// THE UNRESOLVABLE ARE DROPPED, NOT GUESSED. A word carrying `$` or a
-    /// glob was never expanded by this parser, and `/dev/null` is not a file
-    /// anyone wants a history row for. Later mentions win: `rm x` then
-    /// `touch x` in one command line ends with x written, and that ordering
-    /// is what the row should say.
+    /// Absolutise against the payload's cwd, drop what cannot be a real path,
+    /// and collapse repeats. The unresolvable are dropped, not guessed. A word
+    /// carrying `$` or a glob was never expanded by this parser. Later mentions
+    /// win: `rm x` followed by `touch x` results in `x` marked as written.
+    ///
+    /// - Parameters:
+    ///   - targets: The targets to process.
+    ///   - cwd: The current working directory.
+    /// - Returns: Resolved and ordered targets without duplicates.
     private static func resolve(_ targets: [Target], cwd: String) -> [Target] {
         var order: [String] = []
         var intents: [String: Intent] = [:]
@@ -265,10 +310,17 @@ enum BashWritePaths {
         return order.prefix(maxTargets).map { Target(path: $0, intent: intents[$0]!) }
     }
 
-    /// A command word resolves against the cwd the TOOL CALL ran in. `cd` is
+    /// Returns the absolute path resolved against the cwd.
+    ///
+    /// A command word resolves against the cwd the tool call ran in. `cd` is
     /// not tracked across segments — a `cd sub && rm x` records `x` under the
     /// payload's cwd, which is a documented limit of a parser that does not
     /// execute the shell.
+    ///
+    /// - Parameters:
+    ///   - path: The path to resolve, which may be relative or contain `~`.
+    ///   - cwd: The current working directory.
+    /// - Returns: The absolute, standardized path.
     private static func absolutePath(_ path: String, cwd: String) -> String {
         let expanded = (path as NSString).expandingTildeInPath
         return URL(
@@ -281,25 +333,30 @@ enum BashWritePaths {
 
 // MARK: - The command-line scanner
 
-/// One token of a command segment. A redirection OPERATOR is distinguished
-/// from a word because only an unquoted `>` redirects — a quoted one is text,
-/// and treating it as an operator manufactures a write that never happened.
+/// One token of a command segment.
+///
+/// A redirection OPERATOR is distinguished from a word because only an unquoted
+/// `>` redirects — a quoted one is text, and treating it as an operator
+/// manufactures a write that never happened.
 enum BashToken: Equatable {
     case word(String)
     case redirect(String)
 }
 
 /// The quoting-aware segmenter behind PostToolUse Bash capture.
-/// A command line is split into COMMAND POSITIONS, walked once with a context
-/// stack over unquoted, `'…'`, `"…"`, `$( … )` and backtick states. Separators
-/// split only outside quotes, so `git commit -m "cleanup; rm -rf x"` holds no
-/// command position after the `;` and splitting there would invent a deletion
-/// out of a commit message. HEREDOCS STOP THE SCAN at an unquoted `<<`, since
-/// the body is indistinguishable from commands. AN UNBALANCED QUOTE RETURNS
-/// NIL: a half-parsed path is a wrong path.
+///
+/// A command line is split into COMMAND POSITIONS: unquoted, `'…'`, `"…"`,
+/// `$( … )`, and backtick states. Separators split only outside quotes. Example:
+/// `git commit -m "cleanup; rm -rf x"` holds no command position after `;`.
+/// HEREDOCS STOP THE SCAN at `<<`. AN UNBALANCED QUOTE RETURNS NIL: a
+/// half-parsed path is wrong.
 enum BashCommandScanner {
     private enum State { case unquoted, single, double, commandSub, backtick }
 
+    /// Segments the command line by unquoted semicolons and pipes.
+    ///
+    /// - Parameter command: The command line to segment.
+    /// - Returns: An array of token segments, or nil if parsing fails (unbalanced quotes or heredocs).
     static func segments(_ command: String) -> [[BashToken]]? {
         let chars = Array(command)
         var segments: [[BashToken]] = []
@@ -416,12 +473,14 @@ enum BashCommandScanner {
         return segments
     }
 
-    /// Split one segment into the command's own words and the paths its
-    /// redirections write.
+    /// Splits a token segment into command words and redirection targets.
     ///
     /// A redirection's operand is NOT a command argument: in `tee a.txt >
     /// log`, `log` belongs to the shell and `a.txt` to tee, and folding them
     /// together would file `log` twice and shift every positional after it.
+    ///
+    /// - Parameter tokens: The tokens to split.
+    /// - Returns: Command words and paths from write redirections.
     static func split(_ tokens: [BashToken]) -> (words: [String], redirections: [String]) {
         var words: [String] = []
         var redirections: [String] = []
@@ -447,19 +506,23 @@ enum BashCommandScanner {
 
 // MARK: - Kind, confirmed by git
 
-/// The path-limited classifier. It answers ONE question about ONE path the
-/// caller already holds: did that path end up created, edited or deleted?
+/// The path-limited classifier.
 ///
-/// `git status --porcelain -- <path>` is scoped to the single pathspec it is
-/// given, so it can neither enumerate a working tree nor discover a file
-/// nobody named. That bound is the point.
+/// It answers ONE question about ONE path the caller already holds: did that
+/// path end up created, edited or deleted? `git status --porcelain -- <path>`
+/// is scoped to the single pathspec it is given, so it can neither enumerate a
+/// working tree nor discover a file nobody named. That bound is the point.
 enum GitPathClassifier {
-    /// Repo-relative, or nil when the path is not inside this repo at all.
+    /// Returns the repo-relative path, or nil if outside the repo.
     ///
-    /// Containment is checked against the BOOTED repo root rather than "some
-    /// git repo": $HOME can itself be a git toplevel, and the gmfs and kbite
-    /// trees are repos too — foreign paths would land as junk rows in an
-    /// append-only db.
+    /// Containment is checked against the booted repo root rather than any
+    /// git repo: $HOME can itself be a git toplevel, and gmfs and kbite
+    /// trees are repos too — foreign paths would land as junk rows.
+    ///
+    /// - Parameters:
+    ///   - absolute: The absolute path to convert.
+    ///   - repoRoot: The root of the repo.
+    /// - Returns: The path relative to the repo root, or nil if outside it.
     static func repoRelative(_ absolute: String, repoRoot: String) -> String? {
         let path = URL(fileURLWithPath: absolute).standardizedFileURL.path
         let root = URL(fileURLWithPath: repoRoot).standardizedFileURL.path
@@ -467,10 +530,18 @@ enum GitPathClassifier {
         return String(path.dropFirst(root.count + 1))
     }
 
-    /// nil means "nothing happened here that is worth a row": git has no
-    /// answer and there is no file, which is what a misparsed argument looks
-    /// like. THAT FALLTHROUGH IS A SAFETY NET, not an accident — it is why a
-    /// `sed` script mistaken for a filename cannot reach the db.
+    /// Classifies the path change as create, edit, or delete.
+    ///
+    /// Returns nil when nothing happened here that is worth a row — git has no
+    /// answer and there is no file, which is what a misparsed argument looks like.
+    /// The nil fallthrough is a safety net: it prevents a `sed` script mistaken
+    /// for a filename from reaching the database.
+    ///
+    /// - Parameters:
+    ///   - relativePath: The repo-relative path.
+    ///   - repoRoot: The root of the repo.
+    ///   - declared: The write intent from the parsed command.
+    /// - Returns: The kind of change, or nil if nothing actually happened.
     static func classify(
         relativePath: String,
         repoRoot: String,
@@ -488,8 +559,14 @@ enum GitPathClassifier {
         return declared == .delete ? .delete : nil
     }
 
-    /// The two status columns of the first reported line, or nil when git
-    /// reports nothing (clean, unknown, or not a repo).
+    /// Returns the two-character git status code for the path.
+    ///
+    /// Returns nil when git reports nothing (clean, unknown, or not a repo).
+    ///
+    /// - Parameters:
+    ///   - relativePath: The repo-relative path to check.
+    ///   - repoRoot: The root of the repo.
+    /// - Returns: The two-character status code, or nil if git has no status.
     private static func statusCode(relativePath: String, repoRoot: String) -> String? {
         guard
             let output = runGit(
@@ -499,6 +576,10 @@ enum GitPathClassifier {
         return String(line.prefix(2))
     }
 
+    /// Runs a git command and returns its output.
+    ///
+    /// - Parameter arguments: The git command arguments (including subcommand).
+    /// - Returns: The command's stdout, or nil if the process fails.
     private static func runGit(_ arguments: [String]) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")

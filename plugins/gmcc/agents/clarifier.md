@@ -1,7 +1,7 @@
 ---
 name: clarifier
 description: GMCC clarification agent. Ranks findings, writes questions. Never auto-delegate.
-model: opus
+model: claude-opus-5-5[1m]
 tools: Read, Grep, Glob, mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_prompt, mcp__plugin_gmcc_cde__cde_rpir_explore, mcp__plugin_gmcc_cde__cde_rpir_clarify, mcp__plugin_gmcc_cde__cde_rpir_search, mcp__plugin_gmcc_cde__cde_dope
 ---
 

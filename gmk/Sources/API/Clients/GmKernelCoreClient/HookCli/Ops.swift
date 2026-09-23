@@ -22,6 +22,9 @@ let hookUsage = """
 
     """
 
+/// Encodes and prints a value as formatted JSON.
+///
+/// - Parameter value: The value to encode and print.
 private func emit<T: Encodable>(_ value: T) {
     guard let data = try? WireCodec.prettyEncoder.encode(value),
         let text = String(data: data, encoding: .utf8)
@@ -29,14 +32,23 @@ private func emit<T: Encodable>(_ value: T) {
     print(text)
 }
 
+/// Writes an error message to stderr and returns failure status.
+///
+/// - Parameter message: The error message to write.
+/// - Returns: The exit code 1.
 private func fail(_ message: String) -> Int32 {
     FileHandle.standardError.write(Data("[GMB] \(message)\n".utf8))
     return 1
 }
 
-/// The named ops verbs. Deliberately a short list: anything shaped like a
-/// workflow verb belongs on the pen, and anything rarer than these is reachable
-/// through `call` without needing a name here.
+/// Runs the named ops verbs.
+///
+/// Deliberately a short list: anything shaped like a workflow verb belongs on
+/// the pen, and anything rarer than these is reachable through `call` without
+/// needing a name here.
+///
+/// - Parameter argv: The command arguments; first element is the verb name.
+/// - Returns: The process exit code.
 func runOps(_ argv: [String]) -> Int32 {
     let command = argv[0]
     let rest = Array(argv.dropFirst())
@@ -99,6 +111,10 @@ func runOps(_ argv: [String]) -> Int32 {
     }
 }
 
+/// Handles context-related operations.
+///
+/// - Parameter argv: The command arguments; first element is the action.
+/// - Returns: The process exit code.
 private func runContext(_ argv: [String]) -> Int32 {
     let action = argv.first ?? ""
     switch action {

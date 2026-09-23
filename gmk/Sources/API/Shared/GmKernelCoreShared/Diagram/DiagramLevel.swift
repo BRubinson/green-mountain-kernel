@@ -20,23 +20,24 @@ enum DiagramTier: String, Codable, Hashable, CaseIterable, Sendable {
 }
 
 /// diagram.visibility values — an AXIS beside the tier ladder, never a rung
-/// on it (m0024). PRIVATE lives in the db only; PUBLIC additionally
-/// serializes into the repo's committed .gmcc tree via DIAGRAM_WRITE_REPO.
-/// PUBLIC is legal ONLY on SESSION-tier rows — the same
-/// session→instance-root gate DOPE_WRITE_REPO uses — enforced by a Swift
-/// store guard, not a CHECK (the rule crosses tables).
+/// on it (m0024).
+///
+/// PRIVATE lives in the db only; PUBLIC additionally serializes into the repo's
+/// committed .gmcc tree via DIAGRAM_WRITE_REPO. PUBLIC is legal ONLY on
+/// SESSION-tier rows — the same session→instance-root gate DOPE_WRITE_REPO uses
+/// — enforced by a Swift store guard, not a CHECK (the rule crosses tables).
 enum DiagramVisibility: String, Codable, Hashable, CaseIterable, Sendable {
     case `private` = "PRIVATE"
     case `public` = "PUBLIC"
 }
 
-/// diagram_element.element_type values. Raw values are the db discriminators
-/// AND the wire payload tags — one string, three layers.
+/// diagram_element.element_type values.
 ///
-/// The db carries NO CHECK on this column: validity is this enum plus
-/// DiagramElementTypeSpec, enforced on both write paths and thrown on at read.
-/// Adding a type is one case here, one registry entry below, and one subtype
-/// table — never a migration.
+/// Raw values are the db discriminators AND the wire payload tags — one string,
+/// three layers. The db carries NO CHECK on this column: validity is this enum
+/// plus DiagramElementTypeSpec, enforced on both write paths and thrown on at
+/// read. Adding a type is one case here, one registry entry below, and one
+/// subtype table — never a migration.
 enum DiagramElementType: String, Codable, Hashable, CaseIterable, Sendable {
     case drawingLayer = "drawing_layer"
     case drawingStroke = "drawing_stroke"
@@ -115,6 +116,11 @@ enum DiagramVertexStorage: Sendable, Hashable {
         }
     }
 
+    /// Tests equality of two vertex storage configurations.
+    /// - Parameters:
+    ///   - lhs: The left-hand storage configuration.
+    ///   - rhs: The right-hand storage configuration.
+    /// - Returns: True if both configurations are equivalent.
     static func == (lhs: DiagramVertexStorage, rhs: DiagramVertexStorage) -> Bool {
         switch (lhs, rhs) {
         case (.none, .none): return true
@@ -125,6 +131,8 @@ enum DiagramVertexStorage: Sendable, Hashable {
         }
     }
 
+    /// Combines the receiver's value into the given hasher.
+    /// - Parameter hasher: The hasher to update.
     func hash(into hasher: inout Hasher) {
         switch self {
         case .none: hasher.combine(0)
@@ -166,9 +174,10 @@ enum DiagramStrokeTool: String, Codable, Hashable, CaseIterable, Sendable {
 
 /// diagram_uml_node.node_kind values — the UML vocabulary, ONE element type
 /// with a kind column (the drawing_shape/shape_kind precedent, and xyflow's
-/// node-types-are-data model). Reshaping a node is an ordinary wholesale
-/// payload update; a type-per-shape design would make it delete+recreate,
-/// ghosting every incoming connector.
+/// node-types-are-data model).
+///
+/// Reshaping a node is an ordinary wholesale payload update; a type-per-shape
+/// design would make it delete+recreate, ghosting every incoming connector.
 enum DiagramNodeKind: String, Codable, Hashable, CaseIterable, Sendable {
     case dbCylinder = "db_cylinder"
     case roundedRect = "rounded_rect"
@@ -201,6 +210,11 @@ struct DiagramElementRefSpec: Sendable, Hashable {
         case peerOfOwnParent
     }
 
+    /// Creates a reference specification with the given role and rule.
+    /// - Parameters:
+    ///   - role: The reference role name used in error messages.
+    ///   - column: The subtype-table column holding the target element's uuid.
+    ///   - rule: The containment rule to validate the target.
     init(role: String, column: String, rule: ContainmentRule) {
         self.role = role
         self.column = column
@@ -218,21 +232,26 @@ struct DiagramElementTypeSpec: Sendable {
     /// Where this type's geometry lives. `.rows` is the classic vertex
     /// table; `.packedBlob` packs to a blob and falls back to those rows.
     let vertexStorage: DiagramVertexStorage
-    /// nil = a top-level type (parent_element_uuid must be NULL). Since
-    /// m0021 there is NO schema CHECK behind this — the registry IS the
+    /// nil = a top-level type (parent_element_uuid must be NULL).
+    ///
+    /// Since m0021 there is NO schema CHECK behind this — the registry IS the
     /// rule, enforced by both write paths.
     let allowedParentTypes: Set<DiagramElementType>?
     /// Whether this type binds into the dope tree by code.
     let isDopeBinding: Bool
     /// Typed references this type makes to OTHER elements, beyond parent
-    /// containment. Empty for every type except connector.
+    /// containment.
+    ///
+    /// Empty for every type except connector.
     let elementRefs: [DiagramElementRefSpec]
     /// Immediate placement, or a second pass against completed frames.
     let resolution: DiagramResolutionPhase
     /// Whether this type's frame becomes an obstacle the edge router steers
-    /// around. Structural content (entity cards, shapes, text) blocks;
-    /// freehand ink and layers deliberately do not, so edges cross drawings
-    /// by design and a dense stroke corpus never chokes the router.
+    /// around.
+    ///
+    /// Structural content (entity cards, shapes, text) blocks; freehand ink and
+    /// layers deliberately do not, so edges cross drawings by design and a dense
+    /// stroke corpus never chokes the router.
     let participatesInRouting: Bool
 
     /// Non-nil only for vertex-bearing types — derived from `vertexStorage`
@@ -365,6 +384,9 @@ struct DiagramElementTypeSpec: Sendable {
         Set(all.values.filter(\.participatesInRouting).map(\.type))
     }
 
+    /// Looks up the type specification for the given element type.
+    /// - Parameter type: The element type to look up.
+    /// - Returns: The specification for that type.
     static func spec(for type: DiagramElementType) -> DiagramElementTypeSpec {
         // Total over DiagramElementType by construction.
         all[type]!

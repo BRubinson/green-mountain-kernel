@@ -1,11 +1,13 @@
 import Foundation
 
-/// `gm_hook context env` — the SessionStart env block on stdout, consistency
-/// warnings on stderr, ALWAYS exit 0.
+/// Emits environment variable block for session startup.
 ///
-/// EXIT 0 IS THE CONTRACT, not politeness. SessionStart sources this output; a
-/// non-zero exit or a stray stdout line becomes a broken session env rather than
-/// a warning about one. Everything diagnostic goes to stderr.
+/// Outputs the SessionStart env block to stdout with consistency warnings on
+/// stderr, always exiting with 0. SessionStart sources the output; a non-zero
+/// exit or stray stdout line breaks session env.
+///
+/// - Parameter pluginRoot: The plugin root directory path, or nil.
+/// - Returns: Always 0, per the contract with SessionStart.
 func emitSessionEnv(pluginRoot: String?) -> Int32 {
     guard let pluginRoot, !pluginRoot.isEmpty else {
         FileHandle.standardError.write(Data("[GMB] context env needs --plugin-root\n".utf8))

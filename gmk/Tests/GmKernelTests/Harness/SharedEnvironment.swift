@@ -26,6 +26,8 @@ final class SharedEnvironment: NSObject, XCTestObservation {
     private var kernelBinary: URL!
     private var started = false
 
+    /// Registers the environment and boots the kernel once if needed.
+    ///
     /// Registered from `XCTestObservationCenter` the first time any case asks
     /// for the environment. Registration is idempotent; boot happens once.
     static func bootIfNeeded() {
@@ -38,6 +40,9 @@ final class SharedEnvironment: NSObject, XCTestObservation {
 
     // MARK: - Lifecycle
 
+    /// Creates a temporary root, stages the kernel, and spawns a daemon.
+    ///
+    /// Precondition: `started` is true.
     private func boot() {
         let id = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(6)).lowercased()
         root = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
@@ -71,9 +76,10 @@ final class SharedEnvironment: NSObject, XCTestObservation {
         )
     }
 
-    /// True when a real kernel is reachable. Cases skip rather than fail when it
-    /// is not: a machine that has never built the kernel should report "not
-    /// built", not a wall of assertion failures that look like regressions.
+    /// True when a real kernel is reachable.
+    ///
+    /// Cases skip rather than fail when it is not: a machine that has never built the kernel should report "not built",
+    /// not a wall of assertion failures that look like regressions.
     var isAvailable: Bool {
         guard let client else { return false }
         return
@@ -84,9 +90,17 @@ final class SharedEnvironment: NSObject, XCTestObservation {
             )) != nil
     }
 
-    /// Round-trip one verb. The suite's ONLY write path — every mutation goes
-    /// over the wire exactly as a real client's would, which is what makes
-    /// "public interfaces" literally true here rather than aspirational.
+    /// Round-trip one verb over the wire.
+    ///
+    /// The suite's ONLY write path — every mutation goes over the wire exactly as a real client's would, which is what
+    /// makes "public interfaces" literally true here rather than aspirational.
+    ///
+    /// - Parameters:
+    ///   - type: The message type to send.
+    ///   - payload: The request payload.
+    ///   - responseType: The expected response type.
+    /// - Returns: The response deserialized from the server.
+    /// - Throws: `XCTSkip` if no kernel is available, or a decode error if parsing fails.
     @discardableResult
     func send<Req: Codable & Sendable, Resp: Codable & Sendable>(
         _ type: MessageType,
@@ -103,6 +117,9 @@ final class SharedEnvironment: NSObject, XCTestObservation {
         shutdown()
     }
 
+    /// Shuts down the kernel and cleans up the temporary root.
+    ///
+    /// Failures are silently ignored; the suite must not fail on cleanup.
     private func shutdown() {
         if let client {
             _ = try? client.request(
@@ -127,6 +144,9 @@ final class SharedEnvironment: NSObject, XCTestObservation {
     /// `flock` and owns this file as sole writer; a writable handle here would be
     /// the second writer the ownership token exists to forbid, opened by the very
     /// suite meant to defend that property. Assertions read; the wire writes.
+    ///
+    /// - Returns: A read-only database queue connected to `gm.db`.
+    /// - Throws: An error if the database cannot be opened.
     func readOnlyDatabase() throws -> DatabaseQueue {
         var config = Configuration()
         config.readonly = true
@@ -144,6 +164,9 @@ final class SharedEnvironment: NSObject, XCTestObservation {
     /// BUILT_PRODUCTS_DIR. Never `~/gmfs/bin/gm_kernel`: that would test the last
     /// RELEASE instead of the working tree. The COPY is what gets spawned, so no
     /// Info.plist sits beside it and the harness's GM_FS_ROOT wins over the baked root.
+    ///
+    /// - Parameter root: The run root directory where the kernel is staged.
+    /// - Returns: The path to the copied kernel, or nil if the source is not found.
     private static func stageKernel(into root: URL) -> URL? {
         let env = ProcessInfo.processInfo.environment["GM_TEST_KERNEL_BIN"]
         let source =

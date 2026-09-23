@@ -112,6 +112,11 @@ struct DaemonStatusPopover: View {
         }
     }
 
+    /// Creates a grid row with a label and value pair.
+    /// - Parameters:
+    ///   - label: The label text, displayed in secondary color.
+    ///   - value: The value text, displayed in the default color.
+    /// - Returns: A grid row view.
     private func row(_ label: String, _ value: String) -> some View {
         GridRow {
             Text(label).foregroundStyle(.secondary)
@@ -129,6 +134,9 @@ struct DaemonStatusPopover: View {
         .controlSize(.small)
     }
 
+    /// Formats uptime in seconds as a human-readable string.
+    /// - Parameter seconds: The uptime in seconds.
+    /// - Returns: A formatted string (e.g., "2h 30m", "45m 30s", "30s").
     private static func formatUptime(_ seconds: Int) -> String {
         let h = seconds / 3600
         let m = (seconds % 3600) / 60

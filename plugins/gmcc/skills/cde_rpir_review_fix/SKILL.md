@@ -3,7 +3,7 @@ name: cde_rpir_review_fix
 description: "The REVIEW_FIX phase: the settled findings resolved and the rest ruled on."
 user-invocable: false
 allowed-tools: mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_rpir_review
-model: opus
+model: claude-opus-5-5[1m]
 ---
 
 # Workflow Phase

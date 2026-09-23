@@ -8,6 +8,10 @@ struct KBiteFileNode: Identifiable, Hashable {
     var id: URL { url }
     var name: String { url.lastPathComponent }
 
+    /// Loads a file or directory tree into a node hierarchy.
+    ///
+    /// - Parameter url: The file or directory URL to load.
+    /// - Returns: A KBiteFileNode representing the file system tree.
     static func load(from url: URL) -> KBiteFileNode {
         let fm = FileManager.default
         var isDir: ObjCBool = false

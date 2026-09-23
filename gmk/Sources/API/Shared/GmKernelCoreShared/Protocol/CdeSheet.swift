@@ -76,9 +76,10 @@ enum CdeSheet {
     }
 
     /// Orientation before record before write: an agent that calls cde_init
-    /// first never needs the rest of this text. A tool appears on the READ line,
-    /// the WRITE line or both, carrying only the ops of that kind — one tool
-    /// with eleven ops is not eleven entries.
+    /// first never needs the rest of this text.
+    ///
+    /// A tool appears on the READ line, the WRITE line or both, carrying only the ops of that kind — one tool with
+    /// eleven ops is not eleven entries.
     static var roster: Roster {
         var reads: [String] = []
         var writes: [String] = []
@@ -105,7 +106,12 @@ enum CdeSheet {
         return Roster(reads: reads, writes: writes, primaryCalls: primaryCalls.sorted())
     }
 
-    /// `tool` when the whole tool is meant, `tool(op|op)` when it is a subset.
+    /// Formats a tool or subset of tool operations as a sheet entry.
+    /// - Parameters:
+    ///   - tool: The tool name.
+    ///   - ops: The operations in the subset.
+    /// - Returns: A formatted string: `tool` for all ops, or `tool(op|op)` for
+    ///   a subset.
     private static func entry(_ tool: String, _ ops: [String]) -> String {
         let all = CdeToolRoster.spec(named: tool)?.ops.count ?? 0
         return ops.count == all ? tool : "\(tool)(\(ops.joined(separator: "|")))"

@@ -30,6 +30,9 @@ struct SessionPromptScreen: View {
 
     private var store: SessionStore { scope.store }
 
+    /// Creates the session prompt editor screen for a given window.
+    ///
+    /// - Parameter windowID: The session window identifier with optional target prompt.
     init(windowID: SessionWindowID) {
         self.windowID = windowID
         // Create-or-get is side-effect-safe in init; the refcount lease lives
@@ -322,6 +325,13 @@ private struct PromptEditorPane: View {
     @State private var dopeExpanded = false
     @Environment(WindowNav.self) private var nav
 
+    /// Creates an editor pane for a prompt with scope-memoized resources.
+    ///
+    /// - Parameters:
+    ///   - stub: The prompt identity and metadata.
+    ///   - scope: The session scope for resource sharing.
+    ///   - windowID: The parent window identifier.
+    ///   - history: The undo/redo stack, injected to survive pane teardown.
     init(
         stub: PromptStub,
         scope: SessionScope,
@@ -355,10 +365,10 @@ private struct PromptEditorPane: View {
 
     /// Clarify/arch ONLY: draft prompts provably have no clarification or
     /// architecture summary — fetching those two would burst guaranteed
-    /// NOT_FOUNDs per selection onto the serial queue. Exploration and review
-    /// are NEVER gated on this (EXPLORE_OPEN/REVIEW_OPEN are explicit-only
-    /// and legally run while the prompt is still draft) — this flag feeds
-    /// `refresh(lifecyclePhases:)`, which always fetches those two.
+    /// NOT_FOUNDs per selection onto the serial queue.
+    ///
+    /// Exploration and review are NEVER gated on this (EXPLORE_OPEN/REVIEW_OPEN are explicit-only and legally run while
+    /// the prompt is still draft) — this flag feeds `refresh(lifecyclePhases:)`, which always fetches those two.
     private var phasesApply: Bool {
         PromptStatus(rawValue: stub.status) != .draft
     }
@@ -366,9 +376,12 @@ private struct PromptEditorPane: View {
     // Live-phase-first badge precedence: the loaded response is authoritative
     // (report writes don't re-list the session, so stub.reports goes stale);
     // the PROMPT_LIST stub covers the cold start.
-    /// Does anything suggest an exploration/review summary exists for this
-    /// (draft) prompt? Loaded phases keep refreshing; otherwise trust the
-    /// listing's with_reports stubs.
+    /// Indicates whether an exploration or review summary exists.
+    ///
+    /// Loaded phases keep refreshing; otherwise trust the listing's with_reports stubs.
+    ///
+    /// - Parameter fresh: A freshly-loaded prompt stub with current report status.
+    /// - Returns: True when either exploration or review summary exists.
     private func reportsEvidence(_ fresh: PromptStub) -> Bool {
         if case .loaded = phases.exploration { return true }
         if case .loaded = phases.review { return true }
@@ -410,10 +423,19 @@ private struct PromptEditorPane: View {
         FindMatches(segments: findSegments, query: findQuery)
     }
 
+    /// Returns the active match index within a segment, or nil if no match is active.
+    ///
+    /// - Parameter id: The segment identifier.
+    /// - Returns: The active occurrence index in the segment, or nil when no match is active.
     private func activeLocal(_ id: String) -> Int? {
         findMatches.activeLocalOccurrence(in: id, active: find.activeIndex)
     }
 
+    /// Advances find-in-page navigation by a given delta and scrolls to the match.
+    ///
+    /// - Parameters:
+    ///   - delta: The step direction and count (+1 for next, -1 for previous).
+    ///   - proxy: The scroll view proxy for animated navigation.
     private func stepFind(_ delta: Int, proxy: ScrollViewProxy) {
         guard findMatches.total > 0 else { return }
         find.activeIndex = findMatches.clampedActive(find.activeIndex + delta)
@@ -426,6 +448,10 @@ private struct PromptEditorPane: View {
     // publishes nil so the two focused-value publishers never collide.
     private var supportsFind: Bool { !showMemories }
 
+    /// Returns the segment identifier string for a field.
+    ///
+    /// - Parameter field: The editor field.
+    /// - Returns: The unique segment identifier used for scrolling and matching.
     private func segmentID(_ field: Field) -> String {
         switch field {
         case .backstory: "backstory"
@@ -858,6 +884,14 @@ private struct PromptEditorPane: View {
         }
     }
 
+    /// Builds a styled banner view with an icon, text, and action buttons.
+    ///
+    /// - Parameters:
+    ///   - color: The banner's accent color.
+    ///   - icon: The system image name for the leading icon.
+    ///   - text: The message text.
+    ///   - action: A builder that creates the trailing action view.
+    /// - Returns: A styled HStack banner with colored background.
     private func banner(
         color: Color,
         icon: String,
@@ -874,8 +908,14 @@ private struct PromptEditorPane: View {
         .background(color.opacity(0.12), in: .rect(cornerRadius: 10))
     }
 
-    // cmd+G / cmd+shift+G for the find bar — nil (menu greyed) unless the bar
-    // is open with at least one match.
+    /// Returns a closure to advance find navigation, or nil when unavailable.
+    ///
+    /// Returns nil if the find bar is not open, the memories inspector is active, or no matches exist.
+    ///
+    /// - Parameters:
+    ///   - delta: The step direction (+1 for next, -1 for previous).
+    ///   - proxy: The scroll view proxy for animated navigation.
+    /// - Returns: A closure that advances the find index and scrolls, or nil if find is unavailable.
     private func readOnlyStep(_ delta: Int, proxy: ScrollViewProxy) -> (() -> Void)? {
         guard find.isPresented, supportsFind, findMatches.total > 0 else { return nil }
         return { stepFind(delta, proxy: proxy) }
@@ -883,8 +923,17 @@ private struct PromptEditorPane: View {
 
     // MARK: Phase document sections
 
-    /// Persistent section card: sections NEVER disappear with status — status
-    /// only drives which one is expanded by default (seedPhaseExpansion).
+    /// Builds a disclosure-group card for a phase document section.
+    ///
+    /// Sections persist regardless of status; status only drives which section is expanded by default.
+    ///
+    /// - Parameters:
+    ///   - title: The section title.
+    ///   - systemImage: The system image name for the label icon.
+    ///   - expanded: Binding to the section's expanded state.
+    ///   - accessory: A builder for the trailing header accessory (e.g. badge counts).
+    ///   - content: A builder for the disclosure group's content.
+    /// - Returns: A styled DisclosureGroup with an icon label and badge accessory.
     private func phaseCard(
         _ title: String,
         systemImage: String,
@@ -909,15 +958,20 @@ private struct PromptEditorPane: View {
         .background(.quaternary.opacity(0.25), in: .rect(cornerRadius: 10))
     }
 
+    /// Returns a placeholder label for a phase that has not yet started.
+    ///
+    /// - Parameter message: The explanatory text.
+    /// - Returns: A secondary-colored Label with an hourglass icon.
     private func notStarted(_ message: String) -> some View {
         Label(message, systemImage: "hourglass")
             .font(.callout)
             .foregroundStyle(.secondary)
     }
 
-    /// Default emphasis by phase: the relevant section opens and the others close. A user's
-    /// later toggles survive until the next status change, so emphasis follows the phase
-    /// rather than accumulating.
+    /// Default emphasis by phase: the relevant section opens and the others close.
+    ///
+    /// A user's later toggles survive until the next status change, so emphasis follows the phase rather than
+    /// accumulating.
     private func seedPhaseExpansion() {
         // FOLLOWS THE EVIDENCE, NOT THE STATUS. `initiated` covers everything between start
         // and finish, so status cannot say which section to emphasise. The reports stub
@@ -949,8 +1003,15 @@ private struct PromptEditorPane: View {
         }
     }
 
-    /// Refined-by-clarification presentation: the refined text primary, the
-    /// frozen original tucked in a disclosure.
+    /// Presents refined text with an optional disclosure of the original.
+    ///
+    /// The refined text is shown primary; the frozen original is tucked in a disclosure.
+    ///
+    /// - Parameters:
+    ///   - title: The section title.
+    ///   - refined: The clarification-refined text.
+    ///   - original: The original text; omitted from the disclosure if empty.
+    /// - Returns: A VStack with the refined text highlighted and original in a disclosure.
     private func refinedSection(_ title: String, refined: String, original: String) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
@@ -999,6 +1060,15 @@ private struct PromptEditorPane: View {
 
     // MARK: Section (initial)
 
+    /// Builds an editor section for one of the three prompt fields.
+    ///
+    /// - Parameters:
+    ///   - title: The section title (Backstory, Goal, or Detail).
+    ///   - field: The field enum for state tracking and find-in-page navigation.
+    ///   - text: Binding to the field's text value.
+    ///   - minHeight: The minimum height for the editor or viewer.
+    ///   - hint: The hint text shown below the editor.
+    /// - Returns: A VStack with a field title, editor, character count, and hint.
     @ViewBuilder
     private func sectionEditor(
         _ title: String,
@@ -1064,6 +1134,10 @@ private struct PromptEditorPane: View {
 
     // MARK: Load / save
 
+    /// Loads the prompt's text, kbites, and filesystem paths.
+    ///
+    /// Fetches the prompt row if needed, seeds the undo history, registers the draft box, and
+    /// resolves filesystem locations. For draft prompts, seeds the saver actor.
     private func load() async {
         loaded = false
         loadFailed = false
@@ -1116,8 +1190,9 @@ private struct PromptEditorPane: View {
         await resolvePaths()
     }
 
-    /// Resolve filesystem locations off-main (the resolver does FileManager
-    /// probes; body must never trigger them).
+    /// Resolves filesystem locations off the main actor.
+    ///
+    /// The resolver performs FileManager probes; the view body must never trigger them directly.
     private func resolvePaths() async {
         let root = gmcc[.gmFsRoot]
         let sessionStub = catalog.sessionsByUuid[store.sessionUuid]
@@ -1146,8 +1221,8 @@ private struct PromptEditorPane: View {
                 )
                 let memory = GmFsPathResolver.memoryRoot(
                     gmFsRoot: root,
-                    storagePath: storagePath,
-                    artifacts: artifacts
+                    artifacts: artifacts,
+                    storagePath: storagePath
                 )
                 p.memoryRoot = memory.root
                 p.memoryIsDaemonWatched = memory.isDaemonWatched
@@ -1169,11 +1244,17 @@ private struct PromptEditorPane: View {
         if paths != resolved { paths = resolved }
     }
 
+    /// Opens a URL in Visual Studio Code.
+    ///
+    /// - Parameter url: The URL to open, or nil to silently ignore.
     private func openInVSCode(_ url: URL?) {
         guard let url else { return }
         VSCode.open(url)
     }
 
+    /// Opens a URL in iTerm2 as the working directory.
+    ///
+    /// - Parameter url: The directory URL to open, or nil to silently ignore.
     private func openInITerm(_ url: URL?) {
         guard let url else { return }
         ITerm.open(
@@ -1183,15 +1264,17 @@ private struct PromptEditorPane: View {
         )
     }
 
+    /// Returns the current editor state from all three fields.
+    ///
+    /// - Returns: An EditState snapshot with current backstory, goal, and detail.
     private func currentState() -> PromptEditHistory.EditState {
         .init(backstory: backstory, goal: goal, detail: detail)
     }
 
-    // Debounced autosave (~2s after typing stops — daemon writes are cheap
-    // socket round trips, so a short window shrinks worst-case loss).
+    /// Schedules a debounced save approximately 2 seconds after the call.
+    ///
+    /// Paused while a conflict awaits resolution or the prompt is locked. Cancels any pending save task.
     private func scheduleSave() {
-        // Paused while a conflict awaits resolution or the prompt locked
-        // (repeat CONTENT_LOCKED failures are pointless).
         guard saveIssue != .conflict, saveIssue != .locked else { return }
         saveTask?.cancel()
         saveTask = Task {
@@ -1201,13 +1284,17 @@ private struct PromptEditorPane: View {
         }
     }
 
+    /// Flushes pending edits immediately, canceling any scheduled save.
     private func flushSoon() {
         saveTask?.cancel()
         saveTask = Task { await flush(record: true) }
     }
 
-    // Version-threaded save through the per-prompt actor. Typed outcomes drive
-    // the banner; a conflict pauses autosave until the user reloads.
+    /// Saves the editor state through the per-prompt actor's version gate.
+    ///
+    /// Typed outcomes drive the banner display; a conflict pauses autosave. Typed refresh reflects the outcome.
+    ///
+    /// - Parameter record: Whether to record the state in the undo history if the save succeeds.
     private func flush(record: Bool) async {
         guard loaded, let saver else { return }
         let s = currentState()
@@ -1238,16 +1325,16 @@ private struct PromptEditorPane: View {
         }
     }
 
-    // An UPDATE_PROMPT event arrived for this prompt: the refetched row's
-    // version against the PANE-LOCAL watermark separates this pane's own echo
-    // from an edit made anywhere else — including a peer pane sharing the same
-    // save actor (whose shared watermark cannot make that distinction).
-    // Adopt silently only when the buffer is clean.
+    /// Reconciles an external prompt update when the buffer is clean.
+    ///
+    /// An UPDATE_PROMPT event's version is compared against the pane-local watermark to separate
+    /// this pane's own echo from edits made elsewhere. Adopts external changes silently only when
+    /// the current state matches the last saved state; otherwise stores the change for review.
     private func reconcileExternal() async {
         guard loaded, let saver,
             let fresh = store.promptDetails[stub.uuid]?.prompt
         else { return }
-        guard fresh.version > localWatermark else { return }  // own echo — drop
+        guard fresh.version > localWatermark else { return }
         if currentState() == lastSaved {
             backstory = fresh.backstory
             goal = fresh.goal
@@ -1256,10 +1343,13 @@ private struct PromptEditorPane: View {
             localWatermark = fresh.version
             await saver.adoptVersion(fresh.version)
         } else {
-            externalChange = fresh  // never clobber in-flight typing
+            externalChange = fresh
         }
     }
 
+    /// Accepts an external change and updates the editor state.
+    ///
+    /// Clears the conflict banner, records the change in undo history, and updates the version watermark.
     private func acceptExternal() {
         guard let fresh = externalChange ?? store.promptDetails[stub.uuid]?.prompt else { return }
         backstory = fresh.backstory
@@ -1276,9 +1366,10 @@ private struct PromptEditorPane: View {
 
     // MARK: KBites
 
-    // Every kbite the daemon knows (KBITE_LIST all:true), unioned with the
-    // current selection so an already-registered kbite missing from the db
-    // still renders (and can be deselected).
+    /// Loads available kbites from the daemon and merges with the current selection.
+    ///
+    /// All known kbites are unioned with the current selection so an already-registered kbite
+    /// still renders and can be deselected.
     private func loadAvailableKbites() async {
         let refs =
             (try? await GMCCDaemonService.shared.listKbites(
@@ -1289,9 +1380,14 @@ private struct PromptEditorPane: View {
         availableKbites = Set(refs.map(\.code)).union(selectedKbites).sorted()
     }
 
-    // Persist a pill toggle as registry deltas at prompt scope. KBITE_ADD
-    // upserts the kbite row, so this works against an empty kbite table. On
-    // failure the pills reconcile back to the db state and a banner shows.
+    /// Persists kbite pill changes as registry deltas at prompt scope.
+    ///
+    /// KBITE_ADD upserts the kbite row, so this works against an empty kbite table. On failure,
+    /// the pills reconcile back to the database state and show a failure banner.
+    ///
+    /// - Parameters:
+    ///   - old: The previous kbite code list.
+    ///   - new: The updated kbite code list.
     private func syncKbites(old: [String], new: [String]) {
         guard loaded else { return }
         let added = Set(new).subtracting(old)
@@ -1319,8 +1415,9 @@ private struct PromptEditorPane: View {
         }
     }
 
-    // Converge the pill box back to the db registry (terminal-side edits,
-    // failed toggles). Suppressed from re-triggering syncKbites.
+    /// Converges the pill box back to the database registry.
+    ///
+    /// Handles terminal-side edits and failed toggles. Suppressed from re-triggering `syncKbites`.
     private func reconcileKbites() {
         guard loaded, let codes = store.promptDetails[stub.uuid]?.kbiteCodes else { return }
         if Set(codes) != Set(selectedKbites) {
@@ -1333,18 +1430,23 @@ private struct PromptEditorPane: View {
 
     // MARK: Undo / redo
 
+    /// Rewinds to the previous state in the undo history and persists it.
     private func applyUndo() {
         guard let s = history.undo() else { return }
         apply(s)
     }
 
+    /// Advances to the next state in the undo history and persists it.
     private func applyRedo() {
         guard let s = history.redo() else { return }
         apply(s)
     }
 
-    // Apply a history state to the fields WITHOUT recording a new snapshot, then
-    // persist through the version-threaded save path (never a blind write).
+    /// Applies a history state to the fields and persists through the version-threaded save.
+    ///
+    /// Does not record a new snapshot; persists through the save path rather than a blind write.
+    ///
+    /// - Parameter s: The edit state to apply.
     private func apply(_ s: PromptEditHistory.EditState) {
         backstory = s.backstory
         goal = s.goal
@@ -1356,6 +1458,13 @@ private struct PromptEditorPane: View {
 
     // MARK: Clipboard
 
+    /// Copies text to the clipboard and temporarily highlights the copy button.
+    ///
+    /// The highlight fades after 1.2 seconds.
+    ///
+    /// - Parameters:
+    ///   - field: The field being copied (for highlight state tracking).
+    ///   - text: The text to copy.
     private func copy(field: Field, text: String) {
         Clipboard.copy(text)
         copiedField = field
@@ -1371,13 +1480,18 @@ private struct PromptEditorPane: View {
     // windows and died with the pane.
 }
 
-/// Per-prompt undo/redo registry for the session screen. A plain box — NOT
-/// @Observable — so create-or-get from a view body mutates nothing SwiftUI
-/// tracks (the same reason DrawingsStore's registry is @ObservationIgnored).
+/// Per-prompt undo/redo registry for the session screen.
+///
+/// A plain box — NOT @Observable — so create-or-get from a view body mutates nothing SwiftUI tracks (the same reason
+/// DrawingsStore's registry is @ObservationIgnored).
 @MainActor
 private final class EditHistoryBox {
     private var histories: [String: PromptEditHistory] = [:]
 
+    /// Returns the undo/redo stack for a prompt, creating one if needed.
+    ///
+    /// - Parameter promptUuid: The prompt's unique identifier.
+    /// - Returns: The existing or newly-created PromptEditHistory.
     func history(for promptUuid: String) -> PromptEditHistory {
         if let existing = histories[promptUuid] { return existing }
         let fresh = PromptEditHistory()

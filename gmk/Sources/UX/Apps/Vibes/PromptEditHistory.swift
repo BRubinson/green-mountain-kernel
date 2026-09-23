@@ -8,7 +8,9 @@ import Observation
 // every committed write, and local history dying with the process is the
 // "daemon as source of truth" trade the overhaul chose.
 
-/// View-local controller. Holds the snapshot list + cursor; confined to the
+/// View-local controller.
+///
+/// Holds the snapshot list + cursor; confined to the
 /// main actor by design.
 @Observable
 @MainActor
@@ -28,11 +30,15 @@ final class PromptEditHistory {
     var canUndo: Bool { cursor > 0 }
     var canRedo: Bool { cursor >= 0 && cursor < snapshots.count - 1 }
 
-    /// Point the controller at a prompt. Seeds snapshot 0 from the loaded
-    /// state so the very first edit is undoable. A same-key reload with
-    /// UNCHANGED content keeps the existing stack; changed content (external
-    /// edit accepted, conflict reload) records the new state so undo can never
-    /// resurrect text the daemon has moved past unnoticed.
+    /// Loads the history for a prompt.
+    ///
+    /// Seeds snapshot 0 from the loaded state so the very first edit is
+    /// undoable. A same-key reload with unchanged content keeps the existing
+    /// stack; changed content records the new state so undo cannot resurrect
+    /// text the daemon has moved past.
+    /// - Parameters:
+    ///   - promptKey: The prompt identifier.
+    ///   - current: The current edit state.
     func load(promptKey: String, current: EditState) {
         if promptKey == self.promptKey {
             if cursor >= 0, snapshots.indices.contains(cursor), snapshots[cursor] != current {
@@ -45,8 +51,11 @@ final class PromptEditHistory {
         cursor = 0
     }
 
-    /// Record a new state if it differs from the cursor's. Truncates any redo
-    /// branch (states after the cursor) before appending, then trims to `cap`.
+    /// Records a new snapshot if it differs from the current state.
+    ///
+    /// Truncates any redo branch (states after the cursor) before appending,
+    /// then trims to the capacity.
+    /// - Parameter s: The new edit state to record.
     func record(_ s: EditState) {
         guard !promptKey.isEmpty else { return }
         if snapshots.isEmpty { snapshots = [s]; cursor = 0; return }
@@ -61,12 +70,16 @@ final class PromptEditHistory {
         cursor = snapshots.count - 1
     }
 
+    /// Moves the cursor back one snapshot.
+    /// - Returns: The previous state, or `nil` if at the beginning.
     func undo() -> EditState? {
         guard canUndo else { return nil }
         cursor -= 1
         return snapshots[cursor]
     }
 
+    /// Moves the cursor forward one snapshot.
+    /// - Returns: The next state, or `nil` if at the end.
     func redo() -> EditState? {
         guard canRedo else { return nil }
         cursor += 1

@@ -20,11 +20,11 @@ import Foundation
 /// `done` at the end. Phase boundaries are crossed by opening and sealing the
 /// phase's own rows.
 
-/// THE PROSE NAMES A SKILL, NEVER A TOOL. This text is served verbatim through
-/// `BOT_NEXT` to the agents doing the work, and a block naming the wrong write
-/// path is the wrong write path everywhere at once — so it names the phase's
-/// skill and lets the skill name the ops. CDE workflow work is pen-only: a tool
-/// an agent cannot see is a missing GRANT to report, never a cue to shell to the
+/// THE PROSE NAMES A SKILL, NEVER A TOOL.
+///
+/// This text is served verbatim through `BOT_NEXT` to the agents doing the work, and a block naming the wrong write
+/// path is the wrong write path everywhere at once — so it names the phase's skill and lets the skill name the ops. CDE
+/// workflow work is pen-only: a tool an agent cannot see is a missing GRANT to report, never a cue to shell to the
 /// wire, whose unbudgeted output the harness silently truncates.
 enum WorkflowSpec {
 
@@ -44,8 +44,13 @@ enum WorkflowSpec {
         case done
     }
 
-    /// The ordered phase graph per variant. `task` is deliberately absent —
-    /// its write-nothing contract means no workflow row exists to walk.
+    /// Returns the ordered phases for the workflow variant.
+    ///
+    /// `task` is deliberately absent — its write-nothing contract means no
+    /// workflow row exists to walk.
+    ///
+    /// - Parameter variant: The bot variant.
+    /// - Returns: The phase sequence for this variant.
     static func phases(for variant: BotVariant) -> [Phase] {
         switch variant {
         case .bot:
@@ -67,9 +72,14 @@ enum WorkflowSpec {
         }
     }
 
-    /// The exploration agent set each variant must complete before leaving
-    /// the explore phase (the synthesis row is gated separately — its
-    /// complete IS the prompt-level seal).
+    /// Returns the required exploration agents for the variant.
+    ///
+    /// The exploration agent set each variant must complete before leaving the
+    /// explore phase (the synthesis row is gated separately — its complete IS
+    /// the prompt-level seal).
+    ///
+    /// - Parameter variant: The bot variant.
+    /// - Returns: The exploration agent types required for this variant.
     static func expectedExplorationAgents(for variant: BotVariant) -> [ExplorationAgentType] {
         switch variant {
         case .bot, .rpi:
@@ -79,20 +89,32 @@ enum WorkflowSpec {
         }
     }
 
-    /// One line per (variant, phase): the skill that carries the phase's real
-    /// instructions, plus who acts. The skill slug IS the phase's raw value, so
-    /// a new phase cannot point at a skill nobody wrote without saying so.
+    /// Returns the instructions and staffing for a phase.
     ///
-    /// NO TOOL NAME APPEARS HERE. The served roster is where an op is declared
-    /// and the skill is where it is taught; a third copy in compiled-in prose is
-    /// a third thing to keep true, and it was the one nothing checked.
+    /// One line per (variant, phase): the skill that carries the phase's real
+    /// instructions, plus who acts. The skill slug IS the phase's raw value, so a
+    /// new phase cannot point at a skill nobody wrote without saying so. No tool
+    /// name appears here — the served roster is where an op is declared and the
+    /// skill is where it is taught.
+    ///
+    /// - Parameters:
+    ///   - variant: The bot variant.
+    ///   - phase: The workflow phase.
+    /// - Returns: The instructions for this (variant, phase) pair.
     static func instructions(variant: BotVariant, phase: Phase) -> String {
         "Load the skill `gmcc:cde_rpir_\(phase.rawValue)` and follow it. "
             + staffing(variant: variant, phase: phase)
     }
 
-    /// Who does the work. Variant-specific only where the staffing genuinely
-    /// differs; elsewhere it is the one rule the skill assumes of its reader.
+    /// Returns the staffing guidance for a phase.
+    ///
+    /// Variant-specific only where the staffing genuinely differs; elsewhere it
+    /// is the one rule the skill assumes of its reader.
+    ///
+    /// - Parameters:
+    ///   - variant: The bot variant.
+    ///   - phase: The workflow phase.
+    /// - Returns: The staffing description for this (variant, phase) pair.
     private static func staffing(variant: BotVariant, phase: Phase) -> String {
         switch phase {
         case .briefing:

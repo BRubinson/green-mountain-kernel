@@ -15,13 +15,16 @@ extension Store {
     /// NULL content, like binaries).
     private static let maxInlineContentBytes = 2 * 1024 * 1024
 
-    /// The one-step import. Walks {open}/{axis1}/{axis2}/*_chewed.md, parses
-    /// each chewed artifact, and writes resource/file/keyword rows in ONE
-    /// transaction — re-digesting a resource replaces its previous rows.
-    /// Chewed files are deleted only AFTER the commit succeeds (a rollback
-    /// never destroys the artifacts). The maw's raw sources are then moved to
-    /// `{digested}/{code}/` and the open maw is dropped; an archive failure is
-    /// reported on the response, never thrown, because the commit already stands.
+    /// Digests a kbite maw into resources, files, and keywords in one transaction.
+    ///
+    /// Walks the maw's chewed artifacts, parses each one, and writes rows in
+    /// a single transaction; re-digesting replaces previous rows. Chewed files
+    /// are deleted only after commit, so a rollback never destroys artifacts.
+    /// Raw sources are then moved to the digested store and the maw dropped.
+    ///
+    /// - Parameter req: The digest request with maw path and kbite code.
+    /// - Returns: Response with resource/file/keyword counts and archive details.
+    /// - Throws: `StoreError.notComposable` if called within a transaction.
     func digestKbite(_ req: KbiteDigestRequest) throws -> KbiteDigestResponse {
         // FOUR-PHASE VERB — see StoreError.notComposable. Filesystem work
         // between the read and the write must not hold the single writer.
@@ -127,9 +130,16 @@ extension Store {
         )
     }
 
-    /// Merge-move the maw into `{digested}/{code}/` and remove the emptied maw.
-    /// A re-digest merges over the earlier archive file by file, so a partial
-    /// re-chew replaces only the resources it carried.
+    /// Moves the maw to the digested store and removes the empty maw.
+    ///
+    /// A re-digest merges over the earlier archive file by file, so a
+    /// partial re-chew replaces only the resources it carried.
+    ///
+    /// - Parameters:
+    ///   - openURL: The path to the open maw to archive.
+    ///   - code: The kbite code for the destination directory.
+    /// - Returns: The URL of the digested archive directory.
+    /// - Throws: Any filesystem error during the move.
     private func archiveMaw(_ openURL: URL, code: String) throws -> URL {
         let destination = Paths.kbitesDigestedRoot.appendingPathComponent(code, isDirectory: true)
         try Paths.assertContained(openURL)
@@ -139,6 +149,12 @@ extension Store {
         return destination
     }
 
+    /// Recursively moves files and directories from source to destination.
+    ///
+    /// - Parameters:
+    ///   - source: The source directory to move from.
+    ///   - destination: The destination directory to move to (created if needed).
+    /// - Throws: Any filesystem error during the move.
     private static func mergeMove(from source: URL, to destination: URL) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: destination, withIntermediateDirectories: true)
@@ -156,9 +172,14 @@ extension Store {
         }
     }
 
-    /// Full text for text types under the size cap; NULL for everything else
-    /// (missing, unreadable, binary, oversized) — the row still exists so the
-    /// file is discoverable, the filesystem keeps the raw bytes.
+    /// Returns full text for small text-type files, or nil otherwise.
+    ///
+    /// Files above the size cap, non-text types, missing, unreadable, or
+    /// binary files return nil; the row still exists so the file remains
+    /// discoverable while the filesystem keeps the raw bytes.
+    ///
+    /// - Parameter entry: The chewed file entry to read.
+    /// - Returns: The file text, or nil.
     private func inlineContent(_ entry: ChewedFileEntry) -> String? {
         guard let path = entry.fullPath, ChewedArtifactParser.isTextType(fileName: entry.name) else {
             return nil
@@ -170,15 +191,29 @@ extension Store {
         return try? String(contentsOfFile: path, encoding: .utf8)
     }
 
+    /// Retrieves kbite resource metadata and inline content.
+    ///
+    /// - Parameter req: The request with kbite UUID.
+    /// - Returns: The resource response with metadata and content.
+    /// - Throws: Any database error.
     func getKbite(_ req: KbiteGetRequest) throws -> KbiteGetResponse {
         try boundaryRead { db in try KbiteResourceRepository(db: db, core: core).getKbite(req) }
     }
 
-    /// The targeted load replacing "cat the chewed file".
+    /// Retrieves a single file from a kbite resource with inline content.
+    ///
+    /// - Parameter req: The request with resource UUID and file name.
+    /// - Returns: The file response with metadata and content.
+    /// - Throws: Any database error.
     func getKbiteFile(_ req: KbiteFileGetRequest) throws -> KbiteFileGetResponse {
         try boundaryRead { db in try KbiteResourceRepository(db: db, core: core).getKbiteFile(req) }
     }
 
+    /// Searches kbite resources by full-text query.
+    ///
+    /// - Parameter req: The search request with query string.
+    /// - Returns: The search response with matching resources.
+    /// - Throws: Any database error.
     func searchKbites(_ req: KbiteSearchRequest) throws -> KbiteSearchResponse {
         // ORs the query tokens (see Store+DopeSearch for why AND was wrong).
         // The empty-hit-list answer to an untokenizable query is a DELIBERATE
@@ -192,17 +227,38 @@ extension Store {
         }
     }
 
-    /// Attach/detach normalized keywords at kbite or resource-file level.
+    /// Attaches or detaches keywords from kbite resources or files.
+    ///
+    /// - Parameter req: The tag request with target, keyword, and action.
+    /// - Returns: The response with keyword association details.
+    /// - Throws: Any database error.
     func tagKeyword(_ req: KbiteKeywordTagRequest) throws -> KbiteKeywordTagResponse {
         try boundary { db in try KbiteResourceRepository(db: db, core: core).tagKeyword(req) }
     }
 
     // MARK: - Cross-domain helper forwards (Store+KbiteArchive's import reuses these)
 
+    /// Gets or creates a keyword, returning its UUID.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - keyword: The keyword string to ensure.
+    /// - Returns: The UUID of the keyword.
+    /// - Throws: Any database error.
     func ensureKeyword(_ db: Database, _ keyword: String) throws -> String {
         try KbiteResourceRepository(db: db, core: core).ensureKeyword(keyword)
     }
 
+    /// Attaches a keyword to a resource or file.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - table: The name of the table owning the resource.
+    ///   - ownerColumn: The column name holding the owner UUID.
+    ///   - ownerUuid: The UUID of the owner (resource or file).
+    ///   - keywordUuid: The UUID of the keyword to attach.
+    /// - Returns: True if the attachment was new, false if it already existed.
+    /// - Throws: Any database error.
     @discardableResult
     func attachKeyword(
         _ db: Database,

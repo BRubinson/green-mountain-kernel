@@ -7,6 +7,9 @@
 import Foundation
 
 extension KbiteRecord {
+    /// Converts the record to its wire representation.
+    ///
+    /// - Returns: The wire row for this kbite.
     func dto() -> KbiteRow {
         KbiteRow(
             uuid: uuid,
@@ -19,7 +22,11 @@ extension KbiteRecord {
 }
 
 extension KbiteResourceWithFiles {
-    /// `resourceTrust` narrows Int64 to the wire's Int.
+    /// Converts the resource and its files to their wire representation.
+    ///
+    /// `resourceTrust` is narrowed from Int64 to the wire's Int.
+    ///
+    /// - Returns: The wire row for this resource with its files.
     func dto() -> KbiteResourceRow {
         KbiteResourceRow(
             uuid: resource.uuid,
@@ -34,6 +41,9 @@ extension KbiteResourceWithFiles {
 }
 
 extension KbiteResourceFileHead {
+    /// Converts the file header to its wire stub form.
+    ///
+    /// - Returns: The wire stub for this resource file.
     func dto() -> KbiteResourceFileStub {
         KbiteResourceFileStub(
             uuid: uuid,
@@ -45,8 +55,12 @@ extension KbiteResourceFileHead {
 }
 
 extension KbiteResourceFileRecord {
+    /// Converts the record to its wire row form with full content.
+    ///
     /// The full-content shape, reached only by KBITE_FILE_GET. Listing paths
     /// go through `KbiteResourceFileHead` instead.
+    ///
+    /// - Returns: The wire row for this resource file.
     func dto() -> KbiteResourceFileRow {
         KbiteResourceFileRow(
             uuid: uuid,

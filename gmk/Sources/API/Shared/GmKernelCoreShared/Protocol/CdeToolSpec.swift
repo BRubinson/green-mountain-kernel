@@ -1,7 +1,9 @@
 import Foundation
 
 /// One served cde tool: the name agents call, the schema Claude Code is shown,
-/// and the ops it answers. Values of this type are reflected from the
+/// and the ops it answers.
+///
+/// Values of this type are reflected from the
 /// `GmAgentTool` declarations by `gm_kernel bridge` and read back out of the
 /// generated `CdeToolRoster`, so nothing downstream hand-lists a tool name.
 struct CdeToolSpec: Codable, Sendable {
@@ -22,6 +24,9 @@ struct CdeToolSpec: Codable, Sendable {
     var qualifiedName: String { Self.qualifiedName(name) }
 
     /// The harness's plugin namespacing, spelled once for the whole tree.
+    ///
+    /// - Parameter tool: The tool name.
+    /// - Returns: The qualified name with the plugin prefix.
     static func qualifiedName(_ tool: String) -> String { "mcp__plugin_gmcc_cde__" + tool }
 
     enum CodingKeys: String, CodingKey {
@@ -39,9 +44,13 @@ struct CdeToolSpec: Codable, Sendable {
 struct CdeOpSpec: Codable, Sendable {
 
     let op: String
-    /// The verbs this op sends. Empty for an op the pen folds itself.
+    /// The verbs this op sends.
+    ///
+    /// Empty for an op the pen folds itself.
     let verbs: [MessageType]
-    /// True when any of those verbs records. A write that came back over budget
+    /// True when any of those verbs records.
+    ///
+    /// A write that came back over budget
     /// must not be retried, so the guard needs this per OP and not per tool.
     let isWrite: Bool
     /// What a read op can be told to make itself smaller.
@@ -67,7 +76,9 @@ extension CdeToolRoster {
     static let generatedPath =
         "gmk/Sources/API/Shared/GmKernelCoreShared/Protocol/CdeToolRoster.generated.swift"
 
-    /// Decoded once, as an OUTCOME rather than a trap. A roster that will not
+    /// Decoded once, as an OUTCOME rather than a trap.
+    ///
+    /// A roster that will not
     /// decode is a build artifact nothing can serve, but what to do about it is
     /// the reader's call: the pen refuses to start, while a hook that only
     /// needs the sheet degrades to naming no tools instead of killing a session.
@@ -85,6 +96,10 @@ extension CdeToolRoster {
         return error
     }
 
+    /// Fetch the tool spec by name.
+    ///
+    /// - Parameter name: The tool name.
+    /// - Returns: The spec, or `nil` if not found.
     static func spec(named name: String) -> CdeToolSpec? {
         specs.first { $0.name == name }
     }

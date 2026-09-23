@@ -35,6 +35,10 @@ enum JSON {
     case array([JSON])
     case object([String: JSON])
 
+    /// Parses JSON data into a `JSON` value.
+    ///
+    /// - Parameter data: The raw JSON data to parse.
+    /// - Returns: A JSON value, or nil if the data is not valid JSON.
     static func parse(_ data: Data) -> JSON? {
         guard let raw = try? JSONSerialization.jsonObject(with: data, options: [.fragmentsAllowed]) else {
             return nil
@@ -42,6 +46,10 @@ enum JSON {
         return from(raw)
     }
 
+    /// Converts an untyped value into a `JSON` value.
+    ///
+    /// - Parameter raw: An untyped value from JSON deserialization.
+    /// - Returns: The equivalent JSON value.
     static func from(_ raw: Any) -> JSON {
         switch raw {
         case let value as String: return .string(value)
@@ -66,31 +74,50 @@ enum JSON {
         }
     }
 
+    /// Accesses a value in a JSON object by key.
+    ///
+    /// - Parameter key: The object key.
+    /// - Returns: The value at the key, or nil if this is not an object.
     subscript(key: String) -> JSON? {
         guard case .object(let dict) = self else { return nil }
         return dict[key]
     }
 
+    /// Extracts a string value from a JSON value.
+    ///
+    /// - Returns: The string, or nil if this is not a string.
     var stringValue: String? {
         guard case .string(let value) = self else { return nil }
         return value
     }
 
+    /// Extracts an integer value from a JSON number.
+    ///
+    /// - Returns: The integer, or nil if this is not a number.
     var intValue: Int? {
         guard case .number(let value) = self else { return nil }
         return Int(value)
     }
 
+    /// Extracts a 64-bit integer value from a JSON number.
+    ///
+    /// - Returns: The 64-bit integer, or nil if this is not a number.
     var int64Value: Int64? {
         guard case .number(let value) = self else { return nil }
         return Int64(value)
     }
 
+    /// Extracts a boolean value from a JSON boolean.
+    ///
+    /// - Returns: The boolean, or nil if this is not a boolean.
     var boolValue: Bool? {
         guard case .bool(let value) = self else { return nil }
         return value
     }
 
+    /// Extracts an array of strings from a JSON array.
+    ///
+    /// - Returns: An array of strings, or nil if this is not an array.
     var stringArray: [String]? {
         guard case .array(let items) = self else { return nil }
         return items.compactMap(\.stringValue)
@@ -106,6 +133,11 @@ struct ToolError: Error {
 struct Args {
     let json: JSON
 
+    /// Extracts a required string argument.
+    ///
+    /// - Parameter key: The argument name.
+    /// - Returns: The string value.
+    /// - Throws: `ToolError` if the argument is missing or empty.
     func string(_ key: String) throws -> String {
         guard let value = json[key]?.stringValue, !value.isEmpty else {
             throw ToolError(message: "missing required argument '\(key)'")
@@ -113,10 +145,19 @@ struct Args {
         return value
     }
 
+    /// Extracts an optional string argument.
+    ///
+    /// - Parameter key: The argument name.
+    /// - Returns: The string value, or nil if absent.
     func optString(_ key: String) -> String? {
         json[key]?.stringValue
     }
 
+    /// Extracts a required 64-bit integer argument.
+    ///
+    /// - Parameter key: The argument name.
+    /// - Returns: The 64-bit integer value.
+    /// - Throws: `ToolError` if the argument is missing.
     func int64(_ key: String) throws -> Int64 {
         guard let value = json[key]?.int64Value else {
             throw ToolError(message: "missing required argument '\(key)'")
@@ -124,21 +165,39 @@ struct Args {
         return value
     }
 
+    /// Extracts an optional integer argument.
+    ///
+    /// - Parameter key: The argument name.
+    /// - Returns: The integer value, or nil if absent.
     func optInt(_ key: String) -> Int? {
         json[key]?.intValue
     }
 
+    /// Extracts an optional boolean argument.
+    ///
+    /// - Parameter key: The argument name.
+    /// - Returns: The boolean value, or nil if absent.
     func optBool(_ key: String) -> Bool? {
         json[key]?.boolValue
     }
 
+    /// Extracts an optional string array argument.
+    ///
+    /// - Parameter key: The argument name.
+    /// - Returns: An array of strings, or nil if absent.
     func optStrings(_ key: String) -> [String]? {
         json[key]?.stringArray
     }
 
-    /// A REQUIRED boolean. `optBool` cannot serve here: false and absent are
-    /// different answers for a field like `nullable`, where guessing one is a
-    /// migration written from a value nobody supplied.
+    /// Extracts a required boolean argument; false and absent are distinct.
+    ///
+    /// `optBool` cannot serve here; false and absent are different answers
+    /// for a field like `nullable`, where guessing one is a migration written
+    /// from a value nobody supplied.
+    ///
+    /// - Parameter key: The argument name.
+    /// - Returns: The boolean value.
+    /// - Throws: `ToolError` if the argument is missing.
     func bool(_ key: String) throws -> Bool {
         guard let value = json[key]?.boolValue else {
             throw ToolError(message: "missing required argument '\(key)' (true or false)")
@@ -146,10 +205,16 @@ struct Args {
         return value
     }
 
-    /// The rating window shared by rpir_get_exploration and rpir_get_review, mirroring the
-    /// CLI's RatingWindowOptions: mutually exclusive, 0-999, A:B inclusive.
-    /// Without it a pen read of a ranked finding set is all-or-nothing, and
-    /// the 80_000-byte result cap turns "all" into a truncation.
+    /// Parses the rating window options for exploration and review results.
+    ///
+    /// The rating window is shared by rpir_get_exploration and rpir_get_review,
+    /// mirroring the CLI's RatingWindowOptions: mutually exclusive, 0-999,
+    /// A:B inclusive. Without it a pen read of a ranked finding set is
+    /// all-or-nothing, and the 80_000-byte result cap turns "all" into a
+    /// truncation.
+    ///
+    /// - Returns: A tuple with the full flag and optional min/max bounds.
+    /// - Throws: `ToolError` if the options are invalid or mutually violated.
     func ratingWindow() throws -> (full: Bool, min: Int?, max: Int?) {
         let full = optBool("full") ?? false
         let maxRating = optInt("max_rating")
@@ -182,7 +247,7 @@ struct Args {
 struct CdeTool {
     let name: String
     let description: String
-    /// {property name: (type, description, required)}
+    /// {property name: (type, description, required)}.
     let params: [(String, String, String, Bool)]
     /// What makes THIS tool's result smaller, in the tool's own argument
     /// names. nil is a positive statement: the result cannot outgrow the
@@ -190,11 +255,12 @@ struct CdeTool {
     /// verbatim, so a caller is never told to narrow without being told with
     /// what.
 
-    /// True when this tool exists in order to REFUSE. It carries no wire verb,
-    /// so it legitimately has no `VerbSpec` and the roster check must not read
-    /// that absence as an undeclared tool. FLAGGED rather than matched on a
-    /// `_not_supported` suffix, because some refusals do not carry it and a
-    /// check keyed on spelling would pass them silently.
+    /// True when this tool exists in order to REFUSE.
+    ///
+    /// It carries no wire verb, so it legitimately has no `VerbSpec` and the
+    /// roster check must not read that absence as an undeclared tool. FLAGGED
+    /// rather than matched on a `_not_supported` suffix, because some refusals
+    /// do not carry it and a check keyed on spelling would pass them silently.
     var refuses: Bool = false
 
     /// Pinned into every session's listing through `_meta`, rather than left to
@@ -208,20 +274,32 @@ struct CdeTool {
     /// still served under the one-tool-per-verb shape.
     var spec: CdeToolSpec?
 
-    /// Which op the caller picked, or nil for a tool that has no ops. The
-    /// selector is whichever schema property carries the op names — `op` for
-    /// every tool but `cde_rpir_search`, which keys on `scope`.
+    /// Resolves the operation the caller selected for this tool.
+    ///
+    /// The selector is whichever schema property carries the op names — `op`
+    /// for every tool but `cde_rpir_search`, which keys on `scope`.
+    ///
+    /// - Parameter args: The tool arguments.
+    /// - Returns: The operation name, or nil if the tool has no ops.
     func resolvedOp(_ args: Args) -> String? {
         guard let spec, !spec.ops.isEmpty else { return nil }
         if let picked = args.optString(Self.selectorKey(spec)) { return picked }
         return spec.ops.count == 1 ? spec.ops[0].op : nil
     }
 
+    /// Looks up the spec for an operation by name.
+    ///
+    /// - Parameter op: The operation name.
+    /// - Returns: The operation spec, or nil if not found.
     func opSpec(_ op: String?) -> CdeOpSpec? {
         guard let op, let spec else { return nil }
         return spec.ops.first { $0.op == op }
     }
 
+    /// Returns the schema property that carries operation names for a tool.
+    ///
+    /// - Parameter spec: The tool specification.
+    /// - Returns: The property name (e.g., "op" or "scope").
     static func selectorKey(_ spec: CdeToolSpec) -> String {
         let ops = Set(spec.ops.map(\.op))
         guard case .object(let schema) = spec.schema,
@@ -264,8 +342,12 @@ struct CdeTool {
     }
 }
 
-/// `GmJsonValue` as the `[String: Any]` tree `JSONSerialization` writes. The
-/// roster's schema crosses into the protocol's untyped world exactly here.
+/// Converts a `GmJsonValue` to a JSON-serializable untyped tree.
+///
+/// The roster's schema crosses into the protocol's untyped world exactly here.
+///
+/// - Parameter value: The JSON value to convert.
+/// - Returns: An untyped JSON-serializable value.
 func cdeJsonObject(_ value: GmJsonValue) -> Any {
     switch value {
     case .null: return NSNull()
@@ -285,6 +367,11 @@ func cdeJsonObject(_ value: GmJsonValue) -> Any {
 /// tool per verb.
 extension CdeTool {
 
+    /// Creates a tool from a roster specification and dispatch table.
+    ///
+    /// - Parameters:
+    ///   - spec: The tool specification from the roster.
+    ///   - dispatch: The operation dispatch table.
     init(spec: CdeToolSpec, dispatch: [String: CdeArm]) {
         let ops = spec.ops.map(\.op)
         let selector = CdeTool.selectorKey(spec)
@@ -321,8 +408,15 @@ extension CdeTool {
     }
 }
 
-/// Zero-uuid resolution shared by the bot tools: explicit prompt uuid →
-/// ClientKey → the session resolved from CLAUDE_PROJECT_DIR/cwd.
+/// Resolves prompt uuid, client key, and session for bot tools.
+///
+/// Shared by the bot tools: explicit prompt uuid → ClientKey → the session
+/// resolved from CLAUDE_PROJECT_DIR/cwd.
+///
+/// - Parameters:
+///   - args: The tool arguments.
+///   - client: The verb caller.
+/// - Returns: A tuple of (prompt uuid, client key, session uuid).
 private func botSelector(_ args: Args, _ client: any GmVerbCaller) -> (String?, String?, String?) {
     let promptUuid = args.optString("prompt_uuid")
     var session: String?
@@ -332,9 +426,17 @@ private func botSelector(_ args: Args, _ client: any GmVerbCaller) -> (String?, 
     return (promptUuid, ClientKey.resolve(), session)
 }
 
+/// Resolves a prompt uuid for record reads when one is not explicit.
+///
 /// The record reads are prompt-keyed, and an agent is rarely told a uuid —
 /// so an explicit `prompt_uuid` wins, and otherwise the workflow BOT_GET
 /// already resolves answers it. Same zero-uuid contract the bot tools have.
+///
+/// - Parameters:
+///   - args: The tool arguments.
+///   - client: The verb caller.
+/// - Returns: The resolved prompt uuid.
+/// - Throws: `ToolError` if resolution fails.
 private func resolvePromptUuid(_ args: Args, _ client: any GmVerbCaller) throws -> String {
     if let explicit = args.optString("prompt_uuid") { return explicit }
     let (prompt, key, session) = botSelector(args, client)
@@ -349,7 +451,11 @@ private func resolvePromptUuid(_ args: Args, _ client: any GmVerbCaller) throws 
         .workflow.promptUuid
 }
 
-/// One pager per call, from the shared page arguments.
+/// Creates a pager from the shared page arguments.
+///
+/// - Parameter args: The tool arguments.
+/// - Returns: A configured pager.
+/// - Throws: `ToolError` if pager initialization fails.
 func makePager(_ args: Args) throws -> CdePager {
     let bytes = min(args.optInt("page_bytes") ?? CdeResultBudget.pageBytes, CdeResultBudget.maxBytes)
     do {
@@ -359,8 +465,15 @@ func makePager(_ args: Args) throws -> CdePager {
     }
 }
 
+/// Creates narrowing options for paged reads: cursor and optional selectors.
+///
 /// The narrowing every paged read declares: the cursor first, then whatever
 /// selector reads one body.
+///
+/// - Parameters:
+///   - tool: The tool name.
+///   - selectors: Optional selector names for single-body reads.
+/// - Returns: The narrowing specification.
 func pagedNarrowing(_ tool: String, selectors: [String] = []) -> CdeNarrowing {
     let extra = selectors.isEmpty ? "" : "; \(selectors.joined(separator: " / ")) for one body"
     return CdeNarrowing(
@@ -375,8 +488,9 @@ func pagedNarrowing(_ tool: String, selectors: [String] = []) -> CdeNarrowing {
 /// have always had.
 typealias CdeArm = (Args, any GmVerbCaller) throws -> any Encodable
 
-/// tool → op → body. Each door file contributes its own, and `CdeDispatch`
-/// merges them.
+/// tool → op → body.
+///
+/// Each door file contributes its own, and `CdeDispatch` merges them.
 typealias CdeArms = [String: [String: CdeArm]]
 
 /// This file's own contribution: the record reads and writes that were served
@@ -392,6 +506,9 @@ nonisolated(unsafe) let gmMcpServerArms: CdeArms = [
     "cde_rpir_review": reviewArms(),
 ]
 
+/// Returns the dispatch table for prompt-related operations.
+///
+/// - Returns: A map of operation names to their implementations.
 private func promptArms() -> [String: CdeArm] {
     var prompt: [String: CdeArm] = [:]
     prompt["load"] = { args, client in
@@ -454,6 +571,9 @@ private func promptArms() -> [String: CdeArm] {
     return prompt
 }
 
+/// Returns the dispatch table for dope-related operations.
+///
+/// - Returns: A map of operation names to their implementations.
 private func dopeArms() -> [String: CdeArm] {
     var dope: [String: CdeArm] = [:]
     dope["search_session"] = { args, client in
@@ -480,6 +600,9 @@ private func dopeArms() -> [String: CdeArm] {
     return dope
 }
 
+/// Returns the dispatch table for kbite-related operations.
+///
+/// - Returns: A map of operation names to their implementations.
 private func kbiteArms() -> [String: CdeArm] {
     var kbite: [String: CdeArm] = [:]
     kbite["search"] = { args, client in
@@ -495,6 +618,9 @@ private func kbiteArms() -> [String: CdeArm] {
     return kbite
 }
 
+/// Returns the dispatch table for briefing-related operations.
+///
+/// - Returns: A map of operation names to their implementations.
 private func briefingArms() -> [String: CdeArm] {
     var briefing: [String: CdeArm] = [:]
     briefing["load"] = { args, client in
@@ -529,6 +655,9 @@ private func briefingArms() -> [String: CdeArm] {
     return briefing
 }
 
+/// Returns the dispatch table for exploration-related operations.
+///
+/// - Returns: A map of operation names to their implementations.
 private func exploreArms() -> [String: CdeArm] {
     var explore: [String: CdeArm] = [:]
     explore["open"] = { args, client in
@@ -565,8 +694,8 @@ private func exploreArms() -> [String: CdeArm] {
                 kind: kind,
                 title: try args.string("title"),
                 body: try args.string("body"),
-                filePath: args.optString("file_path"),
                 agentName: try args.string("agent_name"),
+                filePath: args.optString("file_path"),
                 agentId: args.optString("agent_id"),
                 rating: args.optInt("rating")
             )
@@ -620,6 +749,9 @@ private func exploreArms() -> [String: CdeArm] {
     return explore
 }
 
+/// Returns the dispatch table for clarification-related operations.
+///
+/// - Returns: A map of operation names to their implementations.
 private func clarifyArms() -> [String: CdeArm] {
     var clarify: [String: CdeArm] = [:]
     clarify["write_questions"] = { args, client in
@@ -691,6 +823,9 @@ private func clarifyArms() -> [String: CdeArm] {
     return clarify
 }
 
+/// Returns the dispatch table for architecture-related operations.
+///
+/// - Returns: A map of operation names to their implementations.
 private func architectureArms() -> [String: CdeArm] {
     var architecture: [String: CdeArm] = [:]
     architecture["open_option"] = { args, client in
@@ -698,8 +833,8 @@ private func architectureArms() -> [String: CdeArm] {
             ArchOptionAddRequest(
                 summaryUuid: try args.string("summary_uuid"),
                 agentName: try args.string("agent_name"),
-                agentId: args.optString("agent_id"),
                 body: try args.string("body"),
+                agentId: args.optString("agent_id"),
                 supersedesOptionUuid: args.optString("supersedes_option_uuid"),
                 expectedVersion: args.optInt("expected_version").map(Int64.init)
             )
@@ -721,6 +856,9 @@ private func architectureArms() -> [String: CdeArm] {
     return architecture
 }
 
+/// Returns the dispatch table for review-related operations.
+///
+/// - Returns: A map of operation names to their implementations.
 private func reviewArms() -> [String: CdeArm] {
     var review: [String: CdeArm] = [:]
     review["write"] = { args, client in
@@ -733,10 +871,10 @@ private func reviewArms() -> [String: CdeArm] {
                 kind: kind,
                 title: try args.string("title"),
                 body: try args.string("body"),
+                agentName: try args.string("agent_name"),
                 filePath: args.optString("file_path"),
                 lineStart: args.optInt("line_start"),
                 lineEnd: args.optInt("line_end"),
-                agentName: try args.string("agent_name"),
                 agentId: args.optString("agent_id"),
                 rating: args.optInt("rating")
             )
@@ -759,9 +897,11 @@ private func reviewArms() -> [String: CdeArm] {
     return review
 }
 
-/// THE ONE TABLE OF BODIES. Every door file hands its arms in here; a tool is
-/// served with the ops this table holds for it, and the startup check reports
-/// any op the roster declares that nothing answers.
+/// THE ONE TABLE OF BODIES.
+///
+/// Every door file hands its arms in here; a tool is served with the ops this
+/// table holds for it, and the startup check reports any op the roster declares
+/// that nothing answers.
 enum CdeDispatch {
 
     /// Add one contribution per door file as it converts.
@@ -769,6 +909,10 @@ enum CdeDispatch {
         gmMcpServerArms, recallDoorArms, phaseDoorArms, primaryDoorArms, fastPathArms,
     ])
 
+    /// Merges multiple dispatch tables into a single table.
+    ///
+    /// - Parameter contributions: The dispatch tables to merge.
+    /// - Returns: The merged dispatch table.
     private static func merge(_ contributions: [CdeArms]) -> CdeArms {
         var table: CdeArms = [:]
         for contribution in contributions {
@@ -779,9 +923,13 @@ enum CdeDispatch {
         return table
     }
 
-    /// Where the roster and the bodies disagree, as lines. A tool with no arms
-    /// at all is a skew like any other: an empty contribution and an unconverted
-    /// door file are indistinguishable, so neither is excused.
+    /// Returns lines where the roster and dispatch table disagree.
+    ///
+    /// A tool with no arms at all is a skew like any other: an empty
+    /// contribution and an unconverted door file are indistinguishable, so
+    /// neither is excused.
+    ///
+    /// - Returns: An array of problem descriptions.
     static func problems() -> [String] {
         var lines: [String] = []
         for spec in CdeToolRoster.specs {
@@ -847,11 +995,12 @@ nonisolated(unsafe) let tools: [CdeTool] =
 /// SubagentStart hook hands spawned agents the same generated text: two
 /// generators over one registry drift apart.
 
-/// Startup refusal on stderr, since stdout belongs to the protocol. The roster,
-/// the registry and the dispatch table must agree, and a binary that serves a
-/// surface nobody declared exits instead of answering — a pen that half-works
-/// is discovered one failing call at a time, by an agent with no way to tell a
-/// build skew from its own mistake.
+/// Startup refusal on stderr, since stdout belongs to the protocol.
+///
+/// The roster, the registry and the dispatch table must agree, and a binary
+/// that serves a surface nobody declared exits instead of answering — a pen
+/// that half-works is discovered one failing call at a time, by an agent with
+/// no way to tell a build skew from its own mistake.
 @MainActor func validateRosterAgainstRegistry() {
     // THE ONE READER THAT REFUSES. `CdeToolRoster.specs` degrades to empty for
     // everything else, which for the pen means serving nothing at all — so the
@@ -869,14 +1018,17 @@ nonisolated(unsafe) let tools: [CdeTool] =
 }
 
 extension GmCdeTools {
-    /// The roster check, as DATA rather than as a side effect on stderr, so a
-    /// test can assert it is empty.
+    /// Reports discrepancies between the roster and dispatch tables.
     ///
-    /// NEITHER NAME DIRECTION IS REPRESENTABLE: `tools` is
-    /// `CdeToolRoster.specs` mapped one-for-one and `VerbRegistry.cdeToolNames`
-    /// IS `CdeToolRoster.names`, so neither an undeclared served name nor an
-    /// unserved declared one can be constructed. What stays checkable is the
-    /// CONTENT of a row — its verbs, its answered ops, its schema shape.
+    /// The roster check is DATA rather than a side effect on stderr, so a
+    /// test can assert it is empty. NEITHER NAME DIRECTION IS REPRESENTABLE:
+    /// `tools` is `CdeToolRoster.specs` mapped one-for-one and
+    /// `VerbRegistry.cdeToolNames` IS `CdeToolRoster.names`, so neither an
+    /// undeclared served name nor an unserved declared one can be constructed.
+    /// What stays checkable is the CONTENT of a row — its verbs, its answered
+    /// ops, its schema shape.
+    ///
+    /// - Returns: An array of problem descriptions.
     static func rosterProblems() -> [String] {
         var lines: [String] = []
         for spec in CdeToolRoster.specs where !spec.refuses {
@@ -895,10 +1047,15 @@ extension GmCdeTools {
         return lines
     }
 
+    /// Returns problems with a tool's schema shape.
+    ///
     /// A schema whose `required` list names anything beyond the op selector is
     /// a tool Claude Code refuses to call for every op but the one that happens
-    /// to need those arguments. Per-op required-ness is a RUNTIME answer the
-    /// arm gives; the JSON schema carries only the selector.
+    /// to need those arguments. Per-op required-ness is a RUNTIME answer; the
+    /// JSON schema carries only the selector.
+    ///
+    /// - Parameter spec: The tool specification to check.
+    /// - Returns: An array of problem descriptions.
     private static func schemaShapeProblems(_ spec: CdeToolSpec) -> [String] {
         var lines: [String] = []
         let selector = CdeTool.selectorKey(spec)
@@ -936,14 +1093,21 @@ extension GmCdeTools {
 
 // MARK: - Rendering (byte-budgeted)
 
+/// Renders a tool result as JSON with byte budgeting applied.
+///
 /// CdeTool results are the wire response as sorted-key JSON, the form agents
-/// parse. THIS NEVER CLIPS: cutting the JSON at a byte count lands the cut
-/// inside whichever key sorts there and eats the rest silently. Every read is
-/// paged by `CdePager` before it gets here, so the guard's withhold note is a
-/// last resort. `op` is what the caller picked, so the narrowing quoted back
-/// and the write flag are the OP's: on a tool carrying both kinds of op, one
-/// answer for the whole tool is wrong for half its calls.
-func renderResult(tool: CdeTool, op: String? = nil, value: any Encodable) throws -> String {
+/// parse. Cutting JSON at a byte count lands the cut mid-key and loses the
+/// rest silently; paging by `CdePager` before here prevents it. `op` and the
+/// OP's narrowing/write flag come from the caller's pick; on tools with mixed
+/// op kinds, one answer cannot fit all calls.
+///
+/// - Parameters:
+///   - tool: The tool being rendered.
+///   - value: The result value to encode.
+///   - op: The operation name, if applicable.
+/// - Returns: The JSON-encoded result as a string.
+/// - Throws: `ToolError` if rendering fails.
+func renderResult(tool: CdeTool, value: any Encodable, op: String? = nil) throws -> String {
     let opSpec = tool.opSpec(op)
     let label = op.map { "\(tool.name) op=\($0)" } ?? tool.name
     return try CdeResultBudget.render(
@@ -956,16 +1120,30 @@ func renderResult(tool: CdeTool, op: String? = nil, value: any Encodable) throws
 
 // MARK: - JSON-RPC loop
 
+/// Writes a JSON-RPC message to stdout.
+///
+/// - Parameter object: The message to write.
 func writeMessage(_ object: [String: Any]) {
     guard let data = try? JSONSerialization.data(withJSONObject: object) else { return }
     FileHandle.standardOutput.write(data)
     FileHandle.standardOutput.write(Data("\n".utf8))
 }
 
+/// Sends a successful JSON-RPC response.
+///
+/// - Parameters:
+///   - id: The request id.
+///   - result: The result object.
 func respond(id: Any, result: [String: Any]) {
     writeMessage(["jsonrpc": "2.0", "id": id, "result": result])
 }
 
+/// Sends a JSON-RPC error response.
+///
+/// - Parameters:
+///   - id: The request id.
+///   - code: The error code.
+///   - message: The error message.
 func respondError(id: Any, code: Int, message: String) {
     writeMessage(["jsonrpc": "2.0", "id": id, "error": ["code": code, "message": message]])
 }
@@ -977,14 +1155,14 @@ func respondError(id: Any, code: Int, message: String) {
 
 enum GmMcpServer {
 
-    /// The `gm_mcp` personality: a JSON-RPC 2.0 server on newline-delimited
-    /// stdio, relaying every `tools/call` to the daemon over the unix socket.
-    /// It stays a CHILD OF THE HARNESS. Three things depend on that and cannot
-    /// be supplied from inside the kernel process: the harness owns this stdin;
-    /// `ClientKey.resolve()` walks process ancestry for the activation-claim
-    /// key; and the chdir below gives one cwd per session. `@MainActor` matches
-    /// the implicit isolation of top-level code, which is what lets
-    /// `validateRosterAgainstRegistry()` be called plainly.
+    /// The `gm_mcp` personality: a JSON-RPC 2.0 MCP server over stdio.
+    ///
+    /// A JSON-RPC 2.0 server on newline-delimited stdio, relaying every
+    /// `tools/call` to the daemon over the unix socket. A CHILD OF THE
+    /// HARNESS: the harness owns this stdin; `ClientKey.resolve()` walks
+    /// process ancestry for the activation-claim key; chdir gives one cwd
+    /// per session. `@MainActor` matches the implicit isolation of top-level
+    /// code.
     @MainActor
     static func main() {
         // Servers spawn with the project dir as cwd; CLAUDE_PROJECT_DIR is the
@@ -1064,7 +1242,7 @@ enum GmMcpServer {
                             "content": [
                                 [
                                     "type": "text",
-                                    "text": try renderResult(tool: tool, op: op, value: result),
+                                    "text": try renderResult(tool: tool, value: result, op: op),
                                 ]
                             ],
                             "isError": false,

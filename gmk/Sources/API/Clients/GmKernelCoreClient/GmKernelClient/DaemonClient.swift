@@ -18,6 +18,13 @@ final class DaemonClient: @unchecked Sendable {
     private var fd: Int32 = -1
     private var readBuffer = Data()
 
+    /// Creates a client bound to a daemon socket.
+    ///
+    /// - Parameters:
+    ///   - socketPath: Unix socket path; defaults to the standard location.
+    ///   - daemonBinaryPath: Path to the daemon executable to spawn if needed.
+    ///   - clientName: Name sent in the hello handshake; defaults to `"gm"`.
+    ///   - autostart: Whether to spawn the daemon if the socket is unreachable.
     init(
         socketPath: String = Paths.socket.path,
         daemonBinaryPath: String = Paths.binDaemon.path,
@@ -34,12 +41,14 @@ final class DaemonClient: @unchecked Sendable {
         close()
     }
 
+    /// Closes the daemon socket and discards the read buffer.
     func close() {
         lock.lock()
         defer { lock.unlock() }
         closeLocked()
     }
 
+    /// Closes the socket and read buffer when the lock is already held.
     private func closeLocked() {
         if fd >= 0 {
             // shutdown() before close(): on Darwin, close() alone does not
@@ -55,17 +64,24 @@ final class DaemonClient: @unchecked Sendable {
 
     // MARK: - Public API
 
-    /// Connect (autostarting the daemon if needed) and run the Hello
-    /// handshake. Mismatch handling is DIRECTIONAL: retry-with-autostart only
-    /// when the daemon reported an older version than ours (the freshly built
-    /// binary wins); when the daemon is newer, a respawn cycle is doomed —
-    /// surface the mismatch immediately.
+    /// Connects to the daemon, autostarting if needed, and exchanges hello.
+    ///
+    /// Mismatch handling is directional: retry-with-autostart only when the daemon reported an older version
+    /// than ours (the freshly built binary wins); when the daemon is newer, a respawn cycle is doomed — surface
+    /// the mismatch immediately.
+    ///
+    /// - Returns: The hello acknowledgment from the daemon.
+    /// - Throws: `DaemonClientError` on connection, wire, or handshake failure.
     func connect() throws -> HelloAck {
         lock.lock()
         defer { lock.unlock() }
         return try connectLocked()
     }
 
+    /// Connects when the lock is already held, retrying with autostart if needed.
+    ///
+    /// - Returns: The hello acknowledgment from the daemon.
+    /// - Throws: `DaemonClientError` on connection, wire, or handshake failure.
     private func connectLocked() throws -> HelloAck {
         do {
             return try connectOnce()
@@ -79,12 +95,21 @@ final class DaemonClient: @unchecked Sendable {
         }
     }
 
-    /// One request/response round-trip. Connects (with handshake) lazily.
-    /// Serialized: concurrent callers queue on the internal lock.
+    /// Sends a request and returns the response, connecting lazily.
+    ///
+    /// Concurrent callers serialize on the internal lock. On wire failure, retries once
+    /// after reconnecting, as the daemon may have restarted under a long-lived client.
+    ///
+    /// - Parameters:
+    ///   - type: Message type identifier.
+    ///   - payload: Encoded message payload.
+    ///   - responseType: Response type for generic type parameter inference.
+    /// - Returns: The decoded response payload.
+    /// - Throws: `DaemonClientError` on connection, wire, or protocol mismatch.
     func request<Req: Codable & Sendable, Resp: Codable & Sendable>(
         type: MessageType,
         payload: Req,
-        responseType _: Resp.Type
+        responseType: Resp.Type  // swiftlint:disable:this unused_parameter
     ) throws -> Resp {
         lock.lock()
         defer { lock.unlock() }
@@ -122,6 +147,10 @@ final class DaemonClient: @unchecked Sendable {
 
     // MARK: - Connection plumbing
 
+    /// Opens a new socket, exchanges hello, and returns the acknowledgment.
+    ///
+    /// - Returns: The hello acknowledgment from the daemon.
+    /// - Throws: `DaemonClientError` on socket open, wire, or handshake failure.
     private func connectOnce() throws -> HelloAck {
         if fd < 0 {
             try openSocket()
@@ -143,6 +172,9 @@ final class DaemonClient: @unchecked Sendable {
         return ack
     }
 
+    /// Dials the socket or spawns the daemon if autostart is enabled.
+    ///
+    /// - Throws: `DaemonClientError.unreachable` if the socket is dead and autostart is disabled.
     private func openSocket() throws {
         if let connected = try? dial() {
             fd = connected
@@ -154,11 +186,13 @@ final class DaemonClient: @unchecked Sendable {
         try autostart()
     }
 
-    /// Spawn the daemon binary and retry the dial with capped backoff
-    /// (10 tries, 100 ms → 1 s). The spawn happens INSIDE the loop: a spawn
-    /// that races a dying daemon's pidfile flock exits 0 by design, so only
-    /// re-spawning (idempotent under the flock) survives the
-    /// rebuild → retire → autostart window.
+    /// Spawns the daemon and retries connection with exponential backoff.
+    ///
+    /// The spawn happens inside the retry loop: a spawn that races a dying daemon's pidfile
+    /// flock exits 0 by design, so only re-spawning (idempotent under the flock) survives the
+    /// rebuild cycle. Retries up to 10 times with delays from 100 ms to 1 s.
+    ///
+    /// - Throws: `DaemonClientError.unreachable` when the binary is missing or all retries fail.
     private func autostart() throws {
         guard FileManager.default.isExecutableFile(atPath: daemonBinaryPath) else {
             throw DaemonClientError.unreachable(
@@ -182,14 +216,13 @@ final class DaemonClient: @unchecked Sendable {
         throw DaemonClientError.unreachable("daemon did not come up at \(socketPath) after autostart")
     }
 
-    /// Spawn the HEADLESS writer, naming the `daemon` personality explicitly
-    /// rather than relying on which name the path resolved under.
+    /// Spawns the headless daemon process with explicit personality argument.
     ///
-    /// `posix_spawn` on a GUI binary produces an AppKit process LaunchServices
-    /// knows nothing about, bypassing one-instance-per-bundle. This runs from
-    /// Claude Code hooks, so that would be a SECOND WRITER on every tool call.
-    /// The argument is harmless to a standalone `gm_daemon` shim, which
-    /// ignores argv entirely.
+    /// Uses `posix_spawn` with the daemon personality to bypass LaunchServices instance-per-bundle
+    /// enforcement. Running on a GUI binary would create a second writer. Passes `GM_FS_ROOT`
+    /// to ensure the spawned daemon uses the same root as the current process.
+    ///
+    /// - Returns: `true` when the spawn succeeds, `false` on `posix_spawn` failure.
     private func spawnDaemon() -> Bool {
         var attr: posix_spawnattr_t?
         posix_spawnattr_init(&attr)
@@ -220,6 +253,12 @@ final class DaemonClient: @unchecked Sendable {
         return rc == 0
     }
 
+    /// Creates a connected unix-domain socket bound to the daemon path.
+    ///
+    /// Sets `SO_NOSIGPIPE` to avoid SIGPIPE on writes to stale sockets.
+    ///
+    /// - Returns: A connected socket file descriptor.
+    /// - Throws: `DaemonClientError.unreachable` on socket creation or connection failure.
     private func dial() throws -> Int32 {
         let sock = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
         guard sock >= 0 else {
@@ -259,6 +298,11 @@ final class DaemonClient: @unchecked Sendable {
 
     // MARK: - NDJSON I/O (internal: DaemonEventSubscription reads raw lines)
 
+    /// Sends a request envelope and reads the response envelope.
+    ///
+    /// - Parameter envelope: The request envelope to encode and send.
+    /// - Returns: The decoded response envelope.
+    /// - Throws: `DaemonClientError.wire` on encoding, write, read, or decode failure.
     func roundTrip<Req: Codable & Sendable, Resp: Codable & Sendable>(
         _ envelope: RequestEnvelope<Req>
     ) throws -> ResponseEnvelope<Resp> {
@@ -277,6 +321,10 @@ final class DaemonClient: @unchecked Sendable {
         }
     }
 
+    /// Writes data to the socket, retrying until all bytes are sent.
+    ///
+    /// - Parameter data: The data to write.
+    /// - Throws: `DaemonClientError.wire` on write failure or broken pipe.
     private func writeAll(_ data: Data) throws {
         var remaining = data
         while !remaining.isEmpty {
@@ -290,6 +338,13 @@ final class DaemonClient: @unchecked Sendable {
         }
     }
 
+    /// Reads a line from the socket, buffering and searching for newline.
+    ///
+    /// Buffers data across multiple reads and returns when a `0x0A` byte is found,
+    /// excluding the newline from the result.
+    ///
+    /// - Returns: Data up to but not including the newline.
+    /// - Throws: `DaemonClientError.wire` on read failure or connection closure.
     func readLine() throws -> Data {
         while true {
             if let newlineIndex = readBuffer.firstIndex(of: 0x0A) {

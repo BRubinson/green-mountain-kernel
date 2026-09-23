@@ -1,24 +1,31 @@
 import Foundation
 import GRDB
 
-/// EXPLORE_* data access — the db-native exploration report machine. Runs
-/// INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts.
-/// The shared rank/validation statics stay on Store, serving Store+Review too.
+/// EXPLORE_* data access — the db-native exploration report machine.
 ///
-/// Summaries are per-agent rows keyed UNIQUE(prompt_uuid, agent_type), and each
-/// agent completes its OWN. The `synthesis`-type row is the prompt-level seal:
-/// its complete refuses while any finding across the prompt is unranked. Key
-/// files are findings of kind 'key_file'.
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
+/// self-transacts. The shared rank/validation statics stay on Store, serving
+/// Store+Review too. Summaries are per-agent rows keyed UNIQUE(prompt_uuid,
+/// agent_type), and each agent completes its OWN. The `synthesis`-type row is
+/// the prompt-level seal: its complete refuses while any finding across the
+/// prompt is unranked. Key files are findings of kind 'key_file'.
 struct ExplorationRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
     // MARK: - Shared create-or-return
 
-    /// Idempotent per (prompt, agentType): returns the existing summary or
-    /// creates one at `exploring`. Called ONLY by EXPLORE_OPEN — never by
-    /// setPromptStatus (explicit-open only; prompt status has no exploration
-    /// coupling).
+    /// Returns the existing summary or creates one for a prompt and agent type.
+    ///
+    /// Idempotent per (prompt, agentType). Called only by EXPLORE_OPEN, never by
+    /// setPromptStatus (which does explicit-open only).
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The prompt identifier.
+    ///   - agentType: The exploration agent type.
+    ///   - agentId: Optional agent instance identifier.
+    /// - Returns: A tuple of the summary UUID and a boolean indicating whether it was created.
+    /// - Throws: `StoreError` on prompt not found, unknown agent type, or invalid workflow variant.
     @discardableResult
     func ensureSummary(
         promptUuid: String,
@@ -93,6 +100,11 @@ struct ExplorationRepository: RepositoryContext {
 
     // MARK: - Verbs
 
+    /// Opens an exploration summary, creating one if needed.
+    ///
+    /// - Parameter req: The open request.
+    /// - Returns: The opened summary and creation status.
+    /// - Throws: `StoreError` on prompt, agent type, or workflow variant errors.
     func open(_ req: ExploreOpenRequest) throws -> ExploreSummaryResponse {
         let agentType = req.agentType ?? ExplorationAgentType.general.rawValue
         let (uuid, created) = try ensureSummary(
@@ -106,11 +118,15 @@ struct ExplorationRepository: RepositoryContext {
         return ExploreSummaryResponse(summary: summary, created: created)
     }
 
-    /// Key files are findings of kind 'key_file' since m0025. Still a shared
-    /// deduped set per summary: a duplicate path is an idempotent
-    /// upsert-ignore returning the existing row (the prompt_artifact
-    /// precedent), never an error — the dedupe is a Swift guard now, not a
-    /// UNIQUE (ordinary findings may repeat paths).
+    /// Adds a key file to an exploration summary.
+    ///
+    /// Key files are findings of kind `key_file` since m0025. A duplicate path
+    /// is an idempotent upsert-ignore returning the existing row (dedupe is a Swift
+    /// guard, not a UNIQUE constraint; ordinary findings may repeat paths).
+    ///
+    /// - Parameter req: The key file add request.
+    /// - Returns: The added key file and creation status.
+    /// - Throws: `StoreError` on summary not found, invalid status, or path normalization error.
     func keyFileAdd(_ req: ExploreKeyFileAddRequest) throws -> ExploreKeyFileAddResponse {
         let summary = try requireSummary(
             uuid: req.summaryUuid,
@@ -161,6 +177,11 @@ struct ExplorationRepository: RepositoryContext {
         return ExploreKeyFileAddResponse(keyFile: keyFileView(row), created: true)
     }
 
+    /// Adds a finding to an exploration summary.
+    ///
+    /// - Parameter req: The finding add request.
+    /// - Returns: The added finding.
+    /// - Throws: `StoreError` on summary not found, invalid status, or validation error.
     func findingAdd(_ req: ExploreFindingAddRequest) throws -> ExploreFindingRowResponse {
         let summary = try requireSummary(
             uuid: req.summaryUuid,
@@ -214,11 +235,16 @@ struct ExplorationRepository: RepositoryContext {
         return ExploreFindingRowResponse(finding: row)
     }
 
-    /// Batch rank — atomic all-or-nothing, deliberately version-less, and
-    /// PROMPT-scoped since m0025: one calibrated batch across every summary
-    /// of the prompt (cross-persona duplicate collapse needs the whole set).
-    /// Refused once the synthesis row is complete — ranking a sealed set
-    /// would shift the sub-100 contract; reopen the synthesis first.
+    /// Ranks findings across all summaries of a prompt.
+    ///
+    /// Batch rank: atomic all-or-nothing, deliberately version-less, prompt-scoped since m0025.
+    /// One calibrated batch across every summary (cross-persona duplicate collapse needs the whole set).
+    /// Refused once the synthesis row is complete — ranking a sealed set would shift the sub-100 contract;
+    /// reopen the synthesis first.
+    ///
+    /// - Parameter req: The rank request with ratings.
+    /// - Returns: The number of updated findings and remaining unranked count.
+    /// - Throws: `StoreError` on prompt not found or synthesis complete.
     func rank(_ req: ExploreRankRequest) throws -> ExploreRankResponse {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -255,10 +281,15 @@ struct ExplorationRepository: RepositoryContext {
         )
     }
 
-    /// exploring → complete, per summary. An agent seals its OWN summary with
-    /// just the overview; the `synthesis` summary is the prompt-level seal —
-    /// it alone carries the unranked-findings gate (promoted from the old
-    /// per-summary complete).
+    /// Seals an exploration summary as complete.
+    ///
+    /// An agent seals its own summary with just the overview; the `synthesis`
+    /// summary is the prompt-level seal—it alone carries the unranked-findings gate
+    /// (promoted from the old per-summary complete).
+    ///
+    /// - Parameter req: The complete request with expected version and overview.
+    /// - Returns: The completed summary.
+    /// - Throws: `StoreError` on summary not found, invalid status, or unranked findings.
     func complete(_ req: ExploreCompleteRequest) throws -> ExploreSummaryResponse {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .exploring, verb: "complete")
         if summary.agentType == ExplorationAgentType.synthesis.rawValue {
@@ -297,10 +328,15 @@ struct ExplorationRepository: RepositoryContext {
         return ExploreSummaryResponse(summary: updated)
     }
 
-    /// complete → exploring: the revision edge. Preserves everything —
-    /// findings, ratings, overview (nulling would make a mistaken reopen
-    /// unrecoverable in an append-only db); the next COMPLETE must re-carry
-    /// the overview, so staleness cannot survive a re-seal.
+    /// Reopens a completed exploration summary for editing.
+    ///
+    /// Transitions from complete to exploring. Preserves all findings, ratings, and
+    /// overview (nulling would make a mistaken reopen unrecoverable in an append-only db);
+    /// the next complete must re-carry the overview.
+    ///
+    /// - Parameter req: The reopen request with expected version.
+    /// - Returns: The reopened summary.
+    /// - Throws: `StoreError` on summary not found or invalid status.
     func reopen(_ req: ExploreReopenRequest) throws -> ExploreSummaryResponse {
         guard let summary = try fetchSummary(uuid: req.summaryUuid) else {
             throw StoreError.notFound(entity: "exploration_summary", key: req.summaryUuid)
@@ -333,6 +369,11 @@ struct ExplorationRepository: RepositoryContext {
         return ExploreSummaryResponse(summary: updated)
     }
 
+    /// Fetches exploration data for a prompt.
+    ///
+    /// - Parameter req: The get request with optional agent type and rating filters.
+    /// - Returns: Summaries, key files, findings, and stubs filtered by rating window.
+    /// - Throws: `StoreError` on prompt not found or no summaries found.
     func get(_ req: ExploreGetRequest) throws -> ExploreGetResponse {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -389,8 +430,13 @@ struct ExplorationRepository: RepositoryContext {
 
     // MARK: - Transition + fetch helpers
 
-    /// The stable key-file wire surface, computed from a kind='key_file'
-    /// finding since m0025.
+    /// Extracts a key file view from a key_file finding.
+    ///
+    /// Computes the stable key-file wire surface from a `kind='key_file'` finding
+    /// since m0025.
+    ///
+    /// - Parameter finding: The exploration finding row.
+    /// - Returns: The key file view.
     private func keyFileView(_ finding: ExplorationFindingRow) -> ExplorationKeyFileRow {
         ExplorationKeyFileRow(
             uuid: finding.uuid,
@@ -400,6 +446,14 @@ struct ExplorationRepository: RepositoryContext {
         )
     }
 
+    /// Fetches a summary and asserts it has a required status.
+    ///
+    /// - Parameters:
+    ///   - uuid: The summary identifier.
+    ///   - required: The expected status.
+    ///   - verb: The operation name for error messages.
+    /// - Returns: The summary row.
+    /// - Throws: `StoreError.notFound` if not found, or `invalidEntityTransition` if status doesn't match.
     private func requireSummary(
         uuid: String,
         at required: ExplorationStatus,
@@ -438,10 +492,22 @@ struct ExplorationRepository: RepositoryContext {
             )
     }
 
+    /// Fetches a summary by UUID.
+    ///
+    /// - Parameter uuid: The summary identifier.
+    /// - Returns: The summary row, or nil if not found.
+    /// - Throws: Database errors.
     func fetchSummary(uuid: String) throws -> ExplorationSummaryRow? {
         try ExplorationSummaryRecord.all().withUuid(uuid).fetchOne(db)?.dto()
     }
 
+    /// Fetches the most recent summary for a prompt and agent type.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The prompt identifier.
+    ///   - agentType: The exploration agent type.
+    /// - Returns: The most recent summary row, or nil if not found.
+    /// - Throws: Database errors.
     func fetchSummary(byPrompt promptUuid: String, agentType: String) throws -> ExplorationSummaryRow? {
         try Self.newestFirst
             .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
@@ -450,6 +516,13 @@ struct ExplorationRepository: RepositoryContext {
             .dto()
     }
 
+    /// Fetches all summaries for a prompt in render order.
+    ///
+    /// Synthesis summary leads, then alphabetical by agent type.
+    ///
+    /// - Parameter promptUuid: The prompt identifier.
+    /// - Returns: An array of summary rows in render order.
+    /// - Throws: Database errors.
     func fetchSummaries(byPrompt promptUuid: String) throws -> [ExplorationSummaryRow] {
         try Self.synthesisFirst
             .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
@@ -457,8 +530,14 @@ struct ExplorationRepository: RepositoryContext {
             .map { $0.dto() }
     }
 
-    /// Explicit ordering: unranked (NULL) rows sort FIRST — the resume
-    /// work-queue can't be missed — then by rating ascending, then id.
+    /// Fetches findings matching a predicate in priority order.
+    ///
+    /// Unranked (NULL rating) rows sort first (resume work-queue can't be missed),
+    /// then by rating ascending, then by id.
+    ///
+    /// - Parameter predicate: Filter expression for findings.
+    /// - Returns: An array of finding rows in priority order.
+    /// - Throws: Database errors.
     private func fetchFindings(matching predicate: SQLExpression) throws -> [ExplorationFindingRow] {
         try ExplorationFindingRecord
             .all()

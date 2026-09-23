@@ -82,6 +82,9 @@ enum GmAgentTools {
         all.map(\.name)
     }
 
+    /// Returns all tools in the given family.
+    /// - Parameter family: The tool family to retrieve.
+    /// - Returns: An array of tools belonging to the family.
     static func tools(in family: GmAgentToolFamily) -> [any GmAgentTool] {
         switch family {
         case .dope: return Dope.all

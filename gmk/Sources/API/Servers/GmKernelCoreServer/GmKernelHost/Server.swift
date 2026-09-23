@@ -15,18 +15,23 @@ struct HandlerResult {
     let line: Data
     let postAction: PostAction
 
+    /// Creates a handler result with a response line and post-action.
+    ///
+    /// - Parameters:
+    ///   - line: The encoded response to send to the client.
+    ///   - postAction: The action to take after writing the response.
     init(line: Data, postAction: PostAction = .none) {
         self.line = line
         self.postAction = postAction
     }
 }
 
-/// NWListener accept loop + NDJSON framing. All state is confined to `queue`.
+/// NWListener accept loop + NDJSON framing.
 ///
-/// Concurrency invariant (load-bearing): every dispatch turn, every db write,
-/// and every event-sink firing happens synchronously on this ONE serial queue.
-/// That is what makes SUBSCRIBE's replay-then-register step gapless and
-/// duplicate-free — no commit can interleave with it.
+/// All state confined to `queue`. Concurrency invariant (load-bearing):
+/// every dispatch turn, db write, and event-sink fires synchronously on ONE
+/// serial queue. SUBSCRIBE's replay-then-register step is gapless and
+/// duplicate-free — no commit can interleave.
 final class Server: @unchecked Sendable {
     private let listener: NWListener
     private let store: Store
@@ -39,19 +44,25 @@ final class Server: @unchecked Sendable {
     /// goodbye sends so exit(0) waits for delivery instead of racing it.
     private var goodbyeGroup: DispatchGroup?
     /// A3/A8: owns both filesystem watchers and the one recompute path.
-    /// Built in start() (needs a fully initialised self), rebuilt via the
-    /// post-commit event sink on CONFIG_SET / CREATE_INSTANCE.
+    ///
+    /// Built in start() (needs a fully initialised self), rebuilt via the post-commit event sink on CONFIG_SET /
+    /// CREATE_INSTANCE.
     private var supervisor: WatcherSupervisor?
     private var rebuildPending = false
-    /// A8 dedupe: instanceUuid → "state|branch" last emitted. Server-queue-
-    /// confined; only a genuine head change broadcasts.
+    /// A8 dedupe: instanceUuid → "state|branch" last emitted.
+    ///
+    /// Server-queue-confined; only a genuine head change broadcasts.
     private var lastCheckoutState: [String: String] = [:]
-    /// Our row in the store's post-commit subscriber table. Released in
-    /// `performShutdown` so a stopped server stops being fanned out to — under
-    /// the old single-sink shape there was nothing to release, because there was
-    /// nothing another consumer could have been holding.
+    /// Our row in the store's post-commit subscriber table.
+    ///
+    /// Released in `performShutdown` so a stopped server stops being fanned out to — under the old single-sink shape
+    /// there was nothing to release, because there was nothing another consumer could have been holding.
     private var eventToken: UUID?
 
+    /// Creates a server bound to the given store.
+    ///
+    /// - Parameter store: The store the server reads and writes.
+    /// - Throws: `NWError` when the listener cannot bind to the socket.
     init(store: Store) throws {
         self.store = store
         // A leftover socket inode from a previous run makes bind fail with
@@ -75,6 +86,7 @@ final class Server: @unchecked Sendable {
         }
     }
 
+    /// Starts the server listening for connections and watching the filesystem.
     func start() {
         listener.newConnectionHandler = { [weak self] connection in
             guard let self else { return }
@@ -104,11 +116,15 @@ final class Server: @unchecked Sendable {
         queue.async { self.supervisor?.rebuild() }
     }
 
+    /// Rebuilds the filesystem watcher when the watched set may have changed.
+    ///
     /// The sink fires on the DATABASE's queue while the issuing write turn is
     /// still unwinding — never read the db here; hop onto the server queue.
-    /// Two committed kinds signal the watched set may have changed: the config
-    /// write and the instance creation. Coalesced so a burst produces one
-    /// recompute; both downstream pushes are idempotent anyway.
+    ///
+    /// Two committed kinds signal the watched set may have changed: the config write and the instance creation.
+    /// Coalesced so a burst produces one recompute; both downstream pushes are idempotent anyway.
+    ///
+    /// - Parameter kind: The kind of database event that occurred.
     private func watchedStateMayHaveChanged(_ kind: String) {
         guard
             kind == DaemonEventKind.configSet.rawValue
@@ -124,12 +140,18 @@ final class Server: @unchecked Sendable {
         }
     }
 
+    /// Broadcasts a checkout state change when the repository head changes.
+    ///
     /// A8 delivery — the exact shape of promptMemoryChanged: hops onto the
     /// server queue, resolves the head state there (the same resolver the
     /// poll messages use, so push and poll can never disagree), dedupes
     /// against the last-emitted cache, and broadcasts an EPHEMERAL
     /// notification (id 0, no daemon_event row — a replayed stale branch
     /// presented as current would be worse than no event).
+    ///
+    /// - Parameters:
+    ///   - instanceUuid: The uuid of the instance whose checkout changed.
+    ///   - repoRoot: The repository root path.
     func checkoutChanged(instanceUuid: String, repoRoot: String) {
         queue.async {
             let (state, code, branch) = Store.headSummary(repoRoot: repoRoot)
@@ -143,14 +165,17 @@ final class Server: @unchecked Sendable {
                 EventNotification(
                     id: 0,
                     kind: DaemonEventKind.checkoutChange.rawValue,
+                    createdAt: Store.isoNow(),
                     subjectUuid: instanceUuid,
-                    payload: Store.jsonPayload(payload),
-                    createdAt: Store.isoNow()
+                    payload: Store.jsonPayload(payload)
                 )
             )
         }
     }
 
+    /// Removes a client connection from the server's tracking.
+    ///
+    /// - Parameter client: The client connection to remove.
     func remove(_ client: ClientConnection) {
         queue.async {
             let key = ObjectIdentifier(client)
@@ -159,12 +184,16 @@ final class Server: @unchecked Sendable {
         }
     }
 
+    /// Broadcasts a prompt memory change when its storage path changes.
+    ///
     /// Item 8 delivery: called by MemoryWatcher's `deliver` closure (which
     /// runs on the lane) — hops onto the server queue, resolves the prompt by
     /// its storage path there, and broadcasts an EPHEMERAL notification.
     /// id 0 marks it as never-a-replay-cursor; no daemon_event row is written,
     /// so the lane's no-db-writes contract holds and the event-sink ordering
     /// invariant is untouched.
+    ///
+    /// - Parameter storagePath: The storage path of the prompt that changed.
     func promptMemoryChanged(storagePath: String) {
         queue.async {
             guard let promptUuid = try? self.store.promptUuid(byStoragePath: storagePath) else {
@@ -174,15 +203,18 @@ final class Server: @unchecked Sendable {
                 EventNotification(
                     id: 0,
                     kind: DaemonEventKind.promptMemoryChange.rawValue,
+                    createdAt: Store.isoNow(),
                     subjectUuid: promptUuid,
-                    payload: "{\"gmfs_relative_storage_path\":\(Self.jsonString(storagePath))}",
-                    createdAt: Store.isoNow()
+                    payload: "{\"gmfs_relative_storage_path\":\(Self.jsonString(storagePath))}"
                 )
             )
         }
     }
 
-    /// JSON-encode one string safely (paths can carry quotes/backslashes).
+    /// JSON-encodes a string safely for inclusion in a notification payload.
+    ///
+    /// - Parameter value: The string to encode; may contain quotes or backslashes.
+    /// - Returns: The JSON-encoded string.
     private static func jsonString(_ value: String) -> String {
         guard let data = try? JSONEncoder().encode([value]),
             let text = String(data: data, encoding: .utf8),
@@ -191,7 +223,9 @@ final class Server: @unchecked Sendable {
         return String(text.dropFirst().dropLast())
     }
 
-    /// Push an EVENT line to every subscriber.
+    /// Broadcasts an event notification to every subscriber.
+    ///
+    /// - Parameter notification: The event notification to broadcast.
     func broadcast(_ notification: EventNotification) {
         let envelope = ResponseEnvelope<EventNotification>(
             type: .event,
@@ -211,22 +245,29 @@ final class Server: @unchecked Sendable {
         }
     }
 
+    /// Stops the server and exits the process.
+    ///
     /// SHUTDOWN contract: drain in-flight work, checkpoint the WAL, remove
-    /// pidfile + socket, exit 0. Always hops onto the server queue so signal
-    /// handlers (main queue) and connection callbacks take the same clean
-    /// path, and the DAEMON_STOP goodbye event broadcasts to subscribers
-    /// before EOF. "Drain" is structural: this runs as one serial-queue turn,
-    /// so every line received ahead of it has already completed.
+    /// pidfile + socket, exit 0.
+    ///
+    /// Always hops onto the server queue so signal handlers (main queue) and connection callbacks take the same clean
+    /// path, and the DAEMON_STOP goodbye event broadcasts to subscribers before EOF. "Drain" is structural: this runs
+    /// as one serial-queue turn, so every line received ahead of it has already completed.
     func shutdown() {
         queue.async { self.performShutdown() }
     }
 
+    /// Prepares the server for host shutdown without exiting the process.
+    ///
     /// The HOSTED shutdown: everything `performShutdown` does except `exit(0)`,
     /// plus one caller-supplied step. `beforeClose` runs after the listener is
     /// cancelled and after DAEMON_STOP has gone out, but BEFORE the database
     /// closes, or a write can arrive after the flush decided what was dirty.
-    /// It runs SYNCHRONOUSLY on the caller's thread, because a terminating app
-    /// can die across an async hop before the flush lands.
+    ///
+    /// It runs SYNCHRONOUSLY on the caller's thread, because a terminating app can die across an async hop before the
+    /// flush lands.
+    ///
+    /// - Parameter beforeClose: A closure to run before closing the database.
     func shutdownForHost(beforeClose: () -> Void) {
         listener.cancel()
         if let token = eventToken {
@@ -250,6 +291,7 @@ final class Server: @unchecked Sendable {
         // exit. Nothing here is.
     }
 
+    /// Executes the shutdown sequence and exits the process.
     private func performShutdown() {
         listener.cancel()
         if let token = eventToken {
@@ -274,14 +316,18 @@ final class Server: @unchecked Sendable {
 
     // MARK: - Dispatch
 
-    /// Route one decoded NDJSON line. Handshake enforcement precedes payload
-    /// decoding and is DIRECTIONAL: a newer client means THIS daemon is stale,
-    /// so reply and self-exit for the client's retry to autostart fresh bits;
-    /// an older client is rejected and the daemon stays up, never kill-loopable.
+    /// Routes one decoded NDJSON line to the appropriate handler.
     ///
-    /// A nil `client` means an IN-PROCESS caller. Only SUBSCRIBE and the
-    /// re-entrant TX_BATCH / harness paths use it, and SUBSCRIBE without one is
-    /// REFUSED: an in-process consumer has `Store.subscribeToEvents`.
+    /// Handshake is DIRECTIONAL: newer client = daemon stale (self-exit for
+    /// retry); older client = rejected (daemon stays up). A nil `client` means
+    /// IN-PROCESS caller (only SUBSCRIBE and re-entrant TX_BATCH/harness use
+    /// it). SUBSCRIBE without connection refused; in-process uses
+    /// `Store.subscribeToEvents`.
+    ///
+    /// - Parameters:
+    ///   - line: The NDJSON line to dispatch.
+    ///   - client: The client connection, or nil for in-process callers.
+    /// - Returns: The handler's result.
     func dispatch(line: Data, from client: ClientConnection?) -> HandlerResult {
         // Version-FIRST: the pre-head keeps `type` raw so a newer client
         // invoking a message name this build doesn't know still reaches the
@@ -733,12 +779,21 @@ final class Server: @unchecked Sendable {
         }
     }
 
+    /// Handles a SUBSCRIBE request with event replay.
+    ///
     /// SUBSCRIBE — replay → ack-ordering is: ack (with the replay horizon),
-    /// then replayed EVENT lines (ids ≤ horizon), then live events. The whole
-    /// step runs inside this single dispatch turn on the serial queue, and
-    /// commits only happen in other turns on the same queue, so an event is
-    /// either ≤ the horizon (replayed) or broadcast live after registration —
-    /// gap and duplicate are structurally impossible.
+    /// then replayed EVENT lines (ids ≤ horizon), then live events.
+    ///
+    /// The whole step runs inside this single dispatch turn on the serial queue, and commits only happen in other turns
+    /// on the same queue, so an event is either ≤ the horizon (replayed) or broadcast live after registration — gap and
+    /// duplicate are structurally impossible.
+    ///
+    /// - Parameters:
+    ///   - line: The NDJSON line containing the SUBSCRIBE request.
+    ///   - head: The envelope head with protocol version and request id.
+    ///   - client: The client connection to stream events to.
+    /// - Returns: The handler result.
+    /// - Throws: `DecodingError` when the payload is malformed.
     private func handleSubscribe(line: Data, head: EnvelopeHead, client: ClientConnection) throws -> HandlerResult {
         // Strict decode: a malformed since_id must be BAD_REQUEST, not a
         // silent live-only subscription that loses the caller's replay.
@@ -781,6 +836,13 @@ final class Server: @unchecked Sendable {
         return HandlerResult(line: Data())
     }
 
+    /// Creates a handler result with an error response.
+    ///
+    /// - Parameters:
+    ///   - type: The message type for the response.
+    ///   - requestId: The request id to echo in the response.
+    ///   - payload: The error payload.
+    /// - Returns: The handler result with the error response.
     func errorResult(type: MessageType, requestId: String, payload: ErrorPayload) -> HandlerResult {
         let envelope = ResponseEnvelope<EmptyPayload>(
             type: type,
@@ -808,11 +870,19 @@ final class ClientConnection: @unchecked Sendable {
     private weak var server: Server?
     private var buffer = Data()
 
+    /// Creates a client connection handler for an accepted socket.
+    ///
+    /// - Parameters:
+    ///   - connection: The network connection to the client.
+    ///   - server: The server to dispatch lines to.
     init(connection: NWConnection, server: Server) {
         self.connection = connection
         self.server = server
     }
 
+    /// Starts the client connection, setting up handlers and beginning reception.
+    ///
+    /// - Parameter queue: The dispatch queue to run on.
     func start(on queue: DispatchQueue) {
         connection.stateUpdateHandler = { [weak self] state in
             switch state {
@@ -826,6 +896,11 @@ final class ClientConnection: @unchecked Sendable {
         receiveLoop()
     }
 
+    /// Sends data to the client with optional completion callback.
+    ///
+    /// - Parameters:
+    ///   - data: The data to send.
+    ///   - completion: An optional closure called when the send completes.
     func send(_ data: Data, completion: (() -> Void)? = nil) {
         connection.send(content: data, completion: .contentProcessed { _ in completion?() })
     }
@@ -834,6 +909,7 @@ final class ClientConnection: @unchecked Sendable {
     /// grow daemon memory without bound.
     private static let maxBufferedBytes = 10 * 1024 * 1024
 
+    /// Continuously receives data from the client.
     private func receiveLoop() {
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             guard let self else { return }
@@ -853,6 +929,7 @@ final class ClientConnection: @unchecked Sendable {
         }
     }
 
+    /// Processes all complete NDJSON lines in the buffer.
     private func drainLines() {
         while let newlineIndex = buffer.firstIndex(of: 0x0A) {
             let line = buffer.subdata(in: buffer.startIndex..<newlineIndex)
@@ -875,6 +952,7 @@ final class ClientConnection: @unchecked Sendable {
         }
     }
 
+    /// Closes the connection and notifies the server.
     private func teardown() {
         connection.cancel()
         server?.remove(self)

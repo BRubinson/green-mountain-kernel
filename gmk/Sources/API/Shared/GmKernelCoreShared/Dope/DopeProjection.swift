@@ -1,16 +1,23 @@
 import Foundation
 
-/// Total projection between the wire tree (identity-bearing) and the on-disk
-/// document bundle (identity-free). References are dot-path codes in BOTH
-/// representations — uuid↔code resolution happens against the db in
-/// Store+Dope hydration/ingest, not here — so this projection is pure
-/// structure: drop identity going out, and there is deliberately no inverse
-/// that fabricates identity (ingest mints fresh rows; every child uuid
-/// changes on every ingest, the locked no-smart-diff consequence).
+/// Total projection between wire tree (identity-bearing) and on-disk document
+/// bundle (identity-free).
+///
+/// References are dot-path codes in both representations; uuid↔code resolution
+/// happens in Store+Dope hydration/ingest. This projection is pure structure:
+/// drop identity outbound. No inverse fabricates identity (ingest mints fresh
+/// rows; every child uuid changes, the locked no-smart-diff consequence).
 enum DopeProjection {
 
-    /// Project one tree into its document bundle. `cogs` is defaulted because
-    /// only the repo write path has the scope's cog rows to pass.
+    /// Projects a dope scope tree into a document bundle.
+    ///
+    /// The `cogs` parameter is defaulted because only the repo write path has
+    /// access to the scope's cog rows.
+    ///
+    /// - Parameters:
+    ///   - tree: The dope scope tree to project.
+    ///   - cogs: The cog nodes for the scope, defaulting to an empty array.
+    /// - Returns: The document bundle for the tree.
     static func documents(
         from tree: DopeScopeTree,
         cogs: [DopeCogNode] = []

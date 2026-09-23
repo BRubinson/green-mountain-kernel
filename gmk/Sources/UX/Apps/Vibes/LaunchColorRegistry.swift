@@ -24,6 +24,10 @@ final class LaunchColorRegistry {
 
     private var cursor = 0
 
+    /// Assigns or returns the launch color for a prompt.
+    ///
+    /// - Parameter promptUuid: The prompt's UUID.
+    /// - Returns: The assigned color, cycling through the palette.
     @discardableResult
     func assign(promptUuid: String) -> LaunchColor {
         if let existing = assignments[promptUuid] { return existing }
@@ -43,10 +47,17 @@ final class LaunchColorRegistry {
         return assigned
     }
 
+    /// Returns the launch color assigned to a prompt, if any.
+    ///
+    /// - Parameter promptUuid: The prompt's UUID.
+    /// - Returns: The assigned color, or `nil` if not yet assigned.
     func color(for promptUuid: String) -> LaunchColor? {
         assignments[promptUuid]
     }
 
+    /// Removes the launch color assignment for a prompt.
+    ///
+    /// - Parameter promptUuid: The prompt's UUID.
     func clear(promptUuid: String) {
         assignments[promptUuid] = nil
     }

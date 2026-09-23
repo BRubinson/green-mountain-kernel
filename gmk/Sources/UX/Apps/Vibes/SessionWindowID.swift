@@ -10,13 +10,11 @@ struct SessionWindowID: Codable, Hashable, Identifiable {
     let instanceUUID: UUID
     let sessionName: String
     /// The prompt identity for `Route.sessionPrompt` (nil degrades to the
-    /// newest-prompt rule). `var` + Optional ⇒ the memberwise init defaults it
-    /// to nil and synthesized Codable uses decodeIfPresent (the
-    /// PromptMemoriesWindowID contract).
+    /// newest-prompt rule).
     ///
-    /// Part of Hashable: targeting a DIFFERENT prompt changes route identity and re-ids the
-    /// window content, while a repeat hit with the SAME target is route-equal and
-    /// `WindowNav.go` short-circuits. The route IS the deep link.
+    /// `var` + Optional: memberwise init defaults to nil, synthesized Codable uses decodeIfPresent
+    /// (PromptMemoriesWindowID contract). DIFFERENT prompt changes route identity and re-ids window;
+    /// SAME target is route-equal and short-circuits. Route IS the deep link.
     var targetPromptUUID: UUID?
 
     var id: UUID { sessionUUID }

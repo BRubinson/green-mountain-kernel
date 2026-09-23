@@ -4,10 +4,22 @@ import Security
 final class WebSocketClient {
     private let socket: SocketConnection
 
+    /// Initializes a WebSocket client with a socket connection.
+    ///
+    /// - Parameter socket: The underlying socket to send and receive frames on.
     init(socket: SocketConnection) {
         self.socket = socket
     }
 
+    /// Performs the WebSocket handshake with iTerm2.
+    ///
+    /// Sends HTTP upgrade headers and verifies the server responds with a 101 status.
+    /// May include optional authentication cookie and api key headers.
+    ///
+    /// - Parameters:
+    ///   - cookie: Optional iTerm2 authentication cookie.
+    ///   - key: Optional iTerm2 authentication key.
+    /// - Throws: `ITerm2Error.handshakeFailed` or `apiDisabled` on failure.
     func handshake(cookie: String?, key: String?) throws(ITerm2Error) {
         let secKey = Self.generateSecWebSocketKey()
 
@@ -46,6 +58,12 @@ final class WebSocketClient {
         }
     }
 
+    /// Sends binary data in a WebSocket frame.
+    ///
+    /// Encodes the data with masking key and length encoding per RFC 6455.
+    ///
+    /// - Parameter data: The binary payload to send.
+    /// - Throws: `ITerm2Error` on socket send failure.
     func sendBinary(_ data: Data) throws(ITerm2Error) {
         var frame = Data()
         frame.reserveCapacity(14 + data.count)
@@ -76,12 +94,25 @@ final class WebSocketClient {
         try socket.send(frame)
     }
 
+    /// Receives binary data from the WebSocket.
+    ///
+    /// Continues receiving frames until a data frame (not a control frame) arrives.
+    ///
+    /// - Returns: The received binary payload.
+    /// - Throws: `ITerm2Error` on socket receive failure or frame errors.
     func receiveBinary() throws(ITerm2Error) -> Data {
         while true {
             if let payload = try receiveOneFrame() { return payload }
         }
     }
 
+    /// Receives and parses one WebSocket frame.
+    ///
+    /// Handles masking, extended payload length encoding, and control frames (close, ping).
+    /// Responds to ping frames with pong and returns nil; returns payload data for data frames.
+    ///
+    /// - Returns: The frame payload for data frames, nil for ping control frames.
+    /// - Throws: `ITerm2Error` on socket errors or unrecognized opcodes.
     private func receiveOneFrame() throws(ITerm2Error) -> Data? {
         let header = try socket.recv(count: 2)
         let opcode = header[header.startIndex] & 0x0F
@@ -129,6 +160,9 @@ final class WebSocketClient {
         return payload
     }
 
+    /// Closes the WebSocket connection.
+    ///
+    /// Sends a close frame and disconnects the underlying socket.
     func disconnect() {
         var closeFrame = Data([0x88, 0x80])
         closeFrame.append(contentsOf: [0, 0, 0, 0])
@@ -136,6 +170,10 @@ final class WebSocketClient {
         socket.disconnect()
     }
 
+    /// Sends a WebSocket pong (control) frame in response to a ping.
+    ///
+    /// - Parameter payload: The ping payload to echo back.
+    /// - Throws: `ITerm2Error.transportFailed` if payload exceeds 125 bytes.
     private func sendPong(_ payload: Data) throws(ITerm2Error) {
         guard payload.count <= 125 else {
             throw .transportFailed(
@@ -155,10 +193,19 @@ final class WebSocketClient {
         try socket.send(frame)
     }
 
+    /// Generates a random WebSocket key for the handshake.
+    ///
+    /// - Returns: A base64-encoded 16-byte random value.
     private static func generateSecWebSocketKey() -> String {
         Data(randomBytes(16)).base64EncodedString()
     }
 
+    /// Generates random bytes using the system entropy source.
+    ///
+    /// Falls back to `UInt8.random` if `SecRandomCopyBytes` fails.
+    ///
+    /// - Parameter count: The number of random bytes to generate.
+    /// - Returns: An array of random bytes.
     private static func randomBytes(_ count: Int) -> [UInt8] {
         var bytes = [UInt8](repeating: 0, count: count)
         if SecRandomCopyBytes(kSecRandomDefault, count, &bytes) != errSecSuccess {

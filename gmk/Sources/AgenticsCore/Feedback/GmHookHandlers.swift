@@ -15,9 +15,12 @@ enum PreToolUseHook: GmHook {
 
     static let timeout: Int? = 5
 
-    /// - Returns: the deny response line when the command invokes a hook
-    ///   binary, otherwise nil for silence. Exit is 0 either way — the
-    ///   DECISION rides the JSON.
+    /// Denies Bash commands that invoke hook binaries.
+    ///
+    /// - Parameter context: The hook context.
+    /// - Returns: The deny response line when the command invokes a hook binary,
+    ///   otherwise nil for silence. Exit is 0 either way — the decision rides
+    ///   the JSON.
     static func run(_ context: GmHookContext) -> String? {
         guard let payload = HookPayload.decode(context.stdin),
             payload.toolName == "Bash",
@@ -61,7 +64,10 @@ enum PostToolUseHook: GmHook {
     /// socket round trip on every Bash call.
     static let isAsync = true
 
-    /// - Returns: the dry-run report when `dryRun` is set, otherwise nil.
+    /// Records the file changes made by a tool call.
+    ///
+    /// - Parameter context: The hook context.
+    /// - Returns: The dry-run report when `dryRun` is set, otherwise nil.
     static func run(_ context: GmHookContext) -> String? {
         guard let payload = HookPayload.decode(context.stdin), let cwd = payload.cwd else {
             return nil
@@ -135,7 +141,10 @@ enum SubagentStartHook: GmHook {
     /// on both transports.
     static var sheetText: String { CdeSheet.text }
 
-    /// - Returns: the dry-run report under `dryRun`, otherwise the
+    /// Registers a spawned agent and provides its context.
+    ///
+    /// - Parameter context: The hook context.
+    /// - Returns: The dry-run report under `dryRun`, otherwise the
     ///   `additionalContext` response line.
     static func run(_ context: GmHookContext) -> String? {
         // The cwd is REQUIRED even though nothing here reads it: "no cwd" means

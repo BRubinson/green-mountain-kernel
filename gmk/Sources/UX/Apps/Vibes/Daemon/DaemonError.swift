@@ -1,7 +1,8 @@
 import Foundation
 
-/// App-facing typed error surface. Views and stores branch on these cases —
-/// never on message text — per the daemon's typed-code contract.
+/// App-facing typed error surface.
+///
+/// Views and stores branch on these cases — never on message text — per the daemon's typed-code contract.
 nonisolated enum DaemonError: Error, Equatable {
     /// Binary absent at `Paths.binDaemon` — the RESOLVED root's `bin/gm_daemon`,
     /// which is `~/gmfs` only for production. Distinct from a stopped daemon.
@@ -32,8 +33,9 @@ nonisolated enum DaemonError: Error, Equatable {
     /// Wire-level encode/decode/socket failure.
     case transport(String)
 
-    /// The single user-facing description. Screens that need context-specific
-    /// wording (e.g. search) may special-case a few cases and fall back here.
+    /// The single user-facing description.
+    ///
+    /// Screens that need context-specific wording (e.g. search) may special-case a few cases and fall back here.
     var userMessage: String {
         switch self {
         case .notInstalled: return "Daemon not installed (run install_gm.sh)."
@@ -51,6 +53,8 @@ nonisolated enum DaemonError: Error, Equatable {
         }
     }
 
+    /// Converts any error to a daemon error, wrapping if necessary.
+    /// - Parameter error: The error to convert.
     init(_ error: Error) {
         if let already = error as? DaemonError {
             self = already
@@ -93,6 +97,7 @@ nonisolated enum DaemonError: Error, Equatable {
 nonisolated extension UUID {
     /// The db and the gmfs yamls store lowercase v4 uuids and SQLite TEXT
     /// comparison is case-sensitive; Swift's `uuidString` emits uppercase.
+    ///
     /// Every uuid crossing the wire goes through this.
     var wireString: String { uuidString.lowercased() }
 }

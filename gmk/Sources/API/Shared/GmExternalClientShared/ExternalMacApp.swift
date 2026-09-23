@@ -12,10 +12,17 @@ enum ExternalAppError: Error, Sendable, Equatable {
 struct ExternalMacApp: Sendable {
     let bundleIdentifier: String
 
+    /// Create an external app reference.
+    ///
+    /// - Parameter bundleIdentifier: The macOS bundle identifier.
     init(bundleIdentifier: String) {
         self.bundleIdentifier = bundleIdentifier
     }
 
+    /// Get the URL of the installed application.
+    ///
+    /// - Returns: The application's URL.
+    /// - Throws: `ExternalAppError.notInstalled` if the app is not found.
     @MainActor
     func url() throws(ExternalAppError) -> URL {
         guard
@@ -33,6 +40,9 @@ struct ExternalMacApp: Sendable {
         !NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).isEmpty
     }
 
+    /// Launch the application without activating it.
+    ///
+    /// - Throws: `ExternalAppError.notInstalled` or `ExternalAppError.launchFailed`.
     @MainActor
     func launchWithoutActivating() async throws(ExternalAppError) {
         let url = try url()
@@ -45,6 +55,7 @@ struct ExternalMacApp: Sendable {
         }
     }
 
+    /// Activate the application if it is running.
     @MainActor
     func activate() {
         for app in NSRunningApplication.runningApplications(
@@ -54,7 +65,13 @@ struct ExternalMacApp: Sendable {
         }
     }
 
-    /// Polls `isReady` on `pollInterval` until it answers true or `budget` expires.
+    /// Poll isReady until true or budget expires.
+    ///
+    /// - Parameters:
+    ///   - budget: The timeout budget in seconds.
+    ///   - pollInterval: The poll interval in seconds.
+    ///   - isReady: A closure that returns readiness state.
+    /// - Throws: `ExternalAppError.readinessTimedOut` or `ExternalAppError.cancelled`.
     static func waitUntilReady(
         budget: TimeInterval,
         pollInterval: TimeInterval = 0.2,

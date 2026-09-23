@@ -50,11 +50,14 @@ extension Store {
     /// Box so a non-object `Database` can round-trip through `pthread_specific`.
     fileprivate final class DatabaseReference {
         let db: Database
+        /// Creates a reference to a database.
+        /// - Parameter db: The database to reference.
         init(db: Database) { self.db = db }
     }
 
-    /// True when a write transaction is already open on this thread. Read by the
-    /// four-phase repo verbs, which must refuse to run inside one.
+    /// True when a write transaction is already open on this thread.
+    ///
+    /// Read by the four-phase repo verbs, which must refuse to run inside one.
     var isInTransaction: Bool { Store.ambient != nil }
 
     // MARK: - The boundary
@@ -67,6 +70,9 @@ extension Store {
     /// calling a public verb inside a transaction would re-enter
     /// `DatabaseQueue.write`, and GRDB's re-entrancy check does not throw: it
     /// **traps**, killing the process.
+    /// - Parameter body: A closure that performs database operations.
+    /// - Returns: The value returned by `body`.
+    /// - Throws: Any error from `body` or the database operation.
     func boundary<T>(_ body: (Database) throws -> T) throws -> T {
         if let db = Store.ambient {
             return try body(db)
@@ -86,6 +92,9 @@ extension Store {
     /// reading a different snapshot than the transaction it was called from —
     /// so a verb would silently fail to see writes its own caller had just
     /// made. Enlisting fixes both at once.
+    /// - Parameter body: A closure that performs database read operations.
+    /// - Returns: The value returned by `body`.
+    /// - Throws: Any error from `body` or the database operation.
     func boundaryRead<T>(_ body: (Database) throws -> T) throws -> T {
         if let db = Store.ambient {
             return try body(db)
@@ -95,14 +104,16 @@ extension Store {
 
     // MARK: - The one new public API
 
-    /// Runs `body` inside ONE transaction. Every existing public `Store` verb
-    /// called within it enlists, and the whole composite commits or rolls back
-    /// together. Nesting is safe and idempotent: an inner `inTransaction`
-    /// enlists in the outer one rather than opening a second.
-    /// Two things deliberately cannot compose and fail loudly instead —
-    /// `checkpointTruncate`, since a WAL checkpoint inside a transaction is
-    /// illegal in SQLite, and the four-phase repo verbs, which would hold the
-    /// single writer across filesystem work.
+    /// Runs `body` inside ONE transaction.
+    ///
+    /// Every existing public `Store` verb called within it enlists, and the whole composite commits or rolls back
+    /// together. Nesting is safe and idempotent: an inner `inTransaction` enlists in the outer one rather than opening
+    /// a second. Two things deliberately cannot compose and fail loudly instead — `checkpointTruncate`, since a WAL
+    /// checkpoint inside a transaction is illegal in SQLite, and the four-phase repo verbs, which would hold the single
+    /// writer across filesystem work.
+    /// - Parameter body: A closure containing the operations to run in the transaction.
+    /// - Returns: The value returned by `body`.
+    /// - Throws: Any error from `body` or the transaction itself.
     func inTransaction<T>(_ body: () throws -> T) throws -> T {
         try boundary { _ in try body() }
     }

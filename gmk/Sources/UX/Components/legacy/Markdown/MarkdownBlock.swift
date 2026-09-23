@@ -32,9 +32,12 @@ enum MarkdownBlock: Identifiable, Equatable, Sendable {
 }
 
 enum MarkdownDocument {
-    // Parse a markdown string into ordered blocks. Deliberately small but covers the
-    // shapes architect-agent output uses: ATX headings, fenced code, bullet/ordered
-    // lists, blockquotes, pipe tables, thematic breaks, and paragraphs.
+    /// Parses a markdown string into ordered blocks.
+    ///
+    /// Covers ATX headings, fenced code blocks, bullet/ordered lists, blockquotes, pipe tables, and thematic breaks.
+    ///
+    /// - Parameter source: The markdown string to parse.
+    /// - Returns: An array of MarkdownBlock in document order.
     static func parse(_ source: String) -> [MarkdownBlock] {
         var blocks: [MarkdownBlock] = []
         // Normalize CRLF/CR so per-line whitespace trimming (which excludes \r) and
@@ -181,6 +184,10 @@ enum MarkdownDocument {
 
     // MARK: - Line classifiers
 
+    /// Parses an ATX heading from a line, or nil if it is not a valid heading.
+    ///
+    /// - Parameter s: A left-trimmed line to parse.
+    /// - Returns: A MarkdownBlock.heading case, or nil if the line is not a heading.
     private static func parseHeading(_ s: String) -> MarkdownBlock? {
         guard let level = headingLevel(of: s) else { return nil }
         // `s` arrives already left-trimmed, so the first `level` characters are the
@@ -191,9 +198,13 @@ enum MarkdownDocument {
         return .heading(level: level, text: text)
     }
 
-    /// The ATX heading level (1...6) for a line, or nil if it isn't a heading.
-    /// Shared by the block parser and the in-editor highlighter so both agree on the
-    /// exact rule: 1–6 leading `#` (after optional leading spaces) followed by a space.
+    /// Returns the ATX heading level (1 to 6) for a line, or nil if not a heading.
+    ///
+    /// Shared by the block parser and the in-editor highlighter so both agree on the rule:
+    /// 1–6 leading `#` (after optional leading spaces) followed by a space.
+    ///
+    /// - Parameter line: The line to examine.
+    /// - Returns: The heading level (1 to 6), or nil if the line is not a valid heading.
     static func headingLevel(of line: String) -> Int? {
         let s = line.drop(while: { $0 == " " })
         guard s.first == "#" else { return nil }
@@ -206,6 +217,10 @@ enum MarkdownDocument {
         return level
     }
 
+    /// Determines whether a line is a thematic break (---, ***, or ___).
+    ///
+    /// - Parameter s: The line to examine.
+    /// - Returns: True if the line is a thematic break.
     private static func isThematicBreak(_ s: String) -> Bool {
         let stripped = s.replacingOccurrences(of: " ", with: "")
         guard stripped.count >= 3 else { return false }
@@ -213,12 +228,20 @@ enum MarkdownDocument {
             || stripped.allSatisfy { $0 == "_" }
     }
 
+    /// Determines whether a line starts a bullet list item (-, *, or +).
+    ///
+    /// - Parameter s: The line to examine.
+    /// - Returns: True if the line is a valid bullet list item marker.
     private static func isBullet(_ s: String) -> Bool {
         guard s.count >= 2 else { return false }
         let first = s.first!
         return (first == "-" || first == "*" || first == "+") && s[s.index(after: s.startIndex)] == " "
     }
 
+    /// Determines whether a line starts an ordered list item (number followed by dot and space).
+    ///
+    /// - Parameter s: The line to examine.
+    /// - Returns: True if the line is a valid ordered list item marker.
     private static func isOrdered(_ s: String) -> Bool {
         guard let dot = s.firstIndex(of: ".") else { return false }
         let prefix = s[s.startIndex..<dot]
@@ -226,9 +249,12 @@ enum MarkdownDocument {
             && s.index(after: dot) < s.endIndex && s[s.index(after: dot)] == " "
     }
 
+    /// Determines whether a line is a pipe-table separator row (dashes and colons).
+    ///
+    /// - Parameter s: The line to examine.
+    /// - Returns: True if the line is a valid table separator.
     private static func isTableSeparator(_ s: String) -> Bool {
         guard s.contains("|"), s.contains("-") else { return false }
-        // Each cell is dashes with optional leading/trailing colons.
         return splitTableRow(s)
             .allSatisfy { cell in
                 let c = cell.trimmingCharacters(in: .whitespaces)
@@ -236,6 +262,10 @@ enum MarkdownDocument {
             }
     }
 
+    /// Splits a pipe-delimited table row into cells, trimming pipes and whitespace.
+    ///
+    /// - Parameter s: The table row line.
+    /// - Returns: An array of cell strings.
     private static func splitTableRow(_ s: String) -> [String] {
         var row = s
         if row.hasPrefix("|") { row.removeFirst() }

@@ -1,17 +1,25 @@
 import Foundation
 
+/// Escapes a string for safe use as a single-quoted shell argument.
+///
+/// - Parameter s: The string to escape.
+/// - Returns: The escaped string in single quotes.
 nonisolated func shellSingleQuoted(_ s: String) -> String {
     "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'"
 }
 
-/// The shared preamble both pane scripts start with: self-delete, cd, root export, the OSC
-/// 1337 helpers, and the three visual signals. One preamble, two tails, so the claude form
-/// and the shell form cannot drift.
+/// Generates the shared preamble for pane scripts.
 ///
-/// The environment signal rides `bg`, never `tab`: the tab colour tints window chrome only
-/// under the Minimal or Compact window styles, so a `tab` signal can fail to render at all.
-/// `--plugin-dir` gets its own `shellSingleQuoted` call, because that helper wraps its entire
-/// input in ONE pair of quotes. A nil value emits nothing at all rather than an empty flag.
+/// The preamble includes self-delete, cd, root export, OSC 1337 helpers, and visual
+/// signals. One preamble with two tails ensure claude and shell forms stay in sync.
+///
+/// - Parameters:
+///   - root: The GM_FS_ROOT value to export.
+///   - repoPath: The repository path to cd into.
+///   - tabColorHex: The hex color for the terminal tab.
+///   - badgeText: Optional badge text; nil emits nothing.
+///   - envBackgroundHex: Optional environment background hex; nil emits nothing.
+/// - Returns: A shell script preamble.
 private nonisolated func paneScriptPreamble(
     root: String,
     repoPath: String,
@@ -51,6 +59,17 @@ private nonisolated func paneScriptPreamble(
         """
 }
 
+/// Generates a pane script that launches Claude.
+///
+/// - Parameters:
+///   - root: The GM_FS_ROOT value to export.
+///   - repoPath: The repository path to cd into.
+///   - tabColorHex: The hex color for the terminal tab.
+///   - tierCommand: The Claude command tier to run.
+///   - pluginDir: Optional plugin directory path.
+///   - badgeText: Optional badge text.
+///   - envBackgroundHex: Optional environment background hex.
+/// - Returns: A shell script to launch Claude in the pane.
 nonisolated func paneLaunchScript(
     root: String,
     repoPath: String,
@@ -71,18 +90,26 @@ nonisolated func paneLaunchScript(
         + "exec claude \(pluginFlag)\(shellSingleQuoted(tierCommand))\n"
 }
 
-/// The INDEPENDENT pane: the same prepared environment, an interactive shell
-/// instead of a bot run. `$GM_FS_ROOT/bin` is prepended to PATH so `gm_hook`
-/// (and a hand-typed `claude`) resolve against this root's staged binaries —
-/// a zshrc that RESETS PATH can shadow the prepend, which is cosmetic;
-/// GM_FS_ROOT itself survives any rc file.
+/// Generates a pane script that launches an interactive shell.
+///
+/// The pane prepares the environment with root export and prepends
+/// `$GM_FS_ROOT/bin` to PATH for `gm_hook` resolution.
+///
+/// - Parameters:
+///   - root: The GM_FS_ROOT value to export.
+///   - repoPath: The repository path to cd into.
+///   - tabColorHex: The hex color for the terminal tab.
+///   - shell: The shell executable to launch.
+///   - badgeText: Optional badge text.
+///   - envBackgroundHex: Optional environment background hex.
+/// - Returns: A shell script to launch the interactive shell in the pane.
 nonisolated func paneShellScript(
     root: String,
     repoPath: String,
     tabColorHex: String,
+    shell: String,
     badgeText: String? = nil,
-    envBackgroundHex: String? = nil,
-    shell: String
+    envBackgroundHex: String? = nil
 ) -> String {
     paneScriptPreamble(
         root: root,
@@ -95,6 +122,9 @@ nonisolated func paneShellScript(
         + "exec \(shellSingleQuoted(shell)) -i\n"
 }
 
+/// Returns the user's login shell path.
+///
+/// - Returns: The login shell path, or /bin/zsh if not determinable.
 nonisolated func loginShellPath() -> String {
     let fallback = "/bin/zsh"
     guard let pw = getpwuid(getuid()), let raw = pw.pointee.pw_shell else { return fallback }
@@ -105,6 +135,13 @@ nonisolated func loginShellPath() -> String {
     }
 }
 
+/// Constructs a command line for executing a pane script.
+///
+/// - Parameters:
+///   - shell: The shell executable to use.
+///   - scriptPath: The path to the script to execute.
+/// - Returns: The command line string.
+/// - Throws: `ITerm2Error.unsafeCommandPath` if the path contains quotes or escapes.
 nonisolated func paneCommandLine(shell: String, scriptPath: String) throws(ITerm2Error) -> String {
     guard !scriptPath.contains("\""), !scriptPath.contains("\\") else {
         throw ITerm2Error.unsafeCommandPath(scriptPath)
@@ -116,6 +153,13 @@ nonisolated func paneCommandLine(shell: String, scriptPath: String) throws(ITerm
 }
 
 enum PaneScriptWriter {
+    /// Writes a pane script to a temp file and returns its URL.
+    ///
+    /// - Parameters:
+    ///   - script: The script content to write.
+    ///   - root: The root directory path.
+    /// - Returns: The URL of the written script file.
+    /// - Throws: `ITerm2Error.unsafeCommandPath` if the path is unsafe.
     nonisolated static func write(script: String, root: String) throws(ITerm2Error) -> URL {
         let dir = URL(fileURLWithPath: root, isDirectory: true)
             .appendingPathComponent("tmp", isDirectory: true)

@@ -1,10 +1,10 @@
 import Foundation
 
-/// `TX_BATCH` — N inner request lines, ONE transaction. A relayed tool call
-/// otherwise arrives as its own wire message, so twelve writes are twelve
-/// commits and a failure at the seventh leaves six rows in an append-only
-/// history that cannot take them back. The payload IS request lines, re-entered
-/// through `Server.dispatch(line:from:)`, so the envelope need not parse them.
+/// `TX_BATCH` — N inner request lines, ONE transaction.
+///
+/// A relayed tool call otherwise arrives as its own wire message, so twelve writes are twelve commits and a failure at
+/// the seventh leaves six rows in an append-only history that cannot take them back. The payload IS request lines,
+/// re-entered through `Server.dispatch(line:from:)`, so the envelope need not parse them.
 ///
 /// Scope is ONE TOOL BODY. A session-scoped `TX_BEGIN`/`TX_COMMIT` is rejected:
 /// it parks the single writer across model latency and leaks the lock on crash.
@@ -22,10 +22,20 @@ enum TxBatchHandler {
         .hello, .subscribe, .shutdown, .backup, .txBatch, .mcpCall, .hookEvent,
     ]
 
-    /// Runs every inner line inside one transaction.
+    /// Runs every inner request inside a single database transaction.
     ///
-    /// `dispatch` is injected rather than reached through a stored `Server`
-    /// reference so this stays testable without standing up a socket.
+    /// Validates all requests before opening the transaction. `dispatch` is
+    /// injected rather than accessed from a stored `Server` reference to keep
+    /// the handler testable without a live socket.
+    ///
+    /// - Parameters:
+    ///   - line: The batch request payload data.
+    ///   - head: The message envelope header.
+    ///   - store: The persistence store.
+    ///   - dispatch: Function to dispatch individual inner requests.
+    /// - Returns: The handler result with all inner responses or the first failure.
+    /// - Throws: `StoreError.badRequest` for invalid or denied requests;
+    ///   other errors from individual request handlers.
     static func handle(
         line: Data,
         head: EnvelopeHead,

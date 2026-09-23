@@ -125,6 +125,41 @@ struct GmAgentCdeRpirArchitectureArguments: Sendable {
     @Guide(description: "Page budget in bytes (default 30000, max 45000).")
     var page_bytes: Int?
 
+    /// Creates an architecture tool arguments struct.
+    ///
+    /// - Parameters:
+    ///   - op: The operation to perform.
+    ///   - prompt_uuid: The prompt identifier.
+    ///   - summary_uuid: The architecture summary identifier.
+    ///   - expected_version: The expected version for conflict detection.
+    ///   - agent_name: The methodology agent name.
+    ///   - agent_id: The agent identifier.
+    ///   - body: The prose body or proposal text.
+    ///   - supersedes_option_uuid: UUID of option being replaced.
+    ///   - class_name: The class or table being changed.
+    ///   - file_path: The repo-relative file path.
+    ///   - reason_brief: Brief explanation of the change.
+    ///   - change_kind: The type of change.
+    ///   - dope_ref: The dope domain reference.
+    ///   - persistence_change_uuid: The persistence change row UUID.
+    ///   - field_name: The name of the field.
+    ///   - data_type: The field data type.
+    ///   - change_reason: Why the field is changing.
+    ///   - change_purpose: What the change is for.
+    ///   - nullable: Whether the field may be null.
+    ///   - is_foreign_key: Whether the field is a foreign key.
+    ///   - fk_target: What the foreign key points to.
+    ///   - is_indexed: Whether the field is indexed.
+    ///   - renamed_from: Old field name for renames.
+    ///   - dope_property_ref: The dope property reference.
+    ///   - change_depth: The depth of the code change.
+    ///   - change_code: The change instruction.
+    ///   - option_uuid: The selected option UUID.
+    ///   - change_uuid: The specific change UUID.
+    ///   - rationale: The rationale for the decision.
+    ///   - limit: The maximum number of rows to return.
+    ///   - cursor: The pagination cursor.
+    ///   - page_bytes: The page size in bytes.
     init(
         op: String,
         prompt_uuid: String? = nil,
@@ -216,81 +251,85 @@ struct GmAgentCdeRpirArchitectureTool: GmAgentRpirTool {
         GmAgentToolOp(
             Op.open,
             verbs: [.archOpen],
-            requiredParams: ["prompt_uuid"],
             summary: """
                 Open the prompt's architecture summary page — fetch-or-open, idempotent. \
                 Opened explicitly like every summary; nothing opens it as a side effect.
-                """
+                """,
+            requiredParams: ["prompt_uuid"]
         ),
         GmAgentToolOp(
             Op.openOption,
             verbs: [.archOptionAdd],
-            requiredParams: ["summary_uuid", "agent_name", "body"],
             summary: """
                 Write YOUR methodology's option row (one per agent_name). To REVISE a \
                 proposal, pass supersedes_option_uuid + expected_version together.
-                """
+                """,
+            requiredParams: ["summary_uuid", "agent_name", "body"]
         ),
         GmAgentToolOp(
             Op.writePersistence,
             verbs: [.archPersistAdd],
-            requiredParams: ["summary_uuid", "class_name", "file_path", "reason_brief"],
             summary: """
                 Record ONE persistence-tier change. Persistence rows come before general \
                 rows because a schema or wire delta is what the plan gate is signed off against.
-                """
+                """,
+            requiredParams: ["summary_uuid", "class_name", "file_path", "reason_brief"]
         ),
         GmAgentToolOp(
             Op.writeField,
             verbs: [.archFieldAdd],
+            summary: "Record ONE field-level change under a persistence change row.",
             requiredParams: [
                 "persistence_change_uuid", "field_name", "data_type", "change_reason", "change_purpose",
                 "nullable",
-            ],
-            summary: "Record ONE field-level change under a persistence change row."
+            ]
         ),
         GmAgentToolOp(
             Op.writeGeneral,
             verbs: [.archGeneralAdd],
-            requiredParams: ["summary_uuid", "file_path", "reason_brief", "change_depth", "change_code"],
             summary: """
                 Record ONE general (non-persistence) change. change_depth is pseudo|draft|actual \
                 — draft is a planned change not yet written.
-                """
+                """,
+            requiredParams: ["summary_uuid", "file_path", "reason_brief", "change_depth", "change_code"]
         ),
         GmAgentToolOp(
             Op.summarize,
             verbs: [.archSummarize],
-            requiredParams: ["summary_uuid", "expected_version", "body"],
-            summary: "Write the architecture summary's own body — the plan narrative over the expanded rows."
+            summary: "Write the architecture summary's own body — the plan narrative over the expanded rows.",
+            requiredParams: ["summary_uuid", "expected_version", "body"]
         ),
         GmAgentToolOp(
             Op.propose,
             verbs: [.archPropose],
-            requiredParams: ["summary_uuid", "expected_version"],
-            summary: "drafting → proposed: put the expanded plan on the table for the plan gate."
+            summary: "drafting → proposed: put the expanded plan on the table for the plan gate.",
+            requiredParams: ["summary_uuid", "expected_version"]
         ),
         GmAgentToolOp(
             Op.approve,
             verbs: [.archApprove],
-            requiredParams: ["summary_uuid", "expected_version"],
             summary: """
                 proposed → approved (terminal; unlocks implementation). The user's sign-off at \
                 the plan gate is what authorizes this call.
-                """
+                """,
+            requiredParams: ["summary_uuid", "expected_version"]
         ),
         GmAgentToolOp(
             Op.revise,
             verbs: [.archRevise],
-            requiredParams: ["summary_uuid", "expected_version"],
             summary: """
                 proposed → drafting: the revision edge. Reopens the summary so options and rows \
                 can change; compose with open_option's supersede form to replace a proposal.
-                """
+                """,
+            requiredParams: ["summary_uuid", "expected_version"]
         ),
         GmAgentToolOp(
             Op.decide,
             verbs: [.archDecide],
+            summary: """
+                Select ONE option. Stamps it selected, rejects every sibling, and records why in \
+                one atomic write. Only the selected option may expand into change rows. Primary only.
+                """,
             // The decision's response carries every option BODY, so it can be over
             // budget while the write has already landed. There is nothing to narrow
             // on a write, so it names the read that shows the outcome instead.
@@ -299,26 +338,22 @@ struct GmAgentCdeRpirArchitectureTool: GmAgentRpirTool {
                 retryWith: "cde_rpir_architecture op=get (the decision and its rationale are on the summary; "
                     + "pass option_uuid for one option's body)"
             ),
-            requiredParams: ["option_uuid", "expected_version", "rationale"],
-            summary: """
-                Select ONE option. Stamps it selected, rejects every sibling, and records why in \
-                one atomic write. Only the selected option may expand into change rows. Primary only.
-                """
+            requiredParams: ["option_uuid", "expected_version", "rationale"]
         ),
         GmAgentToolOp(
             Op.get,
             verbs: [.archGet],
+            summary: """
+                The approved architecture with its implementation state: persistence changes \
+                (whole) before general change stubs, each joined to its recorded file changes. \
+                Long text arrives as windows; loop on cursor until page.next_cursor is null.
+                """,
             narrowing: CdeNarrowing(
                 parameters: ["cursor", "page_bytes", "option_uuid", "change_uuid"],
                 retryWith: "cde_rpir_architecture op=get with cursor = page.next_cursor"
                     + "; option_uuid / change_uuid for one body"
             ),
-            requiredParams: ["prompt_uuid"],
-            summary: """
-                The approved architecture with its implementation state: persistence changes \
-                (whole) before general change stubs, each joined to its recorded file changes. \
-                Long text arrives as windows; loop on cursor until page.next_cursor is null.
-                """
+            requiredParams: ["prompt_uuid"]
         ),
     ]
 
@@ -332,5 +367,6 @@ struct GmAgentCdeRpirArchitectureTool: GmAgentRpirTool {
         (propose → approve or revise), record the decision, and read the plan back.
         """
 
+    /// Creates an architecture tool instance.
     init() {}
 }

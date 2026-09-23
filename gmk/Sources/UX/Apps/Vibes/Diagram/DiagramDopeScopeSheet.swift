@@ -3,9 +3,10 @@ import SwiftUI
 /// The "Add dope scope" modal: pick entities from the workspace's bound dope
 /// scope and land them as dopeEntity cards — plus the scope's
 /// dopeScopePersistenceLayer container when the canvas doesn't hold one yet —
-/// in ONE batch through the edit-session funnel. Deliberately no existence
-/// validation: bindings are ghost-tolerant codes, and the daemon renders an
-/// absent code as a ghost card, never an error.
+/// in ONE batch through the edit-session funnel.
+///
+/// Deliberately no existence validation: bindings are ghost-tolerant codes, and the daemon renders an absent code as a
+/// ghost card, never an error.
 struct DiagramDopeScopeSheet: View {
     @Environment(\.dismiss) private var dismiss
     let workspace: DiagramWorkspace
@@ -95,9 +96,13 @@ struct DiagramDopeScopeSheet: View {
         .padding(12)
     }
 
-    /// Entity codes already carded under this scope's container(s) — shown
-    /// checked-and-disabled so the sheet reads as "what's on the canvas",
+    /// Entity codes already carded under this scope's container(s).
+    ///
+    /// Shown checked-and-disabled so the sheet reads as "what's on the canvas",
     /// and a second add of the same code takes an explicit different path.
+    ///
+    /// - Parameter scopeCode: The scope's code.
+    /// - Returns: The set of entity codes currently on the canvas.
     private func presentEntityCodes(scopeCode: String) -> Set<String> {
         var codes: Set<String> = []
         for element in workspace.tree.elements {
@@ -113,7 +118,10 @@ struct DiagramDopeScopeSheet: View {
         return codes
     }
 
-    /// The scope's container element, when the canvas already holds one.
+    /// The scope's container element when the canvas already holds one.
+    ///
+    /// - Parameter scopeCode: The scope's code.
+    /// - Returns: The container element for this scope, or `nil` if none exists.
     private func container(scopeCode: String) -> DiagramElementNode? {
         workspace.tree.elements.first { element in
             if case .dopeScopePersistenceLayer(let payload) = element.payload {
@@ -123,10 +131,12 @@ struct DiagramDopeScopeSheet: View {
         }
     }
 
-    /// ONE batch: the container add (when absent) via clientRef, then every
-    /// picked entity parented under it — the same in-batch parenting the
-    /// drawing layer's lazy creation uses. New cards stack in a fresh column
-    /// to the right of the current content, so they never land under it.
+    /// Add selected entities to the diagram in one batch edit.
+    ///
+    /// Creates the scope container if absent, then stages every selected entity
+    /// parented under it — the same in-batch parenting the drawing layer's lazy
+    /// creation uses. New cards stack in a fresh column to the right of the
+    /// current content, so they never land under it.
     private func commit() {
         guard let dope = workspace.dope, !selected.isEmpty else { return }
         let scopeCode = dope.tree.body.code
@@ -143,15 +153,15 @@ struct DiagramDopeScopeSheet: View {
             session.stage(
                 .elementAdd(
                     DiagramElementAdd(
+                        payload: .dopeScopePersistenceLayer(
+                            DopeScopePersistenceLayerPayload(dopeScopeCode: scopeCode)
+                        ),
                         clientRef: containerRef,
                         code: "scope_\(scopeCode)",
                         name: dope.tree.body.name,
                         centerX: 0,
                         centerY: 0,
-                        elementZ: 0,
-                        payload: .dopeScopePersistenceLayer(
-                            DopeScopePersistenceLayerPayload(dopeScopeCode: scopeCode)
-                        )
+                        elementZ: 0
                     )
                 )
             )
@@ -168,12 +178,12 @@ struct DiagramDopeScopeSheet: View {
             session.stage(
                 .elementAdd(
                     DiagramElementAdd(
+                        payload: .dopeEntity(DopeEntityPayload(entityCode: code)),
                         parentElementUuid: parentUuid,
                         parentClientRef: parentUuid == nil ? containerRef : nil,
                         name: code,
                         centerX: local.x,
-                        centerY: local.y,
-                        payload: .dopeEntity(DopeEntityPayload(entityCode: code))
+                        centerY: local.y
                     )
                 )
             )

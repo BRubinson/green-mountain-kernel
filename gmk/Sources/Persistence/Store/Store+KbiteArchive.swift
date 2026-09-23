@@ -10,8 +10,16 @@ import GRDB
 // transaction and the file I/O phases.
 
 extension Store {
+    /// Exports a kbite to a file on disk.
+    ///
     /// Assemble the scrubbed export document and write it at
-    /// `req.dbExportPath`. Read-only against the db — no event.
+    /// `req.dbExportPath`.
+    ///
+    /// Read-only against the db — no event.
+    ///
+    /// - Parameter req: The export request with code and paths.
+    /// - Returns: The export response with counts and written path.
+    /// - Throws: `StoreError` for invalid requests or file I/O errors.
     func exportKbite(_ req: KbiteExportRequest) throws -> KbiteExportResponse {
         // FOUR-PHASE VERB — see StoreError.notComposable. Filesystem work
         // between the read and the write must not hold the single writer.
@@ -48,8 +56,14 @@ extension Store {
         )
     }
 
+    /// Imports a kbite from an exported archive file.
+    ///
     /// One-transaction import of a db_export.json (decode + rehydrate happen
     /// outside the write lock; the apply body lives in the repository).
+    ///
+    /// - Parameter req: The import request with file path and rehydration rules.
+    /// - Returns: The import response with counts and created kbite uuid.
+    /// - Throws: `StoreError` for invalid formats or collision handling.
     func importKbite(_ req: KbiteImportRequest) throws -> KbiteImportResponse {
         // FOUR-PHASE VERB — see StoreError.notComposable. Filesystem work
         // between the read and the write must not hold the single writer.
@@ -82,6 +96,11 @@ extension Store {
         }
     }
 
+    /// Deletes a kbite from the database.
+    ///
+    /// - Parameter req: The delete request with the kbite uuid.
+    /// - Returns: The delete response.
+    /// - Throws: Database errors or `StoreError`.
     func deleteKbite(_ req: KbiteDeleteRequest) throws -> KbiteDeleteResponse {
         try boundary { db in
             try KbiteArchiveRepository(db: db, core: core).deleteKbite(req)
@@ -90,11 +109,15 @@ extension Store {
 }
 
 extension KbiteExportDocument {
+    /// Returns a copy with placeholder paths rehydrated to machine roots.
+    ///
     /// The whole document with placeholder paths mapped back to this
     /// machine's roots across the four text surfaces.
+    ///
+    /// - Parameter rules: The prefix rules to apply during rehydration.
+    /// - Returns: A new document with rehydrated paths.
     func rehydrated(rules: [KbitePrefixRule]) -> KbiteExportDocument {
         KbiteExportDocument(
-            formatVersion: formatVersion,
             code: code,
             exportedAt: exportedAt,
             sourceKbiteUuid: sourceKbiteUuid,
@@ -119,7 +142,8 @@ extension KbiteExportDocument {
                         )
                     }
                 )
-            }
+            },
+            formatVersion: formatVersion
         )
     }
 }

@@ -8,6 +8,10 @@ protocol GmBridgeFile {
 
     var isExecutable: Bool { get }
 
+    /// Renders the file contents as a string.
+    ///
+    /// - Returns: The rendered content, or nil if the file is empty.
+    /// - Throws: Encoding errors when rendering fails.
     func contents() throws -> String?
 }
 
@@ -22,6 +26,10 @@ protocol GmBridgeJsonFile: GmBridgeFile, Encodable {}
 
 extension GmBridgeJsonFile {
 
+    /// Encodes the file as JSON with sorted keys and pretty printing.
+    ///
+    /// - Returns: The JSON representation with a trailing newline, or nil if empty.
+    /// - Throws: Encoding errors from the JSON encoder.
     func contents() throws -> String? {
         guard !isEmpty else { return nil }
         let encoder = JSONEncoder()

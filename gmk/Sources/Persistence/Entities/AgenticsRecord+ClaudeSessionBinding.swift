@@ -8,8 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `claude_session_binding` table (m0026). Columns map
-/// via convertFromSnakeCase.
+/// Read-side mirror of the `claude_session_binding` table (m0026).
+///
+/// Columns map via convertFromSnakeCase.
 ///
 /// Two payload columns and no more: `claude_session_id` is Claude Code's
 /// conversation uuid, `session_uuid` the gmcc session it was pinned to. A

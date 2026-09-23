@@ -43,8 +43,10 @@ struct ClarificationQuestionCard: View {
     // MARK: Read-only (building / complete)
 
     /// Today's layout, unchanged: selections as static checkmarks, the typed
-    /// answer under a person glyph. This is what every non-`answering` state
-    /// renders, and what the pane rendered before answering existed.
+    /// answer under a person glyph.
+    ///
+    /// This is what every non-`answering` state renders, and what the pane
+    /// rendered before answering existed.
     @ViewBuilder
     private var readOnlyAnswer: some View {
         ForEach(question.options, id: \.uuid) { option in
@@ -97,6 +99,9 @@ struct ClarificationQuestionCard: View {
         .disabled(!isAnswering || inFlight)
     }
 
+    /// Builds a toggle button for a clarification option.
+    /// - Parameter option: The clarification option to toggle.
+    /// - Returns: A view containing the option toggle button.
     private func optionToggle(_ option: ClarificationOptionRow) -> some View {
         let selected = draft?.selected.contains(option.uuid) ?? false
         return Button {
@@ -143,8 +148,13 @@ struct ClarificationQuestionCard: View {
         .padding(.leading, 18)
     }
 
+    /// Displays a conflict banner for the question.
+    ///
     /// Scoped to THIS question — a collision on one question says nothing about
     /// any other, and every other draft on the pane is still live.
+    ///
+    /// - Parameter message: The error message to display in the banner.
+    /// - Returns: A view containing the conflict warning.
     private func conflictBanner(_ message: String) -> some View {
         Label(message, systemImage: "exclamationmark.triangle")
             .font(.caption)
@@ -154,6 +164,7 @@ struct ClarificationQuestionCard: View {
 
     /// Reads through the model so observation tracks it, writes through
     /// `setText` so the dirty flag and the in-flight lock stay authoritative.
+    ///
     /// Falls back to the server row before the first `adopt` lands.
     private var textBinding: Binding<String> {
         Binding(
@@ -164,6 +175,9 @@ struct ClarificationQuestionCard: View {
 
     // MARK: Bits
 
+    /// Renders a status icon for a clarification row.
+    /// - Parameter status: The raw status string from the wire.
+    /// - Returns: A view displaying the appropriate status icon.
     @ViewBuilder
     private func rowStatusIcon(_ status: String) -> some View {
         switch ClarificationRowStatus(rawValue: status) {

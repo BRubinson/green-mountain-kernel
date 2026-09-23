@@ -9,6 +9,14 @@ enum KBitePreview {
 enum KBiteMarkdown {
     static let maxBytes = 512 * 1024
 
+    /// Generates a preview of a kbite file.
+    ///
+    /// Returns a markdown preview if the file is a `.md` file, a text preview
+    /// for other text files, or unavailable if the file is too large, unreadable,
+    /// or binary.
+    ///
+    /// - Parameter url: The file URL to preview.
+    /// - Returns: The generated preview.
     static func preview(for url: URL) -> KBitePreview {
         let fm = FileManager.default
         let attrs = (try? fm.attributesOfItem(atPath: url.path)) ?? [:]

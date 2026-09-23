@@ -2,12 +2,18 @@ import Foundation
 import GRDB
 
 /// Data access for the daemon_config table (plus the MemoryWatcher's prompt
-/// reverse lookup). Runs INSIDE a Store-owned transaction; holds no dbQueue
-/// and never self-transacts.
+/// reverse lookup).
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
+/// self-transacts.
 struct ConfigRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Fetches daemon configuration paths and roots.
+    ///
+    /// - Returns: The resolved paths and storage roots for the daemon.
+    /// - Throws: Database errors.
     func pathsGet() throws -> PathsGetResponse {
         let config = try Dictionary(
             uniqueKeysWithValues:
@@ -50,6 +56,16 @@ struct ConfigRepository: RepositoryContext {
         )
     }
 
+    /// Sets or updates a daemon configuration value.
+    ///
+    /// Upsert without version threading: config keys are singletons owned by the daemon;
+    /// last write wins (still audited via the event trail).
+    ///
+    /// - Parameters:
+    ///   - req: The config key to set.
+    ///   - value: The configuration value.
+    /// - Returns: The set key-value pair.
+    /// - Throws: Database errors.
     func configSet(_ req: ConfigSetRequest, value: String) throws -> ConfigSetResponse {
         // Upsert without version threading: config keys are singletons
         // owned by the daemon; last write wins (still audited via the
@@ -84,6 +100,11 @@ struct ConfigRepository: RepositoryContext {
         return ConfigSetResponse(key: req.key, value: value)
     }
 
+    /// Fetches a daemon configuration value by key.
+    ///
+    /// - Parameter key: The configuration key.
+    /// - Returns: The configuration value, or nil if not set.
+    /// - Throws: Database errors.
     func configValue(_ key: ConfigKey) throws -> String? {
         try DaemonConfigRecord
             .filter(DaemonConfigRecord.Columns.configKey == key.rawValue)
@@ -91,7 +112,13 @@ struct ConfigRepository: RepositoryContext {
             .fetchOne(db)
     }
 
-    /// MemoryWatcher's reverse lookup: prompt by its gmfs folder path.
+    /// Looks up a prompt by its GMFS storage folder path.
+    ///
+    /// Used by MemoryWatcher for reverse lookups.
+    ///
+    /// - Parameter path: The GMFS-relative storage path.
+    /// - Returns: The prompt UUID, or nil if not found.
+    /// - Throws: Database errors.
     func promptUuid(byStoragePath path: String) throws -> String? {
         try PromptRecord
             .filter(PromptRecord.Columns.gmfsRelativeStoragePath == path)

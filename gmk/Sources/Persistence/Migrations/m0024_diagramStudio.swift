@@ -10,6 +10,9 @@ extension Migrations {
     // kind: six would make reshape a delete+recreate, ghosting every incoming
     // connector. The diagram_fts update trigger fires AFTER UPDATE OF code, name,
     // description only — revision bumps on every stroke would churn the index.
+    /// Registers migration m0024 to add diagram visibility, routing, and UML nodes.
+    ///
+    /// - Parameter migrator: The database migrator to register with.
     static func m0024_diagramStudio(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0024_diagramStudio") { db in
             try db.execute(

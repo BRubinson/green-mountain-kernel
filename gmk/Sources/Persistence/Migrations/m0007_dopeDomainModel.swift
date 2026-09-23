@@ -10,6 +10,8 @@ extension Migrations {
     // constrain nothing for a NULL prompt_uuid. The two property ref FKs are ON
     // DELETE RESTRICT, so scope deletion and ingest's whole-tree wipe delete
     // properties FIRST or a cross-domain relationship RESTRICTs mid-statement.
+    /// Registers the m0007 migration: DOPE persistence tables.
+    /// - Parameter migrator: The database migrator to update.
     static func m0007_dopeDomainModel(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0007_dopeDomainModel") { db in
             try db.execute(

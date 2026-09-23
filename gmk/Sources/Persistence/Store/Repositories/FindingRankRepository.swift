@@ -11,12 +11,19 @@ struct FindingRankRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
-    /// Validate then apply one rank batch inside the caller's transaction.
-    /// The WHOLE batch validates before any write: non-empty, no duplicate
-    /// uuids, every rating 0–999, every finding belonging to this summary
-    /// (cross-summary smuggling check) — one bad pair rejects everything.
-    /// Rows update via updateBase at their in-transaction current versions
-    /// (the clarifyFinalize prompt-version idiom).
+    /// Validates and applies one rank batch inside the caller's transaction.
+    ///
+    /// The WHOLE batch validates before any write: non-empty, no duplicate uuids,
+    /// every rating 0–999, every finding belonging to this summary (cross-summary
+    /// smuggling check) — one bad pair rejects everything. Rows update via
+    /// updateBase at their in-transaction current versions (the clarifyFinalize
+    /// prompt-version idiom).
+    ///
+    /// - Parameters:
+    ///   - type: The finding type being ranked.
+    ///   - summaryUuid: The summary uuid; all findings must belong to this summary.
+    ///   - ratings: The finding uuids and their 0–999 ratings.
+    /// - Throws: `StoreError.badRequest` if the batch is invalid; `StoreError.notFound` if a finding does not exist.
     func applyRankBatch<T: BaseRecordFields & Rankable & ParentKeyed>(
         _ type: T.Type,
         summaryUuid: String,
@@ -41,8 +48,16 @@ struct FindingRankRepository: RepositoryContext {
         }
     }
 
-    /// The shared pre-flight: non-empty, no duplicate uuid, every rating in
-    /// range, and each finding accepted by the caller's membership test.
+    /// Validates a rank batch before processing.
+    ///
+    /// Checks for non-empty, no duplicate uuids, every rating in range, and
+    /// membership via the caller's test.
+    ///
+    /// - Parameters:
+    ///   - ratings: The finding ratings to validate.
+    ///   - belongs: A closure that returns true when the finding belongs to the parent.
+    ///   - rejection: A closure that produces the error message for a failed member.
+    /// - Throws: `StoreError.badRequest` when validation fails.
     private func validate(
         _ ratings: [FindingRating],
         belongs: (String) throws -> Bool,
@@ -68,6 +83,12 @@ struct FindingRankRepository: RepositoryContext {
     }
 
     /// The row's version as the transaction currently sees it, for updateBase.
+    ///
+    /// - Parameters:
+    ///   - type: The record type.
+    ///   - uuid: The row uuid.
+    /// - Returns: The row's version, or nil if not found.
+    /// - Throws: Database errors.
     private func currentVersion<T: BaseRecordFields & TableRecord>(
         _ type: T.Type,
         uuid: String
@@ -78,7 +99,13 @@ struct FindingRankRepository: RepositoryContext {
             .fetchOne(db)
     }
 
-    /// The unranked findings of one summary, for the caller's completion gate.
+    /// The count of unranked findings in a summary.
+    ///
+    /// - Parameters:
+    ///   - type: The finding type.
+    ///   - summaryUuid: The summary uuid.
+    /// - Returns: The count of unranked findings.
+    /// - Throws: Database errors.
     func unrankedCount<T: Rankable & ParentKeyed>(
         _ type: T.Type,
         summaryUuid: String
@@ -88,11 +115,16 @@ struct FindingRankRepository: RepositoryContext {
 
     // MARK: - Prompt-scoped (m0025 per-agent exploration summaries)
 
-    /// The cross-summary rank batch: one atomic calibrated batch over every
-    /// finding of every exploration summary of ONE prompt (the reranker's
-    /// cross-persona tombstone contract, re-keyed from summary to prompt).
-    /// Same all-or-nothing validation as applyRankBatch; the membership check
-    /// walks the summary join instead of one parent uuid.
+    /// Applies a calibrated rank batch across all exploration summaries of one prompt.
+    ///
+    /// This is the cross-summary rank batch with same all-or-nothing validation as
+    /// `applyRankBatch`, but membership checks via the summary join instead of one
+    /// parent uuid. It implements the reranker's cross-persona tombstone contract.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The prompt uuid; all findings must belong to it.
+    ///   - ratings: The finding uuids and their 0–999 ratings.
+    /// - Throws: `StoreError.badRequest` if the batch is invalid; `StoreError.notFound` if a finding does not exist.
     func applyPromptRankBatch(promptUuid: String, ratings: [FindingRating]) throws {
         try validate(ratings) { findingUuid in
             try promptFindings(promptUuid).withUuid(findingUuid).fetchCount(db) > 0
@@ -115,9 +147,14 @@ struct FindingRankRepository: RepositoryContext {
         }
     }
 
-    /// Unranked findings across ALL of the prompt's exploration summaries —
-    /// the synthesis-complete (seal) gate. key_file findings are path anchors,
-    /// never ranked.
+    /// The count of unranked findings across all exploration summaries of a prompt.
+    ///
+    /// Key file findings are path anchors and are excluded. Used as the
+    /// synthesis-complete (seal) gate.
+    ///
+    /// - Parameter promptUuid: The prompt uuid.
+    /// - Returns: The count of unranked findings (excluding key file findings).
+    /// - Throws: Database errors.
     func promptUnrankedCount(promptUuid: String) throws -> Int {
         try promptFindings(promptUuid)
             .unranked()
@@ -126,6 +163,9 @@ struct FindingRankRepository: RepositoryContext {
     }
 
     /// Every exploration finding of one prompt, whichever summary carries it.
+    ///
+    /// - Parameter promptUuid: The prompt uuid.
+    /// - Returns: A query for all findings belonging to the prompt.
     private func promptFindings(_ promptUuid: String) -> QueryInterfaceRequest<ExplorationFindingRecord> {
         ExplorationFindingRecord.joining(
             required: ExplorationFindingRecord.summary

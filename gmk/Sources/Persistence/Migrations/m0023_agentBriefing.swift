@@ -10,6 +10,10 @@ extension Migrations {
     // populated and prompt_uuid is NULL exactly for a task-owned briefing, so
     // uniqueness is a partial index PAIR — SQLite UNIQUE admits multiple NULLs.
     // dope_refs are DOT-PATHS as TEXT JSON; dangling refs are legal ghosts.
+
+    /// Registers the m0023 migration for agent briefing and activation tables.
+    ///
+    /// - Parameter migrator: The database migrator to register with.
     static func m0023_agentBriefing(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0023_agentBriefing") { db in
             try db.execute(

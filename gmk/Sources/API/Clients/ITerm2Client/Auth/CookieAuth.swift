@@ -1,6 +1,12 @@
 import Foundation
 
 enum CookieAuth {
+    /// Fetches iTerm2 authentication credentials from the environment or AppleScript.
+    ///
+    /// First checks for `ITERM2_COOKIE` and `ITERM2_KEY` environment variables;
+    /// if not found, requests credentials via AppleScript from iTerm2.
+    ///
+    /// - Returns: A tuple of optional cookie and key strings; both nil if unavailable.
     static func credentials() -> (cookie: String?, key: String?) {
         let env = ProcessInfo.processInfo.environment
         if let cookie = env["ITERM2_COOKIE"] {
@@ -16,6 +22,12 @@ enum CookieAuth {
         return "application \"iTerm2\""
     }
 
+    /// Requests iTerm2 authentication credentials via AppleScript.
+    ///
+    /// Invokes osascript to ask iTerm2 for the cookie and key for GMVibes.
+    /// Returns nil for either value on failure or if iTerm2 does not respond.
+    ///
+    /// - Returns: A tuple of optional cookie and key strings.
     private static func requestCookie() -> (cookie: String?, key: String?) {
         let script = "tell \(appTarget) to request cookie and key for app named \"GMVibes\""
 

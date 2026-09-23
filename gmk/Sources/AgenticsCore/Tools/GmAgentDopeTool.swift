@@ -48,6 +48,18 @@ struct GmAgentCdeDopeArguments: Sendable {
     )
     var page_bytes: Int?
 
+    /// Creates a dope tool arguments set.
+    /// - Parameters:
+    ///   - op: The operation to perform.
+    ///   - query: The search query, or nil.
+    ///   - scope: The scope type (prompt, session, project), or nil.
+    ///   - prompt_uuid: The prompt uuid selector, or nil.
+    ///   - session_uuid: The explicit session uuid, or nil.
+    ///   - limit: The maximum number of results, or nil.
+    ///   - scope_uuid: The dope scope to write, or nil.
+    ///   - force: Whether to force write despite divergence, or nil.
+    ///   - cursor: The pagination cursor from the previous call, or nil.
+    ///   - page_bytes: The page budget in bytes, or nil.
     init(
         op: String,
         query: String? = nil,
@@ -95,22 +107,22 @@ struct GmAgentCdeDopeTool: GmAgentDopeTool {
         GmAgentToolOp(
             Op.searchSession,
             verbs: [.dopeSearch],
+            summary: "FTS over the session's dope tree (hits carry dot-paths).",
             narrowing: pagedOpNarrowing(Op.searchSession),
-            requiredParams: ["query"],
-            summary: "FTS over the session's dope tree (hits carry dot-paths)."
+            requiredParams: ["query"]
         ),
         GmAgentToolOp(
             Op.searchGlobal,
             verbs: [.dopeSearch],
+            summary: "FTS over the dope trees of ALL projects and sessions, not just this one.",
             narrowing: pagedOpNarrowing(Op.searchGlobal),
-            requiredParams: ["query"],
-            summary: "FTS over the dope trees of ALL projects and sessions, not just this one."
+            requiredParams: ["query"]
         ),
         GmAgentToolOp(
             Op.updateSession,
             verbs: [.dopeWriteRepo],
-            requiredParams: ["scope_uuid"],
-            summary: "Write the session's dope tree back to its repo — many dope nodes to disk at once."
+            summary: "Write the session's dope tree back to its repo — many dope nodes to disk at once.",
+            requiredParams: ["scope_uuid"]
         ),
     ]
 
@@ -123,9 +135,12 @@ struct GmAgentCdeDopeTool: GmAgentDopeTool {
         every project's, or write a scope back to its repo.
         """
 
+    /// Creates the dope search tool.
     init() {}
 
-    /// Names the tool AND the op, so over-budget advice is a call a caller can make.
+    /// Names the tool and operation for paging advice.
+    /// - Parameter op: The operation that is paged.
+    /// - Returns: A narrowing configuration with pagination parameters.
     private static func pagedOpNarrowing(_ op: Op) -> CdeNarrowing {
         CdeNarrowing(
             parameters: ["cursor", "page_bytes"],

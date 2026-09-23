@@ -3,11 +3,10 @@ import GRDB
 
 /// Everything a repository is allowed to hold: the ambient transaction's
 /// `Database`, and the shared write primitives.
-/// Deliberately NOT a Store. No `dbQueue` is reachable from here and no public
-/// verb, so nesting a transaction is not expressible — and GRDB 7 TRAPS on a
-/// re-entrant `dbQueue.write`, killing the daemon rather than returning an
-/// error. The sibling accessors below make a cross-domain call a CALL rather
-/// than a construction, naming the owning repository directly.
+///
+/// NOT a Store; no `dbQueue` or public verb, so nesting a transaction is not expressible.
+/// GRDB 7 TRAPS on re-entrant `dbQueue.write`, killing the daemon rather than returning error.
+/// Sibling accessors make cross-domain calls by naming the owning repository directly.
 /// `EventRepository` does not conform: it holds only `db` and needs no core.
 protocol RepositoryContext {
     var db: Database { get }

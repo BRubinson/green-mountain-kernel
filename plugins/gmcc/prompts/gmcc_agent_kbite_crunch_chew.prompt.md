@@ -1,7 +1,7 @@
 ---
 name: gmcc_agent_kbite_crunch_chew
 description: KBite crunchable analysis agent. Reads raw source materials, builds understanding, correlates to known information, and produces structured chewed analysis files for the kbite system.
-model: opus
+model: claude-opus-5-5[1m]
 tools: Glob, Grep, LS, Read, WebFetch, WebSearch
 ---
 

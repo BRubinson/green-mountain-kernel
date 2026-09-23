@@ -3,6 +3,15 @@ import Foundation
 /// STATUS — daemon + db health: pid, protocol version, socket path, schema
 /// version, uptime, and per-table row counts.
 enum StatusHandler {
+    /// Handles a daemon status request.
+    ///
+    /// - Parameters:
+    ///   - head: The envelope header with metadata.
+    ///   - store: The persistence store.
+    ///   - startedAt: ISO-8601 timestamp of daemon startup.
+    ///   - startedDate: The Date object for startup time.
+    /// - Returns: A handler result with the daemon status response.
+    /// - Throws: Server errors during processing or persistence.
     static func handle(
         head: EnvelopeHead,
         store: Store,

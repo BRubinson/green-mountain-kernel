@@ -4,9 +4,11 @@ import XCTest
 // MARK: - The roster as a value (no kernel)
 
 /// `CdeToolRoster` is a generated build artifact, so nothing about it is held
-/// by the compiler. These are the assertions that keep it honest: that the
-/// reflected roster is structurally sound, and that it agrees with the verb
-/// registry it is a projection of.
+/// by the compiler.
+///
+/// These are the assertions that keep it honest: that the reflected roster is
+/// structurally sound, and that it agrees with the verb registry it is a
+/// projection of.
 final class CdeRosterTests: XCTestCase {
 
     /// Ops whose work the pen folds itself, so they carry no VerbSpec.
@@ -125,8 +127,9 @@ final class CdeRosterTests: XCTestCase {
     }
 
     /// A required argument on the SCHEMA is required for every op, so anything
-    /// beyond the selector makes the harness refuse the calls that do not need
-    /// it. Per-op required-ness is the arm's runtime answer, never the schema's.
+    /// beyond the selector makes the harness refuse the calls that do not need it.
+    ///
+    /// Per-op required-ness is the arm's runtime answer, never the schema's.
     func testEverySchemaRequiresOnlyItsSelector() {
         for spec in CdeToolRoster.specs {
             guard case .object(let schema) = spec.schema else {
@@ -204,9 +207,16 @@ final class CdeRosterTests: XCTestCase {
         }
     }
 
-    /// Every schema KEYWORD anywhere in a schema, so a banned one cannot hide
-    /// in a nested property. The names inside a `properties` map are argument
-    /// names, not keywords — one tool takes an argument called `title`.
+    /// Extracts all schema keywords from a JSON value tree.
+    ///
+    /// Recursively collects every keyword in a schema structure to detect banned ones. Property
+    /// names inside a `properties` map are argument names, not keywords (e.g., a tool with a
+    /// `title` argument).
+    ///
+    /// - Parameters:
+    ///   - value: The JSON value to traverse.
+    ///   - arePropertyNames: When true, skips collecting keys from this level (for `properties` maps).
+    /// - Returns: A set of all keywords found in the tree.
     private static func schemaKeys(_ value: GmJsonValue, arePropertyNames: Bool = false) -> Set<String> {
         switch value {
         case .object(let fields):
@@ -228,8 +238,9 @@ final class CdeRosterTests: XCTestCase {
 
 // MARK: - What the pen actually serves
 
-/// The roster is only worth anything if the shipped binary serves it. This
-/// runs the `gm_mcp` personality of the kernel under test over stdio and
+/// The roster is only worth anything if the shipped binary serves it.
+///
+/// This runs the `gm_mcp` personality of the kernel under test over stdio and
 /// compares its `tools/list` with the roster compiled into this bundle.
 final class CdeRosterWireTests: KernelBackedTestCase {
 
@@ -248,6 +259,9 @@ final class CdeRosterWireTests: KernelBackedTestCase {
         XCTAssertEqual(Set(pinned), CdeToolRoster.pinned)
     }
 
+    /// Fetches the tool list from the running pen binary via MCP.
+    /// - Returns: An array of tool definitions as returned by `tools/list`.
+    /// - Throws: XCTest assertion errors if the pen cannot be run or returns no result.
     private func servedTools() throws -> [[String: Any]] {
         let binary = env.root.appendingPathComponent("gm_kernel", isDirectory: false)
         try XCTSkipUnless(
@@ -296,6 +310,7 @@ final class CdeRosterWireTests: KernelBackedTestCase {
 // MARK: - The rank ops, end to end
 
 /// The two ranking ops take their batch as `"<finding-uuid>:<0-999>"` strings.
+///
 /// Nothing but a real call proves the served arm parses the shape the schema
 /// declares: a mismatch there is a tool that is advertised and cannot be used.
 final class CdeRankWireTests: KernelBackedTestCase {
@@ -342,12 +357,12 @@ final class CdeRankWireTests: KernelBackedTestCase {
             .mcpCall,
             McpCallRequest(
                 tool: "cde_rpir_review",
+                identity: GmHarnessIdentity(),
                 arguments: .object([
                     "op": .string("rank"),
                     "summary_uuid": .string(fixture.reviewSummaryUuid),
                     "ratings": .array([.string("\(fixture.reviewFindingUuid)-100")]),
-                ]),
-                identity: GmHarnessIdentity()
+                ])
             ),
             McpCallResponse.self
         )
@@ -357,10 +372,16 @@ final class CdeRankWireTests: KernelBackedTestCase {
 
     // MARK: Harness
 
+    /// Makes an MCP tool call and returns the result as a JSON object.
+    /// - Parameters:
+    ///   - tool: The tool name to call.
+    ///   - arguments: The tool arguments as a dictionary of JSON values.
+    /// - Returns: The call result as a JSON object.
+    /// - Throws: XCTest assertion errors if the call fails or does not return an object.
     private func call(_ tool: String, _ arguments: [String: GmJsonValue]) throws -> [String: Any] {
         let response = try env.send(
             .mcpCall,
-            McpCallRequest(tool: tool, arguments: .object(arguments), identity: GmHarnessIdentity()),
+            McpCallRequest(tool: tool, identity: GmHarnessIdentity(), arguments: .object(arguments)),
             McpCallResponse.self
         )
         XCTAssertFalse(response.isError, "\(tool): \(response.text.prefix(300))")
@@ -368,8 +389,13 @@ final class CdeRankWireTests: KernelBackedTestCase {
         return try XCTUnwrap(object, "\(tool) did not render an object")
     }
 
-    /// One prompt per process carrying exactly one review finding and one
-    /// exploration finding, so a rank of one names every unranked row.
+    /// Creates a test fixture with a prompt and one review and exploration finding.
+    ///
+    /// Cached per process so a rank of one names every unranked row. Memoized in a static
+    /// variable to avoid redundant setup across test methods.
+    ///
+    /// - Returns: The seeded prompt, summary, and finding uuids.
+    /// - Throws: XCTest assertion errors if setup fails.
     private func seed() throws -> Seeded {
         if let seeded = Self.seeded { return seeded }
         let id = String(UUID().uuidString.prefix(8)).lowercased()
@@ -394,9 +420,9 @@ final class CdeRankWireTests: KernelBackedTestCase {
                 session: SessionContext(
                     code: "main",
                     name: "main",
+                    gmfsRelativeStoragePath: "projects/\(code)/instances/\(code)_1/sessions/main",
                     backstory: "",
-                    goal: "",
-                    gmfsRelativeStoragePath: "projects/\(code)/instances/\(code)_1/sessions/main"
+                    goal: ""
                 )
             ),
             ContextEnsureResponse.self
@@ -428,6 +454,10 @@ final class CdeRankWireTests: KernelBackedTestCase {
         return built
     }
 
+    /// Creates a review summary and a test finding for the given prompt.
+    /// - Parameter promptUuid: The prompt uuid to create a review for.
+    /// - Returns: A tuple of the review summary and finding uuids.
+    /// - Throws: Store or wire errors if creation fails.
     private func seedReview(_ promptUuid: String) throws -> (summaryUuid: String, findingUuid: String) {
         let review = try env.send(
             .reviewOpen,
@@ -448,6 +478,10 @@ final class CdeRankWireTests: KernelBackedTestCase {
         return (review.summary.uuid, finding.finding.uuid)
     }
 
+    /// Creates an exploration summary and a test finding for the given prompt.
+    /// - Parameter promptUuid: The prompt uuid to create an exploration for.
+    /// - Returns: The exploration finding uuid.
+    /// - Throws: Store or wire errors if creation fails.
     private func seedExploration(_ promptUuid: String) throws -> String {
         let explore = try env.send(
             .exploreOpen,

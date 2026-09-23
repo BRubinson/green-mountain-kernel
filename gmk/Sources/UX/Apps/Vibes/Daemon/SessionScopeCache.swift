@@ -2,13 +2,11 @@ import Foundation
 import Observation
 
 /// One `SessionScope` per session uuid, shared by every window showing that
-/// session and refcounted by the screens that hold it. This restores the
-/// invariant the old one-window-per-session `WindowGroup` dedupe provided by
-/// accident: the daemon-event routing registry and the per-prompt save actors
-/// assume a single owner per session/prompt. With the dedupe gone, that owner
-/// is the scope. (Draft boxes are deliberately NOT scope-owned: each pane
-/// registers its own uniquely-keyed box, and the shared actor's version check
-/// surfaces any cross-pane conflict.)
+/// session and refcounted by the screens that hold it.
+///
+/// This restores the invariant the old `WindowGroup` dedupe provided: a single
+/// owner per session/prompt for the daemon-event registry and save actors.
+/// (Draft boxes register independently per pane.)
 @MainActor
 final class SessionScopeCache {
     static let shared = SessionScopeCache()
@@ -19,15 +17,20 @@ final class SessionScopeCache {
     }
 
     private var entries: [String: Entry] = [:]
-    /// Retired scopes, newest last. Navigate-away-and-back revives the scope
-    /// with its prompt cache intact instead of paying a fresh SESSION_GET +
-    /// sequential prefetch.
+    /// Retired scopes, newest last.
+    ///
+    /// Navigate-away-and-back revives the scope with its prompt cache intact
+    /// instead of paying a fresh SESSION_GET + sequential prefetch.
     private var grace: [SessionScope] = []
     private let graceCap = 4
 
-    /// Create-or-return WITHOUT refcounting and WITHOUT promoting a graced
-    /// scope — safe to call from a View init (which SwiftUI may run
-    /// repeatedly). Only `acquire` moves scopes between states.
+    /// Returns a scope without refcounting or promoting from the grace list.
+    ///
+    /// Safe to call from a View init, which SwiftUI may run repeatedly. Only `acquire`
+    /// moves scopes between states.
+    ///
+    /// - Parameter sessionUuid: The session's UUID.
+    /// - Returns: The scope for this session, creating it if needed.
     func scope(for sessionUuid: String) -> SessionScope {
         if let entry = entries[sessionUuid] { return entry.scope }
         if let graced = grace.first(where: { $0.sessionUuid == sessionUuid }) {
@@ -38,6 +41,9 @@ final class SessionScopeCache {
         return fresh
     }
 
+    /// Acquires a scope reference, promoting from the grace list if needed.
+    ///
+    /// - Parameter sessionUuid: The session's UUID.
     func acquire(_ sessionUuid: String) {
         if entries[sessionUuid] != nil {
             entries[sessionUuid]?.refs += 1
@@ -51,6 +57,9 @@ final class SessionScopeCache {
         entries[sessionUuid] = Entry(scope: SessionScope(sessionUuid: sessionUuid), refs: 1)
     }
 
+    /// Releases a scope reference, moving it to the grace list when ref count reaches zero.
+    ///
+    /// - Parameter sessionUuid: The session's UUID.
     func release(_ sessionUuid: String) {
         guard var entry = entries[sessionUuid], entry.refs > 0 else {
             assertionFailure("unbalanced SessionScopeCache.release(\(sessionUuid))")
@@ -81,28 +90,44 @@ final class SessionScope {
     private var phaseStores: [String: PromptPhaseStore] = [:]
     private var dopeStore: DopeStore?
 
+    /// Creates a session scope with a new session store.
+    ///
+    /// - Parameter sessionUuid: The session's UUID.
     init(sessionUuid: String) {
         self.sessionUuid = sessionUuid
         self.store = SessionStore(sessionUuid: sessionUuid)
     }
 
-    /// Idempotent; keeps prompt-update events routing to this session. Owner-
-    /// token guarded so a stale unregister (from a retired predecessor) can
-    /// never kill a live successor's routing.
+    /// Registers prompt updates with the daemon.
+    ///
+    /// Idempotent; keeps prompt-update events routing to this session. Owner-token
+    /// guarded so a stale unregister cannot kill a live successor's routing.
+    ///
+    /// - Parameters:
+    ///   - promptUuids: The prompt UUIDs to register.
+    ///   - daemon: The daemon connection model.
     func registerPrompts(_ promptUuids: Set<String>, daemon: DaemonConnectionModel) {
         self.daemon = daemon
         daemon.registerSession(sessionUuid, promptUuids: promptUuids, owner: ObjectIdentifier(self))
     }
 
-    /// Called by the cache when the last holder releases the scope. Routing
-    /// stops; panes own their draft boxes and flushed on their own teardown.
+    /// Called by the cache when the last holder releases the scope.
+    ///
+    /// Routing stops; panes own their draft boxes and flush on teardown.
     func retire() {
         daemon?.unregisterSession(sessionUuid, ifOwnedBy: ObjectIdentifier(self))
     }
 
-    /// Memoized per prompt uuid so concurrent panes thread one version. The
-    /// version argument seeds a NEW actor only; an existing actor's threading
-    /// is authoritative (and `adoptVersion` is monotonic besides).
+    /// Returns the memoized save actor for a prompt.
+    ///
+    /// Concurrent panes thread one version through a single actor. The version
+    /// argument seeds a new actor only; an existing actor's threading is
+    /// authoritative (and `adoptVersion` is monotonic besides).
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The prompt's UUID.
+    ///   - version: The initial version for a new actor.
+    /// - Returns: The prompt's save actor.
     func saver(forPrompt promptUuid: String, version: Int64) -> PromptSaveActor {
         if let existing = savers[promptUuid] { return existing }
         let fresh = PromptSaveActor(promptUuid: promptUuid, version: version)
@@ -110,8 +135,13 @@ final class SessionScope {
         return fresh
     }
 
-    /// Memoized per prompt uuid — N panes on one prompt share one
-    /// CLARIFY_GET + ARCH_GET pair (and one summary-routing registration).
+    /// Returns the memoized phase store for a prompt.
+    ///
+    /// N panes on one prompt share one CLARIFY_GET + ARCH_GET pair (and one
+    /// summary-routing registration).
+    ///
+    /// - Parameter promptUuid: The prompt's UUID.
+    /// - Returns: The prompt's phase store.
     func phases(forPrompt promptUuid: String) -> PromptPhaseStore {
         if let existing = phaseStores[promptUuid] { return existing }
         let fresh = PromptPhaseStore(promptUuid: promptUuid)
@@ -119,14 +149,17 @@ final class SessionScope {
         return fresh
     }
 
-    /// Memoized per prompt uuid by delegation: the prompt's `PromptPhaseStore`
-    /// OWNS the model, so this is the SAME instance CLARIFY_GET calls `adopt`
-    /// on — one source of truth for every question's version cell, and no
-    /// second registry to keep in sync.
+    /// Returns the memoized answer model for a prompt's clarifications.
     ///
-    /// Reached through the scope so per-question drafts and version cells
-    /// survive pane navigation within a session: a half-typed answer must not
+    /// Memoized per prompt uuid by delegation: the prompt's `PromptPhaseStore` OWNS
+    /// the model, so this is the SAME instance CLARIFY_GET calls `adopt` on — one
+    /// source of truth for every question's version cell, and no second registry to
+    /// keep in sync. Reached through the scope so per-question drafts and version
+    /// cells survive pane navigation within a session: a half-typed answer must not
     /// evaporate because the user glanced at the architecture tab.
+    ///
+    /// - Parameter promptUuid: The prompt's UUID.
+    /// - Returns: The prompt's clarification answer model.
     func answers(forPrompt promptUuid: String) -> ClarificationAnswerModel {
         phases(forPrompt: promptUuid).answers
     }

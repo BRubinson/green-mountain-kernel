@@ -1,21 +1,25 @@
 import Foundation
 
-/// Compiled-in wire-protocol version. Bump whenever the wire shape changes.
-/// The handshake compares client and server values; mismatch handling is
-/// DIRECTIONAL: a newer client makes the (stale) daemon self-exit so the
-/// freshly built binary can take over, while an older client is merely
-/// rejected — the daemon stays up (an old pinned-Kit GMVibes must never be
-/// able to kill-loop a fresh daemon).
+/// Compiled-in wire-protocol version.
+///
+/// Bump whenever the wire shape changes. The handshake compares client and
+/// server values; mismatch handling is DIRECTIONAL: a newer client makes the
+/// (stale) daemon self-exit so the freshly built binary can take over, while
+/// an older client is merely rejected — the daemon stays up (an old pinned-Kit
+/// GMVibes must never be able to kill-loop a fresh daemon).
 enum GmWireProtocol {
     /// Bumped by a NEW message type, or by an incompatible change to an
-    /// existing one: a renamed field, or a REMOVED enum case. Additive
-    /// OPTIONAL fields do NOT bump — they decode safely in both directions.
-    /// Message types that land together share a single bump.
+    /// existing one: a renamed field, or a REMOVED enum case.
+    ///
+    /// Additive OPTIONAL fields do NOT bump — they decode safely in both
+    /// directions. Message types that land together share a single bump.
     static let version = 30
 }
 
-/// Discriminator for every NDJSON message on the socket. One case per spec
-/// message; each request type has its own handler in gm_daemon.
+/// Discriminator for every NDJSON message on the socket.
+///
+/// One case per spec message; each request type has its own handler in
+/// gm_daemon.
 enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     // Infra
     case hello = "HELLO"
@@ -215,9 +219,10 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
 }
 
 /// Version-first pre-head: `type` stays a RAW STRING so the protocol-version
-/// gate runs even for message names this build doesn't know. A newer client
-/// invoking a newer-only message must get PROTOCOL_MISMATCH (+ directional
-/// self-exit), not a decode failure — same forward-compat rule as
+/// gate runs even for message names this build doesn't know.
+///
+/// A newer client invoking a newer-only message must get PROTOCOL_MISMATCH (+
+/// directional self-exit), not a decode failure — same forward-compat rule as
 /// ErrorPayload.code and event kind. Narrow to MessageType only AFTER the
 /// version check; unknown-but-version-matched names get UNKNOWN_TYPE echoing
 /// the real request_id.
@@ -239,6 +244,12 @@ struct RawEnvelopeHead: Codable, Hashable, Sendable {
         case requestId
     }
 
+    /// Creates a raw envelope header with protocol version and message type.
+    ///
+    /// - Parameters:
+    ///   - protocolVersion: The wire protocol version.
+    ///   - typeRaw: The raw message type string.
+    ///   - requestId: Optional request identifier.
     init(
         protocolVersion: Int,
         typeRaw: String,
@@ -258,6 +269,12 @@ struct EnvelopeHead: Codable, Hashable, Sendable {
     let type: MessageType
     let requestId: String
 
+    /// Creates an envelope header for message routing and version negotiation.
+    ///
+    /// - Parameters:
+    ///   - protocolVersion: The wire protocol version.
+    ///   - type: The message type discriminator.
+    ///   - requestId: The request identifier.
     init(
         protocolVersion: Int,
         type: MessageType,
@@ -276,10 +293,16 @@ struct RequestEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
     let requestId: String
     let payload: Payload
 
+    /// Creates a request envelope with a message type and payload.
+    ///
+    /// - Parameters:
+    ///   - type: The message type.
+    ///   - payload: The request payload.
+    ///   - requestId: The request identifier; defaults to a new UUID.
     init(
         type: MessageType,
-        requestId: String = UUID().uuidString.lowercased(),
-        payload: Payload
+        payload: Payload,
+        requestId: String = UUID().uuidString.lowercased()
     ) {
         self.protocolVersion = GmWireProtocol.version
         self.type = type
@@ -298,6 +321,14 @@ struct ResponseEnvelope<Payload: Codable & Sendable>: Codable, Sendable {
     let payload: Payload?
     let error: ErrorPayload?
 
+    /// Creates a response envelope with a message type and result.
+    ///
+    /// - Parameters:
+    ///   - type: The message type.
+    ///   - requestId: The request identifier echoed from the request.
+    ///   - ok: True if the operation succeeded.
+    ///   - payload: The response payload, or nil on error.
+    ///   - error: The error details, or nil on success.
     init(
         type: MessageType,
         requestId: String,
@@ -353,6 +384,12 @@ struct ErrorPayload: Codable, Hashable, Sendable {
         case daemonProtocolVersion
     }
 
+    /// Creates an error payload with a code and message.
+    ///
+    /// - Parameters:
+    ///   - code: The error code.
+    ///   - message: The error message.
+    ///   - daemonProtocolVersion: The daemon's protocol version on mismatch.
     init(code: ErrorCode, message: String, daemonProtocolVersion: Int? = nil) {
         self.codeRaw = code.rawValue
         self.message = message
@@ -362,19 +399,33 @@ struct ErrorPayload: Codable, Hashable, Sendable {
 
 /// Payload type for responses that carry no data.
 struct EmptyPayload: Codable, Hashable, Sendable {
+    /// Creates an empty payload.
     init() {}
 }
 
 /// NDJSON framing helpers: one JSON document per `\n`-terminated line.
+///
 /// Coders come from WireCodec — the snake_case key strategies are the wire's
 /// entire casing contract now that types carry no CodingKeys.
 enum NDJSON {
+    /// Encodes a value as JSON and appends a newline terminator.
+    ///
+    /// - Parameter value: The value to encode.
+    /// - Returns: The encoded data with newline terminator.
+    /// - Throws: Encoding errors from the wire codec.
     static func encodeLine<T: Encodable>(_ value: T) throws -> Data {
         var data = try WireCodec.encoder.encode(value)
         data.append(0x0A)
         return data
     }
 
+    /// Decodes a JSON value from a newline-terminated line.
+    ///
+    /// - Parameters:
+    ///   - type: The type to decode.
+    ///   - line: The encoded line data.
+    /// - Returns: The decoded value.
+    /// - Throws: Decoding errors from the wire codec.
     static func decode<T: Decodable>(_ type: T.Type, from line: Data) throws -> T {
         try WireCodec.decoder.decode(type, from: line)
     }

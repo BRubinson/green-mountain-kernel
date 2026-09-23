@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `architecture_persistence_change` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `architecture_persistence_change` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct ArchitecturePersistenceChangeRecord: BaseRecordFields, TableRecord, SeqOrdered {
     static let databaseTableName = "architecture_persistence_change"
     var uuid: String

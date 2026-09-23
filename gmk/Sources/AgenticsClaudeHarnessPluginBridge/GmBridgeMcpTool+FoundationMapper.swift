@@ -3,6 +3,9 @@ import FoundationModels
 
 extension GmBridgeMcpTool {
 
+    /// Encodes a tool's parameters into a JSON schema.
+    /// - Parameter tool: The agent tool.
+    /// - Returns: A JSON value representing the schema, or an empty object schema if encoding fails.
     static func inputSchema(for tool: any GmAgentTool) -> GmBridgeJsonValue {
         guard
             let data = try? JSONEncoder().encode(tool.parameters),
@@ -13,8 +16,12 @@ extension GmBridgeMcpTool {
         return schema
     }
 
-    /// The tool's declared name IS the served name. The family is a grant
-    /// grouping, never a prefix — every name already spells its own family.
+    /// Creates a bridge tool from an agent tool.
+    ///
+    /// The tool's declared name is the served name; the family is a grant
+    /// grouping, never a prefix.
+    ///
+    /// - Parameter tool: The agent tool to wrap.
     init(_ tool: any GmAgentTool) {
         self.init(
             name: tool.name,

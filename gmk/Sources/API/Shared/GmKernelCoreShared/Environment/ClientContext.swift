@@ -11,6 +11,8 @@ import Foundation
 /// A client-context failure (not inside a git repo, detached HEAD, …).
 struct ClientContextError: Error, LocalizedError {
     let message: String
+    /// Creates a client context error with the given message.
+    /// - Parameter message: A description of the error condition.
     init(_ message: String) { self.message = message }
     var errorDescription: String? { message }
 }
@@ -35,20 +37,22 @@ struct GitContext {
         branch.replacingOccurrences(of: "/", with: "__")
     }
 
-    /// The calling process's own working directory — every interactive client
-    /// invocation.
+    /// Detects git context from the process's working directory.
+    /// - Returns: A git context with repo root, name, and branch.
+    /// - Throws: `ClientContextError` if not in a git repo or HEAD is detached.
     static func detect() throws -> GitContext {
         try detect(in: nil)
     }
 
-    /// Identity for a NAMED directory rather than the process's own cwd.
+    /// Detects git context from a named directory.
     ///
-    /// The hook family is the caller that needs this: a PostToolUse payload
-    /// carries the `cwd` the tool call ran in, and that — never the hook
-    /// process's inherited working directory — is the repo the change belongs
-    /// to. The two differ whenever the hook is launched from somewhere else,
-    /// and resolving against the wrong one files a change under another
-    /// repo's session.
+    /// Hooks use this to derive context from the tool call's working
+    /// directory rather than the hook process's own, ensuring changes are
+    /// filed under the correct repo's session.
+    /// - Parameter directory: The directory to detect context in, or nil for
+    ///   the process's own working directory.
+    /// - Returns: A git context with repo root, name, and branch.
+    /// - Throws: `ClientContextError` if not in a git repo or HEAD is detached.
     static func detect(in directory: String?) throws -> GitContext {
         let at = directory.map { ["-C", $0] } ?? []
         guard let repoRoot = runGit(at + ["rev-parse", "--show-toplevel"]) else {
@@ -68,12 +72,20 @@ struct GitContext {
         )
     }
 
+    /// Creates a git context with the given values.
+    /// - Parameters:
+    ///   - repoRoot: The absolute path to the repo root.
+    ///   - repoName: The repo name (basename of the root path).
+    ///   - branch: The current branch name.
     init(repoRoot: String, repoName: String, branch: String) {
         self.repoRoot = repoRoot
         self.repoName = repoName
         self.branch = branch
     }
 
+    /// Runs a git command and returns trimmed output.
+    /// - Parameter arguments: The git command arguments.
+    /// - Returns: The command output trimmed of whitespace, or nil on failure.
     private static func runGit(_ arguments: [String]) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
@@ -96,18 +108,26 @@ struct GitContext {
 }
 
 enum GmFsYaml {
-    /// The content root — `Paths.contentRoot`, never a second resolution of
-    /// it. Write containment is a prefix test against ONE root, and two roots
-    /// that are "always equal" are two roots that can disagree.
+    /// The content root — `Paths.contentRoot`, never a second resolution of it.
+    ///
+    /// Write containment is a prefix test against ONE root, and two roots that
+    /// are "always equal" are two roots that can disagree.
     static var root: URL { Paths.contentRoot }
 
-    /// Extract the first top-level `uuid:` from a gmfs data yaml, if present.
+    /// Extracts the first top-level `uuid:` value from a gmfs data yaml.
+    /// - Parameter relativePath: The relative path to the yaml file in gmfs.
+    /// - Returns: The uuid value, or nil if not present.
     static func uuid(_ relativePath: String) -> String? {
         scalar("uuid", relativePath)
     }
 
-    /// Extract the first top-level single-line scalar value for `key:` from a
-    /// gmfs data yaml, if present. Block scalars (|, >) are not resolved.
+    /// Extracts the first top-level scalar value for a key.
+    ///
+    /// Block scalars (|, >) are not resolved.
+    /// - Parameters:
+    ///   - key: The yaml key to extract the value for.
+    ///   - relativePath: The relative path to the yaml file in gmfs.
+    /// - Returns: The scalar value, or nil if not present.
     static func scalar(_ key: String, _ relativePath: String) -> String? {
         guard let text = try? String(contentsOf: root.appendingPathComponent(relativePath), encoding: .utf8) else {
             return nil
@@ -122,8 +142,13 @@ enum GmFsYaml {
         return nil
     }
 
-    /// Strip one layer of surrounding quotes — GMVibes' yaml encoder may quote
-    /// scalars, and a literal-quoted code would create a duplicate kbite row.
+    /// Removes one layer of surrounding quotes from a value.
+    ///
+    /// GMVibes' yaml encoder may quote scalars, and a literal-quoted code
+    /// would create a duplicate kbite row.
+    /// - Parameter value: A string that may be quoted.
+    /// - Returns: The string with outer quotes removed, or unchanged if not
+    ///   quoted.
     static func unquoted(_ value: String) -> String {
         var v = value
         if v.count >= 2,
@@ -136,21 +161,26 @@ enum GmFsYaml {
 }
 
 enum ContextBuilder {
-    /// Build the full CONTEXT_ENSURE payload from the working directory's git
-    /// identity plus whatever the gmfs tree already knows (uuids). Kbite
-    /// registries are db-native — no yaml kbite reads on this path.
+    /// Builds a CONTEXT_ENSURE payload from the process's git identity.
     ///
-    /// `claudeSessionId` is the SessionStart payload's conversation uuid. It
-    /// rides this request rather than a verb of its own, so the binding every
-    /// hook write resolves through is created by the same call that creates
-    /// the session it points at.
+    /// Kbite registries are db-native with no yaml kbite reads on this path.
+    /// The `claudeSessionId` is the SessionStart payload's conversation uuid,
+    /// bound by the same call that creates the session it points at.
+    /// - Parameter claudeSessionId: The Claude session id, or nil for none.
+    /// - Returns: A context ensure request with project, instance, and session.
+    /// - Throws: `ClientContextError` if not in a git repo or HEAD is detached.
     static func ensureRequest(claudeSessionId: String? = nil) throws -> ContextEnsureRequest {
         ensureRequest(for: try GitContext.detect(), claudeSessionId: claudeSessionId)
     }
 
-    /// The same payload for an ALREADY-RESOLVED identity — the hook path,
-    /// which derives its git context from the payload's cwd and must not
-    /// re-derive it from the hook process's own.
+    /// Builds a CONTEXT_ENSURE payload for an already-resolved git identity.
+    ///
+    /// The hook path uses this when the payload's cwd is available and must
+    /// not re-derive context from the hook process's own working directory.
+    /// - Parameters:
+    ///   - git: The git context to build the payload for.
+    ///   - claudeSessionId: The Claude session id, or nil for none.
+    /// - Returns: A context ensure request with project, instance, and session.
     static func ensureRequest(
         for git: GitContext,
         claudeSessionId: String? = nil
@@ -183,14 +213,12 @@ enum ContextBuilder {
         )
     }
 
-    /// Idempotent resolve: ensure the chain and return the session uuid.
-    /// Used by session/prompt subcommands when no --session-uuid is given.
+    /// Ensures the context chain and returns the session UUID.
     ///
-    /// Takes `any GmVerbCaller` rather than `DaemonClient` (v30) because the pen
-    /// tool bodies that call it now run kernel-side as well as over the socket.
-    /// The body is one facade call, and the facade hangs off the protocol — so
-    /// widening the parameter costs nothing and every existing caller still
-    /// passes a `DaemonClient`.
+    /// Used by session/prompt subcommands when no --session-uuid is given.
+    /// - Parameter client: A verb caller with the ensureContext method.
+    /// - Returns: The session UUID from the context ensure response.
+    /// - Throws: `ClientContextError` if not in a git repo or HEAD is detached.
     static func resolveSessionUuid(_ client: any GmVerbCaller) throws -> String {
         try client.ensureContext(try ensureRequest()).sessionUuid
     }
@@ -198,13 +226,18 @@ enum ContextBuilder {
 
 /// The calling Claude Code instance's identity, resolved from process
 /// ancestry: walk parents to the nearest `claude` process and key on its pid
-/// plus start time, which defeats pid reuse. Everything that instance spawns
-/// resolves the SAME key, while a second instance on the same GMCC session
-/// resolves a different one, so the activation registry can hold several
-/// active prompts per session without last-writer-wins clobbering. nil when
-/// no claude ancestor exists: callers omit the key and the daemon falls back
-/// to the session's single activation when unambiguous.
+/// plus start time, which defeats pid reuse.
+///
+/// Everything spawned by this instance resolves the SAME key, allowing multiple
+/// active prompts per session without last-writer-wins clobbering. nil when no
+/// claude ancestor exists; omit the key and fall back to session-single activation.
 enum ClientKey {
+    /// Resolves the Claude Code instance key from process ancestry.
+    ///
+    /// Returns a key based on the nearest `claude` process pid and start
+    /// time, allowing multiple active prompts per session without clobbering.
+    /// - Returns: A key in the format `claude:<pid>:<start_time>`, or nil if
+    ///   no Claude ancestor exists.
     static func resolve() -> String? {
         var pid = getpid()
         var hops = 0
@@ -224,6 +257,9 @@ enum ClientKey {
         return nil
     }
 
+    /// Gets process information for a process ID.
+    /// - Parameter pid: The process ID.
+    /// - Returns: A kinfo_proc structure with process info, or nil on failure.
     private static func procInfo(_ pid: pid_t) -> kinfo_proc? {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
         var info = kinfo_proc()

@@ -110,6 +110,32 @@ struct GmAgentCdeRpirReviewArguments: Sendable {
     @Guide(description: "Page budget in bytes, default 30000 and max 45000.")
     var page_bytes: Int?
 
+    /// Creates the review tool arguments from the provided parameters.
+    ///
+    /// - Parameters:
+    ///   - op: The operation: open, write, rank, complete, resolve, or get.
+    ///   - prompt_uuid: The prompt UUID for open operations.
+    ///   - summary_uuid: The review summary UUID.
+    ///   - expected_version: Version number for conflict detection.
+    ///   - agent_name: The writing agent's name.
+    ///   - agent_id: The writing agent's ID.
+    ///   - kind: The finding kind.
+    ///   - title: The finding title.
+    ///   - body: The finding body text.
+    ///   - file_path: Source file path for the finding.
+    ///   - line_start: Starting line number.
+    ///   - line_end: Ending line number.
+    ///   - rating: Single finding rating (0–999).
+    ///   - ratings: Batch ratings from cross-agent calibration.
+    ///   - overview: Review summary overview text.
+    ///   - verdict: Review verdict text.
+    ///   - finding_uuid: UUID of a single finding to resolve.
+    ///   - status: New status for a finding (e.g., "fixed", "accepted").
+    ///   - full: Include all findings or none in the response.
+    ///   - max_rating: Maximum rating to include in the response.
+    ///   - rating_range: Rating range filter as a string.
+    ///   - cursor: Pagination cursor for results.
+    ///   - page_bytes: Page budget in bytes.
     init(
         op: String,
         prompt_uuid: String? = nil,
@@ -178,56 +204,56 @@ struct GmAgentCdeRpirReviewTool: GmAgentRpirTool {
         GmAgentToolOp(
             Op.open,
             verbs: [.reviewOpen],
-            requiredParams: ["prompt_uuid"],
             summary: """
                 Open the prompt's review summary. Like the other summaries, opened \
                 explicitly rather than as a side effect of a status move.
-                """
+                """,
+            requiredParams: ["prompt_uuid"]
         ),
         GmAgentToolOp(
             Op.write,
             verbs: [.reviewFindingAdd],
-            requiredParams: ["summary_uuid", "kind", "title", "body", "agent_name"],
-            summary: "Insert ONE review finding, self-rated 0 = critical … 999 = ignore."
+            summary: "Insert ONE review finding, self-rated 0 = critical … 999 = ignore.",
+            requiredParams: ["summary_uuid", "kind", "title", "body", "agent_name"]
         ),
         GmAgentToolOp(
             Op.rank,
             verbs: [.reviewRank],
-            requiredParams: ["summary_uuid", "ratings"],
             summary: """
                 Apply the calibrated rating batch. Version-less and atomic: ranking is \
                 CROSS-AGENT calibration and belongs to one reader, so an agent rates only \
                 its own findings and never calls this. Primary only.
-                """
+                """,
+            requiredParams: ["summary_uuid", "ratings"]
         ),
         GmAgentToolOp(
             Op.complete,
             verbs: [.reviewComplete],
-            requiredParams: ["summary_uuid", "expected_version", "overview", "verdict"],
-            summary: "Seal the review with its overview and verdict."
+            summary: "Seal the review with its overview and verdict.",
+            requiredParams: ["summary_uuid", "expected_version", "overview", "verdict"]
         ),
         GmAgentToolOp(
             Op.resolve,
             verbs: [.reviewResolve],
-            requiredParams: ["finding_uuid", "expected_version", "status"],
             summary: """
                 Resolve ONE finding during the fix loop. `open` is deliberately not \
                 accepted — it is the initial state, so resolving TO it would move \
                 backwards through an append-only record.
-                """
+                """,
+            requiredParams: ["finding_uuid", "expected_version", "status"]
         ),
         GmAgentToolOp(
             Op.get,
             verbs: [.reviewGet],
+            summary: """
+                The prompt's review record: summary, findings inside the rating window, \
+                stubs outside it. Same window semantics as cde_rpir_explore op=get.
+                """,
             narrowing: CdeNarrowing(
                 parameters: ["cursor", "page_bytes", "finding_uuid"],
                 retryWith: "cde_rpir_review op=get with cursor = page.next_cursor; finding_uuid for one body"
             ),
-            requiredParams: [],
-            summary: """
-                The prompt's review record: summary, findings inside the rating window, \
-                stubs outside it. Same window semantics as cde_rpir_explore op=get.
-                """
+            requiredParams: []
         ),
     ]
 
@@ -243,5 +269,6 @@ struct GmAgentCdeRpirReviewTool: GmAgentRpirTool {
         Pick the part with `op`.
         """
 
+    /// Creates the review tool instance.
     init() {}
 }

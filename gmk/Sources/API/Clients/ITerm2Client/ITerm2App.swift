@@ -9,6 +9,10 @@ enum ITerm2App {
 
     static var socketPath: String { SocketConnection.socketPath() }
 
+    /// Fetches the URL of the installed iTerm2 application.
+    ///
+    /// - Returns: The file URL to the iTerm2 app bundle.
+    /// - Throws: `ITerm2Error` if the app is not installed or inaccessible.
     static func appURL() throws(ITerm2Error) -> URL {
         do {
             return try app.url()
@@ -17,6 +21,12 @@ enum ITerm2App {
         }
     }
 
+    /// Ensures iTerm2 is running and its API server is listening.
+    ///
+    /// Launches the app if needed and waits for the socket to become available.
+    ///
+    /// - Parameter progress: A callback to report launch stages.
+    /// - Throws: `ITerm2Error` on launch failures or timeout.
     static func ensureRunning(
         progress: @Sendable (LaunchStage) -> Void = { _ in }
     ) async throws(ITerm2Error) {
@@ -45,10 +55,15 @@ enum ITerm2App {
         }
     }
 
+    /// Brings iTerm2 to the foreground.
     static func activate() {
         app.activate()
     }
 
+    /// Maps an external app error to an iTerm2 error.
+    ///
+    /// - Parameter error: The external app error to map.
+    /// - Returns: The corresponding iTerm2 error.
     private static func mapped(_ error: ExternalAppError) -> ITerm2Error {
         switch error {
         case .notInstalled:

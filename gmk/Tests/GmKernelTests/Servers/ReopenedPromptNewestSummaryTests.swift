@@ -12,8 +12,14 @@ import XCTest
 /// re-opened prompt resolves one summary set across CLARIFY_GET / ARCH_GET / NEXT.
 final class ReopenedPromptNewestSummaryTests: KernelBackedTestCase {
 
-    /// Mint a project + session to hang a prompt off, uniquely named so cases
-    /// cannot collide no matter what order they run in.
+    /// Creates a session for a test, uniquely named.
+    ///
+    /// Mints a project and session to hang a prompt off so test cases cannot
+    /// collide no matter what order they run in.
+    ///
+    /// - Parameter label: A label to make the session unique.
+    /// - Returns: The session identifier.
+    /// - Throws: Errors from creating the project/session or network calls.
     private func makeSession(_ label: String) throws -> String {
         let id = String(UUID().uuidString.prefix(8)).lowercased()
         let code = "t_\(label)_\(id)"
@@ -38,9 +44,9 @@ final class ReopenedPromptNewestSummaryTests: KernelBackedTestCase {
                 session: SessionContext(
                     code: "main",
                     name: "main",
+                    gmfsRelativeStoragePath: "projects/\(code)/instances/\(code)_1/sessions/main",
                     backstory: "",
-                    goal: "",
-                    gmfsRelativeStoragePath: "projects/\(code)/instances/\(code)_1/sessions/main"
+                    goal: ""
                 )
             ),
             ContextEnsureResponse.self
@@ -48,8 +54,14 @@ final class ReopenedPromptNewestSummaryTests: KernelBackedTestCase {
         return response.sessionUuid
     }
 
-    /// The prompt's current version, re-read before every status move —
-    /// BRIEFING_OPEN bumps it out from under a cached row.
+    /// The prompt's current version.
+    ///
+    /// Re-read before every status move; BRIEFING_OPEN bumps it out from
+    /// under a cached row.
+    ///
+    /// - Parameter promptUuid: The prompt identifier.
+    /// - Returns: The current version of the prompt.
+    /// - Throws: Errors from network calls.
     private func promptVersion(_ promptUuid: String) throws -> Int64 {
         try env.send(
             .promptGet,
@@ -59,6 +71,12 @@ final class ReopenedPromptNewestSummaryTests: KernelBackedTestCase {
         .prompt.version
     }
 
+    /// Sets the prompt's status after reading its current version.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The prompt identifier.
+    ///   - status: The new status.
+    /// - Throws: Errors from reading the version or setting status.
     private func setStatus(_ promptUuid: String, _ status: PromptStatus) throws {
         _ = try env.send(
             .promptSetStatus,
@@ -71,6 +89,13 @@ final class ReopenedPromptNewestSummaryTests: KernelBackedTestCase {
         )
     }
 
+    /// Returns the count of summary rows for a prompt in a table.
+    ///
+    /// - Parameters:
+    ///   - table: The table name to query.
+    ///   - promptUuid: The prompt identifier.
+    /// - Returns: The count of matching rows.
+    /// - Throws: Errors from database access.
     private func summaryCount(table: String, promptUuid: String) throws -> Int {
         let db = try env.readOnlyDatabase()
         return try db.read {
@@ -103,7 +128,7 @@ final class ReopenedPromptNewestSummaryTests: KernelBackedTestCase {
         )
         let briefing1 = try env.send(
             .briefingOpen,
-            BriefingOpenRequest(promptUuid: prompt.uuid, briefingForStep: "initial"),
+            BriefingOpenRequest(briefingForStep: "initial", promptUuid: prompt.uuid),
             BriefingRowResponse.self
         )
         XCTAssertTrue(briefing1.created)
@@ -131,7 +156,7 @@ final class ReopenedPromptNewestSummaryTests: KernelBackedTestCase {
         // class note), which is exactly why `created` must read false here.
         let briefing2 = try env.send(
             .briefingOpen,
-            BriefingOpenRequest(promptUuid: prompt.uuid, briefingForStep: "initial"),
+            BriefingOpenRequest(briefingForStep: "initial", promptUuid: prompt.uuid),
             BriefingRowResponse.self
         )
         XCTAssertFalse(briefing2.created, "BRIEFING_OPEN resets, never duplicates")

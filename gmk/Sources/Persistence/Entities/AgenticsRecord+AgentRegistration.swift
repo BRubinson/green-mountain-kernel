@@ -8,8 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `agent_registration` table. Columns map via
-/// convertFromSnakeCase.
+/// Read-side mirror of the `agent_registration` table.
+///
+/// Columns map via convertFromSnakeCase.
 ///
 /// Every column but agent_id is optional because the row is written by two
 /// parties that never coordinate — the identity half from a payload, the

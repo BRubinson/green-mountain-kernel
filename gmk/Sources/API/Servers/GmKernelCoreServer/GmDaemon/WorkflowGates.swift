@@ -1,24 +1,28 @@
 import Foundation
 import GRDB
 
-/// The two phase-exit contracts: what "implementation is finished" and "the
-/// review fix loop is finished" mean in db evidence. ADVISORY ONLY — derivePhase
-/// appends these strings, prefixed `advisory: `, to the blockers it reports.
-/// They read as the NEXT phase's entry contract because gate logic is ENTRY-only
-/// and derivePhase walks the phases in REVERSE. DO NOT MOVE THEM INTO
-/// entryBlockers: an entry blocker on `.done` derives an already-done prompt
-/// with open sub-100 findings BACKWARDS to `.reviewFix`. derivePhase is on
-/// `FileChangeRepository.add`'s hot path, so the call site opts in.
+/// The two phase-exit contracts: what "implementation is finished" and "the review fix loop
+/// is finished" mean in db evidence.
+///
+/// ADVISORY ONLY. Appended to blockers prefixed `advisory: `. Do not move into entryBlockers:
+/// an entry blocker on `.done` would derive an already-done prompt backwards to `.reviewFix`.
+/// On hot path (from `FileChangeRepository.add`), so opt-in.
 enum WorkflowGates {
 
-    /// The IMPLEMENT exit contract, read as REVIEW's entry contract.
+    /// Returns unmet conditions blocking transition from IMPLEMENT to REVIEW.
     ///
+    /// The IMPLEMENT exit contract, read as REVIEW's entry contract.
     /// Three questions against the plan of record: every planned persistence
     /// change has at least one recorded `file_change` against its path;
     /// persistence-first ordering was not violated, where `nil` passes
     /// vacuously; and the plan carries general change rows while the prompt
     /// recorded NO file changes at all. That last one stops the predicate being
     /// vacuous for every plan with no persistence changes. Empty = nothing to say.
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - promptUuid: The prompt uuid to check.
+    /// - Returns: Array of human-readable unmet condition descriptions.
+    /// - Throws: Database errors from queries.
     static func implementExitUnmet(_ db: Database, promptUuid: String) throws -> [String] {
         var unmet: [String] = []
 
@@ -119,14 +123,21 @@ enum WorkflowGates {
         return unmet
     }
 
+    /// Returns unmet conditions blocking transition from REVIEW_FIX to DONE.
+    ///
     /// The REVIEW_FIX exit contract, read as DONE's entry contract: no open
     /// finding rated below the read threshold (0 = critical, 999 = tombstone,
     /// 100 = the read threshold — the polarity is inverted from the retired
-    /// 1-8 scale). Unranked findings carry a NULL rating and are deliberately
-    /// not counted here; ranking them is the review rank pass's job, and a prompt
-    /// cannot reach review_fix without the review being complete.
+    /// 1-8 scale).
     ///
-    /// Empty = nothing to say.
+    /// Unranked findings carry a NULL rating and are deliberately not counted
+    /// here; ranking them is the review rank pass's job, and a prompt cannot
+    /// reach review_fix without the review being complete. Empty = nothing to say.
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - promptUuid: The prompt uuid to check.
+    /// - Returns: Array of human-readable unmet condition descriptions.
+    /// - Throws: Database errors from queries.
     static func reviewFixExitUnmet(_ db: Database, promptUuid: String) throws -> [String] {
         let open =
             try Int.fetchOne(

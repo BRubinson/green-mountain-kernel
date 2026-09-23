@@ -60,6 +60,28 @@ enum GmBridgeCommand {
 
         var body: String
 
+        /// Creates a new command definition.
+        /// - Parameters:
+        ///   - name: The command name.
+        ///   - description: A brief description of what the command does.
+        ///   - whenToUse: Guidance on when to invoke this command.
+        ///   - argumentHint: A short hint about expected arguments.
+        ///   - arguments: List of argument names.
+        ///   - disableModelInvocation: Whether to disable model invocation.
+        ///   - userInvocable: Whether users can invoke this command.
+        ///   - allowedTools: Tools this command is allowed to use.
+        ///   - disallowedTools: Tools this command cannot use.
+        ///   - model: The model to use for invocation.
+        ///   - effort: The reasoning effort level.
+        ///   - context: The execution context.
+        ///   - agent: The agent type if applicable.
+        ///   - background: Whether to run in the background.
+        ///   - hooks: Hook configurations keyed by hook name.
+        ///   - shell: The shell to execute in.
+        ///   - metadata: Custom metadata key-value pairs.
+        ///   - license: The license type.
+        ///   - compatibility: Version compatibility information.
+        ///   - body: The command body or description text.
         init(
             name: String,
             description: String? = nil,
@@ -116,6 +138,9 @@ enum GmBridgeCommand {
             body.isEmpty
         }
 
+        /// Renders the command definition as YAML frontmatter plus body.
+        /// - Returns: The rendered command file, or nil if the body is empty.
+        /// - Throws: A formatting error if YAML rendering fails.
         func contents() throws -> String? {
             guard !isEmpty else { return nil }
 

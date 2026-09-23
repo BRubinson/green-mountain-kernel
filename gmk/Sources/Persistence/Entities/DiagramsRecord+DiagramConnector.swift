@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `diagram_connector` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `diagram_connector` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DiagramConnectorRecord: DiagramSubtypeRecord, TableRecord {
     static let databaseTableName = "diagram_connector"
 

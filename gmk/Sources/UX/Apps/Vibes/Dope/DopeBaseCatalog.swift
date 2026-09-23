@@ -3,6 +3,7 @@ import SwiftUI
 /// Cross-domain index over ONE already-loaded `DopeScopeTree`: entity ref
 /// (`domain.entity`) → node, base-domain classification, and the inherited
 /// property set an entity composes through its `base_composable_ref` chain.
+///
 /// A pure client-side derivation, rebuilt per `DopeTreeView` body pass for the
 /// same staleness reason as `DopeEnumCatalog`.
 struct DopeBaseCatalog: Equatable {
@@ -22,6 +23,9 @@ struct DopeBaseCatalog: Equatable {
     /// The empty catalog — the default for previews and the not-yet-loaded case.
     init() {}
 
+    /// Initializes the catalog from a scope tree.
+    ///
+    /// - Parameter tree: The scope tree to index.
     init(tree: DopeScopeTree) {
         for domain in tree.domains {
             for entity in domain.entities {
@@ -34,21 +38,28 @@ struct DopeBaseCatalog: Equatable {
         }
     }
 
-    /// Base domain = holds at least one BASE_COMPOSABLE entity. Mixed domains
-    /// count as base (user-confirmed rule).
+    /// Base domain = holds at least one BASE_COMPOSABLE entity.
+    ///
+    /// Mixed domains count as base (user-confirmed rule).
+    ///
+    /// - Parameter domain: The domain to check.
+    /// - Returns: `true` if the domain contains a base-composable entity.
     static func isBaseDomain(_ domain: DopePersistenceNode) -> Bool {
         domain.entities.contains {
             $0.body.entityType == DopeEntityType.baseComposable.rawValue
         }
     }
 
-    /// The full effective inherited set for `entity`, walking its
-    /// `base_composable_ref` chain (daemon-guaranteed acyclic; a visited set
-    /// guards against a malformed tree anyway). Union in chain order with the
-    /// shadow dedupe: an inherited property is suppressed when a local row
-    /// materializes it (`base_origin_ref` equals its full path), when a local
-    /// row already carries the same code, or when a nearer chain link already
-    /// contributed that code.
+    /// Returns the full effective inherited property set for an entity.
+    ///
+    /// Walks the entity's `base_composable_ref` chain. The daemon guarantees
+    /// acyclicity; a visited set guards against malformed trees. Properties are
+    /// deduped: inherited properties are suppressed when a local row materializes
+    /// it (matching `base_origin_ref`), or when a local row or nearer chain link
+    /// already contributed that code.
+    ///
+    /// - Parameter entity: The entity to collect inherited properties for.
+    /// - Returns: Array of inherited properties, deduplicated and in chain order.
     func inheritedProperties(for entity: DopeEntityNode) -> [InheritedProperty] {
         let materializedOrigins = Set(entity.properties.compactMap(\.body.baseOriginRef))
         var seenCodes = Set(entity.properties.map(\.body.code))

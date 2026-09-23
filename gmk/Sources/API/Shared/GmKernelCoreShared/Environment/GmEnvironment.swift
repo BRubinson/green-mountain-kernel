@@ -1,32 +1,36 @@
 import Foundation
 
-/// Single home for the SessionStart env contract: the emitted line set, the
-/// PATH resolution rule, the installable shim text, and the env-vs-db
-/// consistency check. Kit-level so GMVibes can adopt the same resolution
-/// without a second implementation.
+/// Single home for SessionStart env contract: emitted line set, PATH resolution
+/// rule, installable shim text, env-vs-db consistency check.
 ///
-/// `emit` is socket-free by construction — every value comes from
-/// ProcessInfo/Paths (plus an optional db-provided gmfs root the caller
-/// fetched best-effort). Only `check` needs a daemon response.
+/// Kit-level so GMVibes adopts the same resolution without duplication. `emit`
+/// is socket-free (all values from ProcessInfo/Paths plus optional db-provided
+/// gmfs root caller fetched). Only `check` needs daemon response.
 enum GmEnvironment {
 
     struct Finding {
         let code: String
         let message: String
+        /// Creates a finding with a code and message.
+        ///
+        /// - Parameters:
+        ///   - code: A machine-readable error code.
+        ///   - message: A human-readable message.
         init(code: String, message: String) {
             self.code = code
             self.message = message
         }
     }
 
-    /// The daemon-free root resolution used when the db value is unavailable.
+    /// Resolves the gmfs root when the daemon value is unavailable.
     ///
-    /// The ambient case DELEGATES TO `Paths.root` rather than re-deriving it;
-    /// one resolver cannot disagree with itself, and a second would let a
-    /// shell-facing surface report one root while the process writes another.
-    /// The explicit-`env` path stays env-only: a caller passing a dictionary
-    /// is asking what a session with THAT environment would resolve, and
-    /// answering from this process's bundle would ignore the question.
+    /// The ambient case delegates to `Paths.root` rather than re-deriving it.
+    /// With an explicit environment dictionary, checks that dictionary only.
+    /// Prefers `GM_FS_ROOT` env var, falls back to the default production root.
+    ///
+    /// - Parameter env: Environment dictionary to use, or `nil` for the process
+    ///   environment (which returns `Paths.root`).
+    /// - Returns: The resolved gmfs root URL.
     static func fallbackFsRoot(
         env: [String: String]? = nil
     ) -> URL {
@@ -37,14 +41,19 @@ enum GmEnvironment {
         return Paths.defaultProductionRoot
     }
 
-    /// The full CLAUDE_ENV_FILE line set — one `export KEY='VALUE'` per line.
+    /// Builds the CLAUDE_ENV_FILE shell script line set.
     ///
-    /// CLAUDE_ENV_FILE is a shell script run as a preamble before every Bash
-    /// command, so both halves of the shape are load-bearing. `export`,
-    /// because a bare assignment sets a shell variable no child inherits.
-    /// Single quotes, because an unquoted value stops at the first space and a
-    /// PATH component holding one truncates the assignment. Passing `dbFsRoot`
-    /// makes the env/db match invariant true by construction.
+    /// Produces one `export KEY='VALUE'` per line for the shell preamble.
+    /// Uses `export` to make variables inheritable and single quotes to protect
+    /// values with spaces. Passing `dbFsRoot` makes the env/db match invariant true.
+    ///
+    /// - Parameters:
+    ///   - pluginRoot: The plugin directory path.
+    ///   - inheritedPath: The current `PATH` value.
+    ///   - dbFsRoot: The daemon-provided gmfs root, or `nil` to use fallback.
+    ///   - env: The environment dictionary; defaults to the process environment.
+    ///   - bin: The runtime bin URL; defaults to `Paths.bin`.
+    /// - Returns: Lines of `export KEY='VALUE'` statements.
     static func emit(
         pluginRoot: String,
         inheritedPath: String,
@@ -68,17 +77,28 @@ enum GmEnvironment {
         return pairs.map { "export \($0.0)=\(shellQuote($0.1))" }
     }
 
-    /// POSIX single-quote escaping: wrap in `'`, and close/escape/reopen for
-    /// every embedded `'`. Safe for every byte a path can hold except a
-    /// newline, which no env value here can contain.
+    /// Escapes a value for use in POSIX single-quoted shell context.
+    ///
+    /// Wraps in single quotes and closes/escapes/reopens for each embedded
+    /// single quote. Safe for all path bytes except newlines, which cannot appear
+    /// in environment values here.
+    ///
+    /// - Parameter value: The value to escape.
+    /// - Returns: The quoted and escaped value.
     static func shellQuote(_ value: String) -> String {
         "'" + value.replacingOccurrences(of: "'", with: #"'\''"#) + "'"
     }
 
-    /// Our bins first, in order, deduped: prepend each and drop any other
-    /// component that already points at one, so re-boots are idempotent and a
-    /// stale leading entry can never win a bare binary name over the install
-    /// this session is actually running.
+    /// Builds a deduped PATH value with plugin bins first.
+    ///
+    /// Prepends bins in order and removes any existing PATH components that point
+    /// to them. Makes re-boots idempotent; prevents stale entries from shadowing
+    /// the current install.
+    ///
+    /// - Parameters:
+    ///   - current: The current `PATH` value.
+    ///   - bins: Plugin bin directories, in priority order.
+    /// - Returns: The deduplicated PATH value.
     static func pathValue(current: String, bins: [URL] = [Paths.bin]) -> String {
         let mine = bins.map(\.path)
         let survivors =
@@ -89,14 +109,17 @@ enum GmEnvironment {
         return (mine + survivors).joined(separator: ":")
     }
 
-    /// Env-vs-db agreement: the db is the source, the env is the claim.
+    /// Checks that the environment and database gmfs root values agree.
     ///
-    /// ONE comparison against one always-present var and one config row, which
-    /// is a check that cannot quietly stop running. `env` is injectable
-    /// because the claim is an INPUT here — reading the process environment
-    /// would make the mismatch assertion conditional on the runtime being
-    /// installed, and a check that silently stops asserting is worse than one
-    /// that fails.
+    /// The database is the source of truth. The environment variable is the
+    /// claimed value. Compares one var against one config row; an injectable env
+    /// parameter prevents the check from silently stopping when the runtime is
+    /// not installed.
+    ///
+    /// - Parameters:
+    ///   - paths: The paths configuration from the daemon.
+    ///   - env: Environment dictionary to check; defaults to the process environment.
+    /// - Returns: Findings for any mismatches found.
     static func check(
         _ paths: PathsGetResponse,
         env: [String: String] = ProcessInfo.processInfo.environment
@@ -120,7 +143,9 @@ enum GmEnvironment {
         return findings
     }
 
-    /// The installable resolver shim. Resolves at CALL time rather than baking
+    /// The installable resolver shim.
+    ///
+    /// Resolves at CALL time rather than baking
     /// a path in, so one installed shim keeps working across upgrades and
     /// rollbacks — the release store swaps what `bin/` points at, and this
     /// follows it. The SessionStart hook sets GM_FS_ROOT.

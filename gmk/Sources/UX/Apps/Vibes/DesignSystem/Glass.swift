@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Shared visual language, ported from the ForgeApprentice (macOS) landing.
+///
 /// Literals are deliberate copies — the two apps speak the same Liquid Glass
 /// dialect and this file is the single place the brand look lives.
 enum Brand {
@@ -52,7 +53,9 @@ struct CapsuleSearchField: View {
     let prompt: String
     @Binding var text: String
     /// Optional external focus — the ⌘K palette must own first responder on
-    /// open. Defaulted so existing call sites compile unchanged.
+    /// open.
+    ///
+    /// Defaulted so existing call sites compile unchanged.
     var focus: FocusState<Bool>.Binding?
 
     var body: some View {
@@ -86,8 +89,15 @@ struct CapsuleSearchField: View {
 }
 
 extension View {
+    /// Adds an animated state-border stroke to the view.
+    ///
     /// The TabButton state-border idiom: an ALWAYS-PRESENT strokeBorder whose
     /// opacity animates 0→0.9 — state changes never shift layout.
+    /// - Parameters:
+    ///   - color: The color of the border stroke.
+    ///   - active: True to show the border at full opacity, false for zero opacity.
+    ///   - cornerRadius: The radius for rounded corners.
+    /// - Returns: The modified view with animated state border overlay.
     func stateBorder(_ color: Color, active: Bool, cornerRadius: CGFloat) -> some View {
         overlay {
             RoundedRectangle(cornerRadius: cornerRadius)

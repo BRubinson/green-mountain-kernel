@@ -26,6 +26,13 @@ enum GmBridgeMonitor {
 
         var when: When?
 
+        /// Creates a monitor entry with command, name, and optional trigger.
+        ///
+        /// - Parameters:
+        ///   - name: The monitor's display name.
+        ///   - command: The command to run when triggered.
+        ///   - description: A description of what the monitor does.
+        ///   - when: When to run the monitor; defaults to nil.
         init(
             name: String,
             command: String,
@@ -45,6 +52,10 @@ enum GmBridgeMonitor {
             case when
         }
 
+        /// Encodes the monitor entry to the given encoder.
+        ///
+        /// - Parameter encoder: The encoder to encode into.
+        /// - Throws: `EncodingError` if encoding fails.
         func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(name, forKey: .name)
@@ -60,6 +71,9 @@ enum GmBridgeMonitor {
 
         var monitors: [Entry]
 
+        /// Creates a monitors file with the given entries.
+        ///
+        /// - Parameter monitors: The monitor entries to include.
         init(monitors: [Entry]) {
             self.monitors = monitors
         }
@@ -68,6 +82,10 @@ enum GmBridgeMonitor {
             monitors.isEmpty
         }
 
+        /// Encodes the monitors file to the given encoder.
+        ///
+        /// - Parameter encoder: The encoder to encode into.
+        /// - Throws: `EncodingError` if encoding fails.
         func encode(to encoder: Encoder) throws {
             var container = encoder.singleValueContainer()
             try container.encode(monitors)

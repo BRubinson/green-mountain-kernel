@@ -29,12 +29,12 @@ let GM_CONCEPT_GMCC = """
 
 extension GmBridgeResource {
 
-    /// The reference index for one skill, as markdown bullets.
+    /// Returns the reference index for a skill as markdown bullets.
     ///
-    /// Sorted by path so the skill body is stable across regenerations — an
-    /// unordered index makes every rebuild look like a content change.
-    /// A resource with no `summary` is still listed: an unexplained door beats a
-    /// hidden one, and the blank is visible pressure to write the line.
+    /// Sorted by path for stable rebuilds. Resources with no summary are still listed with "(no summary)".
+    ///
+    /// - Parameter skill: The skill name to build the index for.
+    /// - Returns: A markdown-formatted bullet list of references.
     static func index(for skill: String) -> String {
         all.filter { $0.skill == skill }
             .sorted { $0.path < $1.path }

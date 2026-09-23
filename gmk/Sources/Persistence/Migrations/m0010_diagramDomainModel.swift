@@ -10,6 +10,9 @@ extension Migrations {
     // FKs: DOPE_INGEST re-mints every child uuid, so a uuid FK would dangle, and
     // a dangling code is a legal renderable state. Vertex FKs target the subtype
     // table's UNIQUE element_uuid, so a vertex can only hang off a stroke.
+    /// Registers the diagram domain model migration.
+    ///
+    /// - Parameter migrator: The database migrator to register with.
     static func m0010_diagramDomainModel(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0010_diagramDomainModel") { db in
             try db.execute(

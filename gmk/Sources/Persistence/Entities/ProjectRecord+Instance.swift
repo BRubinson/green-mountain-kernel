@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `instance` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `instance` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct InstanceRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "instance"
 

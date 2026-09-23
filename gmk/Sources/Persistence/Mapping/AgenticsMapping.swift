@@ -7,6 +7,8 @@
 import Foundation
 
 extension AgentBriefingWithRefs {
+    /// Converts a briefing record with its references to a wire row.
+    /// - Returns: A wire representation of the briefing with references.
     func dto() -> AgentBriefingRow {
         AgentBriefingRow(
             uuid: agentBriefing.uuid,
@@ -28,12 +30,16 @@ extension AgentBriefingWithRefs {
 }
 
 extension AgentBriefingDopePersistenceRecord {
+    /// Converts a dope reference record to a wire row.
+    /// - Returns: A wire representation of the dope reference.
     func dto() -> AgentBriefingDopeRefRow {
         AgentBriefingDopeRefRow(uuid: uuid, dopeCode: dopeCode, brief: brief, seq: Int(seq))
     }
 }
 
 extension AgentBriefingDopeKbiteRecord {
+    /// Converts a kbite reference record to a wire row.
+    /// - Returns: A wire representation of the kbite reference.
     func dto() -> AgentBriefingKbiteRefRow {
         AgentBriefingKbiteRefRow(
             uuid: uuid,
@@ -45,15 +51,22 @@ extension AgentBriefingDopeKbiteRecord {
 }
 
 extension AgentSessionFileChangeRecord {
+    /// Converts a file change reference record to a wire row.
+    /// - Returns: A wire representation of the file change reference.
     func dto() -> AgentBriefingFileChangeRefRow {
         AgentBriefingFileChangeRefRow(uuid: uuid, fileChangeUuid: fileChangeUuid, seq: Int(seq))
     }
 }
 
 extension ClarificationQuestionWithOptions {
+    /// Converts a question with options to a wire row.
+    ///
     /// The selections are a junction read the caller batches across questions,
     /// so they arrive labelled and un-defaulted rather than as a second query
     /// hidden behind a default.
+    ///
+    /// - Parameter selectedOptionUuids: The selected option identifiers.
+    /// - Returns: A wire representation of the question with options and selections.
     func dto(selectedOptionUuids: [String]) -> ClarificationQuestionRow {
         ClarificationQuestionRow(
             uuid: questionRow.uuid,
@@ -72,15 +85,22 @@ extension ClarificationQuestionWithOptions {
 }
 
 extension UserClarificationOptionRecord {
+    /// Converts an option record to a wire row.
+    /// - Returns: A wire representation of the clarification option.
     func dto() -> ClarificationOptionRow {
         ClarificationOptionRow(uuid: uuid, seq: seq, body: body)
     }
 }
 
 extension ArchPersistenceChangeWithFields {
+    /// Converts a persistence change with fields to a wire row.
+    ///
     /// `implementation` is computed against the file-change trail, not read
     /// from this table, so it stays labelled and un-defaulted: a default would
     /// let a caller silently drop it.
+    ///
+    /// - Parameter implementation: The change implementation state.
+    /// - Returns: A wire representation of the persistence change with fields.
     func dto(implementation: ChangeImplementationState) -> ArchPersistenceChangeRow {
         ArchPersistenceChangeRow(
             uuid: change.uuid,
@@ -88,15 +108,17 @@ extension ArchPersistenceChangeWithFields {
             className: change.className,
             filePath: change.filePath,
             reasonBrief: change.reasonBrief,
-            changeKind: change.changeKind,
-            dopeRef: change.dopeRef,
             fields: fields.map { $0.dto() },
-            implementation: implementation
+            implementation: implementation,
+            changeKind: change.changeKind,
+            dopeRef: change.dopeRef
         )
     }
 }
 
 extension ArchitecturePersistenceFieldChangeRecord {
+    /// Converts a field change record to a wire row.
+    /// - Returns: A wire representation of the field change.
     func dto() -> ArchPersistenceFieldChangeRow {
         ArchPersistenceFieldChangeRow(
             uuid: uuid,
@@ -117,8 +139,13 @@ extension ArchitecturePersistenceFieldChangeRecord {
 }
 
 extension ArchitectureGeneralChangeRecord {
+    /// Converts a general change record to a wire row.
+    ///
     /// See the persistence twin above for why `implementation` is labelled and
     /// un-defaulted.
+    ///
+    /// - Parameter implementation: The change implementation state.
+    /// - Returns: A wire representation of the general change.
     func dto(implementation: ChangeImplementationState) -> ArchGeneralChangeRow {
         ArchGeneralChangeRow(
             uuid: uuid,
@@ -134,6 +161,8 @@ extension ArchitectureGeneralChangeRecord {
 }
 
 extension ArchitectureSummaryRecord {
+    /// Converts a summary record to a wire row.
+    /// - Returns: A wire representation of the architecture summary.
     func dto() -> ArchitectureSummaryRow {
         ArchitectureSummaryRow(
             uuid: uuid,
@@ -141,14 +170,16 @@ extension ArchitectureSummaryRecord {
             promptUuid: promptUuid,
             body: body,
             status: status,
-            decisionRationale: decisionRationale,
             createdAt: createdAt,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            decisionRationale: decisionRationale
         )
     }
 }
 
 extension ArchitectureOptionRecord {
+    /// Converts an option record to a wire row.
+    /// - Returns: A wire representation of the architecture option.
     func dto() -> ArchitectureOptionRow {
         ArchitectureOptionRow(
             uuid: uuid,
@@ -165,6 +196,8 @@ extension ArchitectureOptionRecord {
 }
 
 extension ClarificationSummaryRecord {
+    /// Converts a clarification summary record to a wire row.
+    /// - Returns: A wire representation of the clarification summary.
     func dto() -> ClarificationSummaryRow {
         ClarificationSummaryRow(
             uuid: uuid,
@@ -178,8 +211,12 @@ extension ClarificationSummaryRecord {
 }
 
 extension InternalClarificationNoteRecord {
-    /// weight narrows Int64 (the column type) to the wire's Int, explicitly
-    /// and non-truncating.
+    /// Converts a note record to a wire row.
+    ///
+    /// `weight` narrows `Int64` (the column type) to the wire's `Int`,
+    /// explicitly and non-truncating.
+    ///
+    /// - Returns: A wire representation of the clarification note.
     func dto() -> ClarificationNoteRow {
         ClarificationNoteRow(
             uuid: uuid,
@@ -197,6 +234,8 @@ extension InternalClarificationNoteRecord {
 }
 
 extension ExplorationSummaryRecord {
+    /// Converts an exploration summary record to a wire row.
+    /// - Returns: A wire representation of the exploration summary.
     func dto() -> ExplorationSummaryRow {
         ExplorationSummaryRow(
             uuid: uuid,
@@ -213,8 +252,12 @@ extension ExplorationSummaryRecord {
 }
 
 extension ExplorationFindingRecord {
-    /// findingRating narrows Int64 (the column type) to the wire's Int,
+    /// Converts a finding record to a wire row.
+    ///
+    /// `findingRating` narrows `Int64` (the column type) to the wire's `Int`,
     /// explicitly and non-truncating.
+    ///
+    /// - Returns: A wire representation of the exploration finding.
     func dto() -> ExplorationFindingRow {
         ExplorationFindingRow(
             uuid: uuid,
@@ -232,6 +275,8 @@ extension ExplorationFindingRecord {
 }
 
 extension ReviewSummaryRecord {
+    /// Converts a review summary record to a wire row.
+    /// - Returns: A wire representation of the review summary.
     func dto() -> ReviewSummaryRow {
         ReviewSummaryRow(
             uuid: uuid,
@@ -240,16 +285,20 @@ extension ReviewSummaryRecord {
             status: status,
             verdict: verdict,
             overview: overview,
-            agentId: agentId,
             createdAt: createdAt,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            agentId: agentId
         )
     }
 }
 
 extension ReviewFindingRecord {
-    /// lineStart/lineEnd/findingRating narrow Int64 (the column type) to the
-    /// wire's Int, explicitly and non-truncating.
+    /// Converts a finding record to a wire row.
+    ///
+    /// `lineStart`, `lineEnd` and `findingRating` narrow `Int64` (the column
+    /// type) to the wire's `Int`, explicitly and non-truncating.
+    ///
+    /// - Returns: A wire representation of the review finding.
     func dto() -> ReviewFindingRow {
         ReviewFindingRow(
             uuid: uuid,
@@ -269,6 +318,8 @@ extension ReviewFindingRecord {
 }
 
 extension FileChangeWithRanges {
+    /// Converts a file change with ranges to a wire row.
+    /// - Returns: A wire representation of the file change with ranges.
     func dto() -> FileChangeRow {
         FileChangeRow(
             uuid: fileChange.uuid,
@@ -276,6 +327,8 @@ extension FileChangeWithRanges {
             promptUuid: fileChange.promptUuid,
             relativePath: relativePath,
             changeKind: fileChange.changeKind,
+            createdAt: fileChange.createdAt,
+            ranges: ranges.map { $0.dto() },
             agentId: fileChange.agentId,
             agentName: fileChange.agentName,
             workflowPhase: fileChange.workflowPhase,
@@ -288,20 +341,22 @@ extension FileChangeWithRanges {
             permissionMode: fileChange.permissionMode,
             durationMs: fileChange.durationMs.map(Int.init),
             transcriptPath: fileChange.transcriptPath,
-            agentRegistrationUuid: fileChange.agentRegistrationUuid,
-            createdAt: fileChange.createdAt,
-            ranges: ranges.map { $0.dto() }
+            agentRegistrationUuid: fileChange.agentRegistrationUuid
         )
     }
 }
 
 extension FileChangeRangeRecord {
+    /// Converts a range record to a wire row.
+    /// - Returns: A wire representation of the change range.
     func dto() -> ChangeRangeRow {
         ChangeRangeRow(lineStart: Int(lineStart), lineEnd: Int(lineEnd))
     }
 }
 
 extension CarePackageWithRefs {
+    /// Converts a care package with references to a wire row.
+    /// - Returns: A wire representation of the care package with references.
     func dto() -> CarePackageRow {
         CarePackageRow(
             uuid: carePackage.uuid,
@@ -321,7 +376,9 @@ extension CarePackageWithRefs {
 }
 
 extension TouchedPathSummary {
-    /// db → wire.
+    /// Converts a touched path summary to a wire row.
+    ///
+    /// - Returns: A wire representation of the unplanned change.
     func dto() -> UnplannedChangeRow {
         UnplannedChangeRow(
             path: path,
@@ -333,7 +390,9 @@ extension TouchedPathSummary {
 }
 
 extension BotWorkflowRecord {
-    /// db → wire.
+    /// Converts a workflow record to a wire row.
+    ///
+    /// - Returns: A wire representation of the bot workflow.
     func dto() -> BotWorkflowRow {
         BotWorkflowRow(
             uuid: uuid,
@@ -351,12 +410,16 @@ extension BotWorkflowRecord {
 }
 
 extension CarePackageDopeRefRecord {
+    /// Converts a dope reference record to a wire row.
+    /// - Returns: A wire representation of the care package dope reference.
     func dto() -> CarePackageDopeRefRow {
         CarePackageDopeRefRow(uuid: uuid, dopeCode: dopeCode, note: note, seq: Int(seq))
     }
 }
 
 extension CarePackageKbiteRefRecord {
+    /// Converts a kbite reference record to a wire row.
+    /// - Returns: A wire representation of the care package kbite reference.
     func dto() -> CarePackageKbiteRefRow {
         CarePackageKbiteRefRow(
             uuid: uuid,
@@ -368,6 +431,8 @@ extension CarePackageKbiteRefRecord {
 }
 
 extension CarePackageExplorationRefRecord {
+    /// Converts an exploration reference record to a wire row.
+    /// - Returns: A wire representation of the care package exploration reference.
     func dto() -> CarePackageExplorationRefRow {
         CarePackageExplorationRefRow(
             uuid: uuid,
@@ -381,12 +446,18 @@ extension CarePackageExplorationRefRecord {
 }
 
 extension AgentRegistrationRecord {
-    /// Total and nullary: every field is already on the row.
+    /// Converts a registration record to a wire row.
+    ///
+    /// Every field is already on the row; no transformation occurs.
+    ///
+    /// - Returns: A wire representation of the agent registration.
     func dto() -> AgentRegistrationRow {
         AgentRegistrationRow(
             uuid: uuid,
             version: version,
             agentId: agentId,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
             claudeSessionId: claudeSessionId,
             claudeTurnId: claudeTurnId,
             sessionUuid: sessionUuid,
@@ -394,14 +465,14 @@ extension AgentRegistrationRecord {
             agentType: agentType,
             role: role,
             methodology: methodology,
-            workflowPhase: workflowPhase,
-            createdAt: createdAt,
-            updatedAt: updatedAt
+            workflowPhase: workflowPhase
         )
     }
 }
 
 extension PromptArtifactRecord {
+    /// Converts an artifact record to a wire row.
+    /// - Returns: A wire representation of the artifact.
     func dto() -> ArtifactRow {
         ArtifactRow(
             uuid: uuid,
@@ -414,6 +485,8 @@ extension PromptArtifactRecord {
 }
 
 extension PromptQualifiedDiagramRecord {
+    /// Converts a diagram record to a wire row.
+    /// - Returns: A wire representation of the qualified diagram.
     func dto() -> PromptQualifiedDiagramRow {
         PromptQualifiedDiagramRow(
             uuid: uuid,

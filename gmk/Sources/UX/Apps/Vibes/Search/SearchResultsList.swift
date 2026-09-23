@@ -1,9 +1,10 @@
 import SwiftUI
 
 /// The one SEARCH hit list, shared by the ⌘K palette and the search screen.
+///
 /// `List` (not a glass-row ScrollView) because macOS gives it arrow-key
-/// traversal and selection for free, matching KBiteSearchPane's hitList.
-/// Rows render in the DAEMON'S order — SearchHit.score is bm25-derived and
+/// traversal and selection for free, matching KBiteSearchPane's hitList. Rows
+/// render in the DAEMON'S order — SearchHit.score is bm25-derived and
 /// comparable within a kind only, so any client-side re-sort would be noise.
 struct SearchResultsList: View {
     let hits: [SearchHit]

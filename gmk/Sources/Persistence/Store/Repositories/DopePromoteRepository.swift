@@ -10,8 +10,10 @@ import GRDB
 // every alternating boot, and without a high-water the same session re-promotes
 // identical content at every SessionStart. promoted_from_scope_uuid is audit-only.
 
-/// DOPE_PROMOTE data access. Runs INSIDE a Store-owned transaction; holds no
-/// dbQueue and never self-transacts.
+/// DOPE_PROMOTE data access.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
+/// self-transacts.
 struct DopePromoteRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
@@ -26,6 +28,10 @@ struct DopePromoteRepository: RepositoryContext {
         options: 0
     )
 
+    /// Promotes session scopes to the project's BASE_PROJECT scope.
+    /// - Parameter req: The promotion request specifying which scopes to promote.
+    /// - Returns: The promotion result with promoted scopes and skip reason if any.
+    /// - Throws: `StoreError` if the session is not found or on the primary branch.
     func promote(_ req: DopePromoteRequest) throws -> DopePromoteResponse {
         guard
             let lineage = try SessionLineage.request(sessionUuid: req.sessionUuid).fetchOne(db)
@@ -89,9 +95,17 @@ struct DopePromoteRepository: RepositoryContext {
         )
     }
 
-    /// One source scope's promotion. nil means nothing to do: the base is
-    /// already at or ahead of this source, or there is no base and no content
-    /// worth creating one for.
+    /// Promotes one source scope to BASE_PROJECT, or nil if nothing to do.
+    ///
+    /// Returns nil when the base is already at or ahead of the source, or when
+    /// there is no base and no content worth creating one for.
+    ///
+    /// - Parameters:
+    ///   - source: The source dope scope to promote.
+    ///   - projectUuid: The project uuid for the BASE_PROJECT scope.
+    ///   - dryRun: Whether to simulate the promotion without making changes.
+    /// - Returns: The promoted scope details, or nil if no promotion was needed.
+    /// - Throws: `StoreError` if the promotion fails.
     private func promoteScope(
         source: DopeScopeRow,
         projectUuid: String,
@@ -124,7 +138,17 @@ struct DopePromoteRepository: RepositoryContext {
         )
     }
 
-    /// The high-water gate and the wipe-and-copy over an existing base.
+    /// Replaces an existing BASE_PROJECT scope with source content.
+    ///
+    /// Applies the high-water mark gate and performs a wipe-and-copy operation.
+    ///
+    /// - Parameters:
+    ///   - source: The source dope scope to copy from.
+    ///   - base: The existing BASE_PROJECT scope to replace.
+    ///   - sourceCounts: The number of nodes in the source tree.
+    ///   - dryRun: Whether to simulate without making changes.
+    /// - Returns: The promoted scope details, or nil if already up-to-date.
+    /// - Throws: `StoreError` if the replacement fails or would blank a populated base.
     private func replaceBase(
         source: DopeScopeRow,
         base: DopeScopeRecord,
@@ -190,7 +214,17 @@ struct DopePromoteRepository: RepositoryContext {
         )
     }
 
-    /// The first promotion of a code: the base row does not exist yet.
+    /// Creates a new BASE_PROJECT scope for a source with no existing base.
+    ///
+    /// The first promotion of a code when the base row does not exist yet.
+    ///
+    /// - Parameters:
+    ///   - source: The source dope scope to promote.
+    ///   - projectUuid: The project uuid for the new BASE_PROJECT scope.
+    ///   - sourceCounts: The number of nodes in the source tree.
+    ///   - dryRun: Whether to simulate without making changes.
+    /// - Returns: The promoted scope details, or nil if the source is empty.
+    /// - Throws: `StoreError` if scope creation or copy fails.
     private func createBase(
         source: DopeScopeRow,
         projectUuid: String,

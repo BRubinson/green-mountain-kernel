@@ -62,6 +62,30 @@ enum GmBridgeSkill {
 
         var body: String
 
+        /// Initializes a skill manifest.
+        ///
+        /// - Parameters:
+        ///   - name: The skill name.
+        ///   - description: Short description of the skill.
+        ///   - whenToUse: When to invoke the skill.
+        ///   - argumentHint: Hint for argument syntax.
+        ///   - arguments: Array of argument names.
+        ///   - disableModelInvocation: Whether to disable model invocation.
+        ///   - userInvocable: Whether the user can invoke it.
+        ///   - allowedTools: Tools allowed by this skill.
+        ///   - disallowedTools: Tools disallowed by this skill.
+        ///   - model: The model to use.
+        ///   - effort: The effort level.
+        ///   - context: The execution context.
+        ///   - agent: The agent type.
+        ///   - background: Whether to run in background.
+        ///   - hooks: Hook definitions keyed by hook name.
+        ///   - paths: Filesystem paths related to the skill.
+        ///   - shell: The shell to use.
+        ///   - metadata: Additional metadata as key-value pairs.
+        ///   - license: License string.
+        ///   - compatibility: Compatibility information.
+        ///   - body: The skill content.
         init(
             name: String,
             description: String? = nil,
@@ -116,6 +140,10 @@ enum GmBridgeSkill {
             body.isEmpty
         }
 
+        /// Generates the skill file contents with manifest and body.
+        ///
+        /// - Returns: The formatted skill file content, or `nil` if the skill is empty.
+        /// - Throws: Any YAML serialization error.
         func contents() throws -> String? {
             guard !isEmpty else { return nil }
 

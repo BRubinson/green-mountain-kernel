@@ -20,21 +20,21 @@ enum BotTier: String, CaseIterable, Identifiable {
     /// and stripping it there would reset every saved tier choice.
     private var commandName: String { String(rawValue.dropFirst()) }
 
-    /// What Claude Code actually accepts. Plugin slash commands are namespaced
-    /// `/<plugin>:<command>`, so the bare `/gm_bot_rpi` is "Unknown command"
-    /// while `/<plugin>:gm_bot_rpi` resolves. The `<plugin>` is whichever plugin
-    /// the pane actually LOADS: a prod pane loads the marketplace `gmcc`; a
-    /// beta/test pane loads the working-tree alias through `--plugin-dir`, whose
-    /// name is `gmbeta`. Sourced from `BotTier.loadedPluginNamespace` so the
-    /// command and the loaded plugin can never disagree.
+    /// What Claude Code actually accepts.
+    ///
+    /// Plugin slash commands are namespaced `/<plugin>:<command>`. The `<plugin>`
+    /// is whichever plugin the pane loads (marketplace `gmcc` in prod, working-tree
+    /// via `--plugin-dir` in beta/test). Sourced from `loadedPluginNamespace` so
+    /// command and plugin never disagree.
     var invocation: String { "/\(Self.loadedPluginNamespace):\(commandName)" }
 
-    /// The name of the plugin a pane loads, read ONCE. When a dev plugin dir is
-    /// baked (beta/test), that directory IS what `--plugin-dir` loads, so its
-    /// own `plugin.json` name is the authoritative namespace — reading it here
-    /// rather than hardcoding "gmbeta" keeps this correct even if the alias is
-    /// renamed. With no dev dir baked (prod) the pane loads the marketplace
-    /// plugin, whose name is `gmcc`.
+    /// The name of the plugin a pane loads, read ONCE.
+    ///
+    /// When a dev plugin dir is baked (beta/test), that directory IS what
+    /// `--plugin-dir` loads, so its own `plugin.json` name is the authoritative
+    /// namespace — reading it here rather than hardcoding "gmbeta" keeps this
+    /// correct even if the alias is renamed. With no dev dir baked (prod) the
+    /// pane loads the marketplace plugin, whose name is `gmcc`.
     static let loadedPluginNamespace: String = {
         guard case .present(let dir) = DevPluginDir.current else { return "gmcc" }
         let manifest = URL(fileURLWithPath: dir, isDirectory: true)
@@ -58,16 +58,18 @@ enum BotTier: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Returns the invocation command with a numeric workflow instance.
+    /// - Parameter id: The workflow instance identifier.
+    /// - Returns: The command string with the instance ID appended.
     func command(for id: Int) -> String { "\(command) \(id)" }
 
     /// The bridge that makes the launcher and the phase strip speak ONE
     /// vocabulary: the tier a user copies IS the `bot_workflow.variant` the
-    /// daemon will record, so `WorkflowStrip`'s pills and this cluster can
-    /// never disagree about what `/gm_bot_rpi` means.
+    /// daemon will record, so pills and cluster never disagree.
     ///
-    /// `BotVariant.task` has no tier deliberately — `/gm_task`'s
-    /// write-nothing contract means no workflow row exists, and it is not a
-    /// fidelity tier. (It is also absent from `BotVariant` itself.)
+    /// `BotVariant.task` has no tier deliberately — `/gm_task`'s write-nothing
+    /// contract means no workflow row exists, and it is not a fidelity tier.
+    /// (It is also absent from `BotVariant` itself.)
     var variant: BotVariant {
         switch self {
         case .gmBot: return .bot
@@ -77,8 +79,10 @@ enum BotTier: String, CaseIterable, Identifiable {
     }
 
     /// How many phases this tier's run walks, straight off the daemon kit's
-    /// compiled-in registry — 10 / 11 / 12 today. Read by the launcher's help
-    /// text, so the number can never drift from the machine the bot runs.
+    /// compiled-in registry — 10 / 11 / 12 today.
+    ///
+    /// Read by the launcher's help text, so the number can never drift from the
+    /// machine the bot runs.
     var phaseCount: Int { WorkflowSpec.phases(for: variant).count }
 }
 
@@ -93,8 +97,9 @@ enum BotTier: String, CaseIterable, Identifiable {
 /// `BotLauncherCluster`'s picker and never learned from the last tier clicked, because a
 /// transient selection is not a configured one.
 enum BotLauncherPreference {
-    /// The `@AppStorage` key. Views bind it directly —
-    /// `@AppStorage(BotLauncherPreference.key) var tier = BotLauncherPreference.fallback`
+    /// The `@AppStorage` key.
+    ///
+    /// Views bind it directly — `@AppStorage(BotLauncherPreference.key) var tier = BotLauncherPreference.fallback`
     /// — so the picker, the highlight and this accessor all read one cell.
     static let key = "gmvibes.bot.defaultTier"
 
@@ -102,9 +107,11 @@ enum BotLauncherPreference {
     static let fallback: BotTier = .gmBotRPI
 
     /// Non-SwiftUI read/write of the same cell, for call sites outside a view
-    /// body. An unset or unrecognised rawValue (a preference written by a
-    /// build that knew a tier this one does not) degrades to `fallback`
-    /// rather than trapping.
+    /// body.
+    ///
+    /// An unset or unrecognised rawValue (a preference written by a build that
+    /// knew a tier this one does not) degrades to `fallback` rather than
+    /// trapping.
     static var tier: BotTier {
         get {
             guard let raw = UserDefaults.standard.string(forKey: key),
@@ -119,6 +126,8 @@ enum BotLauncherPreference {
 // MARK: - Clipboard helper
 
 enum Clipboard {
+    /// Copies a string to the general pasteboard.
+    /// - Parameter string: The text to copy.
     static func copy(_ string: String) {
         let pb = NSPasteboard.general
         pb.clearContents()
@@ -129,9 +138,11 @@ enum Clipboard {
 // MARK: - VS Code launcher
 
 enum VSCode {
-    // Opens a folder as a VS Code workspace. Prefers launching the app bundle
-    // directly (no dependency on the `code` CLI being on PATH); falls back to
-    // revealing the folder in Finder if VS Code isn't installed.
+    /// Opens a folder as a VS Code workspace.
+    ///
+    /// Prefers launching the app bundle directly and falls back to revealing
+    /// the folder in Finder if VS Code is not installed.
+    /// - Parameter url: The directory URL to open.
     static func open(_ url: URL) {
         let ws = NSWorkspace.shared
         if let app = ws.urlForApplication(withBundleIdentifier: "com.microsoft.VSCode") {
@@ -151,9 +162,14 @@ enum VSCode {
 // disables ALL dynamic profiles, so we serialize/validate, then write atomically.
 // Falls back to NSWorkspace open-at-dir, then a Finder reveal — mirroring VSCode.
 enum ITerm {
-    // Writes the per-instance Dynamic Profile OFF the main thread, then opens the
-    // window ON the main thread. Both the file write and a cold-iTerm AppleScript
-    // launch are slow enough to hitch the UI if run inline from the button action.
+    /// Opens an iTerm2 window rooted at a directory with dynamic profile configuration.
+    ///
+    /// Writes the dynamic profile off the main thread and opens the window on the
+    /// main thread to avoid UI hitching.
+    /// - Parameters:
+    ///   - dir: The directory to set as the working directory.
+    ///   - instanceUUID: The unique identifier for this instance.
+    ///   - instanceName: The human-readable name for the dynamic profile.
     @MainActor
     static func open(dir: URL, instanceUUID: UUID, instanceName: String) {
         Task {
@@ -166,6 +182,12 @@ enum ITerm {
         }
     }
 
+    /// Ensures a dynamic profile exists for the given instance.
+    /// - Parameters:
+    ///   - instanceUUID: The unique identifier for this instance.
+    ///   - instanceName: The human-readable name for the dynamic profile.
+    ///   - workingDir: The working directory path for the profile.
+    /// - Returns: The profile name if the profile was created successfully, nil otherwise.
     static func ensureProfile(
         instanceUUID: UUID,
         instanceName: String,
@@ -180,6 +202,12 @@ enum ITerm {
             .value
     }
 
+    /// Launches an iTerm2 window with the specified profile.
+    ///
+    /// Falls back to NSWorkspace and Finder reveal if launch fails.
+    /// - Parameters:
+    ///   - dir: The directory to reveal or open.
+    ///   - profileName: The dynamic profile name, if available.
     @MainActor
     private static func launch(dir: URL, profileName: String?) async {
         do {
@@ -193,6 +221,9 @@ enum ITerm {
         revealFallback(dir)
     }
 
+    /// Returns the iTerm2 profile properties for setting a working directory.
+    /// - Parameter path: The directory path to configure.
+    /// - Returns: An array of profile properties specifying the working directory.
     static func workingDirectoryProperties(_ path: String) -> [PaneProfileProperty] {
         [
             .string("Custom Directory", "Yes"),
@@ -200,6 +231,8 @@ enum ITerm {
         ]
     }
 
+    /// Opens a directory with iTerm2 or reveals it in Finder as a fallback.
+    /// - Parameter dir: The directory URL to open or reveal.
     @MainActor
     private static func revealFallback(_ dir: URL) {
         let ws = NSWorkspace.shared
@@ -210,8 +243,10 @@ enum ITerm {
         }
     }
 
-    // ~/Library/Application Support/iTerm2/DynamicProfiles, created if absent.
-    // `nonisolated` so the profile write can run off the main actor.
+    /// Returns the iTerm2 dynamic profiles directory, creating it if absent.
+    ///
+    /// The path is `~/Library/Application Support/iTerm2/DynamicProfiles`.
+    /// - Returns: The directory URL, or nil if the app support directory cannot be resolved.
     private nonisolated static func dynamicProfilesDir() -> URL? {
         guard
             let appSup = FileManager.default
@@ -226,9 +261,15 @@ enum ITerm {
         return dir
     }
 
-    // Idempotent per-instance profile file: gmvibes-<UUID>.json with one profile.
-    // JSONSerialization both validates the shape and renders the bytes we write.
-    // `nonisolated` so it can run off the main actor (pure FileManager/JSON work).
+    /// Writes a dynamic profile JSON file for an iTerm2 instance.
+    ///
+    /// Creates an idempotent per-instance profile file with atomic write
+    /// semantics. JSONSerialization validates the shape before writing.
+    /// - Parameters:
+    ///   - guid: The unique identifier for this profile.
+    ///   - name: The human-readable profile name.
+    ///   - workingDir: The working directory path to configure.
+    /// - Returns: True if the profile was written successfully, false otherwise.
     private nonisolated static func writeProfile(guid: String, name: String, workingDir: String) -> Bool {
         guard let dir = dynamicProfilesDir() else { return false }
         let payload: [String: Any] = [

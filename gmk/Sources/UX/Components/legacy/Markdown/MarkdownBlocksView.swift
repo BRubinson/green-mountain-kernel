@@ -8,26 +8,43 @@ import SwiftUI
 struct MarkdownBlocksView: View {
     let blocks: [MarkdownBlock]
     /// Non-nil scales every block font off this size instead of the
-    /// semantic .body/.title ramp. Diagram text surfaces MUST pass their
+    /// semantic .body/.title ramp.
+    ///
+    /// Diagram text surfaces MUST pass their
     /// persisted font_size through here: the semantic fonts are absolute
     /// and silently override any outer .font() modifier, which is exactly
     /// how the old inline renderer's working font_size column died in the
     /// first block-renderer port.
     let baseFontSize: Double?
 
+    /// Creates a view that renders parsed markdown blocks.
+    /// - Parameters:
+    ///   - blocks: The parsed markdown blocks to render.
+    ///   - baseFontSize: Optional base font size to scale all text, or nil for semantic fonts.
     init(_ blocks: [MarkdownBlock], baseFontSize: Double? = nil) {
         self.blocks = blocks
         self.baseFontSize = baseFontSize
     }
+
+    /// Creates a view that parses and renders markdown source.
+    /// - Parameters:
+    ///   - source: The markdown source string to parse and render.
+    ///   - baseFontSize: Optional base font size to scale all text, or nil for semantic fonts.
     init(source: String, baseFontSize: Double? = nil) {
         self.blocks = MarkdownDocument.parse(source)
         self.baseFontSize = baseFontSize
     }
 
+    /// Calculates a font scaled from the base size or returns a fallback.
+    /// - Parameters:
+    ///   - factor: The scaling factor to apply to the base font size.
+    ///   - fallback: The font to use if no base font size is set.
+    ///   - monospaced: Whether to use monospaced design if scaling; ignored for fallback.
+    /// - Returns: A scaled font or the fallback font.
     private func scaled(
         _ factor: Double,
-        monospaced: Bool = false,
-        fallback: Font
+        fallback: Font,
+        monospaced: Bool = false
     ) -> Font {
         guard let base = baseFontSize else { return fallback }
         return .system(
@@ -45,6 +62,9 @@ struct MarkdownBlocksView: View {
         }
     }
 
+    /// Builds the SwiftUI view for a single markdown block.
+    /// - Parameter block: The markdown block to render.
+    /// - Returns: The SwiftUI view for this block.
     @ViewBuilder
     private func view(for block: MarkdownBlock) -> some View {
         switch block {
@@ -92,8 +112,8 @@ struct MarkdownBlocksView: View {
                     .font(
                         scaled(
                             0.95,
-                            monospaced: true,
-                            fallback: .system(.callout, design: .monospaced)
+                            fallback: .system(.callout, design: .monospaced),
+                            monospaced: true
                         )
                     )
                     .textSelection(.enabled)
@@ -118,6 +138,11 @@ struct MarkdownBlocksView: View {
         }
     }
 
+    /// Builds a table view from headers and rows.
+    /// - Parameters:
+    ///   - headers: The table header strings.
+    ///   - rows: The table rows, each as a list of cell strings.
+    /// - Returns: The SwiftUI table view.
     @ViewBuilder
     private func tableView(headers: [String], rows: [[String]]) -> some View {
         Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 6) {
@@ -144,7 +169,9 @@ struct MarkdownBlocksView: View {
         .background(.quaternary.opacity(0.25), in: .rect(cornerRadius: 8))
     }
 
-    // Inline markdown (bold/italic/links/code-spans) for the text within a block.
+    /// Converts markdown text with inline formatting (bold, italic, links, code).
+    /// - Parameter text: The markdown text to convert.
+    /// - Returns: A Text view with inline markdown parsed and rendered.
     private func inline(_ text: String) -> Text {
         if let attributed = try? AttributedString(
             markdown: text,
@@ -155,6 +182,9 @@ struct MarkdownBlocksView: View {
         return Text(text)
     }
 
+    /// Returns the font for a heading at the given level.
+    /// - Parameter level: The heading level (1-6 or higher).
+    /// - Returns: The scaled or semantic font for this heading level.
     private func headingFont(_ level: Int) -> Font {
         if let base = baseFontSize {
             let factor: Double

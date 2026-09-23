@@ -16,8 +16,10 @@ struct PromptInitResult: Encodable {
     struct Resolution: Encodable {
         let matchedBy: String?
         /// True when this call created the prompt, false when it resolved an
-        /// existing one. The user asked for this explicitly: a caller must
-        /// always be told whether it is starting fresh or resuming.
+        /// existing one.
+        ///
+        /// The user asked for this explicitly: a caller must always be told
+        /// whether it is starting fresh or resuming.
         let created: Bool
         /// Populated ONLY when the selector was ambiguous — and when it is, no
         /// prompt was touched.
@@ -39,7 +41,7 @@ struct PromptInitResult: Encodable {
     }
 
     struct BriefingState: Encodable {
-        /// absent | building | ready
+        /// One of absent, building or ready.
         let state: String
         let uuid: String?
         let version: Int64?
@@ -183,9 +185,9 @@ private nonisolated(unsafe) let initArm: CdeArm = { args, client in
             status: row.status,
             version: row.version,
             gmfsRelativeStoragePath: row.gmfsRelativeStoragePath,
-            reports: nil,
             createdAt: row.createdAt,
-            updatedAt: row.updatedAt
+            updatedAt: row.updatedAt,
+            reports: nil
         )
     }
 
@@ -263,8 +265,8 @@ private nonisolated(unsafe) let initArm: CdeArm = { args, client in
 private nonisolated(unsafe) let briefingOpenArm: CdeArm = { args, client in
     try client.briefingOpen(
         BriefingOpenRequest(
-            promptUuid: try args.string("prompt_uuid"),
             briefingForStep: args.optString("step") ?? "initial",
+            promptUuid: try args.string("prompt_uuid"),
             clientKey: ClientKey.resolve()
         )
     )

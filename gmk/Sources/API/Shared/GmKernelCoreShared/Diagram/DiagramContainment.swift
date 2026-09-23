@@ -4,8 +4,9 @@ import Foundation
 /// predicate both write paths call. `Store+Diagram` answers "who is this
 /// element's parent" from SQL and `DiagramTreeReducer` from an in-memory
 /// tree; sharing the PREDICATE is what keeps the rule from drifting between
-/// them. It is a Swift guard rather than a SQL CHECK because a CHECK cannot
-/// reference another table.
+/// them.
+///
+/// It is a Swift guard rather than a SQL CHECK because a CHECK cannot reference another table.
 enum DiagramContainment {
 
     /// What a reference violated, so both implementations produce the same
@@ -17,6 +18,13 @@ enum DiagramContainment {
         case referrerHasNoParent
         case targetMissing(uuid: String)
 
+        /// A human-readable description of this violation.
+        ///
+        /// - Parameters:
+        ///   - role: The name of the element role being validated.
+        ///   - referrer: The uuid of the element making the reference.
+        ///   - target: The uuid of the target element.
+        /// - Returns: An error message describing the violation.
         func message(role: String, referrer: String, target: String) -> String {
             switch self {
             case .targetIsSelf:
@@ -42,6 +50,16 @@ enum DiagramContainment {
     /// predicate serve both implementations. `grandparentOfReferrer` is the
     /// parent the target must also have; nil means the referrer's parent is
     /// top-level, so a legal target is top-level too.
+    ///
+    /// - Parameters:
+    ///   - rule: The containment rule to apply.
+    ///   - referrerUuid: The uuid of the element making the reference.
+    ///   - parentOfReferrer: The uuid of the referrer's parent, or `nil` if top-level.
+    ///   - grandparentOfReferrer: The uuid of the referrer's parent's parent, or `nil` if top-level.
+    ///   - targetUuid: The uuid of the target element.
+    ///   - parentOfTarget: The uuid of the target's parent, or `nil` if top-level.
+    ///   - targetExists: Whether the target element exists in the diagram.
+    /// - Returns: A `Violation` if the reference is illegal; `nil` if legal.
     static func validateReference(
         rule: DiagramElementRefSpec.ContainmentRule,
         referrerUuid: String,

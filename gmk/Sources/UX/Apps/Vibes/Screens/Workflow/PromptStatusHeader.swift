@@ -1,13 +1,12 @@
 import SwiftUI
 
 /// The ONLY lifecycle chrome in the app: the status chip plus two controls, Mark done and
-/// Back to Draft. The daemon's lifecycle has a real backward edge, done → draft, so Back to
-/// Draft is live on a done prompt and gated by `allowedNext` everywhere else.
+/// Back to Draft.
 ///
-/// Both controls render from `stub.status` and `PromptStatus.allowedNext` ALONE. This view
-/// never reads `phases.workflow`: `WorkflowStrip` is its SIBLING at the call site, so the
-/// strip can fail completely and the lifecycle controls still work. `phases` is taken for one
-/// reason — `transition(to:)`'s `invalidTransition` arm resyncs it — and never for rendering.
+/// Daemon's lifecycle has backward edge done → draft; Back to Draft gates by `allowedNext` elsewhere.
+/// Controls render from `stub.status` and `PromptStatus.allowedNext` ALONE; never reads `phases.workflow`.
+/// `WorkflowStrip` is SIBLING at call site so strip failure doesn't break controls.
+/// `phases` taken for `invalidTransition` resync, never for rendering.
 struct PromptStatusHeader: View {
     let stub: PromptStub
     let phases: PromptPhaseStore
@@ -76,6 +75,10 @@ struct PromptStatusHeader: View {
 
     // MARK: - Transitions
 
+    /// Builds a transition button for a target status.
+    ///
+    /// - Parameter next: The target prompt status.
+    /// - Returns: A bordered button that triggers transition when tapped.
     @ViewBuilder
     private func transitionButton(to next: PromptStatus) -> some View {
         let gate = gate(to: next)
@@ -90,11 +93,21 @@ struct PromptStatusHeader: View {
         .help(helpText(for: next, gate: gate))
     }
 
+    /// Checks whether a transition is blocked.
+    ///
+    /// - Parameter gate: The transition gate status.
+    /// - Returns: `true` if the gate blocks the transition.
     private func isBlocked(_ gate: Gate) -> Bool {
         if case .blocked = gate { return true }
         return false
     }
 
+    /// Returns the help text for a transition attempt.
+    ///
+    /// - Parameters:
+    ///   - next: The target prompt status.
+    ///   - gate: The transition gate status.
+    /// - Returns: User-facing help text explaining the transition.
     private func helpText(for next: PromptStatus, gate: Gate) -> String {
         if case .blocked(let reason, let fix) = gate {
             return "\(reason) — \(fix)"
@@ -102,11 +115,14 @@ struct PromptStatusHeader: View {
         return "Advance this prompt to \(next.rawValue)"
     }
 
-    /// `PromptStatus.allowedNext` is the authority for BOTH edges (`.done`
-    /// from Initiated, `.draft` from Done). The old rail's forward-edge
-    /// branches (clarifying→architecting, architecting→implementing) went with
-    /// the `precomputed*Gate` helpers: they adjudicated edges the rail never
-    /// offered, and that file's own comment called them unreachable.
+    /// Evaluates the gate status for a transition.
+    ///
+    /// `PromptStatus.allowedNext` is the authority for both edges (`.done` from Initiated,
+    /// `.draft` from Done). The old rail's forward-edge branches used `precomputed*Gate` helpers
+    /// that adjudicated edges never offered; they are unreachable.
+    ///
+    /// - Parameter next: The target prompt status.
+    /// - Returns: A `Gate` indicating whether the transition is open, unknown, or blocked.
     private func gate(to next: PromptStatus) -> Gate {
         switch next {
         case .done:
@@ -152,6 +168,10 @@ struct PromptStatusHeader: View {
         }
     }
 
+    /// Returns the title text for a transition button.
+    ///
+    /// - Parameter next: The target prompt status.
+    /// - Returns: Localized button title.
     private func buttonTitle(for next: PromptStatus) -> String {
         switch next {
         case .done: "Mark done"
@@ -160,6 +180,10 @@ struct PromptStatusHeader: View {
         }
     }
 
+    /// Returns the system icon name for a transition button.
+    ///
+    /// - Parameter next: The target prompt status.
+    /// - Returns: System symbol name.
     private func buttonIcon(for next: PromptStatus) -> String {
         switch next {
         case .done: "checkmark.circle"
@@ -168,6 +192,9 @@ struct PromptStatusHeader: View {
         }
     }
 
+    /// Performs a status transition with autosave and refresh.
+    ///
+    /// - Parameter next: The target prompt status.
     private func transition(to next: PromptStatus) async {
         inFlight = true
         transitionError = nil

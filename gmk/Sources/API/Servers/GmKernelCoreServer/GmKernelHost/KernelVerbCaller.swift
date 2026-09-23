@@ -2,12 +2,12 @@ import Foundation
 
 /// `GmVerbCaller` satisfied WITHOUT a socket, by re-entering the dispatcher the
 /// kernel already runs: a tool or hook body that dialled the daemon it runs
-/// inside would self-connect and deadlock behind its own call. It ENCODES the
-/// same envelope `DaemonClient` builds and hands it to `Server.dispatch`, so
-/// handlers see the same decode, the same guards and the same error envelopes.
+/// inside would self-connect and deadlock behind its own call.
 ///
-/// `StoreBoundary` is ambient and RE-ENTRANT, so a verb reached here enlists in
-/// an open boundary — true only while the verb layer makes no thread hops in one.
+/// It ENCODES the same envelope `DaemonClient` builds and hands to
+/// `Server.dispatch`, so handlers see the same decode, guards and error
+/// envelopes. `StoreBoundary` is ambient and RE-ENTRANT, so a verb reached
+/// here enlists in an open boundary — true only while the verb layer makes no thread hops.
 struct KernelVerbCaller: GmVerbCaller {
 
     /// Injected rather than reached through a stored `Server`: testable without
@@ -17,6 +17,17 @@ struct KernelVerbCaller: GmVerbCaller {
     /// send because `Server.dispatch` holds no per-call state.
     let dispatch: @Sendable (Data) -> HandlerResult
 
+    /// Dispatches a verb request and returns the response.
+    ///
+    /// Encodes the request envelope and passes it to the dispatcher; mirrors
+    /// `DaemonClient.request` error handling for indistinguishable caller behavior.
+    ///
+    /// - Parameters:
+    ///   - type: The message type of the verb.
+    ///   - payload: The request payload.
+    ///   - _: The response payload type (unused parameter name).
+    /// - Returns: The response payload of the specified type.
+    /// - Throws: `DaemonClientError` if the response is an error or malformed.
     func request<Req: Codable & Sendable, Resp: Codable & Sendable>(
         type: MessageType,
         payload: Req,

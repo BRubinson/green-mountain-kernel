@@ -42,6 +42,9 @@ struct KbiteResourceWithFiles: FetchableRecord, Decodable {
         )
         .order(Column("resource_file_name"))
 
+    /// Creates a query request for a resource with its file heads.
+    ///
+    /// - Returns: A request for KbiteResourceWithFiles.
     static func request() -> QueryInterfaceRequest<Self> {
         KbiteResourceRecord
             .including(all: Self.fileHeads)
@@ -61,6 +64,10 @@ struct KbiteWithResources: FetchableRecord, Decodable {
     var keywords: [KeywordRecord]
     var resources: [KbiteResourceWithFiles]
 
+    /// Creates a query request for a kbite with its resources and keywords.
+    ///
+    /// - Parameter code: The kbite code to fetch.
+    /// - Returns: A request for KbiteWithResources.
     static func request(code: String) -> QueryInterfaceRequest<Self> {
         KbiteRecord
             .filter(KbiteRecord.Columns.code == code)
@@ -102,6 +109,10 @@ struct KbiteCounts: FetchableRecord, Decodable {
     )
     .forKey("fileCount")
 
+    /// Creates a query request for kbite deletion impact counts.
+    ///
+    /// - Parameter kbiteUuid: The kbite uuid to count deletions for.
+    /// - Returns: A request for KbiteCounts.
     static func request(kbiteUuid: String) -> QueryInterfaceRequest<Self> {
         KbiteRecord
             .all()

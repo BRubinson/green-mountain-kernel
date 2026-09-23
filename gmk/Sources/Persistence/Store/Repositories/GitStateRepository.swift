@@ -2,12 +2,19 @@ import Foundation
 import GRDB
 
 /// Git-derived checked-out state reads (SESSION_RESOLVE /
-/// INSTANCE_CURRENT_SESSION). Runs INSIDE a Store-owned transaction; holds no
-/// dbQueue and never self-transacts.
+/// INSTANCE_CURRENT_SESSION).
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
+/// self-transacts.
 struct GitStateRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Resolves a session's checked-out state in the git repository.
+    ///
+    /// - Parameter req: The session resolve request with session uuid.
+    /// - Returns: The session with git state information.
+    /// - Throws: `StoreError` when the session does not exist.
     func sessionResolve(_ req: SessionResolveRequest) throws -> SessionResolveResponse {
         guard let session = try session.fetchRow(uuid: req.sessionUuid) else {
             throw StoreError.notFound(entity: "session", key: req.sessionUuid)
@@ -27,6 +34,11 @@ struct GitStateRepository: RepositoryContext {
         )
     }
 
+    /// Resolves the currently checked-out session for an instance.
+    ///
+    /// - Parameter req: The instance current session request with instance uuid.
+    /// - Returns: The session stub if found, with git state information.
+    /// - Throws: `StoreError` when the instance does not exist.
     func instanceCurrentSession(
         _ req: InstanceCurrentSessionRequest
     ) throws -> InstanceCurrentSessionResponse {

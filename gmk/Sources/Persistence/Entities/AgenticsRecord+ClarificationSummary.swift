@@ -10,7 +10,9 @@ import GRDB
 
 /// Read-side mirror of the `clarification_summary` table (m0025: slimmed —
 /// backstory_note/refined_goal/refined_detail are gone; clarified intent
-/// lives on the care package). Columns map via convertFromSnakeCase.
+/// lives on the care package).
+///
+/// Columns map via convertFromSnakeCase.
 struct ClarificationSummaryRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "clarification_summary"
     var uuid: String

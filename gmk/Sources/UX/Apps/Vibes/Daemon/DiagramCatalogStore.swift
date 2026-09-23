@@ -14,10 +14,11 @@ final class DiagramCatalogStore {
 
     /// DIAGRAM_LIST takes exactly ONE owner uuid and returns exactly that
     /// tier's rows — never a union, never a cross-tier ladder (the contract
-    /// it inherited verbatim from DOPE_LIST). So a per-prompt attached count
-    /// is N parallel calls, one per prompt; widening the message to fold
-    /// prompt rows in under a session would break that invariant for every
-    /// other caller, which is why the shortcut is off the table.
+    /// it inherited verbatim from DOPE_LIST).
+    ///
+    /// A per-prompt attached count is N parallel calls, one per prompt; widening
+    /// the message to fold prompt rows in a session would break that invariant
+    /// for every other caller, which is why the shortcut is off the table.
     enum Owner: Hashable {
         case project(String)
         case session(String)
@@ -80,12 +81,24 @@ final class DiagramCatalogStore {
     /// read-after-write ordering requirement, so concurrent callers JOIN.
     private var inFlight: [Owner: Task<Void, Never>] = [:]
 
+    /// Returns the diagram rows for an owner.
+    ///
+    /// - Parameter owner: The owner tier and uuid.
+    /// - Returns: An array of rows, or an empty array if none are cached.
     func rows(_ owner: Owner) -> [DiagramRow] { rowsByOwner[owner] ?? [] }
 
-    /// nil until this owner has been listed once — a prompt row renders no
-    /// badge rather than a confident "0" it has not checked.
+    /// Returns the count of rows for an owner, or nil if not yet listed.
+    ///
+    /// Nil until the owner has been listed once; a prompt row renders no
+    /// badge rather than a confident "0" when unchecked.
+    ///
+    /// - Parameter owner: The owner tier and uuid.
+    /// - Returns: The row count, or nil if not yet loaded.
     func count(_ owner: Owner) -> Int? { rowsByOwner[owner]?.count }
 
+    /// Refreshes the diagram list for an owner, coalescing concurrent calls.
+    ///
+    /// - Parameter owner: The owner tier and uuid.
     func refresh(_ owner: Owner) async {
         if let running = inFlight[owner] {
             await running.value
@@ -97,10 +110,12 @@ final class DiagramCatalogStore {
         inFlight[owner] = nil
     }
 
-    /// The per-prompt fan-out, run concurrently: N prompt rows want N counts
-    /// and the daemon queue is serial, so issuing them together at least
-    /// keeps the UI's wait to one queue drain rather than N round trips of
-    /// latency.
+    /// Refreshes the diagram lists for multiple prompts concurrently.
+    ///
+    /// N prompt rows want N counts; issuing them together keeps the UI's
+    /// wait to one queue drain rather than N round trips of latency.
+    ///
+    /// - Parameter prompts: An array of prompt uuids to refresh.
     func refresh(prompts: [String]) async {
         await withTaskGroup(of: Void.self) { group in
             for uuid in prompts {
@@ -109,6 +124,9 @@ final class DiagramCatalogStore {
         }
     }
 
+    /// Performs the actual refresh of diagram rows for an owner.
+    ///
+    /// - Parameter owner: The owner tier and uuid.
     private func performRefresh(_ owner: Owner) async {
         do {
             let rows = try await service.diagramList(owner.listRequest)
@@ -124,14 +142,27 @@ final class DiagramCatalogStore {
 
     // MARK: - Gallery (DIAGRAM_SEARCH, v23)
 
+    /// Returns the gallery rows for a scope.
+    ///
+    /// - Parameter scope: The gallery scope (project or session).
+    /// - Returns: An array of rows, or an empty array if not yet loaded.
     func gallery(_ scope: GalleryScope) -> [DiagramRow] { galleryByScope[scope] ?? [] }
 
-    /// Has this gallery fetched at least once? (nil = show a spinner, not a
-    /// confident empty state.)
+    /// Checks if a gallery has been fetched at least once.
+    ///
+    /// Returns false to show a spinner, not a confident empty state.
+    ///
+    /// - Parameter scope: The gallery scope (project or session).
+    /// - Returns: True when the gallery has fetched; false otherwise.
     func galleryLoaded(_ scope: GalleryScope) -> Bool { galleryByScope[scope] != nil }
 
-    /// Run (and remember) a query for one gallery. Empty query = browse-all
-    /// by recency; non-empty = FTS — both are the daemon's DIAGRAM_SEARCH.
+    /// Searches a gallery with a query string, updating the cached results.
+    ///
+    /// Empty query browses by recency; non-empty uses FTS via DIAGRAM_SEARCH.
+    ///
+    /// - Parameters:
+    ///   - scope: The gallery scope (project or session).
+    ///   - query: The search query, or an empty string to browse all.
     func searchGallery(_ scope: GalleryScope, query: String) async {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         galleryQueries[scope] = trimmed
@@ -153,16 +184,24 @@ final class DiagramCatalogStore {
         }
     }
 
-    /// DIAGRAM_CHANGE wake: re-run whatever the gallery was last showing —
-    /// including dropping a card the "deleted" action just removed.
+    /// Re-runs the gallery's last query on a DIAGRAM_CHANGE event.
+    ///
+    /// Updates cached rows, including dropping deleted cards.
+    ///
+    /// - Parameter scope: The gallery scope (project or session).
     func refreshGallery(_ scope: GalleryScope) async {
         await searchGallery(scope, query: galleryQueries[scope] ?? "")
     }
 
     // MARK: - Thumbnails
 
-    /// The cached resolve behind a card's live thumbnail — nil until loaded,
-    /// and nil again the moment the row's revision moves past the cache.
+    /// Returns the cached thumbnail resolve for a diagram row.
+    ///
+    /// Nil until loaded, and nil again when the row's revision moves past
+    /// the cache entry.
+    ///
+    /// - Parameter row: The diagram row.
+    /// - Returns: The resolved diagram, or nil if not cached or stale.
     func thumbnail(for row: DiagramRow) -> ResolvedDiagram? {
         guard let entry = thumbnailsByUuid[row.uuid],
             entry.revision == row.revision
@@ -170,8 +209,12 @@ final class DiagramCatalogStore {
         return entry.resolved
     }
 
-    /// One lazy DIAGRAM_GET per card, resolved against an EMPTY dope context
-    /// (ghost cards are the legal — and cheap — thumbnail state).
+    /// Lazily loads and caches the thumbnail resolve for a diagram row.
+    ///
+    /// Resolved against an empty dope context; ghost cards are the legal
+    /// and cheap thumbnail state.
+    ///
+    /// - Parameter row: The diagram row to load the thumbnail for.
     func loadThumbnail(for row: DiagramRow) async {
         let key = "\(row.uuid):\(row.revision)"
         if thumbnail(for: row) != nil || thumbnailLoads.contains(key) { return }
@@ -185,9 +228,15 @@ final class DiagramCatalogStore {
 
     // MARK: - Delete / visibility
 
-    /// DIAGRAM_DELETE, CAS-gated on the revision the card was rendered from.
-    /// The galleries refresh off the durable "deleted" event; the immediate
-    /// refresh here just spares the deleting window the round-trip lag.
+    /// Deletes a diagram, CAS-gated on the row's revision.
+    ///
+    /// Galleries refresh off the durable "deleted" event; this immediate
+    /// refresh spares the deleting window the round-trip lag.
+    ///
+    /// - Parameters:
+    ///   - row: The diagram row to delete.
+    ///   - scope: The gallery scope to refresh after deletion.
+    /// - Throws: An error when the daemon rejects the delete.
     func delete(_ row: DiagramRow, scope: GalleryScope) async throws {
         _ = try await service.diagramDelete(
             diagramUuid: row.uuid,
@@ -197,9 +246,16 @@ final class DiagramCatalogStore {
         await refreshGallery(scope)
     }
 
-    /// The v23 visibility axis, ridden on batch-apply like promotion. PUBLIC
-    /// is daemon-guarded to SESSION tier — refusals surface as thrown errors,
-    /// never pre-blocked here.
+    /// Updates the visibility of a diagram.
+    ///
+    /// PUBLIC visibility is daemon-guarded to SESSION tier; refusals surface
+    /// as thrown errors, never pre-blocked.
+    ///
+    /// - Parameters:
+    ///   - row: The diagram row to update.
+    ///   - visibility: The new visibility setting.
+    ///   - scope: The gallery scope to refresh after the update.
+    /// - Throws: An error when the daemon rejects the update.
     func setVisibility(
         _ row: DiagramRow,
         to visibility: DiagramVisibility,
@@ -222,21 +278,31 @@ final class DiagramCatalogStore {
 
     // MARK: - Create
 
-    /// DIAGRAM_INIT (create-or-return, idempotent per owner+code), then the
-    /// ONE-TIME dope scaffold.
+    /// Creates a diagram (idempotent) and optionally seeds it from dope.
     ///
-    /// The scaffold lives here, at create time, and nowhere else: seeding on
-    /// every load would fight the user's own layout, and re-seeding on a
-    /// filter toggle was the delete-and-recreate this whole commit removed.
+    /// The dope scaffold lives here at create time only: reseeding on every
+    /// load would fight the user's layout, and toggle reseeding was removed.
     /// A returned-not-created row is left exactly as it is.
+    ///
+    /// - Parameters:
+    ///   - owner: The owner tier and uuid.
+    ///   - code: A unique code within the owner.
+    ///   - name: The display name.
+    ///   - projectUuid: The project uuid.
+    ///   - description: Optional description.
+    ///   - dopeScopeCode: Optional dope scope to seed from.
+    ///   - sessionUuid: Optional session uuid (for prompt rows).
+    ///   - seedFromDope: Whether to seed from dope on creation; default true.
+    /// - Returns: The created or existing diagram row.
+    /// - Throws: An error when the daemon rejects the creation.
     @discardableResult
     func create(
         owner: Owner,
         code: String,
         name: String,
+        projectUuid: String,
         description: String? = nil,
         dopeScopeCode: String? = nil,
-        projectUuid: String,
         sessionUuid: String? = nil,
         seedFromDope: Bool = true
     ) async throws -> DiagramRow {
@@ -244,25 +310,25 @@ final class DiagramCatalogStore {
         switch owner {
         case .project(let uuid):
             request = DiagramInitRequest(
-                projectUuid: uuid,
                 code: code,
                 name: name,
+                projectUuid: uuid,
                 description: description,
                 dopeScopeCode: dopeScopeCode
             )
         case .session(let uuid):
             request = DiagramInitRequest(
-                sessionUuid: uuid,
                 code: code,
                 name: name,
+                sessionUuid: uuid,
                 description: description,
                 dopeScopeCode: dopeScopeCode
             )
         case .prompt(let uuid):
             request = DiagramInitRequest(
-                promptUuid: uuid,
                 code: code,
                 name: name,
+                promptUuid: uuid,
                 description: description,
                 dopeScopeCode: dopeScopeCode
             )
@@ -280,9 +346,16 @@ final class DiagramCatalogStore {
         return response.diagram
     }
 
-    /// Lay the bound dope scope out once, through the same `DopeCanvasLayout`
-    /// the CLI generator uses (card heights come from the resolver, so the
-    /// app and the daemon can never lay out differently).
+    /// Lays out a diagram's dope scope using the same `DopeCanvasLayout`.
+    ///
+    /// The layout uses `DopeCanvasLayout` (same as the CLI generator);
+    /// card heights from the resolver ensure app and daemon never differ.
+    ///
+    /// - Parameters:
+    ///   - diagram: The diagram row to seed.
+    ///   - dopeScopeCode: The dope scope code.
+    ///   - projectUuid: The project uuid.
+    ///   - sessionUuid: The session uuid, if any.
     private func seed(
         _ diagram: DiagramRow,
         dopeScopeCode: String,
@@ -321,13 +394,21 @@ final class DiagramCatalogStore {
 
     // MARK: - Copy / promote
 
-    /// Copy a diagram to another tier.
+    /// Copies a diagram to another tier, replicating its content.
     ///
-    /// Client-side composition: there is no DIAGRAM_COPY message and adding one bumps the wire.
-    /// DIAGRAM_INIT for the target, then one elementAdd batch replaying the source tree with
-    /// clientRef / targetClientRef remapping, since the target's uuids do not exist until the
-    /// batch runs. The pair is NOT atomic: a failed batch leaves an empty diagram behind and
-    /// there is no DIAGRAM_DELETE to clean it up, so the error says so.
+    /// Client-side composition: no DIAGRAM_COPY message exists (adding one
+    /// bumps the wire). DIAGRAM_INIT for the target, then elementAdd batch
+    /// replaying the source tree with clientRef/targetClientRef remapping.
+    /// The pair is not atomic: a failed batch leaves an empty diagram.
+    ///
+    /// - Parameters:
+    ///   - source: The diagram row to copy.
+    ///   - owner: The target owner tier and uuid.
+    ///   - code: A unique code within the target owner.
+    ///   - name: The display name for the copy.
+    ///   - projectUuid: The project uuid.
+    /// - Returns: The newly copied diagram row.
+    /// - Throws: `DiagramCopyError.contentFailed` if the batch fails.
     @discardableResult
     func copy(
         _ source: DiagramRow,
@@ -340,10 +421,10 @@ final class DiagramCatalogStore {
             owner: owner,
             code: code,
             name: name,
+            projectUuid: projectUuid,
             description: source.description.isEmpty
                 ? nil : source.description,
             dopeScopeCode: source.dopeScopeCode,
-            projectUuid: projectUuid,
             sessionUuid: nil,
             // The COPY carries the content; a
             // scaffold on top would double it.
@@ -368,10 +449,14 @@ final class DiagramCatalogStore {
         return created
     }
 
-    /// The source tree as an add batch. Two passes on purpose: connectors
-    /// reference a PEER of their own parent, and a peer that has not been
-    /// added yet has no clientRef to name — so every non-connector element
-    /// goes first in pre-order (parents before children), connectors last.
+    /// Converts diagram elements into mutations for batch replay.
+    ///
+    /// Two passes: non-connectors first in pre-order (parents before children),
+    /// connectors last. Connectors reference a peer of their own parent; a peer
+    /// not yet added has no clientRef to name.
+    ///
+    /// - Parameter elements: The source diagram elements to convert.
+    /// - Returns: An array of elementAdd mutations in replay order.
     static func replayMutations(for elements: [DiagramElementNode]) -> [DiagramMutation] {
         var refs: [String: String] = [:]  // source uuid -> clientRef
         var structure: [DiagramMutation] = []
@@ -392,6 +477,7 @@ final class DiagramCatalogStore {
                 structure.append(
                     .elementAdd(
                         DiagramElementAdd(
+                            payload: node.payload,
                             clientRef: ref,
                             parentClientRef: parentRef,
                             code: node.base.code,
@@ -401,8 +487,7 @@ final class DiagramCatalogStore {
                             centerX: node.base.centerX,
                             centerY: node.base.centerY,
                             elementZ: node.base.elementZ,
-                            scale: node.base.scale,
-                            payload: node.payload
+                            scale: node.base.scale
                         )
                     )
                 )
@@ -421,6 +506,16 @@ final class DiagramCatalogStore {
             structure.append(
                 .elementAdd(
                     DiagramElementAdd(
+                        payload: .connector(
+                            ConnectorPayload(
+                                targetElementUuid: nil,
+                                strokeColor: payload.strokeColor,
+                                strokeWidth: payload.strokeWidth,
+                                lineStyle: payload.lineStyle,
+                                headKind: payload.headKind,
+                                label: payload.label
+                            )
+                        ),
                         clientRef: refs[node.identity.uuid],
                         parentClientRef: parentRef.isEmpty ? nil : parentRef,
                         targetClientRef: targetRef,
@@ -431,17 +526,7 @@ final class DiagramCatalogStore {
                         centerX: node.base.centerX,
                         centerY: node.base.centerY,
                         elementZ: node.base.elementZ,
-                        scale: node.base.scale,
-                        payload: .connector(
-                            ConnectorPayload(
-                                targetElementUuid: nil,
-                                strokeColor: payload.strokeColor,
-                                strokeWidth: payload.strokeWidth,
-                                lineStyle: payload.lineStyle,
-                                headKind: payload.headKind,
-                                label: payload.label
-                            )
-                        )
+                        scale: node.base.scale
                     )
                 )
             )
@@ -449,9 +534,17 @@ final class DiagramCatalogStore {
         return structure
     }
 
-    /// MOVE the diagram to another tier (the row's own owner chain is
-    /// re-derived server-side). Rides `DiagramRowUpdate.promotion` through
-    /// batch-apply — the diagram row has no update message of its own.
+    /// Promotes a diagram to another tier via `DiagramRowUpdate.promotion`.
+    ///
+    /// The row's owner chain is re-derived server-side; the diagram has no
+    /// update message of its own.
+    ///
+    /// - Parameters:
+    ///   - row: The diagram row to promote.
+    ///   - tier: The target tier.
+    ///   - ownerUuid: The target owner uuid.
+    ///   - owner: The current owner to refresh after promotion.
+    /// - Throws: An error when the daemon rejects the promotion.
     func promote(
         _ row: DiagramRow,
         to tier: DiagramTier,

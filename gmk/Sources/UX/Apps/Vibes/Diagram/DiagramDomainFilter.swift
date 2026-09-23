@@ -10,8 +10,16 @@ import CoreGraphics
 /// `DiagramWorkspace` keeps the filter-blind resolve and re-projects from it.
 enum DiagramDomainFilter {
 
-    /// An empty selection means "every domain", the same convention the pills menu uses, so
-    /// "all selected" and "none selected" are one state.
+    /// Filters a diagram to show only the selected domains.
+    ///
+    /// An empty domain set means "every domain", so "all selected" and "none selected" are one
+    /// state. Hides unselected domain cards, drops edges without both endpoints, and re-derives
+    /// content bounds.
+    ///
+    /// - Parameters:
+    ///   - domains: The set of domain codes to show; empty means show all.
+    ///   - resolved: The diagram to filter.
+    /// - Returns: A filtered diagram showing only selected domains.
     static func apply(_ domains: Set<String>, to resolved: ResolvedDiagram) -> ResolvedDiagram {
         guard !domains.isEmpty else { return resolved }
 
@@ -30,9 +38,16 @@ enum DiagramDomainFilter {
         )
     }
 
-    /// Drop entity cards outside the selection; every other kind survives
-    /// (drawings and text belong to the user, not to a domain, and a ghost
-    /// card has no domain to test).
+    /// Recursively filters an element, removing entity cards not in the domain selection.
+    ///
+    /// Drawings and text survive (they belong to the user); ghost cards survive (they have no
+    /// domain). Tracks kept element uuids for edge filtering.
+    ///
+    /// - Parameters:
+    ///   - element: The element to filter.
+    ///   - domains: The set of domain codes to keep.
+    ///   - kept: Updated to track which elements are kept.
+    /// - Returns: The filtered element, or nil if filtered out.
     private static func keep(
         _ element: ResolvedElement,
         domains: Set<String>,
@@ -58,8 +73,15 @@ enum DiagramDomainFilter {
         )
     }
 
-    /// The union of what is still drawn — the resolver's own contentBounds
-    /// contract, recomputed over the survivors.
+    /// Computes the union of all element frames and edge points.
+    ///
+    /// Recomputes the resolver's contentBounds contract over the surviving filtered elements
+    /// and edges.
+    ///
+    /// - Parameters:
+    ///   - topLevel: The filtered top-level elements.
+    ///   - edges: The filtered edges with both endpoints.
+    /// - Returns: The union of all drawn content, or nil if empty.
     private static func bounds(
         topLevel: [ResolvedElement],
         edges: [ResolvedEdge]

@@ -21,9 +21,10 @@ final class PromptPhaseStore {
         case failed(String)
     }
 
-    /// One briefing row paired with its read-time staleness report. Staleness
-    /// is computed by the daemon at every BRIEFING_GET (never stored), which
-    /// is why the fetch is LIST + per-row GET rather than LIST alone.
+    /// One briefing row paired with its read-time staleness report.
+    ///
+    /// Staleness is computed by the daemon at every BRIEFING_GET (never stored),
+    /// which is why the fetch is LIST + per-row GET rather than LIST alone.
     struct BriefingItem: Equatable {
         let briefing: AgentBriefingRow
         let staleness: BriefingStaleness
@@ -41,17 +42,21 @@ final class PromptPhaseStore {
     private(set) var workflow: Phase<BotNextResponse> = .idle
     private(set) var hasLoaded = false
 
-    /// Feature 2's per-question draft/version cells. OWNED here (one instance
-    /// per prompt, reached through `SessionScope.answers(forPrompt:)`) because
-    /// this store is where CLARIFY_GET lands — every fetch feeds `adopt`, so
-    /// the version cells can never fall behind the rows the UI is editing.
+    /// Feature 2's per-question draft/version cells.
+    ///
+    /// OWNED here (one instance per prompt, reached through
+    /// `SessionScope.answers(forPrompt:)`) because this store is where
+    /// CLARIFY_GET lands — every fetch feeds `adopt`, so the version cells can
+    /// never fall behind the rows the UI is editing.
     let answers = ClarificationAnswerModel()
 
     /// USER INTENT, not payload state: while true every refresh re-fetches
-    /// that report with full:true. A pane's "show all findings" control sets
-    /// it; it survives change events so an expanded pane isn't silently
-    /// truncated by the next EXPLORATION_CHANGE — still exactly ONE full
-    /// fetch per change generation, never a burst.
+    /// that report with full:true.
+    ///
+    /// A pane's "show all findings" control sets it; it survives change events
+    /// so an expanded pane isn't silently truncated by the next
+    /// EXPLORATION_CHANGE — still exactly ONE full fetch per change generation,
+    /// never a burst.
     private(set) var wantsFullExploration = false
     private(set) var wantsFullReview = false
 
@@ -62,6 +67,8 @@ final class PromptPhaseStore {
     // chained successor's bookkeeping.
     private var inFlight: (task: Task<Void, Never>, lifecyclePhases: Bool, reports: Bool, workflow: Bool, token: UUID)?
 
+    /// Creates a read model for a prompt's phase summaries.
+    /// - Parameter promptUuid: The prompt uuid.
     init(promptUuid: String) {
         self.promptUuid = promptUuid
         // A conflicted CLARIFY_ANSWER needs fresh question rows to be
@@ -93,14 +100,16 @@ final class PromptPhaseStore {
 
     // MARK: - Refresh
 
-    /// Coalesced single-flight: the pane's event loop and the section's first render share
-    /// one round trip set.
+    /// Coalesces overlapping refresh requests into a single round trip.
     ///
-    /// `lifecyclePhases: false` skips CLARIFY_GET/ARCH_GET, which a draft prompt provably has
-    /// neither of. `reports: false` skips EXPLORE_GET/REVIEW_GET, legal ONLY for an
-    /// evidence-gated wake on a draft whose freshly-listed stub shows no report summaries.
-    /// `workflow: false` skips BOT_NEXT, its own axis and never folded into `lifecyclePhases`:
-    /// `gm prompt start` creates the `bot_workflow` row while the prompt is still draft.
+    /// The pane's event loop and the section's first render share one request. `lifecyclePhases:
+    /// false` skips CLARIFY_GET/ARCH_GET (legal on a draft); `reports: false` skips
+    /// EXPLORE_GET/REVIEW_GET (legal on a fresh stub); `workflow: false` skips BOT_NEXT.
+    ///
+    /// - Parameters:
+    ///   - lifecyclePhases: Whether to fetch clarification and architecture summaries.
+    ///   - reports: Whether to fetch exploration and review summaries.
+    ///   - workflow: Whether to fetch the workflow status.
     func refresh(
         lifecyclePhases: Bool = true,
         reports: Bool = true,
@@ -118,31 +127,37 @@ final class PromptPhaseStore {
         await chainedRun(lifecyclePhases: lifecyclePhases, reports: reports, workflow: workflow)
     }
 
-    /// One-shot widen from a pane's stub-expansion control. Idempotent — a
-    /// second call while already full issues no request. Runs THROUGH the
-    /// single flight, chained after any in-flight pass: a narrow fetch that
-    /// captured full:false before the flag flipped publishes first, and the
-    /// full payload always publishes last — never clobbered by a stale
-    /// window.
-    /// `workflow: false` on both widens: re-fetching a report window is not a
-    /// reason to spend another BOT_NEXT round trip (and BOT_NEXT is a write).
+    /// One-shot widen from a pane's stub-expansion control.
+    ///
+    /// Idempotent — second call while already full issues no request. Runs
+    /// through the single flight, chained after any in-flight pass: narrow
+    /// fetches publish first, full payload last — never clobbered by stale
+    /// windows. `workflow: false`: re-fetching a report window is not a reason
+    /// to spend another BOT_NEXT round trip (and BOT_NEXT is a write).
     func requestFullExploration() async {
         guard !wantsFullExploration else { return }
         wantsFullExploration = true
         await chainedRun(lifecyclePhases: false, reports: true, workflow: false)
     }
 
+    /// Requests a full review payload on the next refresh.
+    ///
+    /// Idempotent; a second call while already full is a no-op. Does not fetch BOT_NEXT.
     func requestFullReview() async {
         guard !wantsFullReview else { return }
         wantsFullReview = true
         await chainedRun(lifecyclePhases: false, reports: true, workflow: false)
     }
 
-    /// Start a new pass AFTER whatever is in flight (chain, never race — the
-    /// prior task's writes land first, ours land last). Ownership of the
-    /// `inFlight` slot is token-checked on exit: a predecessor resuming after
-    /// a chained successor replaced the slot must not nil it out (that would
-    /// let a third caller start a redundant racing pass).
+    /// Starts a new refresh pass after any in-flight request.
+    ///
+    /// Chains passes to prevent races: prior writes land first, new ones last. Token-checked
+    /// ownership of the `inFlight` slot prevents stale predecessors from clearing it.
+    ///
+    /// - Parameters:
+    ///   - lifecyclePhases: Whether to fetch clarification and architecture summaries.
+    ///   - reports: Whether to fetch exploration and review summaries.
+    ///   - workflow: Whether to fetch the workflow status.
     private func chainedRun(lifecyclePhases: Bool, reports: Bool, workflow: Bool) async {
         let prior = inFlight?.task
         let token = UUID()
@@ -159,6 +174,11 @@ final class PromptPhaseStore {
         if inFlight?.token == token { inFlight = nil }
     }
 
+    /// Performs the actual fetch requests for enabled phases.
+    /// - Parameters:
+    ///   - lifecyclePhases: Whether to fetch clarification and architecture.
+    ///   - reports: Whether to fetch exploration and review.
+    ///   - workflow: Whether to fetch the workflow status.
     private func performRefresh(lifecyclePhases: Bool, reports: Bool, workflow: Bool) async {
         if lifecyclePhases {
             let newClarification = await fetchClarification()
@@ -185,6 +205,8 @@ final class PromptPhaseStore {
         hasLoaded = true
     }
 
+    /// Fetches the clarification summary, adopting question version cells.
+    /// - Returns: The clarification response, absent if not yet opened, or failed if an error occurred.
     private func fetchClarification() async -> Phase<ClarifyGetResponse> {
         do {
             let response = try await service.clarification(promptUuid: promptUuid)
@@ -203,6 +225,8 @@ final class PromptPhaseStore {
         }
     }
 
+    /// Fetches the architecture summary.
+    /// - Returns: The architecture response, absent if not yet opened, or failed if an error occurred.
     private func fetchArchitecture() async -> Phase<ArchGetResponse> {
         do {
             return .loaded(try await service.architecture(promptUuid: promptUuid))
@@ -215,6 +239,9 @@ final class PromptPhaseStore {
         }
     }
 
+    /// Fetches the exploration summary, with optional full payload.
+    /// - Parameter full: Whether to fetch the full findings or a truncated view.
+    /// - Returns: The exploration response, absent if not yet opened, or failed if an error occurred.
     private func fetchExploration(full: Bool) async -> Phase<ExploreGetResponse> {
         do {
             return .loaded(try await service.exploration(promptUuid: promptUuid, full: full))
@@ -227,6 +254,9 @@ final class PromptPhaseStore {
         }
     }
 
+    /// Fetches the review summary, with optional full payload.
+    /// - Parameter full: Whether to fetch the full findings or a truncated view.
+    /// - Returns: The review response, absent if not yet opened, or failed if an error occurred.
     private func fetchReview(full: Bool) async -> Phase<ReviewGetResponse> {
         do {
             return .loaded(try await service.review(promptUuid: promptUuid, full: full))
@@ -239,13 +269,14 @@ final class PromptPhaseStore {
         }
     }
 
-    /// BOT_NEXT, honestly a write: it stamps `last_served_phase` and emits WORKFLOW_CHANGE.
+    /// Fetches the workflow status via BOT_NEXT (a write operation).
     ///
-    /// That event routes to `.prompt(uuid)`, triggering a refresh and another BOT_NEXT. The
-    /// loop SELF-DAMPS: the second call finds `lastServedPhase == current`, writes nothing and
-    /// emits nothing, so the cost is one extra round trip per real phase change.
-    /// SUMMARY_ABSENT is the normal no-`bot_workflow`-row state, so never-started and
-    /// permanent `/gm_task` land on one `.absent` arm with no distinguishing copy.
+    /// BOT_NEXT stamps `last_served_phase` and emits WORKFLOW_CHANGE, which routes to
+    /// `.prompt(uuid)` and triggers a refresh. The loop self-damps: when `lastServedPhase ==
+    /// current`, nothing is written. Retries once on version conflict.
+    ///
+    /// - Returns: The workflow response, absent if no `bot_workflow` row exists, or failed if
+    ///   an error occurred.
     private func fetchWorkflow() async -> Phase<BotNextResponse> {
         do {
             do {
@@ -267,6 +298,8 @@ final class PromptPhaseStore {
         }
     }
 
+    /// Fetches briefing summaries and their staleness reports.
+    /// - Returns: The briefing items, empty if none have been created yet, or failed if an error occurred.
     private func fetchBriefings() async -> Phase<[BriefingItem]> {
         do {
             let list = try await service.briefings(promptUuid: promptUuid).briefings

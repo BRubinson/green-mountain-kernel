@@ -17,6 +17,9 @@ struct AgentBriefingWithRefs: FetchableRecord, Decodable {
     var kbiteRefs: [AgentBriefingDopeKbiteRecord]
     var fileChangeRefs: [AgentSessionFileChangeRecord]
 
+    /// Fetches an agent briefing with its three reference types.
+    /// - Returns: A request that fetches briefings with dope, kbite, and file
+    ///   change refs.
     static func request() -> QueryInterfaceRequest<Self> {
         AgentBriefingRecord
             .including(all: AgentBriefingRecord.dopeRefs)
@@ -35,6 +38,9 @@ struct ClarificationQuestionWithOptions: FetchableRecord, Decodable {
     var questionRow: UserClarificationQuestionRecord
     var options: [UserClarificationOptionRecord]
 
+    /// Fetches a clarification question with its options.
+    /// - Returns: A request that fetches questions ordered by sequence with
+    ///   options.
     static func request() -> QueryInterfaceRequest<Self> {
         UserClarificationQuestionRecord
             .all()
@@ -49,6 +55,9 @@ struct ArchPersistenceChangeWithFields: FetchableRecord, Decodable {
     var change: ArchitecturePersistenceChangeRecord
     var fields: [ArchitecturePersistenceFieldChangeRecord]
 
+    /// Fetches an architecture persistence change with its field changes.
+    /// - Returns: A request that fetches changes ordered by sequence with
+    ///   fields.
     static func request() -> QueryInterfaceRequest<Self> {
         ArchitecturePersistenceChangeRecord
             .all()
@@ -68,6 +77,9 @@ struct ReviewSummaryWithFindings: FetchableRecord, Decodable {
     var summary: ReviewSummaryRecord
     var findings: [ReviewFindingRecord]
 
+    /// Fetches a review summary with its findings in rating order.
+    /// - Returns: A request that fetches summaries with findings ordered by
+    ///   rating readiness, then rating, then insertion order.
     static func request() -> QueryInterfaceRequest<Self> {
         ReviewSummaryRecord
             .including(
@@ -93,6 +105,11 @@ struct FileChangeWithRanges: FetchableRecord, Decodable {
     var relativePath: String
     var ranges: [FileChangeRangeRecord]
 
+    /// Fetches a file change with its path and line ranges.
+    /// - Parameter relativePath: The file path to filter by, or nil for all
+    ///   paths.
+    /// - Returns: A request that fetches changes with relative path annotated
+    ///   and ranges ordered.
     static func request(relativePath: String?) -> QueryInterfaceRequest<Self> {
         let sessionFile = TableAlias<SessionFileRecord>()
         let request =
@@ -114,6 +131,12 @@ struct FileChangeWithSessionFile: FetchableRecord, Decodable {
     var fileChange: FileChangeRecord
     var sessionFile: SessionFileRecord
 
+    /// Fetches a file change with its session file for dedup lookup.
+    /// - Parameters:
+    ///   - toolUseId: The tool use id to filter by.
+    ///   - sessionUuid: The session uuid to filter by.
+    ///   - relativePath: The relative path to filter by.
+    /// - Returns: A request that fetches the change with session file.
     static func request(
         toolUseId: String,
         sessionUuid: String,
@@ -138,6 +161,10 @@ struct TouchedPathSummary: FetchableRecord, Decodable {
     var firstChangedAt: String
     var lastChangedAt: String
 
+    /// Fetches distinct paths touched by a prompt's changes with counts.
+    /// - Parameter promptUuid: The prompt to summarize changes for.
+    /// - Returns: A request that fetches paths with change counts and first/last
+    ///   timestamps.
     static func request(promptUuid: String) -> QueryInterfaceRequest<Self> {
         let file = TableAlias<SessionFileRecord>()
         return
@@ -164,6 +191,9 @@ struct ArchitectureCounts: FetchableRecord, Decodable {
     var optionCount: Int
     var selectedCount: Int
 
+    /// Fetches option counts for an architecture summary.
+    /// - Parameter summaryUuid: The architecture summary uuid.
+    /// - Returns: A request that fetches total and selected option counts.
     static func request(summaryUuid: String) -> QueryInterfaceRequest<Self> {
         ArchitectureSummaryRecord
             .all()
@@ -186,6 +216,9 @@ struct CarePackageWithRefs: FetchableRecord, Decodable {
     var kbiteRefs: [CarePackageKbiteRefRecord]
     var explorationRefs: [CarePackageExplorationRefRecord]
 
+    /// Fetches a care package with its three reference types.
+    /// - Returns: A request that fetches packages with dope, kbite, and
+    ///   exploration refs.
     static func request() -> QueryInterfaceRequest<Self> {
         CarePackageRecord
             .including(all: CarePackageRecord.dopeRefs)

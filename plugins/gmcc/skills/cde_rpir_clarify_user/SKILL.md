@@ -3,7 +3,7 @@ name: cde_rpir_clarify_user
 description: "The CLARIFY_USER phase: the one conversation with the Endotherm, and its recorded answers."
 user-invocable: false
 allowed-tools: mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_rpir_clarify, mcp__plugin_gmcc_cde__cde_rpir_architecture
-model: opus
+model: claude-opus-5-5[1m]
 ---
 
 # Workflow Phase

@@ -27,15 +27,20 @@ struct ProjectTestLockRecord: BaseRecordFields, TableRecord {
     var heldByRunUuid: String?
     var targetInstanceUuid: String?
     /// `process` (flock-backed, the default and the safe one) or `lease`.
+    ///
     /// See `TestRunRepository.isHolderGone` — this selects WHICH liveness test
     /// runs, and only `lease` consults `expiresAt`.
     var holderKind: String
-    /// The file the holder `flock`s. Absent ⇒ lease mode.
+    /// The file the holder `flock`s.
+    ///
+    /// Absent ⇒ lease mode.
     var lockPath: String?
     var holderPid: Int?
     var claimedAt: String?
-    /// Lease mode ONLY. Never the primary liveness test: a TTL fails toward
-    /// HOLDING a stuck lock, which for a mutex is the worst direction.
+    /// Lease mode ONLY.
+    ///
+    /// Never the primary liveness test: a TTL fails toward HOLDING a stuck lock,
+    /// which for a mutex is the worst direction.
     var expiresAt: String?
 
     enum Columns: String, ColumnExpression {

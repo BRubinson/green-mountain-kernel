@@ -1,21 +1,21 @@
 import Foundation
 import GRDB
 
-/// AGENT_REGISTER data access plus the on-demand identity write the
-/// file_change path leans on. Runs INSIDE a Store-owned transaction; holds no
-/// dbQueue and never self-transacts.
+/// AGENT_REGISTER data access plus the on-demand identity write file_change
+/// path leans on.
 ///
-/// ONE ROW PER agent_id, written by two parties that never coordinate: the
-/// SubagentStart hook supplies IDENTITY, the spawner supplies AUTHORITY. Every
-/// write MERGES, so neither party can erase the other's half and neither has
-/// to go first.
+/// Runs INSIDE Store-owned transaction; holds no dbQueue, never self-transacts.
+/// ONE ROW PER agent_id, written by two uncoordinated parties: SubagentStart
+/// hook supplies IDENTITY, spawner supplies AUTHORITY. Every write MERGES so
+/// neither party erases the other's half; neither has to go first.
 struct AgentRegistrationRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
-    /// As much of the identity half as a payload-borne write carries. Passed
-    /// as one value so `ensureRegistration` reads as the single decision it
-    /// is, rather than as six positional arguments a caller can transpose.
+    /// As much of the identity half as a payload-borne write carries.
+    ///
+    /// Passed as one value so `ensureRegistration` reads as the single decision it is, rather than as six positional
+    /// arguments a caller can transpose.
     struct AgentIdentity {
         let agentType: String?
         let claudeSessionId: String?
@@ -24,14 +24,18 @@ struct AgentRegistrationRepository: RepositoryContext {
         let promptUuid: String?
     }
 
-    /// The registry's one write door for both writers, creating the row for
-    /// whichever arrives first.
+    /// Registers or updates an agent: the registry's one write door for both writers.
     ///
-    /// MERGE, never overwrite: only the fields this request names are assigned,
-    /// so neither half can blank the other. The merge is by field rather than by
-    /// row VERSION because the two writers cannot hold each other's version.
-    /// THE GMCC SESSION AND PROMPT ARE DERIVED, NEVER PASSED — a conversation
-    /// resolves through claude_session_binding, the path a file_change takes.
+    /// Creates the row for whichever writer arrives first. MERGE, never overwrite:
+    /// only the fields this request names are assigned, so neither half can blank
+    /// the other. The merge is by field rather than by row VERSION because the two
+    /// writers cannot hold each other's version. The session and prompt are
+    /// derived, never passed; a conversation resolves through
+    /// claude_session_binding.
+    ///
+    /// - Parameter req: The registration request with agent identity and properties.
+    /// - Returns: The agent registration response with created flag.
+    /// - Throws: `StoreError.badRequest` if agent_id is empty.
     func register(_ req: AgentRegisterRequest) throws -> AgentRegisterResponse {
         let agentId = req.agentId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !agentId.isEmpty else {
@@ -88,14 +92,17 @@ struct AgentRegistrationRepository: RepositoryContext {
         )
     }
 
-    /// The file_change path's registration resolver, and the reason
-    /// "registration first" is a GUARANTEE rather than a precondition.
+    /// Ensures an agent registration exists, creating one if needed.
     ///
-    /// A missing registration is CREATED here from the payload, with the
-    /// spawner-owned fields left NULL for its later merge, so nothing is ever
-    /// dropped for want of one. An invented registration appends
-    /// AGENT_UNREGISTERED rather than passing silently. Returns nil for the
-    /// PRIMARY: a missing agent_id IS the primary/subagent discriminator.
+    /// Missing registrations are created here from the identity payload. A missing
+    /// agent_id (the primary discriminator) returns nil. An invented registration
+    /// appends AGENT_UNREGISTERED.
+    ///
+    /// - Parameters:
+    ///   - agentId: The agent identifier, or nil for the primary.
+    ///   - identity: The agent identity and binding information.
+    /// - Returns: The agent uuid, or nil for the primary.
+    /// - Throws: Any store error from database operations.
     func ensureRegistration(agentId: String?, from identity: AgentIdentity) throws -> String? {
         guard let raw = agentId else { return nil }
         let agentId = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -131,12 +138,22 @@ struct AgentRegistrationRepository: RepositoryContext {
 
     // MARK: - Lookup
 
+    /// Fetches a registration by agent identifier.
+    ///
+    /// - Parameter agentId: The agent identifier.
+    /// - Returns: The registration record, or nil if not found.
+    /// - Throws: Any database error from the query.
     func fetch(agentId: String) throws -> AgentRegistrationRecord? {
         try AgentRegistrationRecord
             .filter(AgentRegistrationRecord.Columns.agentId == agentId)
             .fetchOne(db)
     }
 
+    /// Fetches a registration, throwing if not found.
+    ///
+    /// - Parameter agentId: The agent identifier.
+    /// - Returns: The registration record.
+    /// - Throws: `StoreError.notFound` if the registration does not exist.
     private func require(agentId: String) throws -> AgentRegistrationRecord {
         guard let row = try fetch(agentId: agentId) else {
             throw StoreError.notFound(entity: "agent_registration", key: agentId)

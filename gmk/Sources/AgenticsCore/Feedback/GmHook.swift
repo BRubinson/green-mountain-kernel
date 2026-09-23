@@ -19,9 +19,12 @@ protocol GmHook {
 
     static var isAsync: Bool { get }
 
-    /// The hook body. NEVER throws and NEVER blocks: a failure path returns
-    /// nil, because a hook that exits non-zero blocks the tool call it fired on.
+    /// The hook body, returning the stdout line or nil for silence.
     ///
+    /// NEVER throws and NEVER blocks: a failure path returns nil, because a
+    /// hook that exits non-zero blocks the tool call it fired on.
+    ///
+    /// - Parameter context: The hook context with stdin, dry-run flag, and optional caller.
     /// - Returns: the line to print on stdout, or nil for silence.
     static func run(_ context: GmHookContext) -> String?
 }
@@ -33,12 +36,15 @@ struct GmHookContext {
     let dryRun: Bool
 
     /// nil opens a short-lived socket client, which is what the executable does.
+    ///
     /// The kernel passes its own in-process caller, so a `HOOK_EVENT` served
     /// in-process does not dial the daemon it is already inside.
     let caller: (any GmVerbCaller)?
 }
 
-/// The events the plugin hooks. Raw values are the harness's own names, so the
+/// The events the plugin hooks.
+///
+/// Raw values are the harness's own names, so the
 /// same enum is the in-process lookup for `HOOK_EVENT` and the key under which
 /// the bridge writes the `hooks.json` group.
 enum GmHookEvent: String, CaseIterable, Sendable {
@@ -49,7 +55,9 @@ enum GmHookEvent: String, CaseIterable, Sendable {
 
     case subagentStart = "SubagentStart"
 
-    /// THE REGISTRY. An exhaustive switch rather than a list: a case added
+    /// THE REGISTRY.
+    ///
+    /// An exhaustive switch rather than a list: a case added
     /// without a handler does not compile, where an unlisted handler would
     /// be silent.
     var hook: any GmHook.Type {
@@ -63,6 +71,10 @@ enum GmHookEvent: String, CaseIterable, Sendable {
     /// The generated executable's name: `gm_hook_post_tool_use`.
     var binaryName: String { "gm_hook_" + Self.snakeCase(rawValue) }
 
+    /// Convert camelCase text to snake_case.
+    ///
+    /// - Parameter text: The camelCase text.
+    /// - Returns: The text in snake_case.
     private static func snakeCase(_ text: String) -> String {
         var out = ""
         for (index, scalar) in text.unicodeScalars.enumerated() {
@@ -100,16 +112,23 @@ extension GmHook {
 /// Helpers every handler shares.
 enum GmHookSupport {
 
+    /// Read all available data from standard input.
+    ///
+    /// - Returns: The stdin data.
     static func readStdin() -> Data {
         FileHandle.standardInput.readDataToEndOfFile()
     }
 
-    /// Whether a shell command line invokes `gm_hook` or any generated hook
-    /// executable in COMMAND POSITION — line start, after `;` `&` `|` `(` `` ` ``
-    /// `$(`, or after `exec` — never anywhere in the string. `grep gm_hook` is a
-    /// mention, and denying it makes this repository undevelopable from its
-    /// own tooling. `env X=1 gm_hook` and `bash -c "gm_hook …"` are deliberate
-    /// gaps: the guard stops the reach, not a determined circumvention.
+    /// Whether a shell command invokes `gm_hook` in command position.
+    ///
+    /// Detects invocation at line start, after `;` `&` `|` `(` `` ` `` `$(`, or
+    /// after `exec` — never anywhere in the string. `grep gm_hook` is a mention
+    /// and is not denied, as that would make this repository undevelopable from
+    /// its own tooling. `env X=1 gm_hook` and `bash -c "gm_hook …"` are
+    /// deliberate gaps: the guard stops the reach, not a determined circumvention.
+    ///
+    /// - Parameter command: The shell command line.
+    /// - Returns: `true` if `gm_hook` is invoked in command position.
     static func invokesGmHook(_ command: String) -> Bool {
         command.range(of: denyPattern, options: .regularExpression) != nil
     }
@@ -125,9 +144,15 @@ enum GmHookSupport {
         return #"(?:^|[;&|(`]|\$\(|\bexec)\s*(?:\S*/)?(?:"# + names + #")["']?(?=\s|$)"#
     }()
 
-    /// Claude Code's hook response shape, whose keys are camelCase — so it is
-    /// built with JSONSerialization rather than through WireCodec, which
-    /// snake_cases everything it touches.
+    /// Format a hook response line in Claude Code's hook response shape.
+    ///
+    /// Keys are camelCase, so it is built with JSONSerialization rather than
+    /// through WireCodec, which snake_cases everything it touches.
+    ///
+    /// - Parameters:
+    ///   - event: The hook event.
+    ///   - context: The additional context string.
+    /// - Returns: A JSON-encoded response line, or `nil` if encoding fails.
     static func additionalContextLine(event: GmHookEvent, _ context: String) -> String? {
         let response: [String: Any] = [
             "hookSpecificOutput": [
@@ -139,6 +164,13 @@ enum GmHookSupport {
         return String(data: data, encoding: .utf8)
     }
 
+    /// Encode a value to JSON using WireCodec snake_case encoding.
+    ///
+    /// DTOs carry no CodingKeys, so only the shared snake_case strategy keeps
+    /// this output matching the wire keys that skills and bot docs grep for.
+    ///
+    /// - Parameter value: The encodable value.
+    /// - Returns: The pretty-printed JSON string, or `nil` if encoding fails.
     static func encodeJSON<T: Encodable>(_ value: T) -> String? {
         // WireCodec, not a bare JSONEncoder: DTOs carry no CodingKeys, so only
         // the shared snake_case strategy keeps this output matching the wire
@@ -147,14 +179,18 @@ enum GmHookSupport {
         return String(data: data, encoding: .utf8)
     }
 
-    /// Runs `body` against a verb caller, opening a short-lived socket client
-    /// only when one was not supplied, and closing only what it opened. It maps
-    /// NO error onto an exit code, because a hook has none to map onto.
+    /// Run a body function with a verb caller, managing a socket client if needed.
     ///
-    /// THE INJECTED CASE IS NOT AN OPTIMISATION. When the kernel serves
-    /// `HOOK_EVENT` it passes its own in-process caller; opening a `DaemonClient`
-    /// there would connect the kernel to itself on the serial queue that would
-    /// have to answer, which is a deadlock.
+    /// Opens a short-lived socket client only when one was not supplied, and
+    /// closes only what it opened. Maps no error onto exit code (hooks have none
+    /// to map). The kernel's in-process caller prevents a deadlock from opening
+    /// a `DaemonClient` that would connect the kernel to itself.
+    ///
+    /// - Parameters:
+    ///   - caller: An optional verb caller, or `nil` to open a socket client.
+    ///   - body: The function to run with the caller.
+    /// - Returns: The result of calling `body`.
+    /// - Throws: Any error from the body function.
     static func withKitClient<T>(
         _ caller: (any GmVerbCaller)?,
         _ body: (any GmVerbCaller) throws -> T

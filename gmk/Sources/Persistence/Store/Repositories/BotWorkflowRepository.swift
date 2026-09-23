@@ -1,24 +1,28 @@
 import Foundation
 import GRDB
 
-/// BOT_* / PROMPT_START / PROMPT_RESUME data access — the daemon-held
-/// workflow state machine (m0025). Runs INSIDE a Store-owned transaction.
+/// BOT_* / PROMPT_START / PROMPT_RESUME data access — the daemon-held workflow state machine (m0025).
 ///
-/// The row is deliberately thin: variant + status + claim + observability.
-/// The CURRENT PHASE IS DERIVED from db evidence on every NEXT — there is
-/// no stored cursor to drift, so resume is literally the first-run code
-/// path. Gates that move the PROMPT still go through PROMPT_SET_STATUS
-/// (the single door); NEXT only reports and refuses.
+/// Runs INSIDE a Store-owned transaction. The row is deliberately thin: variant + status +
+/// claim + observability. The CURRENT PHASE IS DERIVED from db evidence on every NEXT — there
+/// is no stored cursor to drift, so resume is literally the first-run code path. Gates that
+/// move the PROMPT still go through PROMPT_SET_STATUS (the single door); NEXT only reports
+/// and refuses.
 struct BotWorkflowRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
     // MARK: - Verbs
 
-    /// Enter the machine from `draft`: creates the active workflow row and
-    /// claims the prompt activation for the calling instance. No status
-    /// change — the briefing/explore phases run while the prompt is draft,
-    /// exactly as the manual flow always has.
+    /// Creates an active workflow row and claims the prompt activation.
+    ///
+    /// Enters the machine from a draft prompt; the briefing and explore phases run
+    /// while the prompt remains draft. The prompt must not already have an active workflow.
+    ///
+    /// - Parameter req: Request with `promptUuid`, `variant`, and optional `clientKey`.
+    /// - Returns: The new workflow and a flag indicating it was created.
+    /// - Throws: `StoreError.invalidEntityTransition` if the prompt is not draft;
+    ///   `StoreError.badRequest` if the prompt already has an active workflow.
     func start(_ req: PromptStartRequest) throws -> BotWorkflowResponse {
         let prompt = try PromptRecord.require(db, uuid: req.promptUuid)
         guard prompt.status == "draft" else {
@@ -76,8 +80,15 @@ struct BotWorkflowRepository: RepositoryContext {
         return BotWorkflowResponse(workflow: row, created: true)
     }
 
-    /// Adopt whatever evidence exists: fetch-or-create, re-stamp the client
-    /// key, change nothing else. Phase is recomputed at every NEXT.
+    /// Fetches or creates a workflow and updates the client key claim.
+    ///
+    /// Adopts existing evidence without changing any other state. Phase is recomputed
+    /// on every `next` call. A done prompt cannot be resumed.
+    ///
+    /// - Parameter req: Request with `promptUuid`, optional `variant` and `clientKey`.
+    /// - Returns: The workflow and a flag indicating whether it was created.
+    /// - Throws: `StoreError.invalidEntityTransition` if the prompt is done;
+    ///   `StoreError.badRequest` if no variant is passed and the prompt has none.
     func resume(_ req: PromptResumeRequest) throws -> BotWorkflowResponse {
         let prompt = try PromptRecord.require(db, uuid: req.promptUuid)
         // A done prompt is finished work: new work = a new prompt. Without
@@ -159,9 +170,15 @@ struct BotWorkflowRepository: RepositoryContext {
         return BotWorkflowResponse(workflow: row, created: true)
     }
 
-    /// The machine's read: derive the current phase, serve its instructions
-    /// + uuid bundle, and note what still blocks the next phase.
-    /// last_served_phase is stamped for observability only.
+    /// Derives the current phase and returns its instructions and gate blockers.
+    ///
+    /// Updates `last_served_phase` for observability. The phase is the furthest one
+    /// whose entry gate is satisfied, walked backward so evidence need not be monotonic.
+    ///
+    /// - Parameter req: Request with `promptUuid`, optional `clientKey` and `sessionUuid`.
+    /// - Returns: Workflow, phase, instructions, unmet gate blockers, and phase UUIDs.
+    /// - Throws: `StoreError.corruptState` if the workflow variant is unknown;
+    ///   errors from `resolve` if the workflow cannot be found.
     func next(_ req: BotNextRequest) throws -> BotNextResponse {
         let workflow = try resolve(
             promptUuid: req.promptUuid,
@@ -209,6 +226,11 @@ struct BotWorkflowRepository: RepositoryContext {
         )
     }
 
+    /// Fetches the resolved workflow without changing any state.
+    ///
+    /// - Parameter req: Request with `promptUuid`, optional `clientKey` and `sessionUuid`.
+    /// - Returns: The workflow.
+    /// - Throws: Errors from `resolve` if the workflow cannot be found.
     func get(_ req: BotGetRequest) throws -> BotWorkflowResponse {
         let workflow = try resolve(
             promptUuid: req.promptUuid,
@@ -218,14 +240,20 @@ struct BotWorkflowRepository: RepositoryContext {
         return BotWorkflowResponse(workflow: workflow)
     }
 
-    /// The derivation: the FURTHEST phase whose entry gate passes wins, walked
-    /// from the back so evidence need not be monotonic. An adopted prompt can
-    /// carry architecture evidence while failing the per-agent exploration gate,
-    /// which a forward walk would strand at explore. Reported blockers are the
-    /// NEXT phase's unmet gate.
-    /// `includeAdvisory` defaults OFF because this is also on
-    /// `FileChangeRepository.add`'s hot path, where one sweep would pay the
-    /// advisory SQL per row and discard the blockers. BOT_NEXT opts in.
+    /// Derives the furthest phase whose entry gate is satisfied.
+    ///
+    /// Walks phases backward so evidence need not be monotonic. An adopted prompt may
+    /// carry architecture evidence while failing the per-agent exploration gate. The
+    /// reported blockers are the next phase's unmet gate. Set `includeAdvisory` to also
+    /// evaluate phase-exit contracts; defaults OFF because this also runs on
+    /// `FileChangeRepository.add`'s hot path.
+    ///
+    /// - Parameters:
+    ///   - workflow: The workflow row.
+    ///   - variant: The workflow variant.
+    ///   - includeAdvisory: Include phase-exit advisory blockers; defaults `false`.
+    /// - Returns: The current phase and a list of blockers to the next phase.
+    /// - Throws: Errors from gate checks or database queries.
     func derivePhase(
         workflow: BotWorkflowRow,
         variant: BotVariant,
@@ -254,14 +282,17 @@ struct BotWorkflowRepository: RepositoryContext {
         return (current, blockers)
     }
 
-    /// The phase-EXIT contracts in WorkflowGates, reported and never enforced.
-    /// Appended to derivePhase's reporting half AFTER `current` is fixed;
-    /// `entryBlockers` must stay untouched, because an entry blocker on `.done`
-    /// would derive an already-done prompt with open findings backwards to
-    /// `.reviewFix`. Read WorkflowGates' header before moving these.
-    /// Evaluated only for the two phases whose exit they describe, and status
-    /// scoped on top of that, which suppresses false advisories on closed
-    /// prompts. That scoping is not what makes derivation safe.
+    /// Returns phase-exit advisory blockers defined in WorkflowGates.
+    ///
+    /// Evaluated only for the implement and reviewFix exit phases, status-scoped to suppress
+    /// false positives on closed prompts. Reported but never enforced. Read WorkflowGates
+    /// before modifying these.
+    ///
+    /// - Parameters:
+    ///   - current: The current phase.
+    ///   - promptUuid: The prompt UUID.
+    /// - Returns: Advisory blockers prefixed with "advisory: ".
+    /// - Throws: Errors from database queries.
     private func advisoryBlockers(
         current: WorkflowSpec.Phase,
         promptUuid: String
@@ -283,7 +314,13 @@ struct BotWorkflowRepository: RepositoryContext {
         return unmet.map { "advisory: \($0)" }
     }
 
-    /// set-status done closes the workflow (called by PromptRepository).
+    /// Closes an active workflow when its prompt is set to done status.
+    ///
+    /// Called by `PromptRepository` when a prompt transitions to done. Does nothing
+    /// if the prompt has no active workflow.
+    ///
+    /// - Parameter promptUuid: The prompt UUID.
+    /// - Throws: Errors from database updates.
     func closeForPrompt(promptUuid: String) throws {
         guard let workflow = try fetchActive(promptUuid: promptUuid) else { return }
         try core.updateBase(
@@ -303,7 +340,17 @@ struct BotWorkflowRepository: RepositoryContext {
 
     // MARK: - Phase derivation
 
-    /// Empty = the phase's entry gate is satisfied.
+    /// Returns unmet entry gate blockers for a phase.
+    ///
+    /// Empty list means the phase's entry gate is satisfied. Checks variant-specific
+    /// and status-specific preconditions.
+    ///
+    /// - Parameters:
+    ///   - phase: The workflow phase to check.
+    ///   - workflow: The workflow row.
+    ///   - variant: The workflow variant.
+    /// - Returns: Blocker messages, empty if the phase gate is satisfied.
+    /// - Throws: Errors from database queries or gate evaluations.
     private func entryBlockers(
         phase: WorkflowSpec.Phase,
         workflow: BotWorkflowRow,
@@ -410,6 +457,14 @@ struct BotWorkflowRepository: RepositoryContext {
         }
     }
 
+    /// Fetches the newest UUID for each workflow phase entity.
+    ///
+    /// Ordered by creation time descending, then rowid descending as the tie-break.
+    /// Exploration summaries are collected into a dictionary by agent type.
+    ///
+    /// - Parameter workflow: The workflow row.
+    /// - Returns: Bundle of phase UUIDs and session UUID.
+    /// - Throws: Errors from database queries.
     private func phaseUuids(workflow: BotWorkflowRow) throws -> BotPhaseUuids {
         let promptUuid = workflow.promptUuid
         let briefing = try newestUuid(
@@ -459,6 +514,13 @@ struct BotWorkflowRepository: RepositoryContext {
         )
     }
 
+    /// Returns whether an exploration summary for an agent type has complete status.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The prompt UUID.
+    ///   - agentType: The agent type to check.
+    /// - Returns: `true` if a complete exploration summary exists, `false` otherwise.
+    /// - Throws: Errors from database queries.
     private func explorationComplete(promptUuid: String, agentType: String) throws -> Bool {
         try ExplorationSummaryRecord
             .filter(ExplorationSummaryRecord.Columns.promptUuid == promptUuid)
@@ -467,8 +529,14 @@ struct BotWorkflowRepository: RepositoryContext {
             .fetchCount(db) > 0
     }
 
-    /// Newest first by `created_at` then rowid — the tie-break every uuid
-    /// lookup in this file reads with.
+    /// Returns the UUID of the newest row in a query, ordered by creation time.
+    ///
+    /// Uses creation time descending, then rowid descending as the tie-break.
+    /// This ordering is used throughout the file for consistent UUID lookups.
+    ///
+    /// - Parameter request: A query request to order and fetch from.
+    /// - Returns: The UUID of the newest row, or `nil` if no rows match.
+    /// - Throws: Errors from database queries.
     private func newestUuid<T: BaseRecordFields>(
         _ request: QueryInterfaceRequest<T>
     ) throws -> String? {
@@ -478,6 +546,11 @@ struct BotWorkflowRepository: RepositoryContext {
             .fetchOne(db)
     }
 
+    /// Returns the status of the newest clarification summary for a prompt.
+    ///
+    /// - Parameter promptUuid: The prompt UUID.
+    /// - Returns: The status string, or `nil` if no clarification summary exists.
+    /// - Throws: Errors from database queries.
     private func clarificationStatus(promptUuid: String) throws -> String? {
         try ClarificationSummaryRecord
             .filter(ClarificationSummaryRecord.Columns.promptUuid == promptUuid)
@@ -486,6 +559,11 @@ struct BotWorkflowRepository: RepositoryContext {
             .fetchOne(db)
     }
 
+    /// Returns the status of a prompt.
+    ///
+    /// - Parameter promptUuid: The prompt UUID.
+    /// - Returns: The status string, or `nil` if the prompt is not found.
+    /// - Throws: Errors from database queries.
     private func promptStatus(promptUuid: String) throws -> String? {
         try PromptRecord
             .all()
@@ -496,12 +574,21 @@ struct BotWorkflowRepository: RepositoryContext {
 
     // MARK: - Resolution + fetch
 
-    /// Explicit prompt uuid → the caller's own active workflow (client key)
-    /// → the activation-resolved prompt's workflow → the session's single
-    /// active workflow. The task-tier shadowing hazard applies — every bot
-    /// verb keeps an explicit prompt_uuid escape hatch. Read verbs fall
-    /// back to the prompt's most recent CLOSED workflow so a completed run
-    /// renders as done instead of erroring SUMMARY_ABSENT.
+    /// Resolves a workflow by prompt UUID, client key, or session UUID.
+    ///
+    /// Resolution order: explicit prompt UUID, caller's active workflow by client key,
+    /// activation-resolved workflow, session's single active workflow. The task-tier
+    /// shadowing hazard applies — every bot verb keeps an explicit prompt_uuid escape
+    /// hatch. Read verbs fall back to the prompt's most recent closed workflow so a
+    /// completed run renders as done instead of erroring SUMMARY_ABSENT.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: Explicit prompt UUID; tried first.
+    ///   - clientKey: Caller's client key; tried second.
+    ///   - sessionUuid: Session UUID; tried third.
+    /// - Returns: The resolved workflow.
+    /// - Throws: `StoreError.summaryAbsent` if the prompt is unknown;
+    ///   `StoreError.badRequest` if session has multiple active workflows.
     private func resolve(
         promptUuid: String?,
         clientKey: String?,
@@ -564,6 +651,11 @@ struct BotWorkflowRepository: RepositoryContext {
         workflows.filter(BotWorkflowRecord.Columns.status == "active")
     }
 
+    /// Returns the active workflow for a prompt, if one exists.
+    ///
+    /// - Parameter promptUuid: The prompt UUID.
+    /// - Returns: The active workflow, or `nil` if none exists.
+    /// - Throws: Errors from database queries.
     func fetchActive(promptUuid: String) throws -> BotWorkflowRow? {
         try activeWorkflows
             .filter(BotWorkflowRecord.Columns.promptUuid == promptUuid)
@@ -571,12 +663,24 @@ struct BotWorkflowRepository: RepositoryContext {
             .dto()
     }
 
+    /// Returns a workflow row by UUID.
+    ///
+    /// - Parameter uuid: The workflow UUID.
+    /// - Returns: The workflow row, or `nil` if not found.
+    /// - Throws: Errors from database queries.
     private func fetchRow(uuid: String) throws -> BotWorkflowRow? {
         try BotWorkflowRecord.fetch(db, uuid: uuid)?.dto()
     }
 
-    /// The partial UNIQUE(client_key) WHERE active means one instance drives
-    /// one workflow at a time: moving to a new prompt releases the old hold.
+    /// Releases client key claims from active workflows except one.
+    ///
+    /// The partial UNIQUE(client_key) WHERE active ensures one instance drives one
+    /// workflow at a time. Moving to a new prompt releases the old hold.
+    ///
+    /// - Parameters:
+    ///   - clientKey: The client key to release.
+    ///   - uuid: The workflow UUID to exclude from release, or `nil` to release all.
+    /// - Throws: Errors from database updates.
     private func releaseClientClaim(clientKey: String, except uuid: String?) throws {
         for row
             in try activeWorkflows

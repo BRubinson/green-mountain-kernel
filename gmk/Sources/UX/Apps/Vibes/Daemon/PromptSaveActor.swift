@@ -20,19 +20,34 @@ actor PromptSaveActor {
     private var version: Int64
     private(set) var lastWrittenVersion: Int64 = 0
 
+    /// Creates a save actor for a prompt.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The uuid of the prompt to save.
+    ///   - version: The version of the initial read.
     init(promptUuid: String, version: Int64) {
         self.promptUuid = promptUuid
         self.version = version
     }
 
-    /// Adopt an externally-refreshed row's version as the new expected base
-    /// (after the UI accepts a remote change or resolves a conflict).
+    /// Adopt an externally-refreshed version as the new expected base.
+    ///
+    /// Called after the UI accepts a remote change or resolves a conflict.
     /// MONOTONIC: the actor is shared by every pane on this prompt, so a pane
     /// holding a stale snapshot must never rewind a peer's version thread.
+    ///
+    /// - Parameter newVersion: The externally-refreshed row version.
     func adoptVersion(_ newVersion: Int64) {
         version = max(version, newVersion)
     }
 
+    /// Save the prompt's content with optimistic concurrency control.
+    ///
+    /// - Parameters:
+    ///   - backstory: The prompt's backstory section.
+    ///   - goal: The prompt's goal section.
+    ///   - detail: The prompt's detail section.
+    /// - Returns: A `PromptSaveActor.Outcome` representing the save result.
     func save(backstory: String, goal: String, detail: String) async -> Outcome {
         do {
             let row = try await service.updatePromptContent(
@@ -61,32 +76,44 @@ actor PromptSaveActor {
     }
 }
 
-/// Reference-backed dirty-state holder for one open prompt. The editor pane is
-/// a value-type View whose @State is unreadable after teardown; the box holds
-/// the latest unsaved draft + the save actor by reference, so the teardown and
-/// quit flush paths never touch view state.
+/// Reference-backed dirty-state holder for one open prompt.
+///
+/// The editor pane is a value-type View whose @State is unreadable after
+/// teardown; the box holds the latest unsaved draft + the save actor by
+/// reference, so the teardown and quit flush paths never touch view state.
 @MainActor
 final class PromptDraftBox {
     let promptKey: String
     var saver: PromptSaveActor?
     private(set) var pendingDraft: PromptEditHistory.EditState?
 
+    /// Creates a draft box for a prompt.
+    ///
+    /// - Parameter promptKey: The key identifying the prompt.
     init(promptKey: String) {
         self.promptKey = promptKey
     }
 
     var isDirty: Bool { pendingDraft != nil }
 
+    /// Mark the draft as having unsaved changes.
+    ///
+    /// - Parameter state: The current edit state to store as pending.
     func markDirty(_ state: PromptEditHistory.EditState) {
         pendingDraft = state
     }
 
+    /// Mark the draft as saved if it matches the pending state.
+    ///
+    /// - Parameter state: The edit state that was just saved.
     func markSaved(_ state: PromptEditHistory.EditState) {
         if pendingDraft == state { pendingDraft = nil }
     }
 
-    /// Best-effort teardown/quit flush — silent (banners are gone with the
-    /// view); a conflict or lock here just leaves the draft pending.
+    /// Best-effort flush of the pending draft during teardown or quit.
+    ///
+    /// Silent: banners are gone with the view. A conflict or lock just
+    /// leaves the draft pending for the next opportunity to save.
     func flush() async {
         guard let saver, let draft = pendingDraft else { return }
         let outcome = await saver.save(
@@ -109,10 +136,16 @@ final class PromptFlushRegistry {
 
     private var boxes: [String: PromptDraftBox] = [:]
 
+    /// Register a draft box with the flush registry.
+    ///
+    /// - Parameter box: The draft box to register.
     func register(_ box: PromptDraftBox) {
         boxes[box.promptKey] = box
     }
 
+    /// Unregister a draft box from the flush registry.
+    ///
+    /// - Parameter key: The key of the draft box to unregister.
     func unregister(_ key: String) {
         boxes[key] = nil
     }
@@ -121,6 +154,9 @@ final class PromptFlushRegistry {
         boxes.values.contains(where: \.isDirty)
     }
 
+    /// Flush all dirty draft boxes concurrently.
+    ///
+    /// - Note: Concurrent flushes ensure N open prompts do not serialize N socket timeouts.
     func flushAll() async {
         // Concurrent: N open prompts must not serialize N socket timeouts.
         await withTaskGroup(of: Void.self) { group in
@@ -134,24 +170,27 @@ final class PromptFlushRegistry {
 final class GMVibesAppDelegate: NSObject, NSApplicationDelegate {
     override init() { super.init() }
 
-    /// The kernel this process hosts, if it does. Assigned once by
-    /// `GMVibesApp.init` — the delegate is constructed by
-    /// `@NSApplicationDelegateAdaptor` before the services exist, so it cannot
-    /// build its own.
+    /// The kernel this process hosts, if it does.
     ///
-    /// WEAK IS WRONG HERE and strong is deliberate: the whole job is to run
-    /// during termination, which is exactly when other references are going
-    /// away.
+    /// Assigned once by `GMVibesApp.init` — the delegate is constructed by
+    /// `@NSApplicationDelegateAdaptor` before the services exist, so it cannot build its own.
+    /// WEAK IS WRONG HERE and strong is deliberate: the whole job is to run during termination,
+    /// which is exactly when other references are going away.
     var services: GMVibesServices?
 
-    /// Termination is ordered: flush dirty prompt drafts on a bounded deadline, THEN stop the
-    /// kernel (listener down, DAEMON_STOP, WAL checkpointed, database closed, socket and
-    /// pidfile unlinked). The flush is a write and the stop closes the database.
+    /// Handle application termination with graceful shutdown of the kernel.
     ///
-    /// The deadline does not gate on the flush, because the save path can bottom out in
-    /// blocking I/O and a quit must never be hostage to it. Kernel shutdown runs on BOTH
-    /// completion paths: a flush that timed out must still close the database, or the WAL is
-    /// left for the next boot to recover.
+    /// Termination is ordered: flush dirty prompt drafts on a bounded deadline,
+    /// THEN stop the kernel (listener down, DAEMON_STOP, WAL checkpointed,
+    /// database closed, socket and pidfile unlinked). The flush is a write and
+    /// the stop closes the database, so the deadline does not gate on the flush;
+    /// the save path can bottom out in blocking I/O and a quit must never be
+    /// hostage to it. Kernel shutdown runs on both completion paths: a
+    /// timed-out flush still closes the database, or the WAL is left for the
+    /// next boot to recover.
+    ///
+    /// - Parameter sender: The application requesting termination.
+    /// - Returns: `terminateNow` if no dirty drafts exist; `terminateLater` otherwise.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let registry = PromptFlushRegistry.shared
         guard registry.hasDirtyDrafts else {

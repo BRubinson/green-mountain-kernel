@@ -2,11 +2,15 @@ import Foundation
 import GRDB
 
 extension Migrations {
-    // m0015 — FTS5 mirrors over the dope tables. Pure ADD. The FtsSpec loop is a
-    // PRIVATE COPY of m0003's: a registered migration never reaches out to
-    // shared code that might change under it. Sequenced strictly AFTER the
-    // m0012/m0013 rebuilds — a DROP TABLE takes its triggers with it, so mirrors
-    // attached earlier would be destroyed silently.
+    /// Registers the m0015 migration: FTS5 search indexes for dope tables.
+    ///
+    /// Creates full-text search mirrors over all dope tables. The FtsSpec loop is a
+    /// private copy of m0003's: a registered migration never reaches out to shared
+    /// code that might change under it. Sequenced strictly after m0012/m0013 rebuilds
+    /// because a DROP TABLE takes its triggers with it, so mirrors attached earlier
+    /// would be destroyed silently.
+    ///
+    /// - Parameter migrator: The database migrator to register with.
     static func m0015_dopeSearchIndexes(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0015_dopeSearchIndexes") { db in
             struct FtsSpec {

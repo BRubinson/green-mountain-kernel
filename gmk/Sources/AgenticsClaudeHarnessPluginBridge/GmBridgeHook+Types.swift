@@ -340,6 +340,19 @@ enum GmBridgeHook {
 
         var async: Bool?
 
+        /// Creates a handler of the specified type with optional parameters.
+        ///
+        /// - Parameters:
+        ///   - type: The handler type (command, HTTP, MCP tool, prompt, or agent).
+        ///   - command: The command to run; used for `.command` type.
+        ///   - args: Arguments to pass to the command.
+        ///   - url: The HTTP endpoint; used for `.http` type.
+        ///   - server: The MCP server name; used for `.mcpTool` type.
+        ///   - tool: The MCP tool name; used for `.mcpTool` type.
+        ///   - prompt: The prompt text; used for `.prompt` type.
+        ///   - agent: The agent name; used for `.agent` type.
+        ///   - timeout: Timeout in milliseconds for asynchronous execution.
+        ///   - async: Whether to execute asynchronously.
         init(
             type: HandlerType,
             command: String? = nil,
@@ -364,6 +377,13 @@ enum GmBridgeHook {
             self.async = async
         }
 
+        /// Creates a command handler.
+        ///
+        /// - Parameters:
+        ///   - command: The command to run.
+        ///   - args: Arguments to pass to the command.
+        ///   - timeout: Timeout in milliseconds for asynchronous execution.
+        ///   - async: Whether to execute asynchronously.
         init(
             command: String,
             args: [String]? = nil,
@@ -379,6 +399,13 @@ enum GmBridgeHook {
             )
         }
 
+        /// Creates an HTTP handler.
+        ///
+        /// - Parameters:
+        ///   - url: The HTTP endpoint URL.
+        ///   - timeout: Timeout in milliseconds for asynchronous execution.
+        ///   - async: Whether to execute asynchronously.
+        /// - Returns: An HTTP handler.
         static func http(
             url: String,
             timeout: Int? = nil,
@@ -387,6 +414,13 @@ enum GmBridgeHook {
             Handler(type: .http, url: url, timeout: timeout, async: async)
         }
 
+        /// Creates an MCP tool handler.
+        ///
+        /// - Parameters:
+        ///   - server: The MCP server name.
+        ///   - tool: The tool name in the server.
+        ///   - timeout: Timeout in milliseconds for execution.
+        /// - Returns: An MCP tool handler.
         static func mcpTool(
             server: String,
             tool: String,
@@ -395,10 +429,22 @@ enum GmBridgeHook {
             Handler(type: .mcpTool, server: server, tool: tool, timeout: timeout)
         }
 
+        /// Creates a prompt handler.
+        ///
+        /// - Parameters:
+        ///   - text: The prompt text to send to Claude.
+        ///   - timeout: Timeout in milliseconds for execution.
+        /// - Returns: A prompt handler.
         static func prompt(_ text: String, timeout: Int? = nil) -> Handler {
             Handler(type: .prompt, prompt: text, timeout: timeout)
         }
 
+        /// Creates an agent handler.
+        ///
+        /// - Parameters:
+        ///   - name: The agent name to invoke.
+        ///   - timeout: Timeout in milliseconds for execution.
+        /// - Returns: An agent handler.
         static func agent(_ name: String, timeout: Int? = nil) -> Handler {
             Handler(type: .agent, agent: name, timeout: timeout)
         }
@@ -410,7 +456,12 @@ enum GmBridgeHook {
 
         var hooks: [Handler]
 
-        init(matcher: String? = nil, hooks: [Handler]) {
+        /// Creates a matcher group for hooks.
+        ///
+        /// - Parameters:
+        ///   - hooks: The handlers in this group.
+        ///   - matcher: An optional matcher expression to filter which hooks apply.
+        init(hooks: [Handler], matcher: String? = nil) {
             self.matcher = matcher
             self.hooks = hooks
         }
@@ -424,7 +475,12 @@ enum GmBridgeHook {
 
         var hooks: [String: [MatcherGroup]]
 
-        init(description: String? = nil, hooks: [String: [MatcherGroup]]) {
+        /// Creates a hooks file configuration.
+        ///
+        /// - Parameters:
+        ///   - hooks: A dictionary mapping hook names to matcher groups.
+        ///   - description: An optional description of the hooks file.
+        init(hooks: [String: [MatcherGroup]], description: String? = nil) {
             self.description = description
             self.hooks = hooks
         }

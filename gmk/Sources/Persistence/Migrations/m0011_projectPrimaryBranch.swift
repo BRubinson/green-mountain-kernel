@@ -2,11 +2,14 @@ import Foundation
 import GRDB
 
 extension Migrations {
-    // m0011 — project.primary_project_branch: the branch whose SESSION_INSTANCE
-    // dope scope may promote into the project's BASE_PROJECT scope.
-    // Plain ADD COLUMN, NOT NULL with a CONSTANT DEFAULT and no CHECK and no
-    // REFERENCES — the shape SQLite accepts without a table rebuild. Existing
-    // projects backfill to 'main'.
+    /// Adds the project primary branch column to the database.
+    ///
+    /// Adds the `primary_project_branch` column to the project table, which
+    /// identifies the branch whose SESSION_INSTANCE dope scope may promote
+    /// into the project's BASE_PROJECT scope. Existing projects backfill to
+    /// 'main'.
+    ///
+    /// - Parameter migrator: The database migrator to register this migration.
     static func m0011_projectPrimaryBranch(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0011_projectPrimaryBranch") { db in
             try db.execute(

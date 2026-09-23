@@ -9,7 +9,9 @@ import XCTest
 /// doing real startup work against a real empty directory.
 final class KernelLifecycleTests: KernelBackedTestCase {
 
-    /// A fresh root self-bootstraps. No seeding, no fixtures, no `Store`.
+    /// A fresh root self-bootstraps.
+    ///
+    /// No seeding, no fixtures, no `Store`.
     ///
     /// `KernelWriter.start` migrates an empty directory into a full schema, so
     /// "create a directory and point a kernel at it" is the entire setup — which

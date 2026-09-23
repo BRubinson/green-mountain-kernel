@@ -1,12 +1,18 @@
 import Foundation
 import GRDB
 
-/// PROMPT_* data access — the prompt lifecycle. Runs INSIDE a Store-owned
-/// transaction; holds no dbQueue and never self-transacts.
+/// PROMPT_* data access — the prompt lifecycle.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts.
 struct PromptRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Creates a new prompt for the session.
+    ///
+    /// - Parameter req: Request containing the prompt metadata and session UUID.
+    /// - Returns: The created prompt row.
+    /// - Throws: `StoreError.notFound` if the session does not exist.
     func create(_ req: PromptCreateRequest) throws -> PromptRow {
         guard try SessionRecord.exists(db, key: ["uuid": req.sessionUuid]) else {
             throw StoreError.notFound(entity: "session", key: req.sessionUuid)
@@ -46,7 +52,6 @@ struct PromptRepository: RepositoryContext {
         let uuid = try core.insertBase(
             db,
             table: "prompt",
-            uuid: req.uuid,
             extra: [
                 "session_uuid": req.sessionUuid,
                 "seq": seq,
@@ -58,7 +63,8 @@ struct PromptRepository: RepositoryContext {
                 "command": req.command ?? "",
                 "status": PromptStatus.draft.rawValue,
                 "gmfs_relative_storage_path": gmfsPath,
-            ]
+            ],
+            uuid: req.uuid
         )
         // Seed prompt kbites from the session registry (create-time-only
         // inheritance, same rule as the context chain).
@@ -94,9 +100,15 @@ struct PromptRepository: RepositoryContext {
         return row
     }
 
-    /// nil sessionUuid lists every prompt in the db; a supplied-but-unknown
-    /// uuid is a typed NOT_FOUND, never a silent empty list (the same
-    /// optional-filter contract as Store+Listing).
+    /// Lists prompts for a session or all prompts.
+    ///
+    /// A nil sessionUuid lists every prompt in the database; a supplied-but-unknown
+    /// uuid is a typed NOT_FOUND, never a silent empty list (the same optional-filter
+    /// contract as Store+Listing).
+    ///
+    /// - Parameter req: Request containing the optional session UUID.
+    /// - Returns: The list of prompts.
+    /// - Throws: `StoreError.notFound` if the session UUID is supplied but not found.
     func list(_ req: PromptListRequest) throws -> PromptListResponse {
         if let sessionUuid = req.sessionUuid {
             guard try SessionRecord.exists(db, key: ["uuid": sessionUuid]) else {
@@ -109,6 +121,11 @@ struct PromptRepository: RepositoryContext {
         )
     }
 
+    /// Fetches the complete prompt state including artifacts and kbites.
+    ///
+    /// - Parameter req: Request containing the prompt UUID.
+    /// - Returns: The prompt row with artifacts, kbite codes, and change summary.
+    /// - Throws: `StoreError.notFound` if the prompt does not exist.
     func get(_ req: PromptGetRequest) throws -> PromptGetResponse {
         guard let prompt = try fetchRow(uuid: req.promptUuid) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -134,8 +151,14 @@ struct PromptRepository: RepositoryContext {
         )
     }
 
-    /// STAY TRUE enforced in code: the backstory/goal/detail triple is
-    /// editable only while status == draft.
+    /// Updates prompt content when the status is draft.
+    ///
+    /// The backstory/goal/detail triple is editable only while status == draft.
+    /// This is enforced in code.
+    ///
+    /// - Parameter req: Request containing the prompt UUID and fields to update.
+    /// - Returns: The updated prompt row.
+    /// - Throws: `StoreError.contentLocked` if the prompt is not in draft status.
     func updateContent(_ req: PromptUpdateContentRequest) throws -> PromptRow {
         guard
             let statusRaw =
@@ -180,10 +203,16 @@ struct PromptRepository: RepositoryContext {
         return row
     }
 
-    /// The SINGLE front door for prompt transitions: forward-only and
-    /// adjacent-only per `PromptStatus.allowedNext`, with one skip edge.
-    /// Clarify and architecture verbs never touch prompt.status.
-    /// Activation claim and workflow close ride this same write transaction.
+    /// Transitions the prompt status and handles activation claims.
+    ///
+    /// The single front door for prompt transitions: forward-only and adjacent-only per
+    /// `PromptStatus.allowedNext`, with one skip edge. Clarify and architecture verbs
+    /// never touch prompt.status. Activation claim and workflow close ride this same
+    /// write transaction.
+    ///
+    /// - Parameter req: Request containing the prompt UUID, new status, and optional client key.
+    /// - Returns: The updated prompt row.
+    /// - Throws: `StoreError.invalidTransition` if the status change is not allowed.
     func setStatus(_ req: PromptSetStatusRequest) throws -> PromptRow {
         guard let head = try PromptRecord.fetch(db, uuid: req.promptUuid) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -264,6 +293,11 @@ struct PromptRepository: RepositoryContext {
 
     // MARK: - Shared fetch helper
 
+    /// Fetches and converts a prompt record to a DTO.
+    ///
+    /// - Parameter uuid: The prompt UUID.
+    /// - Returns: The prompt row, or nil if not found.
+    /// - Throws: `StoreError` on database failure.
     func fetchRow(uuid: String) throws -> PromptRow? {
         try PromptRecord.fetch(db, uuid: uuid)?.dto()
     }

@@ -11,10 +11,11 @@ import XCTest
 /// annotation fails here with the missing content named.
 final class ComposedReadTests: KernelBackedTestCase {
 
-    /// A booted identity spine plus the code it was minted under. Every verb
-    /// that re-sends the context blocks has to re-send the SAME codes: the
-    /// ensure chain keys on code, so a different code with the same uuid is a
-    /// second project and collides on the primary key.
+    /// A booted identity spine plus the code it was minted under.
+    ///
+    /// Every verb that re-sends the context blocks has to re-send the SAME
+    /// codes: the ensure chain keys on code, so a different code with the same
+    /// uuid is a second project and collides on the primary key.
     private struct Fixture {
         let code: String
         let repoPath: String
@@ -50,8 +51,13 @@ final class ComposedReadTests: KernelBackedTestCase {
         }
     }
 
-    /// Project + instance + session, uniquely coded so cases cannot collide
-    /// whatever order they run in.
+    /// Creates fixture with project, instance, and session, keyed by label.
+    ///
+    /// The keys ensure cases cannot collide whatever order they run in.
+    ///
+    /// - Parameter label: Unique suffix for the fixture codes.
+    /// - Returns: A booted `Fixture`.
+    /// - Throws: Any error from the context ensure verbs.
     private func makeFixture(_ label: String) throws -> Fixture {
         let id = String(UUID().uuidString.prefix(8)).lowercased()
         let code = "t_\(label)_\(id)"
@@ -84,6 +90,13 @@ final class ComposedReadTests: KernelBackedTestCase {
         return Fixture(code: code, repoPath: repo.path, context: context)
     }
 
+    /// Creates a new prompt row in the session.
+    ///
+    /// - Parameters:
+    ///   - sessionUuid: The session UUID to create the prompt in.
+    ///   - name: The prompt name.
+    /// - Returns: The created `PromptRow`.
+    /// - Throws: Any error from the create verb.
     private func makePrompt(_ sessionUuid: String, _ name: String) throws -> PromptRow {
         try env.send(
             .promptCreate,
@@ -92,8 +105,15 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
-    /// One `file_change` row for the booted fixture, the FK a briefing's third
-    /// ref class needs.
+    /// Creates one file change row with one range, used by briefing tests.
+    ///
+    /// The FK is a briefing's third ref class.
+    ///
+    /// - Parameters:
+    ///   - fixture: The booted `Fixture` providing context.
+    ///   - promptUuid: The prompt UUID for the file change.
+    /// - Returns: A `FileChangeAddResponse`.
+    /// - Throws: Any error from the add verb.
     private func makeFileChange(
         _ fixture: Fixture,
         promptUuid: String
@@ -104,27 +124,41 @@ final class ComposedReadTests: KernelBackedTestCase {
                 project: fixture.project,
                 instance: fixture.instance,
                 session: fixture.session,
-                promptUuid: promptUuid,
                 relativePath: "Sources/Touched.swift",
                 changeKind: .edit,
                 ranges: [ChangeRange(lineStart: 1, lineEnd: 4)],
+                promptUuid: promptUuid,
                 origin: FileChangeOrigin.manual
             ),
             FileChangeAddResponse.self
         )
     }
 
-    /// A real `kbite_resource_file` uuid: both ref families FK onto that table,
-    /// so neither can be exercised with a fabricated uuid. Opens a maw under the
-    /// run root, writes one chewed artifact naming one raw file, and digests.
+    /// Creates a real kbite resource file UUID used by both ref families.
+    ///
+    /// Opens a maw, writes one chewed artifact with one raw file, and digests.
+    /// A fabricated UUID would not work because both ref families FK onto
+    /// `kbite_resource_file`.
+    ///
+    /// - Parameter label: Unique suffix for the kbite code.
+    /// - Returns: The file UUID.
+    /// - Throws: Any error from the kbite verbs.
     private func makeKbiteFileUuid(_ label: String) throws -> String {
         let kbite = try makeDigestedKbite(label)
         let resource = try XCTUnwrap(kbite.resources.first, "digest wrote no resource")
         return try XCTUnwrap(resource.files.first, "digest wrote no file row").uuid
     }
 
-    /// The same fixture, handed back whole for the cases that read the resource
-    /// listing itself rather than borrowing one file uuid out of it.
+    /// Creates a digested kbite with the given files, ready for resource reads.
+    ///
+    /// Used when a test reads the resource listing itself rather than just
+    /// borrowing a file UUID.
+    ///
+    /// - Parameters:
+    ///   - label: Unique suffix for the kbite code.
+    ///   - files: File names to include in the kbite; defaults to `notes.md`.
+    /// - Returns: The `KbiteGetResponse`.
+    /// - Throws: Any error from the kbite verbs.
     private func makeDigestedKbite(
         _ label: String,
         files: [String] = ["notes.md"]
@@ -185,8 +219,16 @@ final class ComposedReadTests: KernelBackedTestCase {
         return try env.send(.kbiteGet, KbiteGetRequest(code: code), KbiteGetResponse.self)
     }
 
-    /// One ref of each kind, in the order the package's three prefetches carry
-    /// them. Returns the last response, whose version is what COMPLETE expects.
+    /// Adds one ref of each kind to a package in prefetch order.
+    ///
+    /// Adds dope, kbite, and exploration refs; returns the last response whose
+    /// version is what COMPLETE expects.
+    ///
+    /// - Parameters:
+    ///   - packageUuid: The package UUID to add refs to.
+    ///   - kbiteFileUuid: The kbite resource file UUID for the kbite ref.
+    /// - Returns: The final `CarePackageResponse`.
+    /// - Throws: Any error from the add verbs.
     private func addOneRefOfEachKind(
         packageUuid: String,
         kbiteFileUuid: String
@@ -240,7 +282,7 @@ final class ComposedReadTests: KernelBackedTestCase {
 
         let opened = try env.send(
             .briefingOpen,
-            BriefingOpenRequest(promptUuid: prompt.uuid, briefingForStep: "initial"),
+            BriefingOpenRequest(briefingForStep: "initial", promptUuid: prompt.uuid),
             BriefingRowResponse.self
         )
         XCTAssertTrue(opened.created)
@@ -386,17 +428,19 @@ final class ComposedReadTests: KernelBackedTestCase {
     // MARK: - DiagramWithOwner
 
     /// The LEFT JOIN annotation: INSTANCE is not a tier, so a SESSION-tier
-    /// diagram reaches its instance through session and a PROJECT-tier one
-    /// reports nil. An INNER join here would drop the project row entirely.
+    /// diagram reaches its instance through session and a PROJECT-tier one reports
+    /// nil.
+    ///
+    /// An INNER join here would drop the project row entirely.
     func testDiagramGetDerivesInstanceOnlyThroughSession() throws {
         let fixture = try makeFixture("diag")
 
         let sessionDiagram = try env.send(
             .diagramInit,
             DiagramInitRequest(
-                sessionUuid: fixture.context.sessionUuid,
                 code: "d_session_tier",
-                name: "session tier"
+                name: "session tier",
+                sessionUuid: fixture.context.sessionUuid
             ),
             DiagramResponse.self
         )
@@ -405,9 +449,9 @@ final class ComposedReadTests: KernelBackedTestCase {
         let projectDiagram = try env.send(
             .diagramInit,
             DiagramInitRequest(
-                projectUuid: fixture.context.projectUuid,
                 code: "d_project_tier",
-                name: "project tier"
+                name: "project tier",
+                projectUuid: fixture.context.projectUuid
             ),
             DiagramResponse.self
         )
@@ -440,7 +484,12 @@ final class ComposedReadTests: KernelBackedTestCase {
         XCTAssertEqual(projectTree.projectUuid, fixture.context.projectUuid)
     }
 
-    /// building → answering, on the summary version the question write left.
+    /// Transitions a clarification summary from building to answering.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The prompt UUID to get current clarification state.
+    ///   - summaryUuid: The summary UUID to seal.
+    /// - Throws: Any error from the seal verb.
     private func sealClarification(promptUuid: String, summaryUuid: String) throws {
         let current = try env.send(
             .clarifyGet,
@@ -627,6 +676,8 @@ final class ComposedReadTests: KernelBackedTestCase {
     /// `including(all:)` plans its children in a SECOND statement that no
     /// prepared request exposes, so the only public door to that SQL is a
     /// trace over a fetch that has parent rows to prefetch for.
+    ///
+    /// - Throws: Any assertion or database error.
     private func assertResourceContentIsOnlyProbed() throws {
         var statements: [String] = []
         try env.readOnlyDatabase()
@@ -770,7 +821,15 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
-    /// One `file_change` at a path with the ranges the case names.
+    /// Adds a file change at a path with the specified ranges.
+    ///
+    /// - Parameters:
+    ///   - fixture: The booted `Fixture` providing context.
+    ///   - promptUuid: The prompt UUID for the file change.
+    ///   - path: The relative file path.
+    ///   - ranges: Array of `(lineStart, lineEnd)` tuples for changed ranges.
+    /// - Returns: A `FileChangeAddResponse`.
+    /// - Throws: Any error from the add verb.
     private func addFileChange(
         _ fixture: Fixture,
         promptUuid: String,
@@ -783,10 +842,10 @@ final class ComposedReadTests: KernelBackedTestCase {
                 project: fixture.project,
                 instance: fixture.instance,
                 session: fixture.session,
-                promptUuid: promptUuid,
                 relativePath: path,
                 changeKind: .edit,
                 ranges: ranges.map { ChangeRange(lineStart: $0.0, lineEnd: $0.1) },
+                promptUuid: promptUuid,
                 origin: FileChangeOrigin.manual
             ),
             FileChangeAddResponse.self
@@ -877,6 +936,10 @@ final class ComposedReadTests: KernelBackedTestCase {
     /// schema the first time it meets it, and those `sqlite_master` reads would
     /// otherwise land on whichever measurement ran first and break the very
     /// comparison this exists for.
+    ///
+    /// - Parameter fetch: A closure that performs the read operation.
+    /// - Returns: Array of SELECT statement strings issued by the fetch.
+    /// - Throws: Any error from the fetch closure or database.
     private func selectStatements(_ fetch: (Database) throws -> Void) throws -> [String] {
         var captured: [String] = []
         var capturing = false
@@ -899,6 +962,14 @@ final class ComposedReadTests: KernelBackedTestCase {
     }
 
     /// Under budget with one child, and the same count with two.
+    ///
+    /// - Parameters:
+    ///   - read: The read name for assertion messages.
+    ///   - withOneChild: The statement count with one child.
+    ///   - withTwoChildren: The statement count with two children.
+    ///   - budget: The maximum allowed statement count.
+    ///   - file: The file where the assertion originated.
+    ///   - line: The line where the assertion originated.
     private func assertBudget(
         _ read: String,
         withOneChild: Int,
@@ -924,7 +995,15 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
-    /// One briefing, completed with the ref set the budget is measured over.
+    /// Creates and completes a briefing with the given refs, for budget tests.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The prompt UUID to open the briefing for.
+    ///   - dopeRefs: Array of dope ref codes to attach.
+    ///   - kbiteFileUuid: The kbite resource file UUID for the kbite ref.
+    ///   - fileChangeUuid: The file change UUID for the file change ref.
+    /// - Returns: The briefing UUID.
+    /// - Throws: Any error from the briefing verbs.
     private func completedBriefing(
         promptUuid: String,
         dopeRefs: [String],
@@ -935,7 +1014,7 @@ final class ComposedReadTests: KernelBackedTestCase {
         // needs a second prompt rather than a second step.
         let opened = try env.send(
             .briefingOpen,
-            BriefingOpenRequest(promptUuid: promptUuid, briefingForStep: "initial"),
+            BriefingOpenRequest(briefingForStep: "initial", promptUuid: promptUuid),
             BriefingRowResponse.self
         )
         _ = try env.send(
@@ -952,8 +1031,11 @@ final class ComposedReadTests: KernelBackedTestCase {
         return opened.briefing.uuid
     }
 
-    /// BRIEFING_GET: one root and three prefetches, four statements whatever
-    /// the ref count. The read it replaced ran three queries per briefing.
+    /// Verifies BRIEFING_GET uses four statements whatever the ref count.
+    ///
+    /// One root and three prefetches; the read it replaced ran three queries.
+    ///
+    /// - Throws: Any assertion or database error.
     private func assertBriefingBudget() throws {
         let fixture = try makeFixture("bbud")
         let kbiteFileUuid = try makeKbiteFileUuid("bbud")
@@ -1001,9 +1083,12 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
-    /// CARE_PACKAGE_GET: ONE request, four statements — a root and its three
-    /// ref classes. The plan's "4 → 1" counts requests, not statements; the
-    /// win is that neither number moves with the ref count.
+    /// Verifies CARE_PACKAGE_GET uses four statements whatever the ref count.
+    ///
+    /// One request for root and three ref classes. The cost is constant
+    /// regardless of ref count.
+    ///
+    /// - Throws: Any assertion or database error.
     private func assertCarePackageBudget() throws {
         let fixture = try makeFixture("pbud")
         let prompt = try makePrompt(fixture.context.sessionUuid, "care package budget")
@@ -1054,9 +1139,12 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
-    /// CLARIFY_GET questions: the composite's two statements plus one batched
-    /// pass over the answer junction, grouped in memory. Three whatever the
-    /// question and option counts.
+    /// Verifies CLARIFY_GET questions use three statements total.
+    ///
+    /// Two statements for the composite plus one batched pass over the answer
+    /// junction, grouped in memory, regardless of question/option counts.
+    ///
+    /// - Throws: Any assertion or database error.
     private func assertClarifyQuestionBudget() throws {
         let fixture = try makeFixture("qbud")
         let prompt = try makePrompt(fixture.context.sessionUuid, "clarify budget")
@@ -1115,8 +1203,11 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
-    /// ARCH_GET persistence changes: the changes and their fields, two
-    /// statements whatever the field count.
+    /// Verifies ARCH_GET persistence changes use two statements.
+    ///
+    /// The changes and their fields, constant regardless of field count.
+    ///
+    /// - Throws: Any assertion or database error.
     private func assertArchitectureBudget() throws {
         let fixture = try makeFixture("abud")
         let prompt = try makePrompt(fixture.context.sessionUuid, "architecture budget")
@@ -1162,6 +1253,12 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
+    /// Adds a field to a persistence change for budget testing.
+    ///
+    /// - Parameters:
+    ///   - changeUuid: The persistence change UUID to add the field to.
+    ///   - named: The field name.
+    /// - Throws: Any error from the add verb.
     private func addArchField(changeUuid: String, named: String) throws {
         _ = try env.send(
             .archFieldAdd,
@@ -1177,8 +1274,11 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
-    /// KBITE_GET resources: the resources and their projected file heads, two
-    /// statements whatever the file count.
+    /// Verifies KBITE_GET resources use two statements whatever the file count.
+    ///
+    /// The resources and their projected file heads.
+    ///
+    /// - Throws: Any assertion or database error.
     private func assertKbiteResourceBudget() throws {
         let one = try makeDigestedKbite("kbud1")
         let two = try makeDigestedKbite("kbud2", files: ["notes.md", "other.md"])
@@ -1212,8 +1312,11 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
-    /// SESSION_GET's session row: ONE request, two statements — the row and
-    /// its activation registry. The plan's "2 → 1" counts requests.
+    /// SESSION_GET's session row: ONE request, two statements — the row and its activation registry.
+    ///
+    /// The plan's "2 → 1" counts requests.
+    ///
+    /// - Throws: Any assertion or database error.
     private func assertSessionBudget() throws {
         let fixture = try makeFixture("sbud")
         let sessionUuid = fixture.context.sessionUuid
@@ -1248,8 +1351,16 @@ final class ComposedReadTests: KernelBackedTestCase {
         )
     }
 
-    /// One activation claim. The key is not a `claude:pid:start` triple, so
-    /// the liveness sweep treats it as alive and leaves it in place.
+    /// Creates one activation claim for a session and prompt.
+    ///
+    /// The key is not a `claude:pid:start` triple, so the liveness sweep
+    /// treats it as alive and leaves it in place.
+    ///
+    /// - Parameters:
+    ///   - sessionUuid: The session UUID to update.
+    ///   - promptUuid: The prompt UUID to set as active.
+    ///   - clientKey: The client key for the activation.
+    /// - Throws: Any error from the update verb.
     private func claimActivation(
         sessionUuid: String,
         promptUuid: String,

@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// The session view's DIAGRAMS tab: the session's SAVED diagrams over DIAGRAM_LIST at SESSION
-/// tier. A diagram is a document, and the dope scope it is drawn over is a property of it.
+/// tier.
+///
+/// A diagram is a document, and the dope scope it is drawn over is a property of it.
 ///
 /// Creating one binds it to a dope scope, read through the session's existing DopeStore so
 /// the tab shares one cache with the dope tab, and the CREATE seeds the canvas. Importing
@@ -110,6 +112,9 @@ struct SessionDiagramsPane: View {
         }
     }
 
+    /// Returns the context menu for a diagram card.
+    /// - Parameter row: The diagram row to build a menu for.
+    /// - Returns: The menu view with available actions.
     @ViewBuilder
     private func cardMenu(_ row: DiagramRow) -> some View {
         if row.tier == DiagramTier.session.rawValue {
@@ -133,6 +138,8 @@ struct SessionDiagramsPane: View {
 
     // MARK: - Actions
 
+    /// Creates a new diagram for the given scope.
+    /// - Parameter scopeRow: The scope to create a diagram for.
     private func create(from scopeRow: DopeScopeRow) {
         run {
             let code = Self.uniqueCode(
@@ -143,13 +150,15 @@ struct SessionDiagramsPane: View {
                 owner: owner,
                 code: code,
                 name: scopeRow.name,
-                dopeScopeCode: scopeRow.code,
                 projectUuid: projectUuid,
+                dopeScopeCode: scopeRow.code,
                 sessionUuid: scope.sessionUuid
             )
         }
     }
 
+    /// Imports a project diagram as a copy in this session.
+    /// - Parameter row: The project diagram to import.
     private func importProjectDiagram(_ row: DiagramRow) {
         run {
             let code = Self.uniqueCode(base: row.code, taken: Set(rows.map(\.code)))
@@ -163,6 +172,8 @@ struct SessionDiagramsPane: View {
         }
     }
 
+    /// Promotes a diagram from session tier to project tier.
+    /// - Parameter row: The diagram to promote.
     private func promote(_ row: DiagramRow) {
         run {
             try await diagrams.promote(
@@ -175,12 +186,18 @@ struct SessionDiagramsPane: View {
         }
     }
 
+    /// Changes a diagram's visibility setting.
+    /// - Parameters:
+    ///   - row: The diagram to update.
+    ///   - visibility: The new visibility level.
     private func setVisibility(_ row: DiagramRow, _ visibility: DiagramVisibility) {
         run {
             try await diagrams.setVisibility(row, to: visibility, scope: galleryScope)
         }
     }
 
+    /// Deletes a diagram.
+    /// - Parameter row: The diagram to delete.
     private func delete(_ row: DiagramRow) {
         run {
             try await diagrams.delete(row, scope: galleryScope)
@@ -188,6 +205,8 @@ struct SessionDiagramsPane: View {
         }
     }
 
+    /// Runs an async body and handles errors from it.
+    /// - Parameter body: An async throwing closure to execute.
     private func run(_ body: @escaping () async throws -> Void) {
         busy = true
         Task {
@@ -204,9 +223,14 @@ struct SessionDiagramsPane: View {
         }
     }
 
-    /// DIAGRAM_INIT is idempotent per (owner, code) — reusing a code would
-    /// silently hand back the EXISTING diagram instead of making a new one,
-    /// so a copy or a second canvas over one scope needs a fresh code.
+    /// Generates a unique diagram code that doesn't conflict with existing ones.
+    ///
+    /// DIAGRAM_INIT is idempotent per (owner, code): reusing a code hands back
+    /// the existing diagram. A copy or second canvas needs a fresh code.
+    /// - Parameters:
+    ///   - base: The desired code name.
+    ///   - taken: The set of codes already in use.
+    /// - Returns: The base code if unused, else `base_<N>` for a unique N.
     static func uniqueCode(base: String, taken: Set<String>) -> String {
         guard taken.contains(base) else { return base }
         var index = 2

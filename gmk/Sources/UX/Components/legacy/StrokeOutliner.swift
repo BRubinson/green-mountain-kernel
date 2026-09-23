@@ -20,6 +20,12 @@ enum StrokeOutliner {
         /// Derive pressure from velocity when the input carries none.
         var simulatePressure: Bool
 
+        /// Creates a set of stroke outlining options.
+        /// - Parameters:
+        ///   - size: Full stroke diameter at pressure 1.
+        ///   - thinning: Pressure effect on width; 0 = constant, 1 = full thinning.
+        ///   - streamline: Input smoothing; 0 = raw points, 1 = heavy lag.
+        ///   - simulatePressure: Whether to derive pressure from velocity.
         init(
             size: Double,
             thinning: Double = 0.6,
@@ -33,9 +39,19 @@ enum StrokeOutliner {
         }
     }
 
+    /// Derives a closed outline polygon from points and pressure values.
+    ///
     /// The closed outline polygon (left side then reversed right side, with
-    /// round caps). Returns [] for degenerate input (< 2 distinct points) —
-    /// callers fall back to the plain stroked centerline.
+    /// round caps).
+    ///
+    /// Returns [] for degenerate input (< 2 distinct points) — callers fall back
+    /// to the plain stroked centerline.
+    ///
+    /// - Parameters:
+    ///   - points: The centerline points of the stroke.
+    ///   - pressures: Optional pressure values, one per point or fewer.
+    ///   - options: The outline algorithm options.
+    /// - Returns: The polygon points forming the closed outline.
     static func outline(
         points: [CGPoint],
         pressures: [Double?],

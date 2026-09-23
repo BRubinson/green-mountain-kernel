@@ -15,10 +15,10 @@ struct ProjectDiagramRail: View {
     let projectUuid: String
     let onOpen: (DiagramWindowID) -> Void
 
-    /// The project's dope scope code, read once. There is no project-tier
-    /// dope STORE (DopeStore is per session scope) and nothing else on this
-    /// page wants the tree — so this is one read for the create path's
-    /// binding and the computed row's label, not a cache.
+    /// The project's dope scope code, read once.
+    ///
+    /// There is no project-tier dope STORE (DopeStore is per session scope) and nothing else on this page wants the
+    /// tree — so this is one read for the create path's binding and the computed row's label, not a cache.
     @State private var dopeScopeCode: String?
     @State private var busy = false
     @State private var actionError: String?
@@ -95,10 +95,10 @@ struct ProjectDiagramRail: View {
         .padding(.vertical, 8)
     }
 
-    /// The always-present computed row. Deliberately not a saved diagram and
-    /// deliberately not hidden when saved ones exist: it is the live view of
-    /// the project's domain model, and it is always current because nothing
-    /// persists it.
+    /// The always-present computed row.
+    ///
+    /// Deliberately not a saved diagram and deliberately not hidden when saved ones exist: it is the live view of the
+    /// project's domain model, and it is always current because nothing persists it.
     private var computedRow: some View {
         Button {
             onOpen(
@@ -127,6 +127,10 @@ struct ProjectDiagramRail: View {
         .help("The project's dope scope, laid out live — a preview, never saved")
     }
 
+    /// Returns a context menu for a diagram card.
+    ///
+    /// - Parameter row: The diagram row.
+    /// - Returns: A view with delete and move actions.
     @ViewBuilder
     private func cardMenu(_ row: DiagramRow) -> some View {
         if row.tier == DiagramTier.project.rawValue {
@@ -146,6 +150,7 @@ struct ProjectDiagramRail: View {
     }
 
     /// The project's sessions, most recent first — the promote-DOWN targets.
+    ///
     /// Capped: a mature project has hundreds, and a menu is not a browser.
     private var projectSessions: [SessionStub] {
         (catalog.instancesByProject[projectUuid] ?? [])
@@ -157,6 +162,7 @@ struct ProjectDiagramRail: View {
 
     // MARK: - Actions
 
+    /// Loads the dope scope code for the project from the daemon.
     private func loadDopeCode() async {
         // A project with no dope scope yet is normal — the row then just says
         // "computed from dope" and the create path binds nothing.
@@ -168,6 +174,7 @@ struct ProjectDiagramRail: View {
         dopeScopeCode = response.tree.body.code
     }
 
+    /// Creates a new diagram for the project.
     private func create() {
         run {
             let base = dopeScopeCode.map { "\($0)_canvas" } ?? "project_canvas"
@@ -179,12 +186,17 @@ struct ProjectDiagramRail: View {
                 owner: owner,
                 code: code,
                 name: dopeScopeCode.map { "\($0) canvas" } ?? "Project Diagram",
-                dopeScopeCode: dopeScopeCode,
-                projectUuid: projectUuid
+                projectUuid: projectUuid,
+                dopeScopeCode: dopeScopeCode
             )
         }
     }
 
+    /// Moves a diagram to a different session.
+    ///
+    /// - Parameters:
+    ///   - row: The diagram to move.
+    ///   - sessionUuid: The target session uuid.
     private func move(_ row: DiagramRow, to sessionUuid: String) {
         run {
             try await diagrams.promote(
@@ -197,6 +209,9 @@ struct ProjectDiagramRail: View {
         }
     }
 
+    /// Deletes a diagram.
+    ///
+    /// - Parameter row: The diagram to delete.
     private func delete(_ row: DiagramRow) {
         run {
             try await diagrams.delete(row, scope: galleryScope)
@@ -204,6 +219,9 @@ struct ProjectDiagramRail: View {
         }
     }
 
+    /// Runs an async task with error handling and busy state management.
+    ///
+    /// - Parameter body: The async closure to execute.
     private func run(_ body: @escaping () async throws -> Void) {
         busy = true
         Task {

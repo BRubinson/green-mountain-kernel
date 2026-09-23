@@ -1,22 +1,23 @@
 import Foundation
 
-/// Long-lived event stream (SUBSCRIBE → EVENT*). Owns its OWN connection —
-/// structurally separate from DaemonClient's request/response surface, so a
-/// streaming connection can never have request frames interleaved into it.
+/// Long-lived event stream (SUBSCRIBE → EVENT*).
 ///
-/// Reconnect contract: persist `lastEventId` and pass it as `sinceId` on the
-/// next subscription; the daemon replays every missed event before going
-/// live. Replay is capped (see `replayCapped`): after a capped replay,
-/// re-subscribe from the new `lastEventId` to drain the remainder.
+/// Owns its own connection, structurally separate from DaemonClient's
+/// request/response surface to prevent request frame interleaving. Reconnect:
+/// persist `lastEventId`, pass as `sinceId` on next subscription. Daemon
+/// replays missed events before going live. Replay is capped (see
+/// `replayCapped`): re-subscribe from new `lastEventId` to drain remainder.
 final class DaemonEventSubscription: @unchecked Sendable {
     private let client: DaemonClient
     private let sinceId: Int64?
     private var started = false
 
-    /// Highest daemon_event.id seen. Seeded from the caller's own cursor so a
-    /// quiet since_id reconnect that drops never regresses it to 0 (which
-    /// would replay the entire event log next time); the ack horizon covers
-    /// the fresh-subscription case, and each event advances it.
+    /// Highest daemon_event.id seen.
+    ///
+    /// Seeded from the caller's own cursor so a quiet since_id reconnect that
+    /// drops never regresses it to 0 (which would replay the entire event log
+    /// next time); the ack horizon covers the fresh-subscription case, and each
+    /// event advances it.
     private(set) var lastEventId: Int64
 
     /// True when the subscribe ack indicates the replay hit the daemon's row
@@ -24,6 +25,14 @@ final class DaemonEventSubscription: @unchecked Sendable {
     /// replayed; re-subscribe from `lastEventId` after draining.
     private(set) var replayCapped = false
 
+    /// Creates an event subscription, optionally resuming from a prior cursor.
+    ///
+    /// - Parameters:
+    ///   - sinceId: The last event id to resume from, or nil to start fresh.
+    ///   - socketPath: The daemon socket path.
+    ///   - daemonBinaryPath: The daemon binary path for autostart.
+    ///   - clientName: The client name for daemon logging.
+    ///   - autostart: Whether to autostart the daemon if not running.
     init(
         sinceId: Int64? = nil,
         socketPath: String = Paths.socket.path,
@@ -41,9 +50,12 @@ final class DaemonEventSubscription: @unchecked Sendable {
         )
     }
 
-    /// Subscribe and yield replayed + live events until the connection drops.
-    /// A DAEMON_STOP event immediately before the stream ends means the drop
-    /// was an intentional daemon shutdown, not a failure.
+    /// Subscribes and yields replayed plus live events until the connection drops.
+    ///
+    /// A DAEMON_STOP event immediately before the stream ends indicates an intentional daemon
+    /// shutdown, not a failure. May only be called once per subscription.
+    ///
+    /// - Returns: An async throwing stream of event notifications.
     func events() -> AsyncThrowingStream<EventNotification, Error> {
         AsyncThrowingStream { continuation in
             // One-shot: a second events() call would put two readers on one

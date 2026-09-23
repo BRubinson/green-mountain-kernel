@@ -32,16 +32,29 @@ enum SchemaEnrollment {
         let prepare: @Sendable (Database) throws -> String
     }
 
-    /// A record whose table name comes from the record itself: a name that has
-    /// drifted from the schema fails at `columns(in:)` rather than decoding.
+    /// A record entry where the table name comes from the record type.
+    ///
+    /// A name that has drifted from the schema fails at `columns(in:)` rather
+    /// than decoding.
+    ///
+    /// - Returns: A `RecordEntry` for the record type.
     private static func mirror<R: BaseRecordFields>(_: R.Type) -> RecordEntry {
         RecordEntry(table: R.databaseTableName) { _ = try R(row: $0) }
     }
 
-    /// A join association: `origin` is the table carrying the foreign key and
-    /// `destination` the table it points at, which is the direction
-    /// `foreign_key_list` reports. A `belongsTo` reads forwards, a `hasOne`
-    /// backwards.
+    /// A join association for belongsTo or hasOne relationships.
+    ///
+    /// The `origin` table carries the foreign key and `destination` receives
+    /// it; this is the direction `foreign_key_list` reports. A `belongsTo`
+    /// reads forwards, a `hasOne` reads backwards.
+    ///
+    /// - Parameters:
+    ///   - association: The association.
+    ///   - key: The decoded key name.
+    ///   - origin: The origin table name.
+    ///   - destination: The destination table name.
+    ///   - columns: Explicit origin columns for a `ForeignKey`; `nil` to infer.
+    /// - Returns: An `AssociationEntry`.
     private static func join<A: Association>(
         _ association: A,
         key: String,
@@ -64,8 +77,18 @@ enum SchemaEnrollment {
         }
     }
 
-    /// A `hasMany`, whose children arrive in a second statement. For a
-    /// `through` form the recorded hop is the last one: pivot to destination.
+    /// A prefetch association for hasMany relationships.
+    ///
+    /// Children arrive in a second statement. For a `through` form the recorded
+    /// hop is the last one: pivot to destination.
+    ///
+    /// - Parameters:
+    ///   - association: The association.
+    ///   - key: The decoded key name.
+    ///   - origin: The origin table name.
+    ///   - destination: The destination table name.
+    ///   - columns: Explicit origin columns for a `ForeignKey`; `nil` to infer.
+    /// - Returns: An `AssociationEntry`.
     private static func prefetch<A: AssociationToMany>(
         _ association: A,
         key: String,
@@ -630,13 +653,19 @@ enum SchemaEnrollment {
         ),
     ]
 
-    /// A composite's canonical request, compiled the way a multi-row fetch
-    /// compiles it: `forSingleResult: false`, so a prefetch plans its children.
+    /// A composite's canonical request, compiled and fetched.
     ///
-    /// The fetch runs too: compiling proves the SQL valid, and only decoding a
-    /// result set runs the composite's own `Decodable`, where a property name
-    /// colliding with a column, a prefetch key that stopped matching its
-    /// `forKey` or a drifted annotation alias actually fails.
+    /// Compiled the way a multi-row fetch compiles it with `forSingleResult:
+    /// false`, so a prefetch plans its children. The fetch runs too: compiling
+    /// proves the SQL valid, and decoding the result set runs the composite's
+    /// `Decodable`, where property-name collisions, drifted prefetch keys, or
+    /// drifted annotation aliases actually fail.
+    ///
+    /// - Parameters:
+    ///   - _: The composite record type.
+    ///   - label: The display label for this composite.
+    ///   - request: A closure that builds the canonical request for this composite.
+    /// - Returns: A `CompositeEntry`.
     private static func composite<C: FetchableRecord>(
         _: C.Type,
         _ label: String,
@@ -651,6 +680,11 @@ enum SchemaEnrollment {
     }
 
     /// A composite whose request decodes a bare scalar rather than a record.
+    ///
+    /// - Parameters:
+    ///   - label: The display label for this scalar composite.
+    ///   - request: A closure that builds the canonical request for this composite.
+    /// - Returns: A `CompositeEntry`.
     private static func scalarComposite<V: DatabaseValueConvertible>(
         _ label: String,
         request: @escaping @Sendable () -> QueryInterfaceRequest<V>

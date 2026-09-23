@@ -116,6 +116,8 @@ opt_in_rules:
   - pattern_matching_keywords
   - unavailable_function
   - static_operator
+  - missing_docs
+  - function_default_parameter_at_end
   - empty_count
   - empty_string
   - empty_collection_literal
@@ -194,9 +196,15 @@ custom_rules:
     severity: error
   long_comment_run:
     name: "Comment run over 8 lines"
-    regex: '(?:^[ \t]*//[^\n]*\n){9,}'
-    match_kinds: [comment, doccomment]
+    regex: '(?:^[ \t]*//(?!/)[^\n]*\n){9,}'
+    match_kinds: [comment]
     message: "A comment states intent the code cannot; nine or more consecutive comment lines is a decision record."
+    severity: error
+  long_doc_comment_run:
+    name: "Doc comment over 30 lines"
+    regex: '(?:^[ \t]*///[^\n]*\n){31,}'
+    match_kinds: [doccomment]
+    message: "A doc comment is a summary plus Parameters/Returns/Throws; over 30 lines it has become a design document."
     severity: error
   block_comment:
     name: "No block comments"

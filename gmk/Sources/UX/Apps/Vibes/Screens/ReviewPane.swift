@@ -3,7 +3,9 @@ import SwiftUI
 /// Read-only review section (REVIEW_GET): verdict + overview + PARTITIONED
 /// findings with per-finding fix-loop resolution badges — full rows rendered
 /// IN WIRE ORDER (unranked first, the resume-queue contract), stubs collapse
-/// behind a one-shot full:true widen. All review writes stay bot/CLI-side.
+/// behind a one-shot full:true widen.
+///
+/// All review writes stay bot/CLI-side.
 struct ReviewPane: View {
     let phase: PromptPhaseStore.Phase<ReviewGetResponse>
     /// Widen the store to full:true — invoked once when the user reveals the
@@ -37,6 +39,9 @@ struct ReviewPane: View {
         }
     }
 
+    /// Builds the review panel content from the response.
+    /// - Parameter response: The review response to display.
+    /// - Returns: A view containing the review status, verdict, findings, and controls.
     @ViewBuilder
     private func content(_ response: ReviewGetResponse) -> some View {
         let visible = response.findings.visibleFindings(
@@ -106,6 +111,9 @@ struct ReviewPane: View {
         }
     }
 
+    /// Builds a row view for a single finding.
+    /// - Parameter finding: The finding to display.
+    /// - Returns: A disclosure group with the finding details and metadata.
     private func findingRow(_ finding: ReviewFindingRow) -> some View {
         DisclosureGroup {
             VStack(alignment: .leading, spacing: 6) {
@@ -140,7 +148,14 @@ struct ReviewPane: View {
         }
     }
 
-    /// nil filePath = cross-cutting finding (wire contract) — no location row.
+    /// Formats a file location as a string for display.
+    ///
+    /// A nil path indicates a cross-cutting finding per the wire contract, so no location row is shown.
+    /// - Parameters:
+    ///   - path: The file path; may be nil for cross-cutting findings.
+    ///   - start: The starting line number, or nil for a path-only location.
+    ///   - end: The ending line number, or nil for a single-line location.
+    /// - Returns: The formatted location string like "path:line" or "path:start–end".
     private func location(path: String, start: Int?, end: Int?) -> String {
         switch (start, end) {
         case (let s?, let e?) where s != e: "\(path):\(s)–\(e)"
@@ -149,12 +164,18 @@ struct ReviewPane: View {
         }
     }
 
+    /// Builds a styled section header view.
+    /// - Parameter title: The header text.
+    /// - Returns: A text view styled as a section header.
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
     }
 
+    /// Builds a status chip view for the review status.
+    /// - Parameter status: The review status to display.
+    /// - Returns: A capsule-styled chip with the status label and color.
     @ViewBuilder
     private func statusChip(_ status: ReviewSummaryStatus?) -> some View {
         let (label, color): (String, Color) =
@@ -170,8 +191,12 @@ struct ReviewPane: View {
             .foregroundStyle(color)
     }
 
-    /// Verdict is written only by REVIEW_COMPLETE; nil while reviewing.
-    /// Unknown raw verdicts render their raw string rather than vanishing.
+    /// Builds a verdict chip view for the review verdict.
+    ///
+    /// Verdict is written only by REVIEW_COMPLETE and is nil while reviewing. Unknown raw verdicts
+    /// render their raw string rather than vanishing.
+    /// - Parameter raw: The raw verdict string, or nil if not yet complete.
+    /// - Returns: A capsule-styled chip with the verdict label and color, or an empty view if nil.
     @ViewBuilder
     private func verdictChip(_ raw: String?) -> some View {
         if let raw {

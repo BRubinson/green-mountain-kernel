@@ -15,6 +15,14 @@ enum KernelRole: Equatable, Sendable {
     case client(holderPid: Int32?, bundlePath: String?)
     case unknown
 
+    /// Creates a role from the wire's `writer_role` string.
+    ///
+    /// Unrecognised roles degrade to `.unknown` so the UI can still render.
+    ///
+    /// - Parameters:
+    ///   - writerRole: The role string from the wire ("writer", "client", or unknown).
+    ///   - holderPid: The owning process ID when role is "client".
+    ///   - bundlePath: The owning bundle path when role is "client".
     init(writerRole: String?, holderPid: Int32?, bundlePath: String?) {
         switch writerRole {
         case "writer": self = .writer
@@ -44,12 +52,25 @@ struct KernelMenuBarContent: View {
     /// kernel is the writer), and the row is absent rather than disabled.
     var onActivateHolder: (() -> Void)?
 
-    /// Two-step quit, in place. NOT a `confirmationDialog`: the menu bar panel
-    /// is a transient window that dismisses the moment focus leaves it, which
-    /// takes any sheet or alert presented from it down too — the confirmation
-    /// would flash and vanish, reading as a quit that did not happen.
+    /// Two-step quit, in place.
+    ///
+    /// NOT a `confirmationDialog`: the menu bar panel is a transient window
+    /// that dismisses the moment focus leaves it, which takes any sheet or
+    /// alert presented from it down too — the confirmation would flash and
+    /// vanish, reading as a quit that did not happen.
     @State private var confirmingQuit = false
 
+    /// Creates the menu bar dropdown view with all required state and callbacks.
+    ///
+    /// - Parameters:
+    ///   - role: The kernel's current role (writer or client).
+    ///   - vitals: Live kernel vitals (uptime, memory, CPU).
+    ///   - protocolVersion: Wire protocol version, or `nil` if unknown.
+    ///   - buildSha: Build identifier, or `nil` if unknown.
+    ///   - onNewWindow: Callback to open a new window.
+    ///   - onQuit: Callback to quit the kernel.
+    ///   - onActivateHolder: Callback to bring the writer kernel to front
+    ///     (client mode only), or `nil` if not applicable.
     init(
         role: KernelRole,
         vitals: KernelVitals,
@@ -106,8 +127,9 @@ struct KernelMenuBarContent: View {
 
     /// FIRST row, and deliberately so: client mode IS the mitigation for a
     /// second copy of the app opening the same database, and a mitigation the
-    /// user cannot see mitigates nothing. It gets the colour, the weight and
-    /// the top of the panel.
+    /// user cannot see mitigates nothing.
+    ///
+    /// It gets the colour, the weight and the top of the panel.
     @ViewBuilder
     private var roleRow: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -258,9 +280,16 @@ struct KernelMenuBarContent: View {
         }
     }
 
-    /// A menu-shaped row for the panel style: full-width hit target, secondary
-    /// symbol, no button chrome — `.menu` gives this for free and `.window`
-    /// does not.
+    /// Builds a menu-style row suitable for the window panel layout.
+    ///
+    /// Provides full-width hit target with a secondary symbol and no button chrome.
+    /// (`.menu` style provides this by default; `.window` style does not.)
+    ///
+    /// - Parameters:
+    ///   - title: The row text label.
+    ///   - systemImage: The SF Symbols name for the icon.
+    ///   - action: Callback invoked when the row is selected.
+    /// - Returns: A styled menu row view.
     private func menuRow(
         _ title: String,
         systemImage: String,

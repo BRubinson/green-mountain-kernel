@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `instance_active_kbite` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `instance_active_kbite` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct InstanceActiveKbiteRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "instance_active_kbite"
     var uuid: String

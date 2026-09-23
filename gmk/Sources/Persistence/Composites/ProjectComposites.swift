@@ -16,14 +16,22 @@ struct SessionSummary: FetchableRecord, Decodable {
     var session: SessionRecord
     var lastActivityAt: String
 
+    /// Fetches a session and its recency annotation.
+    /// - Returns: A request that fetches sessions with `lastActivityAt` annotated.
     static func request() -> QueryInterfaceRequest<Self> {
         SessionRecord.annotated(with: SqlAnnotations.lastActivityAt).asRequest(of: Self.self)
     }
 
-    /// The same shape joined to the parent instance. `session` carries no
-    /// `project_uuid`, so project scope rides this join, and the caller
-    /// constrains the instance further through the alias it passes in — the
-    /// join has to be applied before `asRequest(of:)` rebinds the decoder.
+    /// Fetches a session joined to the parent instance with project scope.
+    ///
+    /// `session` carries no `project_uuid`, so project scope rides this join.
+    /// The caller constrains the instance further through the alias it passes
+    /// in — the join has to be applied before `asRequest(of:)` rebinds the
+    /// decoder.
+    /// - Parameters:
+    ///   - instance: The instance table alias for the join.
+    ///   - projectUuid: The project to filter by, or nil for all projects.
+    /// - Returns: A request that fetches sessions joined to the instance.
     static func request(
         instance: TableAlias<InstanceRecord>,
         projectUuid: String?
@@ -47,6 +55,9 @@ struct SessionWithActivations: FetchableRecord, Decodable {
     var session: SessionRecord
     var activations: [PromptActivationRecord]
 
+    /// Fetches a session with its activation records.
+    /// - Returns: A request that fetches sessions with activations ordered by
+    ///   creation time.
     static func request() -> QueryInterfaceRequest<Self> {
         SessionRecord
             .including(all: SessionRecord.activations.orderedByCreatedAt())
@@ -64,6 +75,10 @@ struct SessionLineage: FetchableRecord, Decodable {
     var projectUuid: String
     var primaryBranch: String
 
+    /// Fetches a session's lineage keys joined from instance and project.
+    /// - Parameter sessionUuid: The session to fetch lineage for.
+    /// - Returns: A request that fetches the session code, project UUID, and
+    ///   primary branch.
     static func request(sessionUuid: String) -> QueryInterfaceRequest<Self> {
         let instance = TableAlias<InstanceRecord>()
         let project = TableAlias<ProjectRecord>()
@@ -96,14 +111,25 @@ struct ChangeRollup: FetchableRecord, Decodable {
     var distinctFiles: Int
     var totalLineSpan: Int
 
+    /// Fetches file-change tallies for a session.
+    /// - Parameter sessionUuid: The session to tally changes for.
+    /// - Returns: A request that fetches the change tally.
     static func request(sessionUuid: String) -> QueryInterfaceRequest<Self> {
         Self.base().filter(FileChangeRecord.Columns.sessionUuid == sessionUuid)
     }
 
+    /// Fetches file-change tallies for a prompt.
+    /// - Parameter promptUuid: The prompt to tally changes for.
+    /// - Returns: A request that fetches the change tally.
     static func request(promptUuid: String) -> QueryInterfaceRequest<Self> {
         Self.base().filter(FileChangeRecord.Columns.promptUuid == promptUuid)
     }
 
+    /// Builds SQL selections for file-change tally aggregates.
+    /// - Parameter range: The file change range table alias for line span
+    ///   calculations.
+    /// - Returns: An array of SQL selections for change count, distinct files,
+    ///   and total line span.
     static func tally(
         _ range: TableAlias<FileChangeRangeRecord>
     ) -> [any SQLSelectable] {
@@ -118,6 +144,9 @@ struct ChangeRollup: FetchableRecord, Decodable {
         ]
     }
 
+    /// Builds the base request for file-change tallies with range joins.
+    /// - Returns: A request that fetches change tallies with optional range
+    ///   joins.
     private static func base() -> QueryInterfaceRequest<Self> {
         let range = TableAlias<FileChangeRangeRecord>()
         return
@@ -138,6 +167,9 @@ struct PromptChangeRollup: FetchableRecord, Decodable {
     var distinctFiles: Int
     var totalLineSpan: Int
 
+    /// Fetches file-change tallies split per prompt in a session.
+    /// - Parameter sessionUuid: The session to tally changes for.
+    /// - Returns: A request that fetches the tally grouped by prompt UUID.
     static func request(sessionUuid: String) -> QueryInterfaceRequest<Self> {
         let range = TableAlias<FileChangeRangeRecord>()
         return
@@ -174,6 +206,11 @@ struct ClarificationReport: FetchableRecord, Decodable {
     )
     .forKey("carePackageReady")
 
+    /// Fetches a clarification with question and note counts.
+    /// - Parameter sessionUuid: The session to filter by, or nil for all
+    ///   sessions.
+    /// - Returns: A request that fetches clarifications with annotated counts
+    ///   and care package readiness.
     static func request(sessionUuid: String?) -> QueryInterfaceRequest<Self> {
         ClarificationSummaryRecord
             .annotated(
@@ -206,6 +243,13 @@ struct ArchitectureReport: FetchableRecord, Decodable {
     var persistenceChangeCount: Int
     var generalChangeCount: Int
 
+    /// Fetches an architecture summary with annotated change counts.
+    ///
+    /// Includes counts of persistence and general changes.
+    /// - Parameter sessionUuid: The session to filter by, or nil for all
+    ///   sessions.
+    /// - Returns: A request that fetches architecture summaries with annotated
+    ///   change counts.
     static func request(sessionUuid: String?) -> QueryInterfaceRequest<Self> {
         ArchitectureSummaryRecord
             .annotated(
@@ -296,6 +340,12 @@ struct ExplorationReport: FetchableRecord, Decodable {
         .forKey("unrankedFindingCount"),
     ]
 
+    /// Builds a SQL scalar subquery for exploration finding aggregates.
+    /// - Parameters:
+    ///   - aggregate: The SQL aggregate function (e.g., `COUNT(*)`).
+    ///   - excludingKeyFiles: Whether to exclude key file findings.
+    ///   - extra: Additional SQL conditions to append.
+    /// - Returns: A SQL scalar subquery string.
     private static func findingScalar(
         _ aggregate: String,
         excludingKeyFiles: Bool,
@@ -310,6 +360,11 @@ struct ExplorationReport: FetchableRecord, Decodable {
         """
     }
 
+    /// Fetches an exploration report folded across per-agent summaries.
+    /// - Parameter sessionUuid: The session to filter by, or nil for all
+    ///   sessions.
+    /// - Returns: A request that fetches exploration reports with pivot and
+    ///   finding counts.
     static func request(sessionUuid: String?) -> QueryInterfaceRequest<Self> {
         ExplorationSummaryRecord
             .select(
@@ -343,6 +398,11 @@ struct ReviewReport: FetchableRecord, Decodable {
         SQL(sql: "COALESCE(SUM(finding.status = 'open'), 0)").forKey("openFindingCount"),
     ]
 
+    /// Fetches a review summary with finding counts.
+    /// - Parameter sessionUuid: The session to filter by, or nil for all
+    ///   sessions.
+    /// - Returns: A request that fetches review summaries with annotated
+    ///   finding counts.
     static func request(sessionUuid: String?) -> QueryInterfaceRequest<Self> {
         let finding = TableAlias<ReviewFindingRecord>(name: "finding")
         return
@@ -364,8 +424,13 @@ struct ReviewReport: FetchableRecord, Decodable {
 struct PromptSummary: FetchableRecord, Decodable {
     var prompt: PromptRecord
 
-    /// A nil `sessionUuid` reads every prompt in the db, where `seq` is unique
-    /// only inside one session and so orders under its parent.
+    /// Fetches prompts in a session, or all prompts if session is nil.
+    ///
+    /// When `sessionUuid` is nil, `seq` is not unique across sessions, so
+    /// ordering uses the session UUID as a secondary sort.
+    /// - Parameter sessionUuid: The session to filter by, or nil for all
+    ///   sessions.
+    /// - Returns: A request that fetches the prompt row.
     static func request(sessionUuid: String?) -> QueryInterfaceRequest<Self> {
         guard let sessionUuid else {
             return

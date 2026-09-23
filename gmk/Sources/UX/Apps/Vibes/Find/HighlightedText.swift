@@ -6,6 +6,16 @@ import SwiftUI
 // range-walk the old reader used, but keyed by per-occurrence ordinal rather than
 // by a structural anchor, so it can distinguish the Nth match within one string.
 enum FindHighlight {
+    /// Renders a string with find-in-page highlighting.
+    ///
+    /// Query occurrences get a yellow background; the active occurrence (if it
+    /// falls in this segment) is recolored green.
+    ///
+    /// - Parameters:
+    ///   - source: The text to highlight.
+    ///   - query: The search query.
+    ///   - activeLocalOccurrence: The ordinal of the active match in this string, or `nil`.
+    /// - Returns: An `AttributedString` with highlighting applied.
     static func attributed(
         _ source: String,
         query: SearchQuery,

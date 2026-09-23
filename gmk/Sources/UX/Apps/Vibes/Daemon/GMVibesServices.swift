@@ -4,8 +4,10 @@ import SwiftUI
 
 /// The app's shared service singletons in one container, injected by a single
 /// modifier at every scene root — adding a service later is zero call-site
-/// churn. Views keep their existing granular @Environment bindings
-/// (GMVibesEnvironment / FileTreeStore / DaemonConnectionModel / CatalogStore).
+/// churn.
+///
+/// Views keep their existing granular @Environment bindings (GMVibesEnvironment
+/// / FileTreeStore / DaemonConnectionModel / CatalogStore).
 @Observable @MainActor
 final class GMVibesServices {
     let env: GMVibesEnvironment
@@ -16,6 +18,7 @@ final class GMVibesServices {
     /// daemon-side INSTANCE_CURRENT_SESSION resolution).
     let checkout: CheckoutWatcher
     /// Tier-scoped diagram lists (DIAGRAM_LIST) + the row-level writes.
+    ///
     /// App-lifetime, like CatalogStore: the project rail, the session pane
     /// and every prompt row read one store.
     let diagramCatalog: DiagramCatalogStore
@@ -29,18 +32,25 @@ final class GMVibesServices {
     /// below skips the socket entirely.
     private let kernel: KernelServices?
 
-    /// The holder, when we are NOT it. Drives the menu bar's client-mode row.
+    /// The holder, when we are NOT it.
+    ///
+    /// Drives the menu bar's client-mode row.
     private let kernelHolder: KernelOwnership.Holder?
 
-    /// Set when we won the lock and then could not open the database — a schema
-    /// written by newer bits is the case that reaches this. Distinct from client
-    /// mode because here NOBODY is serving.
+    /// Set when we won the lock and then could not open the database — a
+    /// schema written by newer bits is the case that reaches this.
+    ///
+    /// Distinct from client mode because here NOBODY is serving.
     private let kernelFailure: Error?
 
     /// Our row in the store's post-commit subscriber table, released on
-    /// shutdown. Writer mode only.
+    /// shutdown.
+    ///
+    /// Writer mode only.
     private var kernelEventToken: UUID?
 
+    /// Creates the services container, including kernel arbitration.
+    /// - Throws: Never; kernel failure is stored, not thrown.
     init() {
         // ARBITRATION IS THE FIRST THING THAT HAPPENS, before any stored
         // property that could reach the database. `KernelOwnership.acquire`
@@ -102,7 +112,9 @@ final class GMVibesServices {
     // off the latest ping. These properties are the whole of what `GMVibesApp` needs.
 
     /// Vitals as the answering kernel last reported them, or nil before the
-    /// first ping. Shaped for `KernelVitals(report:)`.
+    /// first ping.
+    ///
+    /// Shaped for `KernelVitals(report:)`.
     var vitalsReport: KernelVitalsReport? {
         guard let ping = daemon.ping else { return nil }
         return KernelVitalsReport(
@@ -112,13 +124,14 @@ final class GMVibesServices {
         )
     }
 
-    /// Who holds the database. Answered locally when arbitration already knows, so the menu
-    /// bar does not read `.unknown` for the first second of its own kernel's life.
+    /// Who holds the database.
     ///
-    /// In CLIENT mode the wire is the authority, because only the holder can report on
-    /// itself. `writerRole` and `writerBundlePath` are additive optionals, so a kernel
-    /// without them answers nil and this reads `.unknown`. No extra connection and no
-    /// polling: `DaemonConnectionModel` still runs the single health watchdog.
+    /// Answered locally when arbitration already knows, so the menu bar
+    /// does not read `.unknown` for the first second of its own kernel's
+    /// life. In CLIENT mode the wire is the authority; `writerRole` and
+    /// `writerBundlePath` are additive optionals, so a kernel without them
+    /// answers nil and reads `.unknown`. No polling: `DaemonConnectionModel`
+    /// runs the single health watchdog.
     var kernelRole: KernelRole {
         if kernel != nil { return .writer }
         if let kernelHolder {
@@ -158,8 +171,10 @@ final class GMVibesServices {
         }
     }
 
-    /// True when this process owns the database. The termination path needs to
-    /// know whether there is a kernel to stop at all.
+    /// True when this process owns the database.
+    ///
+    /// The termination path needs to know whether there is a kernel to
+    /// stop at all.
     var isKernelWriter: Bool { kernel != nil }
 
     /// Stop the kernel, in order, before the process goes away.
@@ -184,7 +199,9 @@ final class GMVibesServices {
 }
 
 extension View {
-    /// Inject the shared GMCC services into a scene's root view in one call.
+    /// Injects the shared services into a view hierarchy.
+    /// - Parameter services: The services container.
+    /// - Returns: The modified view with all services in the environment.
     func gmEnv(_ services: GMVibesServices) -> some View {
         self
             .environment(services.env)

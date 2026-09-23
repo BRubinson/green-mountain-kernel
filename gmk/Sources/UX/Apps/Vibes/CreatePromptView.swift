@@ -93,6 +93,7 @@ struct CreatePromptView: View {
 
     // MARK: - KBite options
 
+    /// Loads available kbites from the daemon and preselects inherited ones.
     private func loadKbites() async {
         // Session-scope registry seeds the preselection (kbite inheritance).
         let sessionCodes =
@@ -117,6 +118,7 @@ struct CreatePromptView: View {
 
     // MARK: - Save
 
+    /// Saves the new prompt to the daemon.
     private func save() async {
         isSaving = true
         errorText = nil
@@ -131,8 +133,8 @@ struct CreatePromptView: View {
             let row = try await service.createPrompt(
                 PromptCreateRequest(
                     sessionUuid: store.sessionUuid,
-                    code: segment,
                     name: name.trimmingCharacters(in: .whitespaces),
+                    code: segment,
                     backstory: backstory,
                     goal: goal,
                     detail: detail

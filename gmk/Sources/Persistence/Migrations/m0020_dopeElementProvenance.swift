@@ -9,6 +9,9 @@ extension Migrations {
     // KEYED BY DOT-PATH, NEVER BY UUID — dopeIngest is a whole-tree wipe and
     // reinsert that re-mints every child uuid, so a uuid-keyed provenance row
     // would be destroyed by the very operation it exists to inform.
+    /// Registers the m0020 migration for dope element provenance tracking.
+    ///
+    /// - Parameter migrator: The database migrator to register the migration with.
     static func m0020_dopeElementProvenance(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0020_dopeElementProvenance") { db in
             try db.execute(

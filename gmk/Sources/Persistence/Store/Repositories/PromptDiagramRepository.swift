@@ -2,12 +2,21 @@ import Foundation
 import GRDB
 
 /// PROMPT_DIAGRAM_QUALIFY / _GET / _LIST data access — a prompt's standing
-/// reading of a rendered diagram (m0022). Runs INSIDE a Store-owned
-/// transaction; holds no dbQueue and never self-transacts.
+/// reading of a rendered diagram (m0022).
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
+/// self-transacts.
 struct PromptDiagramRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Records or updates a qualified diagram for a prompt.
+    ///
+    /// - Parameters:
+    ///   - req: The qualify request containing the prompt and diagram UUIDs.
+    ///   - qualification: The qualification string to record.
+    /// - Returns: The qualified diagram row.
+    /// - Throws: `StoreError.notFound` when the prompt or diagram does not exist.
     func qualify(
         _ req: PromptDiagramQualifyRequest,
         qualification: String
@@ -75,6 +84,13 @@ struct PromptDiagramRepository: RepositoryContext {
         return row
     }
 
+    /// Fetches the qualified diagram for a specific prompt and diagram pair.
+    ///
+    /// - Parameter req: The get request containing the prompt and diagram UUIDs.
+    /// - Returns: The qualified diagram row.
+    /// - Throws: `StoreError.notFound` when the prompt or diagram does not exist;
+    ///   `StoreError.summaryAbsent` when no qualification exists; `StoreError.badRequest`
+    ///   when multiple qualifications exist for the same prompt.
     func get(_ req: PromptDiagramGetRequest) throws -> PromptQualifiedDiagramRow {
         try requireQualificationTargets(
             promptUuid: req.promptUuid,
@@ -100,6 +116,11 @@ struct PromptDiagramRepository: RepositoryContext {
         return first
     }
 
+    /// Lists all qualified diagrams attached to a prompt.
+    ///
+    /// - Parameter req: The list request containing the prompt UUID.
+    /// - Returns: The list response with all qualified diagrams.
+    /// - Throws: `StoreError.notFound` when the prompt does not exist.
     func list(_ req: PromptDiagramListRequest) throws -> PromptDiagramListResponse {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -113,9 +134,16 @@ struct PromptDiagramRepository: RepositoryContext {
 
     // MARK: - Shared helpers
 
-    /// Existence first, in the same transaction as the write. Without it an
-    /// unknown uuid surfaces as a raw FK failure, which tells the caller
-    /// nothing about WHICH end was wrong.
+    /// Verifies that the prompt and diagram UUIDs exist.
+    ///
+    /// Checking existence in the same transaction as the write avoids exposing
+    /// raw foreign key failures, which would not clearly indicate which UUID
+    /// was invalid.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The UUID of the prompt to verify.
+    ///   - diagramUuid: The UUID of the diagram to verify, or `nil` to skip.
+    /// - Throws: `StoreError.notFound` when the prompt or diagram does not exist.
     private func requireQualificationTargets(
         promptUuid: String,
         diagramUuid: String?
@@ -129,10 +157,22 @@ struct PromptDiagramRepository: RepositoryContext {
         }
     }
 
+    /// Fetches a qualified diagram by UUID.
+    ///
+    /// - Parameter uuid: The UUID of the qualified diagram.
+    /// - Returns: The qualified diagram row, or `nil` if not found.
+    /// - Throws: Any error from the database query.
     func fetchRow(uuid: String) throws -> PromptQualifiedDiagramRow? {
         try PromptQualifiedDiagramRecord.all().withUuid(uuid).fetchOne(db)?.dto()
     }
 
+    /// Fetches qualified diagrams for a prompt, optionally filtered by diagram UUID.
+    ///
+    /// - Parameters:
+    ///   - promptUuid: The UUID of the prompt.
+    ///   - diagramUuid: The UUID of a specific diagram to filter by, or `nil` for all.
+    /// - Returns: An array of qualified diagram rows, ordered by creation time.
+    /// - Throws: Any error from the database query.
     func fetchRows(
         promptUuid: String,
         diagramUuid: String?

@@ -10,6 +10,12 @@ enum GmBridgeClaudePlugin {
 
         var url: String?
 
+        /// Creates an author record with name and optional contact information.
+        ///
+        /// - Parameters:
+        ///   - name: The author's name.
+        ///   - email: The author's email address; defaults to nil.
+        ///   - url: The author's website URL; defaults to nil.
         init(name: String, email: String? = nil, url: String? = nil) {
             self.name = name
             self.email = email
@@ -25,6 +31,12 @@ enum GmBridgeClaudePlugin {
 
         var evals: [String]?
 
+        /// Creates an experimental features configuration.
+        ///
+        /// - Parameters:
+        ///   - themes: Optional list of experimental themes.
+        ///   - monitors: Optional list of experimental monitors.
+        ///   - evals: Optional list of experimental evaluations.
         init(
             themes: [String]? = nil,
             monitors: [String]? = nil,
@@ -87,6 +99,28 @@ enum GmBridgeClaudePlugin {
 
         var experimental: Experimental?
 
+        /// Creates a plugin manifest file structure.
+        ///
+        /// - Parameters:
+        ///   - name: The plugin's identifier name.
+        ///   - displayName: User-visible plugin name; defaults to nil.
+        ///   - version: Plugin version; defaults to nil.
+        ///   - description: Plugin description; defaults to nil.
+        ///   - author: Author information; defaults to nil.
+        ///   - homepage: Homepage URL; defaults to nil.
+        ///   - repository: Repository URL; defaults to nil.
+        ///   - license: License identifier; defaults to nil.
+        ///   - keywords: Search keywords; defaults to nil.
+        ///   - metadata: Custom metadata map; defaults to nil.
+        ///   - defaultEnabled: Whether plugin is enabled by default; defaults to nil.
+        ///   - skills: Skill identifiers; defaults to nil.
+        ///   - commands: Command identifiers; defaults to nil.
+        ///   - agents: Agent identifiers; defaults to nil.
+        ///   - workflows: Workflow identifiers; defaults to nil.
+        ///   - hooks: Hook identifiers; defaults to nil.
+        ///   - mcpServers: MCP server identifiers; defaults to nil.
+        ///   - lspServers: LSP server identifiers; defaults to nil.
+        ///   - experimental: Experimental features; defaults to nil.
         init(
             name: String,
             displayName: String? = nil,

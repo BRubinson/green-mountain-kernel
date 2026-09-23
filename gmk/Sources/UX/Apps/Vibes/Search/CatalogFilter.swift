@@ -33,12 +33,18 @@ struct CatalogFilter: Equatable {
     /// `excludeCheckedOut` is set.
     var checkedOutCodeByInstance: [String: String] = [:]
     var excludeCheckedOut = false
-    /// Keep projects whose kept-instance list is empty. The browse tree
+    /// Keep projects whose kept-instance list is empty.
+    ///
+    /// The browse tree
     /// (ProjectsView) wants them (it renders a "No instances." row); the
     /// drill-down cards do NOT — an instance-less project would be a dead
     /// card, which the traversal this replaced explicitly refused.
     var includeEmptyProjects = false
 
+    /// Applies the filter to the catalog and returns a filtered snapshot.
+    ///
+    /// - Parameter catalog: The catalog to filter.
+    /// - Returns: A filtered and ordered copy of the catalog.
     @MainActor
     func apply(to catalog: CatalogStore) -> FilteredCatalog {
         var outProjects: [ProjectRow] = []
@@ -130,10 +136,18 @@ struct FilteredCatalog: Equatable {
     /// Ancestor uuids of every match — drives search auto-expansion.
     var expandedAncestors: Set<String> = []
 
+    /// Retrieves the filtered instances of a project.
+    ///
+    /// - Parameter project: The project row.
+    /// - Returns: The project's filtered instances, or empty array if none.
     func instances(of project: ProjectRow) -> [InstanceRow] {
         instancesByProject[project.uuid] ?? []
     }
 
+    /// Retrieves the filtered sessions of an instance.
+    ///
+    /// - Parameter instance: The instance row.
+    /// - Returns: The instance's filtered sessions, or empty array if none.
     func sessions(of instance: InstanceRow) -> [SessionStub] {
         sessionsByInstance[instance.uuid] ?? []
     }

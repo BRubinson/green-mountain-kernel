@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `diagram_drawing_text` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `diagram_drawing_text` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DiagramDrawingTextRecord: DiagramSubtypeRecord, TableRecord {
     static let databaseTableName = "diagram_drawing_text"
 

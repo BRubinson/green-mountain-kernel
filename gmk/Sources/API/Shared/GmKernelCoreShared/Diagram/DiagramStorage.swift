@@ -15,12 +15,19 @@ enum DiagramStorage {
     static let defaultDirectory = "diagrams"
     static let screenshotsDirectory = "screenshots"
 
-    /// `{owner storage}/{gmcc_diagram_path ?? "diagrams"}/screenshots/{code}.png`
+    /// Computes the screenshot path for a diagram.
     ///
-    /// One mutable file per diagram code — not one per revision. Staleness
-    /// is decided by comparing a sidecar fingerprint, so a bot always reads
-    /// the same path and never has to guess which of several files is
-    /// current.
+    /// Path format: `{owner storage}/{gmcc_diagram_path ?? "diagrams"}/screenshots/{code}.png`.
+    /// One mutable file per diagram code, not per revision. Staleness is decided by comparing
+    /// a sidecar fingerprint, so a bot always reads the same path.
+    ///
+    /// - Parameters:
+    ///   - ownerStoragePath: Owner's GMFS-relative storage directory.
+    ///   - gmccDiagramPath: Override for the diagram directory; defaults to `"diagrams"`.
+    ///   - diagramCode: Diagram code identifier.
+    ///   - fileExtension: File extension; defaults to `"png"`.
+    /// - Returns: GMFS-relative path to the screenshot file.
+    /// - Throws: `StoreError` on path validation failure.
     static func screenshotRelativePath(
         ownerStoragePath: String,
         gmccDiagramPath: String?,
@@ -41,7 +48,16 @@ enum DiagramStorage {
             .joined(separator: "/")
     }
 
-    /// The fingerprint sidecar sits beside its PNG, same stem.
+    /// Computes the fingerprint sidecar path for a diagram.
+    ///
+    /// The fingerprint file sits beside its PNG with the same stem.
+    ///
+    /// - Parameters:
+    ///   - ownerStoragePath: Owner's GMFS-relative storage directory.
+    ///   - gmccDiagramPath: Override for the diagram directory; defaults to `"diagrams"`.
+    ///   - diagramCode: Diagram code identifier.
+    /// - Returns: GMFS-relative path to the fingerprint file (`render.json`).
+    /// - Throws: `StoreError` on path validation failure.
     static func fingerprintRelativePath(
         ownerStoragePath: String,
         gmccDiagramPath: String?,
@@ -57,9 +73,16 @@ enum DiagramStorage {
 
     // MARK: - Path hygiene
 
-    /// Split and validate, so a stored path can never climb out of the GMFS
-    /// root. This runs BEFORE any sandbox check — defence in depth, and it
-    /// gives a comprehensible error instead of a containment refusal.
+    /// Splits and validates a path to prevent escaping the GMFS root.
+    ///
+    /// Runs before any sandbox check for defence in depth and provides clear error messages
+    /// instead of generic containment refusal.
+    ///
+    /// - Parameters:
+    ///   - raw: The path string to split and validate.
+    ///   - label: Description used in error messages.
+    /// - Returns: Array of validated path segments.
+    /// - Throws: `StoreError` on empty, absolute, relative, dotfile, or slashed segments.
     static func sanitizedSegments(_ raw: String, label: String) throws -> [String] {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -78,6 +101,12 @@ enum DiagramStorage {
         return segments
     }
 
+    /// Validates a path segment name.
+    ///
+    /// - Parameters:
+    ///   - name: The segment to validate.
+    ///   - label: Description used in error messages.
+    /// - Throws: `StoreError` on empty, relative (`..`, `.`), dotfile, or slashed segments.
     static func validateName(_ name: String, label: String) throws {
         guard !name.isEmpty else {
             throw StoreError.badRequest(detail: "\(label) has an empty segment")
@@ -117,12 +146,22 @@ struct DiagramRenderFingerprint: Codable, Hashable, Sendable {
     let diagramUuid: String
     let diagramRevision: Int64
     /// dope scope code -> that scope's revision, for every RESOLVED binding.
+    ///
     /// Sorted by key when encoded, so the JSON is stable.
     let dopeRevisions: [String: Int64]
     let scheme: String
     let scale: Double
     let algoVersion: Int
 
+    /// Creates a diagram render fingerprint.
+    ///
+    /// - Parameters:
+    ///   - diagramUuid: The diagram identifier.
+    ///   - diagramRevision: The diagram's revision number.
+    ///   - dopeRevisions: Map of dope scope codes to their revisions for all resolved bindings.
+    ///   - scheme: The rendering color scheme.
+    ///   - scale: The rendering scale factor.
+    ///   - algoVersion: The render algorithm version; defaults to current version.
     init(
         diagramUuid: String,
         diagramRevision: Int64,
@@ -139,18 +178,29 @@ struct DiagramRenderFingerprint: Codable, Hashable, Sendable {
         self.algoVersion = algoVersion
     }
 
-    /// A rendered file is reusable only against an identical key.
+    /// Checks whether this fingerprint matches another.
     ///
-    /// `diagramUuid` is part of it: a diagram renamed onto a code another
-    /// diagram once held would otherwise inherit that diagram's PNG.
+    /// A rendered file is reusable only against an identical key. `diagramUuid` is part of it:
+    /// a diagram renamed onto a code another diagram once held would otherwise inherit that diagram's PNG.
+    ///
+    /// - Parameter other: The fingerprint to compare.
+    /// - Returns: `true` when the fingerprints are identical.
     func matches(_ other: DiagramRenderFingerprint) -> Bool { self == other }
 
+    /// Encodes this fingerprint to JSON data.
+    ///
+    /// - Returns: Pretty-printed JSON with sorted keys.
+    /// - Throws: Encoding errors.
     func encoded() throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
         return try encoder.encode(self)
     }
 
+    /// Decodes a fingerprint from JSON data.
+    ///
+    /// - Parameter data: JSON data to decode.
+    /// - Returns: The decoded fingerprint, or nil on decode failure.
     static func decoded(_ data: Data) -> DiagramRenderFingerprint? {
         try? JSONDecoder().decode(DiagramRenderFingerprint.self, from: data)
     }

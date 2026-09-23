@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `kbite_keyword_junction` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `kbite_keyword_junction` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct KbiteKeywordJunctionRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "kbite_keyword_junction"
     var uuid: String

@@ -10,6 +10,15 @@ extension Migrations {
     // CHECKed as a BICONDITIONAL so the index cannot silently constrain nothing.
     // promoted_from_* is the BASE_PROJECT high-water mark, kept separate from
     // `revision` so two instances on one branch cannot overwrite each other.
+    /// Registers the m0013 migration: widens dope_scope from two to four tiers.
+    ///
+    /// Rebuilds the table to add instance_uuid and prompt_uuid columns with
+    /// corresponding tier scopes: BASE_PROJECT, PROJECT_ITEM, SESSION_INSTANCE,
+    /// and SESSION_INSTANCE_ITEM. Five other dope_persistence tables CASCADE-reference
+    /// this one; the schema enforces tier membership via CHECK constraints and
+    /// partial unique indexes.
+    ///
+    /// - Parameter migrator: The database migrator to register this migration with.
     static func m0013_dopeScopeTierLadder(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0013_dopeScopeTierLadder") { db in
             let orphans =

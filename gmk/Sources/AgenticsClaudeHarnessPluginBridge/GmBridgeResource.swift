@@ -29,7 +29,14 @@ struct GmBridgeResource: Equatable, Sendable, GmBridgeFile {
 
     var body: String
 
-    init(skill: String, path: String, summary: String = "", body: String) {
+    /// Creates a reference resource for a skill directory.
+    ///
+    /// - Parameters:
+    ///   - skill: The skill directory name (e.g., `gmcc`).
+    ///   - path: The relative path within the skill directory.
+    ///   - body: The file contents.
+    ///   - summary: A one-line summary of when to open this resource.
+    init(skill: String, path: String, body: String, summary: String = "") {
         self.skill = skill
         self.path = path
         self.summary = summary
@@ -46,6 +53,9 @@ struct GmBridgeResource: Equatable, Sendable, GmBridgeFile {
 
     var isEmpty: Bool { body.isEmpty }
 
+    /// Returns the resource file contents with a trailing newline.
+    ///
+    /// - Returns: The file body, or nil if empty, with trailing newline guaranteed.
     func contents() -> String? {
         guard !isEmpty else { return nil }
         // Verbatim, with a guaranteed trailing newline. NO frontmatter is

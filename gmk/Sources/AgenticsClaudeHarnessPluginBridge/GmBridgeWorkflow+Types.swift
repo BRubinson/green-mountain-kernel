@@ -10,6 +10,12 @@ enum GmBridgeWorkflow {
 
         var model: GmBridgeClaudeTypeModel?
 
+        /// Creates a workflow phase with title, detail, and optional model.
+        ///
+        /// - Parameters:
+        ///   - title: The phase title.
+        ///   - detail: Optional additional detail text.
+        ///   - model: The Claude model for this phase, or nil.
         init(
             title: String,
             detail: String? = nil,
@@ -33,6 +39,14 @@ enum GmBridgeWorkflow {
 
         var body: String
 
+        /// Creates a workflow file with metadata and phases.
+        ///
+        /// - Parameters:
+        ///   - name: The workflow name.
+        ///   - description: A description of what the workflow does.
+        ///   - whenToUse: Optional guidance on when to invoke the workflow.
+        ///   - phases: The phases this workflow contains.
+        ///   - body: The JavaScript/TypeScript body code.
         init(
             name: String,
             description: String,
@@ -55,6 +69,11 @@ enum GmBridgeWorkflow {
             body.isEmpty
         }
 
+        /// Renders the workflow metadata and body as JavaScript code.
+        ///
+        /// - Returns: The rendered JavaScript with meta export and body, or nil
+        ///   if the file is empty.
+        /// - Throws: Errors if YAML serialization fails.
         func contents() throws -> String? {
             guard !isEmpty else { return nil }
 

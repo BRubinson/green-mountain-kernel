@@ -19,8 +19,14 @@ struct PromptStatusBadge: View {
     private var label: String { status?.rawValue.capitalized ?? "—" }
     var color: Color { Self.color(for: status) }
 
-    /// The lifecycle palette — a static so callers (the lifecycle rail) read
-    /// a color without instantiating a view.
+    /// Returns the color for a prompt status.
+    ///
+    /// A static method so callers can read a color without instantiating a
+    /// view. The lifecycle palette uses well-separated hues (orange, blue,
+    /// green, gray) for clarity at capsule size.
+    ///
+    /// - Parameter status: The prompt status, or nil for unknown.
+    /// - Returns: The corresponding color.
     static func color(for status: PromptStatus?) -> Color {
         // Three well-separated hues rather than three picked out of the old
         // six: orange / blue / green read as distinct at capsule size and in

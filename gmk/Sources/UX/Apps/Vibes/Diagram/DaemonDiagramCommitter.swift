@@ -13,6 +13,11 @@ final class DaemonDiagramCommitter: DiagramCommitting {
     private let onCommit: @MainActor @Sendable (DiagramGetResponse) -> Void
     private let service = GMCCDaemonService.shared
 
+    /// Creates a committer for a diagram.
+    ///
+    /// - Parameters:
+    ///   - diagramUuid: The diagram uuid to commit mutations to.
+    ///   - onCommit: A callback invoked on the main actor after each commit with the fresh tree.
     init(
         diagramUuid: String,
         onCommit: @escaping @MainActor @Sendable (DiagramGetResponse) -> Void
@@ -21,10 +26,24 @@ final class DaemonDiagramCommitter: DiagramCommitting {
         self.onCommit = onCommit
     }
 
+    /// Applies mutations to the diagram and returns the new revision.
+    ///
+    /// - Parameters:
+    ///   - mutations: The mutations to apply.
+    ///   - expectedRevision: The revision to CAS against, or nil to skip the check.
+    /// - Returns: The new diagram revision after mutations are applied.
+    /// - Throws: `StoreError.versionConflict` if the expected revision is stale.
     func commit(_ mutations: [DiagramMutation], expectedRevision: Int64?) async throws -> Int64 {
         try await commitReporting(mutations, expectedRevision: expectedRevision).revision
     }
 
+    /// Applies mutations and returns the outcome with minted uuids and fresh tree.
+    ///
+    /// - Parameters:
+    ///   - mutations: The mutations to apply.
+    ///   - expectedRevision: The revision to CAS against, or nil to skip the check.
+    /// - Returns: The outcome containing the new revision and minted uuids mapped from client refs.
+    /// - Throws: `StoreError.versionConflict` if the expected revision is stale.
     func commitReporting(
         _ mutations: [DiagramMutation],
         expectedRevision: Int64?

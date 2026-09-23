@@ -18,14 +18,18 @@ bash gmk/scripts/swift_lint_format.sh $ARGUMENTS
   changed semantics here (double-optional flattening, closure parameters, test base classes).
 - Paths after the flags restrict the run to those files or directories.
 
-Two tools, one gate, in this order:
+Three stages, one gate, in this order:
 
 1. **swift-format** owns layout. Config discovered by walking up: root `.swift-format`, and
-   `gmk/Gm_Kernel_test/.swift-format` for the test package (force-try and IUOs allowed there).
+   `gmk/Tests/.swift-format` for the test package (force-try and IUOs allowed there).
    `.swift-format-ignore` at the root declares vendored, generated and build output.
 2. **SwiftLint 0.65.1** owns semantics and comments. Config is the root `.swiftlint.yml`.
    Not installed → the stage is skipped with a warning; install with
    `bash gmk/scripts/install_swiftlint.sh` (pinned binary under `$GM_FS_ROOT/tools/swiftlint/`).
+3. **swift_doc_check.py** owns doc-comment completeness: every function, init and subscript has
+   a one-line summary of at most 100 characters, a Parameters section naming each parameter,
+   Returns when it returns, Throws when it throws. Findings print as `[DocComment]` and every one
+   fails the gate; the tree carries no baseline. Style: `.claude/skills/swift-doc-comments/SKILL.md`.
 
 The script skips `gmk/gmClaudeForFoundationModels`, `Generated/`, `.build`, `Package.swift` and
 `plugins/`. Never format those by hand either.
@@ -40,7 +44,8 @@ AlwaysUseLowerCamelCase exemptions) and needs a hand edit at the reported line.
 
 SwiftLint findings print as `path:line:col: error|warning: Message (rule_id)`. Errors fail the
 gate; warnings do not. The error-severity rules are the comment rules
-(`historical_comment`, `long_comment_run`, `block_comment`, `comment_line_length`), `no_print`,
+(`historical_comment`, `long_comment_run`, `long_doc_comment_run`, `block_comment`,
+`comment_line_length`), `no_print`,
 `no_unchecked_sendable`, `no_file_literal`, and the error tier of `function_body_length`,
 `cyclomatic_complexity` and `identifier_name`.
 
@@ -57,10 +62,11 @@ visible before it is committed.
 
 ## Rules the configs disable, and why
 
-- swift-format `AlwaysUseLowerCamelCase`: migration functions are `m00NN_name` and template
-  constants are `GM_*`. SwiftLint admits the same names through `identifier_name.excluded`.
-  Do not rename them to satisfy a linter. Type names ARE checked (`TypeNamesShouldBeCapitalized`
-  is on).
+- swift-format `AlwaysUseLowerCamelCase` (off under `gmk/Sources`, on under `gmk/Tests`):
+  migration functions are `m00NN_name`, template constants are `GM_*`, and `@Generable` tool
+  argument properties are snake_case because they ARE the wire names. SwiftLint admits the same
+  names through `identifier_name.excluded`. Do not rename them to satisfy a linter. Type names ARE
+  checked (`TypeNamesShouldBeCapitalized` is on).
 - swift-format `UseSynthesizedInitializer`, `UseLetInEveryBoundCaseVariable`: hand-written inits and
   `case let .x(a, b)` are the house style.
 - SwiftLint layout rules (whitespace, braces, colons, commas, multiline_*, line_length ...): swift-format

@@ -75,10 +75,12 @@ private struct ProjectTreeView: View {
         .onChange(of: catalog.sessionsByInstance) { _, _ in refilter() }
     }
 
+    /// Recomputes the filtered catalog based on the current search query.
+    ///
+    /// Keeps the catalog's recency order (the drill-down pages are the alphabetical
+    /// surfaces) and shows instance-less projects (the tree renders a "No instances."
+    /// row for them).
     private func refilter() {
-        // This browser keeps the catalog's recency order (the drill-down
-        // pages are the alphabetical surfaces) and SHOWS instance-less
-        // projects (the tree renders a "No instances." row for them).
         let next = CatalogFilter(
             query: SearchQuery(query),
             instanceOrder: .recency,

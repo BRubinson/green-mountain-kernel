@@ -2,7 +2,9 @@ import Foundation
 
 /// COMPUTED, NOT A CONSTANT: the reference index at the bottom is built from
 /// `GmBridgeResource.all`, so a document declared under this skill is cited
-/// here automatically and one removed stops being cited. See `GM_CONCEPT_GMCC`.
+/// here automatically and one removed stops being cited.
+///
+/// See `GM_CONCEPT_GMCC`.
 var GM_CONCEPT_KBITE: String {
     """
     ## KBite — Pre-Indexed External Knowledge

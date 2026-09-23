@@ -2,12 +2,13 @@ import Foundation
 import GRDB
 
 /// DOPE domain modeling data access — scope lifecycle, tree hydration, and the
-/// generic per-level node mutations. Whole-tree repo verbs live in
-/// Store+DopeRepo. Runs INSIDE a Store-owned transaction; holds no dbQueue.
-/// Two counters, deliberately split: every row's `version` is THE optimistic
-/// lock, while `dope_scope.revision` is the whole-tree content counter advanced
-/// by `bumpScopeRevision` without touching the scope row's version, so a deep
-/// property edit cannot invalidate a version a scope editor is holding.
+/// generic per-level node mutations.
+///
+/// Whole-tree repo verbs in Store+DopeRepo. Runs INSIDE a Store transaction;
+/// no dbQueue. Two counters split: every `version` is optimistic lock, while
+/// `dope_scope.revision` is the whole-tree content counter advanced by
+/// `bumpScopeRevision` without touching scope row's version, so a deep property
+/// edit cannot invalidate a version a scope editor is holding.
 struct DopeRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
@@ -22,17 +23,28 @@ struct DopeRepository: RepositoryContext {
 
     // MARK: - Row + scope helpers
 
+    /// Fetches the scope row by uuid.
+    /// - Parameter uuid: The scope uuid.
+    /// - Returns: The scope row, or nil if not found.
+    /// - Throws: Store errors if the fetch fails.
     func fetchDopeScope(uuid: String) throws -> DopeScopeRow? {
         try DopeScopeRecord.all().withUuid(uuid).fetchOne(db).map { $0.dto() }
     }
 
-    /// Advance the whole-tree content counter WITHOUT bumping the scope row's
-    /// version — see the extension doc comment and StoreCore.touchSession.
-    /// `area` additionally advances that subtree's own content counter, which
-    /// is what makes dope sub-LOADABLE: a client compares one area's number
-    /// instead of refetching the whole tree. dope_scope.revision REMAINS the
-    /// single whole-tree counter and the sole CAS gate for read-repo, write-repo
-    /// and ingest; area counters sit BESIDE it and never replace it.
+    /// Advances the whole-tree content counter without bumping the scope row's version.
+    ///
+    /// When `area` and `ownerUuid` are provided, also advances that subtree's own
+    /// counter, enabling clients to compare one area's number instead of refetching the
+    /// whole tree. The scope's `revision` remains the sole CAS gate for read-repo and
+    /// write-repo, while area counters sit beside it and never replace it. See
+    /// StoreCore.touchSession for the versioning strategy.
+    ///
+    /// - Parameters:
+    ///   - scopeUuid: The scope uuid.
+    ///   - area: The area to advance, if any.
+    ///   - ownerUuid: The row uuid that owns this area, required when `area` is provided.
+    /// - Returns: The new revision number.
+    /// - Throws: Store errors if the update fails.
     @discardableResult
     func bumpScopeRevision(
         scopeUuid: String,
@@ -58,6 +70,10 @@ struct DopeRepository: RepositoryContext {
         return revision
     }
 
+    /// Fetches the current revision number for the scope.
+    /// - Parameter scopeUuid: The scope uuid.
+    /// - Returns: The revision, or nil if not found.
+    /// - Throws: Store errors if the fetch fails.
     private func scopeRevision(scopeUuid: String) throws -> Int64? {
         try DopeScopeRecord
             .all()
@@ -66,8 +82,14 @@ struct DopeRepository: RepositoryContext {
             .fetchOne(db)
     }
 
-    /// Session-keyed twin of the promptUuid variant in Store+Architecture —
-    /// dope's repo verbs are scope-addressed and scopes hang off sessions.
+    /// Fetches the instance root path for the session.
+    ///
+    /// Session-keyed twin of the promptUuid variant in Store+Architecture. Dope's repo
+    /// verbs are scope-addressed and scopes hang off sessions.
+    ///
+    /// - Parameter sessionUuid: The session uuid.
+    /// - Returns: The absolute file system path.
+    /// - Throws: Store errors if the fetch fails.
     func instanceRoot(sessionUuid: String) throws -> String {
         try InstanceRecord
             .joining(required: InstanceRecord.sessions.withUuid(sessionUuid))
@@ -75,8 +97,16 @@ struct DopeRepository: RepositoryContext {
             .fetchOne(db) ?? ""
     }
 
-    /// Resolve the scope that owns a node at `level`, walking the registry's
-    /// parent links as associations.
+    /// Fetches the scope that owns a node at the given level.
+    ///
+    /// Resolves ownership by walking the registry's parent links as associations, returning
+    /// the scope that contains the node at the specified level.
+    ///
+    /// - Parameters:
+    ///   - level: The level of the node.
+    ///   - nodeUuid: The node uuid.
+    /// - Returns: The owning scope.
+    /// - Throws: `StoreError.notFound` if the node or scope not found; other store errors.
     func dopeOwningScope(level: DopeLevel, nodeUuid: String) throws -> DopeScopeRow {
         let request: QueryInterfaceRequest<DopeScopeRecord>
         switch level {
@@ -132,7 +162,19 @@ struct DopeRepository: RepositoryContext {
     /// because it is a filter here and never a result set.
     private static let persistences = DopeScopeRecord.persistences.unordered()
 
-    // internal: the promotion machine emits DOPE_CHANGE too.
+    /// Records a change event for a dope node.
+    ///
+    /// Every granular mutation funnels through here, making this the one place the merge base
+    /// learns that this session touched an element. Changes are addressed by dot-path so ingest can
+    /// re-mint uuids. The session's activity is touched only if the scope has a session.
+    ///
+    /// - Parameters:
+    ///   - scope: The scope that owns the node.
+    ///   - action: The mutation action (e.g., "init", "update", "delete").
+    ///   - level: The level of the node, or nil for a scope-level change.
+    ///   - nodeUuid: The node uuid, or nil for a scope-level change.
+    ///   - revision: The current scope revision after the change.
+    /// - Throws: Store errors if the event append fails.
     func recordDopeChange(
         scope: DopeScopeRow,
         action: String,
@@ -181,14 +223,19 @@ struct DopeRepository: RepositoryContext {
 
     // MARK: - Read-time staleness (shared by agent_briefing and care_package)
 
-    /// The read-time drift report BOTH agent_briefing and care_package need.
-    /// Compare a stamped scope revision against the live one, re-resolve every
-    /// dot-path. Warn, never block. Computed, never stored.
+    /// Reports read-time drift for a stamped scope revision.
     ///
-    /// `drifted` guards BOTH sides: a MISSING number on either side is not
-    /// evidence of drift, so an unstamped ref set and an absent scope row both
-    /// report `false`. A bare `!=` would flip the badge on for every
-    /// never-stamped briefing.
+    /// Compares a stamped scope revision against the live one, re-resolving every dot-path
+    /// to detect removals. The `drifted` flag guards both sides—missing numbers on either side
+    /// are not drift evidence, so never-stamped ref sets report false. This computed result is
+    /// never stored.
+    ///
+    /// - Parameters:
+    ///   - scopeUuid: The scope uuid, or nil for no drift check.
+    ///   - stampedRevision: The revision number from a prior read, or nil.
+    ///   - dotPaths: The dot-paths to check for existence.
+    /// - Returns: A tuple with the stamped and current revisions, drift flag, and ghost paths.
+    /// - Throws: Store errors if the staleness check fails.
     func scopeStaleness(
         scopeUuid: String?,
         stampedRevision: Int64?,
@@ -208,14 +255,17 @@ struct DopeRepository: RepositoryContext {
         return (stampedRevision, current, drifted, ghosts)
     }
 
-    /// Dot-path existence check for ghost reporting. Forms accepted:
-    /// domain · domain.entity · domain.entity.property ·
-    /// domain.enums.enum_code · domain.enums.enum_code.option_code.
-    /// Anything unparseable is simply a ghost — never an error.
+    /// Checks whether a dot-path refers to an existing node.
     ///
-    /// MOVED VERBATIM from BriefingRepository (was `private func
-    /// dopeDotPathExists`): dope_persistence* is THIS repository's table set,
-    /// and RepositoryContext's own doc comment prescribes naming the owner.
+    /// Forms accepted: `domain`, `domain.entity`, `domain.entity.property`, `domain.enums.enum_code`,
+    /// and `domain.enums.enum_code.option_code`. Unparseable paths are treated as missing, never as
+    /// errors. Moved verbatim from BriefingRepository; see RepositoryContext doc comment for table naming.
+    ///
+    /// - Parameters:
+    ///   - scopeUuid: The scope uuid.
+    ///   - path: The dot-path to check.
+    /// - Returns: True if the path exists; false if not found or malformed.
+    /// - Throws: Store errors if the query fails.
     func dotPathExists(scopeUuid: String, path: String) throws -> Bool {
         let segs = path.split(separator: ".").map(String.init)
         guard !segs.isEmpty, segs.count <= 4 else { return false }
@@ -270,6 +320,10 @@ struct DopeRepository: RepositoryContext {
 
     // MARK: - Init
 
+    /// Initializes a new dope scope for a session or prompt.
+    /// - Parameter req: The initialization request with session, prompt, code, and description.
+    /// - Returns: A response with the created scope and created flag.
+    /// - Throws: Validation errors if code is invalid, description too long, or session/prompt not found.
     func dopeInit(_ req: DopeInitRequest) throws -> DopeScopeResponse {
         try DopeCode.validateCode(req.code, field: "scope code")
         let description = req.description ?? ""
@@ -373,10 +427,16 @@ struct DopeRepository: RepositoryContext {
 
     // MARK: - Read-verb guards + shared candidate query
 
-    /// dopeInit's existence validation (minus the ownership check, a
-    /// write-verb concern), hoisted so the read verbs can discriminate an
-    /// unknown uuid (NOT_FOUND) from a real-but-uninitialized target
-    /// (SUMMARY_ABSENT) — the clarify/arch/explore/review get pattern.
+    /// Validates that a session and optional prompt exist.
+    ///
+    /// Hoisted from dopeInit to let read verbs distinguish an unknown uuid (NOT_FOUND) from a
+    /// real but uninitialized target (SUMMARY_ABSENT). Used by the clarify/arch/explore/review
+    /// get pattern. Skips the ownership check that dopeInit performs.
+    ///
+    /// - Parameters:
+    ///   - sessionUuid: The session uuid to validate.
+    ///   - promptUuid: The optional prompt uuid to validate.
+    /// - Throws: `StoreError.notFound` if the session or prompt not found.
     private func requireDopeTarget(
         sessionUuid: String,
         promptUuid: String?
@@ -391,11 +451,19 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
-    /// The scope-candidate query shared by dopeGet's resolution ladder and
-    /// dopeList's enumeration — one copy keeps the picker's row order and
-    /// the BAD_REQUEST candidate order identical (ORDER BY code).
-    // internal, not private: Store+Diagram's binding resolution reuses this
-    // exact ladder query (the v12 candidates() promotion precedent).
+    /// Fetches dope scope candidates matching session, type, prompt, and optional code.
+    ///
+    /// Shared by dopeGet's resolution ladder and dopeList's enumeration. One copy keeps the
+    /// picker's row order and BAD_REQUEST candidate order identical (ORDER BY code). Internal
+    /// (not private): Store+Diagram's binding resolution reuses this exact ladder query.
+    ///
+    /// - Parameters:
+    ///   - sessionUuid: The session uuid.
+    ///   - scopeType: The scope type to filter by.
+    ///   - promptUuid: The optional prompt uuid; required when scope type is .sessionInstanceItem.
+    ///   - code: The optional scope code to filter by.
+    /// - Returns: Array of matching scope rows, ordered by code.
+    /// - Throws: Store errors if the query fails.
     func dopeScopeCandidates(
         sessionUuid: String,
         scopeType: DopeScopeType,
@@ -423,13 +491,18 @@ struct DopeRepository: RepositoryContext {
             .map { $0.dto() }
     }
 
-    /// Project-tier scope candidates.
+    /// Fetches project-tier dope scope candidates.
     ///
-    /// `dopeScopeCandidates` is `WHERE session_uuid = ?`, which cannot address a
-    /// BASE_PROJECT scope, so a PROJECT-tier diagram binding one would resolve
-    /// nothing and render as a canvas of ghosts. PROJECT_ITEM is the masking
-    /// tier over BASE_PROJECT, mirroring SESSION_INSTANCE_ITEM over
-    /// SESSION_INSTANCE.
+    /// `dopeScopeCandidates` cannot address BASE_PROJECT scopes (session_uuid-based filter).
+    /// PROJECT_ITEM is the masking tier over BASE_PROJECT, mirroring SESSION_INSTANCE_ITEM
+    /// over SESSION_INSTANCE. Without this, project-tier diagrams would resolve nothing.
+    ///
+    /// - Parameters:
+    ///   - projectUuid: The project uuid.
+    ///   - scopeType: The scope type to filter by.
+    ///   - code: The optional scope code to filter by.
+    /// - Returns: Array of matching scope rows, ordered by code.
+    /// - Throws: Store errors if the query fails.
     func dopeProjectScopeCandidates(
         projectUuid: String,
         scopeType: DopeScopeType,
@@ -452,6 +525,10 @@ struct DopeRepository: RepositoryContext {
 
     // MARK: - List (v12; picker enumeration — never a PROMPT/SESSION_INSTANCE union)
 
+    /// Lists dope scopes for a session or prompt.
+    /// - Parameter req: The list request with session, optional prompt, and optional scope code.
+    /// - Returns: A response with the matching scopes.
+    /// - Throws: Validation errors if session or prompt not found.
     func dopeList(_ req: DopeListRequest) throws -> DopeListResponse {
         try requireDopeTarget(
             sessionUuid: req.sessionUuid,
@@ -475,6 +552,10 @@ struct DopeRepository: RepositoryContext {
 
     // MARK: - Get (PROMPT → SESSION_INSTANCE fallback)
 
+    /// Fetches a dope tree with optional overlay resolution.
+    /// - Parameter req: The get request with session, optional prompt, project, and scope code.
+    /// - Returns: A response with the tree and resolution information.
+    /// - Throws: Validation errors if session/prompt/project not found, or multiple scopes match.
     func dopeGet(_ req: DopeGetRequest) throws -> DopeGetResponse {
         func pick(_ rows: [DopeScopeRow]) throws -> DopeScopeRow? {
             if rows.count > 1 {
@@ -601,9 +682,16 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
-    /// The scope an overlay masks: same code, one tier up. A session-owned
-    /// base is addressed through the session, a project-tier one through the
-    /// project, which has no session at all.
+    /// The scope an overlay masks: same code, one tier up.
+    ///
+    /// A session-owned base is addressed through the session, a project-tier
+    /// one through the project, which has no session at all.
+    ///
+    /// - Parameters:
+    ///   - scope: The overlay scope row.
+    ///   - baseTier: The tier of the base scope to find.
+    /// - Returns: The rows for scopes at the base tier with the same code.
+    /// - Throws: Store errors if the query fails.
     private func baseScopeRows(
         of scope: DopeScopeRow,
         at baseTier: DopeScopeType
@@ -625,9 +713,16 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
-    /// The dope_persistence row a node lives under — the persistence area's
-    /// counter owner. Mirrors dopeOwningScope's join chain, stopping one level
-    /// short.
+    /// Fetches the persistence uuid that owns a node at the given level.
+    ///
+    /// Mirrors dopeOwningScope's join chain, stopping one level short. Returns nil for
+    /// scope-level nodes.
+    ///
+    /// - Parameters:
+    ///   - level: The level of the node.
+    ///   - nodeUuid: The node uuid.
+    /// - Returns: The owning persistence uuid, or nil for scope-level nodes.
+    /// - Throws: Store errors if the query fails.
     func owningPersistenceUuid(
         level: DopeLevel,
         nodeUuid: String
@@ -670,10 +765,14 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
-    /// Per-area content counters, derived as the max content_revision inside
-    /// each area. Derived rather than stored on the scope: one fewer column to
-    /// keep consistent, and the answer a client actually wants ("has anything
-    /// in this area moved?") is exactly a max.
+    /// Fetches per-area content counters derived from the max content_revision in each area.
+    ///
+    /// Computed rather than stored on the scope to reduce columns. The query a client actually
+    /// needs is the maximum content_revision per area.
+    ///
+    /// - Parameter scopeUuid: The scope uuid.
+    /// - Returns: A dictionary mapping area names to their max revision.
+    /// - Throws: Store errors if the query fails.
     func areaVersions(scopeUuid: String) throws -> [String: Int64] {
         var out: [String: Int64] = [:]
         for area in DopeArea.allCases {
@@ -693,14 +792,20 @@ struct DopeRepository: RepositoryContext {
     // MARK: - Hydration (five flat queries, grouped in Swift — never per-node
     // recursion; ORDER BY sort_order, code keeps write-repo deterministic)
 
+    /// Fetches the complete domain and enumeration tree for a scope.
+    ///
     /// `forProjection` makes every level filter `deleted_on IS NULL`. Reads
-    /// deliberately return tombstoned rows, because the masking resolver needs
-    /// them: a whiteout is only meaningful if it is visible. The db → files
-    /// projection must not, since a tombstone is personal overlay-tier state
-    /// while a saved .doped.json is shared, committed fact. That filter is
-    /// DEFENCE IN DEPTH over `dopeNodeDelete`'s soft-delete tier check and
-    /// `requireRepoWritableScope`, so the invariant survives either being
-    /// relaxed. Defaults to false; only writes opt in.
+    /// deliberately return tombstoned rows for the masking resolver. The db → files
+    /// projection must not, since tombstones are personal overlay-tier state while
+    /// .doped.json is shared fact. That filter is defence in depth over
+    /// `dopeNodeDelete`'s soft-delete tier check and `requireRepoWritableScope`,
+    /// surviving either being relaxed.
+    ///
+    /// - Parameters:
+    ///   - scope: The scope row to fetch the tree for.
+    ///   - forProjection: When true, filters out soft-deleted rows; defaults to false.
+    /// - Returns: The assembled dope scope tree with all domains, entities, properties, and enums.
+    /// - Throws: Store errors if the queries fail.
     func fetchDopeTree(
         scope: DopeScopeRow,
         forProjection: Bool = false
@@ -726,10 +831,16 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
-    /// The five flat reads behind one tree, each an inner join up to the
-    /// scope. Deliberately five statements grouped in Swift, never per-node
-    /// recursion, and never a prefetch: the folds below need every level as
-    /// one flat list to resolve cross-level refs.
+    /// Fetches the five flat reads that comprise a dope tree.
+    ///
+    /// Five SQL statements grouped in Swift, never per-node recursion or prefetch. The folds
+    /// that follow need every level as one flat list to resolve cross-level references.
+    ///
+    /// - Parameters:
+    ///   - scopeUuid: The scope uuid.
+    ///   - live: When true, filters out soft-deleted rows.
+    /// - Returns: A tuple with arrays for each level: domains, entities, properties, enums, options.
+    /// - Throws: Store errors if any query fails.
     private func dopeTreeRows(
         scopeUuid: String,
         forProjection live: Bool
@@ -803,14 +914,20 @@ struct DopeRepository: RepositoryContext {
         var properties: [DopePersistenceEntityPropertyRecord]
     }
 
-    /// uuid → dot-path code, per level. Cross-level refs are stored as uuids
-    /// and projected as codes, so every ref needs its target's ancestry.
+    /// uuid → dot-path code, per level.
+    ///
+    /// Cross-level refs are stored as uuids and projected as codes, so every
+    /// ref needs its target's ancestry.
     private struct DopeTreeRefs {
         var entity: [String: String] = [:]
         var dopeEnum: [String: String] = [:]
         var property: [String: String] = [:]
     }
 
+    /// Builds uuid-to-dot-path reference maps for all rows in a tree.
+    ///
+    /// - Parameter rows: The flat tree rows from `dopeTreeRows`.
+    /// - Returns: Maps of uuids to dot-path codes for entities, enums, and properties.
     private static func treeRefs(_ rows: DopeTreeRows) -> DopeTreeRefs {
         var refs = DopeTreeRefs()
         var domainCode: [String: String] = [:]
@@ -836,6 +953,12 @@ struct DopeRepository: RepositoryContext {
         return refs
     }
 
+    /// Assembles domain nodes with nested entities, enums, and properties.
+    ///
+    /// - Parameters:
+    ///   - rows: The flat tree rows from `dopeTreeRows`.
+    ///   - refs: The uuid-to-code reference maps from `treeRefs`.
+    /// - Returns: The assembled domain nodes with fully nested hierarchies.
     private static func domainNodes(
         _ rows: DopeTreeRows,
         refs: DopeTreeRefs
@@ -932,13 +1055,18 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
-    /// Whole-tree copy between scopes: hydrate, project to identity-free
-    /// documents, re-insert. EXTRACTED verbatim from what dopeInit already
-    /// inlined for --clone-from-session-base, so `dopeInit` and
-    /// `dopePromote` share ONE copy path rather than growing a second.
+    /// Copies a tree between scopes, reminting child uuids.
     ///
-    /// Child uuids are re-minted by insertDopeTree, which is exactly why
-    /// cross-layer references are dot-path codes and never uuids.
+    /// Hydrates the source tree, projects it to identity-free documents, and re-inserts into
+    /// the target. Extracted verbatim from dopeInit's inline clone, so dopeInit and dopePromote
+    /// share one copy path. Child uuids are reminted by insertDopeTree, which is why
+    /// cross-layer references use dot-path codes rather than uuids.
+    ///
+    /// - Parameters:
+    ///   - source: The source scope row.
+    ///   - targetScopeUuid: The target scope uuid.
+    /// - Returns: Counts of rows inserted at each level.
+    /// - Throws: Store errors if the copy fails.
     @discardableResult
     func copyDopeTree(
         from source: DopeScopeRow,
@@ -957,6 +1085,13 @@ struct DopeRepository: RepositoryContext {
     // Insert order is dependency order: domains → enums → options → entities
     // → non-relationship properties → relationship properties.
 
+    /// Inserts a complete domain tree from validated documents.
+    ///
+    /// - Parameters:
+    ///   - scopeUuid: The scope to insert the tree into.
+    ///   - domainFiles: The domain documents in arbitrary order.
+    /// - Returns: Counts of rows inserted at each level.
+    /// - Throws: Store errors if any insert fails or schema violations occur.
     @discardableResult
     func insertDopeTree(
         scopeUuid: String,
@@ -1176,11 +1311,19 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
-    /// Ingest's revision gate and scope-field adoption, in one guarded UPDATE.
+    /// Updates scope metadata and revision atomically during an ingest.
     ///
     /// The WHERE carries `expectedRevision`, so a concurrent writer loses the
     /// race cleanly; the CASE bumps `version` only when name or description
     /// actually move, leaving a pure tree ingest's optimistic lock alone.
+    ///
+    /// - Parameters:
+    ///   - scopeUuid: The scope uuid to update.
+    ///   - incoming: The new revision number from the ingest.
+    ///   - expectedRevision: The revision the caller last read; fail if stale.
+    ///   - name: The new scope name.
+    ///   - description: The new scope description.
+    /// - Throws: `StoreError.revisionConflict` if `expectedRevision` is stale.
     func applyIngestedScope(
         scopeUuid: String,
         incoming: Int64,
@@ -1224,9 +1367,14 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
-    /// The ordered whole-tree wipe: relationship properties, then all
-    /// remaining properties, then domains (CASCADE clears entities, enums,
-    /// options). Never rely on CASCADE to unwind a RESTRICT.
+    /// Deletes all persistence, domains, entities, properties, enums, and options in a scope.
+    ///
+    /// The ordered delete handles relationship properties first, then remaining
+    /// properties, then domains; CASCADE clears entities, enums, and options.
+    /// Never rely on CASCADE to unwind a RESTRICT.
+    ///
+    /// - Parameter scopeUuid: The scope uuid to wipe.
+    /// - Throws: Store errors if any delete fails or constraint checks fail.
     func wipeDopeTree(scopeUuid: String) throws {
         // Entities compose each other under an ON DELETE RESTRICT self-FK, so
         // un-link every base BEFORE the domain CASCADE reaches the rows — a
@@ -1290,9 +1438,15 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
-    /// Insert the cogs area of an ingested bundle, expanding each hull's
-    /// collapsed `links.persistence_owners` back into sibling
-    /// PersistenceOwner element rows.
+    /// Inserts cogs from an ingested bundle, expanding persistence owner links.
+    ///
+    /// Each hull's collapsed `links.persistence_owners` are expanded back into
+    /// sibling PersistenceOwner element rows.
+    ///
+    /// - Parameters:
+    ///   - scopeUuid: The scope to insert cogs into.
+    ///   - cogFiles: The cog documents to insert.
+    /// - Throws: Store errors if any insert fails.
     func insertDopeCogs(
         scopeUuid: String,
         cogFiles: [DopeCogDocument]
@@ -1366,6 +1520,12 @@ struct DopeRepository: RepositoryContext {
 
     // MARK: - Generic node mutations
 
+    /// Validates that all provided fields are owned by the given level.
+    ///
+    /// - Parameters:
+    ///   - fields: The node fields being validated.
+    ///   - level: The level that must own each field.
+    /// - Throws: `StoreError.badRequest` if a field is not owned by the level.
     private func requireOwnedFields(_ fields: DopeNodeFields, level: DopeLevel) throws {
         let spec = DopeLevelSpec.spec(for: level)
         var carried: [DopeField] = []
@@ -1403,6 +1563,12 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
+    /// Validates that a description does not exceed the length limit for its level.
+    ///
+    /// - Parameters:
+    ///   - text: The description text to validate, or nil.
+    ///   - level: The dope level whose description limit applies.
+    /// - Throws: `StoreError.badRequest` if the text exceeds the limit.
     private func validateDopeDescription(_ text: String?, level: DopeLevel) throws {
         guard let text else { return }
         let limit = Self.dopeDescriptionLimits[level] ?? 128
@@ -1413,9 +1579,23 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
-    /// Same-scope + shape checks for a property's final (post-mutation)
-    /// state. The schema CHECKs are the backstop; this produces the friendly
-    /// message and enforces what SQL cannot see (same scope, no chain refs).
+    /// Validates that a property's final state is consistent and reachable.
+    ///
+    /// The schema CHECKs are the backstop; this produces the friendly message
+    /// and enforces what SQL cannot see: same scope, no chain refs, and reachable
+    /// base origins.
+    ///
+    /// - Parameters:
+    ///   - scope: The scope the property belongs to.
+    ///   - propertyUuid: The property uuid, or nil on add.
+    ///   - entityUuid: The entity the property belongs to.
+    ///   - dataType: The property's data type.
+    ///   - enumUuid: The enum uuid for enumeration properties, nil otherwise.
+    ///   - relationshipTargetUuid: The target property uuid for relationship properties.
+    ///   - baseOriginPropertyUuid: The origin property uuid for materialized properties.
+    ///   - autoIncrement: The auto-increment flag for long properties.
+    ///   - textCharLimit: The text character limit for text properties.
+    /// - Throws: `StoreError.badRequest` if any validation fails.
     private func validatePropertyShape(
         scope: DopeScopeRow,
         propertyUuid: String?,
@@ -1514,10 +1694,17 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
-    /// The materialization rule: `entityUuid` must actually compose
-    /// `targetUuid`, directly or through the chain. Out-degree is 1, so this
-    /// is requireAcyclicBase's pointer-chase walked forwards; the visited set
-    /// keeps a pre-existing cycle from hanging the walk.
+    /// Validates that an entity's base chain reaches a target entity.
+    ///
+    /// The materialization rule requires that `entityUuid` actually composes
+    /// `targetUuid`, directly or through the chain. Out-degree is 1, so this is
+    /// a pointer-chase walked forwards; the visited set keeps a pre-existing
+    /// cycle from hanging the walk.
+    ///
+    /// - Parameters:
+    ///   - entityUuid: The entity that must compose the target.
+    ///   - targetUuid: The entity that must be in the composition chain.
+    /// - Throws: `StoreError.badRequest` if the target is not in the chain.
     private func requireBaseChainReaches(
         entityUuid: String,
         targetUuid: String
@@ -1535,8 +1722,17 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
-    /// Same-scope + shape checks for an entity's final (post-mutation) state.
-    /// `entityUuid` is nil on add (a row nothing can reference yet).
+    /// Validates that an entity's final state is consistent and non-cyclic.
+    ///
+    /// `entityUuid` is nil on add (a row nothing can reference yet). Checks
+    /// same-scope base composition, acyclicity, demotion rules, and property origins.
+    ///
+    /// - Parameters:
+    ///   - scope: The scope the entity belongs to.
+    ///   - entityUuid: The entity uuid, or nil on add.
+    ///   - entityType: The entity type to validate.
+    ///   - baseComposableUuid: The base entity uuid for composition, or nil.
+    /// - Throws: `StoreError.badRequest` if any validation fails.
     private func validateEntityShape(
         scope: DopeScopeRow,
         entityUuid: String?,
@@ -1612,11 +1808,17 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
-    /// Chaining is ALLOWED but must stay acyclic. Out-degree is 1 (a single
+    /// Validates that composing the target would not create a cycle.
+    ///
+    /// Chaining is allowed but must stay acyclic. Out-degree is 1 (a single
     /// nullable column), so "does the chain from target reach entity?" is a
-    /// bounded pointer-chase, not a graph search. The visited set is
-    /// defensive only — a pre-existing cycle cannot be reached through these
-    /// guards.
+    /// bounded pointer-chase, not a graph search. The visited set is defensive
+    /// only — a pre-existing cycle cannot be reached through these guards.
+    ///
+    /// - Parameters:
+    ///   - entityUuid: The entity being modified.
+    ///   - targetUuid: The proposed base entity.
+    /// - Throws: `StoreError.badRequest` if setting target as base would create a cycle.
     private func requireAcyclicBase(
         entityUuid: String,
         targetUuid: String
@@ -1637,8 +1839,14 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
-    /// The base one entity composes, or nil. Out-degree is 1, so every chain
-    /// walk here is a pointer-chase over this one hop.
+    /// The base entity one entity composes, or nil.
+    ///
+    /// Out-degree is 1, so every chain walk here is a pointer-chase over this
+    /// one hop.
+    ///
+    /// - Parameter entityUuid: The entity uuid to query.
+    /// - Returns: The base entity uuid, or nil if none.
+    /// - Throws: Store errors if the query fails.
     private func baseComposableUuid(of entityUuid: String) throws -> String? {
         try DopePersistenceEntityRecord
             .all()
@@ -1647,8 +1855,13 @@ struct DopeRepository: RepositoryContext {
             .fetchOne(db)
     }
 
-    /// Dot-paths of the entities composing `entityUuid` (bounded at 5, the
-    /// requireNoExternalReferrers convention).
+    /// Returns up to five dot-paths of entities that compose the given entity.
+    ///
+    /// Bounded at 5 per the requireNoExternalReferrers convention.
+    ///
+    /// - Parameter entityUuid: The entity uuid to find composers for.
+    /// - Returns: A list of dot-path references to composing entities.
+    /// - Throws: Store errors if the query fails.
     private func baseComposableReferrers(
         entityUuid: String
     ) throws -> [String] {
@@ -1662,6 +1875,11 @@ struct DopeRepository: RepositoryContext {
     /// Referrer reports name a handful of offenders, never the whole set.
     private static let referrerLimit = 5
 
+    /// Adds a new dope node to the tree and bumps the scope revision.
+    ///
+    /// - Parameter req: The add request with level, parent, fields, and metadata.
+    /// - Returns: The response with the new node's uuid, version, and scope revision.
+    /// - Throws: Store errors if validation fails or insert fails.
     func dopeNodeAdd(_ req: DopeNodeAddRequest) throws -> DopeNodeResponse {
         guard req.level != .scope else {
             throw StoreError.badRequest(detail: "scopes are created with DOPE_INIT, not node-add")
@@ -1769,6 +1987,11 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
+    /// Updates a dope node with new field values and bumps the scope revision.
+    ///
+    /// - Parameter req: The update request with node uuid, level, expected version, and fields.
+    /// - Returns: The response with the node's new version and scope revision.
+    /// - Throws: Store errors if validation fails, version is stale, or update fails.
     func dopeNodeUpdate(_ req: DopeNodeUpdateRequest) throws -> DopeNodeResponse {
         let spec = DopeLevelSpec.spec(for: req.level)
         try requireOwnedFields(req.fields, level: req.level)
@@ -1852,9 +2075,18 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
-    /// Validate the FINAL (entity_type, base_composable) pair and stage it.
-    /// Either half can change in one call, and the second call of
-    /// A.base=B / B.base=A must be the one that gets refused.
+    /// Validates and stages the final entity type and base composable for an update.
+    ///
+    /// Either half can change in one call, and the second call of A.base=B /
+    /// B.base=A must be the one that gets refused. Calls `validateEntityShape`
+    /// and stages the update into the provided set.
+    ///
+    /// - Parameters:
+    ///   - req: The update request containing field changes.
+    ///   - scope: The scope the entity belongs to.
+    ///   - spec: The level specification for the entity.
+    ///   - set: The staging dictionary for column updates.
+    /// - Throws: Store errors if validation fails.
     private func applyEntityUpdate(
         _ req: DopeNodeUpdateRequest,
         scope: DopeScopeRow,
@@ -1887,10 +2119,19 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
-    /// Validate a property's final shape and stage it. Every clearable column
-    /// goes through updateValue, not subscript: a typed-nil subscript
-    /// assignment REMOVES the key, so a clear-alone call would throw
+    /// Validates and stages the final property shape for an update.
+    ///
+    /// Calls `validatePropertyShape` and stages the update into the provided set.
+    /// Every clearable column goes through updateValue, not subscript: a typed-nil
+    /// subscript assignment REMOVES the key, so a clear-alone call would throw
     /// emptyUpdate and a combined call would silently skip the clear.
+    ///
+    /// - Parameters:
+    ///   - req: The update request containing field changes.
+    ///   - scope: The scope the property belongs to.
+    ///   - spec: The level specification for the property.
+    ///   - set: The staging dictionary for column updates.
+    /// - Throws: Store errors if validation fails.
     private func applyPropertyUpdate(
         _ req: DopeNodeUpdateRequest,
         scope: DopeScopeRow,
@@ -1951,6 +2192,14 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
+    /// Deletes a dope node, either soft-deleting or cascading as configured.
+    ///
+    /// Soft deletes are allowed only in overlay scopes; hard deletes check for
+    /// external referrers before deleting and cascade in dependency order.
+    ///
+    /// - Parameter req: The delete request with node uuid, level, expected version, and soft flag.
+    /// - Returns: The response with the deleted uuid, cascade counts, scope uuid, and revision.
+    /// - Throws: Store errors if referrer checks fail, delete fails, or soft-delete rules violated.
     func dopeNodeDelete(_ req: DopeNodeDeleteRequest) throws -> DopeNodeDeleteResponse {
         guard req.level != .scope else {
             throw StoreError.badRequest(
@@ -2127,9 +2376,16 @@ struct DopeRepository: RepositoryContext {
         )
     }
 
-    /// RESTRICT-friendly pre-checks: name the referring dot-paths instead of
-    /// surfacing an opaque FK error. "External" means outside the subtree
-    /// being deleted — internal referrers are handled by the ordered deletes.
+    /// Validates that no external referrers exist before a hard delete.
+    ///
+    /// RESTRICT-friendly pre-checks that name the referring dot-paths instead of
+    /// surfacing an opaque FK error. "External" means outside the subtree being
+    /// deleted — internal referrers are handled by the ordered deletes.
+    ///
+    /// - Parameters:
+    ///   - level: The level of the node being deleted.
+    ///   - nodeUuid: The node uuid to check.
+    /// - Throws: `StoreError.badRequest` if external referrers exist.
     private func requireNoExternalReferrers(
         level: DopeLevel,
         nodeUuid: String
@@ -2195,20 +2451,38 @@ struct DopeRepository: RepositoryContext {
         }
     }
 
-    /// Referrer dot-paths, bounded. `limit` rather than `fetchAll().prefix`:
-    /// the bound belongs to the statement, not to the result.
+    /// Fetches property referrer dot-paths up to the limit.
+    ///
+    /// Bound the result at the statement level rather than with `fetchAll().prefix`,
+    /// to avoid fetching more rows than needed.
+    ///
+    /// - Parameter request: A query for domain grandchild paths.
+    /// - Returns: A list of property dot-paths, bounded by `referrerLimit`.
+    /// - Throws: Store errors if the query fails.
     private func propertyPaths(
         _ request: QueryInterfaceRequest<DopeDomainGrandchildPath>
     ) throws -> [String] {
         try request.limit(Self.referrerLimit).fetchAll(db).map(\.propertyDotPath)
     }
 
+    /// Fetches entity referrer dot-paths up to the limit.
+    ///
+    /// - Parameter request: A query for domain child paths.
+    /// - Returns: A list of entity dot-paths, bounded by `referrerLimit`.
+    /// - Throws: Store errors if the query fails.
     private func entityPaths(
         _ request: QueryInterfaceRequest<DopeDomainChildPath>
     ) throws -> [String] {
         try request.limit(Self.referrerLimit).fetchAll(db).map(\.entityDotPath)
     }
 
+    /// Counts the rows that would be cascaded when deleting a node.
+    ///
+    /// - Parameters:
+    ///   - level: The level of the node being deleted.
+    ///   - nodeUuid: The node uuid to count cascades for.
+    /// - Returns: Counts of domains, entities, properties, enums, and options.
+    /// - Throws: Store errors if the queries fail.
     private func dopeCascadeCounts(
         level: DopeLevel,
         nodeUuid: String

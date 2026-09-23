@@ -2,10 +2,10 @@ import Foundation
 import Observation
 
 /// Per-session-window read state: the SessionRow, its prompt stubs, change
-/// summaries, and a full PromptGetResponse per stub. The prefetch is
-/// deliberately SEQUENTIAL — the daemon serves every request on one serial
-/// queue with no fairness, so a burst here would stall the user's terminal
-/// `gm` calls. Prefetched bodies serve prose search, the editor's content,
+/// summaries, and a full PromptGetResponse per stub.
+///
+/// The prefetch is deliberately SEQUENTIAL — the daemon serves every request on one serial queue with no fairness, so a
+/// burst here would stall the user's terminal `gm` calls. Prefetched bodies serve prose search, the editor's content,
 /// and the memory-root derivation in one cache.
 @Observable @MainActor
 final class SessionStore {
@@ -23,13 +23,17 @@ final class SessionStore {
     private let service = GMCCDaemonService.shared
     private var inFlight: Task<Void, Never>?
 
+    /// Creates a read model for a session.
+    /// - Parameter sessionUuid: The session uuid.
     init(sessionUuid: String) {
         self.sessionUuid = sessionUuid
     }
 
-    /// Coalesced: the store is shared by every window on this session, and
-    /// each window's refresh loop calls this per invalidation — N windows must
-    /// still cost ONE SESSION_GET + one sequential prefetch.
+    /// Coalesces refresh requests across all windows for the session.
+    ///
+    /// The store is shared by every window on this session, and each window's refresh loop
+    /// calls this per invalidation. Multiple requests still cost one SESSION_GET and one
+    /// sequential prefetch.
     func refresh() async {
         if let running = inFlight {
             await running.value
@@ -41,6 +45,10 @@ final class SessionStore {
         inFlight = nil
     }
 
+    /// Performs the session fetch and sequential prefetch of prompt details.
+    ///
+    /// Fetches the session row and prompts with reports in one round trip, then sequentially
+    /// updates stale or missing prompt details.
     private func performRefresh() async {
         do {
             let response = try await service.getSession(sessionUuid: sessionUuid)
@@ -82,6 +90,8 @@ final class SessionStore {
         }
     }
 
+    /// Fetches the full prompt details by uuid.
+    /// - Parameter uuid: The prompt uuid.
     func refreshPrompt(uuid: String) async {
         do {
             let response = try await service.getPrompt(promptUuid: uuid)

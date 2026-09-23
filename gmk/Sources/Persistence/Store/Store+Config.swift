@@ -11,10 +11,17 @@ import GRDB
 // Bodies live in ConfigRepository; these wrappers own the transaction.
 
 extension Store {
+    /// Fetches the daemon's paths configuration.
+    /// - Returns: A response containing the daemon's configured paths.
+    /// - Throws: `StoreError` if the read fails.
     func pathsGet() throws -> PathsGetResponse {
         try boundaryRead { db in try ConfigRepository(db: db, core: core).pathsGet() }
     }
 
+    /// Sets a daemon configuration key-value pair.
+    /// - Parameter req: The configuration set request with key and value.
+    /// - Returns: A response confirming the configuration was set.
+    /// - Throws: `StoreError.badRequest` if the value is empty; other store errors otherwise.
     func configSet(_ req: ConfigSetRequest) throws -> ConfigSetResponse {
         let value = req.value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !value.isEmpty else {
@@ -25,13 +32,21 @@ extension Store {
         }
     }
 
-    /// The watcher's root, read outside a request cycle. nil until config
-    /// exists (a daemon booted before m0002 seeded it simply has no watcher).
+    /// Reads a daemon configuration value by key.
+    ///
+    /// Returns nil until config exists. A daemon booted before m0002 seeded
+    /// the table simply has no watcher and no configuration.
+    /// - Parameter key: The configuration key to read.
+    /// - Returns: The configuration value, or nil if not set.
+    /// - Throws: `StoreError` if the read fails.
     func configValue(_ key: ConfigKey) throws -> String? {
         try boundaryRead { db in try ConfigRepository(db: db, core: core).configValue(key) }
     }
 
-    /// MemoryWatcher's reverse lookup: prompt by its gmfs folder path.
+    /// Looks up a prompt UUID by its gmfs folder path.
+    /// - Parameter path: The gmfs folder path to look up.
+    /// - Returns: The prompt UUID, or nil if not found.
+    /// - Throws: `StoreError` if the read fails.
     func promptUuid(byStoragePath path: String) throws -> String? {
         try boundaryRead { db in try ConfigRepository(db: db, core: core).promptUuid(byStoragePath: path) }
     }

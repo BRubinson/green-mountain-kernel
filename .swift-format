@@ -13,6 +13,8 @@
   "multiElementCollectionTrailingCommas": true,
   "rules": {
     "AlwaysUseLowerCamelCase": false,
+    "AllPublicDeclarationsHaveDocumentation": true,
+    "BeginDocumentationCommentWithOneLineSummary": true,
     "TypeNamesShouldBeCapitalized": true,
     "UseSynthesizedInitializer": false,
     "UseLetInEveryBoundCaseVariable": false,

@@ -92,6 +92,7 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 
 ### Lint
 - swift-format owns layout; SwiftLint owns semantics and the comment rules (errors, never baselined). `excluded` uses single-star paths: `**` crashes SwiftLint 0.65.1. The PostToolUse hook never formats.
+- `swift_doc_check.py` is gate stage 3: one-line summary (100 chars), Parameters, Returns, Throws on every function. There is no baseline and none is to be created; `--write-baseline` exists for adopting another tree. Doc comments may run to 30 lines (a 20-parameter wire init needs 23), plain `//` runs still stop at 8.
 
 ## Working-tree note
 

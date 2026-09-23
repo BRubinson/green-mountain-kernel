@@ -2,8 +2,9 @@
 import SwiftUI
 
 /// The one selection/emphasis channel: a host sets this ONCE at its scene root
-/// via `.environment(\.diagramSelection, …)` and every leaf reads it. The unset
-/// default is the empty state, which screenshot call sites rely on.
+/// via `.environment(\.diagramSelection, …)` and every leaf reads it.
+///
+/// The unset default is the empty state, which screenshot call sites rely on.
 ///
 /// Environment-carried rather than init params, so a new emphasis axis (hover,
 /// search-match, error markers) is a one-struct change instead of re-threading
@@ -16,6 +17,12 @@ struct DiagramSelectionState: Hashable, Sendable {
     /// Elements faded back (domain filtering, drag ghosting).
     var dimmedElementUuids: Set<String>
 
+    /// Creates a diagram selection state.
+    ///
+    /// - Parameters:
+    ///   - selectedElementUuid: The uuid of the selected element; defaults to nil.
+    ///   - highlightedElementUuids: The set of highlighted element uuids; defaults to empty.
+    ///   - dimmedElementUuids: The set of dimmed element uuids; defaults to empty.
     init(
         selectedElementUuid: String? = nil,
         highlightedElementUuids: Set<String> = [],

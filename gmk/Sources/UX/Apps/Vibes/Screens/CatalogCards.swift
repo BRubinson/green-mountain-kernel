@@ -8,6 +8,9 @@ import SwiftUI
 enum CatalogDates {
     // ISO8601DateFormatter is thread-safe; the checker cannot see that.
     nonisolated(unsafe) private static let iso = ISO8601DateFormatter()
+    /// Formats an ISO8601 date string as a relative time string.
+    /// - Parameter raw: The ISO8601 date string to format.
+    /// - Returns: The relative time (e.g., "1 day ago"), or "—" if parsing fails.
     nonisolated static func relative(_ raw: String) -> String {
         guard let date = iso.date(from: raw) else { return "—" }
         return date.formatted(.relative(presentation: .named))
@@ -49,7 +52,9 @@ struct SessionBlockCard: View {
     }
 }
 
-/// One instance row plus its inline session blocks. The row navigates to the
+/// One instance row plus its inline session blocks.
+///
+/// The row navigates to the
 /// instance; each block navigates to its session.
 struct InstanceSessionBlock: View {
     let instance: InstanceRow

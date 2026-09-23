@@ -1,9 +1,16 @@
 import Foundation
 
 /// REVIEW_OPEN — idempotent create-or-return of the review summary.
-/// EXPLICIT-only: prompt status transitions never create or gate on it, which
-/// is what keeps skip-to-done legal.
+///
+/// EXPLICIT-only: prompt status transitions never create or gate on it, which is what keeps skip-to-done legal.
 enum ReviewOpenHandler {
+    /// Handles a review open request.
+    /// - Parameters:
+    ///   - line: The request payload data.
+    ///   - head: The message envelope header.
+    ///   - store: The main store.
+    /// - Returns: The handler result.
+    /// - Throws: Errors from decoding or store operations.
     static func handle(line: Data, head: EnvelopeHead, store: Store) throws -> HandlerResult {
         let request = try decodePayload(ReviewOpenRequest.self, from: line)
         return try okResult(.reviewOpen, head, try store.reviewOpen(request))

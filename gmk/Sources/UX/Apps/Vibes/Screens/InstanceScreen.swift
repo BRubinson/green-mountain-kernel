@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// The instance page: ALL of one instance's sessions, current-first. The
-/// active (checked-out) session is resolved DAEMON-side
+/// The instance page: ALL of one instance's sessions, current-first.
+///
+/// The active (checked-out) session is resolved DAEMON-side
 /// (INSTANCE_CURRENT_SESSION via CheckoutWatcher) and hoisted with the
-/// outline + dot; a head-state strip explains branch / detached /
-/// unavailable / unresolved. Nothing here auto-navigates — with no embedded
-/// editor, "never auto-switch" is true by construction (the old
-/// auto-load/drift machinery is gone; drift is simply the strip re-rendering
-/// around a different active row).
+/// outline + dot; a head-state strip explains branch / detached / unavailable
+/// / unresolved. Nothing here auto-navigates — with no embedded editor, "never
+/// auto-switch" is true by construction (the old auto-load/drift machinery is
+/// gone; drift is simply the strip re-rendering around a different active row).
 struct InstanceScreen: View {
     let instanceUuid: String
 
@@ -63,6 +63,9 @@ struct InstanceScreen: View {
         }
     }
 
+    /// Refilters the session list based on the current catalog state.
+    ///
+    /// Updates the filtered sessions with the active session hoisted to the top.
     private func refilter() {
         var active: [String: String] = [:]
         if let stub = activeStub { active[instanceUuid] = stub.uuid }
@@ -164,6 +167,10 @@ struct InstanceScreen: View {
         }
     }
 
+    /// Creates a clickable session row view for the given session stub.
+    ///
+    /// - Parameter stub: The session to display.
+    /// - Returns: A view displaying the session with active state highlighting.
     private func sessionRow(_ stub: SessionStub) -> some View {
         let active = stub.uuid == activeStub?.uuid
         return Button {
@@ -202,6 +209,9 @@ struct InstanceScreen: View {
         .help(active ? "Checked out on this instance's repo" : stub.name)
     }
 
+    /// Navigates to the session detail window for the given session.
+    ///
+    /// - Parameter stub: The session to open.
     private func openSession(_ stub: SessionStub) {
         // CatalogStore's factory: nil on a malformed uuid ⇒ inert row, never
         // a fabricated identity.

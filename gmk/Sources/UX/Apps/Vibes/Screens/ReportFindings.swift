@@ -27,8 +27,15 @@ extension ReviewFindingRow: RatedFinding {}
 extension ReviewFindingStub: RatedFinding {}
 
 extension Array where Element: RatedFinding {
+    /// Filters findings by visibility based on ratings and flags.
+    ///
     /// FILTERS, never sorts. The daemon's order (unranked first, then rating
     /// ascending — the resume-queue contract) must survive to the screen.
+    ///
+    /// - Parameters:
+    ///   - showLowPriority: Whether to include findings with rating >= 100.
+    ///   - showTombstones: Whether to include tombstone findings (rating >= 999).
+    /// - Returns: The filtered array of findings.
     func visibleFindings(showLowPriority: Bool, showTombstones: Bool) -> [Element] {
         filter { finding in
             guard let rating = finding.findingRating else { return true }  // unranked: ALWAYS
@@ -53,6 +60,9 @@ extension Array where Element: RatedFinding {
 /// unknown kinds degrade to their raw name instead of vanishing (the
 /// ClarificationPane "Other" precedent).
 enum ReportKindStyle {
+    /// Maps an exploration finding kind to a label and tint color.
+    /// - Parameter raw: The raw kind string from the wire.
+    /// - Returns: A tuple with the display label and accent color.
     static func exploration(_ raw: String) -> (label: String, tint: Color) {
         switch ExplorationFindingKind(rawValue: raw) {
         case .persistenceModel: ("Persistence", .indigo)
@@ -66,6 +76,9 @@ enum ReportKindStyle {
         }
     }
 
+    /// Maps a review finding kind to a label and tint color.
+    /// - Parameter raw: The raw kind string from the wire.
+    /// - Returns: A tuple with the display label and accent color.
     static func review(_ raw: String) -> (label: String, tint: Color) {
         switch ReviewFindingKind(rawValue: raw) {
         case .correctnessBug: ("Bug", .red)
@@ -133,8 +146,9 @@ struct FindingRatingPill: View {
     }
 }
 
-/// Per-finding fix-loop resolution (review only). Unknown raw statuses render
-/// neutrally rather than disappearing.
+/// Per-finding fix-loop resolution (review only).
+///
+/// Unknown raw statuses render neutrally rather than disappearing.
 struct ResolutionBadge: View {
     let rawStatus: String
 
@@ -167,6 +181,9 @@ extension ReportBadgeItem {
     // exist for both the PROMPT_LIST stub (cold start) and the live response
     // (authoritative once loaded — report writes don't re-list the session).
 
+    /// Builds badge items from an exploration report stub.
+    /// - Parameter stub: The exploration report stub.
+    /// - Returns: An array of badge items for the stub's counts.
     static func exploration(_ stub: ExplorationReportStub) -> [ReportBadgeItem] {
         explorationItems(
             unranked: stub.unrankedFindingCount,
@@ -175,6 +192,9 @@ extension ReportBadgeItem {
         )
     }
 
+    /// Builds badge items from an exploration report response.
+    /// - Parameter response: The exploration get response.
+    /// - Returns: An array of badge items for the response's counts.
     static func exploration(_ response: ExploreGetResponse) -> [ReportBadgeItem] {
         explorationItems(
             unranked: response.findings.unrankedCount,
@@ -183,6 +203,9 @@ extension ReportBadgeItem {
         )
     }
 
+    /// Builds badge items from a review report stub.
+    /// - Parameter stub: The review report stub.
+    /// - Returns: An array of badge items for the stub's verdict and counts.
     static func review(_ stub: ReviewReportStub) -> [ReportBadgeItem] {
         reviewItems(
             verdict: stub.verdict.flatMap(ReviewVerdict.init(rawValue:)),
@@ -191,6 +214,9 @@ extension ReportBadgeItem {
         )
     }
 
+    /// Builds badge items from a review report response.
+    /// - Parameter response: The review get response.
+    /// - Returns: An array of badge items for the response's verdict and counts.
     static func review(_ response: ReviewGetResponse) -> [ReportBadgeItem] {
         let openCount =
             response.findings.filter { $0.status == ReviewFindingStatus.open.rawValue }.count
@@ -202,6 +228,12 @@ extension ReportBadgeItem {
         )
     }
 
+    /// Builds exploration badge items from count values.
+    /// - Parameters:
+    ///   - unranked: The count of unranked findings.
+    ///   - findings: The total count of findings.
+    ///   - keyFiles: The count of key files.
+    /// - Returns: An array of badge items for the non-zero counts.
     private static func explorationItems(unranked: Int, findings: Int, keyFiles: Int) -> [ReportBadgeItem] {
         var items: [ReportBadgeItem] = []
         if unranked > 0 {  // stalled-run signal
@@ -237,6 +269,12 @@ extension ReportBadgeItem {
         return items
     }
 
+    /// Builds review badge items from verdict and count values.
+    /// - Parameters:
+    ///   - verdict: The review verdict, or nil if not set.
+    ///   - open: The count of open findings.
+    ///   - unranked: The count of unranked findings.
+    /// - Returns: An array of badge items for the non-zero counts and verdict.
     private static func reviewItems(verdict: ReviewVerdict?, open: Int, unranked: Int) -> [ReportBadgeItem] {
         var items: [ReportBadgeItem] = []
         if let verdict {

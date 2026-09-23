@@ -26,9 +26,10 @@ enum KernelOwnership {
         let pid: pid_t
         let executablePath: String
         /// nil means the holder is HEADLESS — a `gm_kernel daemon` process
-        /// rather than an app bundle. The distinction decides what a losing app
-        /// does next: take over from a headless writer, but never from another
-        /// app copy.
+        /// rather than an app bundle.
+        ///
+        /// The distinction decides what a losing app does next: take over from a headless writer, but never from
+        /// another app copy.
         let bundlePath: String?
     }
 
@@ -43,6 +44,10 @@ enum KernelOwnership {
     /// could touch the database happens after the `flock`, and the `.heldBy`
     /// path has no fall-through — it cannot reach a `Store` even by accident,
     /// because it does not produce a `Token`.
+    /// Attempts to acquire the ownership lock for this kernel instance.
+    ///
+    /// - Returns: An `Outcome.acquired` with a lock token on success, or `Outcome.heldBy` if already held by another process.
+    /// - Throws: `OwnershipError` errors if the lock cannot be acquired due to system errors.
     static func acquire() throws -> Outcome {
         try Paths.ensureRuntimeDirs()
 
@@ -83,8 +88,11 @@ enum KernelOwnership {
         return .acquired(Token(fd: fd))
     }
 
-    /// The current holder, read without attempting to take the lock. Used by the
-    /// menu bar to name the owning process in client mode.
+    /// Reads the current lock holder without attempting to acquire the lock.
+    ///
+    /// Used by the menu bar to name the owning process in client mode.
+    ///
+    /// - Returns: The current holder information, or nil if the pidfile cannot be read.
     static func readHolder() -> Holder? {
         let fd = open(Paths.pidfile.path, O_RDONLY)
         guard fd >= 0 else { return nil }
@@ -92,10 +100,14 @@ enum KernelOwnership {
         return readHolder(fd: fd)
     }
 
-    /// Three lines: pid, executable path, bundle path (empty when headless).
-    /// This is the only reader of the contents; every other consumer merely
-    /// `flock`s the file. One retry, because a loser can catch the winner
-    /// between `ftruncate` and `write` and see an empty file.
+    /// Reads holder information from the pidfile descriptor.
+    ///
+    /// Parses three lines: pid, executable path, bundle path (empty when headless).
+    /// This is the only reader of the contents; one retry handles the race window
+    /// between `ftruncate` and `write`.
+    ///
+    /// - Parameter fd: The file descriptor for the pidfile.
+    /// - Returns: The holder information, or nil if the file is unreadable or improperly formatted.
     private static func readHolder(fd: Int32) -> Holder? {
         for attempt in 0..<2 {
             lseek(fd, 0, SEEK_SET)
@@ -116,11 +128,12 @@ enum KernelOwnership {
         return nil
     }
 
-    /// This process's bundle path, or nil when it is not a bundled app.
+    /// Returns this process's bundle path if it is a bundled app.
     ///
-    /// A headless `gm_kernel daemon` still has a `Bundle.main`, so the presence
-    /// of a bundle object proves nothing — what distinguishes the two is whether
-    /// it carries an identifier, which only a real `.app` does.
+    /// A headless `gm_kernel daemon` has a `Bundle.main` but no identifier;
+    /// only a real `.app` carries an identifier and a `.app` suffix.
+    ///
+    /// - Returns: The bundle path ending in `.app`, or nil if not a bundled app.
     private static func ownBundlePath() -> String? {
         guard Bundle.main.bundleIdentifier != nil else { return nil }
         let path = Bundle.main.bundlePath

@@ -11,6 +11,11 @@ import GRDB
 // Bodies live in CatalogSearchRepository; this wrapper owns the transaction.
 
 extension Store {
+    /// Searches the catalog by name and code across all projects.
+    ///
+    /// - Parameter req: The search request with query and limit.
+    /// - Returns: The matching instances and sessions.
+    /// - Throws: Any error from the repository.
     func searchCatalog(_ req: CatalogSearchRequest) throws -> CatalogSearchResponse {
         let tokens = req.query
             .split(whereSeparator: \.isWhitespace)
@@ -25,8 +30,12 @@ extension Store {
         }
     }
 
-    /// Escape LIKE wildcards so tokens match as literal substrings (the escape
-    /// char itself first, so escaped wildcards don't get double-escaped).
+    /// Escapes LIKE wildcards in a token for literal substring matching.
+    ///
+    /// The escape character itself is replaced first to prevent double-escaping.
+    ///
+    /// - Parameter token: The token to escape.
+    /// - Returns: The token with LIKE wildcards escaped.
     private static func escapeLikeToken(_ token: String) -> String {
         token
             .replacingOccurrences(of: "\\", with: "\\\\")

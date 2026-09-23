@@ -2,12 +2,12 @@ import SwiftUI
 
 /// Cross-domain index over ONE already-loaded `DopeScopeTree`: enum ref →
 /// definition, and enum ref → every property (in ANY domain) pointing at it.
-/// A pure client-side derivation — DOPE_GET already ships the whole tree, so
-/// this costs no daemon call, no wire field, and no cache entry.
 ///
-/// Rebuilt per `DopeTreeView` body pass rather than cached: the tree is a few
-/// hundred nodes and a stale index on a live DOPE_CHANGE reload would be a
-/// correctness bug, not a performance win.
+/// A pure client-side derivation — DOPE_GET already ships the whole tree, so
+/// this costs no daemon call, no wire field, and no cache entry. Rebuilt per
+/// `DopeTreeView` body pass rather than cached: the tree is a few hundred nodes
+/// and a stale index on a live DOPE_CHANGE reload would be a correctness bug,
+/// not a performance win.
 struct DopeEnumCatalog: Equatable {
 
     /// One property that references an enum, plus the domain/entity it lives
@@ -54,6 +54,8 @@ struct DopeEnumCatalog: Equatable {
     /// The empty catalog — the default for previews and the not-yet-loaded case.
     init() {}
 
+    /// Builds a catalog from a dope scope tree.
+    /// - Parameter tree: The dope scope tree to index.
     init(tree: DopeScopeTree) {
         for domain in tree.domains {
             for enumNode in domain.enums {
@@ -84,11 +86,16 @@ struct DopeEnumCatalog: Equatable {
         }
     }
 
-    /// Definition lookup for the badge strip. `nil` for a dangling ref — the
-    /// row then keeps its plain-text render rather than offering a dialog
-    /// that would open on nothing.
+    /// Looks up an enum definition by reference.
+    ///
+    /// Returns nil for dangling refs, keeping the row's plain-text render for badge display.
+    /// - Parameter ref: The enum reference.
+    /// - Returns: The enum node, or nil if not defined.
     func node(for ref: String) -> DopeEnumNode? { definitions[ref]?.node }
 
+    /// Resolves an enum ref to its definition, domain, and all usages.
+    /// - Parameter ref: The enum reference.
+    /// - Returns: The resolved enum data, or nil if not defined.
     func resolved(_ ref: String) -> Resolved? {
         guard let definition = definitions[ref] else { return nil }
         return Resolved(

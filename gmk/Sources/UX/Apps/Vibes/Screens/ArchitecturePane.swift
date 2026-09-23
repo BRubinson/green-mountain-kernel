@@ -6,8 +6,7 @@ import SwiftUI
 /// as before), persistence-first change rows — RENDERED IN WIRE ORDER, never
 /// re-sorted (persistence-before-general is the daemon's positional
 /// contract) — each decorated with derived implementation state, then
-/// unplanned changes (scope drift) and the ordering audit. All arch writes
-/// stay bot/CLI-side.
+/// unplanned changes (scope drift), audit, and bot/CLI-side-only writes.
 struct ArchitecturePane: View {
     let phase: PromptPhaseStore.Phase<ArchGetResponse>
 
@@ -35,6 +34,10 @@ struct ArchitecturePane: View {
         }
     }
 
+    /// Renders the architecture overview with status, options, and changes.
+    ///
+    /// - Parameter response: The architecture data to display.
+    /// - Returns: A view hierarchy showing status, plan, and all changes.
     @ViewBuilder
     private func content(_ response: ArchGetResponse) -> some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -99,16 +102,24 @@ struct ArchitecturePane: View {
         }
     }
 
+    /// Creates a styled section header.
+    ///
+    /// - Parameter title: The header text.
+    /// - Returns: A styled text view.
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.secondary)
     }
 
-    /// m0025 team flows: the persisted methodology options. Selection lives
-    /// on `status` ("selected" — the same derivation the daemon uses for the
-    /// option stubs), not a dedicated flag. The selected body is the plan's
-    /// primary text; the losers stay readable as collapsed offers.
+    /// Renders the team flow options and decision rationale.
+    ///
+    /// Selection lives on `status` ("selected" — the same derivation the daemon uses for
+    /// the option stubs), not a dedicated flag. The selected body is the plan's primary
+    /// text; the losers stay readable as collapsed offers.
+    ///
+    /// - Parameter response: The architecture data containing options.
+    /// - Returns: A view showing the selected and proposed options, or nothing if empty.
     @ViewBuilder
     private func optionsSection(_ response: ArchGetResponse) -> some View {
         let selected = response.options.first(where: { $0.status == "selected" })
@@ -169,6 +180,10 @@ struct ArchitecturePane: View {
         }
     }
 
+    /// Creates a colored badge for an option's status.
+    ///
+    /// - Parameter status: The status string ("selected", "rejected", etc.).
+    /// - Returns: A styled text badge.
     private func optionStatusChip(_ status: String) -> some View {
         let color: Color =
             switch status {
@@ -183,6 +198,10 @@ struct ArchitecturePane: View {
             .foregroundStyle(color)
     }
 
+    /// Renders a persistence change row with fields and implementation status.
+    ///
+    /// - Parameter change: The persistence change to display.
+    /// - Returns: A view showing the change details and field list.
     private func persistenceRow(_ change: ArchPersistenceChangeRow) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
@@ -220,6 +239,10 @@ struct ArchitecturePane: View {
         .padding(.vertical, 3)
     }
 
+    /// Renders a general change row with collapsible code view.
+    ///
+    /// - Parameter change: The general change to display.
+    /// - Returns: A view showing the change file path and collapsed code block.
     private func generalRow(_ change: ArchGeneralChangeRow) -> some View {
         DisclosureGroup {
             Text(change.changeCode)
@@ -248,6 +271,10 @@ struct ArchitecturePane: View {
         }
     }
 
+    /// Creates a small tag for field attributes (nullable, FK, indexed).
+    ///
+    /// - Parameter text: The tag label.
+    /// - Returns: A styled text tag.
     private func fieldTag(_ text: String) -> some View {
         Text(text)
             .font(.caption2)
@@ -256,6 +283,10 @@ struct ArchitecturePane: View {
             .foregroundStyle(.secondary)
     }
 
+    /// Creates a badge showing the change depth level.
+    ///
+    /// - Parameter depth: The depth description.
+    /// - Returns: A styled depth badge.
     private func depthBadge(_ depth: String) -> some View {
         Text(depth)
             .font(.caption2)
@@ -264,6 +295,10 @@ struct ArchitecturePane: View {
             .foregroundStyle(.purple)
     }
 
+    /// Renders an icon indicating whether a change has been implemented.
+    ///
+    /// - Parameter state: The implementation state of the change.
+    /// - Returns: A checkmark or dashed circle icon.
     @ViewBuilder
     private func implementationIcon(_ state: ChangeImplementationState) -> some View {
         if state.fileChangeCount > 0 {
@@ -273,6 +308,10 @@ struct ArchitecturePane: View {
         }
     }
 
+    /// Renders a label showing implementation progress.
+    ///
+    /// - Parameter state: The implementation state of the change.
+    /// - Returns: Text showing edit count or "planned" status.
     @ViewBuilder
     private func implementationLabel(_ state: ChangeImplementationState) -> some View {
         if state.fileChangeCount > 0 {
@@ -286,6 +325,10 @@ struct ArchitecturePane: View {
         }
     }
 
+    /// Computes the implementation progress label.
+    ///
+    /// - Parameter response: The architecture data.
+    /// - Returns: A progress string like "3/5 implemented", or `nil` if there are no planned changes.
     private func progressLabel(_ response: ArchGetResponse) -> String? {
         let planned = response.persistenceChanges.count + response.generalChanges.count
         guard planned > 0 else { return nil }
@@ -295,6 +338,10 @@ struct ArchitecturePane: View {
         return "\(touched)/\(planned) implemented"
     }
 
+    /// Renders a colored badge for the architecture status.
+    ///
+    /// - Parameter status: The architecture status; `nil` renders as a dash.
+    /// - Returns: A styled status badge.
     @ViewBuilder
     private func statusChip(_ status: ArchitectureStatus?) -> some View {
         let (label, color): (String, Color) =
@@ -311,8 +358,13 @@ struct ArchitecturePane: View {
             .foregroundStyle(color)
     }
 
-    /// The persistence-first execution audit: nil = not assessable (either
-    /// side empty/untouched) — a distinct third state, not "false".
+    /// Renders the persistence-first ordering audit status.
+    ///
+    /// `nil` means not assessable (either side empty/untouched) — a distinct third
+    /// state, not "false".
+    ///
+    /// - Parameter respected: The ordering audit result; `nil` for not assessable.
+    /// - Returns: A badge showing the ordering status.
     @ViewBuilder
     private func orderingChip(_ respected: Bool?) -> some View {
         switch respected {

@@ -3,12 +3,10 @@ import Foundation
 
 /// Obstacle-avoiding orthogonal edge routing behind ONE pure entry point:
 /// visibility lattice → multi-terminal A* with bend costs → corridor nudging.
-/// SwiftUI-free on purpose, outside any `canImport(SwiftUI)` guard.
 ///
-/// All routing arithmetic is Int64 at 1/256 pt: determinism is a correctness
-/// requirement here, and an integer domain rules out float slivers and hash-order
-/// hazards by construction. Anchor sides are an OUTPUT — each endpoint offers both
-/// candidate terminals, and an exhausted search yields `routed: false`.
+/// SwiftUI-free on purpose, outside any `canImport(SwiftUI)` guard. Routing arithmetic is Int64
+/// at 1/256 pt for determinism; integer domain rules out float slivers and hash-order hazards.
+/// Anchor sides are OUTPUT: each endpoint offers candidate terminals, exhausted search yields `routed: false`.
 enum DiagramEdgeRouter {
 
     // MARK: - Public surface
@@ -27,6 +25,14 @@ enum DiagramEdgeRouter {
         /// (duplicate cards binding one entity emit identical refs).
         let fromElementUuid: String
 
+        /// Creates a request to route an edge between two frames.
+        ///
+        /// - Parameters:
+        ///   - fromFrame: UNinflated diagram-space frame of the source card.
+        ///   - toFrame: UNinflated diagram-space frame of the target card.
+        ///   - sourceRowY: Diagram-space y of the FK property row on the source card.
+        ///   - propertyRef: Domain-qualified property reference; nudge/order key part 1.
+        ///   - fromElementUuid: Order key part 2 for disambiguating duplicate cards.
         init(
             fromFrame: CGRect,
             toFrame: CGRect,
@@ -49,6 +55,11 @@ enum DiagramEdgeRouter {
         /// corridors survive scaled subtrees.
         let scale: CGFloat
 
+        /// Creates an obstacle with a diagram-space frame and transform scale.
+        ///
+        /// - Parameters:
+        ///   - frame: UNinflated diagram-space card frame.
+        ///   - scale: Accumulated transform scale; inflation = `padding * scale`.
         init(frame: CGRect, scale: CGFloat) {
             self.frame = frame
             self.scale = scale
@@ -57,32 +68,50 @@ enum DiagramEdgeRouter {
 
     struct RoutedPolyline: Sendable {
         /// When `routed`: >= 2 diagram-space points, orthogonal,
-        /// collinear-merged. When not: EMPTY — the caller substitutes its
-        /// legacy straight pair.
+        /// collinear-merged.
+        ///
+        /// When not: EMPTY — the caller substitutes its legacy straight pair.
         let points: [CGPoint]
         let routed: Bool
     }
 
-    /// Cost per 90° turn, in points. Bends dominate legibility.
+    /// Cost per 90° turn, in points.
+    ///
+    /// Bends dominate legibility.
     static let bendPenaltyPoints: Double = 15
     /// Parallel-offset spacing for edges sharing a corridor, in points.
     static let nudgeSpacingPoints: Double = 4
 
-    /// Routes every request against every obstacle. Requests are routed in
-    /// array order (the resolver's emission order, already uuid-sorted);
-    /// output index i corresponds to input index i.
-    /// Coordinates past this bound (or non-finite) come from hostile db
-    /// geometry — routing degrades instead of letting `Int64(Double)` trap.
+    /// Routes every request against every obstacle.
+    ///
+    /// Requests are routed in array order (the resolver's emission order, already uuid-sorted); output index i
+    /// corresponds to input index i. Coordinates past this bound (or non-finite) come from hostile db geometry —
+    /// routing degrades instead of letting `Int64(Double)` trap.
     private static let saneLimit: CGFloat = 1_000_000_000
 
+    /// True when the coordinate is finite and within the routing limit.
+    ///
+    /// - Parameter value: The coordinate to check.
+    /// - Returns: True when the coordinate is finite and below `saneLimit`.
     private static func isSane(_ value: CGFloat) -> Bool {
         value.isFinite && abs(value) <= saneLimit
     }
 
+    /// True when all four corners of the rect are finite and within the routing limit.
+    ///
+    /// - Parameter rect: The rect to check.
+    /// - Returns: True when all corners pass the `isSane` test.
     private static func isSane(_ rect: CGRect) -> Bool {
         isSane(rect.minX) && isSane(rect.minY) && isSane(rect.maxX) && isSane(rect.maxY)
     }
 
+    /// Routes every edge request around every obstacle.
+    ///
+    /// - Parameters:
+    ///   - edges: Requests routed in array order; output index i corresponds to input index i.
+    ///   - obstacles: Diagram-space obstacle frames with transform scale.
+    ///   - padding: Parallel-offset spacing for inflated obstacle boundaries, in points (default 12).
+    /// - Returns: Routed polylines in the same order as input edges.
     static func route(
         edges: [EdgeRequest],
         obstacles: [Obstacle],
@@ -186,15 +215,25 @@ enum DiagramEdgeRouter {
         /// On the card border — the polyline's real endpoint.
         let anchor: QPoint
         /// On the card's own inflated ring — the lattice node the escape
-        /// stub reaches. Never searched; prepended/appended by construction.
+        /// stub reaches.
+        ///
+        /// Never searched; prepended/appended by construction.
         let terminus: QPoint
 
         var stubLength: Int64 { abs(anchor.x - terminus.x) + abs(anchor.y - terminus.y) }
     }
 
-    /// The endpoint's own inflated ring. The card IS an obstacle; matching
-    /// by quantized frame recovers its scale-inflated rect. A frame with no
-    /// obstacle entry (defensive) gets a scale-1 ring.
+    /// The endpoint's own inflated ring.
+    ///
+    /// The card IS an obstacle; matching by quantized frame recovers its scale-inflated rect. A frame with no obstacle
+    /// entry (defensive) gets a scale-1 ring.
+    ///
+    /// - Parameters:
+    ///   - frame: The card's UNinflated diagram-space frame.
+    ///   - obstacles: The obstacles from the request.
+    ///   - rects: Quantized inflated obstacle rectangles.
+    ///   - padding: Inflation amount in points.
+    /// - Returns: The quantized inflated rect matching the frame.
     private static func ownRing(
         for frame: CGRect,
         obstacles: [Obstacle],
@@ -209,12 +248,17 @@ enum DiagramEdgeRouter {
         return QRect(inflating: frame, by: padding)
     }
 
-    /// A candidate dies when its stub terminus is strictly inside ANY ring
-    /// other than its own (cards closer than 2×padding — the enclosed-anchor
-    /// fallback case), or when the stub SEGMENT crosses another ring's
-    /// interior (a card small enough to sit between anchor and terminus
-    /// would otherwise be skewered — stubs are never searched, so this is
-    /// their only blocked test). Both checked cheaply before search.
+    /// True when the terminal's stub does not intersect other obstacles.
+    ///
+    /// A candidate dies when its stub terminus is strictly inside another ring
+    /// (cards closer than 2×padding) or when the stub segment crosses another
+    /// ring's interior. Both tests are checked cheaply before search.
+    ///
+    /// - Parameters:
+    ///   - terminal: The terminal candidate to test.
+    ///   - ownRing: The terminal's own inflated ring (never an obstacle).
+    ///   - rects: All inflated obstacle rectangles.
+    /// - Returns: True when the stub passes intersection tests.
     private static func valid(
         _ terminal: Terminal,
         ownRing: QRect,
@@ -234,8 +278,12 @@ enum DiagramEdgeRouter {
 
     // MARK: - Simplify
 
-    /// Drop zero-length segments, merge collinear runs — the view's corner
-    /// clamp must see honest segment lengths.
+    /// Removes zero-length segments and merges collinear runs.
+    ///
+    /// The view's corner clamp must see honest segment lengths.
+    ///
+    /// - Parameter points: The polyline points to simplify.
+    /// - Returns: The simplified polyline.
     static func simplify(_ points: [QPoint]) -> [QPoint] {
         var result: [QPoint] = []
         for point in points {
@@ -256,9 +304,28 @@ enum DiagramEdgeRouter {
 // MARK: - Quant — the only float ↔ integer boundary (1/256 pt)
 
 enum Quant {
+    /// Rounds the point coordinate to the nearest integer in 1/256 pt units.
+    ///
+    /// - Parameter value: The coordinate in points.
+    /// - Returns: The rounded integer coordinate.
     static func q(_ value: CGFloat) -> Int64 { Int64((value * 256).rounded()) }
+
+    /// Rounds the point coordinate down to the integer in 1/256 pt units.
+    ///
+    /// - Parameter value: The coordinate in points.
+    /// - Returns: The floored integer coordinate.
     static func floorQ(_ value: CGFloat) -> Int64 { Int64((value * 256).rounded(.down)) }
+
+    /// Rounds the point coordinate up to the integer in 1/256 pt units.
+    ///
+    /// - Parameter value: The coordinate in points.
+    /// - Returns: The ceiled integer coordinate.
     static func ceilQ(_ value: CGFloat) -> Int64 { Int64((value * 256).rounded(.up)) }
+
+    /// Converts an integer coordinate in 1/256 pt units back to points.
+    ///
+    /// - Parameter value: The integer coordinate.
+    /// - Returns: The point coordinate.
     static func dq(_ value: Int64) -> CGFloat { CGFloat(value) / 256 }
 }
 
@@ -275,7 +342,13 @@ struct QRect: Equatable {
     var maxX: Int64
     var maxY: Int64
 
-    /// Inflated corners round OUTWARD so blocking is conservative and exact.
+    /// Creates a quantized inflated rectangle.
+    ///
+    /// Corners round outward so blocking is conservative and exact.
+    ///
+    /// - Parameters:
+    ///   - frame: The diagram-space frame to inflate.
+    ///   - pad: The padding amount in points.
     init(inflating frame: CGRect, by pad: CGFloat) {
         minX = Quant.floorQ(frame.minX - pad)
         minY = Quant.floorQ(frame.minY - pad)
@@ -283,6 +356,10 @@ struct QRect: Equatable {
         maxY = Quant.ceilQ(frame.maxY + pad)
     }
 
+    /// True when the point is strictly inside this rectangle.
+    ///
+    /// - Parameter p: The point to test.
+    /// - Returns: True when the point is inside (not on the boundary).
     func strictlyContains(_ p: QPoint) -> Bool {
         p.x > minX && p.x < maxX && p.y > minY && p.y < maxY
     }
@@ -290,14 +367,13 @@ struct QRect: Equatable {
 
 // MARK: - RoutingField — the implicit orthogonal visibility graph
 
-/// Sorted-distinct interesting coordinates + per-segment open flags. Same
-/// node set (coordinate intersections outside inflated obstacles) and edge
-/// set (unblocked axis-aligned neighbor segments) as an explicit visibility
-/// graph — matrix-encoded, adjacency computed O(1), zero hash iteration.
-/// Blocking tests use STRICT interiors with half-open interval logic, so
-/// segments exactly on an inflated boundary are free (edges hug the ring)
-/// and overlapping obstacles simply OR together — degenerate hand-layouts
-/// (overlapping cards, zero-gap stacks) degrade gracefully.
+/// Sorted-distinct interesting coordinates + per-segment open flags.
+///
+/// Same node set (coordinate intersections outside inflated obstacles) and edge set (unblocked axis-aligned neighbor
+/// segments) as an explicit visibility graph — matrix-encoded, adjacency computed O(1), zero hash iteration. Blocking
+/// tests use STRICT interiors with half-open interval logic, so segments exactly on an inflated boundary are free
+/// (edges hug the ring) and overlapping obstacles simply OR together — degenerate hand-layouts (overlapping cards,
+/// zero-gap stacks) degrade gracefully.
 struct RoutingField {
     let xs: [Int64]
     let ys: [Int64]
@@ -307,6 +383,12 @@ struct RoutingField {
     /// vOpen[xi * (ys.count-1) + yi]: segment (xs[xi],ys[yi])→(xs[xi],ys[yi+1]).
     private var vOpen: [Bool]
 
+    /// Creates a routing field with sorted distinct coordinates.
+    ///
+    /// - Parameters:
+    ///   - rects: Inflated obstacle rectangles.
+    ///   - extraXs: Extra x-coordinates (terminals) to include in the field.
+    ///   - extraYs: Extra y-coordinates (terminals) to include in the field.
     init(rects: [QRect], extraXs: [Int64], extraYs: [Int64]) {
         self.rects = rects
         var allXs = extraXs
@@ -349,20 +431,50 @@ struct RoutingField {
         self.vOpen = vOpen
     }
 
+    /// Returns the index of the x-coordinate in the sorted list.
+    ///
+    /// - Parameter x: The x-coordinate to search for.
+    /// - Returns: The index if found, or nil.
     func xIndex(of x: Int64) -> Int? { binarySearch(xs, x) }
+
+    /// Returns the index of the y-coordinate in the sorted list.
+    ///
+    /// - Parameter y: The y-coordinate to search for.
+    /// - Returns: The index if found, or nil.
     func yIndex(of y: Int64) -> Int? { binarySearch(ys, y) }
 
+    /// True when the horizontal segment at the given position is unblocked.
+    ///
+    /// - Parameters:
+    ///   - yi: The y-index in the grid.
+    ///   - xi: The x-index of the segment start.
+    /// - Returns: True when the segment `(xs[xi], ys[yi])` to `(xs[xi+1], ys[yi])` is open.
     func horizontalOpen(yi: Int, fromXi xi: Int) -> Bool {
         hOpen[yi * (xs.count - 1) + xi]
     }
 
+    /// True when the vertical segment at the given position is unblocked.
+    ///
+    /// - Parameters:
+    ///   - xi: The x-index in the grid.
+    ///   - yi: The y-index of the segment start.
+    /// - Returns: True when the segment `(xs[xi], ys[yi])` to `(xs[xi], ys[yi+1])` is open.
     func verticalOpen(xi: Int, fromYi yi: Int) -> Bool {
         vOpen[xi * (ys.count - 1) + yi]
     }
 
-    /// Free perpendicular distance from a run at `coordinate` spanning
-    /// (lo, hi) to the nearest inflated boundary on each side — the corridor
-    /// slack that bounds nudge offsets. `vertical:` flips the roles.
+    /// Returns the free perpendicular distance from a run to boundaries.
+    ///
+    /// Computes the corridor slack that bounds nudge offsets on each side
+    /// of a run at the given coordinate spanning (lo, hi). The `vertical`
+    /// parameter flips which coordinates measure distance and span.
+    ///
+    /// - Parameters:
+    ///   - coordinate: The position perpendicular to the run.
+    ///   - lo: The run's span lower bound.
+    ///   - hi: The run's span upper bound.
+    ///   - vertical: True when the run is vertical; false for horizontal.
+    /// - Returns: Tuple with `before` and `after` distance to boundaries.
     func slack(
         coordinate: Int64,
         lo: Int64,
@@ -383,6 +495,12 @@ struct RoutingField {
         return (gapBefore, gapAfter)
     }
 
+    /// Searches for a value in a sorted array using binary search.
+    ///
+    /// - Parameters:
+    ///   - array: A sorted array of integers.
+    ///   - value: The value to search for.
+    /// - Returns: The index if found, or nil.
     private func binarySearch(_ array: [Int64], _ value: Int64) -> Int? {
         var lo = 0, hi = array.count - 1
         while lo <= hi {
@@ -396,13 +514,12 @@ struct RoutingField {
 
 // MARK: - PathSearch — multi-source/multi-target A*
 
-/// One search per edge over the shared field. Virtual super-source arcs are
-/// the source stubs (seed cost = stub length, horizontal axis); virtual
-/// super-target arcs are the target stubs (exit cost = stub length + a bend
-/// when arriving vertically, correctly pricing the corner onto the
-/// horizontal stub). State carries the arrival axis so bends are exact.
-/// Determinism: binary heap ordered by (f, insertion counter); neighbors
-/// expanded in fixed (x, y)-sorted order; all-integer costs.
+/// One search per edge over the shared field.
+///
+/// Virtual super-source arcs are the source stubs (seed cost = stub length, horizontal axis); virtual super-target arcs
+/// are the target stubs (exit cost = stub length + a bend when arriving vertically, correctly pricing the corner onto
+/// the horizontal stub). State carries the arrival axis so bends are exact. Determinism: binary heap ordered by (f,
+/// insertion counter); neighbors expanded in fixed (x, y)-sorted order; all-integer costs.
 enum PathSearch {
 
     private struct HeapEntry {
@@ -411,8 +528,18 @@ enum PathSearch {
         let state: Int32
     }
 
-    /// States: nodeIndex * 2 + axis (0 = horizontal arrival, 1 = vertical).
-    /// The virtual goal is state -1 handled out of band.
+    /// Routes between source and target terminals using A* search.
+    ///
+    /// States are encoded as nodeIndex * 2 + axis, where axis is 0 for
+    /// horizontal arrival and 1 for vertical. The virtual goal state -1 is
+    /// handled out of band.
+    ///
+    /// - Parameters:
+    ///   - sources: The available source terminals.
+    ///   - targets: The available target terminals.
+    ///   - field: The routing field defining obstacles and unblocked segments.
+    ///   - bendPenaltyQ: The quantized cost per 90-degree bend.
+    /// - Returns: The routed path as quantized points, or nil if no path exists.
     static func route(
         sources: [DiagramEdgeRouter.Terminal],
         targets: [DiagramEdgeRouter.Terminal],
@@ -592,12 +719,12 @@ enum PathSearch {
 // MARK: - TrackAllocator — deterministic corridor nudging
 
 /// Edges sharing a corridor run get symmetric parallel offsets so they don't
-/// overprint. A separate pure stage behind `route()`: interference groups by
-/// (axis, coordinate, interval overlap); members ordered by (propertyRef,
-/// fromElementUuid, segment index) — the full total order; offsets in
-/// `spacingQ` steps, each clamped to half the corridor slack. Polyline
-/// endpoints (anchors, stubs) never move — the two adjacent perpendicular
-/// segments stretch to follow.
+/// overprint.
+///
+/// A separate pure stage behind `route()`: interference groups by (axis, coordinate, interval overlap); members ordered
+/// by (propertyRef, fromElementUuid, segment index) — the full total order; offsets in `spacingQ` steps, each clamped
+/// to half the corridor slack. Polyline endpoints (anchors, stubs) never move — the two adjacent perpendicular segments
+/// stretch to follow.
 enum TrackAllocator {
 
     private struct SegmentRef {
@@ -610,6 +737,13 @@ enum TrackAllocator {
         let orderKey: (String, String, Int)
     }
 
+    /// Applies deterministic parallel offsets to interior segments of edges in a corridor.
+    ///
+    /// - Parameters:
+    ///   - paths: The routed polylines to nudge (modified in place).
+    ///   - edges: The edge requests corresponding to paths.
+    ///   - field: The routing field defining obstacle boundaries and slack.
+    ///   - spacingQ: The quantized spacing between nudged parallel runs.
     static func nudge(
         _ paths: inout [[QPoint]?],
         edges: [DiagramEdgeRouter.EdgeRequest],

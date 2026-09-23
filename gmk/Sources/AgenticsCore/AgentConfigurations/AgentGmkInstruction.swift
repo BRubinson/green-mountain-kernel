@@ -4,15 +4,16 @@ import Foundation
 
 /// The compiled instruction for one session profile.
 ///
-/// This replaced `AgentPhaseInstructions`, which was a `DynamicInstructions`
-/// rebuilt on every phase change. Rebuilding was the problem: the framework's
-/// key-value cache is keyed on the instruction body, so a body that changes at
-/// each phase throws the cache away silently. A profile's instruction is fixed
-/// for the life of the session, so it is assembled once and never varies.
+/// A profile's instruction is fixed for the life of the session and assembled once,
+/// never varying. This ensures the framework's key-value cache, which is keyed on
+/// instruction body, is not discarded across the session.
 struct AgentGmkInstruction: Sendable, Hashable {
 
     let text: String
 
+    /// Creates an instruction with the given text.
+    ///
+    /// - Parameter text: The instruction body text.
     init(_ text: String) {
         self.text = text
     }

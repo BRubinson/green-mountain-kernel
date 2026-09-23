@@ -10,14 +10,14 @@
 import Foundation
 import GRDB
 
-/// Opt-in snake_case column mapping. Every read-side decoder in this module
-/// declares this conformance explicitly — there is deliberately NO blanket
-/// `extension FetchableRecord where Self: Codable` here, so a query struct
-/// added inside a repository cannot silently inherit a decoding strategy from
-/// a file nobody opened.
+/// Opt-in snake_case column mapping.
 ///
-/// A scope read through `including(optional:)` or `including(required:)`
-/// inherits the PARENT's strategy, so every joined child declares this itself.
+/// Every read-side decoder declares this conformance explicitly — there is NO
+/// blanket `extension FetchableRecord where Self: Codable` here, so a query
+/// struct added inside a repository cannot silently inherit a decoding strategy
+/// from a file nobody opened. A scope read through `including(optional:)` or
+/// `including(required:)` inherits the PARENT's strategy, so every joined child
+/// declares this itself.
 protocol SnakeCaseDecoded: Codable, FetchableRecord {
     // no requirements: conformance IS the opt-in
 }
@@ -45,10 +45,22 @@ protocol BaseRecordFields: SnakeCaseDecoded, Sendable {
 /// `BaseRecordFields` itself: the protocol stays free of TableRecord, so a
 /// projection decoder can adopt it without claiming to mirror a table.
 extension BaseRecordFields where Self: TableRecord {
+    /// Fetches the record with the given uuid.
+    /// - Parameters:
+    ///   - db: The database to query.
+    ///   - uuid: The unique identifier to look up.
+    /// - Returns: The record, or nil if not found.
+    /// - Throws: Any database error.
     static func fetch(_ db: Database, uuid: String) throws -> Self? {
         try Self.all().withUuid(uuid).fetchOne(db)
     }
 
+    /// Fetches the record with the given uuid or throws.
+    /// - Parameters:
+    ///   - db: The database to query.
+    ///   - uuid: The unique identifier to look up.
+    /// - Returns: The record.
+    /// - Throws: `StoreError.notFound` if the record does not exist.
     static func require(_ db: Database, uuid: String) throws -> Self {
         guard let row = try fetch(db, uuid: uuid) else {
             throw StoreError.notFound(entity: databaseTableName, key: uuid)

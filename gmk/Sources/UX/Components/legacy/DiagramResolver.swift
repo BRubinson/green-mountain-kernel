@@ -8,14 +8,19 @@ import Foundation
 /// only, deliberately outside the `#if canImport(SwiftUI)` guard the views carry.
 
 /// Caller-assembled dope context: one hydrated tree per RESOLVED dope_scope
-/// binding code (from DIAGRAM_GET's bindings + one DOPE_GET each). Codes the
-/// caller could not resolve are simply absent — their elements ghost.
+/// binding code (from DIAGRAM_GET's bindings + one DOPE_GET each).
+///
+/// Codes the caller could not resolve are simply absent — their elements ghost.
 struct DiagramDopeContext: Sendable {
     struct Entry: Sendable {
         let tree: DopeScopeTree
         /// "prompt" | "session_base" — surfaced on the scope card.
         let resolvedVia: String
 
+        /// Creates an entry with a dope scope tree and resolution source.
+        /// - Parameters:
+        ///   - tree: The hydrated dope scope tree.
+        ///   - resolvedVia: The source of the resolved scope ("prompt" or "session_base").
         init(tree: DopeScopeTree, resolvedVia: String) {
             self.tree = tree
             self.resolvedVia = resolvedVia
@@ -25,6 +30,8 @@ struct DiagramDopeContext: Sendable {
     /// Keyed by dope scope code.
     let entries: [String: Entry]
 
+    /// Creates a dope context with the given scope entries.
+    /// - Parameter entries: A dictionary mapping scope codes to their resolved entries.
     init(entries: [String: Entry] = [:]) {
         self.entries = entries
     }
@@ -40,6 +47,12 @@ struct ResolvedDiagram: Sendable {
     let edges: [ResolvedEdge]
     let environment: DiagramRenderEnvironment
 
+    /// Creates a resolved diagram with the given content and environment.
+    /// - Parameters:
+    ///   - contentBounds: The union of all drawn frames and edges.
+    ///   - topLevel: Painter-sorted resolved elements (depth-first global).
+    ///   - edges: Foreign-key edges between entity cards.
+    ///   - environment: The rendering environment (colors, scale, padding).
     init(
         contentBounds: CGRect,
         topLevel: [ResolvedElement],
@@ -63,15 +76,28 @@ struct ResolvedElement: Sendable {
     let kind: ResolvedElementKind
     let children: [ResolvedElement]
     /// This element's composed diagram-space center — the same value the
-    /// resolver positioned the frame around. Hosts invert view hits with it
-    /// instead of re-walking the tree.
+    /// resolver positioned the frame around.
+    ///
+    /// Hosts invert view hits with it instead of re-walking the tree.
     let accumulatedCenter: CGPoint
-    /// This element's OWN composed scale (parentScale × node.scale). The
-    /// drag-delta divisor is the PARENT's accumulated scale — use
+    /// This element's OWN composed scale (parentScale × node.scale).
+    ///
+    /// The drag-delta divisor is the PARENT's accumulated scale — use
     /// `DiagramDrag.moveMutation`, which divides correctly, rather than
     /// dividing by this value directly.
     let accumulatedScale: Double
 
+    /// Creates a resolved element with the given properties.
+    /// - Parameters:
+    ///   - uuid: The unique identifier for this element.
+    ///   - code: The dope binding code for this element.
+    ///   - name: The display name of the element.
+    ///   - frame: The diagram-space frame (transforms already composed).
+    ///   - elementZ: The depth ordering within siblings (painter-sorted).
+    ///   - kind: The render kind that determines the chrome and styling.
+    ///   - children: The child elements, in render order.
+    ///   - accumulatedCenter: The composed diagram-space center; default is origin.
+    ///   - accumulatedScale: The composed scale factor; default is 1.0.
     init(
         uuid: String,
         code: String,
@@ -94,8 +120,12 @@ struct ResolvedElement: Sendable {
         self.accumulatedScale = accumulatedScale
     }
 
-    /// Value-semantics rebuilds used by the deferred pass, which has to
-    /// patch geometry into a tree phase 1 already built.
+    /// Returns a copy of this element with the given children.
+    ///
+    /// Value-semantics rebuild used by the deferred pass to patch geometry
+    /// into a tree that phase 1 already built.
+    /// - Parameter children: The new children for this element.
+    /// - Returns: A new element with the same properties but different children.
     func replacingChildren(_ children: [ResolvedElement]) -> ResolvedElement {
         ResolvedElement(
             uuid: uuid,
@@ -110,6 +140,12 @@ struct ResolvedElement: Sendable {
         )
     }
 
+    /// Returns a copy with the given kind, frame, and children.
+    /// - Parameters:
+    ///   - kind: The new element kind.
+    ///   - frame: The new diagram-space frame.
+    ///   - children: The new children.
+    /// - Returns: A new element with the updated properties.
     func replacing(
         kind: ResolvedElementKind,
         frame: CGRect,
@@ -130,10 +166,15 @@ struct ResolvedElement: Sendable {
 }
 
 extension ResolvedElement {
-    /// Diagram-space y of one drawn property row's center on this entity
-    /// card — the FK-exit formula. `resolveEdges` and the host's search
-    /// field-jump both call this, so the two can never disagree. Row order
-    /// is own-properties-first, composed-base union appended.
+    /// Returns the diagram-space y coordinate for a property row's center.
+    ///
+    /// `resolveEdges` and the host's search field-jump both call this to ensure
+    /// they never disagree. Row order is own-properties-first, then the
+    /// composed-base union appended.
+    /// - Parameters:
+    ///   - rowIndex: The property row index within the card.
+    ///   - environment: The rendering environment with card metrics.
+    /// - Returns: The y coordinate of the row's center in diagram space.
     func rowCenterY(_ rowIndex: Int, environment: DiagramRenderEnvironment) -> CGFloat {
         DiagramResolver.rowCenterY(
             frameMinY: frame.minY,
@@ -145,10 +186,13 @@ extension ResolvedElement {
 }
 
 extension ResolvedDiagram {
-    /// Swap ONLY the color scheme — an O(1) copy for live appearance flips.
+    /// Returns a copy with a different color scheme (O(1) operation).
+    ///
     /// Valid because `DiagramResolver.resolve` never reads
     /// `environment.colorScheme` (geometry depends only on the card metrics);
     /// changing metrics or padding still requires a full resolve.
+    /// - Parameter scheme: The new color scheme to apply.
+    /// - Returns: A new diagram with the same geometry but different colors.
     func reskinned(_ scheme: DiagramRenderEnvironment.ColorScheme) -> ResolvedDiagram {
         guard scheme != environment.colorScheme else { return self }
         let env = DiagramRenderEnvironment(
@@ -196,6 +240,12 @@ struct ResolvedText: Hashable, Sendable {
     let textColor: String
     let backgroundColor: String?
 
+    /// Creates a resolved text element with the given properties.
+    /// - Parameters:
+    ///   - markdown: The markdown source to render.
+    ///   - fontSize: The font size in points (scaled by accumulated tree scale).
+    ///   - textColor: The text color as a hex string.
+    ///   - backgroundColor: The background color as a hex string, or nil for none.
     init(
         markdown: String,
         fontSize: Double,
@@ -230,15 +280,25 @@ struct ResolvedConnector: Hashable, Sendable {
     let tailKind: DiagramConnectorHead
     let label: String
 
+    /// Creates a resolved connector with the given styling and routing.
+    /// - Parameters:
+    ///   - target: The target element frame or `.absent` if unresolved.
+    ///   - strokeColor: The connector stroke color as a hex string.
+    ///   - lineWidth: The line width in diagram space.
+    ///   - lineStyle: The dash or solid style of the line.
+    ///   - headKind: The arrowhead style at the target end.
+    ///   - label: The connector label text.
+    ///   - routingKind: The routing algorithm; default is orthogonal steps.
+    ///   - tailKind: The arrowhead style at the source end; default is none.
     init(
         target: Target,
         strokeColor: String,
         lineWidth: Double,
         lineStyle: DiagramConnectorLineStyle,
         headKind: DiagramConnectorHead,
+        label: String,
         routingKind: DiagramConnectorRouting = .orthogonalStep,
-        tailKind: DiagramConnectorHead = .none,
-        label: String
+        tailKind: DiagramConnectorHead = .none
     ) {
         self.target = target
         self.strokeColor = strokeColor
@@ -252,8 +312,10 @@ struct ResolvedConnector: Hashable, Sendable {
 }
 
 /// A resolved UML node: explicit frame (never text-measured), a kind that
-/// picks the chrome, and the markdown interior. Optional chrome is
-/// nil-means-theme-default so unstyled nodes stay legible in both schemes.
+/// picks the chrome, and the markdown interior.
+///
+/// Optional chrome is nil-means-theme-default so unstyled nodes stay legible
+/// in both schemes.
 struct ResolvedUmlNode: Hashable, Sendable {
     let nodeKind: DiagramNodeKind
     let markdown: String
@@ -263,6 +325,15 @@ struct ResolvedUmlNode: Hashable, Sendable {
     let lineWidth: Double
     let fillColor: String?
 
+    /// Creates a resolved UML node with the given styling.
+    /// - Parameters:
+    ///   - nodeKind: The UML node type (box, diamond, actor, etc.).
+    ///   - markdown: The markdown text to render inside the node.
+    ///   - fontSize: The font size in points.
+    ///   - textColor: The text color as a hex string, or nil for theme default.
+    ///   - strokeColor: The border color as a hex string, or nil for theme default.
+    ///   - lineWidth: The border line width in diagram space.
+    ///   - fillColor: The background color as a hex string, or nil for theme default.
     init(
         nodeKind: DiagramNodeKind,
         markdown: String,
@@ -287,6 +358,11 @@ struct LayerStyle: Hashable, Sendable {
     let visible: Bool
     let locked: Bool
 
+    /// Creates a layer style with the given properties.
+    /// - Parameters:
+    ///   - opacity: The layer opacity from 0 to 1.
+    ///   - visible: True if the layer is currently visible.
+    ///   - locked: True if the layer is locked for editing.
     init(opacity: Double, visible: Bool, locked: Bool) {
         self.opacity = opacity
         self.visible = visible
@@ -301,11 +377,19 @@ struct ResolvedStroke: Sendable {
     /// Scales with the accumulated transform.
     let lineWidth: Double
     let tool: DiagramStrokeTool
-    /// The perfect-freehand outline polygon, derived at resolve time from
-    /// the persisted centerline+pressure (renderAlgoVersion 2). Empty =
-    /// degenerate stroke; the view falls back to the plain stroked line.
+    /// The perfect-freehand outline polygon, derived at resolve time from the
+    /// persisted centerline+pressure (renderAlgoVersion 2).
+    ///
+    /// Empty = degenerate stroke; the view falls back to the plain stroked line.
     let outline: [CGPoint]
 
+    /// Creates a resolved stroke with the given points and styling.
+    /// - Parameters:
+    ///   - points: The diagram-space vertices of the stroke.
+    ///   - color: The stroke color as a hex string.
+    ///   - lineWidth: The line width in diagram space (scales with transforms).
+    ///   - tool: The drawing tool that created the stroke (pen, marker, etc.).
+    ///   - outline: The outline polygon for rendering; empty for degenerate strokes.
     init(
         points: [CGPoint],
         color: String,
@@ -329,6 +413,14 @@ struct ResolvedShape: Sendable {
     let fillColor: String?
     let cornerRadius: Double?
 
+    /// Creates a resolved shape with the given geometry and styling.
+    /// - Parameters:
+    ///   - kind: The shape type (rectangle, circle, polygon, etc.).
+    ///   - points: The diagram-space vertices defining the shape.
+    ///   - strokeColor: The border color as a hex string.
+    ///   - lineWidth: The border line width in diagram space.
+    ///   - fillColor: The fill color as a hex string, or nil for no fill.
+    ///   - cornerRadius: The corner radius in diagram space, or nil for none.
     init(
         kind: DiagramShapeKind,
         points: [CGPoint],
@@ -352,6 +444,11 @@ struct ResolvedScopeCard: Sendable {
     /// "prompt" | "session_base" — which ladder rung won.
     let resolvedVia: String
 
+    /// Creates a resolved scope card with the given identity and resolution source.
+    /// - Parameters:
+    ///   - dopeScopeCode: The dope scope binding code.
+    ///   - scopeName: The human-readable scope name.
+    ///   - resolvedVia: The source of the resolved scope ("prompt" or "session_base").
     init(dopeScopeCode: String, scopeName: String, resolvedVia: String) {
         self.dopeScopeCode = dopeScopeCode
         self.scopeName = scopeName
@@ -370,6 +467,11 @@ struct EntityCardModel: Sendable {
         /// "FK" (relationship), "B" (materialized from a composed base).
         let badges: [String]
 
+        /// Creates a property row with the given name, type, and badges.
+        /// - Parameters:
+        ///   - name: The property name.
+        ///   - typeLabel: The property type as a display label.
+        ///   - badges: Array of constraint badges (NN, UQ, AI, FK, B).
         init(name: String, typeLabel: String, badges: [String]) {
             self.name = name
             self.typeLabel = typeLabel
@@ -382,9 +484,11 @@ struct EntityCardModel: Sendable {
     let entityName: String
     let domainCode: String
     /// The entity's OWN code — i.e. the table name, the second segment of
-    /// `entityCode`. Cards render this, never the 2-segment binding path:
-    /// the domain is already carried by the header hue and the enclosing
-    /// scope card, so repeating it in the header is noise.
+    /// `entityCode`.
+    ///
+    /// Cards render this, never the 2-segment binding path: the domain is
+    /// already carried by the header hue and the enclosing scope card, so
+    /// repeating it in the header is noise.
     var tableName: String {
         entityCode.split(separator: ".").last.map(String.init) ?? entityCode
     }
@@ -392,6 +496,13 @@ struct EntityCardModel: Sendable {
     let headerHue: Double
     let rows: [PropertyRow]
 
+    /// Creates an entity card model with the given identity and properties.
+    /// - Parameters:
+    ///   - entityCode: The 2-segment domain.entity binding code.
+    ///   - entityName: The human-readable entity name.
+    ///   - domainCode: The domain code (first segment of entityCode).
+    ///   - headerHue: The FNV-1a stable hue [0, 1) for the header color.
+    ///   - rows: The property rows displayed on the card.
     init(
         entityCode: String,
         entityName: String,
@@ -421,22 +532,37 @@ enum ResolvedEdgeOrigin: Sendable, Equatable {
 }
 
 struct ResolvedEdge: Sendable {
-    /// Diagram-space anchor points on the two card borders. When `routed`,
-    /// these are the routed polyline's real endpoints (`points.first/.last`).
+    /// Diagram-space anchor points on the two card borders.
+    ///
+    /// When `routed`, these are the routed polyline's real endpoints
+    /// (`points.first/.last`).
     let from: CGPoint
     let to: CGPoint
     let fromElementUuid: String
     let toElementUuid: String
-    /// `domain.entity.property` of the relationship property. For a
-    /// connector this is its element code — the edge's human name either way.
+    /// `domain.entity.property` of the relationship property.
+    ///
+    /// For a connector this is its element code — the edge's human name either
+    /// way.
     let propertyRef: String
     /// Diagram-space orthogonal polyline, >= 2 points — `[from, to]` when
-    /// routing declined (`routed == false`) and the view keeps the legacy
-    /// cubic. Derived state: never persisted, never on the wire.
+    /// routing declined (`routed == false`) and the view keeps the legacy cubic.
+    ///
+    /// Derived state: never persisted, never on the wire.
     let points: [CGPoint]
     let routed: Bool
     let origin: ResolvedEdgeOrigin
 
+    /// Creates a resolved edge between two elements.
+    /// - Parameters:
+    ///   - from: The anchor point on the source card border in diagram space.
+    ///   - to: The anchor point on the target card border in diagram space.
+    ///   - fromElementUuid: The uuid of the source element.
+    ///   - toElementUuid: The uuid of the target element.
+    ///   - propertyRef: The property code ("domain.entity.property" or element code).
+    ///   - points: The routed polyline points, or nil for a straight line.
+    ///   - routed: True if points were computed by the routing algorithm.
+    ///   - origin: Whether this is a derived FK or a persisted connector.
     init(
         from: CGPoint,
         to: CGPoint,
@@ -467,6 +593,11 @@ enum DiagramResolver {
     ///    is depth-first, so a child never interleaves with another parent's.
     ///  - Ghost injection happens here once: an unresolved scope code makes the
     ///    card `.absentScope` and its entity children `.absentEntity`.
+    /// - Parameters:
+    ///   - tree: The diagram tree to resolve.
+    ///   - dope: The hydrated dope context with resolved scope bindings.
+    ///   - environment: The rendering environment (colors, scale, padding).
+    /// - Returns: A fully resolved diagram ready to render.
     static func resolve(
         _ tree: DiagramTree,
         dope: DiagramDopeContext,
@@ -568,11 +699,21 @@ enum DiagramResolver {
 
     // MARK: - Internals
 
+    /// Returns true if element a should be rendered before element b in painter order.
+    /// - Parameters:
+    ///   - a: The first element to compare.
+    ///   - b: The second element to compare.
+    /// - Returns: True if a comes before b in rendering order (by Z, then code).
     private static func siblingOrder(_ a: DiagramElementNode, _ b: DiagramElementNode) -> Bool {
         if a.base.elementZ != b.base.elementZ { return a.base.elementZ < b.base.elementZ }
         return a.base.code < b.base.code
     }
 
+    /// Returns the dope scope entry for the given node, if it is a scope card.
+    /// - Parameters:
+    ///   - node: The element node to query.
+    ///   - dope: The dope context containing resolved scopes.
+    /// - Returns: The scope entry, or nil if the node is not a scope card.
     private static func scopeEntry(
         for node: DiagramElementNode,
         dope: DiagramDopeContext
@@ -583,11 +724,22 @@ enum DiagramResolver {
         return nil
     }
 
+    /// Recursively resolves an element node and its children.
+    /// - Parameters:
+    ///   - node: The element node to resolve.
+    ///   - parentCenter: The parent element's diagram-space center.
+    ///   - parentScale: The parent element's accumulated scale.
+    ///   - scope: The dope scope context for this element, if any.
+    ///   - environment: The rendering environment (colors, scale, padding).
+    ///   - entityFrames: Mutable dictionary of resolved entity frame rects.
+    ///   - obstacles: Mutable array of edge-routing obstacles.
+    ///   - pass: Mutable resolve pass state tracking deferred elements.
+    ///   - parentUuid: The uuid of the parent element, if any.
+    /// - Returns: A fully resolved element with transformed geometry and children.
     private static func resolveElement(
         _ node: DiagramElementNode,
         parentCenter: CGPoint,
         parentScale: Double,
-        parentUuid: String? = nil,
         scope: DiagramDopeContext.Entry?,
         environment: DiagramRenderEnvironment,
         entityFrames:
@@ -596,7 +748,8 @@ enum DiagramResolver {
                 scopeCode: String, scale: Double
             )],
         obstacles: inout [DiagramEdgeRouter.Obstacle],
-        pass: inout ResolvePass
+        pass: inout ResolvePass,
+        parentUuid: String? = nil
     ) -> ResolvedElement {
         let scale = parentScale * node.base.scale
         let center = CGPoint(
@@ -618,12 +771,12 @@ enum DiagramResolver {
                     $0,
                     parentCenter: center,
                     parentScale: scale,
-                    parentUuid: node.identity.uuid,
                     scope: nil,
                     environment: environment,
                     entityFrames: &entityFrames,
                     obstacles: &obstacles,
-                    pass: &pass
+                    pass: &pass,
+                    parentUuid: node.identity.uuid
                 )
             }
             kind = .layer(
@@ -747,9 +900,9 @@ enum DiagramResolver {
                     lineWidth: payload.strokeWidth * scale,
                     lineStyle: payload.lineStyle,
                     headKind: payload.headKind,
+                    label: payload.label,
                     routingKind: payload.routingKind,
-                    tailKind: payload.tailKind,
-                    label: payload.label
+                    tailKind: payload.tailKind
                 )
             )
 
@@ -763,12 +916,12 @@ enum DiagramResolver {
                     $0,
                     parentCenter: center,
                     parentScale: scale,
-                    parentUuid: node.identity.uuid,
                     scope: scope,
                     environment: environment,
                     entityFrames: &entityFrames,
                     obstacles: &obstacles,
-                    pass: &pass
+                    pass: &pass,
+                    parentUuid: node.identity.uuid
                 )
             }
             let width = payload.width * scale
@@ -797,12 +950,12 @@ enum DiagramResolver {
                     $0,
                     parentCenter: center,
                     parentScale: scale,
-                    parentUuid: node.identity.uuid,
                     scope: scope,
                     environment: environment,
                     entityFrames: &entityFrames,
                     obstacles: &obstacles,
-                    pass: &pass
+                    pass: &pass,
+                    parentUuid: node.identity.uuid
                 )
             }
             if let scope {
@@ -838,12 +991,12 @@ enum DiagramResolver {
                     $0,
                     parentCenter: center,
                     parentScale: scale,
-                    parentUuid: node.identity.uuid,
                     scope: scope,
                     environment: environment,
                     entityFrames: &entityFrames,
                     obstacles: &obstacles,
-                    pass: &pass
+                    pass: &pass,
+                    parentUuid: node.identity.uuid
                 )
             }
             if let scope, let model = entityCard(payload.entityCode, in: scope.tree) {
@@ -912,10 +1065,15 @@ enum DiagramResolver {
         )
     }
 
-    /// Card contents from the hydrated dope tree: the entity's own
-    /// properties plus the composed-base union (walked through the
-    /// baseComposableRef chain — bases are never replicated in the db, so
-    /// render time is where the union happens).
+    /// Returns an entity card model from the dope tree.
+    ///
+    /// Card contents include the entity's own properties plus the composed-base
+    /// union (walked through baseComposableRef chain — bases are never replicated
+    /// in the db, so render time is where the union happens).
+    /// - Parameters:
+    ///   - entityCode: The 2-segment domain.entity binding code.
+    ///   - tree: The hydrated dope scope tree.
+    /// - Returns: The entity card model, or nil if the code is not found.
     static func entityCard(_ entityCode: String, in tree: DopeScopeTree) -> EntityCardModel? {
         let segments = entityCode.split(separator: ".").map(String.init)
         guard segments.count == 2 else { return nil }
@@ -992,11 +1150,12 @@ enum DiagramResolver {
             let scale: Double
             var nodeKind: DiagramNodeKind?
 
-            /// The frame ANCHORS attach to. A triangle's side midpoints are
-            /// empty space (the outline slopes inward), so its anchor frame
-            /// insets horizontally to where the outline actually is at
-            /// mid-height. Obstacles keep the FULL frame — edges must still
-            /// route around the base.
+            /// The frame ANCHORS attach to.
+            ///
+            /// A triangle's side midpoints are empty space (the outline slopes
+            /// inward), so its anchor frame insets horizontally to where the
+            /// outline actually is at mid-height. Obstacles keep the FULL frame
+            /// — edges must still route around the base.
             var anchorFrame: CGRect {
                 guard nodeKind == .triangle else { return frame }
                 return frame.insetBy(dx: frame.width * 0.24, dy: 0)
@@ -1018,13 +1177,15 @@ enum DiagramResolver {
         }
     }
 
-    /// Connector seeds, computed against the completed frame index.
+    /// Generates edge seeds for persisted connector elements.
     ///
     /// A connector's endpoints are its PARENT's frame and its TARGET's
     /// frame — it is rendered as a child of the thing it connects from, so
     /// the parent IS the source anchor. Anything unresolvable (no parent, no
     /// target, a target that was deleted) is a ghost: it emits no seed and
     /// draws nothing, exactly like a dangling dope binding.
+    /// - Parameter pass: The resolve pass state containing deferred connectors and frame index.
+    /// - Returns: Array of edge seeds for routing.
     private static func connectorEdgeSeeds(pass: ResolvePass) -> [EdgeSeed] {
         var seeds: [EdgeSeed] = []
         // Sorted by uuid so routing order — and therefore the rendered
@@ -1058,9 +1219,9 @@ enum DiagramResolver {
                             lineWidth: deferred.payload.strokeWidth * deferred.scale,
                             lineStyle: deferred.payload.lineStyle,
                             headKind: deferred.payload.headKind,
+                            label: deferred.payload.label,
                             routingKind: deferred.payload.routingKind,
-                            tailKind: deferred.payload.tailKind,
-                            label: deferred.payload.label
+                            tailKind: deferred.payload.tailKind
                         )
                     )
                 )
@@ -1069,11 +1230,15 @@ enum DiagramResolver {
         return seeds
     }
 
-    /// Replace phase-1's placeholder connector kinds with resolved geometry.
+    /// Replaces phase-1 placeholder connectors with resolved geometry.
     ///
     /// A connector's own frame becomes the union of its endpoints, so the
     /// diagram's content bounds include it and a screenshot cannot clip a
     /// connector that runs outside every card.
+    /// - Parameters:
+    ///   - element: The resolved element to patch (recursively patches children).
+    ///   - pass: The resolve pass state containing deferred connector metadata.
+    /// - Returns: The element with connectors patched and children updated.
     private static func patchDeferred(
         _ element: ResolvedElement,
         pass: ResolvePass
@@ -1099,9 +1264,9 @@ enum DiagramResolver {
                     lineWidth: placeholder.lineWidth,
                     lineStyle: placeholder.lineStyle,
                     headKind: placeholder.headKind,
+                    label: placeholder.label,
                     routingKind: placeholder.routingKind,
-                    tailKind: placeholder.tailKind,
-                    label: placeholder.label
+                    tailKind: placeholder.tailKind
                 )
             ),
             frame: source.frame.union(target.frame),
@@ -1121,6 +1286,7 @@ enum DiagramResolver {
     }
 
     /// Base routing padding in points, scaled per-obstacle by accumulated scale.
+    ///
     /// Coupled to the frozen layout generator's corridors (50pt gutters, 48pt row
     /// gaps), so it must stay under 24 or the vertical row-gap corridors close
     /// entirely. Routing policy rather than a render setting, hence not a
@@ -1128,9 +1294,16 @@ enum DiagramResolver {
     /// fixture can pin it against the generator constants.
     static let edgeRoutingPadding: Double = 12
 
-    /// The FK edge pass: for every relationship property of every rendered entity
-    /// card, draw an edge between the two card borders when the target property's
-    /// owning entity also has a card under the SAME scope element family.
+    /// Generates edge seeds for foreign-key relationships between cards.
+    ///
+    /// For every relationship property of every rendered entity card, draws
+    /// an edge between the two card borders when the target's owning entity
+    /// also has a card under the SAME scope element family.
+    /// - Parameters:
+    ///   - dope: The dope context with resolved scope bindings.
+    ///   - entityFrames: Dictionary mapping entity uuids to their frame rects and metadata.
+    ///   - environment: The rendering environment (colors, scale, padding).
+    /// - Returns: Array of edge seeds for routing.
     private static func foreignKeyEdgeSeeds(
         dope: DiagramDopeContext,
         entityFrames: [String: (
@@ -1203,9 +1376,17 @@ enum DiagramResolver {
         return seeds
     }
 
-    /// The single home of the FK-row y formula — `resolveEdges` anchors and
-    /// `ResolvedElement.rowCenterY` (the host's search field-jump) both call
+    /// Returns the y coordinate for a property row within a card.
+    ///
+    /// The single home of the FK-row y formula — both `resolveEdges` anchors
+    /// and `ResolvedElement.rowCenterY` (the host's search field-jump) call
     /// this, so the two can never disagree.
+    /// - Parameters:
+    ///   - frameMinY: The minimum y coordinate of the card frame.
+    ///   - scale: The accumulated scale factor to apply.
+    ///   - rowIndex: The property row index (0 for first).
+    ///   - environment: The rendering environment with card layout metrics.
+    /// - Returns: The y coordinate of the row's center in diagram space.
     static func rowCenterY(
         frameMinY: CGFloat,
         scale: Double,
@@ -1217,7 +1398,11 @@ enum DiagramResolver {
                 + (Double(rowIndex) + 0.5) * environment.cardRowHeight) * scale
     }
 
-    /// Side-midpoint anchors: leave from the edge facing the target.
+    /// Returns anchor points on the edges of two rectangles facing each other.
+    /// - Parameters:
+    ///   - a: The source rectangle.
+    ///   - b: The target rectangle.
+    /// - Returns: A tuple of two CGPoints on the edges facing each other.
     private static func anchorPoints(_ a: CGRect, _ b: CGRect) -> (CGPoint, CGPoint) {
         if b.midX >= a.midX {
             return (CGPoint(x: a.maxX, y: a.midY), CGPoint(x: b.minX, y: b.midY))

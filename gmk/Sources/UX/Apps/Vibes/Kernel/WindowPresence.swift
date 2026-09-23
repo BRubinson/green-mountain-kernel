@@ -13,16 +13,19 @@ final class WindowPresence {
     static let shared = WindowPresence()
 
     private var openWindows = 0
-    /// Invalidates a scheduled demotion. See `release()`.
+    /// Invalidates a scheduled demotion.
+    ///
+    /// See `release()`.
     private var demotionToken = 0
 
+    /// Creates the shared window presence manager.
     private init() {}
 
-    /// Raise the policy BEFORE asking for a window; the failure is invisible until you tile.
+    /// Raise the policy BEFORE asking for a window.
     ///
-    /// A lease is taken from `.task`, which SwiftUI runs after the `NSWindow` exists. A window
-    /// manager classifies a window when it is CREATED, so raising the policy afterwards leaves
-    /// the first window of an accessory process permanently unmanageable.
+    /// The failure is invisible until you tile. A lease is taken from `.task`
+    /// (which SwiftUI runs after the `NSWindow` exists); a window manager
+    /// classifies windows at CREATION time.
     ///
     /// Only the menu bar needs to call this: it is the only surface that can open a window
     /// from the zero-window state, and every other call site already runs inside one.
@@ -30,12 +33,15 @@ final class WindowPresence {
         raise()
     }
 
+    /// Acquire a window reference, raising the Dock policy.
+    ///
     /// Balanced against window lifetime by the caller's `.task`.
     func acquire() {
         openWindows += 1
         raise()
     }
 
+    /// Release a window reference, demotion the Dock policy if no windows remain.
     func release() {
         openWindows -= 1
         guard openWindows == 0 else { return }

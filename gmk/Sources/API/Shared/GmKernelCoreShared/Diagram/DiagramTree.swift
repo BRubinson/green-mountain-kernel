@@ -22,6 +22,17 @@ struct DiagramElementBase: Codable, Hashable, Sendable {
     /// Composes multiplicatively down the tree.
     let scale: Double
 
+    /// Creates a diagram element base with positioning and layout properties.
+    ///
+    /// - Parameters:
+    ///   - code: The element code identifier.
+    ///   - name: The element name.
+    ///   - description: The element description.
+    ///   - sortOrder: The sort order among siblings.
+    ///   - centerX: The x position in parent space.
+    ///   - centerY: The y position in parent space.
+    ///   - elementZ: The z position relative to siblings.
+    ///   - scale: The multiplicative scale applied down the tree.
     init(
         code: String,
         name: String,
@@ -51,6 +62,13 @@ struct DiagramElementNode: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case payload, children }
 
+    /// Creates a diagram element tree node.
+    ///
+    /// - Parameters:
+    ///   - identity: The node's identity metadata.
+    ///   - base: The base element properties.
+    ///   - payload: The element's type-specific payload.
+    ///   - children: The child nodes in the tree.
     init(
         identity: DopeNodeIdentity,
         base: DiagramElementBase,
@@ -63,6 +81,10 @@ struct DiagramElementNode: Codable, Hashable, Sendable {
         self.children = children
     }
 
+    /// Decodes a diagram element node from a decoder.
+    ///
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Any error from the decoding process.
     init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         base = try DiagramElementBase(from: decoder)
@@ -71,6 +93,10 @@ struct DiagramElementNode: Codable, Hashable, Sendable {
         children = try c.decode([DiagramElementNode].self, forKey: .children)
     }
 
+    /// Encodes this diagram element node to an encoder.
+    ///
+    /// - Parameter encoder: The encoder to write to.
+    /// - Throws: Any error from the encoding process.
     func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try base.encode(to: encoder)
@@ -103,6 +129,21 @@ struct DiagramTree: Codable, Hashable, Sendable {
         case code, name, description, gmccDiagramPath, revision, elements
     }
 
+    /// Creates a diagram tree with all properties.
+    ///
+    /// - Parameters:
+    ///   - identity: The diagram's identity metadata.
+    ///   - tier: The diagram tier classification.
+    ///   - projectUuid: The project UUID, or `nil` for non-project diagrams.
+    ///   - instanceUuid: The instance UUID, or `nil` if not project-scoped.
+    ///   - sessionUuid: The session UUID, or `nil` if not session-scoped.
+    ///   - promptUuid: The prompt UUID, or `nil` if not prompt-scoped.
+    ///   - code: The diagram code.
+    ///   - name: The diagram name.
+    ///   - description: The diagram description.
+    ///   - gmccDiagramPath: The GMCC diagram file path, or `nil` if not persisted.
+    ///   - revision: The content revision counter.
+    ///   - elements: The top-level element nodes.
     init(
         identity: DopeNodeIdentity,
         tier: String,
@@ -131,6 +172,10 @@ struct DiagramTree: Codable, Hashable, Sendable {
         self.elements = elements
     }
 
+    /// Decodes a diagram tree from a decoder.
+    ///
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Any error from the decoding process.
     init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -147,6 +192,10 @@ struct DiagramTree: Codable, Hashable, Sendable {
         elements = try c.decode([DiagramElementNode].self, forKey: .elements)
     }
 
+    /// Encodes this diagram tree to an encoder.
+    ///
+    /// - Parameter encoder: The encoder to write to.
+    /// - Throws: Any error from the encoding process.
     func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -166,7 +215,9 @@ struct DiagramTree: Codable, Hashable, Sendable {
 
 /// Read-time resolution of one dope_scope binding element, computed through
 /// the EXISTING dopeScopeCandidates ladder against the diagram row's own
-/// session/prompt FKs. `resolvedVia` nil ⇒ the legal `.absent` ghost state
+/// session/prompt FKs.
+///
+/// `resolvedVia` nil ⇒ the legal `.absent` ghost state
 /// (always the case for PROJECT/INSTANCE-tier diagrams, which carry no
 /// session context). Entity-level presence is the render pass's job — it
 /// holds the hydrated dope tree this row points at.
@@ -178,6 +229,14 @@ struct DiagramBindingResolution: Codable, Hashable, Sendable {
     let scopeUuid: String?
     let dopeRevision: Int64?
 
+    /// Creates a diagram binding resolution.
+    ///
+    /// - Parameters:
+    ///   - elementUuid: The UUID of the element being resolved.
+    ///   - dopeScopeCode: The dope scope code for the binding.
+    ///   - resolvedVia: The resolution path ("prompt", "session_base", or `nil`).
+    ///   - scopeUuid: The UUID of the resolved scope, or `nil` if unresolved.
+    ///   - dopeRevision: The dope revision, or `nil` if unresolved.
     init(
         elementUuid: String,
         dopeScopeCode: String,
@@ -196,6 +255,10 @@ struct DiagramBindingResolution: Codable, Hashable, Sendable {
         case elementUuid, dopeScopeCode, resolvedVia, scopeUuid, dopeRevision
     }
 
+    /// Decodes a diagram binding resolution from a decoder.
+    ///
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Any error from the decoding process.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         elementUuid = try c.decode(String.self, forKey: .elementUuid)

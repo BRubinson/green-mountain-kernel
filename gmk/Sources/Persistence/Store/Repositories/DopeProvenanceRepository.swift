@@ -1,19 +1,21 @@
 import Foundation
 import GRDB
 
-/// Reads and writes `dope_element_provenance` — the merge base. Runs INSIDE a
-/// Store-owned transaction; holds no dbQueue and never self-transacts. The
-/// merge-plan/resolve orchestrations stay on the Store facade.
+/// Reads and writes `dope_element_provenance` — the merge base.
 ///
-/// Two writers, deliberately the only two: `stampFromFiles` records what each
-/// element looked like when it arrived and clears the dirty flag, which IS the
-/// base; `markLocallyModified` sets the dirty flag for one dot-path. Everything
-/// is addressed by dot-path, because ingest re-mints every child uuid.
+/// Runs in a Store-owned transaction with no dbQueue. Two writers,
+/// deliberately the only two: `stampFromFiles` records element state on
+/// arrival and clears the dirty flag (the base); `markLocallyModified` sets
+/// it for one dot-path. Everything is addressed by dot-path; ingest
+/// re-mints every child uuid.
 struct DopeProvenanceRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
-    /// Load the stored base for one scope.
+    /// Loads the stored merge base for one scope.
+    /// - Parameter scopeUuid: The scope identifier.
+    /// - Returns: A map of dot-paths to their base values.
+    /// - Throws: Any database error.
     func provenance(scopeUuid: String) throws -> [String: DopeMerge.Base] {
         // Widens a 3-column list to SELECT *: the Record needs the BaseEntity
         // columns. locallyModified is decoded as Bool by GRDB (!= 0), which
@@ -34,11 +36,15 @@ struct DopeProvenanceRepository: RepositoryContext {
         return out
     }
 
-    /// Record the base after a files -> db sync: every element that came from
-    /// a file gets its hash stored and its dirty flag cleared.
+    /// Records the merge base after a files-to-db sync.
     ///
+    /// Every element from a file gets its hash stored and dirty flag cleared.
     /// Rows for paths absent from the tree are deleted, so provenance cannot
-    /// outlive what it describes and resurrect a stale base later.
+    /// outlive what it describes and resurrect a stale base.
+    /// - Parameters:
+    ///   - scopeUuid: The scope identifier.
+    ///   - bundle: The document bundle loaded from files.
+    /// - Throws: Any database error.
     func stampFromFiles(scopeUuid: String, bundle: DopeDocumentBundle) throws {
         let elements = DopeMerge.elements(of: bundle)
         let now = Store.isoNow()
@@ -81,12 +87,16 @@ struct DopeProvenanceRepository: RepositoryContext {
         }
     }
 
-    /// Flag one dot-path as edited in this session.
+    /// Marks a dot-path as edited in this session.
     ///
     /// Upserts rather than requiring a prior row: an element created here has
-    /// no base, and "dirty with no base" is a meaningful state the merge
-    /// reads as a local addition (or, when the file also has it, as a
-    /// conflict it refuses to guess about).
+    /// no base, and "dirty with no base" is a meaningful state the merge reads
+    /// as a local addition (or a conflict it refuses to guess about).
+    /// - Parameters:
+    ///   - scopeUuid: The scope identifier.
+    ///   - dotPath: The element's dot-path.
+    ///   - kind: The element kind (e.g., "entity", "property").
+    /// - Throws: Any database error.
     func markLocallyModified(scopeUuid: String, dotPath: String, kind: String) throws {
         let now = Store.isoNow()
         try db.execute(
@@ -106,12 +116,17 @@ struct DopeProvenanceRepository: RepositoryContext {
         )
     }
 
-    /// Express one merge resolution IN the base, for each conflicting path.
+    /// Records a merge resolution into the base for conflicting paths.
     ///
-    /// Take theirs clears the dirty flag, so the next sync takes the file as an
-    /// untouched element would. Take ours re-bases onto the file's CURRENT hash
-    /// while staying dirty, so the local edit is kept and the file is not
-    /// treated as having moved.
+    /// Taking theirs clears the dirty flag so the next sync treats the file as
+    /// untouched. Taking ours re-bases onto the file's current hash while
+    /// staying dirty, keeping the local edit and preventing file-moved conflict.
+    /// - Parameters:
+    ///   - scopeUuid: The scope identifier.
+    ///   - dotPaths: The conflicting dot-paths to resolve.
+    ///   - takeOurs: True to keep local changes; false to take the file.
+    ///   - theirHashes: Map of dot-paths to the file's current hashes.
+    /// - Throws: Any database error.
     func recordResolutions(
         scopeUuid: String,
         dotPaths: [String],
@@ -145,14 +160,17 @@ struct DopeProvenanceRepository: RepositoryContext {
         }
     }
 
-    /// Resolve a node's dot-path from its uuid, for the level it sits at.
+    /// Resolves a node's dot-path from its uuid at a given level.
     ///
-    /// The merge is addressed by dot-path but the mutation verbs speak in
-    /// uuids, so this is the join between them. Returns nil for a node that
-    /// has already been deleted — a hard delete cascades, so by the time a
-    /// delete is recorded the row may be gone; the caller marks what it can
-    /// and a missing mark degrades to "not known to be dirty", which the
-    /// merge treats as files-win rather than as a silent data loss.
+    /// The merge is addressed by dot-path but mutations speak in uuids; this
+    /// joins them. Returns nil for a deleted node: hard delete cascades, so
+    /// the row may be gone by recording time. The caller marks what it can;
+    /// a missing mark degrades to "not known to be dirty", treated as files-win.
+    /// - Parameters:
+    ///   - nodeUuid: The node identifier.
+    ///   - level: The hierarchy level where the node sits.
+    /// - Returns: The dot-path, or nil if the node is deleted.
+    /// - Throws: Any database error.
     func dotPath(nodeUuid: String, level: DopeLevel) throws -> String? {
         switch level {
         case .scope:
@@ -188,6 +206,9 @@ struct DopeProvenanceRepository: RepositoryContext {
     }
 
     /// The dot-paths this session has edited, in order.
+    /// - Parameter scopeUuid: The scope identifier.
+    /// - Returns: All locally modified dot-paths, in order.
+    /// - Throws: Any database error.
     func locallyModifiedPaths(scopeUuid: String) throws -> [String] {
         try DopeElementProvenanceRecord
             .filter(DopeElementProvenanceRecord.Columns.dopeScopeUuid == scopeUuid)

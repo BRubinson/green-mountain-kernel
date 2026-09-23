@@ -10,6 +10,8 @@ extension Migrations {
     // 2. diagram drops the INSTANCE tier; session/prompt reach an instance
     //    transitively. 3. The gmcc_diagram_path CHECK goes: every tier has a
     //    resolvable storage root. 4. Two subtype tables and packed strokes, ADDed.
+    /// Registers the diagram vocabulary and tier collapse migration.
+    /// - Parameter migrator: The database migrator to register the migration with.
     static func m0021_diagramVocabularyAndTierCollapse(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0021_diagramVocabularyAndTierCollapse") { db in
             let elementsBefore =

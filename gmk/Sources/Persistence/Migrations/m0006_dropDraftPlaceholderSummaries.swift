@@ -10,6 +10,9 @@ extension Migrations {
     // while the prompt is still `draft`. Its own migration rather than a fix to
     // m0005's body: the migrator silently skips a changed body on a db that
     // already ran it.
+    /// Registers the m0006 migration: drops placeholder summaries from draft prompts.
+    ///
+    /// - Parameter migrator: The database migrator to register this migration with.
     static func m0006_dropDraftPlaceholderSummaries(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0006_dropDraftPlaceholderSummaries") { db in
             let marker = "Backfilled by m0005; not authored by a bot run."

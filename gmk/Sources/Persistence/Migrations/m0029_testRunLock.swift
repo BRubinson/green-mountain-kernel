@@ -10,6 +10,8 @@ extension Migrations {
     // NO CHECKs on state / done_kind / holder_kind — vocabulary lives in Swift.
     // The inline UNIQUE on project_uuid IS the one-lock-per-project rule, chosen
     // knowing a later removal costs the m0028 rebuild dance.
+    /// Creates test run and project test lock tables for mutual exclusion.
+    /// - Parameter migrator: The database migrator.
     static func m0029_testRunLock(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0029_testRunLock") { db in
             // ---- test_run: APPEND-ONLY HISTORY. One row per run, forever.

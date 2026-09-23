@@ -25,8 +25,12 @@ enum DiagramOrganizer {
     static let forceIterations = 120
     static let separationSweeps = 40
 
-    /// New diagram-space centers for every entity card (present or ghost),
-    /// keyed by element uuid. Only cards that moved appear.
+    /// Returns new diagram-space centers for entity cards, keyed by element uuid.
+    ///
+    /// Only cards that moved appear in the result. Non-entity elements keep their drawn positions.
+    ///
+    /// - Parameter resolved: The resolved diagram with all element geometry.
+    /// - Returns: A dictionary mapping element uuids to new center points.
     static func newCenters(for resolved: ResolvedDiagram) -> [String: CGPoint] {
         struct Card {
             let uuid: String
@@ -172,9 +176,15 @@ enum DiagramOrganizer {
         return result
     }
 
-    /// The organize batch: one `elementUpdate` per moved card, diagram-space
-    /// deltas converted to parent-space writes via the same divisor rule as
-    /// `DiagramDrag.moveMutation`.
+    /// Returns mutations for all entity cards arranged by the force-directed layout.
+    ///
+    /// One `elementUpdate` per moved card; diagram-space deltas are converted to parent-space
+    /// writes via the same rule as `DiagramDrag.moveMutation`.
+    ///
+    /// - Parameters:
+    ///   - resolved: The resolved diagram with all element geometry.
+    ///   - tree: The diagram tree to find nodes for mutation.
+    /// - Returns: An array of mutations for all moved cards.
     static func organize(
         _ resolved: ResolvedDiagram,
         tree: DiagramTree

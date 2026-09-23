@@ -12,7 +12,9 @@
   "lineBreakAroundMultilineExpressionChainComponents": true,
   "multiElementCollectionTrailingCommas": true,
   "rules": {
-    "AlwaysUseLowerCamelCase": false,
+    "AlwaysUseLowerCamelCase": true,
+    "AllPublicDeclarationsHaveDocumentation": true,
+    "BeginDocumentationCommentWithOneLineSummary": true,
     "TypeNamesShouldBeCapitalized": true,
     "UseSynthesizedInitializer": false,
     "UseLetInEveryBoundCaseVariable": false,

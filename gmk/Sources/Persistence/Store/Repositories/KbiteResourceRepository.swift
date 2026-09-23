@@ -2,16 +2,29 @@ import Foundation
 import GRDB
 
 /// Digested-content data access (KBITE_DIGEST db phase / KBITE_GET /
-/// KBITE_FILE_GET / KBITE_SEARCH / KBITE_KEYWORD_TAG). Runs INSIDE a
-/// Store-owned transaction; holds no dbQueue and never self-transacts.
-/// The digest verb's filesystem phases stay in the Store facade — filesystem
-/// work never enters a db transaction.
+/// KBITE_FILE_GET / KBITE_SEARCH / KBITE_KEYWORD_TAG).
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts. The digest verb's filesystem
+/// phases stay in the Store facade — filesystem work never enters a db transaction.
 struct KbiteResourceRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
-    /// The digest's single write-transaction body: resource/file/keyword rows
-    /// from the pre-scanned artifacts (content pre-read by the facade).
+    /// Writes scanned artifacts and their files and keywords in one transaction.
+    ///
+    /// Performs the digest's single write-transaction body, replacing earlier digests
+    /// of the same resources. Content is pre-read by the facade.
+    ///
+    /// - Parameters:
+    ///   - code: The kbite code.
+    ///   - found: Scanned artifacts with axis1 (primary/secondary), axis2 (type),
+    ///     and chewed path.
+    ///   - inlinedContents: File contents indexed by [artifact][file].
+    ///   - resourceCount: Incremented by the number of resources written.
+    ///   - fileCount: Incremented by the number of files written.
+    ///   - attachedKeywords: Union of all keywords attached to any resource.
+    /// - Returns: The kbite UUID.
+    /// - Throws: Errors from database operations.
     func digestApply(
         code: String,
         found: [(artifact: ChewedArtifact, axis1: String, axis2: String, chewedPath: String)],
@@ -92,6 +105,13 @@ struct KbiteResourceRepository: RepositoryContext {
         return kbiteUuid
     }
 
+    /// Fetches a kbite and all its resources, files (without content), and keywords.
+    ///
+    /// Excludes resource file content from the fetch to reduce memory usage.
+    ///
+    /// - Parameter req: Request with the kbite code.
+    /// - Returns: Kbite with resources, files, and keywords.
+    /// - Throws: `StoreError.notFound` if the kbite code does not exist.
     func getKbite(_ req: KbiteGetRequest) throws -> KbiteGetResponse {
         guard
             let kbiteRecord =
@@ -121,7 +141,13 @@ struct KbiteResourceRepository: RepositoryContext {
         return KbiteGetResponse(kbite: kbite, resources: resources, keywords: keywords)
     }
 
-    /// The targeted load replacing "cat the chewed file".
+    /// Fetches a single resource file with its content by UUID.
+    ///
+    /// The only read that loads resource file content.
+    ///
+    /// - Parameter req: Request with the file UUID.
+    /// - Returns: The file row with content.
+    /// - Throws: `StoreError.notFound` if the file UUID does not exist.
     func getKbiteFile(_ req: KbiteFileGetRequest) throws -> KbiteFileGetResponse {
         // The one read that SHOULD load resource_file_content: a single file
         // by uuid. The stub listing above must never widen to this.
@@ -131,9 +157,18 @@ struct KbiteResourceRepository: RepositoryContext {
         return KbiteFileGetResponse(file: row.dto())
     }
 
-    /// FTS5 query, bm25-ranked (name ≫ summary ≫ content, smaller = better),
-    /// optionally scoped to a kbite_uuids list. The MATCH pattern is built by
-    /// GRDB from the raw query — user text never reaches SQL.
+    /// Searches kbite resource files with FTS5, ranked by bm25 relevance.
+    ///
+    /// Searches name, summary, and content (in that order of importance). Results are
+    /// optionally scoped to a list of kbite UUIDs. The MATCH pattern is built by GRDB
+    /// from the raw query; user text never reaches SQL directly. Matched keywords are
+    /// filtered by query tokens.
+    ///
+    /// - Parameters:
+    ///   - req: Request with query text, optional kbite UUIDs, and result limit.
+    ///   - pattern: The FTS5 search pattern built from the query.
+    /// - Returns: Ranked search hits with file info and matched keywords.
+    /// - Throws: Errors from database queries.
     func searchKbites(_ req: KbiteSearchRequest, pattern: FTS5Pattern) throws -> KbiteSearchResponse {
         let limit = min(max(req.limit ?? 50, 1), 500)
 
@@ -205,7 +240,16 @@ struct KbiteResourceRepository: RepositoryContext {
         )
     }
 
-    /// Attach/detach normalized keywords at kbite or resource-file level.
+    /// Attaches or detaches normalized keywords from a kbite or resource file.
+    ///
+    /// Keywords are normalized before processing. Idempotent; attaching an already-attached
+    /// keyword or detaching an absent one has no effect.
+    ///
+    /// - Parameter req: Request with target UUID, keywords, level (kbite or file), and
+    ///   whether to attach or detach.
+    /// - Returns: Counts of newly attached and detached keywords.
+    /// - Throws: `StoreError.notFound` if the target kbite or resource file does not exist;
+    ///   errors from database operations.
     func tagKeyword(_ req: KbiteKeywordTagRequest) throws -> KbiteKeywordTagResponse {
         let (table, ownerColumn, ownerTable): (String, String, String)
         switch req.level {
@@ -260,8 +304,13 @@ struct KbiteResourceRepository: RepositoryContext {
 
     // MARK: - Keyword primitives
 
-    /// The shared vocabulary's uuid for one normalized word, absent when the
-    /// word has never been attached.
+    /// Returns the UUID of a keyword from the shared vocabulary.
+    ///
+    /// Returns `nil` if the keyword has never been attached to any resource or file.
+    ///
+    /// - Parameter keyword: The normalized keyword.
+    /// - Returns: The keyword UUID, or `nil` if the keyword does not exist.
+    /// - Throws: Errors from database queries.
     func keywordUuid(_ keyword: String) throws -> String? {
         try KeywordRecord
             .filter(KeywordRecord.Columns.keyword == keyword)
@@ -269,7 +318,14 @@ struct KbiteResourceRepository: RepositoryContext {
             .fetchOne(db)
     }
 
-    /// Upsert the shared vocabulary by normalized text (mirrors ensureKbite).
+    /// Returns or creates a keyword in the shared vocabulary.
+    ///
+    /// Idempotent; fetches an existing keyword or creates one if absent. Mirrors
+    /// the behavior of `ensureKbite`.
+    ///
+    /// - Parameter keyword: The normalized keyword text.
+    /// - Returns: The keyword UUID.
+    /// - Throws: Errors from database operations.
     func ensureKeyword(_ keyword: String) throws -> String {
         if let existing = try keywordUuid(keyword) {
             return existing
@@ -277,8 +333,19 @@ struct KbiteResourceRepository: RepositoryContext {
         return try core.insertBase(db, table: "keyword", extra: ["keyword": keyword])
     }
 
-    /// Idempotent junction insert; returns whether a row was created.
-    /// (Internal, not private — Store+KbiteArchive's import reuses it.)
+    /// Attaches a keyword to a kbite or resource file, idempotently.
+    ///
+    /// (Internal, not private — `Store+KbiteArchive`'s import reuses it.) Returns
+    /// `true` only if a new junction row was created; returns `false` if the
+    /// association already exists.
+    ///
+    /// - Parameters:
+    ///   - table: The junction table name.
+    ///   - ownerColumn: The column name holding the owner UUID.
+    ///   - ownerUuid: The owner (kbite or file) UUID.
+    ///   - keywordUuid: The keyword UUID.
+    /// - Returns: `true` if a new row was created, `false` if it already existed.
+    /// - Throws: Errors from database operations.
     @discardableResult
     func attachKeyword(
         table: String,

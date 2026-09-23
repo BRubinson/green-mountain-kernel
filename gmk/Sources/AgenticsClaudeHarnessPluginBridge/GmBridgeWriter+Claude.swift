@@ -107,6 +107,9 @@ enum GmBridgeWriter {
     ///
     /// The half that `--check` runs and the half `write` reuses, so the thing
     /// inspected and the thing written cannot differ.
+    /// Renders the plugin file tree from bridge instructions.
+    ///
+    /// - Returns: A tuple with rendered files (path, body, executable flag) and omitted file paths.
     static func render() -> (rendered: [(path: String, body: String, executable: Bool)], omitted: [String]) {
         var rendered: [(String, String, Bool)] = []
         var omitted: [String] = []
@@ -120,11 +123,14 @@ enum GmBridgeWriter {
         return (rendered, omitted)
     }
 
-    /// Refuse early if the render is missing anything boot-critical.
+    /// Verifies that the render is complete and the roster is valid.
     ///
-    /// SEPARATE FROM `write` ON PURPOSE. The check has to be runnable without
-    /// the destructive step — that is what makes `--check` a real answer rather
-    /// than a rehearsal of a different code path.
+    /// Separate from `write` on purpose. The check is runnable without the
+    /// destructive step, so `--check` is a real answer rather than a rehearsal
+    /// of a different code path.
+    ///
+    /// - Returns: A report with written files, omitted files, byte count, unknown tool names, and roster problems.
+    /// - Throws: `WriteError.missingBootCritical` if any boot-critical files are missing; `WriteError` errors on verification failure.
     static func verify() throws -> Report {
         let (rendered, omitted) = render()
         let fatal = Set(omitted).intersection(bootCritical)
@@ -153,10 +159,13 @@ enum GmBridgeWriter {
         /`(cde_[a-z0-9_]+)`/
     }
 
-    /// Every cde tool name a rendered body cites, in either spelling.
+    /// Returns every cde tool name cited in a body, in either spelling.
     ///
     /// What a body cites is what its reader will reach for, so a grant derived
     /// from this cannot omit a tool the prose sends an agent after.
+    ///
+    /// - Parameter body: The text to search for tool citations.
+    /// - Returns: A set of cde tool names found in the body.
     static func citedToolNames(in body: String) -> Set<String> {
         var names: Set<String> = []
         for match in body.matches(of: qualifiedToolCitation) { names.insert(String(match.1)) }
@@ -164,12 +173,14 @@ enum GmBridgeWriter {
         return names
     }
 
-    /// Every qualified pen-tool name the rendered tree cites — in `allowed-tools`
-    /// frontmatter and in prose alike — that the served roster does not carry.
+    /// Returns every qualified tool name cited but not served.
     ///
-    /// A name nothing serves is silent at runtime in both directions: a grant
-    /// resolves to no tool, and an instruction sends an agent after a door that
-    /// is not there.
+    /// Checks both `allowed-tools` frontmatter and prose. A name nothing serves
+    /// is silent at runtime in both directions: a grant resolves to no tool,
+    /// and an instruction sends an agent after a door that is not there.
+    ///
+    /// - Parameter rendered: The rendered file tuples with paths and bodies.
+    /// - Returns: A sorted array of unknown tool names.
     static func unknownToolNames(
         in rendered: [(path: String, body: String, executable: Bool)]
     ) -> [String] {
@@ -184,8 +195,12 @@ enum GmBridgeWriter {
         return unknown.sorted()
     }
 
-    /// The reflected roster against the declarations it is reflected from: same
-    /// names, and each tool's op table matching the enum its schema advertises.
+    /// Checks the reflected roster against declared tool schemas.
+    ///
+    /// Verifies that reflected names match declared names, and each tool's op
+    /// table matches the enum its schema advertises.
+    ///
+    /// - Returns: An array of problem descriptions; empty if no problems found.
     static func rosterProblems() -> [String] {
         do {
             let reflected = try GmBridgeRoster.specs().map(\.name).sorted()
@@ -201,13 +216,16 @@ enum GmBridgeWriter {
         }
     }
 
-    /// Delete `directory` and rewrite it from the bridge.
+    /// Rewrites the plugin directory with the rendered bridge output.
     ///
-    /// Stage-and-swap rather than rm-then-write: the tree is built beside the
-    /// target and moved in through a trash directory, so a crash leaves either the
-    /// old tree or the new one rather than a half-plugin that still looks
-    /// installed. `verify()` runs first, so a bridge that cannot render a bootable
-    /// plugin never reaches the delete.
+    /// Uses stage-and-swap: the tree is built beside the target and moved
+    /// through a trash directory, so a crash leaves either the old tree or the
+    /// new one rather than a half-plugin. Verification runs first to ensure
+    /// bootability.
+    ///
+    /// - Parameter directory: The plugin directory to write to; must be absolute.
+    /// - Returns: A report with written files, omitted files, byte count, unknown tool names, and roster problems.
+    /// - Throws: `WriteError.notAbsolute` if the directory path is not absolute; `WriteError.refusedOutsideRepo` if the directory is not a plugin; `WriteError` errors on write failure.
     @discardableResult
     static func write(to directory: URL) throws -> Report {
         guard directory.path.hasPrefix("/") else {

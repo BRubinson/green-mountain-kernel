@@ -8,14 +8,22 @@ enum BriefingWaitOutcome {
     case timedOut(lastSeen: AgentBriefingRow?)
 }
 
-/// The client-side loop behind every "wait until the briefing is ready":
-/// re-issue the GET until it reads `ready`, sleeping between polls. `fetch`
-/// returns nil for a RETRYABLE absence and throws everything else immediately.
-/// The deadline is WALL-CLOCK so fetch latency spends the budget too.
-/// CALLER TIMEOUT CEILING: an MCP tool call from the main conversation that
-/// runs past ~2 minutes is moved to a background task and silently returns
-/// control. An MCP-facing wrapper must cap `timeoutSeconds` well under that
-/// and report a timeout as a RESULT the caller loops on, never as an error.
+/// Polls the briefing state until ready or timeout.
+///
+/// The client-side loop behind every "wait until the briefing is ready" operation.
+/// `fetch` returns nil for retryable absence and throws immediately otherwise.
+/// Deadline is wall-clock; fetch latency consumes the budget. MCP tool calls past
+/// ~2 minutes move to background and silently return. An MCP-facing wrapper must cap
+/// `timeoutSeconds` under that ceiling and report timeout as a result, never as error.
+///
+/// - Parameters:
+///   - timeoutSeconds: The maximum seconds to wait; moves to background if exceeded.
+///   - pollIntervalMicros: The sleep duration between fetches; defaults to 1 second.
+///   - sleeper: The sleep function; defaults to `usleep`.
+///   - now: The current time function; defaults to `Date()`.
+///   - fetch: A closure returning the briefing or nil; throws to fail immediately.
+/// - Returns: `.ready` when the briefing is ready, or `.timedOut` when deadline is hit.
+/// - Throws: Errors from the fetch closure; retryable absence is nil, not an error.
 func awaitBriefingReady(
     timeoutSeconds: Int,
     pollIntervalMicros: UInt32 = 1_000_000,

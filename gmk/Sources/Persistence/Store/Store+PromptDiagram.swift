@@ -8,6 +8,13 @@ import GRDB
 // (and the pre-transaction payload validation).
 
 extension Store {
+    /// Qualifies and stores a diagram reading for a prompt.
+    ///
+    /// Validates that the qualification is non-empty, the rendered path is provided, and the
+    /// render fingerprint is a valid JSON object before storing the diagram row.
+    /// - Parameter req: The qualification request with diagram details.
+    /// - Returns: The stored qualified diagram row.
+    /// - Throws: `StoreError.badRequest` if validation fails; any error from the repository.
     func promptDiagramQualify(
         _ req: PromptDiagramQualifyRequest
     ) throws -> PromptQualifiedDiagramRow {
@@ -35,12 +42,20 @@ extension Store {
         }
     }
 
+    /// Retrieves the qualified diagram for a prompt.
+    /// - Parameter req: The retrieval request with the prompt UUID.
+    /// - Returns: The qualified diagram row, or nil if no diagram has been stored.
+    /// - Throws: Any error from the repository during the read.
     func promptDiagramGet(
         _ req: PromptDiagramGetRequest
     ) throws -> PromptQualifiedDiagramRow {
         try boundaryRead { db in try PromptDiagramRepository(db: db, core: core).get(req) }
     }
 
+    /// Lists qualified diagrams for a given session and optional prompt filter.
+    /// - Parameter req: The list request with session UUID and optional prompt UUIDs.
+    /// - Returns: A response containing the matching qualified diagram rows.
+    /// - Throws: Any error from the repository during the read.
     func promptDiagramList(
         _ req: PromptDiagramListRequest
     ) throws -> PromptDiagramListResponse {

@@ -19,6 +19,7 @@ final class FindController {
 
     var searchQuery: SearchQuery { SearchQuery(query, mode: .literal) }
 
+    /// Resets the active search result index to zero.
     func reset() { activeIndex = 0 }
 }
 
@@ -35,6 +36,11 @@ struct FindHit: Equatable {
 struct FindMatches {
     let hits: [FindHit]
 
+    /// Creates a computed view of search matches over segments.
+    ///
+    /// - Parameters:
+    ///   - segments: The segments to search, in order.
+    ///   - query: The search query.
     init(segments: [(id: String, text: String)], query: SearchQuery) {
         guard query.isActive else { hits = []; return }
         var out: [FindHit] = []
@@ -49,17 +55,30 @@ struct FindMatches {
 
     var total: Int { hits.count }
 
+    /// Wraps an active index to fit within the hit count.
+    ///
+    /// - Parameter active: The active index.
+    /// - Returns: The wrapped index, or zero if no hits.
     func clampedActive(_ active: Int) -> Int {
         guard total > 0 else { return 0 }
         return ((active % total) + total) % total
     }
 
+    /// Returns the hit at the active index.
+    ///
+    /// - Parameter active: The active index.
+    /// - Returns: The active hit, or nil if no hits.
     func activeHit(_ active: Int) -> FindHit? {
         guard total > 0 else { return nil }
         return hits[clampedActive(active)]
     }
 
-    // Which local occurrence (if any) is the active one within `segmentID`.
+    /// Returns the local occurrence index within a specific segment.
+    ///
+    /// - Parameters:
+    ///   - segmentID: The segment to check.
+    ///   - active: The active index.
+    /// - Returns: The local occurrence index if the active hit is in this segment.
     func activeLocalOccurrence(in segmentID: String, active: Int) -> Int? {
         guard let hit = activeHit(active), hit.segmentID == segmentID else { return nil }
         return hit.localOccurrence

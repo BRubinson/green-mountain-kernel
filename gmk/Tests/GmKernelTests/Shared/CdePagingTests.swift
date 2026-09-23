@@ -10,6 +10,11 @@ final class CdePagerTests: XCTestCase {
         let body: String
     }
 
+    /// Creates test rows with the given count and body width.
+    /// - Parameters:
+    ///   - count: Number of rows to create.
+    ///   - chars: Character count in each row's body.
+    /// - Returns: An array of test rows.
     private func rows(_ count: Int, chars: Int) -> [Row] {
         (0..<count).map { Row(id: $0, body: String(repeating: "x", count: chars)) }
     }
@@ -111,8 +116,9 @@ final class CdePagerTests: XCTestCase {
 // MARK: - The cde doors over the wire (MCP_CALL)
 
 /// Every paged read is exercised the way the harness reaches it: `MCP_CALL`
-/// into a booted kernel, the rendered text parsed back as JSON. The fixtures
-/// are deliberately oversized so every read needs more than one page.
+/// into a booted kernel, the rendered text parsed back as JSON.
+///
+/// The fixtures are deliberately oversized so every read needs more than one page.
 final class CdePagingWireTests: KernelBackedTestCase {
 
     private struct Fixture {
@@ -132,11 +138,18 @@ final class CdePagingWireTests: KernelBackedTestCase {
 
     nonisolated(unsafe) private static var fixture: Fixture?
 
+    /// Creates a padded string with the given tag and character count.
+    /// - Parameters:
+    ///   - tag: The tag to prepend to the filler text.
+    ///   - chars: Target character count (may be slightly exceeded).
+    /// - Returns: The padded string.
     private func filler(_ tag: String, _ chars: Int) -> String {
         String(repeating: "\(tag) lorem ipsum dolor sit amet ", count: chars / 30 + 1).prefix(chars).description
     }
 
     /// Built ONCE per process: every case reads the same oversized prompt.
+    /// - Returns: The assembled fixture with seeded data.
+    /// - Throws: Any error from sending requests to the kernel.
     private func makeFixture() throws -> Fixture {
         if let fixture = Self.fixture { return fixture }
         let id = String(UUID().uuidString.prefix(8)).lowercased()
@@ -158,9 +171,9 @@ final class CdePagingWireTests: KernelBackedTestCase {
         let session = SessionContext(
             code: "main",
             name: "main",
+            gmfsRelativeStoragePath: "projects/\(code)/instances/\(code)_1/sessions/main",
             backstory: "",
-            goal: "",
-            gmfsRelativeStoragePath: "projects/\(code)/instances/\(code)_1/sessions/main"
+            goal: ""
         )
         let ensured = try env.send(
             .contextEnsure,
@@ -186,7 +199,7 @@ final class CdePagingWireTests: KernelBackedTestCase {
         )
         let briefing = try env.send(
             .briefingOpen,
-            BriefingOpenRequest(promptUuid: prompt.uuid, briefingForStep: "initial"),
+            BriefingOpenRequest(briefingForStep: "initial", promptUuid: prompt.uuid),
             BriefingRowResponse.self
         )
         _ = try env.send(
@@ -225,7 +238,10 @@ final class CdePagingWireTests: KernelBackedTestCase {
         return built
     }
 
-    /// 40 findings of 3 KB and a 60 KB overview.
+    /// Populates an exploration with 40 findings and a large overview.
+    /// - Parameter promptUuid: The prompt identifier to seed.
+    /// - Returns: A tuple of finding UUIDs and the overview text.
+    /// - Throws: Any error from sending requests to the kernel.
     private func seedExploration(_ promptUuid: String) throws -> ([String], String) {
         let explore = try env.send(
             .exploreOpen,
@@ -260,8 +276,12 @@ final class CdePagingWireTests: KernelBackedTestCase {
         return (findingUuids, overview)
     }
 
-    /// 30 notes of 2 KB, plus a care package with a 25 KB intent and 20
-    /// curated copies of 5 KB.
+    /// Populates a clarification with 30 notes and a care package.
+    ///
+    /// The care package includes a 25 KB intent and 20 curated copies of 5 KB.
+    /// - Parameter promptUuid: The prompt identifier to seed.
+    /// - Returns: A tuple of note UUIDs and the intent text.
+    /// - Throws: Any error from sending requests to the kernel.
     private func seedClarification(_ promptUuid: String) throws -> ([String], String) {
         let clarify = try env.send(
             .clarifyOpen,
@@ -312,7 +332,10 @@ final class CdePagingWireTests: KernelBackedTestCase {
         return (noteUuids, intent)
     }
 
-    /// A 40 KB body and 30 general changes of 4 KB.
+    /// Populates an architecture with a body and 30 general changes.
+    /// - Parameter promptUuid: The prompt identifier to seed.
+    /// - Returns: A tuple of change UUIDs and the architecture body text.
+    /// - Throws: Any error from sending requests to the kernel.
     private func seedArchitecture(_ promptUuid: String) throws -> ([String], String) {
         let arch = try env.send(.archOpen, ArchOpenRequest(promptUuid: promptUuid), ArchSummaryResponse.self)
         let archBody = filler("plan", 40_000)
@@ -332,10 +355,10 @@ final class CdePagingWireTests: KernelBackedTestCase {
                 ArchGeneralAddRequest(
                     summaryUuid: arch.summary.uuid,
                     filePath: "src/file\(index).swift",
-                    className: nil,
                     reasonBrief: "change \(index)",
                     changeDepth: .draft,
-                    changeCode: filler("code\(index)", 4_000)
+                    changeCode: filler("code\(index)", 4_000),
+                    className: nil
                 ),
                 ArchGeneralAddResponse.self
             )
@@ -344,7 +367,9 @@ final class CdePagingWireTests: KernelBackedTestCase {
         return (changeUuids, archBody)
     }
 
-    /// 40 review findings of 3 KB.
+    /// Populates a review with 40 findings.
+    /// - Parameter promptUuid: The prompt identifier to seed.
+    /// - Throws: Any error from sending requests to the kernel.
     private func seedReview(_ promptUuid: String) throws {
         let review = try env.send(
             .reviewOpen,
@@ -366,7 +391,13 @@ final class CdePagingWireTests: KernelBackedTestCase {
         }
     }
 
-    /// 240 file change rows, each with a few ranges.
+    /// Populates file changes with 240 rows and ranges.
+    /// - Parameters:
+    ///   - promptUuid: The prompt identifier to seed.
+    ///   - project: The project context.
+    ///   - instance: The instance context.
+    ///   - session: The session context.
+    /// - Throws: Any error from sending requests to the kernel.
     private func seedFileChanges(
         _ promptUuid: String,
         project: ProjectContext,
@@ -380,13 +411,13 @@ final class CdePagingWireTests: KernelBackedTestCase {
                     project: project,
                     instance: instance,
                     session: session,
-                    promptUuid: promptUuid,
                     relativePath: "src/file\(index % 7).swift",
                     changeKind: .edit,
                     ranges: [
                         ChangeRange(lineStart: 1, lineEnd: 10, changedContent: nil),
                         ChangeRange(lineStart: 20 + index, lineEnd: 30 + index, changedContent: nil),
-                    ]
+                    ],
+                    promptUuid: promptUuid
                 ),
                 FileChangeAddResponse.self
             )
@@ -395,10 +426,16 @@ final class CdePagingWireTests: KernelBackedTestCase {
 
     // MARK: Driving the cde door
 
+    /// Calls a cde tool and asserts a valid response within budget.
+    /// - Parameters:
+    ///   - tool: The tool name to invoke.
+    ///   - arguments: The tool arguments as JSON values.
+    /// - Returns: The response object, parsed from JSON.
+    /// - Throws: Assertion or JSON parsing errors.
     private func call(_ tool: String, _ arguments: [String: GmJsonValue]) throws -> [String: Any] {
         let response = try env.send(
             .mcpCall,
-            McpCallRequest(tool: tool, arguments: .object(arguments), identity: GmHarnessIdentity()),
+            McpCallRequest(tool: tool, identity: GmHarnessIdentity(), arguments: .object(arguments)),
             McpCallResponse.self
         )
         XCTAssertFalse(response.isError, "\(tool): \(response.text.prefix(300))")
@@ -409,7 +446,12 @@ final class CdePagingWireTests: KernelBackedTestCase {
         return result
     }
 
-    /// Walk every page of a read; returns the pages in order.
+    /// Walks every page of a tool read and collects the results.
+    /// - Parameters:
+    ///   - tool: The tool name to invoke.
+    ///   - arguments: The tool arguments as JSON values.
+    /// - Returns: All pages in order.
+    /// - Throws: Any error from calling the tool or parsing responses.
     private func allPages(_ tool: String, _ arguments: [String: GmJsonValue]) throws -> [[String: Any]] {
         var collected: [[String: Any]] = []
         var cursor: String?
@@ -425,6 +467,11 @@ final class CdePagingWireTests: KernelBackedTestCase {
         return collected
     }
 
+    /// Extracts and reassembles text windows from pages by region.
+    /// - Parameters:
+    ///   - pages: All pages from a tool read.
+    ///   - region: The region name to extract.
+    /// - Returns: The reassembled text from all windows in the region.
     private func windows(_ pages: [[String: Any]], region: String) -> String {
         pages
             .flatMap { ($0["windows"] as? [[String: Any]]) ?? [] }
@@ -434,10 +481,20 @@ final class CdePagingWireTests: KernelBackedTestCase {
             .joined()
     }
 
+    /// Extracts rows from all pages by key.
+    /// - Parameters:
+    ///   - pages: All pages from a tool read.
+    ///   - key: The key to extract (e.g., "findings", "rows").
+    /// - Returns: All rows from all pages under that key.
     private func rows(_ pages: [[String: Any]], key: String) -> [[String: Any]] {
         pages.flatMap { ($0["\(key)"] as? [[String: Any]]) ?? [] }
     }
 
+    /// Extracts the total count for a region from a page.
+    /// - Parameters:
+    ///   - page: One page object from a tool read.
+    ///   - region: The region name to look up.
+    /// - Returns: The total count for that region, or nil if not found.
     private func total(_ page: [String: Any], region: String) -> Int? {
         ((page["page"] as? [String: Any])?["regions"] as? [[String: Any]])?
             .first { ($0["name"] as? String) == region }?["total"] as? Int

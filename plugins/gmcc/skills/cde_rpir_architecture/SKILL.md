@@ -3,7 +3,7 @@ name: cde_rpir_architecture
 description: "The ARCHITECTURE phase: the plan, persistence changes first and general changes built over them."
 user-invocable: false
 allowed-tools: mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_rpir_architecture
-model: opus
+model: claude-opus-5-5[1m]
 ---
 
 # Workflow Phase

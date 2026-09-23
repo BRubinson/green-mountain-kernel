@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `session` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `session` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct SessionRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "session"
 

@@ -30,10 +30,15 @@ final class GMVibesEnvironment {
     private var fromDaemon: [GMVibesEnvKey: String] = [:]
     private var loadInFlight: Task<Void, Never>?
 
+    /// Accesses an environment variable value by key.
+    ///
+    /// - Parameter key: The environment variable key.
+    /// - Returns: The variable's value, or nil if not set.
     subscript(key: GMVibesEnvKey) -> String? { values[key] }
 
     var isLoaded: Bool { values[.gmFsRoot] != nil }
 
+    /// Initializes the environment by probing the local filesystem.
     init() {
         refresh()
     }
@@ -78,11 +83,12 @@ final class GMVibesEnvironment {
         publish()
     }
 
-    /// Single-flight PATHS_GET — the env is a process-wide singleton, so N
-    /// windows' loader tasks must cost ONE round trip on the fairness-free
-    /// serial queue, not N (and not 2N on the reconnect stampede, when the
-    /// generation restart and the `.paths` yield from invalidateAll() both
-    /// fire).
+    /// Fetches filesystem roots from the daemon via a single-flight request.
+    ///
+    /// The env is a process-wide singleton, so N windows' loader tasks must cost
+    /// ONE round trip on the fairness-free serial queue, not N. This avoids 2N trips
+    /// on reconnect stampedes when the generation restart and the `.paths` yield
+    /// from invalidateAll() both fire.
     func loadFromDaemon() async {
         if let running = loadInFlight {
             await running.value
@@ -106,12 +112,14 @@ final class GMVibesEnvironment {
         loadInFlight = nil
     }
 
-    /// Adopt the daemon's typed roots (PATHS_GET). Strictly an overlay — the
-    /// probe stays underneath so a daemon restart never blanks the env.
-    /// Roots move as a SET: when the daemon answers with a gmfs root but the
-    /// kbite roots are unset daemon-side, they are derived from the daemon's
-    /// root rather than left pointing at probe-derived paths under a
-    /// possibly-different root.
+    /// Adopts filesystem roots from the daemon.
+    ///
+    /// Strictly an overlay: the probe stays underneath so a daemon restart never
+    /// blanks the env. Roots move as a SET: when the daemon answers with a gmfs root
+    /// but the kbite roots are unset daemon-side, they are derived from the daemon's
+    /// root rather than left pointing at probe-derived paths under a possibly-different root.
+    ///
+    /// - Parameter paths: The typed roots returned by the daemon.
     func adopt(_ paths: PathsGetResponse) {
         var out: [GMVibesEnvKey: String] = [:]
         if !paths.gmFsRoot.isEmpty { out[.gmFsRoot] = paths.gmFsRoot }
@@ -131,6 +139,9 @@ final class GMVibesEnvironment {
         publish()
     }
 
+    /// Merges probed and daemon-provided roots and notifies observers.
+    ///
+    /// Daemon roots win on merge. Only updates the published values when they change.
     private func publish() {
         let merged = probed.merging(fromDaemon) { _, daemon in daemon }
         if values != merged { values = merged }  // change-gated (house idiom)

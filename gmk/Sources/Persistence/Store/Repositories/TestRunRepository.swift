@@ -1,28 +1,32 @@
 import Foundation
 import GRDB
 
-/// TEST_* data access — the agent-scoped test mutex, run INSIDE a Store-owned
-/// transaction. It is a mutex for AGENTS above the kernel's own single-writer
-/// `flock`, and what it serialises is the BUILD and the CHECKOUT.
-/// Liveness is DERIVED, never asserted: the primary test is `flock(LOCK_NB)` on
-/// the holder's own `run.lock`, so a SIGKILLed holder is provably gone.
-/// `expires_at` serves `holder_kind == .lease` only and must never become the
-/// primary check, since a TTL fails toward HOLDING. Reaping is LAZY, inside the
-/// next `acquire`: a reaper timer would hop threads inside a StoreBoundary.
+/// TEST_* data access — the agent-scoped test mutex, run INSIDE a Store-owned transaction.
+///
+/// Mutex for AGENTS above the kernel's single-writer `flock`; serialises BUILD
+/// and CHECKOUT. Liveness is DERIVED via `flock(LOCK_NB)` on the holder's own
+/// `run.lock`: a SIGKILLed holder is provably gone. `expires_at` serves
+/// `holder_kind == .lease` only, never the primary check (TTL fails toward
+/// HOLDING). Reaping is LAZY inside the next `acquire`: a reaper timer would
+/// hop threads inside a StoreBoundary.
 struct TestRunRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
     // MARK: - Verbs
 
-    /// The runnable suites, read from a file in the CHECKOUT rather than from a
-    /// table. A manifest in the db would be a second copy of what the checkout
-    /// already states, and the two would disagree the moment the repo is cloned
-    /// into another environment, which every beta and test refresh does. A file
-    /// travels with the clone; a row does not.
-    /// An absent manifest is NOT an error, and `manifestPath` comes back so a
-    /// caller staring at an empty list can tell "none declared" from "looked in
-    /// the wrong tree".
+    /// Fetches the runnable test suites from a repository manifest file.
+    ///
+    /// The manifest is read from the checkout directory rather than the database
+    /// to ensure it stays synchronized with the actual repository. A file travels
+    /// with a cloned repository, whereas a database row would not. An absent
+    /// manifest is not an error; the caller can determine whether that means no
+    /// suites were declared or the lookup targeted the wrong directory.
+    ///
+    /// - Parameter req: The project UUID and target instance UUID for the lookup.
+    /// - Returns: A response containing the list of suites and the manifest's file
+    ///   path, or `nil` if no manifest was found.
+    /// - Throws: `StoreError.notFound` when the project does not exist.
     func suiteList(_ req: TestSuiteListRequest) throws -> TestSuiteListResponse {
         guard
             let instance =
@@ -48,14 +52,17 @@ struct TestRunRepository: RepositoryContext {
         return TestSuiteListResponse(suites: decoded.suites, manifestPath: manifest.path)
     }
 
-    /// Report the lock. WRITES NOTHING — not the claim cell, not a reclaim.
+    /// Reports the current state of the test lock for a project.
     ///
-    /// It does NOT fetch-or-OPEN the cell: a project nobody has locked has no
-    /// row, and `open` is synthesised rather than persisted, because creating a
-    /// row on read would need a write transaction inside a read-only verb.
-    /// It REPORTS a dead holder as `open` without reclaiming it, since a read
-    /// that silently broke somebody else's lock would make inspection
-    /// destructive. Reclaiming is `acquire`'s job.
+    /// This read-only operation writes nothing: neither the claim cell nor a
+    /// reclaim is performed. A project that has never been locked has no row; the
+    /// lock state is synthesized as open rather than persisted. A dead holder is
+    /// reported as open without reclaiming it, since a read operation must not
+    /// silently break another process's lock. Reclaiming is `acquire`'s job.
+    ///
+    /// - Parameter req: The project UUID for which to report the lock state.
+    /// - Returns: The current lock response for the project.
+    /// - Throws: `StoreError.notFound` when the project does not exist.
     func lockStatus(_ req: TestLockStatusRequest) throws -> TestLockResponse {
         try requireProject(req.projectUuid)
         guard let cell = try cell(projectUuid: req.projectUuid) else {
@@ -73,6 +80,13 @@ struct TestRunRepository: RepositoryContext {
         return response(cell: cell, run: try run(uuid: cell.heldByRunUuid))
     }
 
+    /// Acquires the test lock for a project, creating a new test run.
+    ///
+    /// - Parameter req: The lock request containing the project UUID, target instance,
+    ///   session details, and holder information.
+    /// - Returns: The lock response with the newly acquired lock state and run details.
+    /// - Throws: `StoreError.badRequest` when the test lock is held by another active
+    ///   run.
     func acquire(_ req: TestLockAcquireRequest) throws -> TestLockResponse {
         let cell = try fetchOrOpenCell(projectUuid: req.projectUuid)
         var reclaimed = false
@@ -99,7 +113,6 @@ struct TestRunRepository: RepositoryContext {
         let runUuid = try core.insertBase(
             db,
             table: "test_run",
-            now: now,
             extra: [
                 "project_uuid": req.projectUuid,
                 "instance_uuid": req.targetInstanceUuid,
@@ -113,7 +126,8 @@ struct TestRunRepository: RepositoryContext {
                 "done_kind": req.doneKind.rawValue,
                 "done_condition": req.doneCondition,
                 "done_hint": req.doneHint,
-            ]
+            ],
+            now: now
         )
 
         // holder_kind is derived from what the caller actually supplied rather
@@ -158,6 +172,13 @@ struct TestRunRepository: RepositoryContext {
         return response(cell: fresh, run: try run(uuid: runUuid), reclaimed: reclaimed)
     }
 
+    /// Releases the test lock held by a specific run.
+    ///
+    /// - Parameter req: The release request containing the project UUID, run UUID,
+    ///   final state, exit code, and force flag.
+    /// - Returns: The lock response with the updated lock state.
+    /// - Throws: `StoreError.badRequest` when the run does not hold the lock and
+    ///   `force` is false.
     func release(_ req: TestLockReleaseRequest) throws -> TestLockResponse {
         let cell = try fetchOrOpenCell(projectUuid: req.projectUuid)
 
@@ -212,6 +233,12 @@ struct TestRunRepository: RepositoryContext {
         return response(cell: fresh, run: try run(uuid: req.runUuid))
     }
 
+    /// Marks a test run as started.
+    ///
+    /// - Parameter req: The start request containing the run UUID and expected
+    ///   version.
+    /// - Returns: The updated test run response.
+    /// - Throws: `StoreError.versionConflict` when the expected version is stale.
     func runStart(_ req: TestRunStartRequest) throws -> TestRunResponse {
         try core.updateBase(
             db,
@@ -229,6 +256,13 @@ struct TestRunRepository: RepositoryContext {
         return TestRunResponse(runs: [row])
     }
 
+    /// Fetches the status of a specific test run or all runs for a project.
+    ///
+    /// - Parameter req: The status request containing the run UUID or project UUID,
+    ///   and optional result limit.
+    /// - Returns: The test run response with the matching run details.
+    /// - Throws: `StoreError.badRequest` when neither run UUID nor project UUID is
+    ///   provided; `StoreError.notFound` when the specified run is not found.
     func runStatus(_ req: TestRunStatusRequest) throws -> TestRunResponse {
         if let uuid = req.runUuid {
             guard let row = try run(uuid: uuid) else {
@@ -250,14 +284,16 @@ struct TestRunRepository: RepositoryContext {
 
     // MARK: - Liveness
 
-    /// THE DEADLOCK ANSWER. Returns true when the current holder is provably
-    /// gone. For `.process` holders this takes the holder's own `run.lock` with
-    /// `LOCK_NB`: success means the kernel already released it, which happens
-    /// exactly when the holding process died, `kill -9` included. The probe
-    /// unlocks and closes immediately so it never becomes a holder itself.
-    /// A MISSING lock file counts as gone, because the run root is wiped on
-    /// teardown; failing the other way would strand the lock forever on exactly
-    /// the tidy path.
+    /// Returns true when the holder of the lock is provably gone.
+    ///
+    /// For process holders, attempts to acquire the holder's own `run.lock` with
+    /// `LOCK_NB`; success indicates the kernel released it and the process has
+    /// died. The probe unlocks immediately and never becomes a holder. A missing
+    /// lock file counts as gone because the run root is wiped on teardown;
+    /// otherwise an orphaned lock would strand forever.
+    ///
+    /// - Parameter cell: The project test lock record to check.
+    /// - Returns: `true` when the lock holder is provably gone; `false` otherwise.
     private func isHolderGone(_ cell: ProjectTestLockRecord) -> Bool {
         guard cell.state == TestLockState.held.rawValue else { return true }
         guard cell.holderKind == TestHolderKind.process.rawValue,
@@ -273,8 +309,14 @@ struct TestRunRepository: RepositoryContext {
         return true
     }
 
-    /// Lease mode only — the degraded path. Absent an expiry we report NOT
-    /// expired, because inventing one would silently break a live holder.
+    /// Returns true when a lease-mode lock has expired.
+    ///
+    /// If no expiry time is set, returns false to avoid silently breaking a live
+    /// holder by inventing a deadline that was never specified.
+    ///
+    /// - Parameter cell: The project test lock record to check.
+    /// - Returns: `true` when the lease has passed its expiration time; `false`
+    ///   otherwise or when no expiry is set.
     private func leaseExpired(_ cell: ProjectTestLockRecord) -> Bool {
         guard let expires = cell.expiresAt,
             let deadline = StoreCore.parseIso(expires)
@@ -284,20 +326,25 @@ struct TestRunRepository: RepositoryContext {
 
     // MARK: - Rows
 
-    /// Fetch the project's claim cell, opening an `open` one on first contact.
-    /// Fetch-or-open rather than requiring a separate registration step: the
-    /// cell is a property of the project, and making callers create it first
-    /// would just be a second way to fail.
-    /// An unknown project is NOT_FOUND rather than a silently-open lock. A typo
-    /// in a uuid must not read as "go ahead, nobody is testing that".
+    /// Verifies that a project exists.
+    ///
+    /// - Parameter projectUuid: The UUID of the project to verify.
+    /// - Throws: `StoreError.notFound` when the project does not exist.
     private func requireProject(_ projectUuid: String) throws {
         guard try ProjectRecord.exists(db, key: ["uuid": projectUuid]) else {
             throw StoreError.notFound(entity: "project", key: projectUuid)
         }
     }
 
-    /// Fetch-or-open. Called ONLY from the write verbs — see `lockStatus` for
-    /// why a read must never reach this.
+    /// Fetches the test lock cell for a project, creating an open one if needed.
+    ///
+    /// This method combines the fetch and open operations to avoid requiring a
+    /// separate registration step. The cell is a property of the project, and
+    /// making callers create it first would introduce an unnecessary failure path.
+    ///
+    /// - Parameter projectUuid: The UUID of the project.
+    /// - Returns: The project test lock cell, newly created if it did not exist.
+    /// - Throws: `StoreError.notFound` when the project does not exist.
     private func fetchOrOpenCell(projectUuid: String) throws -> ProjectTestLockRecord {
         try requireProject(projectUuid)
         if let existing = try cell(projectUuid: projectUuid) { return existing }
@@ -313,21 +360,41 @@ struct TestRunRepository: RepositoryContext {
         return try requireCell(uuid: uuid)
     }
 
+    /// Fetches the test lock cell for a project, if it exists.
+    ///
+    /// - Parameter projectUuid: The UUID of the project.
+    /// - Returns: The project test lock cell, or `nil` if none exists.
+    /// - Throws: Any error from the database query.
     private func cell(projectUuid: String) throws -> ProjectTestLockRecord? {
         try ProjectTestLockRecord
             .filter(ProjectTestLockRecord.Columns.projectUuid == projectUuid)
             .fetchOne(db)
     }
 
+    /// Fetches the test lock cell by UUID, requiring it to exist.
+    ///
+    /// - Parameter uuid: The UUID of the test lock cell.
+    /// - Returns: The project test lock cell.
+    /// - Throws: `StoreError.notFound` when the cell does not exist.
     private func requireCell(uuid: String) throws -> ProjectTestLockRecord {
         try ProjectTestLockRecord.require(db, uuid: uuid)
     }
 
+    /// Fetches a test run by UUID as a summary.
+    ///
+    /// - Parameter uuid: The UUID of the test run to fetch, or `nil`.
+    /// - Returns: The test run summary, or `nil` if the UUID is `nil` or the run
+    ///   does not exist.
+    /// - Throws: Any error from the database query.
     private func run(uuid: String?) throws -> TestRunSummary? {
         guard let uuid else { return nil }
         return try TestRunRecord.fetch(db, uuid: uuid)?.dto()
     }
 
+    /// Marks a test run as abandoned.
+    ///
+    /// - Parameter runUuid: The UUID of the test run to abandon.
+    /// - Throws: Any error from the database update.
     private func abandon(runUuid: String) throws {
         try finish(
             runUuid: runUuid,
@@ -337,10 +404,19 @@ struct TestRunRepository: RepositoryContext {
         )
     }
 
-    /// Stamp a terminal state. Reads the current version rather than taking one
-    /// from the caller: the release path already proved who holds the lock, and
-    /// demanding a second version the caller has no reason to be holding would
-    /// turn a legitimate release into a VERSION_CONFLICT it cannot fix.
+    /// Marks a test run with a terminal state.
+    ///
+    /// The current version is read from the database rather than taken from the
+    /// caller, because the release path has already proven who holds the lock.
+    /// Demanding a version the caller has no reason to be holding would turn a
+    /// legitimate release into a version conflict it cannot fix.
+    ///
+    /// - Parameters:
+    ///   - runUuid: The UUID of the test run.
+    ///   - state: The terminal state to set on the run.
+    ///   - exitCode: The process exit code, or `nil` if not applicable.
+    ///   - summary: A summary message about the run's outcome, or `nil` for none.
+    /// - Throws: `StoreError.notFound` when the test run does not exist.
     private func finish(
         runUuid: String,
         state: TestRunState,
@@ -370,6 +446,15 @@ struct TestRunRepository: RepositoryContext {
 
     // MARK: - Mapping
 
+    /// Constructs a test lock response from a cell record and optional run.
+    ///
+    /// - Parameters:
+    ///   - cell: The project test lock cell to construct the response from.
+    ///   - run: The associated test run summary, or `nil` if not available.
+    ///   - overrideState: An override lock state to use instead of the cell's
+    ///     state, or `nil` to use the cell's state.
+    ///   - reclaimed: Whether the lock was reclaimed from a dead holder.
+    /// - Returns: The lock response constructed from these components.
     private func response(
         cell: ProjectTestLockRecord,
         run: TestRunSummary?,
@@ -383,6 +468,7 @@ struct TestRunRepository: RepositoryContext {
         return TestLockResponse(
             projectUuid: cell.projectUuid,
             state: state,
+            version: cell.version,
             heldByRunUuid: state == .held ? cell.heldByRunUuid : nil,
             targetInstanceUuid: state == .held ? cell.targetInstanceUuid : nil,
             holderKind: TestHolderKind(rawValue: cell.holderKind),
@@ -390,7 +476,6 @@ struct TestRunRepository: RepositoryContext {
             holderPid: cell.holderPid.map { Int32($0) },
             claimedAt: cell.claimedAt,
             expiresAt: cell.expiresAt,
-            version: cell.version,
             run: run,
             reclaimed: reclaimed
         )

@@ -1,15 +1,22 @@
 import Foundation
 
-/// `HOOK_EVENT` — one Claude Code lifecycle hook, served by the kernel. It
-/// re-points the `GmHook` handlers at the in-process caller; those take their
-/// cwd from the PAYLOAD, since the kernel's own cwd is meaningless here.
+/// `HOOK_EVENT` — one Claude Code lifecycle hook served by the kernel.
 ///
-/// `hookSafe` rides the wire because a hook may never exit non-zero — a
-/// non-zero `PostToolUse` is a BLOCKED tool call. Under it a BUSINESS failure
-/// answers `ok: true` with the reason in `note`; framing and decode failures
-/// still throw, since swallowing those hides a broken client forever.
+/// Re-points `GmHook` handlers at in-process caller; those take cwd from
+/// PAYLOAD since kernel's cwd is meaningless here. `hookSafe` rides the wire
+/// because hooks never exit non-zero (non-zero `PostToolUse` = BLOCKED tool).
+/// A BUSINESS failure answers `ok: true` with reason in `note`; framing and
+/// decode failures throw (swallowing hides broken client).
 enum HookEventHandler {
 
+    /// Handles a hook event request.
+    /// - Parameters:
+    ///   - line: The encoded request payload.
+    ///   - head: The envelope header for the request.
+    ///   - store: The persistence store for the operation.
+    ///   - caller: The caller context for the hook operation.
+    /// - Returns: A handler result with the response.
+    /// - Throws: Any error from decoding the request or running the hook.
     static func handle(
         line: Data,
         head: EnvelopeHead,
@@ -48,6 +55,12 @@ enum HookEventHandler {
     /// decoded: the harness owns this vocabulary and grows it, so an unknown
     /// event must be a recorded no-op rather than a decode failure that turns a
     /// harness upgrade into a broken session.
+    /// - Parameters:
+    ///   - req: The hook event request.
+    ///   - caller: The caller context for the hook operation.
+    ///   - store: The persistence store for the operation.
+    /// - Returns: A response indicating whether the hook was recorded and any associated note.
+    /// - Throws: Any error from running the hook.
     private static func run(
         _ req: HookEventRequest,
         caller: any GmVerbCaller,

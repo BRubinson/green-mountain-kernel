@@ -1,11 +1,17 @@
 import Foundation
 import GRDB
 
-/// Data access for daemon_event reads. Runs INSIDE a Store-owned transaction;
+/// Data access for daemon_event reads.
+///
+/// Runs INSIDE a Store-owned transaction;
 /// holds no dbQueue and never self-transacts.
 struct EventRepository {
     let db: Database
 
+    /// Lists daemon events matching the given filters.
+    /// - Parameter req: The list request with optional filters.
+    /// - Returns: A response containing the filtered events.
+    /// - Throws: Any database error.
     func listEvents(_ req: EventListRequest) throws -> EventListResponse {
         var request = DaemonEventRecord.all()
         if let kind = req.kind {
@@ -33,7 +39,9 @@ struct EventRepository {
         return EventListResponse(events: events)
     }
 
-    /// Highest daemon_event.id — the replay horizon SUBSCRIBE acks with.
+    /// Returns the highest daemon_event.id, the SUBSCRIBE replay horizon.
+    /// - Returns: The highest event id, or 0 if no events exist.
+    /// - Throws: Any database error.
     func lastEventId() throws -> Int64 {
         try DaemonEventRecord
             .select(max(DaemonEventRecord.Columns.id) ?? 0, as: Int64.self)

@@ -7,6 +7,8 @@ import Foundation
 
 extension ProjectRecord {
     /// db → wire.
+    ///
+    /// - Returns: The wire projection of this project record.
     func dto() -> ProjectRow {
         ProjectRow(
             uuid: uuid,
@@ -15,15 +17,17 @@ extension ProjectRecord {
             code: code,
             name: name,
             gmfsRelativeStoragePath: gmfsRelativeStoragePath,
-            primaryProjectBranch: primaryProjectBranch,
             createdAt: createdAt,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            primaryProjectBranch: primaryProjectBranch
         )
     }
 }
 
 extension InstanceRecord {
     /// db → wire.
+    ///
+    /// - Returns: The wire projection of this instance record.
     func dto() -> InstanceRow {
         InstanceRow(
             uuid: uuid,
@@ -41,6 +45,8 @@ extension InstanceRecord {
 
 extension SessionSummary {
     /// db → wire.
+    ///
+    /// - Returns: The wire stub of this session summary.
     func dto() -> SessionStub {
         SessionStub(
             uuid: session.uuid,
@@ -58,6 +64,8 @@ extension SessionSummary {
 
 extension SessionWithActivations {
     /// db → wire.
+    ///
+    /// - Returns: The wire projection of this session with activations.
     func dto() -> SessionRow {
         SessionRow(
             uuid: session.uuid,
@@ -74,7 +82,11 @@ extension SessionWithActivations {
 }
 
 extension PromptRecord {
-    /// db → wire. PromptRow is field-for-field identical to the record.
+    /// db → wire.
+    ///
+    /// PromptRow is field-for-field identical to the record.
+    ///
+    /// - Returns: The wire projection of this prompt record.
     func dto() -> PromptRow {
         PromptRow(
             uuid: uuid,
@@ -96,8 +108,13 @@ extension PromptRecord {
 }
 
 extension PromptSummary {
-    /// db → wire. `reports` is the enrichment PROMPT_LIST attaches only when
-    /// asked, so nil here keeps "not requested" distinct from "none exists".
+    /// Wire projection of this prompt summary with optional enriched reports.
+    ///
+    /// `reports` is the enrichment PROMPT_LIST attaches only when asked, so
+    /// nil here keeps "not requested" distinct from "none exists".
+    ///
+    /// - Parameter reports: The optional report enrichment.
+    /// - Returns: The wire stub of this prompt summary.
     func dto(reports: PromptReportsStub?) -> PromptStub {
         PromptStub(
             uuid: prompt.uuid,
@@ -108,15 +125,17 @@ extension PromptSummary {
             status: prompt.status,
             version: prompt.version,
             gmfsRelativeStoragePath: prompt.gmfsRelativeStoragePath,
-            reports: reports,
             createdAt: prompt.createdAt,
-            updatedAt: prompt.updatedAt
+            updatedAt: prompt.updatedAt,
+            reports: reports
         )
     }
 }
 
 extension ClarificationReport {
     /// db → wire.
+    ///
+    /// - Returns: The wire stub of this clarification report.
     func dto() -> ClarificationReportStub {
         ClarificationReportStub(
             summaryUuid: summary.uuid,
@@ -132,6 +151,8 @@ extension ClarificationReport {
 
 extension ArchitectureReport {
     /// db → wire.
+    ///
+    /// - Returns: The wire stub of this architecture report.
     func dto() -> ArchitectureReportStub {
         ArchitectureReportStub(
             summaryUuid: summary.uuid,
@@ -144,8 +165,12 @@ extension ArchitectureReport {
 }
 
 extension ExplorationReport {
-    /// db → wire. The identity is the pivot's representative row, never one
-    /// agent's own summary.
+    /// db → wire.
+    ///
+    /// The identity is the pivot's representative row, never one agent's own
+    /// summary.
+    ///
+    /// - Returns: The wire stub of this exploration report.
     func dto() -> ExplorationReportStub {
         ExplorationReportStub(
             summaryUuid: repUuid,
@@ -161,6 +186,8 @@ extension ExplorationReport {
 
 extension ReviewReport {
     /// db → wire.
+    ///
+    /// - Returns: The wire stub of this review report.
     func dto() -> ReviewReportStub {
         ReviewReportStub(
             summaryUuid: summary.uuid,
@@ -177,6 +204,8 @@ extension ReviewReport {
 
 extension ChangeRollup {
     /// db → wire.
+    ///
+    /// - Returns: The wire summary of this change rollup.
     func dto() -> ChangeSummary {
         ChangeSummary(
             changeCount: changeCount,
@@ -188,6 +217,8 @@ extension ChangeRollup {
 
 extension PromptChangeRollup {
     /// db → wire.
+    ///
+    /// - Returns: The wire summary of this prompt change rollup.
     func dto() -> PromptChangeSummary {
         PromptChangeSummary(
             promptUuid: promptUuid,
@@ -202,6 +233,8 @@ extension PromptChangeRollup {
 
 extension PromptActivationRecord {
     /// db → wire.
+    ///
+    /// - Returns: The wire projection of this prompt activation record.
     func dto() -> PromptActivationRow {
         PromptActivationRow(
             uuid: uuid,

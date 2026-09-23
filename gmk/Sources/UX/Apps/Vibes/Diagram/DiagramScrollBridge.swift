@@ -15,29 +15,40 @@ struct DiagramScrollBridge: NSViewRepresentable {
     @MainActor
     final class Sink {
         var onPan: (CGSize) -> Void = { _ in }
-        /// (factor, anchor in view coordinates, top-left origin)
+        /// (factor, anchor in view coordinates, top-left origin).
         var onZoom: (CGFloat, CGPoint) -> Void = { _, _ in }
     }
     let sink: Sink
 
+    /// Creates the scroll catcher view.
+    /// - Returns: A new ScrollCatcher view.
     func makeNSView(context _: Context) -> ScrollCatcher { ScrollCatcher(sink: sink) }
+    /// Updates the sink reference in the scroll catcher.
+    /// - Parameters:
+    ///   - nsView: The scroll catcher view.
+    ///   - _: The representable context (unused).
     func updateNSView(_ nsView: ScrollCatcher, context _: Context) { nsView.sink = sink }
 
     final class ScrollCatcher: NSView {
         var sink: Sink
         private var monitor: Any?
 
+        /// Creates a scroll catcher with a sink.
+        /// - Parameter sink: The event sink.
         init(sink: Sink) {
             self.sink = sink
             super.init(frame: .zero)
         }
 
+        /// Unavailable; this view is created programmatically.
+        /// - Parameter _: Unused (coder parameter).
         @available(*, unavailable)
         required init?(coder _: NSCoder) { fatalError("unused") }
 
         /// v0 ships no keyboard handling — a focusable view here would join the
-        /// key-view loop and steal arrow keys from the sidebar List. Flipping
-        /// this to true and adding `keyDown` is the entire v1 tool-shortcut seam.
+        /// key-view loop and steal arrow keys from the sidebar List.
+        ///
+        /// Flipping this to true and adding `keyDown` is the entire v1 tool-shortcut seam.
         override var acceptsFirstResponder: Bool { false }
         override var isFlipped: Bool { true }  // match SwiftUI's top-left origin
 
@@ -58,7 +69,9 @@ struct DiagramScrollBridge: NSViewRepresentable {
             if let monitor { NSEvent.removeMonitor(monitor) }
         }
 
-        /// Returns nil when consumed, the event untouched when it isn't ours.
+        /// Handles scroll events, consuming or passing through as appropriate.
+        /// - Parameter event: The scroll wheel event to handle.
+        /// - Returns: `nil` if the event was consumed, otherwise the event untouched.
         private func handle(_ event: NSEvent) -> NSEvent? {
             guard let window, event.window === window else { return event }
             let local = convert(event.locationInWindow, from: nil)

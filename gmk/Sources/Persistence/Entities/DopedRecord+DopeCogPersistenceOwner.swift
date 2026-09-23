@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `dope_cog_persistence_owner` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `dope_cog_persistence_owner` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DopeCogPersistenceOwnerRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "dope_cog_persistence_owner"
     var uuid: String

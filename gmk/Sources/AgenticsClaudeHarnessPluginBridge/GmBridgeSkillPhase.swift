@@ -69,13 +69,15 @@ extension GmCdeRpirWorkflowPhase {
 
 extension GmBridgeSkill.File {
 
+    /// Creates a skill file for a workflow phase.
+    /// - Parameter phase: The workflow phase.
     init(phase: GmCdeRpirWorkflowPhase) {
         self.init(
             name: phase.skillName,
             description: phase.skillBrief,
             userInvocable: false,
             allowedTools: phase.skillTools.map { GmBridgeSkill.Tool.mcp(GmBridgeMcpTool($0)) },
-            model: .opus,
+            model: .opus55OneMillion,
             body: phase.template
         )
     }

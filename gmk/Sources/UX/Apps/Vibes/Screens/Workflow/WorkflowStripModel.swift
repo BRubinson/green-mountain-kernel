@@ -27,34 +27,46 @@ struct WorkflowStripModel: Equatable {
 
     struct Pill: Equatable, Identifiable {
         /// The phase code — `WorkflowSpec.Phase.rawValue`, or the served
-        /// string verbatim for an `.unknown` pill. Unique within a strip:
-        /// a phase graph never repeats a code, and the trailing unknown
-        /// pill exists only because its code matched nothing in the graph.
+        /// string verbatim for an `.unknown` pill.
+        ///
+        /// Unique within a strip: a phase graph never repeats a code, and the
+        /// trailing unknown pill exists only because its code matched nothing
+        /// in the graph.
         let id: String
         /// Display title: `clarify_user` → `Clarify User`.
         let title: String
         let state: PillState
         /// `WorkflowSpec.instructions(variant:phase:)` verbatim — the exact
-        /// compiled-in prose the bot itself reads at that phase. `nil` when
-        /// there is no (variant, phase) pair to ask for: an unrecognised
-        /// variant, or a phase outside this build's graph.
+        /// compiled-in prose the bot itself reads at that phase.
+        ///
+        /// Nil when there is no (variant, phase) pair to ask for: an
+        /// unrecognised variant, or a phase outside this build's graph.
         let instructions: String?
     }
 
     let pills: [Pill]
     /// `BotNextResponse.gateBlockers` verbatim — display-ready prose from
-    /// `BotWorkflowRepository.entryBlockers`. Never re-interpreted here.
+    /// `BotWorkflowRepository.entryBlockers`.
+    ///
+    /// Never re-interpreted here.
     let blockers: [String]
-    /// `bot_workflow.status != "active"`. The daemon writes `done` when
-    /// `gm prompt set-status --status done` closes the run.
+    /// `bot_workflow.status != "active"`.
+    ///
+    /// The daemon writes `done` when `gm prompt set-status --status done`
+    /// closes the run.
     let closed: Bool
-    /// `"rpi · 11 phases"`. `nil` when the variant is unrecognised — the
-    /// degraded marker: the strip still renders its one pill, just with no
-    /// variant label beside the row.
+    /// `"rpi · 11 phases"`.
+    ///
+    /// Nil when the variant is unrecognised — the degraded marker: the strip
+    /// still renders its one pill, just with no variant label beside the row.
     let variantLabel: String?
 
     // MARK: - Derivation
 
+    /// Creates a workflow strip model from a bot response.
+    ///
+    /// - Parameter response: The bot next response with workflow and phase data.
+    /// - Returns: The formatted strip model for display.
     static func make(_ response: BotNextResponse) -> WorkflowStripModel {
         // Rule 3, evaluated first because it overrides every per-pill
         // decision below: a closed run reads as FINISHED, not as a run
@@ -132,7 +144,15 @@ struct WorkflowStripModel: Equatable {
         )
     }
 
-    /// Rule 4 (and rule 3's override of it).
+    /// Determines the state of a pill based on position in the workflow.
+    ///
+    /// Rule 4 applies unless rule 3's closed override makes it done.
+    ///
+    /// - Parameters:
+    ///   - index: The pill's position in the phase graph.
+    ///   - servedIndex: The position of the currently served phase, or nil if unknown.
+    ///   - closed: Whether the workflow is closed.
+    /// - Returns: The pill state for rendering.
     private static func pillState(index: Int, servedIndex: Int?, closed: Bool) -> PillState {
         if closed { return .done }
         guard let servedIndex else {
@@ -146,9 +166,13 @@ struct WorkflowStripModel: Equatable {
         return .pending
     }
 
-    /// `clarify_user` → `Clarify User`. Same transform BriefingPane uses on
-    /// `briefing_for_step`; applied to arbitrary served strings too, so an
-    /// unrecognised code still reads as a label rather than a raw token.
+    /// Converts a phase code to a human-readable title.
+    ///
+    /// Transforms `clarify_user` to `Clarify User`, applied to arbitrary
+    /// served strings so unrecognised codes read as labels, not raw tokens.
+    ///
+    /// - Parameter code: The phase code (e.g. `clarify_user`).
+    /// - Returns: The formatted title.
     static func title(forPhaseCode code: String) -> String {
         let words = code.split(separator: "_")
             .map { $0.prefix(1).uppercased() + $0.dropFirst() }

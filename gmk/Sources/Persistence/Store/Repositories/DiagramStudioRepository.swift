@@ -2,12 +2,20 @@ import Foundation
 import GRDB
 
 /// Diagram Studio (v23) data access: cross-tier search/browse and the row
-/// delete. Runs INSIDE a Store-owned transaction; holds no dbQueue and never
-/// self-transacts.
+/// delete.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts.
 struct DiagramStudioRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Searches diagrams by name and description with optional FTS5 pattern matching.
+    ///
+    /// - Parameters:
+    ///   - req: The search request with project, session, and visibility filters.
+    ///   - pattern: An FTS5 pattern for full-text search, or nil for unranked listing.
+    /// - Returns: A search response with matching diagrams ordered by update time or relevance.
+    /// - Throws: Store errors if project or session is not found.
     func diagramSearch(_ req: DiagramSearchRequest, pattern: FTS5Pattern?) throws -> DiagramSearchResponse {
         guard try ProjectRecord.all().withUuid(req.projectUuid).fetchCount(db) > 0 else {
             throw StoreError.notFound(entity: "project", key: req.projectUuid)
@@ -38,9 +46,17 @@ struct DiagramStudioRepository: RepositoryContext {
         return DiagramSearchResponse(diagrams: rows.map { $0.dto() })
     }
 
-    /// bm25 is negative-better; ORDER BY score ascending is rank order (the
-    /// Store+Search convention). The scoring function is callable only on a
-    /// query over the fts table, so this branch spells its own join.
+    /// Ranks and returns diagrams matching an FTS5 pattern with score-ordered results.
+    ///
+    /// BM25 scoring is negative-better; ORDER BY ascending is rank order per Store+Search convention.
+    /// The scoring function requires a direct FTS table query.
+    ///
+    /// - Parameters:
+    ///   - req: The search request with filters.
+    ///   - pattern: The FTS5 search pattern.
+    ///   - limit: The maximum number of results to return.
+    /// - Returns: Ranked diagram matches.
+    /// - Throws: Database errors or pattern matching errors.
     private func rankedSearch(
         _ req: DiagramSearchRequest,
         pattern: FTS5Pattern,
@@ -72,6 +88,13 @@ struct DiagramStudioRepository: RepositoryContext {
         )
     }
 
+    /// Deletes a diagram and its associated elements and change record.
+    ///
+    /// Verifies the revision, records a deletion change event, and cascades the delete to elements and FTS rows.
+    ///
+    /// - Parameter req: The delete request with diagram UUID and optional expected revision.
+    /// - Returns: The delete response with cascaded element count and metadata.
+    /// - Throws: Store errors if diagram is not found or revision conflicts.
     func diagramDelete(_ req: DiagramDeleteRequest) throws -> DiagramDeleteResponse {
         guard let diagram = try diagram.fetchDiagram(uuid: req.diagramUuid) else {
             throw StoreError.notFound(entity: "diagram", key: req.diagramUuid)

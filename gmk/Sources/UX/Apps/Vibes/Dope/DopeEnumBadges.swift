@@ -25,6 +25,10 @@ struct DopeEnumBadgeStrip: View {
         }
     }
 
+    /// Returns a candidate view for a given number of badges.
+    ///
+    /// - Parameter requested: The requested number of badges to show.
+    /// - Returns: A view containing the requested number of option badges.
     private func candidate(_ requested: Int) -> some View {
         let count = max(0, min(requested, shown))
         let hidden = options.count - count

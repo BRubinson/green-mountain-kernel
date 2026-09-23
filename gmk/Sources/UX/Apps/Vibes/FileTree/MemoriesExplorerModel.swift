@@ -12,6 +12,11 @@ final class MemoriesExplorerModel {
     // Whether the default-expand seeding has run for the current root yet.
     var didSeedExpansion = false
 
+    /// Creates a Memories explorer model with initial state.
+    ///
+    /// - Parameters:
+    ///   - selectedFile: The initially selected file, if any.
+    ///   - expanded: The initially expanded folder URLs.
     init(selectedFile: URL? = nil, expanded: Set<URL> = []) {
         self.selectedFile = selectedFile
         self.expanded = expanded

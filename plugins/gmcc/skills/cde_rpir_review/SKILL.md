@@ -3,7 +3,7 @@ name: cde_rpir_review
 description: "The REVIEW phase: what was built judged against what was asked."
 user-invocable: false
 allowed-tools: mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_prompt, mcp__plugin_gmcc_cde__cde_rpir_clarify, mcp__plugin_gmcc_cde__cde_rpir_architecture, mcp__plugin_gmcc_cde__cde_rpir_review
-model: opus
+model: claude-opus-5-5[1m]
 ---
 
 # Workflow Phase

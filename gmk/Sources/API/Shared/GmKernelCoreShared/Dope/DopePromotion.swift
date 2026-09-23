@@ -18,6 +18,12 @@ enum DopePromotion {
         case unreachable(String)
     }
 
+    /// Runs the dope promotion workflow and returns its outcome.
+    ///
+    /// - Parameters:
+    ///   - client: The daemon client.
+    ///   - sessionUuid: The session identifier.
+    /// - Returns: The promotion outcome.
     static func run(client: DaemonClient, sessionUuid: String) -> Outcome {
         do {
             let response = try client.dopePromote(DopePromoteRequest(sessionUuid: sessionUuid))
@@ -33,6 +39,9 @@ enum DopePromotion {
     }
 
     /// One human line for hook output; nil for the silent outcomes.
+    ///
+    /// - Parameter outcome: The promotion outcome to format.
+    /// - Returns: A human-readable message, or nil for silent outcomes.
     static func notice(for outcome: Outcome) -> String? {
         switch outcome {
         case .notPrimaryBranch, .nothingToPublish, .upToDate:

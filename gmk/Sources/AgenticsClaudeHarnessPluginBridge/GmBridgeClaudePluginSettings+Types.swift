@@ -8,6 +8,8 @@ enum GmBridgeClaudePluginSettings {
 
         var command: String
 
+        /// Creates a subagent status line with a command.
+        /// - Parameter command: The status line command to display.
         init(command: String) {
             self.type = "command"
             self.command = command
@@ -22,6 +24,10 @@ enum GmBridgeClaudePluginSettings {
 
         var subagentStatusLine: SubagentStatusLine?
 
+        /// Creates a plugin settings file with optional agent and status line.
+        /// - Parameters:
+        ///   - agent: The agent name, if configured.
+        ///   - subagentStatusLine: The subagent status line configuration, if set.
         init(
             agent: String? = nil,
             subagentStatusLine: SubagentStatusLine? = nil

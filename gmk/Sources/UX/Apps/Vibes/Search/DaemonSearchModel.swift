@@ -3,6 +3,7 @@ import Observation
 import SwiftUI
 
 /// The debounced SEARCH engine shared by the ⌘K palette and the search screen.
+///
 /// Query text stays in the VIEW (@State, the KBiteSearchPane shape) — this owns
 /// only the RPC lifecycle and its published results, so both surfaces inherit
 /// one cancellation/error discipline instead of copy-pasting it.
@@ -16,10 +17,20 @@ final class DaemonSearchModel {
     let limit: Int
     @ObservationIgnored private var task: Task<Void, Never>?
 
+    /// Creates a search model with a result limit.
+    /// - Parameter limit: The maximum number of search results to fetch.
     init(limit: Int) { self.limit = limit }
 
-    /// `debounce: .zero` for discrete actions (chip tap, scope toggle, palette
-    /// hand-off) — still routed here so any in-flight task is cancelled first.
+    /// Schedules a debounced search query.
+    ///
+    /// Use `debounce: .zero` for discrete actions like chip taps or scope toggles—
+    /// the search is still routed here to cancel any in-flight task first.
+    ///
+    /// - Parameters:
+    ///   - query: The search query text.
+    ///   - sessionUuid: The session to search, or nil for the current session.
+    ///   - kinds: The search result kinds to include, or empty for all kinds.
+    ///   - debounce: The delay before starting the search; `.zero` for immediate.
     func schedule(
         query: String,
         sessionUuid: String? = nil,
@@ -65,6 +76,7 @@ final class DaemonSearchModel {
         }
     }
 
+    /// Cancels any in-flight search and clears the searching state.
     func cancel() {
         task?.cancel()
         task = nil

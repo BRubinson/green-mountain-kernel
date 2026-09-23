@@ -1,10 +1,11 @@
 import Foundation
 
-/// Per-domain multicast invalidation signals. A view's visibility-scoped `.task` awaits a
-/// domain stream instead of sleeping.
+/// Per-domain multicast invalidation signals.
 ///
-/// Streams coalesce with `.bufferingNewest(1)`: a capped event replay can deliver thousands
-/// of events, and subscribers must wake once, not N times.
+/// A view's visibility-scoped `.task` awaits a domain stream instead of
+/// sleeping. Streams coalesce with `.bufferingNewest(1)`: a capped event
+/// replay can deliver thousands of events, and subscribers must wake once, not
+/// N times.
 @MainActor
 final class InvalidationHub {
     enum Domain: Hashable {
@@ -39,6 +40,9 @@ final class InvalidationHub {
 
     private var continuations: [Domain: [UUID: AsyncStream<Void>.Continuation]] = [:]
 
+    /// Returns an async stream for invalidation signals in a domain.
+    /// - Parameter domain: The invalidation domain to observe.
+    /// - Returns: An async stream yielding on domain invalidations.
     func stream(for domain: Domain) -> AsyncStream<Void> {
         AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
             let token = UUID()
@@ -57,13 +61,17 @@ final class InvalidationHub {
         }
     }
 
+    /// Signals invalidation to all observers in a domain.
+    /// - Parameter domain: The invalidation domain to signal.
     func invalidate(_ domain: Domain) {
         continuations[domain]?.values.forEach { $0.yield() }
     }
 
-    /// Degradation path: UPDATE_PROMPT / PROMPT_STATUS_CHANGE carry no session
-    /// uuid on the wire, and CREATE_PROMPT / FILE_CHANGE payloads can be absent
-    /// on replayed pre-v7 rows — those fan out to every open session observer.
+    /// Signals all session-domain observers as a degradation path.
+    ///
+    /// UPDATE_PROMPT, PROMPT_STATUS_CHANGE, CREATE_PROMPT and FILE_CHANGE may
+    /// lack a session UUID on the wire or in pre-v7 replayed rows. This method
+    /// fans out to every open session observer in those cases.
     func invalidateAllSessions() {
         for (domain, conts) in continuations {
             if case .session = domain {
@@ -72,9 +80,11 @@ final class InvalidationHub {
         }
     }
 
-    /// Mirror of invalidateAllSessions for the one prompt-scoped payload that
-    /// omits prompt_uuid (REVIEW_CHANGE with action "resolve") — delete when
-    /// the daemon adds the field there.
+    /// Signals all prompt-domain observers as a degradation path.
+    ///
+    /// REVIEW_CHANGE events with action "resolve" omit the prompt UUID on the
+    /// wire. This method fans out to every prompt observer as a workaround.
+    /// Delete this when the daemon adds the field.
     func invalidateAllPrompts() {
         for (domain, conts) in continuations {
             if case .prompt = domain {
@@ -83,8 +93,10 @@ final class InvalidationHub {
         }
     }
 
-    /// Mirror of invalidateAllSessions for DOPE_CHANGE rows whose payload
-    /// carries no session_uuid (defensive — recordDopeChange always writes it).
+    /// Signals all dope-domain observers as a degradation path.
+    ///
+    /// DOPE_CHANGE rows defensively fan out when the payload lacks a session
+    /// UUID, though recordDopeChange always writes it.
     func invalidateAllDope() {
         for (domain, conts) in continuations {
             if case .dope = domain {
@@ -93,8 +105,10 @@ final class InvalidationHub {
         }
     }
 
-    /// Resync barrier — fired when the connection comes (back) up, so visible
-    /// surfaces refetch once instead of trusting a possibly-gapped stream.
+    /// Signals all observers across all domains as a resync barrier.
+    ///
+    /// Fired when the connection comes back up, so visible surfaces refetch
+    /// once instead of trusting a possibly-gapped stream.
     func invalidateAll() {
         continuations.values.forEach { $0.values.forEach { $0.yield() } }
     }

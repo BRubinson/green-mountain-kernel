@@ -1,11 +1,18 @@
 import Foundation
 
-/// Cog rows ↔ cog documents. The mirror of DopeProjection for the cogs area.
+/// Cog rows ↔ cog documents.
+///
+/// The mirror of DopeProjection for the cogs area.
 enum DopeCogProjection {
 
-    /// db → file. Top-level elements become documents; their PersistenceOwner
-    /// children collapse into the parent's `links.persistence_owners`.
-    /// Tombstoned rows are dropped, matching the persistence projection.
+    /// Converts a cog node to a cog document.
+    ///
+    /// Top-level elements become documents; their PersistenceOwner children
+    /// collapse into the parent's `links.persistence_owners`. Tombstoned rows
+    /// are dropped, matching the persistence projection.
+    ///
+    /// - Parameter cog: The cog node to convert.
+    /// - Returns: The cog document representation.
     static func document(from cog: DopeCogNode) -> DopeCogDocument {
         let live = cog.elements.filter { $0.deletedOn == nil }
         let byParent = Dictionary(grouping: live.filter { $0.parentElementUuid != nil }) {
@@ -40,10 +47,16 @@ enum DopeCogProjection {
         )
     }
 
-    /// One synthesized PersistenceOwner child, as both the reader and the
-    /// seeder must mint it. Centralised so the two cannot drift — drift here
-    /// would make every publish/ingest cycle produce a different tree and
-    /// report phantom conflicts forever.
+    /// Synthesizes a PersistenceOwner child element.
+    ///
+    /// Both the reader and seeder must mint it; centralized to prevent drift,
+    /// which would make every publish/ingest cycle produce a different tree.
+    ///
+    /// - Parameters:
+    ///   - parentCode: The parent element code.
+    ///   - persistenceCode: The persistence code.
+    ///   - sortOrder: The sort order for the element.
+    /// - Returns: A tuple with code, name, description and sortOrder.
     static func ownerElement(
         parentCode: String,
         persistenceCode: String,

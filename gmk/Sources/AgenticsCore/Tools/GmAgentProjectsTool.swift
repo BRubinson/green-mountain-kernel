@@ -19,18 +19,18 @@ struct GmAgentCdeSessionTool: GmAgentProjectsTool {
         GmAgentToolOp(
             Op.search,
             verbs: [.catalogSearch],
+            summary: "Find projects, instances and sessions by name or id.",
             narrowing: CdeNarrowing(
                 parameters: ["cursor", "page_bytes", "project_uuid", "limit"],
                 retryWith: "\(toolName) op=search with cursor = page.next_cursor"
             ),
-            requiredParams: ["query"],
-            summary: "Find projects, instances and sessions by name or id."
+            requiredParams: ["query"]
         ),
         GmAgentToolOp(
             Op.update,
             verbs: [.sessionUpdate],
-            requiredParams: ["session_uuid", "expected_version"],
-            summary: "Change one session's name, backstory or goal."
+            summary: "Change one session's name, backstory or goal.",
+            requiredParams: ["session_uuid", "expected_version"]
         ),
     ]
 
@@ -38,6 +38,7 @@ struct GmAgentCdeSessionTool: GmAgentProjectsTool {
     let description =
         "The project, instance and session spine: op search finds them by name or id, op update changes one session."
 
+    /// Creates a CDE session tool instance.
     init() {}
 
     // Argument property names ARE the served tool's snake_case wire argument names.

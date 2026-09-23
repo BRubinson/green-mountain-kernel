@@ -12,8 +12,12 @@ import XCTest
 /// the shared database is append-only and will not be clean.
 final class TestLockTests: KernelBackedTestCase {
 
-    /// Mint a project + instance to hang a lock off, named uniquely so cases
-    /// cannot collide no matter what order they run in.
+    /// Create a project and instance with a unique name.
+    ///
+    /// Named uniquely so test cases cannot collide regardless of execution order.
+    /// - Parameter label: The label to include in the unique project code.
+    /// - Returns: A tuple with project UUID and instance UUID.
+    /// - Throws: File system, kernel, or request errors.
     private func makeProject(_ label: String) throws -> (project: String, instance: String) {
         let id = String(UUID().uuidString.prefix(8)).lowercased()
         let code = "t_\(label)_\(id)"
@@ -38,9 +42,9 @@ final class TestLockTests: KernelBackedTestCase {
                 session: SessionContext(
                     code: "main",
                     name: "main",
+                    gmfsRelativeStoragePath: "projects/\(code)/instances/\(code)_1/sessions/main",
                     backstory: "",
-                    goal: "",
-                    gmfsRelativeStoragePath: "projects/\(code)/instances/\(code)_1/sessions/main"
+                    goal: ""
                 )
             ),
             ContextEnsureResponse.self
@@ -48,8 +52,11 @@ final class TestLockTests: KernelBackedTestCase {
         return (response.projectUuid, response.instanceUuid)
     }
 
-    /// A lock file a live holder would be holding. Returns the open descriptor —
-    /// the caller closes it to simulate the holder dying.
+    /// Create and lock a file for testing.
+    ///
+    /// Returns the open descriptor; the caller closes it to simulate the holder dying.
+    /// - Parameter name: The lock file name (without .lock extension).
+    /// - Returns: A tuple with the file path and open descriptor.
     private func heldLockFile(_ name: String) -> (path: String, fd: Int32) {
         let path = env.root.appendingPathComponent("\(name).lock", isDirectory: false).path
         FileManager.default.createFile(atPath: path, contents: nil)
@@ -59,23 +66,31 @@ final class TestLockTests: KernelBackedTestCase {
         return (path, fd)
     }
 
+    /// Acquire a test lock.
+    /// - Parameters:
+    ///   - project: The project UUID.
+    ///   - lockPath: The lock file path; nil for lease mode.
+    ///   - instance: The instance UUID; nil if not specified.
+    ///   - suite: The test suite identifier; defaults to "kernel".
+    /// - Returns: The test lock response.
+    /// - Throws: Kernel or request errors.
     private func acquire(
         project: String,
-        instance: String? = nil,
         lockPath: String?,
+        instance: String? = nil,
         suite: String = "kernel"
     ) throws -> TestLockResponse {
         try env.send(
             .testLockAcquire,
             TestLockAcquireRequest(
                 projectUuid: project,
-                targetInstanceUuid: instance,
                 suiteId: suite,
                 runRoot: env.root.path,
-                lockPath: lockPath,
-                holderPid: getpid(),
                 doneKind: .process,
                 doneCondition: #"{"kind":"process"}"#,
+                targetInstanceUuid: instance,
+                lockPath: lockPath,
+                holderPid: getpid(),
                 doneHint: "exits non-zero on failure"
             ),
             TestLockResponse.self
@@ -106,7 +121,7 @@ final class TestLockTests: KernelBackedTestCase {
         let lock = try heldLockFile("acquire")
         defer { flock(lock.fd, LOCK_UN); close(lock.fd) }
 
-        let held = try acquire(project: project, instance: instance, lockPath: lock.path)
+        let held = try acquire(project: project, lockPath: lock.path, instance: instance)
         XCTAssertEqual(held.state, .held)
         XCTAssertFalse(held.reclaimed)
         XCTAssertEqual(held.targetInstanceUuid, instance)

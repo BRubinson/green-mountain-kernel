@@ -17,21 +17,37 @@ enum DiagramConnectorHeadGeometry {
         /// open ones (open_arrow, circle outline, cross).
         let fill: Bool
 
+        /// Creates a rendering with the given path and fill mode.
+        /// - Parameters:
+        ///   - path: The path to render.
+        ///   - fill: True to fill the path; false to stroke it.
         init(path: Path, fill: Bool) {
             self.path = path
             self.fill = fill
         }
     }
 
-    /// Decoration length for a given line width — one formula for every
-    /// kind so mixed-head diagrams read as one family.
+    /// Computes the decoration length for a given line width.
+    ///
+    /// One formula applies to every head kind so mixed-head diagrams read as one family.
+    ///
+    /// - Parameter lineWidth: The line width.
+    /// - Returns: The computed head length.
     static func headLength(lineWidth: Double) -> CGFloat {
         max(8, lineWidth * 3)
     }
 
-    /// The head path at `tip`, arriving along `direction` (need not be
-    /// normalized; a zero vector falls back to +x so a degenerate edge still
-    /// draws something sane). Returns nil for `.none`.
+    /// Builds the path for a connector head at the given tip and direction.
+    ///
+    /// The `direction` need not be normalized; a zero vector falls back to +x so degenerate
+    /// edges still draw something sane. Returns nil for `.none` head kind.
+    ///
+    /// - Parameters:
+    ///   - kind: The head decoration kind.
+    ///   - tip: The head tip point.
+    ///   - direction: The incoming direction vector.
+    ///   - lineWidth: The line width for sizing.
+    /// - Returns: A rendering with the head path, or nil for `.none`.
     static func headPath(
         kind: DiagramConnectorHead,
         tip: CGPoint,

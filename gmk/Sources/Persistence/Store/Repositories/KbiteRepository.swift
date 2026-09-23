@@ -1,14 +1,18 @@
 import Foundation
 import GRDB
 
-/// Registry data access over the {scope}_active_kbite junctions. All dynamic
-/// table/column identifiers come from KbiteScope.rawValue — enum-bound, never
-/// caller text. Runs INSIDE a Store-owned transaction; holds no dbQueue and
-/// never self-transacts.
+/// Registry data access over the {scope}_active_kbite junctions.
+///
+/// All dynamic table/column identifiers come from KbiteScope.rawValue — enum-bound, never caller text. Runs INSIDE a
+/// Store-owned transaction; holds no dbQueue and never self-transacts.
 struct KbiteRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Fetches kbites for a scope, or all kbites if requested.
+    /// - Parameter req: A request specifying whether to list all kbites or those active in a scope.
+    /// - Returns: A list of kbite references sorted by code.
+    /// - Throws: Database errors or when scope validation fails.
     func listKbites(_ req: KbiteListRequest) throws -> KbiteListResponse {
         if req.all == true {
             let records = try KbiteRecord.order(KbiteRecord.Columns.code).fetchAll(db)
@@ -28,9 +32,14 @@ struct KbiteRepository: RepositoryContext {
         return KbiteListResponse(kbites: refs.sorted { $0.code < $1.code })
     }
 
-    /// Explicit-only registration (v11 model — the daemon never adds a kbite
-    /// on its own). Idempotent: re-adding an existing junction reports
-    /// added: false rather than erroring.
+    /// Registers a kbite for a scope owner.
+    ///
+    /// Explicit-only registration; the daemon never adds a kbite on its own.
+    /// Idempotent: re-adding an existing junction reports added: false.
+    ///
+    /// - Parameter req: A request with the scope, owner uuid, and kbite code.
+    /// - Returns: The kbite uuid, code, and a flag indicating whether it was newly added.
+    /// - Throws: Errors when the scope owner or kbite does not exist.
     func addKbite(_ req: KbiteAddRequest) throws -> KbiteAddResponse {
         try requireScopeOwner(scope: req.scope, ownerUuid: req.ownerUuid)
         let kbiteUuid = try context.ensureKbite(code: req.code)
@@ -58,8 +67,13 @@ struct KbiteRepository: RepositoryContext {
         return KbiteAddResponse(kbiteUuid: kbiteUuid, code: req.code, added: !exists)
     }
 
-    /// Remove a kbite from ONE scope's registry (never cascades to other
-    /// scopes, never deletes the kbite row itself).
+    /// Unregisters a kbite from a single scope.
+    ///
+    /// Never cascades to other scopes; never deletes the kbite row itself.
+    ///
+    /// - Parameter req: A request with the scope, owner uuid, and kbite code.
+    /// - Returns: A flag indicating whether a registration was removed.
+    /// - Throws: Errors when the scope owner is not found.
     func removeKbite(_ req: KbiteRemoveRequest) throws -> KbiteRemoveResponse {
         try requireScopeOwner(scope: req.scope, ownerUuid: req.ownerUuid)
         guard
@@ -92,7 +106,12 @@ struct KbiteRepository: RepositoryContext {
 
     // MARK: - Registry reads
 
-    /// The kbites one scope owner has registered, ordered by code.
+    /// Fetches kbites registered for a scope owner.
+    /// - Parameters:
+    ///   - scope: The scope to query.
+    ///   - ownerUuid: The scope owner uuid.
+    /// - Returns: An array of kbite records ordered by code.
+    /// - Throws: Database errors.
     private func activeKbites(scope: KbiteScope, ownerUuid: String) throws -> [KbiteRecord] {
         let kbites = KbiteRecord.order(Column("code"))
         switch scope {
@@ -129,8 +148,12 @@ struct KbiteRepository: RepositoryContext {
 
     // MARK: - Scope resolution
 
-    /// `ancestorScopes` spelled with the level as its raw string, for callers
-    /// outside this repository.
+    /// Resolves ancestor scopes for an owner, returning raw scope level strings.
+    /// - Parameters:
+    ///   - scope: The starting scope.
+    ///   - ownerUuid: The scope owner uuid.
+    /// - Returns: An array of tuples with scope level strings and corresponding uuids.
+    /// - Throws: Errors when an ancestor is not found.
     func resolveAncestorScopes(
         scope: KbiteScope,
         ownerUuid: String
@@ -139,8 +162,16 @@ struct KbiteRepository: RepositoryContext {
             .map { (level: $0.scope.rawValue, uuid: $0.uuid) }
     }
 
-    /// The owner's own scope plus every ancestor scope+uuid, walked up the
-    /// prompt → session → instance → project FK columns.
+    /// Walks the scope hierarchy from a starting point to the root.
+    ///
+    /// Returns the owner's own scope plus every ancestor, following foreign
+    /// key relationships from prompt to session to instance to project.
+    ///
+    /// - Parameters:
+    ///   - scope: The starting scope.
+    ///   - ownerUuid: The scope owner uuid.
+    /// - Returns: An array of scope/uuid tuples from the starting point to project root.
+    /// - Throws: Errors when an ancestor is not found.
     private func ancestorScopes(
         scope: KbiteScope,
         ownerUuid: String
@@ -170,8 +201,15 @@ struct KbiteRepository: RepositoryContext {
         return scopes
     }
 
-    /// Mutations verify the owner row exists so a typo'd uuid surfaces as
-    /// NOT_FOUND instead of a silently empty registry.
+    /// Verifies a scope owner exists.
+    ///
+    /// Mutations use this to surface typos as NOT_FOUND instead of a
+    /// silently empty registry.
+    ///
+    /// - Parameters:
+    ///   - scope: The scope to check.
+    ///   - ownerUuid: The owner uuid to verify.
+    /// - Throws: `StoreError.notFound` if the owner does not exist.
     private func requireScopeOwner(scope: KbiteScope, ownerUuid: String) throws {
         guard try Table(scope.rawValue).filter(Column("uuid") == ownerUuid).fetchCount(db) > 0 else {
             throw StoreError.notFound(entity: scope.rawValue, key: ownerUuid)

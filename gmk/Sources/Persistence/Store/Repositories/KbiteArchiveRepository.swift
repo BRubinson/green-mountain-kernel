@@ -2,6 +2,7 @@ import Foundation
 import GRDB
 
 /// Portable-kbite db phases (KBITE_EXPORT / KBITE_IMPORT / KBITE_DELETE).
+///
 /// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
 /// self-transacts. The file I/O phases stay on the Store facade — filesystem
 /// work never enters a db transaction.
@@ -9,7 +10,13 @@ struct KbiteArchiveRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
-    /// Assemble the scrubbed export document (read-only — no event).
+    /// Assembles a scrubbed export document for a kbite.
+    ///
+    /// - Parameters:
+    ///   - code: The kbite code to export.
+    ///   - anonymize: Prefix rules to scrub sensitive text in the output.
+    /// - Returns: Tuple with the export document and total file keyword count.
+    /// - Throws: `StoreError.notFound` if the kbite code does not exist.
     func exportDocument(
         code: String,
         anonymize: [KbitePrefixRule]
@@ -49,8 +56,16 @@ struct KbiteArchiveRepository: RepositoryContext {
         return (document, fileKeywordCount)
     }
 
-    /// One file's export entry. The content column is read here, a single row
-    /// at a time, and never through the manifest.
+    /// Assembles one file's export entry with scrubbed content.
+    ///
+    /// The content column is read here, a single row at a time, not through
+    /// the manifest.
+    ///
+    /// - Parameters:
+    ///   - head: The file metadata from the resource.
+    ///   - anonymize: Prefix rules to scrub sensitive text.
+    /// - Returns: The export file entry with scrubbed content and keywords.
+    /// - Throws: Any database error while fetching keywords or content.
     private func exportFile(
         head: KbiteResourceFileHead,
         anonymize: [KbitePrefixRule]
@@ -65,13 +80,18 @@ struct KbiteArchiveRepository: RepositoryContext {
         )
     }
 
-    /// One-transaction import apply — the pre-decoded, pre-validated,
-    /// rehydrated document in; rows out. Collision `skip` leaves the existing
-    /// kbite untouched; `overwrite` replaces content under the EXISTING kbite
-    /// uuid (ensureKbite — never delete+reinsert the kbite row, whose CASCADE
-    /// would silently drop every scope registration). Resource/file uuids are
-    /// re-minted; keywords remap by TEXT through the shared vocabulary.
-    /// Never touches registration tables.
+    /// Applies a validated import document to the database in one transaction.
+    ///
+    /// Collision `skip` leaves the existing kbite untouched; `overwrite`
+    /// replaces content under the existing kbite UUID. Resource and file UUIDs
+    /// are re-minted; keywords remap by text through the shared vocabulary.
+    /// Registration tables are never touched.
+    ///
+    /// - Parameters:
+    ///   - rehydrated: The pre-decoded, pre-validated export document to import.
+    ///   - onCollision: How to handle an existing kbite with this code.
+    /// - Returns: The import response with resource, file, and keyword counts.
+    /// - Throws: Any database error.
     func importApply(
         rehydrated: KbiteExportDocument,
         onCollision: KbiteImportCollision
@@ -183,9 +203,15 @@ struct KbiteArchiveRepository: RepositoryContext {
         )
     }
 
-    /// One cascading delete plus shared-vocabulary GC. Registrations going
-    /// with the row is the DESIRED behavior here; daemon_event history rows
-    /// survive (subject_uuid is not FK'd — append-only ethos holds).
+    /// Deletes a kbite and its resources, files, and keywords.
+    ///
+    /// Registrations cascade with the kbite; event history rows survive
+    /// (subject_uuid is not foreign-keyed, preserving append-only ethos).
+    /// Orphaned keywords are garbage-collected from the shared vocabulary.
+    ///
+    /// - Parameter req: The delete request with kbite code.
+    /// - Returns: The delete response with counts of deleted entities.
+    /// - Throws: `StoreError.notFound` if the kbite code does not exist.
     func deleteKbite(_ req: KbiteDeleteRequest) throws -> KbiteDeleteResponse {
         guard
             let kbiteUuid = try KbiteRecord
@@ -228,9 +254,14 @@ struct KbiteArchiveRepository: RepositoryContext {
         )
     }
 
-    /// GC keywords no junction references any more (delete AND overwrite
-    /// import would otherwise bloat the shared vocabulary forever). Safe as
-    /// a global sweep: only the two kbite junctions reference keyword.
+    /// Garbage-collects unreferenced keywords from the shared vocabulary.
+    ///
+    /// Delete and overwrite operations would otherwise bloat the vocabulary.
+    /// Safe as a global sweep because only the two kbite junctions reference
+    /// keywords.
+    ///
+    /// - Returns: The number of keywords deleted.
+    /// - Throws: Any database error.
     func gcOrphanKeywords() throws -> Int {
         try db.execute(
             sql: """

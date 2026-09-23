@@ -1,26 +1,30 @@
 import Foundation
 import GRDB
 
-/// claude_session_binding data access: Claude Code's conversation uuid → the
-/// gmcc session (instance + branch) it was started in. Runs INSIDE a
-/// Store-owned transaction; holds no dbQueue and never self-transacts.
-/// This is the ONLY key a payload-borne write resolves through: a hook payload
-/// carries a session_id and a cwd, and process ancestry cannot tell one sibling
-/// subagent from another. The table has exactly two columns, and the missing
-/// ones are the design — a mid-session checkout leaves the binding on the
-/// session it was pinned to, and that staleness is ACCEPTED, not detected.
+/// claude_session_binding data access: Claude Code's conversation uuid → gmcc
+/// session (instance + branch) it was started in.
+///
+/// Runs INSIDE Store-owned transaction; holds no dbQueue, never self-transacts.
+/// ONLY key payload-borne writes resolve through: hook payload carries
+/// session_id and cwd; process ancestry cannot distinguish sibling subagents.
+/// Table has two columns; missing ones are design (mid-session checkout leaves
+/// binding on pinned session; staleness ACCEPTED, not detected).
 struct ClaudeSessionBindingRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
-    /// Pin a conversation to a session, once. Returns the binding in force
-    /// afterwards, which is the existing one when already pinned.
+    /// Pins a conversation to a session.
     ///
-    /// INSERT OR IGNORE, not a read-then-branch: the UNIQUE index on
-    /// claude_session_id IS the pin-once rule, so a re-run bounces off the
-    /// schema rather than a condition a caller can forget. The base columns are
-    /// spelled out because `insertBase` has no conflict clause, and teaching it
-    /// one would put OR IGNORE within reach of every table.
+    /// Returns binding in force after (existing when pinned). Uses INSERT OR
+    /// IGNORE, not read-then-branch: the UNIQUE index IS the pin-once rule.
+    /// Re-run bounces off the schema. Base columns are spelled out because
+    /// `insertBase` has no conflict clause.
+    ///
+    /// - Parameters:
+    ///   - claudeSessionId: The Claude Code conversation UUID.
+    ///   - sessionUuid: The gmcc session UUID to pin to.
+    /// - Returns: The binding UUID.
+    /// - Throws: `StoreError` on database failure or corrupt state.
     @discardableResult
     func pin(claudeSessionId: String, sessionUuid: String) throws -> String {
         let now = Store.isoNow()
@@ -47,9 +51,15 @@ struct ClaudeSessionBindingRepository: RepositoryContext {
         return uuid
     }
 
-    /// The resolution step every payload-borne write starts from. nil means
-    /// this conversation was never pinned — the caller decides whether that is
+    /// Resolves a conversation to its pinned session.
+    ///
+    /// The resolution step every payload-borne write starts from. nil means this
+    /// conversation was never pinned — the caller decides whether that is
     /// somebody else's repo (silent) or dead capture in a known one (loud).
+    ///
+    /// - Parameter claudeSessionId: The Claude Code conversation UUID.
+    /// - Returns: The pinned session UUID, or nil if not pinned.
+    /// - Throws: `StoreError` on database failure.
     func resolveSession(claudeSessionId: String) throws -> String? {
         try ClaudeSessionBindingRecord
             .filter(ClaudeSessionBindingRecord.Columns.claudeSessionId == claudeSessionId)

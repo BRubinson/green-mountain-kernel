@@ -12,7 +12,11 @@ import Foundation
 /// Uuid/timestamp injection so tests are deterministic and the app supplies
 /// real `UUID()`s.
 protocol DiagramIdentityMinting {
+    /// Generates a unique identifier.
+    /// - Returns: A unique identifier string.
     func mintUuid() -> String
+    /// Returns the current timestamp.
+    /// - Returns: The current timestamp string.
     func now() -> String
 }
 
@@ -22,16 +26,24 @@ final class SequentialDiagramMinting: DiagramIdentityMinting {
     private let prefix: String
     private let timestamp: String
 
+    /// Creates a deterministic minting instance.
+    /// - Parameters:
+    ///   - prefix: The prefix for generated identifiers; defaults to "local".
+    ///   - timestamp: The timestamp to return; defaults to "t".
     init(prefix: String = "local", timestamp: String = "t") {
         self.prefix = prefix
         self.timestamp = timestamp
     }
 
+    /// Generates a sequential identifier with the configured prefix.
+    /// - Returns: An identifier combining prefix and counter.
     func mintUuid() -> String {
         counter += 1
         return "\(prefix)-\(counter)"
     }
 
+    /// Returns the configured timestamp.
+    /// - Returns: The timestamp string.
     func now() -> String { timestamp }
 }
 
@@ -47,11 +59,19 @@ enum DiagramTreeReducer {
 
     static let maxMintedSuffix = 999_999
 
+    /// Applies mutations to a diagram tree.
+    /// - Parameters:
+    ///   - mutations: Array of mutations to apply.
+    ///   - tree: The diagram tree to mutate.
+    ///   - minting: The identity minting provider.
+    ///   - expectedRevision: The revision to validate; `nil` skips the gate.
+    /// - Returns: The mutated tree with incremented revision.
+    /// - Throws: `DiagramReducerError` on validation failure or revision conflict.
     static func apply(
         _ mutations: [DiagramMutation],
         to tree: DiagramTree,
-        expectedRevision: Int64? = nil,
-        minting: some DiagramIdentityMinting
+        minting: some DiagramIdentityMinting,
+        expectedRevision: Int64? = nil
     ) throws -> DiagramTree {
         guard !mutations.isEmpty else {
             throw DiagramReducerError.badRequest(detail: "batch-apply carried no mutations")
@@ -111,6 +131,8 @@ enum DiagramTreeReducer {
         var description: String
         var gmccDiagramPath: String?
 
+        /// Initializes row state from a diagram tree.
+        /// - Parameter tree: The diagram tree to extract state from.
         init(tree: DiagramTree) {
             version = tree.identity.version
             updatedAt = tree.identity.updatedAt
@@ -123,6 +145,13 @@ enum DiagramTreeReducer {
 
     // MARK: - element_add
 
+    /// Applies an element add mutation.
+    /// - Parameters:
+    ///   - add: The add mutation.
+    ///   - elements: The element tree to mutate.
+    ///   - ledger: The client reference ledger.
+    ///   - minting: The identity minting provider.
+    /// - Throws: `DiagramReducerError` on validation failure.
     private static func applyAdd(
         _ add: DiagramElementAdd,
         elements: inout [DiagramElementNode],
@@ -258,6 +287,12 @@ enum DiagramTreeReducer {
 
     // MARK: - element_update
 
+    /// Applies an element update mutation.
+    /// - Parameters:
+    ///   - update: The update mutation.
+    ///   - elements: The element tree to mutate.
+    ///   - minting: The identity minting provider.
+    /// - Throws: `DiagramReducerError` on validation failure or version conflict.
     private static func applyUpdate(
         _ update: DiagramElementUpdate,
         elements: inout [DiagramElementNode],
@@ -337,6 +372,12 @@ enum DiagramTreeReducer {
         }
     }
 
+    /// Returns the node with updates applied.
+    /// - Parameters:
+    ///   - node: The node to update.
+    ///   - update: The update mutation.
+    ///   - minting: The identity minting provider.
+    /// - Returns: The updated node.
     private static func rewritten(
         _ node: DiagramElementNode,
         update: DiagramElementUpdate,
@@ -367,6 +408,11 @@ enum DiagramTreeReducer {
 
     // MARK: - element_delete
 
+    /// Applies an element delete mutation.
+    /// - Parameters:
+    ///   - delete: The delete mutation.
+    ///   - elements: The element tree to mutate.
+    /// - Throws: `DiagramReducerError` on validation failure or version conflict.
     private static func applyDelete(
         _ delete: DiagramElementDelete,
         elements: inout [DiagramElementNode]
@@ -386,6 +432,12 @@ enum DiagramTreeReducer {
 
     // MARK: - diagram_update
 
+    /// Applies a diagram row update mutation.
+    /// - Parameters:
+    ///   - update: The row update mutation.
+    ///   - row: The row state to mutate.
+    ///   - minting: The identity minting provider.
+    /// - Throws: `DiagramReducerError` on validation failure or version conflict.
     private static func applyRowUpdate(
         _ update: DiagramRowUpdate,
         row: inout RowState,
@@ -421,6 +473,12 @@ enum DiagramTreeReducer {
 
     // MARK: - Shape validation (mirrors validateDiagramElementShape)
 
+    /// Validates element type and payload compatibility.
+    /// - Parameters:
+    ///   - type: The element type.
+    ///   - parentType: The parent element type, if any.
+    ///   - payload: The element payload.
+    /// - Throws: `DiagramReducerError` on validation failure.
     private static func validateShape(
         type: DiagramElementType,
         parentType: DiagramElementType?,
@@ -512,12 +570,18 @@ enum DiagramTreeReducer {
         }
     }
 
-    /// The connector containment rule, evaluated against the in-memory tree.
+    /// Validates connector target containment rules.
     ///
     /// The daemon answers the same question with SQL lookups; both call
-    /// DiagramContainment so the RULE cannot drift even though the lookups
+    /// DiagramContainment so the rule cannot drift even though the lookups
     /// do. This is the half of the parity contract a fixture alone would not
     /// guarantee.
+    /// - Parameters:
+    ///   - referrerUuid: The connector element identifier.
+    ///   - parentOfReferrer: The connector's parent, if any.
+    ///   - targetUuid: The target element identifier.
+    ///   - elements: The element tree.
+    /// - Throws: `DiagramReducerError` when containment rules are violated.
     private static func validateConnectorTarget(
         referrerUuid: String,
         parentOfReferrer: String?,
@@ -549,6 +613,9 @@ enum DiagramTreeReducer {
         }
     }
 
+    /// Wraps validation errors as bad request errors.
+    /// - Parameter body: The validation closure.
+    /// - Throws: `DiagramReducerError.badRequest` when validation fails.
     private static func mapValidation(_ body: () throws -> Void) throws {
         do { try body() } catch {
             throw DiagramReducerError.badRequest(detail: String(describing: error))
@@ -557,6 +624,11 @@ enum DiagramTreeReducer {
 
     // MARK: - Code minting (mirrors mintElementCode)
 
+    /// Generates a unique code for an element type.
+    /// - Parameters:
+    ///   - type: The element type whose code to mint.
+    ///   - elements: The element tree to check for existing codes.
+    /// - Returns: A unique code with the type's prefix.
     private static func mintCode(
         type: DiagramElementType,
         elements: [DiagramElementNode]
@@ -580,8 +652,14 @@ enum DiagramTreeReducer {
 
     // MARK: - Tree surgery helpers
 
-    /// Depth-first lookup — public because hosts resolve hit uuids back to
-    /// tree nodes with it (the drag path's node snapshot).
+    /// Finds the element node with the given identifier.
+    ///
+    /// Public because hosts resolve hit uuids back to tree nodes with it
+    /// (the drag path's node snapshot).
+    /// - Parameters:
+    ///   - uuid: The element identifier to find.
+    ///   - elements: The element tree to search.
+    /// - Returns: The matching element node, or `nil` if not found.
     static func findNode(_ uuid: String, in elements: [DiagramElementNode]) -> DiagramElementNode? {
         for node in elements {
             if node.identity.uuid == uuid { return node }
@@ -590,6 +668,11 @@ enum DiagramTreeReducer {
         return nil
     }
 
+    /// Finds the parent identifier of an element.
+    /// - Parameters:
+    ///   - uuid: The element identifier.
+    ///   - elements: The element tree to search.
+    /// - Returns: The parent element identifier, or `nil` if at root.
     private static func findParentUuid(
         of uuid: String,
         in elements: [DiagramElementNode]
@@ -604,6 +687,11 @@ enum DiagramTreeReducer {
         return walk(elements, parent: nil)
     }
 
+    /// Removes an element node from the tree.
+    /// - Parameters:
+    ///   - uuid: The element identifier to remove.
+    ///   - elements: The element tree to mutate.
+    /// - Returns: The removed element node, or `nil` if not found.
     @discardableResult
     private static func removeNode(
         _ uuid: String,
@@ -622,6 +710,12 @@ enum DiagramTreeReducer {
         return nil
     }
 
+    /// Inserts a node as a child of the given parent.
+    /// - Parameters:
+    ///   - node: The element node to insert.
+    ///   - parentUuid: The parent element identifier.
+    ///   - elements: The element tree to mutate.
+    /// - Returns: `true` if insertion succeeded, `false` if parent not found.
     private static func insertChild(
         _ node: DiagramElementNode,
         under parentUuid: String,
@@ -644,6 +738,12 @@ enum DiagramTreeReducer {
         return false
     }
 
+    /// Transforms an element node in place.
+    /// - Parameters:
+    ///   - uuid: The element identifier to transform.
+    ///   - elements: The element tree to mutate.
+    ///   - transform: The transformation function.
+    /// - Returns: `true` if transformation succeeded, `false` if not found.
     private static func rewriteNode(
         _ uuid: String,
         in elements: inout [DiagramElementNode],
@@ -663,6 +763,11 @@ enum DiagramTreeReducer {
         return false
     }
 
+    /// Returns the node with updated children.
+    /// - Parameters:
+    ///   - node: The element node.
+    ///   - children: The new children array.
+    /// - Returns: A new node with updated children.
     private static func withChildren(
         _ node: DiagramElementNode,
         _ children: [DiagramElementNode]
@@ -675,9 +780,13 @@ enum DiagramTreeReducer {
         )
     }
 
-    /// The store reads children `ORDER BY element_z, sort_order, code` —
-    /// normalize the same way so reducer output and a daemon read tree
+    /// Sorts elements to match daemon read order.
+    ///
+    /// The store reads children `ORDER BY element_z, sort_order, code`.
+    /// Normalize the same way so reducer output and a daemon read tree
     /// compare equal in the parity test.
+    /// - Parameter elements: The element array to sort.
+    /// - Returns: The sorted element array.
     private static func normalized(_ elements: [DiagramElementNode]) -> [DiagramElementNode] {
         elements
             .map { withChildren($0, normalized($0.children)) }

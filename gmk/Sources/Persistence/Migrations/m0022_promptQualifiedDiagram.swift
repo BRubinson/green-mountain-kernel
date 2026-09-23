@@ -10,6 +10,12 @@ extension Migrations {
     // render_fingerprint, not revision alone, is what makes a stale qualification
     // detectable: a bound dope tree moves under the picture without ever touching
     // diagram.revision.
+    /// Registers migration m0022: creates the prompt_qualified_diagram table.
+    ///
+    /// Records the qualified interpretation of a diagram for each prompt,
+    /// including rendered path, revision, fingerprint, and qualification text.
+    ///
+    /// - Parameter migrator: The database migrator to register the migration with.
     static func m0022_promptQualifiedDiagram(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0022_promptQualifiedDiagram") { db in
             try db.execute(

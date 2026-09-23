@@ -62,8 +62,14 @@ extension GmAgentTool {
 
 extension GmAgentTool where Arguments: Generable, Output == String {
 
+    /// Invokes the tool through the served dispatch, reaching one implementation.
+    ///
     /// Runs the tool through the same served dispatch the pen uses, so a native
     /// model and an MCP caller reach one implementation of every op.
+    ///
+    /// - Parameter arguments: The generated tool arguments.
+    /// - Returns: The tool's result as a string.
+    /// - Throws: `GmCdeToolError` or other errors if the daemon call fails.
     func call(arguments: Arguments) throws -> String {
         try GmCdeTools.call(
             tool: name,
@@ -72,9 +78,14 @@ extension GmAgentTool where Arguments: Generable, Output == String {
         )
     }
 
-    /// The generated arguments as the wire's untyped value. Property names are
-    /// snake_case, so the encoded keys are already the argument names the
-    /// served tool reads.
+    /// Converts generated arguments to the wire's untyped JSON value.
+    ///
+    /// Property names are snake_case, so the encoded keys are already the
+    /// argument names the served tool reads.
+    ///
+    /// - Parameter arguments: The generated tool arguments.
+    /// - Returns: The wire JSON value, or nil if encoding fails.
+    /// - Throws: `DecodingError` if JSON decoding fails.
     private static func wireArguments(_ arguments: Arguments) throws -> GmJsonValue? {
         let json = arguments.generatedContent.jsonString
         guard let data = json.data(using: .utf8) else { return nil }

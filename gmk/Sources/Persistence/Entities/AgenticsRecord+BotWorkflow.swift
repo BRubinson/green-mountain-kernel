@@ -9,7 +9,9 @@ import Foundation
 import GRDB
 
 /// Read-side mirror of the `bot_workflow` table (m0025): the daemon-held
-/// workflow state machine row. Deliberately thin — phase is DERIVED from db
+/// workflow state machine row.
+///
+/// Deliberately thin — phase is DERIVED from db
 /// evidence at every BOT_NEXT; last_served_phase is observability only.
 struct BotWorkflowRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "bot_workflow"

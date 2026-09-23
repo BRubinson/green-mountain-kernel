@@ -11,10 +11,11 @@ import SwiftUI
 struct WorkflowStrip: View {
     let phase: PromptPhaseStore.Phase<BotNextResponse>
 
-    /// `nil` for any non-`.loaded` state — `.idle` / `.absent` render
-    /// nothing and `.failed` renders its own caption line in `body`. Every
-    /// `.loaded` response renders, including the degraded one-pill model an
-    /// unrecognised variant produces (`variantLabel == nil`), which draws a
+    /// Nil for any non-`.loaded` state — `.idle` / `.absent` render nothing and
+    /// `.failed` renders its own caption line in `body`.
+    ///
+    /// Every `.loaded` response renders, including the degraded one-pill model
+    /// an unrecognised variant produces (`variantLabel == nil`), which draws a
     /// single unlabelled pill rather than nothing.
     private var model: WorkflowStripModel? {
         guard case .loaded(let response) = phase else { return nil }
@@ -43,6 +44,9 @@ struct WorkflowStrip: View {
 
     // MARK: - Pills
 
+    /// Renders the row of phase pills and variant label.
+    /// - Parameter model: The workflow strip model containing pills and variant info.
+    /// - Returns: A view showing the phase pills in a scrollable row with variant label.
     private func pillRow(_ model: WorkflowStripModel) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             // 10 / 11 / 12 pills per variant — a long row on a narrow pane,
@@ -66,6 +70,9 @@ struct WorkflowStrip: View {
         }
     }
 
+    /// Renders a single phase pill with state-based styling and help text.
+    /// - Parameter pill: The pill model containing title, state, and instructions.
+    /// - Returns: A view showing the styled pill with help text tooltip.
     @ViewBuilder
     private func pill(_ pill: WorkflowStripModel.Pill) -> some View {
         Text(pill.title)
@@ -81,6 +88,9 @@ struct WorkflowStrip: View {
             .help(pill.instructions ?? "Phase \(pill.id) — not in this build's workflow spec")
     }
 
+    /// Returns the foreground color for a pill state.
+    /// - Parameter state: The pill state.
+    /// - Returns: The corresponding shape style for the pill's foreground.
     private func tint(for state: WorkflowStripModel.PillState) -> AnyShapeStyle {
         switch state {
         case .done: AnyShapeStyle(.secondary)
@@ -92,6 +102,9 @@ struct WorkflowStrip: View {
         }
     }
 
+    /// Returns the background color for a pill state.
+    /// - Parameter state: The pill state.
+    /// - Returns: The corresponding shape style for the pill's background.
     private func background(for state: WorkflowStripModel.PillState) -> AnyShapeStyle {
         switch state {
         case .current: AnyShapeStyle(Color.accentColor.opacity(0.18))

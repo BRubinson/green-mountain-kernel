@@ -19,6 +19,13 @@ enum GmBridgeTheme {
 
         var overrides: [String: String]
 
+        /// Creates a theme file specification.
+        ///
+        /// - Parameters:
+        ///   - slug: The theme slug identifier.
+        ///   - name: The human-readable theme name.
+        ///   - base: The base theme to override.
+        ///   - overrides: Optional color overrides.
         init(
             slug: String,
             name: String,

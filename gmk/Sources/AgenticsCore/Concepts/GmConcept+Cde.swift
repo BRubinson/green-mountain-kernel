@@ -2,7 +2,9 @@ import Foundation
 
 /// COMPUTED, NOT A CONSTANT: the phase index at the bottom is built from
 /// `GmBridgeSkillPhase.all`, so a phase skill is cited here automatically and one
-/// removed stops being cited. See `GM_CONCEPT_GMCC`.
+/// removed stops being cited.
+///
+/// See `GM_CONCEPT_GMCC`.
 var GM_CONCEPT_CDE: String {
     """
     # CDE — Contextual Development Environment

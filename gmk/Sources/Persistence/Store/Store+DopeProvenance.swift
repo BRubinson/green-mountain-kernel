@@ -13,10 +13,24 @@ extension Store {
 
     // MARK: - Cross-domain helper forwards (bodies in DopeProvenanceRepository)
 
+    /// Retrieves the merge base provenance for a dope scope.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - scopeUuid: The scope's identifier.
+    /// - Returns: A map of dot-paths to their merge base states.
+    /// - Throws: A store error if the scope is not found.
     func dopeProvenance(_ db: Database, scopeUuid: String) throws -> [String: DopeMerge.Base] {
         try DopeProvenanceRepository(db: db, core: core).provenance(scopeUuid: scopeUuid)
     }
 
+    /// Records the provenance of dope elements from a bundle.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - scopeUuid: The scope's identifier.
+    ///   - bundle: The dope document bundle to record provenance for.
+    /// - Throws: A store error if the write fails.
     func stampProvenanceFromFiles(
         _ db: Database,
         scopeUuid: String,
@@ -26,6 +40,14 @@ extension Store {
             .stampFromFiles(scopeUuid: scopeUuid, bundle: bundle)
     }
 
+    /// Marks a dope element as locally modified.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - scopeUuid: The scope's identifier.
+    ///   - dotPath: The element's dot-path.
+    ///   - kind: The element kind.
+    /// - Throws: A store error if the write fails.
     func markLocallyModified(
         _ db: Database,
         scopeUuid: String,
@@ -36,12 +58,26 @@ extension Store {
             .markLocallyModified(scopeUuid: scopeUuid, dotPath: dotPath, kind: kind)
     }
 
+    /// Retrieves the dot-path of a dope node.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - nodeUuid: The node's identifier.
+    ///   - level: The node's level in the dope tree.
+    /// - Returns: The dot-path, or nil if the node is not found.
+    /// - Throws: A store error if the read fails.
     func dopeDotPath(_ db: Database, nodeUuid: String, level: DopeLevel) throws -> String? {
         try DopeProvenanceRepository(db: db, core: core)
             .dotPath(nodeUuid: nodeUuid, level: level)
     }
 
-    /// The dot-paths this session has edited, in order.
+    /// Returns the dot-paths this scope has edited, in order.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - scopeUuid: The scope's identifier.
+    /// - Returns: An ordered list of modified dot-paths.
+    /// - Throws: A store error if the scope is not found.
     func locallyModifiedPaths(_ db: Database, scopeUuid: String) throws -> [String] {
         try DopeProvenanceRepository(db: db, core: core)
             .locallyModifiedPaths(scopeUuid: scopeUuid)
@@ -52,13 +88,17 @@ extension Store {
 
 extension Store {
 
-    /// The current merge plan for a scope: db tree vs the on-disk tree,
-    /// judged against the stored base.
+    /// Returns the merge plan for a dope scope.
     ///
-    /// Read-only and non-blocking by construction — it never ingests, never
-    /// writes files, and never mutates provenance. Boot sync calls it to
-    /// report rather than to decide, which is what keeps the documented
-    /// "boot must never block on a domain model" contract true.
+    /// Compares the db tree vs the on-disk tree, judged against the stored
+    /// base. Read-only and non-blocking by construction — it never ingests,
+    /// never writes files, and never mutates provenance. Boot sync calls it to
+    /// report rather than to decide, which keeps the documented "boot must
+    /// never block on a domain model" contract true.
+    ///
+    /// - Parameter scopeUuid: The scope's identifier.
+    /// - Returns: The merge outcomes for each element.
+    /// - Throws: A store error if the scope is not found.
     func dopeMergePlan(scopeUuid: String) throws -> [DopeMerge.Outcome] {
         let (scope, root) = try boundaryRead { db -> (DopeScopeRow, String) in
             guard let scope = try self.fetchDopeScope(db, uuid: scopeUuid) else {
@@ -84,14 +124,22 @@ extension Store {
         }
     }
 
-    /// Resolve one conflicting dot-path, or every one of them.
+    /// Resolves conflicting dope elements to the selected version.
     ///
-    /// Resolution is expressed IN the base rather than by rewriting a tree,
-    /// which makes it one small write instead of a second merge engine. Take
-    /// theirs clears the dirty flag, so the next sync takes the file exactly as
-    /// an untouched element would. Take ours re-bases onto the file's CURRENT
-    /// hash while staying dirty, so the local edit is kept and the file is not
-    /// treated as having moved. Either way the conflict is gone on the next plan.
+    /// Resolves one conflicting dot-path or all of them. Resolution is
+    /// expressed IN the base rather than by rewriting a tree, which makes it
+    /// one small write instead of a second merge engine. Take theirs clears the
+    /// dirty flag, so the next sync takes the file exactly as an untouched
+    /// element would. Take ours re-bases onto the file's CURRENT hash while
+    /// staying dirty, so the local edit is kept and the file is not treated as
+    /// having moved. Either way the conflict is gone on the next plan.
+    ///
+    /// - Parameters:
+    ///   - scopeUuid: The scope's identifier.
+    ///   - dotPath: The conflicting element's dot-path, or nil to resolve all.
+    ///   - takeOurs: True to keep the local edit, false to accept the file.
+    /// - Returns: The resolved dot-paths.
+    /// - Throws: A store error if the scope is not found or dotPath is invalid.
     @discardableResult
     func dopeResolve(
         scopeUuid: String,

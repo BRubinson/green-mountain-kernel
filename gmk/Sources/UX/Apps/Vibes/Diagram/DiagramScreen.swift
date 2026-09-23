@@ -1,14 +1,14 @@
 import SwiftUI
 import AppKit
 
-/// The full-window diagram editor (`Route.diagram`). Persistence follows the route payload,
-/// not this screen: a `.saved` workspace writes every gesture through DIAGRAM_BATCH_APPLY,
-/// a `.dopePreview` one through the local reducer only.
+/// The full-window diagram editor (`Route.diagram`).
 ///
-/// COORDINATE COMPOSITION: pan rides the kit's diagram-space `offset:` parameter, applied
-/// inside each Canvas and on each `.position`; the `.offset` modifier is BANNED here. Zoom
-/// rides `.scaleEffect(zoom, anchor: .topLeading)`. Together that is `DiagramViewport.toScreen`,
-/// which stays the single screen-to-diagram truth.
+/// Persistence follows the route payload,
+/// not this screen: a `.saved` workspace writes every gesture through DIAGRAM_BATCH_APPLY,
+/// a `.dopePreview` one through the local reducer only. Coordinate composition: pan rides
+/// the kit's diagram-space `offset:` parameter applied inside Canvas and `.position`; the
+/// `.offset` modifier is banned. Zoom rides `.scaleEffect(zoom, anchor: .topLeading)`.
+/// Together that is `DiagramViewport.toScreen`, the single screen-to-diagram truth.
 struct DiagramScreen: View {
     @Environment(DaemonConnectionModel.self) private var daemon
     @Environment(DiagramWorkspaceStore.self) private var workspaces
@@ -132,9 +132,10 @@ struct DiagramScreen: View {
         }
     }
 
-    /// The first fit needs BOTH a loaded tree and a real host size — either
-    /// can arrive first (the load vs GeometryReader), so both paths call this
-    /// and the flag flips only once it actually ran.
+    /// Runs the initial fit when both the tree is loaded and host size is known.
+    ///
+    /// Either can arrive first, so both paths call this and the flag flips only
+    /// once it actually ran.
     private func attemptInitialFit() {
         guard !didInitialFit, workspace.loaded, hostSize != .zero else { return }
         didInitialFit = true
@@ -207,8 +208,13 @@ struct DiagramScreen: View {
         .clipped()
     }
 
-    /// Pan expressed in DIAGRAM space for the kit's offset parameter:
-    /// (diagram + offset/zoom)·zoom = diagram·zoom + offset == toScreen.
+    /// The offset of the diagram scene in viewport space, adjusted for zoom.
+    ///
+    /// Converts panning to diagram-space coordinates via the formula:
+    /// (diagram + offset/zoom)·zoom = diagram·zoom + offset = toScreen.
+    ///
+    /// - Parameter viewport: The viewport defining the pan offset and zoom level.
+    /// - Returns: The scene offset in diagram space.
     private func sceneOffset(_ viewport: DiagramViewport) -> CGSize {
         CGSize(
             width: viewport.offset.width / viewport.zoom,
@@ -338,6 +344,11 @@ struct DiagramScreen: View {
             }
     }
 
+    /// Clears the drag and draw state after a gesture ends or is cancelled.
+    ///
+    /// - Parameter discardStaged: When true, discards staged mutations from a
+    ///   cancelled drag and clears the erased uuids set; when false, leaves the
+    ///   erased set for cleanup after a flush lands.
     private func resetDrafts(discardStaged: Bool) {
         if discardStaged {
             // Stale staged mutations from a cancelled drag must never ride
@@ -354,6 +365,10 @@ struct DiagramScreen: View {
         lastPan = .zero
     }
 
+    /// Determines the drag intent based on the tool and hit test result.
+    ///
+    /// - Parameter p: The diagram-space point where the drag began.
+    /// - Returns: A `DragIntent` describing the action to perform.
     private func begin(at p: CGPoint) -> DragIntent {
         let intent: DragIntent
         switch viewState.tool {
@@ -430,6 +445,9 @@ struct DiagramScreen: View {
 
     // MARK: - Selection / centering
 
+    /// Selects and highlights an element by its uuid.
+    ///
+    /// - Parameter uuid: The uuid of the element to select.
     private func select(_ uuid: String) {
         viewState.selection = DiagramSelectionState(
             selectedElementUuid: uuid,
@@ -437,11 +455,14 @@ struct DiagramScreen: View {
         )
     }
 
+    /// Clears the current selection state.
     private func clearSelection() {
         viewState.selection = DiagramSelectionState()
     }
 
-    /// Center a diagram-space point (search jump / selection).
+    /// Centers the viewport on a diagram-space point.
+    ///
+    /// - Parameter point: The diagram-space point to center on.
     private func center(on point: CGPoint) {
         guard hostSize != .zero else { return }
         withAnimation(.snappy(duration: 0.2)) {
@@ -469,7 +490,12 @@ struct DiagramScreen: View {
 
     // MARK: - Draw mode
 
-    /// Commit a freehand stroke through the shared drawing-layer funnel.
+    /// Commits a freehand stroke through the shared drawing-layer funnel.
+    ///
+    /// - Parameters:
+    ///   - tool: The drawing tool used.
+    ///   - _: The starting point (unused).
+    ///   - draft: The draw draft containing the stroke data.
     private func commitDrawing(
         tool: DiagramTool,
         from _: CGPoint,
@@ -482,21 +508,25 @@ struct DiagramScreen: View {
         flushSelectingNewElement()
     }
 
-    /// ONE batch that lazily creates the top-level drawing_layer (high
-    /// sibling z) via clientRef + parentClientRef when it doesn't exist yet —
-    /// layer and first element land atomically, exactly what in-batch
-    /// parenting exists for.
+    /// Stages an element on the drawing layer, creating it if needed.
+    ///
+    /// Lazily creates the top-level drawing layer via a single batch so the
+    /// layer and first element land atomically.
+    ///
+    /// - Parameters:
+    ///   - center: The diagram-space center point of the element.
+    ///   - payload: The payload describing the element.
     private func stageOnDrawingLayer(center: CGPoint, payload: DiagramElementPayload) {
         let session = workspace.editSession!
         if let layer = workspace.drawingLayer {
             session.stage(
                 .elementAdd(
                     DiagramElementAdd(
+                        payload: payload,
                         clientRef: Self.newElementRef,
                         parentElementUuid: layer.identity.uuid,
                         centerX: center.x,
-                        centerY: center.y,
-                        payload: payload
+                        centerY: center.y
                     )
                 )
             )
@@ -504,31 +534,35 @@ struct DiagramScreen: View {
             session.stage(
                 .elementAdd(
                     DiagramElementAdd(
+                        payload: .drawingLayer(DrawingLayerPayload()),
                         clientRef: "drawing_layer",
-                        elementZ: workspace.maxTopLevelZ + 10,
-                        payload: .drawingLayer(DrawingLayerPayload())
+                        elementZ: workspace.maxTopLevelZ + 10
                     )
                 )
             )
             session.stage(
                 .elementAdd(
                     DiagramElementAdd(
+                        payload: payload,
                         clientRef: Self.newElementRef,
                         parentClientRef: "drawing_layer",
                         centerX: center.x,
-                        centerY: center.y,
-                        payload: payload
+                        centerY: center.y
                     )
                 )
             )
         }
     }
 
-    /// The stroke payload + diagram-space center. Vertices are always
-    /// ELEMENT-LOCAL (relative to that center) — the kit's storage contract.
-    /// RDP once on pointer-up: a trackpad emits far more points than the
-    /// curve needs, and every one of them costs storage and every later
-    /// render.
+    /// Creates the stroke payload and diagram-space center from a draw draft.
+    ///
+    /// Vertices are stored element-local relative to the center per the kit's
+    /// storage contract. RDP simplification runs once on pointer-up to reduce
+    /// points and storage cost.
+    ///
+    /// - Parameter draft: The draw draft with collected stroke points.
+    /// - Returns: A tuple of center and payload, or nil if the draft has fewer
+    ///   than two points.
     private func freehandAdd(
         draft: DiagramViewState.DrawDraft
     )
@@ -558,8 +592,9 @@ struct DiagramScreen: View {
         )
     }
 
-    /// Insert one UML node at the viewport center, parented under the (lazily
-    /// created) drawing layer — the same funnel a drawn stroke rides.
+    /// Inserts a UML node at the viewport center on the drawing layer.
+    ///
+    /// - Parameter kind: The kind of UML node to insert.
     private func insertNode(_ kind: DiagramNodeKind) {
         let center =
             hostSize == .zero
@@ -581,8 +616,9 @@ struct DiagramScreen: View {
         flushSelectingNewElement()
     }
 
-    /// Gesture-end erase: ONE batch of element_delete for everything the drag
-    /// swept, CAS-gated per element on the version the tree holds. The dim
+    /// Commits a batch delete of all elements swept by the erase gesture.
+    ///
+    /// One mutation per swept element, CAS-gated on the tree version. The dim
     /// set clears only after the flush lands so dead ink never flashes back.
     private func commitErase() {
         let uuids = viewState.erasedUuids
@@ -608,11 +644,15 @@ struct DiagramScreen: View {
         }
     }
 
-    /// Connect two elements. The connector is parented to the SOURCE and
-    /// targets a PEER OF THAT PARENT — so the two ends must share a parent
-    /// (two cards in one scope layer). Anything else is refused silently:
-    /// the write path would reject it, and a validation error on a drag is
-    /// noise, not information.
+    /// Connects two elements with a connector parented to the source.
+    ///
+    /// Both elements must share a parent (two cards in one scope layer).
+    /// Anything else is refused silently, as validation errors on a drag are
+    /// noise rather than information.
+    ///
+    /// - Parameters:
+    ///   - fromUuid: The uuid of the source element.
+    ///   - point: The diagram-space point where the connector ends.
     private func commitConnector(from fromUuid: String, to point: CGPoint) {
         guard
             case .element(let target)? = workspace.resolved.hitTest(
@@ -626,9 +666,9 @@ struct DiagramScreen: View {
         session.stage(
             .elementAdd(
                 DiagramElementAdd(
+                    payload: .connector(ConnectorPayload(targetElementUuid: target.uuid)),
                     clientRef: Self.newElementRef,
-                    parentElementUuid: fromUuid,
-                    payload: .connector(ConnectorPayload(targetElementUuid: target.uuid))
+                    parentElementUuid: fromUuid
                 )
             )
         )
@@ -638,7 +678,9 @@ struct DiagramScreen: View {
     /// The clientRef every "the user just drew this" add carries.
     private static let newElementRef = "new_element"
 
-    /// Commit, then select what was created. The WRITER mints the uuid — the
+    /// Commit, then select what was created.
+    ///
+    /// The WRITER mints the uuid — the
     /// daemon for a saved diagram, the reducer for a preview — so the
     /// clientRef the add carried is the only handle on the new row, and the
     /// commit outcome is where it comes back.
@@ -653,6 +695,7 @@ struct DiagramScreen: View {
 
     // MARK: - Organize / clipboard
 
+    /// Organizes the diagram by staging layout mutations and flushing.
     private func organize() {
         let mutations = DiagramOrganizer.organize(
             workspace.resolved,
@@ -664,10 +707,10 @@ struct DiagramScreen: View {
         Task { await workspace.flush() }
     }
 
-    /// Copy the RENDERED diagram to the pasteboard — the screenshot framing
-    /// view (content-derived bounds, baked background), not a window grab, so
-    /// what lands on the clipboard is the whole canvas rather than whatever
-    /// the viewport happened to be showing.
+    /// Renders the diagram to the pasteboard as a screenshot image.
+    ///
+    /// Captures the whole canvas content-derived bounds with a baked
+    /// background, not a window grab of the current viewport.
     private func copyToClipboard() {
         let canvas = DiagramCanvasView(resolved: workspace.resolved)
         let renderer = ImageRenderer(content: canvas)
@@ -681,7 +724,9 @@ struct DiagramScreen: View {
 
 /// The overlay slot's content: the drag ghost (dashed accent rect tracking
 /// the cursor — a Canvas stroke, not a re-rendered card) and the in-progress
-/// draw draft. Draws in DIAGRAM space at the scene's own offset, so it
+/// draw draft.
+///
+/// Draws in DIAGRAM space at the scene's own offset, so it
 /// inherits the outer `.scaleEffect` like every other layer.
 private struct DiagramDraftOverlay: View {
     let dragDraft: DiagramViewState.DragDraft?

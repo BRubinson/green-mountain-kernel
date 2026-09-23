@@ -17,6 +17,9 @@ nonisolated(unsafe) let primaryDoorArms: CdeArms = [
     "cde_rpir_clarify": ["package_close": carePackageCloseArm()],
 ]
 
+/// Returns the arm for cde_prompt set_status operation.
+///
+/// - Returns: The arm handler for setting prompt status.
 private func setStatusArm() -> CdeArm {
     { args, client in
         let raw = try args.string("status")
@@ -37,6 +40,9 @@ private func setStatusArm() -> CdeArm {
     }
 }
 
+/// Returns the arm for architecture decide operation.
+///
+/// - Returns: The arm handler for deciding among architecture options.
 private func archDecideArm() -> CdeArm {
     { args, client in
         try client.archDecide(
@@ -49,8 +55,12 @@ private func archDecideArm() -> CdeArm {
     }
 }
 
-/// The calibrated batch arrives as `"<finding-uuid>:<0-999>"` strings, the one
-/// shape the roster declares and the same one `cde_rpir_explore` op rank takes.
+/// Returns the arm for review rank operation.
+///
+/// The calibrated batch arrives as "<finding-uuid>:<0-999>" strings,
+/// the shape the roster declares and `cde_rpir_explore` op rank takes.
+///
+/// - Returns: The arm handler for ranking review findings.
 private func reviewRankArm() -> CdeArm {
     { args, client in
         let raw = args.optStrings("ratings") ?? []
@@ -73,6 +83,9 @@ private func reviewRankArm() -> CdeArm {
     }
 }
 
+/// Returns the arm for care package close operation.
+///
+/// - Returns: The arm handler for closing the care package.
 private func carePackageCloseArm() -> CdeArm {
     { args, client in
         try client.carePackageComplete(

@@ -1,8 +1,10 @@
 import SwiftUI
 
-/// Sliding global navigation rail. Deliberately NOT a `NavigationSplitView`
-/// sidebar: the session screen owns one of those for its prompt navigator, and
-/// nesting two split views fights on macOS. Collapses after every click.
+/// Sliding global navigation rail.
+///
+/// Deliberately NOT a `NavigationSplitView` sidebar: the session screen owns
+/// one of those for its prompt navigator, and nesting two split views fights on
+/// macOS. Collapses after every click.
 struct GlobalNavRail: View {
     @Environment(WindowNav.self) private var nav
 
@@ -19,6 +21,13 @@ struct GlobalNavRail: View {
         .background(.regularMaterial)
     }
 
+    /// Builds a navigation button for the rail.
+    ///
+    /// - Parameters:
+    ///   - title: The button label text.
+    ///   - systemImage: The SF Symbols name for the icon.
+    ///   - action: Callback invoked when the button is selected.
+    /// - Returns: A styled navigation button view.
     private func railButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)

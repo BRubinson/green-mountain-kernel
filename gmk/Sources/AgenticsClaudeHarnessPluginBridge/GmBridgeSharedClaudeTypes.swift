@@ -9,6 +9,9 @@ enum GmBridgeClaudeTypeModel: String, Equatable, Hashable, Sendable, CaseIterabl
 
     case opus
 
+    /// Opus 5.5 pinned with the 1M context window; the `opus` alias drifts with the provider.
+    case opus55OneMillion = "claude-opus-5-5[1m]"
+
     case sonnet
 
     case haiku
@@ -117,6 +120,13 @@ struct GmBridgeClaudeTypeHookHandler: Codable, Equatable, Sendable {
 
     var once: Bool?
 
+    /// Creates a hook handler that executes a command.
+    ///
+    /// - Parameters:
+    ///   - command: The command string to execute.
+    ///   - timeout: Optional timeout in milliseconds.
+    ///   - async: Whether the command runs asynchronously.
+    ///   - once: Whether the hook runs only once.
     init(
         command: String,
         timeout: Int? = nil,
@@ -137,7 +147,12 @@ struct GmBridgeClaudeTypeHookGroup: Codable, Equatable, Sendable {
 
     var hooks: [GmBridgeClaudeTypeHookHandler]
 
-    init(matcher: String? = nil, hooks: [GmBridgeClaudeTypeHookHandler]) {
+    /// Creates a hook group with an optional matcher.
+    ///
+    /// - Parameters:
+    ///   - hooks: The hook handlers in this group.
+    ///   - matcher: An optional matcher pattern for when these hooks apply.
+    init(hooks: [GmBridgeClaudeTypeHookHandler], matcher: String? = nil) {
         self.matcher = matcher
         self.hooks = hooks
     }

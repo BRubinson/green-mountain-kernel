@@ -9,12 +9,13 @@ import SwiftUI
 struct MemoriesExplorer: View {
     let rootURL: URL
     @Bindable var model: MemoriesExplorerModel
-    /// The refresh edge is chosen by `isDaemonWatched`: true ⇒ the root IS
-    /// the daemon-watched storage-path memory/ and PROMPT_MEMORY_CHANGED
-    /// (reliable as of v8) drives it; false ⇒ an artifact-common-ancestor
-    /// root, by definition described by the prompt's artifact rows, so the
-    /// `.prompt` domain (ADD_ARTIFACT et al.) drives it. A nil promptUuid
-    /// refreshes once and stays static.
+    /// The refresh edge is chosen by `isDaemonWatched`.
+    ///
+    /// true ⇒ the root IS the daemon-watched storage-path memory/ and
+    /// PROMPT_MEMORY_CHANGED (reliable as of v8) drives it; false ⇒ an
+    /// artifact-common-ancestor root, by definition described by the prompt's
+    /// artifact rows, so the `.prompt` domain (ADD_ARTIFACT et al.) drives it.
+    /// A nil promptUuid refreshes once and stays static.
     var promptUuid: String?
     var isDaemonWatched: Bool = false
 
@@ -78,6 +79,7 @@ struct MemoriesExplorer: View {
         }
     }
 
+    /// Refreshes the file tree once.
     private func refreshOnce() async {
         await fs.refreshFileTree(at: rootURL)
         seedExpansionIfNeeded()
@@ -104,8 +106,7 @@ struct MemoriesExplorer: View {
         }
     }
 
-    // Default-expand every directory in the (small) memory tree once, so the folder
-    // opens already expanded as requested.
+    /// Auto-expands the entire memory tree on first load.
     private func seedExpansionIfNeeded() {
         guard !model.didSeedExpansion, let tree else { return }
         var dirs: Set<URL> = []
@@ -299,6 +300,8 @@ private struct MemoriesReader: View {
         }
     }
 
+    /// Advances the active search match by the given offset.
+    /// - Parameter delta: The number of matches to step by.
     private func step(_ delta: Int) {
         guard matches.total > 0 else { return }
         find.activeIndex = matches.clampedActive(find.activeIndex + delta)

@@ -1,8 +1,9 @@
 import Foundation
 import Observation
 
-/// One session surfaced on the landing page's Recent Sessions strip. Recency
-/// is the stub's `lastActivityAt` — computed daemon-side as MAX(session
+/// One session surfaced on the landing page's Recent Sessions strip.
+///
+/// Recency is the stub's `lastActivityAt` — computed daemon-side as MAX(session
 /// updated, newest prompt update, newest file change), a strict superset of
 /// the retired client-side FILE_CHANGE_LIST fold.
 struct RecentSessionCard: Identifiable, Equatable {
@@ -18,10 +19,11 @@ struct RecentSessionCard: Identifiable, Equatable {
     var id: UUID { windowID.sessionUUID }
 }
 
-/// Read-only derivation over the CatalogStore snapshot. Owns no persisted
-/// state and issues no I/O — the landing view refreshes the catalog
-/// (event-driven) and re-derives. Scoped to the Recent Sessions strip only:
-/// the landing's project/instance/session rows derive from CatalogFilter
+/// Read-only derivation over the CatalogStore snapshot.
+///
+/// Owns no persisted state and issues no I/O — the landing view refreshes the
+/// catalog (event-driven) and re-derives. Scoped to the Recent Sessions strip
+/// only: the landing's project/instance/session rows derive from CatalogFilter
 /// (the app's one tree traversal) instead.
 @Observable
 @MainActor
@@ -35,10 +37,16 @@ final class RecentsModel {
 
     private let sessionLimit: Int
 
+    /// Creates a model for displaying recent sessions.
+    ///
+    /// - Parameter sessionLimit: The maximum number of recent sessions to track; defaults to 8.
     init(sessionLimit: Int = 8) {
         self.sessionLimit = sessionLimit
     }
 
+    /// Updates the recent sessions list from the catalog.
+    ///
+    /// - Parameter catalog: The catalog store to read from.
     func refresh(catalog: CatalogStore) {
         var sessions: [RecentSessionCard] = []
 
@@ -86,6 +94,13 @@ final class RecentsModel {
         if recentSessions != topSessions { recentSessions = topSessions }
     }
 
+    /// Parses an ISO8601 date string with caching.
+    ///
+    /// The hot key is lastActivityAt, which mints a new string on every file
+    /// change, so the cache never saturates. Bound it at 2048 entries.
+    ///
+    /// - Parameter raw: The ISO8601 date string to parse.
+    /// - Returns: The parsed date, or `.distantPast` if parsing fails.
     private func parse(_ raw: String) -> Date {
         if let cached = dateCache[raw] { return cached }
         // The hot key is lastActivityAt, which mints a NEW string on every file change, so

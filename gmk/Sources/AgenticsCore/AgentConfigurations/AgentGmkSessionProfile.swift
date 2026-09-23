@@ -39,7 +39,9 @@ enum AgentGmkSessionProfile: String, Sendable, Hashable, Codable, CaseIterable {
         }
     }
 
-    /// The role this profile wears. A mission profile wears the primarch's — the
+    /// The role this profile wears.
+    ///
+    /// A mission profile wears the primarch's — the
     /// primary is who runs a workflow.
     var directive: AgentGmkDirective {
         switch self {
@@ -54,7 +56,9 @@ enum AgentGmkSessionProfile: String, Sendable, Hashable, Codable, CaseIterable {
         }
     }
 
-    /// The compiled body. Assembled once per process, not per call — see
+    /// The compiled body.
+    ///
+    /// Assembled once per process, not per call — see
     /// ``AgentGmkInstruction`` for why that matters.
     var instruction: AgentGmkInstruction {
         Self.compiled[self] ?? AgentGmkInstruction(compile())
@@ -65,10 +69,14 @@ enum AgentGmkSessionProfile: String, Sendable, Hashable, Codable, CaseIterable {
             uniqueKeysWithValues: allCases.map { ($0, AgentGmkInstruction($0.compile())) }
         )
 
+    /// Assemble the instruction from core, personality, directive, and mission parts.
+    ///
     /// Assembly order is longest-lived content first: core, then personality,
     /// then the directive text, then the mission and its phase walk. A profile
     /// never reorders these, so the prefix every profile shares stays a shared
     /// prefix.
+    ///
+    /// - Returns: The assembled instruction text.
     private func compile() -> String {
         var parts = [GM_AGENT_CORE, AgentGmkPersonality.compliant.text, directiveText]
         if let mission {

@@ -2,8 +2,10 @@ import SwiftUI
 
 /// The PROJECT page (`Route.project`): all of one project's instances,
 /// searchable, with the last 5 sessions of each rendered inline — the active
-/// session hoisted first with the recents outline + dot. Clicks drill down:
-/// instance row → `Route.instance`, session block → `Route.session`.
+/// session hoisted first with the recents outline + dot.
+///
+/// Clicks drill down: instance row → `Route.instance`, session block →
+/// `Route.session`.
 struct ProjectScreen: View {
     let projectUuid: String
 
@@ -95,6 +97,7 @@ struct ProjectScreen: View {
         }
     }
 
+    /// Ensures all project instances are watched and refilters the catalog.
     private func ensureWatchingAndRefilter() {
         for instance in catalog.instancesByProject[projectUuid] ?? [] {
             checkout.ensureWatching(instanceUuid: instance.uuid, generation: daemon.generation)
@@ -102,6 +105,7 @@ struct ProjectScreen: View {
         refilter()
     }
 
+    /// Filters the catalog view based on the current query and active sessions.
     private func refilter() {
         var active: [String: String] = [:]
         for instance in catalog.instancesByProject[projectUuid] ?? [] {
@@ -122,6 +126,11 @@ struct ProjectScreen: View {
         if filtered != next { filtered = next }
     }
 
+    /// Opens a session in a new window.
+    ///
+    /// - Parameters:
+    ///   - stub: The session to open.
+    ///   - _: The instance row associated with the session (unused).
     private func openSession(_ stub: SessionStub, _: InstanceRow) {
         // CatalogStore's factory: nil on a malformed uuid ⇒ inert row, never
         // a fabricated identity.

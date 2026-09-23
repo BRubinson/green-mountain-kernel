@@ -2,13 +2,17 @@ import Foundation
 import GRDB
 
 extension Migrations {
-    // m0004 — db-native exploration + review reports. Pure ADD: five BaseEntity
-    // tables plus five external-content FTS5 mirrors, no data motion.
-    // finding_rating is deliberately nullable: NULL marks unranked, and the
-    // complete transition refuses while any NULL remains. The FtsSpec loop is a
-    // private copy of m0003's — never share helpers across migration bodies.
-    // The `_ad` triggers ride the global recursive_triggers pragma so FK cascade
-    // deletes stay FTS-synced. No PRAGMA in this body.
+    /// Registers the m0004 migration creating exploration and review tables.
+    ///
+    /// m0004 — db-native exploration + review reports. Pure ADD: five BaseEntity
+    /// tables plus five external-content FTS5 mirrors, no data motion.
+    /// finding_rating is deliberately nullable: NULL marks unranked, and the
+    /// complete transition refuses while any NULL remains. The FtsSpec loop is a
+    /// private copy of m0003's — never share helpers across migration bodies.
+    /// The `_ad` triggers ride the global recursive_triggers pragma so FK cascade
+    /// deletes stay FTS-synced. No PRAGMA in this body.
+    ///
+    /// - Parameter migrator: The database migrator to register with.
     static func m0004_explorationReviewReports(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0004_explorationReviewReports") { db in
             try db.execute(

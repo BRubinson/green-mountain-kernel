@@ -14,17 +14,30 @@ struct DopeCogDocument: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case elements }
 
+    /// Creates a dope cog document with a body and elements.
+    ///
+    /// - Parameters:
+    ///   - body: The cog identity and metadata.
+    ///   - elements: The top-level elements contained in the cog.
     init(body: DopeCogBody, elements: [DopeCogElementDocument]) {
         self.body = body
         self.elements = elements
     }
 
+    /// Decodes a dope cog document from its wire format.
+    ///
+    /// - Parameter decoder: The decoder.
+    /// - Throws: Decoding errors.
     init(from decoder: Decoder) throws {
         body = try DopeCogBody(from: decoder)
         elements = try decoder.container(keyedBy: CodingKeys.self)
             .decode([DopeCogElementDocument].self, forKey: .elements)
     }
 
+    /// Encodes the dope cog document to its wire format.
+    ///
+    /// - Parameter encoder: The encoder.
+    /// - Throws: Encoding errors.
     func encode(to encoder: Encoder) throws {
         try body.encode(to: encoder)
         var c = encoder.container(keyedBy: CodingKeys.self)
@@ -39,6 +52,13 @@ struct DopeCogBody: Codable, Hashable, Sendable {
     let description: String
     let sortOrder: Int
 
+    /// Creates a cog body with identity and metadata.
+    ///
+    /// - Parameters:
+    ///   - code: The unique code for the cog.
+    ///   - name: The human-readable name.
+    ///   - description: A description of the cog.
+    ///   - sortOrder: The display order within its parent.
     init(code: String, name: String, description: String, sortOrder: Int) {
         self.code = code
         self.name = name
@@ -58,6 +78,17 @@ struct DopeCogElementDocument: Codable, Hashable, Sendable {
     let dopeScopeCode: String?
     let links: DopeCogLinks?
 
+    /// Creates a cog element document with identity, metadata, and links.
+    ///
+    /// - Parameters:
+    ///   - code: The unique code for the element.
+    ///   - name: The human-readable name.
+    ///   - description: A description of the element.
+    ///   - sortOrder: The display order within its parent.
+    ///   - elementType: The type of the element (e.g., "Hull").
+    ///   - primaryPath: Optional primary file path for the element.
+    ///   - dopeScopeCode: Optional dope scope code binding.
+    ///   - links: Optional collapsed persistence owner links.
     init(
         code: String,
         name: String,
@@ -86,6 +117,9 @@ struct DopeCogElementDocument: Codable, Hashable, Sendable {
 struct DopeCogLinks: Codable, Hashable, Sendable {
     let persistenceOwners: [String]
 
+    /// Creates a links container with persistence owner codes.
+    ///
+    /// - Parameter persistenceOwners: The codes of persistence domains.
     init(persistenceOwners: [String]) {
         self.persistenceOwners = persistenceOwners
     }

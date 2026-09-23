@@ -10,14 +10,18 @@ import SwiftUI
 // .position, never as a .offset modifier — Canvas clips to its own bounds before
 // a view offset applies, silently discarding negative-coordinate content.
 
-/// Root view: draws a resolved diagram, offset so contentBounds' origin
-/// lands at (padding, padding). Only the two parent-level kinds appear at
-/// the top (the store's invariant); the switch is exhaustive anyway — the
-/// compiler forces every render site to handle every kind, ghosts included
-/// (the prompt's critical design pattern).
+/// Root view: draws a resolved diagram, offset so contentBounds' origin lands
+/// at (padding, padding).
+///
+/// Only the two parent-level kinds appear at the top (the store's invariant);
+/// the switch is exhaustive anyway — the compiler forces every render site to
+/// handle every kind, ghosts included (the prompt's critical design pattern).
 struct DiagramCanvasView: View {
     let resolved: ResolvedDiagram
 
+    /// Creates a canvas view for a resolved diagram.
+    ///
+    /// - Parameter resolved: The resolved diagram to render.
     init(resolved: ResolvedDiagram) {
         self.resolved = resolved
     }
@@ -55,13 +59,21 @@ struct DiagramCanvasView: View {
     }
 }
 
-/// One resolved element + its children. Exhaustive switch #2 (the resolver's
-/// kind construction is #1) — both compiler-enforced over the same enum.
+/// One resolved element + its children.
+///
+/// Exhaustive switch #2 (the resolver's kind construction is #1) — both
+/// compiler-enforced over the same enum.
 struct ResolvedElementView: View {
     let element: ResolvedElement
     let environment: DiagramRenderEnvironment
     let offset: CGSize
 
+    /// Creates a view for a resolved element and its children.
+    ///
+    /// - Parameters:
+    ///   - element: The resolved element to render.
+    ///   - environment: The diagram rendering environment.
+    ///   - offset: The offset in view space; defaults to zero.
     init(
         element: ResolvedElement,
         environment: DiagramRenderEnvironment,
@@ -258,6 +270,9 @@ struct ShapeView: View {
         .allowsHitTesting(false)
     }
 
+    /// Constructs a path for the shape in the given bounds.
+    ///
+    /// - Returns: A path that draws the shape.
     private func shapePath() -> Path {
         var path = Path()
         let points = shape.points
@@ -322,16 +337,23 @@ struct ShapeView: View {
 }
 
 /// A UML node: kind-picked chrome + the kit's block-markdown interior on a
-/// transparent background — THE text surface for nodes. Chrome colors are
-/// nil-means-theme-default so unstyled nodes are legible in both schemes.
-/// Children (connectors) render nothing here — connector visuals ride
-/// DiagramEdgeCanvas like every other edge.
+/// transparent background — THE text surface for nodes.
+///
+/// Chrome colors are nil-means-theme-default so unstyled nodes are legible in
+/// both schemes. Children (connectors) render nothing here — connector visuals
+/// ride DiagramEdgeCanvas like every other edge.
 struct UmlNodeView: View {
     let element: ResolvedElement
     let node: ResolvedUmlNode
     let offset: CGSize
     @Environment(\.diagramSelection) private var selection
 
+    /// Creates a view for a UML node element.
+    ///
+    /// - Parameters:
+    ///   - element: The resolved node element.
+    ///   - node: The resolved UML node model.
+    ///   - offset: The offset in view space; defaults to zero.
     init(
         element: ResolvedElement,
         node: ResolvedUmlNode,
@@ -440,16 +462,28 @@ struct UmlNodeView: View {
 struct UmlNodeShape: Shape {
     let kind: DiagramNodeKind
 
+    /// Creates a shape renderer for a diagram node.
+    ///
+    /// - Parameter kind: The diagram node kind.
     init(kind: DiagramNodeKind) {
         self.kind = kind
     }
 
-    /// The cylinder's cap half-height: shallow enough that squat nodes keep
-    /// a body, deep enough to read as a disk.
+    /// Returns the cylinder's cap half-height for a node.
+    ///
+    /// The cap is shallow enough that squat nodes keep a body, yet deep enough to
+    /// read as a disk.
+    ///
+    /// - Parameter rect: The node bounds.
+    /// - Returns: The half-height in points.
     static func cylinderCapHeight(for rect: CGRect) -> CGFloat {
         min(rect.height * 0.12, 18)
     }
 
+    /// Constructs a path that draws the node shape in the given bounds.
+    ///
+    /// - Parameter rect: The bounds to fill.
+    /// - Returns: A path for the node shape.
     func path(in rect: CGRect) -> Path {
         var path = Path()
         switch kind {
@@ -510,7 +544,9 @@ struct UmlNodeShape: Shape {
 }
 
 /// The scope container: basic outline + the resolved domain-scope name (or
-/// the ghost variant naming the dangling code). Children render inside.
+/// the ghost variant naming the dangling code).
+///
+/// Children render inside.
 struct DopeScopeOutlineView: View {
     let element: ResolvedElement
     let card: ResolvedScopeCard?
@@ -519,6 +555,14 @@ struct DopeScopeOutlineView: View {
     let offset: CGSize
     @Environment(\.diagramSelection) private var selection
 
+    /// Creates a view for a diagram scope card element.
+    ///
+    /// - Parameters:
+    ///   - element: The resolved card element.
+    ///   - card: The scope card model, or nil for a ghost.
+    ///   - environment: The diagram rendering environment.
+    ///   - ghostCode: The code for a ghost card, or nil.
+    ///   - offset: The offset in view space; defaults to zero.
     init(
         element: ResolvedElement,
         card: ResolvedScopeCard?,
@@ -600,6 +644,14 @@ struct DopeEntityCardView: View {
     let offset: CGSize
     @Environment(\.diagramSelection) private var selection
 
+    /// Creates a view for a diagram entity card element.
+    ///
+    /// - Parameters:
+    ///   - element: The resolved card element.
+    ///   - model: The entity card model, or nil for a ghost.
+    ///   - environment: The diagram rendering environment.
+    ///   - ghostCode: The code for a ghost card, or nil.
+    ///   - offset: The offset in view space; defaults to zero.
     init(
         element: ResolvedElement,
         model: EntityCardModel?,
@@ -689,13 +741,21 @@ struct DopeEntityCardView: View {
 /// The FK edge pass, drawn over everything: a dumb stroker over the
 /// resolver's routed orthogonal polylines (rounded corners, radius clamped
 /// per corner), with the legacy cubic quarantined as the `routed: false`
-/// fallback. All geometry decisions live in DiagramEdgeRouter — none here.
+/// fallback.
+///
+/// All geometry decisions live in DiagramEdgeRouter — none here.
 struct DiagramEdgeCanvas: View {
     let edges: [ResolvedEdge]
     let environment: DiagramRenderEnvironment
     let offset: CGSize
     @Environment(\.diagramSelection) private var selection
 
+    /// Creates a view for diagram connector edges.
+    ///
+    /// - Parameters:
+    ///   - edges: The edges to render.
+    ///   - environment: The diagram rendering environment.
+    ///   - offset: The offset in view space; defaults to zero.
     init(
         edges: [ResolvedEdge],
         environment: DiagramRenderEnvironment,
@@ -838,10 +898,11 @@ struct DiagramEdgeCanvas: View {
         .allowsHitTesting(false)
     }
 
-    /// A connector's drawn path plus the directions its decorations point: the
-    /// head arrives along the LAST drawn segment, the tail points back out along
-    /// the FIRST segment reversed. Never the from→to chord — the chord is wrong
-    /// exactly when routing worked.
+    /// A connector's drawn path plus the directions its decorations point.
+    ///
+    /// The head arrives along the LAST drawn segment, the tail points back out
+    /// along the FIRST segment reversed. Never the from→to chord — the chord is
+    /// wrong exactly when routing worked.
     ///
     /// routingKind picks the geometry: orthogonal_step is the router's polyline
     /// (cubic when routing declines), straight is the chord, curved is the cubic.
@@ -851,6 +912,12 @@ struct DiagramEdgeCanvas: View {
         let tailDirection: CGVector
     }
 
+    /// Computes the geometry for a connector edge.
+    ///
+    /// - Parameters:
+    ///   - edge: The edge whose geometry to compute.
+    ///   - style: The connector style.
+    /// - Returns: The computed connector geometry.
     static func connectorGeometry(
         edge: ResolvedEdge,
         style: ResolvedConnector
@@ -904,9 +971,15 @@ struct DiagramEdgeCanvas: View {
         }
     }
 
-    /// Where an edge label sits: the ARCLENGTH midpoint of the drawn
-    /// geometry, never points[count/2] — for a 2-3 point routed array that
-    /// index is a terminal point and the label crashes into the arrowhead.
+    /// Returns the label position on a connector.
+    ///
+    /// The position is the ARCLENGTH midpoint of the drawn edge, never a
+    /// terminal point, so the label cannot crash into the arrowhead.
+    ///
+    /// - Parameters:
+    ///   - edge: The edge whose label position to compute.
+    ///   - style: The connector style.
+    /// - Returns: The label position in diagram space.
     static func labelPosition(edge: ResolvedEdge, style: ResolvedConnector) -> CGPoint {
         switch style.routingKind {
         case .straight:
@@ -955,9 +1028,16 @@ struct DiagramEdgeCanvas: View {
         }
     }
 
-    /// Rounded-corner orthogonal polyline. Radius clamps per corner to half
-    /// the shorter adjacent segment — the router merged collinear runs, so
-    /// segment lengths are honest and short jogs never invert visually.
+    /// Rounded-corner orthogonal polyline.
+    ///
+    /// Radius clamps per corner to half the shorter adjacent segment — the
+    /// Constructs a path with rounded corners for polyline points.
+    ///
+    /// The router merges collinear runs so segment lengths are honest and short jogs
+    /// never invert visually.
+    ///
+    /// - Parameter points: The polyline points in order.
+    /// - Returns: A path with rounded corners at each point.
     static func roundedPolyline(_ points: [CGPoint]) -> Path {
         var path = Path()
         path.move(to: points[0])
@@ -978,8 +1058,15 @@ struct DiagramEdgeCanvas: View {
         return path
     }
 
-    /// The pre-routing straight-curve v1, kept VERBATIM — drawn only when
-    /// the router declined (`routed: false`).
+    /// Constructs a path using the legacy straight-curve algorithm.
+    ///
+    /// This pre-routing v1 algorithm is kept verbatim and drawn only when the router
+    /// declined the edge.
+    ///
+    /// - Parameters:
+    ///   - from: The start point.
+    ///   - to: The end point.
+    /// - Returns: A path for the legacy cubic curve.
     static func legacyCubic(from: CGPoint, to: CGPoint) -> Path {
         var path = Path()
         path.move(to: from)
@@ -995,7 +1082,11 @@ struct DiagramEdgeCanvas: View {
 }
 
 extension Color {
-    /// #rgb / #rrggbb / #rrggbbaa hex parsing with a graceful gray fallback.
+    /// Creates a color from a hex string with a gray fallback.
+    ///
+    /// Parses #rgb, #rrggbb, or #rrggbbaa hex strings and falls back to gray on error.
+    ///
+    /// - Parameter hex: A hex color string.
     init(hex: String) {
         var value = hex.trimmingCharacters(in: .whitespaces)
         if value.hasPrefix("#") { value.removeFirst() }

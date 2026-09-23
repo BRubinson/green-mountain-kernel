@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// KBites route host. KnowledgeBitesView is a TabView with a toolbar but no
+/// KBites route host.
+///
+/// KnowledgeBitesView is a TabView with a toolbar but no
 /// navigation container of its own, so wrap it in the ScreenScaffold as the
 /// title/toolbar host; the wrapper also owns the view-local KBiteStore.
 struct KBitesScene: View {
@@ -184,6 +186,7 @@ private struct KBiteSearchPane: View {
         }
     }
 
+    /// Schedules a kbite search with debouncing after user input.
     private func scheduleSearch() {
         searchTask?.cancel()
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -218,6 +221,9 @@ private struct KBiteSearchPane: View {
         }
     }
 
+    /// Loads the content of a kbite file.
+    ///
+    /// - Parameter uuid: The file UUID to load.
     private func loadFile(_ uuid: String) {
         fileContent = nil
         fileName = nil
@@ -289,6 +295,10 @@ private struct KBitesPaneView: View {
         return "No kbites at\n\(path)"
     }
 
+    /// Checks whether a URL points to a previewable file.
+    ///
+    /// - Parameter url: The URL to check.
+    /// - Returns: True if the URL exists and is a regular file, not a directory.
     private func isPreviewableFile(_ url: URL) -> Bool {
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir) else { return false }
@@ -317,6 +327,10 @@ private struct KBiteAccordionSidebar: View {
         }
     }
 
+    /// Builds the expandable section for a kbite in the sidebar.
+    ///
+    /// - Parameter kbite: The kbite entry to display.
+    /// - Returns: The view for the kbite section.
     @ViewBuilder
     private func kbiteSection(_ kbite: KBiteEntry) -> some View {
         DisclosureGroup(isExpanded: bindingFor(kbite.url)) {
@@ -349,6 +363,10 @@ private struct KBiteAccordionSidebar: View {
         .tag(kbite.url as URL?)
     }
 
+    /// Builds the view for a file or folder row in the kbite tree.
+    ///
+    /// - Parameter node: The file node to display.
+    /// - Returns: The view for the file row.
     @ViewBuilder
     private func fileRow(_ node: KBiteFileNode) -> some View {
         if node.isDirectory {
@@ -369,6 +387,10 @@ private struct KBiteAccordionSidebar: View {
         }
     }
 
+    /// Creates a binding for the expanded state of a kbite section.
+    ///
+    /// - Parameter url: The kbite URL.
+    /// - Returns: A binding to its expanded state.
     private func bindingFor(_ url: URL) -> Binding<Bool> {
         Binding(
             get: { expandedURL == url },
@@ -382,6 +404,9 @@ private struct KBiteAccordionSidebar: View {
         )
     }
 
+    /// Expands a kbite section and loads its file tree.
+    ///
+    /// - Parameter url: The kbite URL to expand.
     private func expand(_ url: URL) {
         expandedURL = url
         if loadedNodes[url] == nil {

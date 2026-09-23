@@ -12,6 +12,14 @@ struct StructuredPatchHunk: Codable, Hashable, Sendable {
     let newLines: Int
     let lines: [String]
 
+    /// Creates a structured patch hunk from line range and content.
+    ///
+    /// - Parameters:
+    ///   - oldStart: The starting line number in the original file.
+    ///   - oldLines: The number of lines in the original file.
+    ///   - newStart: The starting line number in the modified file.
+    ///   - newLines: The number of lines in the modified file.
+    ///   - lines: The content lines of the hunk.
     init(oldStart: Int, oldLines: Int, newStart: Int, newLines: Int, lines: [String]) {
         self.oldStart = oldStart
         self.oldLines = oldLines
@@ -21,14 +29,14 @@ struct StructuredPatchHunk: Codable, Hashable, Sendable {
     }
 }
 
-/// structuredPatch → `file_change_range` rows. Exact line numbers off the
-/// payload, no diffing and no filesystem read.
+/// structuredPatch → `file_change_range` rows.
 ///
-/// The mapping is deliberately NEW-side: an edit is recorded where it landed,
-/// so a later reader lines a range up against the file as it now is. A hunk
-/// that deletes every line it touches reports `newLines: 0`, and a zero-height
-/// range would be unreadable — hence the `max(newLines, 1)` floor, which puts
-/// the deletion on the line it collapsed into.
+/// Exact line numbers off the payload, no diffing and no filesystem read. The
+/// mapping is deliberately NEW-side: an edit is recorded where it landed, so a
+/// later reader lines a range up against the file as it now is. A hunk that
+/// deletes every line it touches reports `newLines: 0`, and a zero-height range
+/// would be unreadable — hence the `max(newLines, 1)` floor, which puts the
+/// deletion on the line it collapsed into.
 enum StructuredPatchExpander {
     /// Applied at the source as well as in `FileChangeRepository`, which is
     /// the actual guarantee: expanding here keeps a megabyte of generated-file
@@ -36,6 +44,10 @@ enum StructuredPatchExpander {
     static let maxHunks = FileChangeLimits.maxRangesPerChange
     static let maxHunkBodyCharacters = FileChangeLimits.maxChangedContentCharacters
 
+    /// Expands patch hunks into recorded change ranges.
+    ///
+    /// - Parameter hunks: The patch hunks to expand.
+    /// - Returns: Change ranges capped at `maxHunks` entries.
     static func expand(_ hunks: [StructuredPatchHunk]) -> [ChangeRange] {
         hunks.prefix(maxHunks)
             .map { hunk in
@@ -52,9 +64,11 @@ enum StructuredPatchExpander {
 }
 
 /// The size budget on recorded ranges, declared once and enforced where the
-/// rows are written. A structuredPatch for a regenerated file can carry
-/// thousands of hunks and megabytes of body; file_change is append-only
-/// history, so an uncapped expansion is permanent.
+/// rows are written.
+///
+/// A structuredPatch for a regenerated file can carry thousands of hunks and
+/// megabytes of body; file_change is append-only history, so an uncapped
+/// expansion is permanent.
 enum FileChangeLimits {
     static let maxRangesPerChange = 100
     static let maxChangedContentCharacters = 4000

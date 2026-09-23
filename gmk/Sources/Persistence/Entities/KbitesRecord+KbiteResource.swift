@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `kbite_resource` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `kbite_resource` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct KbiteResourceRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "kbite_resource"
     var uuid: String

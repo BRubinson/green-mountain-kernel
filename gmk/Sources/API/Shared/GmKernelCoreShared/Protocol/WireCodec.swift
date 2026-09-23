@@ -1,13 +1,13 @@
 import Foundation
 
-/// The single source of JSON coders for the wire and every human-facing JSON
-/// printer. snake_case is applied by STRATEGY, not by hand-written CodingKeys:
-/// wire types declare none except the two intentional renames, and a type that
-/// keeps an explicit CodingKeys enum must list every other key as a bare case,
-/// because under `.convertFromSnakeCase` an explicit snake_case raw value stops
-/// matching and an Optional field silently decodes to nil. Every coder site
-/// routes through here; a bare `JSONEncoder()` elsewhere silently emits
-/// camelCase.
+/// The single source of JSON coders for the wire and human-facing JSON.
+///
+/// snake_case is applied by STRATEGY, not by hand-written CodingKeys: wire
+/// types declare none except the two intentional renames. A type with an
+/// explicit CodingKeys enum must list every other key as a bare case, because
+/// under `.convertFromSnakeCase` an explicit snake_case raw value stops
+/// matching and Optional fields decode to nil. All coder sites route through
+/// here; a bare `JSONEncoder()` elsewhere silently emits camelCase.
 enum WireCodec {
     static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()

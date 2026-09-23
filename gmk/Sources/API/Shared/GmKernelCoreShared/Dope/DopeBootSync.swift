@@ -1,6 +1,7 @@
 import Foundation
 
 /// Files → db boot reconciliation for a session's SESSION_INSTANCE dope scope.
+///
 /// Files are authoritative forward: a virgin scope seeds wholesale, a scope
 /// behind the files re-adopts, and a db ahead of the files only warns. The
 /// verbs composed here reach no DOPE_WRITE_REPO, so repo files are read and
@@ -28,9 +29,16 @@ enum DopeBootSync {
         case unreadable(String)
     }
 
-    /// Reconcile the session's SESSION_INSTANCE scope with the repo tree.
-    /// `instanceRoot` is the repo checkout root (the tree lives at
-    /// `{instanceRoot}/.gmcc`).
+    /// Reconciles the session's SESSION_INSTANCE scope with the repo tree.
+    ///
+    /// The repo tree lives at `{instanceRoot}/.gmcc`. Returns an outcome
+    /// describing the reconciliation result without throwing.
+    ///
+    /// - Parameters:
+    ///   - client: The daemon client for dope operations.
+    ///   - sessionUuid: The session UUID.
+    ///   - instanceRoot: The repo checkout root directory.
+    /// - Returns: An `Outcome` describing the reconciliation result.
     static func run(
         client: DaemonClient,
         sessionUuid: String,
@@ -110,6 +118,9 @@ enum DopeBootSync {
     }
 
     /// One human line for hook/CLI output; nil for the silent outcomes.
+    ///
+    /// - Parameter outcome: The reconciliation outcome.
+    /// - Returns: A human-readable notice string, or `nil` for silent outcomes.
     static func notice(for outcome: Outcome) -> String? {
         switch outcome {
         case .noRepoTree, .inSync:

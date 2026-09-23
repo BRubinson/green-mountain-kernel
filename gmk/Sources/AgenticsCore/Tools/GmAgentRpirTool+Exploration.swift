@@ -22,53 +22,53 @@ struct GmAgentCdeRpirExploreTool: GmAgentRpirTool {
         GmAgentToolOp(
             Op.open,
             verbs: [.botGet, .exploreOpen],
-            requiredParams: ["agent_type"],
             summary: """
                 Fetch-or-open an exploration summary (identity is the self-reported \
                 agent_type; 'synthesis' is the prompt-level seal row the clarifier opens \
                 once everything is ranked).
-                """
+                """,
+            requiredParams: ["agent_type"]
         ),
         GmAgentToolOp(
             Op.write,
             verbs: [.exploreFindingAdd],
-            requiredParams: ["summary_uuid", "kind", "title", "body", "agent_name"],
             summary: """
                 Insert ONE exploration finding (self-rate 0=critical…999=ignore; unranked \
                 blocks the synthesis seal).
-                """
+                """,
+            requiredParams: ["summary_uuid", "kind", "title", "body", "agent_name"]
         ),
         GmAgentToolOp(
             Op.rank,
             verbs: [.botGet, .exploreRank],
-            requiredParams: ["ratings"],
             summary: """
                 Batch-rank findings PROMPT-wide: one atomic calibrated batch across every \
                 summary. One bad pair rejects the whole batch; 0 unranked is what lets the \
                 synthesis seal pass.
-                """
+                """,
+            requiredParams: ["ratings"]
         ),
         GmAgentToolOp(
             Op.complete,
             verbs: [.exploreComplete],
-            requiredParams: ["summary_uuid", "expected_version", "overview"],
             summary: """
                 Seal a summary with its overview — your own methodology row, or the \
                 synthesis row once every finding is ranked (it refuses while anything is \
                 unranked).
-                """
+                """,
+            requiredParams: ["summary_uuid", "expected_version", "overview"]
         ),
         GmAgentToolOp(
             Op.get,
             verbs: [.botGet, .exploreGet],
-            narrowing: CdeNarrowing(
-                parameters: ["cursor", "page_bytes", "finding_uuid"],
-                retryWith: "\(toolName) op=get with cursor = page.next_cursor; finding_uuid for one body"
-            ),
             summary: """
                 The prompt's exploration record: summaries, key files, findings inside the \
                 rating window, stubs outside it. Unranked findings are ALWAYS full rows.
-                """
+                """,
+            narrowing: CdeNarrowing(
+                parameters: ["cursor", "page_bytes", "finding_uuid"],
+                retryWith: "\(toolName) op=get with cursor = page.next_cursor; finding_uuid for one body"
+            )
         ),
     ]
 
@@ -79,6 +79,7 @@ struct GmAgentCdeRpirExploreTool: GmAgentRpirTool {
         an overview, op get reads the findings back.
         """
 
+    /// Initializes the exploration tool.
     init() {}
 
     // Argument property names ARE the served tool's snake_case wire argument names.

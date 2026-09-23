@@ -56,6 +56,20 @@ struct GmAgentCdeRpirBriefingArguments: Sendable {
     )
     var page_bytes: Int?
 
+    /// Creates a briefing tool arguments instance.
+    ///
+    /// - Parameters:
+    ///   - op: The operation to perform (open, write, close, load).
+    ///   - prompt_uuid: The prompt UUID.
+    ///   - step: The step name for zero-uuid form operations.
+    ///   - briefing_uuid: The briefing row UUID.
+    ///   - expected_version: The version for write operations.
+    ///   - dope_refs: References to dope model rows.
+    ///   - kbite_refs: References to knowledge bite rows.
+    ///   - file_change_refs: References to file change rows.
+    ///   - agent_id: The agent identifier.
+    ///   - cursor: Pagination cursor for list operations.
+    ///   - page_bytes: Page budget in bytes for paginated results.
     init(
         op: String,
         prompt_uuid: String? = nil,
@@ -98,19 +112,16 @@ struct GmAgentCdeRpirBriefingTool: GmAgentRpirTool {
         GmAgentToolOp(
             Op.open,
             verbs: [.briefingOpen],
-            requiredParams: ["prompt_uuid"],
             summary: """
                 Open the briefing row a briefer then fills. The only legal response to the \
                 'initial briefing not ready' gate blocker, and the very next call after cde_init \
                 for a prompt whose briefing is absent.
-                """
+                """,
+            requiredParams: ["prompt_uuid"]
         ),
         GmAgentToolOp(
             Op.write,
             verbs: [.briefingComplete],
-            requiredParams: [
-                "briefing_uuid", "expected_version", "dope_refs", "kbite_refs", "file_change_refs",
-            ],
             summary: """
                 building → ready: write the briefing's ref set (opinion-free; the daemon \
                 stamps staleness + kbite briefs). ALL THREE ref classes are REQUIRED of \
@@ -118,31 +129,34 @@ struct GmAgentCdeRpirBriefingTool: GmAgentRpirTool {
                 [] for a class you searched and came up empty on — that is a real answer. \
                 Omitting a class is refused, because absent is indistinguishable from \
                 never having looked.
-                """
+                """,
+            requiredParams: [
+                "briefing_uuid", "expected_version", "dope_refs", "kbite_refs", "file_change_refs",
+            ]
         ),
         GmAgentToolOp(
             Op.close,
             verbs: [.briefingComplete],
-            requiredParams: [
-                "briefing_uuid", "expected_version", "dope_refs", "kbite_refs", "file_change_refs",
-            ],
             summary: """
                 Seal the briefing — the briefer's page is done and the agent can go away. \
                 Same verb as op=write: BRIEFING_COMPLETE both writes the ref set and moves \
                 building → ready.
-                """
+                """,
+            requiredParams: [
+                "briefing_uuid", "expected_version", "dope_refs", "kbite_refs", "file_change_refs",
+            ]
         ),
         GmAgentToolOp(
             Op.load,
             verbs: [.briefingGet],
-            narrowing: CdeNarrowing(
-                parameters: ["cursor", "page_bytes"],
-                retryWith: "cde_rpir_briefing op=load with cursor = page.next_cursor"
-            ),
             summary: """
                 Fetch a briefing + staleness. Zero-uuid form: pass only step and YOUR \
                 briefing resolves.
-                """
+                """,
+            narrowing: CdeNarrowing(
+                parameters: ["cursor", "page_bytes"],
+                retryWith: "cde_rpir_briefing op=load with cursor = page.next_cursor"
+            )
         ),
     ]
 
@@ -155,5 +169,6 @@ struct GmAgentCdeRpirBriefingTool: GmAgentRpirTool {
         set, seal it, and read it back.
         """
 
+    /// Creates a briefing tool instance.
     init() {}
 }

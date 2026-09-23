@@ -51,9 +51,11 @@ struct DopeStalenessBadge<S: DopeScopeStalenessReporting>: View {
 
 // MARK: - Dot-path chips
 
-/// One dope dot-path chip. A ghost — a path that does not resolve against the live scope —
-/// is struck through and demoted to secondary, but still rendered: a dangling path is a legal
-/// state the user needs to see, not an error to swallow.
+/// One dope dot-path chip.
+///
+/// A ghost — a path that does not resolve against the live scope — is struck through and
+/// demoted to secondary, but still rendered: a dangling path is a legal state the user needs
+/// to see, not an error to swallow.
 struct DopeDotPathChip: View {
     let path: String
     let isGhost: Bool
@@ -68,13 +70,18 @@ struct DopeDotPathChip: View {
     }
 }
 
-/// The chip layout both panes share, for callers that have bare dot-paths and
-/// nothing to hang off them. (The care package annotates each ref with its
-/// curator note, so it composes `DopeDotPathChip` directly — same chip, same
-/// pixels, one extra caption line.)
+/// Renders dope dot-paths in a vertical flow with chip styling.
 ///
-/// Simple wrapping-free flow: dot-paths are short and few; a vertical list keeps
-/// them selectable and legible without a layout dependency.
+/// The chip layout both panes share for callers with bare dot-paths and nothing
+/// to hang off them. The care package annotates each ref with a curator note and
+/// composes `DopeDotPathChip` directly for the same chip and pixels with an extra
+/// caption line. Simple wrapping-free flow: dot-paths are short and few; a
+/// vertical list keeps them selectable and legible without layout dependencies.
+///
+/// - Parameters:
+///   - paths: The dope dot-path strings to render.
+///   - ghosts: The set of paths that do not resolve against the live scope.
+/// - Returns: A SwiftUI view rendering the paths as chips.
 func dopeChipFlow(paths: [String], ghosts: Set<String>) -> some View {
     VStack(alignment: .leading, spacing: 3) {
         ForEach(paths, id: \.self) { path in

@@ -8,6 +8,8 @@ extension Migrations {
     // cannot be a CHECK — a SQLite CHECK cannot reference another table, and
     // ALTER TABLE ADD COLUMN cannot add one at all — so it is a Swift guard on
     // write plus ghost-tolerant resolution on read.
+    /// Registers migration m0016: adds diagram.dope_scope column.
+    /// - Parameter migrator: The database migrator to register with.
     static func m0016_diagramDopeScopeBinding(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0016_diagramDopeScopeBinding") { db in
             try db.execute(

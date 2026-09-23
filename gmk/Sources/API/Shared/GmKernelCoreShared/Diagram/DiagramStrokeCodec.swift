@@ -10,8 +10,10 @@ import Foundation
 /// coordinate. `DiagramElementTypeSpec.vertexStorage` decides, per type.
 enum DiagramStrokeCodec {
 
-    /// RDP tolerance in element-local units. ~0.75px keeps a 100-vertex
-    /// trackpad stroke at roughly 25 with no visible change.
+    /// RDP tolerance in element-local units.
+    ///
+    /// ~0.75px keeps a 100-vertex trackpad stroke at roughly 25 with no
+    /// visible change.
     static let defaultEpsilon: Double = 0.75
 
     /// 4-byte float x, 4-byte float y, 1-byte pressure.
@@ -26,13 +28,14 @@ enum DiagramStrokeCodec {
 
     // MARK: - Quantization
 
-    /// Round-trip a vertex through the STORAGE precision without touching the
-    /// database.
+    /// Returns a vertex quantized to storage precision.
     ///
     /// In-memory vertices are exact `Double`s; the daemon writes f32/u8 and
     /// reads them back changed in the last bits. Both write paths normalize
     /// through here, so the in-memory tree and the persisted tree hold the
     /// same numbers by construction rather than by tolerance.
+    /// - Parameter vertex: The vertex to normalize.
+    /// - Returns: The vertex with coordinates and pressure quantized to storage precision.
     static func normalizedForStorage(_ vertex: DiagramVertex) -> DiagramVertex {
         DiagramVertex(
             x: Double(Float(vertex.x)),
@@ -41,17 +44,22 @@ enum DiagramStrokeCodec {
         )
     }
 
+    /// Returns vertices quantized to storage precision.
+    /// - Parameter vertices: The vertices to normalize.
+    /// - Returns: The vertices with coordinates and pressure quantized to storage precision.
     static func normalizedForStorage(_ vertices: [DiagramVertex]) -> [DiagramVertex] {
         vertices.map(normalizedForStorage)
     }
 
-    /// Normalize a payload to exactly what storage will hold.
+    /// Returns a payload with stroke vertices quantized to storage precision.
     ///
     /// Called by BOTH write paths — the daemon's and the reducer's — so an
     /// in-memory tree and a persisted tree agree by construction. Only
     /// strokes are affected: shape vertices are stored as REAL rows and
     /// round-trip exactly, so quantizing them would be a lie about
     /// precision that does not exist.
+    /// - Parameter payload: The element payload to normalize (only strokes are modified).
+    /// - Returns: The payload with stroke vertices quantized, or unchanged if not a stroke.
     static func normalizedForStorage(
         _ payload: DiagramElementPayload
     ) -> DiagramElementPayload {
@@ -66,6 +74,9 @@ enum DiagramStrokeCodec {
         )
     }
 
+    /// Returns a pressure value quantized to storage precision.
+    /// - Parameter p: The pressure value in [0, 1].
+    /// - Returns: The pressure value quantized to the 0-254 storage range.
     static func quantizedPressure(_ p: Double) -> Double {
         let clamped = min(max(p, 0), 1)
         return (clamped * pressureScale).rounded() / pressureScale
@@ -73,8 +84,12 @@ enum DiagramStrokeCodec {
 
     // MARK: - Packing
 
+    /// Encodes vertices to packed binary format in little-endian byte order.
+    ///
     /// Little-endian, explicitly: this blob outlives the machine that wrote
     /// it, and "native order" is not a format.
+    /// - Parameter vertices: The vertices to pack.
+    /// - Returns: The packed binary data.
     static func pack(_ vertices: [DiagramVertex]) -> Data {
         var data = Data(capacity: vertices.count * bytesPerVertex)
         for vertex in vertices {
@@ -94,6 +109,12 @@ enum DiagramStrokeCodec {
         return data
     }
 
+    /// Decodes vertices from packed binary format.
+    /// - Parameters:
+    ///   - data: The packed binary data to decode.
+    ///   - count: The number of vertices to decode.
+    /// - Returns: The decoded vertices.
+    /// - Throws: `StoreError.corruptState` if the data is malformed.
     static func unpack(_ data: Data, count: Int) throws -> [DiagramVertex] {
         guard count >= 0 else {
             throw StoreError.corruptState(
@@ -138,12 +159,16 @@ enum DiagramStrokeCodec {
 
     // MARK: - Decimation
 
-    /// Ramer–Douglas–Peucker, run once on pointer-up.
+    /// Reduces vertex count using Ramer–Douglas–Peucker algorithm.
     ///
     /// A trackpad emits far more points than the curve needs; keeping them
     /// all costs storage and slows every later render for no visual gain.
     /// Endpoints are always preserved, so a decimated stroke still starts
     /// and ends exactly where the hand did.
+    /// - Parameters:
+    ///   - vertices: The vertices to decimate.
+    ///   - epsilon: The tolerance distance; default is 0.75 element-local units.
+    /// - Returns: The decimated vertex array.
     static func decimate(
         _ vertices: [DiagramVertex],
         epsilon: Double = defaultEpsilon
@@ -156,6 +181,13 @@ enum DiagramStrokeCodec {
         return zip(vertices, keep).compactMap { $1 ? $0 : nil }
     }
 
+    /// Recursively marks vertices to keep during decimation.
+    /// - Parameters:
+    ///   - v: The vertex array.
+    ///   - first: The index of the first vertex in the current line segment.
+    ///   - last: The index of the last vertex in the current line segment.
+    ///   - epsilon: The tolerance distance for simplification.
+    ///   - keep: Mutable array tracking which vertices to keep.
     private static func simplify(
         _ v: [DiagramVertex],
         _ first: Int,
@@ -179,6 +211,12 @@ enum DiagramStrokeCodec {
         simplify(v, maxIndex, last, epsilon, &keep)
     }
 
+    /// Returns the perpendicular distance from a point to a line segment.
+    /// - Parameters:
+    ///   - p: The point to measure from.
+    ///   - a: The first endpoint of the line segment.
+    ///   - b: The second endpoint of the line segment.
+    /// - Returns: The perpendicular distance.
     private static func perpendicularDistance(
         _ p: DiagramVertex,
         _ a: DiagramVertex,

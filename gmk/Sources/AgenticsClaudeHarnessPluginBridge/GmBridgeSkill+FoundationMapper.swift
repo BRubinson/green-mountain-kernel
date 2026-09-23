@@ -39,6 +39,8 @@ extension GmConcept {
 
 extension GmBridgeSkill.File {
 
+    /// Creates a bridge skill file from a concept.
+    /// - Parameter concept: The concept to derive the skill from.
     init(_ concept: GmConcept) {
         self.init(
             name: concept.code,

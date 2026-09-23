@@ -50,9 +50,26 @@ enum GmBridgeAgent {
 
         var prompt: String
 
+        /// Creates an agent file configuration with tools, skills, and execution parameters.
+        ///
+        /// - Parameters:
+        ///   - name: The agent's name.
+        ///   - description: A short description of the agent's role.
+        ///   - prompt: The agent's instruction prompt text.
+        ///   - model: The LLM model, or nil for default.
+        ///   - effort: The reasoning effort level, or nil for default.
+        ///   - maxTurns: The maximum conversation turns, or nil for unlimited.
+        ///   - nativeTools: Native tools the agent can use.
+        ///   - mcpTools: MCP tools the agent can use.
+        ///   - disallowedTools: Native tools explicitly disallowed.
+        ///   - skills: Skill names available to the agent.
+        ///   - memory: The agent's memory scope.
+        ///   - background: Whether to run as a background task.
+        ///   - isolation: The isolation mode for the agent.
         init(
             name: String,
             description: String,
+            prompt: String,
             model: Model? = nil,
             effort: Effort? = nil,
             maxTurns: Int? = nil,
@@ -62,8 +79,7 @@ enum GmBridgeAgent {
             skills: [String] = [],
             memory: Memory? = nil,
             background: Bool? = nil,
-            isolation: Isolation? = nil,
-            prompt: String
+            isolation: Isolation? = nil
         ) {
             self.name = name
             self.description = description
@@ -88,6 +104,9 @@ enum GmBridgeAgent {
             nativeTools.map(\.rawValue) + mcpTools.map(\.qualifiedName)
         }
 
+        /// Renders the agent configuration as YAML frontmatter followed by the prompt.
+        ///
+        /// - Returns: The complete agent file content as a string.
         func contents() -> String? {
             var lines = ["---"]
             lines.append("name: \(GmBridgeYaml.scalar(name))")

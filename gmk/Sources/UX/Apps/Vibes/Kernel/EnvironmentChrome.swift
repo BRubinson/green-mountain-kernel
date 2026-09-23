@@ -47,9 +47,11 @@ enum EnvironmentKind: Sendable {
         }
     }
 
-    /// The banner colour. Red for test, amber for beta — distinct because
-    /// mistaking beta for test is a different mistake from mistaking either for
-    /// production, and a single "not prod" colour would hide that.
+    /// The banner colour.
+    ///
+    /// Red for test, amber for beta — distinct because mistaking beta for
+    /// test is a different mistake from mistaking either for production, and
+    /// a single "not prod" colour would hide that.
     var bannerColor: Color {
         switch self {
         case .production: return .clear
@@ -83,6 +85,9 @@ enum EnvironmentKind: Sendable {
 struct EnvironmentBanner: View {
     private let kind: EnvironmentKind
 
+    /// Creates an environment banner for the given environment kind.
+    ///
+    /// - Parameter kind: The environment to display; defaults to the current environment.
     init(kind: EnvironmentKind = .current) {
         self.kind = kind
     }
@@ -124,6 +129,11 @@ struct EnvironmentBanner: View {
 @MainActor
 enum EnvironmentDockBadge {
 
+    /// Updates the Dock icon with an environment badge.
+    ///
+    /// A no-op on production and when there is no Dock tile.
+    ///
+    /// - Parameter kind: The environment to badge; defaults to the current environment.
     static func apply(kind: EnvironmentKind = .current) {
         guard !kind.isProduction else {
             NSApp.applicationIconImage = nil  // back to the bundle icon
@@ -133,7 +143,10 @@ enum EnvironmentDockBadge {
         NSApp.applicationIconImage = badged(kind: kind)
     }
 
-    /// Composite the environment letter over the app icon.
+    /// Composites the environment letter over the app icon.
+    ///
+    /// - Parameter kind: The environment kind to badge on the icon.
+    /// - Returns: A new image with the badge, or nil if the icon cannot be rendered.
     private static func badged(kind: EnvironmentKind) -> NSImage? {
         let base = NSApp.applicationIconImage ?? NSImage(named: NSImage.applicationIconName)
         guard let base else { return nil }

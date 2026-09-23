@@ -2,14 +2,12 @@ import Foundation
 import GRDB
 
 extension Migrations {
-    // m0008 — BASE_COMPOSABLE entities + the base_composable_uuid self-FK.
-    // SQLite cannot ALTER a CHECK, so dope_domain_entity is REBUILT in the m0002
-    // order. Registered .deferred with NO PRAGMA in this body: the property
-    // table CASCADE-references this one, so with FK enforcement live the DROP
-    // would take every property row. The self-FK is written against the FINAL
-    // table name — under foreign_keys=OFF a RENAME does not rewrite REFERENCES.
-    // ON DELETE RESTRICT means wipeDopeTree and domain-delete must NULL every
-    // base_composable_uuid in scope BEFORE the domain CASCADE.
+    /// Migration m0008: Add BASE_COMPOSABLE entities and base_composable_uuid self-FK.
+    ///
+    /// Rebuilds dope_domain_entity to add the base_composable_uuid column and
+    /// related indexes. Registered as deferred to avoid FK cascade issues.
+    ///
+    /// - Parameter migrator: The database migrator to register this migration with.
     static func m0008_dopeBaseComposableEntities(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0008_dopeBaseComposableEntities") { db in
             try db.execute(

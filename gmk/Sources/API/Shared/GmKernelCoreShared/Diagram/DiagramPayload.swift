@@ -2,11 +2,11 @@ import Foundation
 
 /// The load-bearing tagged union: ONE type drives the wire codec, store
 /// persistence, containment validation, and the exhaustive-switch render
-/// protocol. No clear* flags exist on this surface — an update carrying a
-/// payload REPLACES the subtype row and its vertex set wholesale, so the
-/// typed-nil SET-dictionary idiom is structurally impossible here. Encoding
+/// protocol.
+///
+/// No clear* flags — payload updates replace the subtype row wholesale. Encoding
 /// is `{"kind": "<element_type raw>", "fields": {...}}`; `kind` and `fields`
-/// are single-word keys, fixed points of the snake_case strategies.
+/// are snake_case fixed points.
 enum DiagramElementPayload: Codable, Hashable, Sendable {
     case drawingLayer(DrawingLayerPayload)
     case drawingStroke(DrawingStrokePayload)
@@ -34,6 +34,11 @@ enum DiagramElementPayload: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case kind, fields }
 
+    /// Decodes a diagram element from its wire representation.
+    ///
+    /// The `kind` field determines which payload type to decode from `fields`.
+    /// - Parameter decoder: The decoder to read the element from.
+    /// - Throws: `DecodingError.dataCorruptedError` when `kind` is not a valid element type.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let kind = try c.decode(String.self, forKey: .kind)
@@ -64,6 +69,11 @@ enum DiagramElementPayload: Codable, Hashable, Sendable {
         }
     }
 
+    /// Encodes a diagram element to its wire representation.
+    ///
+    /// Writes the element's type to the `kind` field and its payload to `fields`.
+    /// - Parameter encoder: The encoder to write the element to.
+    /// - Throws: Any error from the encoder during the write.
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(elementType.rawValue, forKey: .kind)
@@ -81,15 +91,22 @@ enum DiagramElementPayload: Codable, Hashable, Sendable {
 }
 
 /// One stroke/shape vertex as it rides the wire — INSIDE the payload, so the
-/// whole element is one value. Persisted as full BaseEntity rows (user
-/// decision); written as whole-set replacement, so vertex row uuids are not
-/// stable across edits (vertices are not elements).
-/// Coordinates are ELEMENT-LOCAL (relative to the element's center).
+/// whole element is one value.
+///
+/// Persisted as full BaseEntity rows (user decision); written as whole-set
+/// replacement, so vertex row uuids are not stable across edits (vertices are
+/// not elements). Coordinates are ELEMENT-LOCAL (relative to the element's
+/// center).
 struct DiagramVertex: Codable, Hashable, Sendable {
     let x: Double
     let y: Double
     let pressure: Double?
 
+    /// Creates a vertex at element-local coordinates with optional pressure.
+    /// - Parameters:
+    ///   - x: The x-coordinate relative to the element's center.
+    ///   - y: The y-coordinate relative to the element's center.
+    ///   - pressure: The pressure value for the vertex, or nil if not specified.
     init(x: Double, y: Double, pressure: Double? = nil) {
         self.x = x
         self.y = y
@@ -98,6 +115,9 @@ struct DiagramVertex: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case x, y, pressure }
 
+    /// Decodes a vertex from its wire representation.
+    /// - Parameter decoder: The decoder to read the vertex from.
+    /// - Throws: Any error from the decoder during the read.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         x = try c.decode(Double.self, forKey: .x)
@@ -115,6 +135,11 @@ struct DrawingLayerPayload: Codable, Hashable, Sendable {
     let visible: Bool
     let locked: Bool
 
+    /// Creates a drawing layer with the specified properties.
+    /// - Parameters:
+    ///   - opacity: The layer opacity from 0 (transparent) to 1 (opaque); defaults to 1.
+    ///   - visible: Whether the layer is visible; defaults to true.
+    ///   - locked: Whether the layer is locked; defaults to false.
     init(opacity: Double = 1, visible: Bool = true, locked: Bool = false) {
         self.opacity = opacity
         self.visible = visible
@@ -123,6 +148,11 @@ struct DrawingLayerPayload: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case opacity, visible, locked }
 
+    /// Decodes a drawing layer from its wire representation.
+    ///
+    /// Missing keys are decoded to their schema defaults.
+    /// - Parameter decoder: The decoder to read the layer from.
+    /// - Throws: Any error from the decoder during the read.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         opacity = try c.decodeIfPresent(Double.self, forKey: .opacity) ?? 1
@@ -137,6 +167,12 @@ struct DrawingStrokePayload: Codable, Hashable, Sendable {
     let strokeWidth: Double
     let vertices: [DiagramVertex]
 
+    /// Creates a drawing stroke with the specified properties.
+    /// - Parameters:
+    ///   - tool: The drawing tool; defaults to `.pencil`.
+    ///   - strokeColor: The stroke color as a hex string; defaults to "#1a1a1a".
+    ///   - strokeWidth: The stroke width in points; defaults to 2.
+    ///   - vertices: The list of vertices; defaults to an empty list.
     init(
         tool: DiagramStrokeTool = .pencil,
         strokeColor: String = "#1a1a1a",
@@ -153,6 +189,11 @@ struct DrawingStrokePayload: Codable, Hashable, Sendable {
         case tool, strokeColor, strokeWidth, vertices
     }
 
+    /// Decodes a drawing stroke from its wire representation.
+    ///
+    /// Missing keys are decoded to their schema defaults.
+    /// - Parameter decoder: The decoder to read the stroke from.
+    /// - Throws: Any error from the decoder during the read.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         tool = try c.decodeIfPresent(DiagramStrokeTool.self, forKey: .tool) ?? .pencil
@@ -170,6 +211,14 @@ struct DrawingShapePayload: Codable, Hashable, Sendable {
     let cornerRadius: Double?
     let vertices: [DiagramVertex]
 
+    /// Creates a drawing shape with the specified properties.
+    /// - Parameters:
+    ///   - shapeKind: The shape type.
+    ///   - strokeColor: The stroke color as a hex string; defaults to "#1a1a1a".
+    ///   - strokeWidth: The stroke width in points; defaults to 2.
+    ///   - fillColor: The fill color as a hex string, or nil for no fill.
+    ///   - cornerRadius: The corner radius in points, or nil for sharp corners.
+    ///   - vertices: The list of vertices; defaults to an empty list.
     init(
         shapeKind: DiagramShapeKind,
         strokeColor: String = "#1a1a1a",
@@ -190,6 +239,11 @@ struct DrawingShapePayload: Codable, Hashable, Sendable {
         case shapeKind, strokeColor, strokeWidth, fillColor, cornerRadius, vertices
     }
 
+    /// Decodes a drawing shape from its wire representation.
+    ///
+    /// Missing keys are decoded to their schema defaults.
+    /// - Parameter decoder: The decoder to read the shape from.
+    /// - Throws: Any error from the decoder during the read.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         shapeKind = try c.decode(DiagramShapeKind.self, forKey: .shapeKind)
@@ -216,6 +270,14 @@ struct DrawingTextPayload: Codable, Hashable, Sendable {
     let textColor: String
     let backgroundColor: String?
 
+    /// Creates a drawing text with the specified properties.
+    /// - Parameters:
+    ///   - markdown: The text content as markdown; defaults to an empty string.
+    ///   - width: The width in points; defaults to 180.
+    ///   - height: The height in points; defaults to 60.
+    ///   - fontSize: The font size in points; defaults to 13.
+    ///   - textColor: The text color as a hex string; defaults to "#1a1a1a".
+    ///   - backgroundColor: The background color as a hex string, or nil for transparent.
     init(
         markdown: String = "",
         width: Double = 180,
@@ -236,6 +298,11 @@ struct DrawingTextPayload: Codable, Hashable, Sendable {
         case markdown, width, height, fontSize, textColor, backgroundColor
     }
 
+    /// Decodes a drawing text from its wire representation.
+    ///
+    /// Missing keys are decoded to their schema defaults.
+    /// - Parameter decoder: The decoder to read the text from.
+    /// - Throws: Any error from the decoder during the read.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         markdown = try c.decodeIfPresent(String.self, forKey: .markdown) ?? ""
@@ -253,11 +320,13 @@ enum DiagramConnectorLineStyle: String, Codable, Hashable, CaseIterable, Sendabl
     case dashed
 }
 
-/// Connector head style. Widened at wire v23 for UML semantics — `dot` IS
-/// the filled-circle variant and stays legal forever (pre-v23 rows carry
-/// it); `circle` is the OPEN (stroked) ring. New cases ride the v23 bump:
-/// the envelope handshake fences them from pre-v23 decoders, for which an
-/// unknown rawValue is dataCorrupted, not a skippable field.
+/// Connector head style.
+///
+/// Widened at wire v23 for UML semantics — `dot` IS the filled-circle variant
+/// and stays legal forever (pre-v23 rows carry it); `circle` is the OPEN
+/// (stroked) ring. New cases ride the v23 bump: the envelope handshake fences
+/// them from pre-v23 decoders, for which an unknown rawValue is dataCorrupted,
+/// not a skippable field.
 enum DiagramConnectorHead: String, Codable, Hashable, CaseIterable, Sendable {
     case none
     case arrow
@@ -268,12 +337,13 @@ enum DiagramConnectorHead: String, Codable, Hashable, CaseIterable, Sendable {
     case cross
 }
 
-/// Connector routing style (v23). Every case selects among geometry that
-/// already existed: `orthogonalStep` is the router's polyline (the ONLY
-/// pre-v23 renderer, hence the decode default), `straight` is the 2-point
-/// chord, `curved` is the legacy cubic promoted from routing-declined
-/// fallback to a first-class choice. DiagramEdgeRouter internals are not a
-/// function of this enum.
+/// Connector routing style (v23).
+///
+/// Every case selects among geometry that already existed: `orthogonalStep`
+/// is the router's polyline (the ONLY pre-v23 renderer, hence the decode
+/// default), `straight` is the 2-point chord, `curved` is the legacy cubic
+/// promoted from routing-declined fallback to a first-class choice.
+/// DiagramEdgeRouter internals are not a function of this enum.
 enum DiagramConnectorRouting: String, Codable, Hashable, CaseIterable, Sendable {
     case orthogonalStep = "orthogonal_step"
     case straight
@@ -281,13 +351,12 @@ enum DiagramConnectorRouting: String, Codable, Hashable, CaseIterable, Sendable 
 }
 
 /// A hand-drawn connection from the element it is parented under to a PEER
-/// of that element. `targetElementUuid` is optional at every layer: the
-/// column is `ON DELETE
-/// SET NULL`, because CASCADE on a subtype table would leave the
-/// `diagram_element` row with no subtype and corrupt every later read of the
-/// diagram. A deleted target degrades to a renderable ghost. In a batch a
-/// connector may instead name its target by `targetClientRef` on the
-/// mutation; temp-id resolution is a batch concern a payload is blind to.
+/// of that element.
+///
+/// `targetElementUuid` is optional at every layer; its column uses `ON DELETE
+/// SET NULL` to prevent CASCADE corruption. A deleted target becomes a ghost.
+/// In batch operations, use `targetClientRef` instead; temp-id resolution is
+/// a batch concern the payload is blind to.
 struct ConnectorPayload: Codable, Hashable, Sendable {
     let targetElementUuid: String?
     let strokeColor: String
@@ -298,6 +367,16 @@ struct ConnectorPayload: Codable, Hashable, Sendable {
     let tailKind: DiagramConnectorHead
     let label: String
 
+    /// Creates a connector line with the specified properties.
+    /// - Parameters:
+    ///   - targetElementUuid: The UUID of the target element, or nil for a ghost state.
+    ///   - strokeColor: The stroke color as a hex string; defaults to "#1a1a1a".
+    ///   - strokeWidth: The stroke width in points; defaults to 2.
+    ///   - lineStyle: The line style; defaults to `.solid`.
+    ///   - headKind: The line head style; defaults to `.arrow`.
+    ///   - routingKind: The routing style; defaults to `.orthogonalStep`.
+    ///   - tailKind: The line tail style; defaults to `.none`.
+    ///   - label: The connector label text; defaults to an empty string.
     init(
         targetElementUuid: String? = nil,
         strokeColor: String = "#1a1a1a",
@@ -323,6 +402,11 @@ struct ConnectorPayload: Codable, Hashable, Sendable {
             routingKind, tailKind, label
     }
 
+    /// Decodes a connector from its wire representation.
+    ///
+    /// Missing keys are decoded to their schema defaults.
+    /// - Parameter decoder: The decoder to read the connector from.
+    /// - Throws: Any error from the decoder during the read.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         targetElementUuid = try c.decodeIfPresent(String.self, forKey: .targetElementUuid)
@@ -358,8 +442,10 @@ struct ConnectorPayload: Codable, Hashable, Sendable {
 /// DiagramNodeKind), an explicit frame (the drawing_text doctrine — markdown
 /// wrapping needs a known width, and the kit never measures text), and a
 /// block-markdown interior rendered by the kit's own renderer so rendering
-/// and every host draw the same thing. Chrome fields are nil-means-theme-
-/// default so an unstyled node is legible in both schemes.
+/// and every host draw the same thing.
+///
+/// Chrome fields are nil-means-theme-default so an unstyled node is legible
+/// in both schemes.
 struct UmlNodePayload: Codable, Hashable, Sendable {
     let nodeKind: DiagramNodeKind
     let width: Double
@@ -371,6 +457,17 @@ struct UmlNodePayload: Codable, Hashable, Sendable {
     let strokeWidth: Double?
     let fillColor: String?
 
+    /// Creates a UML node with the specified properties.
+    /// - Parameters:
+    ///   - nodeKind: The node type.
+    ///   - width: The node width in points; defaults to 160.
+    ///   - height: The node height in points; defaults to 90.
+    ///   - markdown: The node content as block markdown; defaults to an empty string.
+    ///   - fontSize: The font size, or nil to use the theme default.
+    ///   - textColor: The text color as a hex string, or nil for the theme default.
+    ///   - strokeColor: The stroke color as a hex string, or nil for the theme default.
+    ///   - strokeWidth: The stroke width in points, or nil for the theme default.
+    ///   - fillColor: The fill color as a hex string, or nil for the theme default.
     init(
         nodeKind: DiagramNodeKind,
         width: Double = 160,
@@ -398,6 +495,11 @@ struct UmlNodePayload: Codable, Hashable, Sendable {
             strokeColor, strokeWidth, fillColor
     }
 
+    /// Decodes a UML node from its wire representation.
+    ///
+    /// Missing keys are decoded to their schema defaults or nil for theme defaults.
+    /// - Parameter decoder: The decoder to read the node from.
+    /// - Throws: Any error from the decoder during the read.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         nodeKind = try c.decode(DiagramNodeKind.self, forKey: .nodeKind)
@@ -412,12 +514,16 @@ struct UmlNodePayload: Codable, Hashable, Sendable {
     }
 }
 
-/// fk-by-code binding to a dope scope. Resolution runs at READ time through
-/// the diagram row's own session/prompt context (the dopeGet ladder), never
-/// at write time — a dangling code is a legal, renderable ghost state.
+/// fk-by-code binding to a dope scope.
+///
+/// Resolution runs at READ time through the diagram row's own session/prompt
+/// context (the dopeGet ladder), never at write time — a dangling code is a
+/// legal, renderable ghost state.
 struct DopeScopePersistenceLayerPayload: Codable, Hashable, Sendable {
     let dopeScopeCode: String
 
+    /// Creates a dope scope persistence layer binding.
+    /// - Parameter dopeScopeCode: The code identifying the dope scope.
     init(dopeScopeCode: String) {
         self.dopeScopeCode = dopeScopeCode
     }
@@ -428,14 +534,17 @@ struct DopeScopePersistenceLayerPayload: Codable, Hashable, Sendable {
 struct DopeEntityPayload: Codable, Hashable, Sendable {
     let entityCode: String
 
+    /// Creates a dope entity binding.
+    /// - Parameter entityCode: The code identifying the dope entity in the format `domain.entity`.
     init(entityCode: String) {
         self.entityCode = entityCode
     }
 }
 
 /// Tri-state field write for nullable columns: absent = leave alone,
-/// `{"op": "set", "value": …}` = write, `{"op": "clear"}` = NULL. The typed
-/// replacement for dope's clear* flag pairs; one use site this pass
+/// `{"op": "set", "value": …}` = write, `{"op": "clear"}` = NULL.
+///
+/// The typed replacement for dope's clear* flag pairs; one use site this pass
 /// (diagram.gmcc_diagram_path), available to future surfaces.
 enum FieldPatch<T: Codable & Hashable & Sendable>: Codable, Hashable, Sendable {
     case set(T)
@@ -443,6 +552,11 @@ enum FieldPatch<T: Codable & Hashable & Sendable>: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case op, value }
 
+    /// Decodes a field patch from its wire representation.
+    ///
+    /// The `op` field determines whether to set a new value or clear the field to NULL.
+    /// - Parameter decoder: The decoder to read the field patch from.
+    /// - Throws: `DecodingError.dataCorruptedError` when `op` is not "set" or "clear".
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let op = try c.decode(String.self, forKey: .op)
@@ -460,6 +574,11 @@ enum FieldPatch<T: Codable & Hashable & Sendable>: Codable, Hashable, Sendable {
         }
     }
 
+    /// Encodes a field patch to its wire representation.
+    ///
+    /// Writes "set" with the value, or "clear" without a value.
+    /// - Parameter encoder: The encoder to write the field patch to.
+    /// - Throws: Any error from the encoder during the write.
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {

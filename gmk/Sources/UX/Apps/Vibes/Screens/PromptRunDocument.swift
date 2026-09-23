@@ -1,13 +1,12 @@
 import SwiftUI
 
-/// The post-draft RUN DOCUMENT: one continuous card assembling the phase panes into a
-/// narrative read of the prompt's run. Every section EMBEDS its existing pane unchanged, so
-/// the panes' contracts ride along: the clarification answer cards stay live, the widen
-/// closures reach the same store intent flags, and staleness badges render as they do there.
+/// The post-draft RUN DOCUMENT: one continuous card assembling phase panes.
 ///
-/// Evidence gating is uniform: a section renders only when the run left evidence for it.
-/// `.absent` renders NOTHING, because `/gm_task` prompts never get a workflow row and a stub
-/// per phase would bury the record. `.failed` renders ONE dim caption line.
+/// Every section embeds its existing pane unchanged, so the panes' contracts
+/// ride along with live clarification answer cards and staleness badges. A
+/// section renders only when the run left evidence for it. `.absent` renders
+/// nothing (/.gm_task prompts never get workflow rows). `.failed` renders one
+/// dim caption line.
 struct PromptRunDocument: View {
     let stub: PromptStub
     let phases: PromptPhaseStore
@@ -20,18 +19,17 @@ struct PromptRunDocument: View {
     let clarifiedIntent: String?
     let availableKbites: [String]
     @Binding var selectedKbites: [String]
-    /// Find-in-page plumbing from the host pane. Segment ids stay
-    /// "backstory"/"goal"/"detail" — the pane's find contract, preserved.
+    /// Find-in-page plumbing from the host pane.
+    ///
+    /// Segment ids stay "backstory"/"goal"/"detail" — the pane's find
+    /// contract, preserved.
     let findQuery: SearchQuery
     let activeLocal: (String) -> Int?
 
-    /// Find-anchor liveness: a collapsed DisclosureGroup never BUILDS its
-    /// content, so the "backstory"/"goal"/"detail" anchors inside these two
-    /// disclosures would not exist for `scrollTo` while collapsed — find
-    /// would count matches it physically cannot reach. Both force open the
-    /// moment a find query goes active (and stay open when it clears — a
-    /// deliberate keep, so the section is not yanked out from under the
-    /// match the user just landed on).
+    /// Find-anchor liveness: collapsed Groups don't build anchors for scrollTo.
+    ///
+    /// Both force open when find query goes active (and stay open when it
+    /// clears — a deliberate keep).
     @State private var backstoryExpanded = false
     @State private var originalExpanded = false
 
@@ -123,9 +121,16 @@ struct PromptRunDocument: View {
         case content
     }
 
-    /// ONE pure function over a phase state: loaded-with-content renders, a
-    /// non-nil reports stub covers the not-yet-loaded cold start, absence
-    /// renders nothing, failure renders a single dim line.
+    /// Determines what to render for a phase state.
+    ///
+    /// Loaded-with-content renders, a non-nil reports stub covers the not-yet-loaded
+    /// cold start, absence renders nothing, and failure renders a single dim line.
+    ///
+    /// - Parameters:
+    ///   - phase: The phase state to evaluate.
+    ///   - stubEvidence: Whether a reports stub counts as content.
+    ///   - hasContent: A predicate determining whether loaded content is non-empty.
+    /// - Returns: The evidence for rendering the phase.
     private func evidence<T: Equatable>(
         _ phase: PromptPhaseStore.Phase<T>,
         stubEvidence: Bool,
@@ -145,9 +150,16 @@ struct PromptRunDocument: View {
 
     // MARK: - Section chrome
 
-    /// The document's section chrome: an injected divider-and-header rather
-    /// than a per-section card — one continuous container, generalized from
-    /// the editor's refinedSection idiom.
+    /// Builds a standardized section container with title and icon.
+    ///
+    /// An injected divider-and-header rather than a per-section card,
+    /// generalized from the editor's refinedSection idiom.
+    ///
+    /// - Parameters:
+    ///   - title: The section title to display.
+    ///   - icon: The system icon name for the title label.
+    ///   - content: The section content view builder.
+    /// - Returns: A styled section view.
     private func documentSection(
         _ title: String,
         icon: String,
@@ -162,6 +174,14 @@ struct PromptRunDocument: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Renders a section with evidence-gated visibility and error handling.
+    ///
+    /// - Parameters:
+    ///   - title: The section title to display.
+    ///   - icon: The system icon name for the title label.
+    ///   - evidence: The evidence state determining visibility.
+    ///   - content: The section content view builder.
+    /// - Returns: A view rendered according to the evidence state.
     @ViewBuilder
     private func phaseSection(
         _ title: String,
@@ -209,11 +229,12 @@ struct PromptRunDocument: View {
 
     // MARK: - Intent
 
-    /// Always renders: the intent is prompt content, gated only on what it
-    /// holds. Clarified intent is PRIMARY when the care package carries one
-    /// (the human triple stays reachable in the disclosure beneath — m0025:
-    /// nothing writes prompt content past draft); otherwise the frozen
-    /// goal/detail render directly.
+    /// Always renders: the intent is prompt content, gated only on what it holds.
+    ///
+    /// Clarified intent is PRIMARY when the care package carries one (the human
+    /// triple stays reachable in the disclosure beneath — m0025: nothing writes
+    /// prompt content past draft); otherwise the frozen goal/detail render
+    /// directly.
     @ViewBuilder
     private var intentSection: some View {
         VStack(alignment: .leading, spacing: 10) {

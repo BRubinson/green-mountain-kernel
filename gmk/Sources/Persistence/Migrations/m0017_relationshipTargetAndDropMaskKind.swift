@@ -10,6 +10,12 @@ extension Migrations {
     // (2) mask_kind is DROPPED from all seven tables. The overlay rule reduces
     // to: a node present in the overlay overrides, deleted_on means deleted, join
     // on code. ALTER TABLE DROP COLUMN handles the column's inline CHECK.
+    /// Registers the m0017 migration: renames and drops dope schema columns.
+    ///
+    /// Renames `related_property_uuid` to `relationship_target_uuid` and drops
+    /// the `mask_kind` column from seven dope tables.
+    ///
+    /// - Parameter migrator: The database migrator to register the migration on.
     static func m0017_relationshipTargetAndDropMaskKind(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0017_relationshipTargetAndDropMaskKind") { db in
             try db.execute(

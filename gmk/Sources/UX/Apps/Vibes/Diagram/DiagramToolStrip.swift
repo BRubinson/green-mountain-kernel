@@ -82,9 +82,11 @@ struct DiagramToolStrip: View {
         .help("Copy the rendered diagram to the clipboard")
     }
 
-    /// Multi-select domain pills. RENDER-TIME filtering (see
-    /// DiagramDomainFilter): toggling hides cards in the resolved output and
-    /// never touches the tree, so a pill click costs no write and no re-mint.
+    /// Multi-select domain pills.
+    ///
+    /// RENDER-TIME filtering (see DiagramDomainFilter): toggling hides cards in
+    /// the resolved output and never touches the tree, so a pill click costs no
+    /// write and no re-mint.
     @ViewBuilder
     private var domainPills: some View {
         if let dope = workspace.dope, dope.tree.domains.count > 1 {
@@ -119,6 +121,9 @@ struct DiagramToolStrip: View {
         }
     }
 
+    /// Returns the display label for a diagram node kind.
+    /// - Parameter kind: The node kind.
+    /// - Returns: A human-readable label for the node.
     static func nodeLabel(_ kind: DiagramNodeKind) -> String {
         switch kind {
         case .dbCylinder: "Database"
@@ -130,6 +135,9 @@ struct DiagramToolStrip: View {
         }
     }
 
+    /// Returns the system image symbol for a diagram node kind.
+    /// - Parameter kind: The node kind.
+    /// - Returns: A system image name for the node.
     static func nodeSymbol(_ kind: DiagramNodeKind) -> String {
         switch kind {
         case .dbCylinder: "cylinder"
@@ -141,6 +149,10 @@ struct DiagramToolStrip: View {
         }
     }
 
+    /// Toggles a domain filter on or off, clearing all when all are selected.
+    /// - Parameters:
+    ///   - code: The domain code to toggle.
+    ///   - allCodes: All available domain codes.
     private func toggle(_ code: String, allCodes: [String]) {
         var filter =
             workspace.domainFilter.isEmpty
@@ -152,9 +164,10 @@ struct DiagramToolStrip: View {
 }
 
 /// Search entities AND fields: a pure query over the loaded DopeScopeTree.
-/// Picking a result centers the viewport on the card (entity hit) or the
-/// exact property row (field hit, via the resolver's own row-Y formula) and
-/// selects the card so the outline + FK edge accent come free.
+///
+/// Picking a result centers the viewport on the card (entity hit) or the exact
+/// property row (field hit, via the resolver's own row-Y formula) and selects the
+/// card so the outline + FK edge accent come free.
 private struct DiagramSearchField: View {
     let workspace: DiagramWorkspace
     let viewState: DiagramViewState
@@ -199,9 +212,10 @@ private struct DiagramSearchField: View {
         .help("Search results — picking one centers the viewport on the entity or field row")
     }
 
-    /// Entities and properties by name/code, case-insensitive. Ghost cards
-    /// (codes matching nothing) never come from here — the query runs over
-    /// the DOPE tree, not the diagram.
+    /// Entities and properties by name/code, case-insensitive.
+    ///
+    /// Ghost cards (codes matching nothing) never come from here — the query runs
+    /// over the DOPE tree, not the diagram.
     private var hits: [Hit] {
         let query = viewState.searchText.trimmingCharacters(in: .whitespaces)
         guard !query.isEmpty, let dope = workspace.dope else { return [] }
@@ -240,10 +254,17 @@ private struct DiagramSearchField: View {
         return Array(result.prefix(20))
     }
 
+    /// Checks if candidate contains query, case-insensitive.
+    /// - Parameters:
+    ///   - query: The search query string.
+    ///   - candidate: The string to match against.
+    /// - Returns: True if candidate contains query.
     private func matches(_ query: String, _ candidate: String) -> Bool {
         candidate.range(of: query, options: .caseInsensitive) != nil
     }
 
+    /// Centers viewport on a search hit and selects its element.
+    /// - Parameter hit: The search result to jump to.
     private func jump(to hit: Hit) {
         // Resolve the entity code to its REAL card. Duplicate-code cards are
         // legal; first-in-paint-order wins (deterministic).
@@ -263,6 +284,9 @@ private struct DiagramSearchField: View {
         }
     }
 
+    /// Finds the first resolved element matching the entity code.
+    /// - Parameter entityCode: The entity code to search for.
+    /// - Returns: The matching element, or nil if not found.
     private func cardElement(entityCode: String) -> ResolvedElement? {
         func walk(_ element: ResolvedElement) -> ResolvedElement? {
             if case .entityCard(let model) = element.kind,

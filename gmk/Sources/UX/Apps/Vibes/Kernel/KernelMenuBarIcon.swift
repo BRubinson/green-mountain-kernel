@@ -12,10 +12,10 @@ enum KernelMenuBarIcon {
     /// the point size, so the drawing handler stays resolution-independent.
     private static let side: CGFloat = 18
 
-    /// Matched to an SF Symbol at `.regular` weight in the menu bar. Thinner
-    /// reads as a hairline against the system icons; thicker closes up the
-    /// snow line, whose zigzag has to stay wider than the pen that draws it —
-    /// see `snowLine`.
+    /// Matched to an SF Symbol at `.regular` weight in the menu bar.
+    ///
+    /// Thinner reads as a hairline against the system icons; thicker closes up the snow line, whose zigzag has to stay
+    /// wider than the pen that draws it — see `snowLine`.
     private static let stroke: CGFloat = 1.15
 
     static let image: NSImage = {
@@ -46,8 +46,12 @@ enum KernelMenuBarIcon {
         return image
     }()
 
-    /// A filled corner disc carrying the environment letter, knocked out of the
-    /// glyph. Drawn as a shape rather than a colour so the icon stays a template.
+    /// Draw a filled corner disc carrying the environment letter.
+    ///
+    /// Knocked out of the glyph and drawn as a shape rather than a colour so
+    /// the icon stays a template.
+    ///
+    /// - Parameter letter: The environment letter to draw.
     private static func drawEnvironmentBadge(_ letter: String) {
         let diameter: CGFloat = 9
         let rect = NSRect(
@@ -74,6 +78,7 @@ enum KernelMenuBarIcon {
         )
     }
 
+    /// Draw the glyph silhouette and snow line.
     private static func draw() {
         NSColor.black.setStroke()
 
@@ -86,6 +91,9 @@ enum KernelMenuBarIcon {
         line.stroke()
     }
 
+    /// Apply menu bar styling to a path.
+    ///
+    /// - Parameter path: The path to style.
     private static func style(_ path: NSBezierPath) {
         path.lineWidth = stroke
         // Round, like the symbols beside it. Mitred joins spike at the summit,
@@ -113,8 +121,9 @@ enum KernelMenuBarIcon {
     ]
 
     /// An open dip across the summit's two flanks, its ends solved against each flank so the
-    /// line meets the ridge instead of stopping short or crossing through. An outlined snow
-    /// CAP would read as a second mountain, so the snow line alone is the convention.
+    /// line meets the ridge instead of stopping short or crossing through.
+    ///
+    /// An outlined snow CAP would read as a second mountain, so the snow line alone is the convention.
     ///
     /// ONE dip is a size limit rather than a taste: above the snow line this mountain is about
     /// 4pt wide, so any tooth must clear BOTH flanks by more than a stroke width or its stroke
@@ -125,6 +134,12 @@ enum KernelMenuBarIcon {
         NSPoint(x: 12.80, y: 11.0),  // on the right flank
     ]
 
+    /// Create a path from a series of points.
+    ///
+    /// - Parameters:
+    ///   - points: The points to connect.
+    ///   - closed: Whether to close the path.
+    /// - Returns: The bezier path.
     private static func path(_ points: [NSPoint], closed: Bool) -> NSBezierPath {
         let path = NSBezierPath()
         path.move(to: points[0])

@@ -1,12 +1,20 @@
 import Foundation
 import Observation
 
-/// The route() → checkout-state edge. A protocol so DaemonConnectionModel
-/// stays free of concrete store types. No owner token: unlike the session
-/// registry's SwiftUI scopes, the sink is an app-lifetime singleton, so
-/// there is no successor-clobbering race to guard.
+/// The route() → checkout-state edge.
+///
+/// A protocol so DaemonConnectionModel stays free of concrete store types. No
+/// owner token: the sink is an app-lifetime singleton with no successor-
+/// clobbering race to guard.
 @MainActor
 protocol CheckoutEventSink: AnyObject {
+    /// Applies a checkout state change broadcast.
+    ///
+    /// - Parameters:
+    ///   - instanceUuid: The instance uuid whose checkout state changed.
+    ///   - headState: The head state string (`branch`, `detached`, `unavailable`).
+    ///   - currentBranch: The current branch name, or nil if not on a branch.
+    ///   - currentSessionCode: The slugged session code, or nil if detached.
     func applyCheckoutChange(
         instanceUuid: String,
         headState: String,
@@ -15,26 +23,29 @@ protocol CheckoutEventSink: AnyObject {
     )
 }
 
-/// Per-instance checked-out-session cache. The push edge is the daemon's
-/// CHECKOUT_CHANGE broadcast (FSEvents on instance git dirs live daemon-side
-/// as of v8) — the client watches nothing on disk. A broadcast's cheap fields
-/// (head state, raw branch, slugged code) publish immediately; the resolved
+/// Per-instance checked-out-session cache.
+///
+/// The daemon's CHECKOUT_CHANGE broadcasts cheap fields immediately; resolved
 /// `SessionStub` arrives via one coalesced INSTANCE_CURRENT_SESSION, keeping
-/// resolution daemon-side (no client catalog scan). Broadcasts are ephemeral
-/// (id 0, never replayed), so a reconnect resyncs every watched instance once
-/// per daemon generation.
+/// resolution daemon-side. Broadcasts are ephemeral, so a reconnect resyncs
+/// every watched instance once per daemon generation.
 @Observable
 @MainActor
 final class CheckoutWatcher: CheckoutEventSink {
-    /// Mirrors the wire's `head_state` string. `unavailable` (path gone / not
-    /// a repo) is NOT `detached` (a real checkout with no branch) — the
-    /// instance page says different things about them. Unknown wire values
-    /// degrade to `.unavailable` rather than fabricating state.
+    /// Mirrors the wire's `head_state` string.
+    ///
+    /// `unavailable` (path gone / not a repo) is NOT `detached` (a real
+    /// checkout with no branch) — the instance page says different things
+    /// about them. Unknown wire values degrade to `.unavailable` rather than
+    /// fabricating state.
     enum HeadState: Equatable, Sendable {
         case branch
         case detached
         case unavailable
 
+        /// Creates a head state from a wire string, degrading unknown values.
+        ///
+        /// - Parameter wire: The head state string from the daemon.
         init(wire: String) {
             switch wire {
             case "branch": self = .branch
@@ -50,23 +61,28 @@ final class CheckoutWatcher: CheckoutEventSink {
         /// against `SessionStub.code`; never unslug.
         let currentSessionCode: String?
         /// The RAW branch name (nil unless headState == .branch) — the wire's
-        /// display truth. The code stays slugged; the two are never
-        /// interconverted client-side.
+        /// display truth.
+        ///
+        /// The code stays slugged; the two are never interconverted client-side.
         let currentBranch: String?
         let session: SessionStub?
     }
 
-    /// Last-known state per instance uuid. Kept on RPC failure — checked-out
-    /// state is a display signal, and a daemon restart must not blank every
-    /// green ring. Absent entry = never resolved.
+    /// Last-known state per instance uuid.
+    ///
+    /// Kept on RPC failure — checked-out state is a display signal, and a
+    /// daemon restart must not blank every green ring. Absent entry = never
+    /// resolved.
     private(set) var stateByInstance: [String: CheckoutState] = [:]
 
-    /// Membership set the reconnect resync iterates. Instances leave it when
-    /// they leave the catalog.
+    /// Membership set the reconnect resync iterates.
+    ///
+    /// Instances leave it when they leave the catalog.
     private var watchedInstances: Set<String> = []
-    /// The daemon generation the last full resync ran against. Ephemeral
-    /// CHECKOUT_CHANGE broadcasts are lost while disconnected, so each
-    /// down→up transition re-resolves every watched instance exactly once.
+    /// The daemon generation the last full resync ran against.
+    ///
+    /// Ephemeral CHECKOUT_CHANGE broadcasts are lost while disconnected, so
+    /// each down→up transition re-resolves every watched instance exactly once.
     private var lastResyncGeneration = 0
     /// Per-instance trailing coalesce: back-to-back events (or a broadcast
     /// landing during a resync) must collapse to ONE round trip on the
@@ -78,29 +94,48 @@ final class CheckoutWatcher: CheckoutEventSink {
     // MARK: - Reads
 
     /// Is this session the checked-out one on its instance?
+    ///
     /// `session.code` IS the slugged branch; the daemon's code is authoritative.
+    ///
+    /// - Parameters:
+    ///   - sessionCode: The slugged session code to check.
+    ///   - instanceUuid: The instance uuid.
+    /// - Returns: True if `sessionCode` is the checked-out code on the instance.
     func isCheckedOut(sessionCode: String, instanceUuid: String) -> Bool {
         stateByInstance[instanceUuid]?.currentSessionCode == sessionCode
     }
 
     /// The slugged code of the checked-out branch on an instance, or nil.
+    ///
+    /// - Parameter instanceUuid: The instance uuid.
+    /// - Returns: The slugged session code, or nil if detached or unresolved.
     func checkedOutCode(instanceUuid: String) -> String? {
         stateByInstance[instanceUuid]?.currentSessionCode
     }
 
-    /// The resolved session row for the checked-out branch, or nil (detached,
-    /// unavailable, or no matching session row).
+    /// The resolved session row for the checked-out branch, or nil.
+    ///
+    /// Returns nil when the branch is detached, unavailable, or no matching
+    /// session row exists.
+    ///
+    /// - Parameter instanceUuid: The instance uuid.
+    /// - Returns: The session stub for the checked-out branch, or nil.
     func currentSession(instanceUuid: String) -> SessionStub? {
         stateByInstance[instanceUuid]?.session
     }
 
     // MARK: - Watch management
 
-    /// (Re)target the watch set. Called after every catalog refresh — it must
-    /// not burst N RPCs: on an unchanged set and generation it schedules
-    /// nothing. A generation bump resolves EVERY member once (missed
-    /// ephemeral broadcasts are unrecoverable); otherwise only new or
-    /// never-resolved instances resolve.
+    /// (Re)target the watch set.
+    ///
+    /// Called after every catalog refresh — it must not burst N RPCs: on an
+    /// unchanged set and generation it schedules nothing. A generation bump
+    /// resolves EVERY member once (missed ephemeral broadcasts are
+    /// unrecoverable); otherwise only new or never-resolved instances resolve.
+    ///
+    /// - Parameters:
+    ///   - instanceUuids: The set of instance uuids to watch.
+    ///   - generation: The current daemon generation number.
     func watch(instanceUuids: Set<String>, generation: Int) {
         for uuid in watchedInstances.subtracting(instanceUuids) {
             drop(instanceUuid: uuid)
@@ -115,8 +150,13 @@ final class CheckoutWatcher: CheckoutEventSink {
         }
     }
 
-    /// Add one instance to the watch set without dropping the others. The
-    /// first call to see a new generation resyncs the whole set.
+    /// Add one instance to the watch set without dropping the others.
+    ///
+    /// The first call to see a new generation resyncs the whole set.
+    ///
+    /// - Parameters:
+    ///   - instanceUuid: The instance uuid to watch.
+    ///   - generation: The current daemon generation number.
     func ensureWatching(instanceUuid: String, generation: Int) {
         let isNew = watchedInstances.insert(instanceUuid).inserted
         if generation != lastResyncGeneration {
@@ -127,6 +167,9 @@ final class CheckoutWatcher: CheckoutEventSink {
         }
     }
 
+    /// Removes an instance from the watch set and clears its state.
+    ///
+    /// - Parameter instanceUuid: The instance uuid to stop watching.
     private func drop(instanceUuid: String) {
         watchedInstances.remove(instanceUuid)
         refreshTasks[instanceUuid]?.cancel()
@@ -138,11 +181,19 @@ final class CheckoutWatcher: CheckoutEventSink {
 
     // MARK: - Event application (CheckoutEventSink)
 
-    /// Two-phase apply. The broadcast carries no resolved `SessionStub`, so:
-    /// publish everything it DOES carry now (every display surface is
-    /// satisfied), keeping the previous stub only while the code is unchanged
-    /// — a stub from the old branch is worse than none. Then one coalesced
-    /// round trip fills `session` authoritatively.
+    /// Two-phase apply.
+    ///
+    /// The broadcast carries no resolved `SessionStub`, so publish everything
+    /// it DOES carry now (every display surface is satisfied), keeping the
+    /// previous stub only while the code is unchanged — a stub from the old
+    /// branch is worse than none. Then one coalesced round trip fills `session`
+    /// authoritatively.
+    ///
+    /// - Parameters:
+    ///   - instanceUuid: The instance uuid whose checkout state changed.
+    ///   - headState: The head state string (`branch`, `detached`, `unavailable`).
+    ///   - currentBranch: The current branch name, or nil if not on a branch.
+    ///   - currentSessionCode: The slugged session code, or nil if detached.
     func applyCheckoutChange(
         instanceUuid: String,
         headState: String,
@@ -170,6 +221,11 @@ final class CheckoutWatcher: CheckoutEventSink {
 
     // MARK: - Resolution (daemon-side)
 
+    /// Schedules a coalesced refresh of an instance's session.
+    ///
+    /// Consecutive calls within 250ms are coalesced into a single RPC.
+    ///
+    /// - Parameter instanceUuid: The instance uuid to refresh.
     private func scheduleRefresh(instanceUuid: String) {
         refreshTasks[instanceUuid]?.cancel()
         // The slot is NOT cleared from inside the task: a task past its sleep
@@ -186,6 +242,11 @@ final class CheckoutWatcher: CheckoutEventSink {
         }
     }
 
+    /// Fetches the current session for an instance and updates state.
+    ///
+    /// Skips the update if the task was cancelled before the RPC completed.
+    ///
+    /// - Parameter instanceUuid: The instance uuid to refresh.
     private func refresh(instanceUuid: String) async {
         do {
             let response = try await service.instanceCurrentSession(instanceUuid: instanceUuid)

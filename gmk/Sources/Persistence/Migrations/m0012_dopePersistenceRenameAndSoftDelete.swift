@@ -10,6 +10,14 @@ extension Migrations {
     // rename needs. deleted_on is a whiteout marker reads do NOT filter out.
     // Target names are NEW, so no ALTER..RENAME: create with final REFERENCES
     // text, copy parent-first, drop child-first, `id` explicit, .deferred.
+
+    /// Registers the m0012 migration for dope persistence table rename.
+    ///
+    /// Renames dope_domain* tables to dope_persistence*, adds soft-delete and
+    /// masking columns, creates partial uniqueness indexes for deleted rows,
+    /// and adds foreign key and other supporting indexes.
+    ///
+    /// - Parameter migrator: The database migrator to register the migration with.
     static func m0012_dopePersistenceRenameAndSoftDelete(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0012_dopePersistenceRenameAndSoftDelete") { db in
             // Row counts BEFORE, so the copy is proven and not merely hoped

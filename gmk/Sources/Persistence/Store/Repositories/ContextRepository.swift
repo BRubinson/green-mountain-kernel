@@ -2,14 +2,20 @@ import Foundation
 import GRDB
 
 /// CONTEXT_ENSURE / CONTEXT_GET data access — the promoted ensure chain plus
-/// create-time-only kbite seeding. Runs INSIDE a Store-owned transaction;
-/// holds no dbQueue and never self-transacts.
+/// create-time-only kbite seeding.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts.
 struct ContextRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
-    /// Upsert project → instance → session from repo identity, seeding kbite
-    /// inheritance down the chain at CREATE time only.
+    /// Upserts project, instance, and session from repo identity.
+    ///
+    /// Seeds kbite inheritance down the chain at CREATE time only.
+    ///
+    /// - Parameter req: The ensure request with context payloads.
+    /// - Returns: The `ContextEnsureResponse`.
+    /// - Throws: Any database or persistence error.
     func ensureContext(_ req: ContextEnsureRequest) throws -> ContextEnsureResponse {
         let (projectUuid, createdProject) = try ensureProject(req.project)
         let (instanceUuid, createdInstance) = try ensureInstance(
@@ -49,7 +55,11 @@ struct ContextRepository: RepositoryContext {
         )
     }
 
-    /// Read-only resolution — never creates rows.
+    /// Read-only resolution of context without creating rows.
+    ///
+    /// - Parameter req: The get request with project code, instance name, and session code.
+    /// - Returns: The `ContextGetResponse`.
+    /// - Throws: Any database error.
     func getContext(_ req: ContextGetRequest) throws -> ContextGetResponse {
         let projectUuid = try self.projectUuid(code: req.projectCode)
         var instanceUuid: String?
@@ -82,9 +92,15 @@ struct ContextRepository: RepositoryContext {
 
     // MARK: - Identity lookups (shared by the read and the ensure chain)
 
-    /// A project is identified by its code, an instance by its name inside one
-    /// project, and a session by its code inside one instance — the same three
-    /// keys CONTEXT_GET resolves and the ensure chain tests before inserting.
+    /// Resolves a project UUID from its code.
+    ///
+    /// Projects are identified by code; instances by name within a project;
+    /// sessions by code within an instance. These are the same three keys that
+    /// CONTEXT_GET resolves and the ensure chain tests before inserting.
+    ///
+    /// - Parameter code: The project code.
+    /// - Returns: The project UUID, or `nil` if not found.
+    /// - Throws: Any database error.
     func projectUuid(code: String) throws -> String? {
         try ProjectRecord
             .filter(ProjectRecord.Columns.code == code)
@@ -92,6 +108,13 @@ struct ContextRepository: RepositoryContext {
             .fetchOne(db)
     }
 
+    /// Resolves an instance UUID from its project and name.
+    ///
+    /// - Parameters:
+    ///   - projectUuid: The parent project UUID.
+    ///   - name: The instance name.
+    /// - Returns: The instance UUID, or `nil` if not found.
+    /// - Throws: Any database error.
     func instanceUuid(projectUuid: String, name: String) throws -> String? {
         try InstanceRecord
             .filter(InstanceRecord.Columns.projectUuid == projectUuid)
@@ -100,6 +123,13 @@ struct ContextRepository: RepositoryContext {
             .fetchOne(db)
     }
 
+    /// Resolves a session UUID from its instance and code.
+    ///
+    /// - Parameters:
+    ///   - instanceUuid: The parent instance UUID.
+    ///   - code: The session code.
+    /// - Returns: The session UUID, or `nil` if not found.
+    /// - Throws: Any database error.
     func sessionUuid(instanceUuid: String, code: String) throws -> String? {
         try SessionRecord
             .filter(SessionRecord.Columns.instanceUuid == instanceUuid)
@@ -110,6 +140,11 @@ struct ContextRepository: RepositoryContext {
 
     // MARK: - Ensure chain (shared with addFileChange)
 
+    /// Creates a project or returns the existing one, seeding its kbites.
+    ///
+    /// - Parameter ctx: The project context.
+    /// - Returns: Tuple of the project UUID and a boolean indicating if created.
+    /// - Throws: Any database or persistence error.
     func ensureProject(_ ctx: ProjectContext) throws -> (uuid: String, created: Bool) {
         if let existing = try projectUuid(code: ctx.code) {
             return (existing, false)
@@ -117,19 +152,26 @@ struct ContextRepository: RepositoryContext {
         let uuid = try core.insertBase(
             db,
             table: "project",
-            uuid: ctx.uuid,
             extra: [
                 "git_repo_name": ctx.gitRepoName,
                 "code": ctx.code,
                 "name": ctx.name,
                 "gmfs_relative_storage_path": ctx.gmfsRelativeStoragePath,
-            ]
+            ],
+            uuid: ctx.uuid
         )
         try seedKbites(level: "project", ownerUuid: uuid, codes: ctx.kbiteCodes, parent: nil)
         try core.appendEvent(db, kind: .createProject, subjectUuid: uuid)
         return (uuid, true)
     }
 
+    /// Creates an instance or returns the existing one, seeding its kbites.
+    ///
+    /// - Parameters:
+    ///   - ctx: The instance context.
+    ///   - projectUuid: The parent project UUID.
+    /// - Returns: Tuple of the instance UUID and a boolean indicating if created.
+    /// - Throws: Any database or persistence error.
     func ensureInstance(
         _ ctx: InstanceContext,
         projectUuid: String
@@ -140,14 +182,14 @@ struct ContextRepository: RepositoryContext {
         let uuid = try core.insertBase(
             db,
             table: "instance",
-            uuid: ctx.uuid,
             extra: [
                 "project_uuid": projectUuid,
                 "code": ctx.code,
                 "name": ctx.name,
                 "absolute_file_system_path": ctx.absoluteFileSystemPath,
                 "gmfs_relative_storage_path": ctx.gmfsRelativeStoragePath,
-            ]
+            ],
+            uuid: ctx.uuid
         )
         try seedKbites(
             level: "instance",
@@ -159,6 +201,13 @@ struct ContextRepository: RepositoryContext {
         return (uuid, true)
     }
 
+    /// Creates a session or returns the existing one, seeding its kbites.
+    ///
+    /// - Parameters:
+    ///   - ctx: The session context.
+    ///   - instanceUuid: The parent instance UUID.
+    /// - Returns: Tuple of the session UUID and a boolean indicating if created.
+    /// - Throws: Any database or persistence error.
     func ensureSession(
         _ ctx: SessionContext,
         instanceUuid: String
@@ -169,7 +218,6 @@ struct ContextRepository: RepositoryContext {
         let uuid = try core.insertBase(
             db,
             table: "session",
-            uuid: ctx.uuid,
             extra: [
                 "instance_uuid": instanceUuid,
                 "code": ctx.code,
@@ -178,7 +226,8 @@ struct ContextRepository: RepositoryContext {
                 "goal": ctx.goal,
                 "status": SessionStatus.active.rawValue,
                 "gmfs_relative_storage_path": ctx.gmfsRelativeStoragePath,
-            ]
+            ],
+            uuid: ctx.uuid
         )
         try seedKbites(
             level: "session",
@@ -192,7 +241,11 @@ struct ContextRepository: RepositoryContext {
 
     // MARK: - Kbite seeding (create-time-only, mirrors inherit_kbite)
 
-    /// Upsert a kbite row by code, returning its uuid.
+    /// Upserts a kbite row by code, returning its UUID.
+    ///
+    /// - Parameter code: The kbite code.
+    /// - Returns: The kbite UUID.
+    /// - Throws: Any database error.
     func ensureKbite(code: String) throws -> String {
         if let existing =
             try KbiteRecord
@@ -205,10 +258,19 @@ struct ContextRepository: RepositoryContext {
         return try core.insertBase(db, table: "kbite", extra: ["code": code])
     }
 
-    /// Fill a newly created row's active-kbite junction: explicit codes from
-    /// the context payload, plus a copy of the parent level's junction rows
-    /// (create-time-only inheritance — existing rows are never re-seeded,
-    /// exactly like gm_session_startup.sh's inherit_kbite).
+    /// Seeds active kbites for a newly created context row.
+    ///
+    /// Populates the junction with explicit codes from the context payload,
+    /// plus a copy of the parent level's junction rows (create-time-only
+    /// inheritance). Existing rows are never re-seeded, exactly like
+    /// `gm_session_startup.sh`'s `inherit_kbite`.
+    ///
+    /// - Parameters:
+    ///   - level: The context level: `project`, `instance`, or `session`.
+    ///   - ownerUuid: The UUID of the newly created row.
+    ///   - codes: Explicit kbite codes to add; `nil` for none.
+    ///   - parent: Parent level and UUID for inheritance; `nil` to skip.
+    /// - Throws: Any database error.
     private func seedKbites(
         level: String,
         ownerUuid: String,

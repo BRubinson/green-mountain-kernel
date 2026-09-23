@@ -15,8 +15,15 @@ struct FileTreeNode: Identifiable, Hashable {
     var id: URL { url }
     var name: String { url.lastPathComponent }
 
-    // Recursively walk `url` to at most `maxDepth` levels. `nonisolated` + intended
-    // to be called from Task.detached so the disk I/O never touches the main actor.
+    /// Recursively walks a directory tree and returns a snapshot.
+    ///
+    /// Intended to be called from Task.detached so disk I/O never touches the main actor.
+    /// Includes hidden files except those prefixed with `.`, sorted by directory status then name.
+    ///
+    /// - Parameters:
+    ///   - url: The directory URL to walk.
+    ///   - maxDepth: The maximum recursion depth; defaults to 8.
+    /// - Returns: A tree node representing the directory and its contents.
     nonisolated static func walk(_ url: URL, maxDepth: Int = 8) -> FileTreeNode {
         let fm = FileManager.default
         let keys: [URLResourceKey] = [.isDirectoryKey, .contentModificationDateKey]

@@ -38,6 +38,9 @@ struct KBitePillBox: View {
         .glassEffect(.regular, in: .rect(cornerRadius: 14))
     }
 
+    /// Toggles the selection state of a kbite name, maintaining stable ordering.
+    ///
+    /// - Parameter name: The kbite name to toggle.
     private func toggle(_ name: String) {
         if selected.contains(name) {
             selected.removeAll { $0 == name }
@@ -87,6 +90,13 @@ private struct KBitePill: View {
 private struct KBiteFlowLayout: Layout {
     var spacing: CGFloat = 6
 
+    /// Calculates the size needed to fit all subviews with wrapping.
+    ///
+    /// - Parameters:
+    ///   - proposal: The proposed available size.
+    ///   - subviews: The subviews to layout.
+    ///   - _: Layout cache (unused).
+    /// - Returns: The total size needed for all rows and columns.
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
         var rowWidth: CGFloat = 0
@@ -107,6 +117,13 @@ private struct KBiteFlowLayout: Layout {
         return CGSize(width: maxWidth.isFinite ? maxWidth : rowWidth, height: totalHeight)
     }
 
+    /// Places subviews in rows within the bounds, wrapping as needed.
+    ///
+    /// - Parameters:
+    ///   - bounds: The available layout bounds.
+    ///   - _: Proposed size (unused).
+    ///   - subviews: The subviews to place.
+    ///   - _: Layout cache (unused).
     func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
         var x = bounds.minX
         var y = bounds.minY

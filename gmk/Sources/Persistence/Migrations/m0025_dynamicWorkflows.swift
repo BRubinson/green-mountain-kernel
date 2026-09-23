@@ -10,6 +10,9 @@ extension Migrations {
     // The data transformations below rewrite history deliberately: exploration
     // summaries become agent_type='synthesis', key files become findings, and
     // clarification text is preserved as a care_package row per summary.
+    /// Registers the dynamic workflows migration.
+    ///
+    /// - Parameter migrator: The database migrator to register the migration with.
     static func m0025_dynamicWorkflows(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0025_dynamicWorkflows") { db in
             // ---- Stash rows whose source columns are about to drop.

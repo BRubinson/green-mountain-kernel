@@ -38,6 +38,15 @@ struct GmAgentCdeInitArguments: Sendable {
     )
     var detail: String?
 
+    /// Initializes arguments for the cde init tool.
+    ///
+    /// - Parameters:
+    ///   - op: The operation to perform (default: `"run"`).
+    ///   - selector: A prompt identifier selector.
+    ///   - variant: The workflow variant (default: `"bot"`).
+    ///   - create: Whether to create a prompt if not found.
+    ///   - name: The name for a new prompt.
+    ///   - detail: The detail text for a new prompt.
     init(
         op: String = GmAgentCdeInitTool.Op.run.rawValue,
         selector: String? = nil,
@@ -82,6 +91,7 @@ struct GmAgentCdeInitTool: GmAgentCdeTool {
         )
     ]
 
+    /// Initializes the cde init tool.
     init() {}
 }
 
@@ -160,6 +170,22 @@ struct GmAgentCdePromptArguments: Sendable {
     @Guide(description: "Page budget in bytes; every array and every long text is paged inside it.")
     var page_bytes: Int?
 
+    /// Initializes arguments for the cde prompt tool.
+    ///
+    /// - Parameters:
+    ///   - op: The operation to perform.
+    ///   - prompt_uuid: The prompt's identifier.
+    ///   - selector: A prompt selector for listing.
+    ///   - session_uuid: The session's identifier.
+    ///   - expected_version: The prompt's last-read version.
+    ///   - detail: The prompt's detail text.
+    ///   - backstory: The prompt's backstory.
+    ///   - goal: The prompt's goal.
+    ///   - status: The new status when transitioning.
+    ///   - path: A repo-relative path for file changes.
+    ///   - limit: The maximum number of file changes to return.
+    ///   - cursor: A pagination cursor for continued reads.
+    ///   - page_bytes: The page size budget in bytes.
     init(
         op: String,
         prompt_uuid: String? = nil,
@@ -220,14 +246,14 @@ struct GmAgentCdePromptTool: GmAgentCdeTool {
         GmAgentToolOp(
             Op.load,
             verbs: [.botGet, .promptGet],
-            narrowing: CdeNarrowing(
-                parameters: ["cursor", "page_bytes"],
-                retryWith: "cde_prompt op=load with cursor = page.next_cursor"
-            ),
             summary: """
                 The prompt this workflow is on. Reading it never advances it; its detail, \
                 backstory and goal arrive as text windows.
-                """
+                """,
+            narrowing: CdeNarrowing(
+                parameters: ["cursor", "page_bytes"],
+                retryWith: "cde_prompt op=load with cursor = page.next_cursor"
+            )
         ),
         GmAgentToolOp(
             Op.list,
@@ -237,34 +263,35 @@ struct GmAgentCdePromptTool: GmAgentCdeTool {
         GmAgentToolOp(
             Op.draft,
             verbs: [.promptUpdateContent],
-            requiredParams: ["prompt_uuid", "expected_version"],
             summary: """
                 Edit a DRAFT prompt's stay-true triple. The daemon refuses once the prompt \
                 has left draft, so re-open it first.
-                """
+                """,
+            requiredParams: ["prompt_uuid", "expected_version"]
         ),
         GmAgentToolOp(
             Op.setStatus,
             verbs: [.promptSetStatus],
-            requiredParams: ["prompt_uuid", "expected_version", "status"],
             summary: """
                 THE ONLY DOOR THAT MOVES A PROMPT, and it claims or releases the prompt's \
                 activation for this instance. It creates no summaries. Primary only.
-                """
+                """,
+            requiredParams: ["prompt_uuid", "expected_version", "status"]
         ),
         GmAgentToolOp(
             Op.fileChanges,
             verbs: [.fileChangeList],
-            narrowing: CdeNarrowing(
-                parameters: ["cursor", "page_bytes", "path", "limit"],
-                retryWith: "cde_prompt op=file_changes with cursor = page.next_cursor; path for one file"
-            ),
             summary: """
                 READ ONLY: what the machine believes you have touched. Capture belongs to \
                 the PostToolUse hook, so there is no op here that writes one.
-                """
+                """,
+            narrowing: CdeNarrowing(
+                parameters: ["cursor", "page_bytes", "path", "limit"],
+                retryWith: "cde_prompt op=file_changes with cursor = page.next_cursor; path for one file"
+            )
         ),
     ]
 
+    /// Initializes the cde prompt tool.
     init() {}
 }

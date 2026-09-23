@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `prompt` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `prompt` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct PromptRecord: BaseRecordFields, TableRecord, SeqOrdered {
     static let databaseTableName = "prompt"
 

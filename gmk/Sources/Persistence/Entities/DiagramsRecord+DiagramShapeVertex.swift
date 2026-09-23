@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `diagram_shape_vertex` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `diagram_shape_vertex` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DiagramShapeVertexRecord: BaseRecordFields, TableRecord, SeqOrdered {
     static let databaseTableName = "diagram_shape_vertex"
 

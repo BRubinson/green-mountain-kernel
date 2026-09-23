@@ -41,7 +41,14 @@ struct ScreenScaffold<Sidebar: View, Content: View>: View {
 }
 
 extension ScreenScaffold where Sidebar == EmptyView {
+    /// Initializes a screen scaffold with no sidebar, hosting content in a stack.
+    ///
     /// Plain shape: a `NavigationStack` hosting the content.
+    ///
+    /// - Parameters:
+    ///   - title: Optional title text to display.
+    ///   - subtitle: Optional subtitle text to display.
+    ///   - content: A view builder closure that provides the main content.
     init(
         title: String? = nil,
         subtitle: String? = nil,

@@ -2,27 +2,28 @@ import CoreGraphics
 import Foundation
 
 /// Pure, SwiftUI-free hit resolution over the resolved value — the ONLY
-/// place a host gesture becomes a target. Every SwiftUI render layer stays
-/// non-hit-testing; the host's single top-level DragGesture converts its
-/// location to diagram space and asks here (the proven DrawingCanvasView
-/// discipline: one gesture, manual hit-testing, no competing recognizers).
+/// place a host gesture becomes a target.
 ///
-/// Deliberately outside any `#if canImport(SwiftUI)` guard so the tests run
-/// in plain XCTest.
+/// Non-hit-testing SwiftUI layers; the host's DragGesture converts location
+/// to diagram space. Deliberately outside `#if canImport(SwiftUI)` so tests
+/// run in plain XCTest.
 enum DiagramHit: Sendable {
     case element(ResolvedElement)
     case edge(ResolvedEdge)
 }
 
 extension ResolvedDiagram {
-    /// Hit test in THREE ordered passes: entity cards in reverse paint order, then
-    /// edges by tolerance band over the routed polyline, then scope outlines. That
-    /// deviates from strict reverse paint order because a fallback edge crossing a
-    /// card must not steal the card's drag, and a scope outline's frame is the
-    /// union of its children, so scope-before-edge would swallow every edge inside
-    /// it. `point` is DIAGRAM space, and a `.layer` is descended into but NEVER
-    /// returned. `includeInk` opts strokes and shapes into the third pass, strokes
-    /// by distance to their polyline inflated by half their line width.
+    /// Performs a hit test at the given point using three ordered passes.
+    ///
+    /// Cards in reverse paint order, then edges by tolerance, then outlines.
+    /// Deviates from paint order: fallback edges don't steal cards, and
+    /// scope outline frames are unions of children.
+    ///
+    /// - Parameters:
+    ///   - point: The test point in diagram space.
+    ///   - edgeTolerance: The tolerance band for edge detection; default 6.
+    ///   - includeInk: Whether to include ink strokes; default false.
+    /// - Returns: The hit element or edge, or nil if nothing is hit.
     func hitTest(
         at point: CGPoint,
         edgeTolerance: CGFloat = 6,
@@ -65,7 +66,10 @@ extension ResolvedDiagram {
         return nil
     }
 
-    /// Depth-first lookup by uuid (paint order, first match).
+    /// Finds an element by uuid using depth-first search in paint order.
+    ///
+    /// - Parameter uuid: The element uuid to find.
+    /// - Returns: The matching element, or nil if not found.
     func element(uuid: String) -> ResolvedElement? {
         func find(_ element: ResolvedElement) -> ResolvedElement? {
             if element.uuid == uuid { return element }
@@ -80,6 +84,15 @@ extension ResolvedDiagram {
         return nil
     }
 
+    /// Recursively tests hit on an element and its children.
+    ///
+    /// - Parameters:
+    ///   - element: The element to test.
+    ///   - point: The test point in diagram space.
+    ///   - cardsOnly: Whether to test cards only.
+    ///   - includeInk: Whether to include ink strokes.
+    ///   - inkTolerance: The ink tolerance distance.
+    /// - Returns: The hit element, or nil if not hit.
     private static func hitElement(
         _ element: ResolvedElement,
         at point: CGPoint,
@@ -143,8 +156,15 @@ extension ResolvedDiagram {
         }
     }
 
-    /// Point-to-segment distance (the Drawing/Geometry formula, kit-resident
-    /// because the module boundary is a hard wall).
+    /// Returns the closest distance from a point to a line segment.
+    ///
+    /// Uses the Drawing/Geometry formula, kit-resident due to module boundary.
+    ///
+    /// - Parameters:
+    ///   - p: The point to measure from.
+    ///   - a: The segment start point.
+    ///   - b: The segment end point.
+    /// - Returns: The distance from p to the closest point on segment a-b.
     static func distance(_ p: CGPoint, segment a: CGPoint, _ b: CGPoint) -> CGFloat {
         let ab = CGPoint(x: b.x - a.x, y: b.y - a.y)
         let lengthSquared = ab.x * ab.x + ab.y * ab.y

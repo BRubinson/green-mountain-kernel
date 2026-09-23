@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `dope_cog_element` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `dope_cog_element` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DopeCogElementRecord: BaseRecordFields, TableRecord, SoftDeletable {
     static let databaseTableName = "dope_cog_element"
     var uuid: String

@@ -2,8 +2,10 @@ import SwiftUI
 
 /// The Lucidchart-style browse surface both diagram pages share: a searchable
 /// LazyVGrid of thumbnail-first cards over DIAGRAM_SEARCH (empty query =
-/// recency browse, typed query = FTS, debounced). The host owns creation and
-/// per-tier row actions; this view owns fetch, live refresh, and the grid.
+/// recency browse, typed query = FTS, debounced).
+///
+/// The host owns creation and per-tier row actions; this view owns fetch, live
+/// refresh, and the grid.
 struct DiagramGalleryView<CardMenu: View>: View {
     @Environment(DaemonConnectionModel.self) private var daemon
     @Environment(DiagramCatalogStore.self) private var diagrams
@@ -167,6 +169,11 @@ private struct DiagramGalleryCard<Menu: View>: View {
         badge(row.tier, tint: .secondary)
     }
 
+    /// Renders a colored badge with text.
+    /// - Parameters:
+    ///   - text: The badge text.
+    ///   - tint: The badge color.
+    /// - Returns: The styled badge view.
     private func badge(_ text: String, tint: Color) -> some View {
         Text(text)
             .font(.caption2.weight(.semibold))
@@ -177,8 +184,9 @@ private struct DiagramGalleryCard<Menu: View>: View {
     }
 }
 
-/// A resolve scaled to fit its container — the live-view thumbnail. Hit
-/// testing is off wholesale: the card's button owns the click.
+/// A resolve scaled to fit its container — the live-view thumbnail.
+///
+/// Hit testing is off wholesale: the card's button owns the click.
 private struct DiagramThumbnailView: View {
     let resolved: ResolvedDiagram
 

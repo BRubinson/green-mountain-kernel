@@ -27,7 +27,9 @@ struct TestRunRecord: BaseRecordFields, TableRecord {
     /// make claiming fail on registration ORDERING rather than on anything
     /// about the claim.
     var agentId: String?
-    /// The ephemeral root this run owns. Whatever generates it must keep it
+    /// The ephemeral root this run owns.
+    ///
+    /// Whatever generates it must keep it
     /// SHORT: `sun_path` is 104 bytes on macOS and the server binds
     /// `NWEndpoint.unix(path:)` beneath this root, so a long path yields a
     /// listener that cannot bind.

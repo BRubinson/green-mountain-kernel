@@ -9,6 +9,8 @@ extension Migrations {
     // Values are corrected to THIS kernel's resolved root. The LIKE guard keeps
     // this a no-op on healthy rows, including a row deliberately pointed
     // elsewhere, because such a row does not name the retired root.
+    /// Registers the m0030 migration to update retired root config values.
+    /// - Parameter migrator: The database migrator to register the migration with.
     static func m0030_retiredRootConfigValues(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0030_retiredRootConfigValues") { db in
             let root = Paths.root.path

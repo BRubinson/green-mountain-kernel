@@ -5,9 +5,10 @@ import FoundationModels
 
 struct GmAgentCdeRpirSearchTool: GmAgentRpirTool {
 
-    /// The record the search is pinned to. The kinds filter is applied by the
-    /// scope rather than by the caller, so "search explorations" cannot widen
-    /// into "search everything".
+    /// The record the search is pinned to.
+    ///
+    /// The kinds filter is applied by the scope rather than by the caller, so
+    /// "search explorations" cannot widen into "search everything".
     enum Op: String, CaseIterable, Sendable {
 
         case exploration
@@ -25,37 +26,37 @@ struct GmAgentCdeRpirSearchTool: GmAgentRpirTool {
         GmAgentToolOp(
             Op.exploration,
             verbs: [.search],
+            summary: "Find old exploration findings by words in them.",
             narrowing: searchNarrowing(.exploration),
-            requiredParams: ["query"],
-            summary: "Find old exploration findings by words in them."
+            requiredParams: ["query"]
         ),
         GmAgentToolOp(
             Op.clarification,
             verbs: [.search],
+            summary: "Find old clarification questions and notes by words in them.",
             narrowing: searchNarrowing(.clarification),
-            requiredParams: ["query"],
-            summary: "Find old clarification questions and notes by words in them."
+            requiredParams: ["query"]
         ),
         GmAgentToolOp(
             Op.architecture,
             verbs: [.search],
+            summary: "Find old architecture plans by words in them — summaries and their change rows.",
             narrowing: searchNarrowing(.architecture),
-            requiredParams: ["query"],
-            summary: "Find old architecture plans by words in them — summaries and their change rows."
+            requiredParams: ["query"]
         ),
         GmAgentToolOp(
             Op.architectureOption,
             verbs: [.search],
+            summary: "Find one architect's proposed option by words in it.",
             narrowing: searchNarrowing(.architectureOption),
-            requiredParams: ["query"],
-            summary: "Find one architect's proposed option by words in it."
+            requiredParams: ["query"]
         ),
         GmAgentToolOp(
             Op.review,
             verbs: [.search],
+            summary: "Find old review findings by words in them.",
             narrowing: searchNarrowing(.review),
-            requiredParams: ["query"],
-            summary: "Find old review findings by words in them."
+            requiredParams: ["query"]
         ),
     ]
 
@@ -71,6 +72,7 @@ struct GmAgentCdeRpirSearchTool: GmAgentRpirTool {
 
     typealias Output = String
 
+    /// Creates a search tool instance.
     init() {}
 
     // Argument property names ARE the served tool's snake_case wire argument names.
@@ -104,6 +106,15 @@ struct GmAgentCdeRpirSearchTool: GmAgentRpirTool {
         )
         var page_bytes: Int?
 
+        /// Creates search tool arguments.
+        ///
+        /// - Parameters:
+        ///   - scope: Which record to search.
+        ///   - query: Words to search for.
+        ///   - session_uuid: Optional session UUID to limit search scope.
+        ///   - limit: Maximum results to return (1-500).
+        ///   - cursor: Opaque page cursor for continuation.
+        ///   - page_bytes: Page budget in bytes (default 30000, max 45000).
         init(
             scope: String,
             query: String,
@@ -123,8 +134,13 @@ struct GmAgentCdeRpirSearchTool: GmAgentRpirTool {
     // swiftlint:enable identifier_name
 }
 
-/// Quotes the scope back in the retry advice, so an over-budget hit list names
-/// the call that produced it rather than the tool alone.
+/// Creates narrowing advice for a record search.
+///
+/// Quotes the scope back in the retry advice so an over-budget hit list names the call
+/// that produced it rather than the tool alone.
+///
+/// - Parameter op: The record scope being searched.
+/// - Returns: A narrowing suggestion with scope context.
 private func searchNarrowing(_ op: GmAgentCdeRpirSearchTool.Op) -> CdeNarrowing {
     pagedNarrowing("\(GmAgentCdeRpirSearchTool.toolName) scope=\(op.rawValue)")
 }

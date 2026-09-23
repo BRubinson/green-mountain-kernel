@@ -20,6 +20,8 @@ struct CdeExplorationSummaryStub: Encodable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a paged stub from an exploration summary row.
+    /// - Parameter row: The exploration summary row to transform.
     init(_ row: ExplorationSummaryRow) {
         uuid = row.uuid
         version = row.version
@@ -44,6 +46,8 @@ struct CdeReviewSummaryStub: Encodable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a paged stub from a review summary row.
+    /// - Parameter row: The review summary row to transform.
     init(_ row: ReviewSummaryRow) {
         uuid = row.uuid
         version = row.version
@@ -67,6 +71,8 @@ struct CdeArchitectureSummaryStub: Encodable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a paged stub from an architecture summary row.
+    /// - Parameter row: The architecture summary row to transform.
     init(_ row: ArchitectureSummaryRow) {
         uuid = row.uuid
         version = row.version
@@ -95,6 +101,8 @@ struct CdeBriefingStub: Encodable {
     let createdAt: String
     let updatedAt: String
 
+    /// Creates a paged stub from an agent briefing row.
+    /// - Parameter row: The agent briefing row to transform.
     init(_ row: AgentBriefingRow) {
         uuid = row.uuid
         version = row.version
@@ -123,7 +131,16 @@ struct CdeExplorationPage: Encodable {
     let windows: [CdeTextWindow]
     let page: CdePage
 
+    /// Builds an exploration page from a daemon response.
+    ///
     /// `findingUuid` pins one full row and empties every other region.
+    ///
+    /// - Parameters:
+    ///   - response: The exploration response from the daemon.
+    ///   - pager: The pager managing this page's result window.
+    ///   - findingUuid: The uuid of a finding to focus, or nil for the full page.
+    /// - Returns: The exploration page.
+    /// - Throws: `ToolError` when the finding uuid is not found in the response.
     static func build(
         _ response: ExploreGetResponse,
         pager: inout CdePager,
@@ -172,6 +189,13 @@ struct CdeReviewPage: Encodable {
     let windows: [CdeTextWindow]
     let page: CdePage
 
+    /// Builds a review page from a daemon response.
+    /// - Parameters:
+    ///   - response: The review response from the daemon.
+    ///   - pager: The pager managing this page's result window.
+    ///   - findingUuid: The uuid of a finding to focus, or nil for the full page.
+    /// - Returns: The review page.
+    /// - Throws: `ToolError` when the finding uuid is not found in the response.
     static func build(
         _ response: ReviewGetResponse,
         pager: inout CdePager,
@@ -209,6 +233,13 @@ struct CdeClarificationPage: Encodable {
     let carePackageStub: CarePackageStub?
     let page: CdePage
 
+    /// Builds a clarification page from a daemon response.
+    /// - Parameters:
+    ///   - response: The clarification response from the daemon.
+    ///   - pager: The pager managing this page's result window.
+    ///   - noteUuid: The uuid of a note to focus, or nil for the full page.
+    /// - Returns: The clarification page.
+    /// - Throws: `ToolError` when the note uuid is not found in the response.
     static func build(
         _ response: ClarifyGetResponse,
         pager: inout CdePager,
@@ -253,6 +284,13 @@ struct CdeCarePackagePage: Encodable {
     let windows: [CdeTextWindow]
     let page: CdePage
 
+    /// Builds a care package page from a care package row.
+    /// - Parameters:
+    ///   - package: The care package row to page.
+    ///   - pager: The pager managing this page's result window.
+    ///   - refUuid: The uuid of an exploration ref to focus, or nil for the full page.
+    /// - Returns: The care package page.
+    /// - Throws: `ToolError` when the ref uuid is not found in the package.
     static func build(
         _ package: CarePackageRow,
         pager: inout CdePager,
@@ -305,8 +343,19 @@ struct CdeArchitecturePage: Encodable {
     let windows: [CdeTextWindow]
     let page: CdePage
 
-    /// Built from the UNNARROWED daemon response: every option body and every
-    /// change_code is in hand, and this layer decides what becomes a window.
+    /// Builds an architecture page from a daemon response.
+    ///
+    /// Built from the unnarrowed daemon response: every option body and every
+    /// change code is in hand, and this layer decides what becomes a window.
+    ///
+    /// - Parameters:
+    ///   - response: The architecture response from the daemon.
+    ///   - pager: The pager managing this page's result window.
+    ///   - optionUuid: The uuid of an option to focus, or nil for all options.
+    ///   - changeUuid: The uuid of a general change to focus, or nil for all changes.
+    ///   - limit: The maximum number of general changes to include, or nil for all.
+    /// - Returns: The architecture page.
+    /// - Throws: `ToolError` when an option or change uuid is not found in the response.
     static func build(
         _ response: ArchGetResponse,
         pager: inout CdePager,
@@ -382,6 +431,12 @@ struct CdeFileChangePage: Encodable {
     let changes: [FileChangeRow]
     let page: CdePage
 
+    /// Builds a file change page from a daemon response.
+    /// - Parameters:
+    ///   - response: The file change list response from the daemon.
+    ///   - pager: The pager managing this page's result window.
+    /// - Returns: The file change page.
+    /// - Throws: Any error from the pager.
     static func build(_ response: FileChangeListResponse, pager: inout CdePager) throws -> Self {
         Self(changes: try pager.rows("changes", response.changes), page: try pager.page())
     }
@@ -392,6 +447,12 @@ struct CdeHitsPage<Hit: Encodable>: Encodable {
     let hits: [Hit]
     let page: CdePage
 
+    /// Builds a generic hits page from ranked search results.
+    /// - Parameters:
+    ///   - hits: The ranked search hits to page.
+    ///   - pager: The pager managing this page's result window.
+    /// - Returns: The hits page.
+    /// - Throws: Any error from the pager.
     static func build(_ hits: [Hit], pager: inout CdePager) throws -> Self {
         Self(hits: try pager.rows("hits", hits), page: try pager.page())
     }
@@ -402,7 +463,15 @@ struct CdeCatalogPage: Encodable {
     let sessions: [SessionStub]
     let page: CdePage
 
+    /// Builds a catalog page showing sessions and their parent instances.
+    ///
     /// Sessions page; instances are the parents of the sessions on the page.
+    ///
+    /// - Parameters:
+    ///   - response: The catalog search response from the daemon.
+    ///   - pager: The pager managing this page's result window.
+    /// - Returns: The catalog page with sessions and their parent instances.
+    /// - Throws: Any error from the pager.
     static func build(_ response: CatalogSearchResponse, pager: inout CdePager) throws -> Self {
         let sessions = try pager.rows("sessions", response.sessions)
         let parents = Set(sessions.map(\.instanceUuid))
@@ -419,6 +488,12 @@ struct CdePromptPage: Encodable {
     let windows: [CdeTextWindow]
     let page: CdePage
 
+    /// Builds a prompt page from a daemon response.
+    /// - Parameters:
+    ///   - response: The prompt response from the daemon.
+    ///   - pager: The pager managing this page's result window.
+    /// - Returns: The prompt page.
+    /// - Throws: Any error from the pager.
     static func build(_ response: PromptGetResponse, pager: inout CdePager) throws -> Self {
         let row = response.prompt
         let stub = PromptStub(
@@ -430,9 +505,9 @@ struct CdePromptPage: Encodable {
             status: row.status,
             version: row.version,
             gmfsRelativeStoragePath: row.gmfsRelativeStoragePath,
-            reports: nil,
             createdAt: row.createdAt,
-            updatedAt: row.updatedAt
+            updatedAt: row.updatedAt,
+            reports: nil
         )
         pager.charge(stub)
         pager.charge(response.kbiteCodes)
@@ -463,6 +538,12 @@ struct CdeBriefingPage: Encodable {
     let fileChangeRefs: [AgentBriefingFileChangeRefRow]
     let page: CdePage
 
+    /// Builds a briefing page from a daemon response.
+    /// - Parameters:
+    ///   - response: The briefing response from the daemon.
+    ///   - pager: The pager managing this page's result window.
+    /// - Returns: The briefing page.
+    /// - Throws: Any error from the pager.
     static func build(_ response: BriefingGetResponse, pager: inout CdePager) throws -> Self {
         let stub = CdeBriefingStub(response.briefing)
         pager.charge(stub)

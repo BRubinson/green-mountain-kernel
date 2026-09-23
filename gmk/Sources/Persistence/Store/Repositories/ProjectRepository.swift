@@ -1,14 +1,19 @@
 import Foundation
 import GRDB
 
-/// Data access for the project table. Runs INSIDE a Store-owned transaction;
-/// holds no dbQueue and never self-transacts. `core` grants the shared write
-/// primitives and nothing else, so that is now structural rather than a
-/// promise: there is no public verb to reach and no queue to re-enter.
+/// Data access for the project table.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts. `core` grants the shared write
+/// primitives and nothing else, so that is now structural rather than a promise: there is no public verb to reach and
+/// no queue to re-enter.
 struct ProjectRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
+    /// Updates the project's primary branch.
+    /// - Parameter req: The request with project uuid, branch, and expected version.
+    /// - Returns: The updated project row.
+    /// - Throws: `StoreError.badRequest` if the branch is blank; `StoreError.notFound` if not found.
     func update(_ req: ProjectUpdateRequest) throws -> ProjectRow {
         var set: [String: (any DatabaseValueConvertible)?] = [:]
         if let branch = req.primaryProjectBranch {
@@ -45,6 +50,10 @@ struct ProjectRepository: RepositoryContext {
         return row
     }
 
+    /// Fetches a project row by its uuid.
+    /// - Parameter uuid: The project uuid.
+    /// - Returns: The project row, or nil if not found.
+    /// - Throws: Any database error during the fetch.
     func fetchRow(uuid: String) throws -> ProjectRow? {
         try ProjectRecord.fetch(db, uuid: uuid)?.dto()
     }

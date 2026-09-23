@@ -1,9 +1,10 @@
 import Foundation
 
-/// The six DOPED tree levels. `enumeration`'s and `persistence`'s raw-value
-/// renames are wire-safe: the CodingKeys hazard documented in Envelope.swift
-/// applies to property keys under the snake_case strategies, not to enum raw
-/// values.
+/// The six DOPED tree levels.
+///
+/// `enumeration`'s and `persistence`'s raw-value renames are wire-safe: the
+/// CodingKeys hazard documented in Envelope.swift applies to property keys
+/// under the snake_case strategies, not to enum raw values.
 enum DopeLevel: String, Codable, Hashable, CaseIterable, Sendable {
     case scope
     /// Renamed from `domain` when the Dope*Domain* vocabulary became
@@ -15,18 +16,24 @@ enum DopeLevel: String, Codable, Hashable, CaseIterable, Sendable {
     case enumeration = "enum"
     case option
 
-    /// Accepts the retired "domain" spelling so a stale peer, a scripted
-    /// call, or a queued request still resolves. Decoding is tolerant;
-    /// encoding always emits the current raw value.
+    /// Creates a dope level from a wire spelling, accepting retired spellings.
+    ///
+    /// Decoding is tolerant of the retired "domain" spelling so a stale peer,
+    /// scripted call, or queued request still resolves correctly. Encoding always
+    /// emits the current raw value.
+    ///
+    /// - Parameter raw: The wire spelling of the level.
     init?(fromWire raw: String) {
         if raw == "domain" { self = .persistence; return }
         self.init(rawValue: raw)
     }
 }
 
-/// Field identifiers a granular node mutation may carry. Which subset is
-/// legal at which level is the registry's `ownedFields` — stated once, so a
-/// misdirected field is a precise BAD_REQUEST instead of a silent no-op.
+/// Field identifiers a granular node mutation may carry.
+///
+/// Which subset is legal at which level is the registry's `ownedFields` —
+/// stated once, so a misdirected field is a precise BAD_REQUEST instead of a
+/// silent no-op.
 enum DopeField: String, Codable, Hashable, CaseIterable, Sendable {
     case code, name, description, sortOrder
     case entityType, repoRepresentativeFile, baseComposableUuid
@@ -35,6 +42,7 @@ enum DopeField: String, Codable, Hashable, CaseIterable, Sendable {
 }
 
 /// One level's registration: table name, parent linkage, legal field set.
+///
 /// The registry is the single truth consumed by the generic store mutations,
 /// the tree fetch, the projection, and the validator — adding a level later
 /// is one entry here plus one CLI verb triple.
@@ -102,6 +110,10 @@ struct DopeLevelSpec: Sendable {
         return Dictionary(uniqueKeysWithValues: specs.map { ($0.level, $0) })
     }()
 
+    /// Returns the registration spec for a dope level.
+    ///
+    /// - Parameter level: The dope level to look up.
+    /// - Returns: The level's registration spec.
     static func spec(for level: DopeLevel) -> DopeLevelSpec {
         // The registry is total over DopeLevel by construction.
         all[level]!
@@ -125,10 +137,13 @@ enum DopeScopeType: String, Codable, Hashable, CaseIterable, Sendable {
     /// Personal, db-only overlay masking SESSION_INSTANCE.
     case sessionInstanceItem = "SESSION_INSTANCE_ITEM"
 
-    /// Accepts the retired on-disk/wire spellings. Every committed
-    /// main.doped.json says "SESSION_BASE"; the file self-updates on its next
-    /// write-repo. Decoding is tolerant, encoding always emits the current
-    /// raw value.
+    /// Creates a dope scope type from a wire spelling, accepting retired spellings.
+    ///
+    /// Decoding is tolerant of retired on-disk/wire spellings; every committed
+    /// main.doped.json says "SESSION_BASE" and the file self-updates on its next
+    /// write-repo. Encoding always emits the current raw value.
+    ///
+    /// - Parameter raw: The wire spelling of the scope type.
     init?(fromWire raw: String) {
         switch raw {
         case "SESSION_BASE": self = .sessionInstance
@@ -137,9 +152,11 @@ enum DopeScopeType: String, Codable, Hashable, CaseIterable, Sendable {
         }
     }
 
-    /// True for the two personal masking tiers. Expressed ONCE so
-    /// overlay-vs-base logic is never re-derived from `promptUuid == nil`,
-    /// which would compile and be silently wrong for a PROJECT_ITEM.
+    /// True for the two personal masking tiers.
+    ///
+    /// Expressed ONCE so overlay-vs-base logic is never re-derived from
+    /// `promptUuid == nil`, which would compile and be silently wrong for a
+    /// PROJECT_ITEM.
     var isOverlay: Bool { self == .projectItem || self == .sessionInstanceItem }
 
     /// The tier this one masks, or nil for a base tier.

@@ -13,8 +13,9 @@ struct BotLauncherCluster: View {
     /// prompts by seq, not uuid.
     let seq: Int
 
-    /// The one piece of persisted state Feature 1 adds. Bound straight to the
-    /// picker, so setting the default IS the write; no sheet, no save button.
+    /// The one piece of persisted state Feature 1 adds.
+    ///
+    /// Bound straight to the picker, so setting the default IS the write; no sheet, no save button.
     @AppStorage(BotLauncherPreference.key) private var defaultTier = BotLauncherPreference.fallback
 
     var body: some View {
@@ -55,27 +56,30 @@ struct BotLauncherCluster: View {
 
     // MARK: - Copy
 
-    /// Puts a tier's resume command on the pasteboard. Called with an explicit
-    /// tier by each copy button; the persisted default supplies the tier when
-    /// it is invoked without a choice.
+    /// Copies a tier's resume command to the pasteboard.
     ///
-    /// Copying does NOT touch the preference — see the type's doc comment.
+    /// Explicit tier comes from each copy button; the persisted default
+    /// supplies the tier when invoked without a choice. Copying does not
+    /// touch the preference.
+    /// - Parameter tier: The bot tier to copy, or nil for the default tier.
     private func copyResume(_ tier: BotTier? = nil) {
         Clipboard.copy((tier ?? defaultTier).command(for: seq))
     }
 
     // MARK: - Chrome
 
-    // Filled icon for the default tier, outline for the rest (person /
-    // person.2 / person.3 — 1/2/3-person crews by fidelity).
+    /// Returns the symbol for a tier with fill or outline based on default.
+    /// - Parameter tier: The bot tier.
+    /// - Returns: The SF symbol name (filled for default, outlined for others).
     private func symbol(_ tier: BotTier) -> String {
         tier == defaultTier
             ? tier.symbol
             : tier.symbol.replacingOccurrences(of: ".fill", with: "")
     }
 
-    // Phase counts come from the daemon kit's WorkflowSpec, so the help text
-    // describes the machine the run will actually walk.
+    /// Generates help text describing a tier's phase count.
+    /// - Parameter tier: The bot tier to describe.
+    /// - Returns: Help text with the tier name, phase count, and default flag.
     private func help(for tier: BotTier) -> String {
         let base = "Copy \(tier.command(for: seq)) to the clipboard — \(tier.phaseCount) phases"
         return tier == defaultTier ? base + " (default)" : base

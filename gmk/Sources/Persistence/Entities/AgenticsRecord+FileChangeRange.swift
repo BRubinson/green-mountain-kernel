@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `file_change_range` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `file_change_range` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct FileChangeRangeRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "file_change_range"
     var uuid: String

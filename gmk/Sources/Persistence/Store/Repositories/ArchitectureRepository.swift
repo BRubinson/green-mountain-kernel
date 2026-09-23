@@ -1,16 +1,24 @@
 import Foundation
 import GRDB
 
-/// ARCH_* data access — the db-native architecture machine. Runs INSIDE a
-/// Store-owned transaction; holds no dbQueue and never self-transacts.
+/// ARCH_* data access — the db-native architecture machine.
+///
+/// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
+/// self-transacts.
 struct ArchitectureRepository: RepositoryContext {
     let db: Database
     let core: StoreCore
 
     // MARK: - Shared create-or-return
 
-    /// Idempotent; called by ARCH_OPEN and by setPromptStatus's
-    /// clarifying → architecting create-on-enter (suppressed for legacy).
+    /// Creates or returns the architecture summary for a prompt.
+    ///
+    /// Idempotent create-or-return called by ARCH_OPEN and by
+    /// setPromptStatus's clarifying → architecting create-on-enter flow.
+    ///
+    /// - Parameter promptUuid: The prompt uuid; must exist in the database.
+    /// - Returns: The summary uuid and whether it was newly created.
+    /// - Throws: `StoreError.notFound` when the prompt does not exist.
     @discardableResult
     func ensureSummary(promptUuid: String) throws -> (uuid: String, created: Bool) {
         guard try PromptRecord.exists(db, key: ["uuid": promptUuid]) else {
@@ -44,6 +52,11 @@ struct ArchitectureRepository: RepositoryContext {
 
     // MARK: - Verbs
 
+    /// Opens an architecture summary, creating one if it does not exist.
+    ///
+    /// - Parameter req: The open request carrying the prompt uuid.
+    /// - Returns: The summary row and whether it was newly created.
+    /// - Throws: `StoreError.notFound` when the prompt does not exist.
     func open(_ req: ArchOpenRequest) throws -> ArchSummaryResponse {
         let (uuid, created) = try ensureSummary(promptUuid: req.promptUuid)
         guard let summary = try fetchSummary(uuid: uuid) else {
@@ -52,6 +65,11 @@ struct ArchitectureRepository: RepositoryContext {
         return ArchSummaryResponse(summary: summary, created: created)
     }
 
+    /// Writes the summary body and records the change.
+    ///
+    /// - Parameter req: The summarize request with summary uuid, body, and expected version.
+    /// - Returns: The updated summary row.
+    /// - Throws: `StoreError.versionConflict` on a stale expected version.
     func summarize(_ req: ArchSummarizeRequest) throws -> ArchSummaryResponse {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .drafting, verb: "summarize")
         try core.updateBase(
@@ -74,6 +92,11 @@ struct ArchitectureRepository: RepositoryContext {
         return ArchSummaryResponse(summary: updated)
     }
 
+    /// Adds a persistence change row to the architecture summary.
+    ///
+    /// - Parameter req: The request with summary uuid, class name, file path, and change metadata.
+    /// - Returns: The created persistence change row.
+    /// - Throws: `StoreError` variants for invalid state or conflicts.
     func persistAdd(_ req: ArchPersistAddRequest) throws -> ArchPersistAddResponse {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .drafting, verb: "persist-add")
         try requireDecisionBeforeExpansion(summaryUuid: req.summaryUuid, verb: "persist-add")
@@ -124,6 +147,11 @@ struct ArchitectureRepository: RepositoryContext {
         return ArchPersistAddResponse(change: change)
     }
 
+    /// Adds a field change to a persistence change row.
+    ///
+    /// - Parameter req: The request with persistence change uuid, field name, and metadata.
+    /// - Returns: The created field change row.
+    /// - Throws: `StoreError` variants for invalid state or conflicts.
     func fieldAdd(_ req: ArchFieldAddRequest) throws -> ArchFieldAddResponse {
         let summaryUuid = try parentSummaryUuid(persistenceChangeUuid: req.persistenceChangeUuid)
         let summary = try requireSummary(uuid: summaryUuid, at: .drafting, verb: "field-add")
@@ -180,6 +208,11 @@ struct ArchitectureRepository: RepositoryContext {
         return ArchFieldAddResponse(field: field)
     }
 
+    /// Adds a general change row to the architecture summary.
+    ///
+    /// - Parameter req: The request with summary uuid, file path, class name, and change code.
+    /// - Returns: The created general change row.
+    /// - Throws: `StoreError` variants for invalid state or conflicts.
     func generalAdd(_ req: ArchGeneralAddRequest) throws -> ArchGeneralAddResponse {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .drafting, verb: "general-add")
         try requireDecisionBeforeExpansion(summaryUuid: req.summaryUuid, verb: "general-add")
@@ -236,14 +269,18 @@ struct ArchitectureRepository: RepositoryContext {
 
     // MARK: - Options
 
-    /// One option row per methodology, UNIQUE(summary, agent_name): a re-add by
-    /// the same persona is refused, because the option IS the proposal.
+    /// Adds or revises an architecture option for one agent.
     ///
-    /// THE SANCTIONED REVISION DOOR rides the SAME verb: pass
-    /// `supersedes_option_uuid` + `expected_version` and the new row replaces
-    /// the named one atomically. The superseded row is stamped `rejected` and
-    /// KEPT, and a selection on it carries over with a line appended to the
-    /// summary's rationale, so the selection never vanishes mid-drafting.
+    /// One option row per agent per summary with UNIQUE(summary, agent_name);
+    /// re-add by the same agent is refused because the option IS the proposal.
+    /// Pass `supersedes_option_uuid` + `expected_version` to replace an existing
+    /// option atomically. The superseded row is stamped `rejected` but kept,
+    /// and its selection carries over with a note appended to the summary's
+    /// rationale so the selection never vanishes mid-drafting.
+    ///
+    /// - Parameter req: The request with summary uuid, agent name and id, body, and optional supersession.
+    /// - Returns: The created or superseding option row.
+    /// - Throws: `StoreError` variants for invalid state or conflicts.
     func optionAdd(_ req: ArchOptionAddRequest) throws -> ArchOptionRowResponse {
         let summary = try requireSummary(uuid: req.summaryUuid, at: .drafting, verb: "option-add")
         let agentName = Store.normalizedAgentName(req.agentName)
@@ -341,8 +378,17 @@ struct ArchitectureRepository: RepositoryContext {
         return ArchOptionRowResponse(option: row)
     }
 
-    /// A superseded selection rides over to its successor, with the move
-    /// appended to the summary's rationale so the record keeps both rows.
+    /// Carries a superseded selection to its successor option.
+    ///
+    /// When an option with a selection is superseded, the selection rides over
+    /// to the new option with the move appended to the summary's rationale so
+    /// both rows stay in the record.
+    ///
+    /// - Parameters:
+    ///   - summaryUuid: The architecture summary uuid.
+    ///   - from: The superseded option uuid.
+    ///   - to: The new option uuid that carries the selection.
+    /// - Throws: `StoreError.versionConflict` on version conflicts.
     private func carryOverSelection(summaryUuid: String, from: String, to: String) throws {
         let version = try summaryVersion(uuid: summaryUuid)
         let existing =
@@ -361,8 +407,15 @@ struct ArchitectureRepository: RepositoryContext {
         )
     }
 
-    /// Atomically stamp one option selected, reject its siblings, and record
-    /// the rationale on the summary. expectedVersion targets the OPTION row.
+    /// Selects one option, rejects its siblings, and records the rationale.
+    ///
+    /// Atomically stamps the selected option as chosen, rejects all sibling
+    /// options, and records the decision rationale on the summary. The
+    /// `expectedVersion` targets the selected option row, not the summary.
+    ///
+    /// - Parameter req: The request with option uuid, expected version, and rationale.
+    /// - Returns: The updated summary and all options.
+    /// - Throws: `StoreError` variants for invalid state or version conflicts.
     func decide(_ req: ArchDecideRequest) throws -> ArchDecideResponse {
         guard let winner = try fetchOption(uuid: req.optionUuid) else {
             throw StoreError.notFound(entity: "architecture_option", key: req.optionUuid)
@@ -426,6 +479,15 @@ struct ArchitectureRepository: RepositoryContext {
         )
     }
 
+    /// Fetches the architecture state for a prompt.
+    ///
+    /// Returns the summary, all persistence and general changes, options,
+    /// and unplanned file paths. Narrows the result by option uuid or change
+    /// uuid if requested, returning stubs and excerpts to fit the response size.
+    ///
+    /// - Parameter req: The request with prompt uuid and optional narrowing.
+    /// - Returns: The architecture state, possibly narrowed and paged.
+    /// - Throws: `StoreError` variants for missing prompts or summaries.
     func get(_ req: ArchGetRequest) throws -> ArchGetResponse {
         guard try PromptRecord.exists(db, key: ["uuid": req.promptUuid]) else {
             throw StoreError.notFound(entity: "prompt", key: req.promptUuid)
@@ -473,11 +535,11 @@ struct ArchitectureRepository: RepositoryContext {
         guard req.isNarrowed else {
             return ArchGetResponse(
                 summary: summary,
-                options: allOptions,
                 persistenceChanges: persistence,
                 generalChanges: allGeneral,
                 unplannedChanges: unplanned,
-                orderingRespected: orderingRespected
+                orderingRespected: orderingRespected,
+                options: allOptions
             )
         }
 
@@ -557,11 +619,11 @@ struct ArchitectureRepository: RepositoryContext {
 
         return ArchGetResponse(
             summary: summary,
-            options: options,
             persistenceChanges: persistence,
             generalChanges: generalChanges,
             unplannedChanges: unplanned,
             orderingRespected: orderingRespected,
+            options: options,
             optionStubs: optionStubs,
             generalChangeStubs: generalChangeStubs,
             changePage: ArchChangePage(
@@ -575,10 +637,18 @@ struct ArchitectureRepository: RepositoryContext {
 
     // MARK: - Option guard (m0025)
 
-    /// Once ANY option row exists for a summary, the change-row expansion
-    /// refuses until exactly one option is selected — the pen-inversion
-    /// gate, a Swift store guard by the m0016 cross-table rule. Zero options
-    /// = legal direct expansion (bot/rpi flows untouched by construction).
+    /// Guards expansion until an undecided option set is resolved.
+    ///
+    /// Once any option row exists for a summary, change-row expansion is
+    /// forbidden until exactly one option is selected. This is the
+    /// pen-inversion gate, enforced as a Swift store guard by the m0016
+    /// cross-table rule. Zero options allows legal direct expansion, so
+    /// bot and rpi flows remain untouched by construction.
+    ///
+    /// - Parameters:
+    ///   - summaryUuid: The architecture summary uuid.
+    ///   - verb: The operation name, for error messaging.
+    /// - Throws: `StoreError.invalidEntityTransition` when options exist but none is selected.
     private func requireDecisionBeforeExpansion(summaryUuid: String, verb: String) throws {
         guard
             let counts = try ArchitectureCounts.request(summaryUuid: summaryUuid).fetchOne(db),
@@ -595,7 +665,11 @@ struct ArchitectureRepository: RepositoryContext {
         }
     }
 
-    /// The summary one persistence change hangs from.
+    /// Fetches the parent summary uuid of a persistence change.
+    ///
+    /// - Parameter persistenceChangeUuid: The persistence change uuid.
+    /// - Returns: The architecture summary uuid that owns the change.
+    /// - Throws: `StoreError.notFound` when the change does not exist.
     private func parentSummaryUuid(persistenceChangeUuid: String) throws -> String {
         guard
             let uuid =
@@ -616,6 +690,13 @@ struct ArchitectureRepository: RepositoryContext {
         return uuid
     }
 
+    /// Returns a validated change kind or a default.
+    ///
+    /// - Parameters:
+    ///   - raw: The raw change kind string, or nil to use the default.
+    ///   - defaulting: The fallback kind; one of add, modify, rename, delete.
+    /// - Returns: The validated kind, or the default if raw is nil or empty.
+    /// - Throws: `StoreError.badRequest` when raw is not a recognized kind.
     private func validatedChangeKind(_ raw: String?, defaulting: String) throws -> String {
         guard let raw, !raw.isEmpty else { return defaulting }
         let legal = ["add", "modify", "rename", "delete"]
@@ -627,6 +708,11 @@ struct ArchitectureRepository: RepositoryContext {
         return raw
     }
 
+    /// Fetches architecture options matching a predicate.
+    ///
+    /// - Parameter predicate: A GRDB SQL expression to filter options.
+    /// - Returns: The matching option rows, ordered by agent name.
+    /// - Throws: Database errors.
     func fetchOptions(matching predicate: SQLExpression) throws -> [ArchitectureOptionRow] {
         try ArchitectureOptionRecord
             .all()
@@ -636,17 +722,31 @@ struct ArchitectureRepository: RepositoryContext {
             .map { $0.dto() }
     }
 
+    /// Fetches one architecture option by uuid.
+    ///
+    /// - Parameter uuid: The option uuid.
+    /// - Returns: The option row, or nil if not found.
+    /// - Throws: Database errors.
     private func fetchOption(uuid: String) throws -> ArchitectureOptionRow? {
         try fetchOptions(matching: ArchitectureOptionRecord.Columns.uuid == uuid).first
     }
 
+    /// Fetches all architecture options for a summary.
+    ///
+    /// - Parameter summaryUuid: The architecture summary uuid.
+    /// - Returns: The option rows for the summary.
+    /// - Throws: Database errors.
     private func fetchOptions(summaryUuid: String) throws -> [ArchitectureOptionRow] {
         try fetchOptions(
             matching: ArchitectureOptionRecord.Columns.architectureSummaryUuid == summaryUuid
         )
     }
 
-    /// The summary row's version as this transaction sees it, for updateBase.
+    /// Fetches the version of an architecture summary.
+    ///
+    /// - Parameter uuid: The summary uuid.
+    /// - Returns: The summary's current version.
+    /// - Throws: `StoreError.notFound` when the summary does not exist.
     private func summaryVersion(uuid: String) throws -> Int64 {
         guard
             let version =
@@ -663,9 +763,16 @@ struct ArchitectureRepository: RepositoryContext {
 
     // MARK: - Comparison support
 
-    /// One aggregate query (mirrors changeSummary — never per-row): every
-    /// distinct path this prompt's file changes touched, with count and
-    /// first/last timestamps. Keyed by path for the decoration lookup.
+    /// Fetches every file path touched by changes, with counts and timestamps.
+    ///
+    /// One aggregate query (never per-row) that mirrors changeSummary: returns
+    /// every distinct path this prompt's file changes touched, with change
+    /// count and first and last modification timestamps. The result is keyed
+    /// by path for the decoration lookup.
+    ///
+    /// - Parameter promptUuid: The prompt uuid.
+    /// - Returns: A map of file paths to their change counts and timestamps.
+    /// - Throws: Database errors.
     private func touchedPaths(
         promptUuid: String
     ) throws -> [String: UnplannedChangeRow] {
@@ -676,6 +783,12 @@ struct ArchitectureRepository: RepositoryContext {
         return byPath
     }
 
+    /// Returns the implementation state for a file path.
+    ///
+    /// - Parameters:
+    ///   - path: The file path to look up.
+    ///   - touched: The map of touched paths and their change counts.
+    /// - Returns: The implementation state with change count and timestamps, or zeros if untouched.
     private func implementationState(
         for path: String,
         touched: [String: UnplannedChangeRow]
@@ -690,10 +803,16 @@ struct ArchitectureRepository: RepositoryContext {
         )
     }
 
+    /// Fetches the filesystem root path for an instance via a prompt.
+    ///
     /// The arch change-add paths normalize against the instance root reached
     /// via prompt → session → instance (the add payloads carry no context
-    /// blocks). Empty when the chain is broken — the normalizer then only
-    /// applies its lexical rules.
+    /// blocks). Returns empty when the chain is broken; the normalizer then
+    /// applies only its lexical rules.
+    ///
+    /// - Parameter promptUuid: The prompt uuid.
+    /// - Returns: The instance's absolute filesystem path, or empty if not found.
+    /// - Throws: Database errors.
     func instanceRoot(promptUuid: String) throws -> String {
         let instance = TableAlias<InstanceRecord>()
         return
@@ -710,6 +829,14 @@ struct ArchitectureRepository: RepositoryContext {
 
     // MARK: - Transition + fetch helpers
 
+    /// Fetches a summary and asserts it has the required status.
+    ///
+    /// - Parameters:
+    ///   - uuid: The summary uuid.
+    ///   - required: The expected status; the function throws if it differs.
+    ///   - verb: The operation name, for error messaging.
+    /// - Returns: The summary row.
+    /// - Throws: `StoreError.notFound` when not found, or `invalidEntityTransition` if status mismatches.
     private func requireSummary(
         uuid: String,
         at required: ArchitectureStatus,
@@ -729,6 +856,16 @@ struct ArchitectureRepository: RepositoryContext {
         return summary
     }
 
+    /// Transitions an architecture summary to a new status.
+    ///
+    /// - Parameters:
+    ///   - summaryUuid: The summary uuid.
+    ///   - expectedVersion: The expected current version.
+    ///   - to: The target status.
+    ///   - action: The action name, for event logging.
+    ///   - requireFrom: The required current status before transition.
+    /// - Returns: The updated summary.
+    /// - Throws: `StoreError` variants for invalid state or version conflicts.
     func transition(
         summaryUuid: String,
         expectedVersion: Int64,
@@ -787,19 +924,43 @@ struct ArchitectureRepository: RepositoryContext {
             .order(ArchitectureSummaryRecord.Columns.createdAt.desc, Column("id").desc)
     }
 
+    /// Fetches an architecture summary by uuid.
+    ///
+    /// - Parameter uuid: The summary uuid.
+    /// - Returns: The summary row, or nil if not found.
+    /// - Throws: Database errors.
     func fetchSummary(uuid: String) throws -> ArchitectureSummaryRow? {
         try fetchSummary(matching: ArchitectureSummaryRecord.Columns.uuid == uuid)
     }
 
+    /// Fetches the architecture summary for a prompt.
+    ///
+    /// - Parameter promptUuid: The prompt uuid.
+    /// - Returns: The summary row, or nil if no summary exists for the prompt.
+    /// - Throws: Database errors.
     func fetchSummary(byPrompt promptUuid: String) throws -> ArchitectureSummaryRow? {
         try fetchSummary(matching: ArchitectureSummaryRecord.Columns.promptUuid == promptUuid)
     }
 
+    /// Fetches an architecture summary matching a predicate.
+    ///
+    /// - Parameter predicate: A GRDB SQL expression to filter summaries.
+    /// - Returns: The newest matching summary, or nil if none found.
+    /// - Throws: Database errors.
     private func fetchSummary(matching predicate: SQLExpression) throws -> ArchitectureSummaryRow? {
         try Self.newestFirst.filter(predicate).fetchOne(db)?.dto()
     }
 
-    /// Two statements whatever the change count: the changes and their fields.
+    /// Fetches persistence changes with their fields and implementation state.
+    ///
+    /// Two statements whatever the change count: the changes and their fields
+    /// are fetched and composed together.
+    ///
+    /// - Parameters:
+    ///   - summaryUuid: The architecture summary uuid.
+    ///   - touched: The map of touched file paths and their change counts.
+    /// - Returns: The persistence change rows with nested field changes and implementation state.
+    /// - Throws: Database errors.
     private func fetchPersistenceChanges(
         summaryUuid: String,
         touched: [String: UnplannedChangeRow]
@@ -816,6 +977,11 @@ struct ArchitectureRepository: RepositoryContext {
             }
     }
 
+    /// Fetches field changes for a persistence change.
+    ///
+    /// - Parameter changeUuid: The persistence change uuid.
+    /// - Returns: The field change rows, ordered by sequence.
+    /// - Throws: Database errors.
     private func fetchFieldChanges(
         changeUuid: String
     ) throws -> [ArchPersistenceFieldChangeRow] {
@@ -829,6 +995,13 @@ struct ArchitectureRepository: RepositoryContext {
             .map { $0.dto() }
     }
 
+    /// Fetches general changes with their implementation state.
+    ///
+    /// - Parameters:
+    ///   - summaryUuid: The architecture summary uuid.
+    ///   - touched: The map of touched file paths and their change counts.
+    /// - Returns: The general change rows, ordered by sequence, with implementation state.
+    /// - Throws: Database errors.
     private func fetchGeneralChanges(
         summaryUuid: String,
         touched: [String: UnplannedChangeRow]

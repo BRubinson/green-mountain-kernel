@@ -11,6 +11,10 @@ import GRDB
 // that is the common case. Do not "restore" matchingAllTokensIn.
 
 extension Store {
+    /// Search the dope tree with full-text search.
+    /// - Parameter req: The DOPE_SEARCH request.
+    /// - Returns: The search response with matching results.
+    /// - Throws: FTS pattern, storage, or query errors.
     func dopeSearch(_ req: DopeSearchRequest) throws -> DopeSearchResponse {
         guard let pattern = FTS5Pattern(matchingAnyTokenIn: req.query) else {
             throw StoreError.badRequest(detail: "search query has no searchable tokens")

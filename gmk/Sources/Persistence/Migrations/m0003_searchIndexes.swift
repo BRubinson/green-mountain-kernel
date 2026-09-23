@@ -9,6 +9,13 @@ extension Migrations {
     // (Store) so they fire on FK cascade deletes too. Each table ends with a
     // one-time 'rebuild' because triggers only fire on future writes. No PRAGMA
     // in this body: pragmas are silently ignored inside a transaction.
+    /// Registers the m0003 migration to create FTS5 search indexes.
+    ///
+    /// Creates six full-text search virtual tables for prompt, clarification,
+    /// and architecture entities, with after-insert/delete/update triggers to
+    /// keep them synchronized.
+    ///
+    /// - Parameter migrator: The database migrator to register with.
     static func m0003_searchIndexes(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0003_searchIndexes") { db in
             struct FtsSpec {

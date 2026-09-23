@@ -9,6 +9,11 @@ import GRDB
 // live in ProjectRepository; these wrappers own the transaction.
 
 extension Store {
+    /// Updates a project's configuration with optimistic locking.
+    ///
+    /// - Parameter req: The update request with new project data and expected version.
+    /// - Returns: The updated project row.
+    /// - Throws: Store errors or version conflict errors.
     func updateProject(_ req: ProjectUpdateRequest) throws -> ProjectRow {
         try boundary { db in
             try ProjectRepository(db: db, core: core).update(req)

@@ -15,25 +15,37 @@ final class MemoryWatcher: @unchecked Sendable {
     private var root: String = ""
     private let deliver: @Sendable (_ promptStoragePath: String) -> Void
 
+    /// Creates a watcher that watches filesystem events for a gmfs root.
+    ///
+    /// - Parameter deliver: A callback invoked on distinct prompt memory path changes.
     init(deliver: @escaping @Sendable (String) -> Void) {
         self.deliver = deliver
         lane.setHandler { [weak self] paths in self?.handle(paths: paths) }
     }
 
-    /// Pushed by the supervisor. nil or a nonexistent path stops the stream, so
-    /// a machine with no gmfs simply has no watcher. Idempotent via the lane.
+    /// Starts watching a filesystem root for memory directory changes.
+    ///
+    /// Pushed by the supervisor. `nil` or a nonexistent path stops the stream, so a
+    /// machine with no gmfs simply has no watcher. Idempotent via the lane.
+    ///
+    /// - Parameter newRoot: The root path to watch, or `nil` to stop watching.
     func setRoot(_ newRoot: String?) {
         let resolved = newRoot ?? ""
         lane.run { self.root = resolved }
         lane.setPaths(resolved.isEmpty ? [] : [resolved])
     }
 
+    /// Stops watching for filesystem events.
     func stop() {
         lane.stop()
     }
 
-    /// Runs on the lane. Reduces raw event paths to the set of distinct
-    /// prompt storage paths whose memory/ subtree changed, then delivers each.
+    /// Processes filesystem events and delivers distinct prompt memory paths.
+    ///
+    /// Runs on the lane, reduces raw event paths to the set of distinct prompt
+    /// storage paths whose memory/ subtree changed, then delivers each.
+    ///
+    /// - Parameter paths: Raw filesystem event paths.
     private func handle(paths: [String]) {
         guard !root.isEmpty else { return }
         var promptPaths: Set<String> = []

@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `diagram_stroke_vertex` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `diagram_stroke_vertex` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DiagramStrokeVertexRecord: BaseRecordFields, TableRecord, SeqOrdered {
     static let databaseTableName = "diagram_stroke_vertex"
 

@@ -1,15 +1,27 @@
 import Foundation
 
-/// `MCP_CALL` — one MCP `tools/call`, served by the kernel. The tool body runs
-/// HERE, where `StoreBoundary` is ambient and re-entrant, so a composite's
-/// writes enlist in ONE boundary and land or roll back together.
+/// `MCP_CALL` — one MCP `tools/call`, served by the kernel.
 ///
+/// The tool body runs HERE, where `StoreBoundary` is ambient and re-entrant, so
+/// a composite's writes enlist in ONE boundary and land or roll back together.
 /// The harness-side child PROCESS stays, thinned: `ClientKey.resolve()` walks
 /// process ancestry for a `claude` parent and a kernel is not one, so the child
 /// supplies the identity triple. `GmCdeTools.call` runs the same `Tool` values
 /// the stdio door runs, so both doors share roster, narrowing and degrade.
 enum McpCallHandler {
 
+    /// Handles an MCP tool call request.
+    ///
+    /// Executes the tool within a single transaction so composite operations
+    /// remain atomic. Tool-level failures are reported in the response envelope.
+    ///
+    /// - Parameters:
+    ///   - line: The encoded request data.
+    ///   - head: The message envelope header.
+    ///   - store: The persistence store.
+    ///   - caller: The verb caller for the tool invocation.
+    /// - Returns: The handler result with the response.
+    /// - Throws: Any error from decoding or transport-level failures.
     static func handle(
         line: Data,
         head: EnvelopeHead,

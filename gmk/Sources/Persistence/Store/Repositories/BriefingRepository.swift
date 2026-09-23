@@ -1,17 +1,18 @@
 import Foundation
 import GRDB
 
-/// BRIEFING_* data access — the agent-briefing machine. Runs INSIDE a
-/// Store-owned transaction; holds no dbQueue and never self-transacts.
+/// BRIEFING_* data access — the agent-briefing machine.
 ///
-/// A briefing is an OPINION-FREE ref pre-selection. Dope children carry dot-path
-/// CODES, ghost-legal at read; kbite and file-change children carry uuid FKs.
-/// The completeness rule turns nil-vs-empty into meaning: omitting a ref class
-/// ENTIRELY is refused while `[]` is accepted, so a stored zero-row class reads
-/// as ATTEMPTED AND EMPTY. It is a PAYLOAD rule, applying to every caller.
+/// Runs inside a Store-owned transaction, no dbQueue or self-transact. Briefing
+/// is OPINION-FREE ref pre-selection. Dope children carry dot-path CODES (ghost-
+/// legal), kbite/file-change children carry uuid FKs. Completeness rule: omitting
+/// a ref class is refused, `[]` accepted. Zero-row class reads as attempted-empty.
 enum BriefingCompletenessRule {
 
     /// Throws when the caller left a ref class out of the payload.
+    ///
+    /// - Parameter req: The briefing completion request to validate.
+    /// - Throws: `StoreError.badRequest` when a ref class is omitted from the payload.
     static func check(_ req: BriefingCompleteRequest) throws {
         let missing = [
             ("dope_refs", req.dopeRefs == nil),
@@ -39,9 +40,14 @@ struct BriefingRepository: RepositoryContext {
     // MARK: - Verbs
 
     /// Reserve (or reset) the briefing row for one (owner, step) pair.
+    ///
     /// Exactly one owner flag; session_uuid is ALWAYS stored (derived from
     /// the prompt's owner chain when prompt-owned) so the two columns can
     /// never disagree and task-owned rows share the same list key.
+    ///
+    /// - Parameter req: The briefing open request specifying the owner and step.
+    /// - Returns: The briefing row with creation status.
+    /// - Throws: `StoreError` when the owner or step is invalid or does not exist.
     func open(_ req: BriefingOpenRequest) throws -> BriefingRowResponse {
         let step = try BriefingStepSpec.validateStep(req.briefingForStep)
         let sessionUuid: String
@@ -173,14 +179,16 @@ struct BriefingRepository: RepositoryContext {
         return BriefingRowResponse(briefing: row, created: true)
     }
 
-    /// building → ready. The daemon stamps the staleness evidence ITSELF, so the
-    /// writing agent cannot mis-stamp, and denormalizes kbite briefs into the
-    /// child rows.
-    /// ONE ref policy for all three classes: MALFORMED is a hard refusal naming
-    /// the ref; WELL-FORMED BUT UNRESOLVABLE is stored and reported back in
-    /// `unresolvedDopeRefs`, since a legal dope code may ghost when the tree
-    /// moves; and an unknown uuid on a REAL FK throws, because the caller cannot
-    /// tell a vanished file from a typo through a silent success.
+    /// building → ready.
+    ///
+    /// Daemon stamps staleness; agent cannot mis-stamp. Denormalizes kbite
+    /// briefs into child rows. One ref policy: MALFORMED hard-refuses, WELL-
+    /// FORMED BUT UNRESOLVABLE stores in `unresolvedDopeRefs` (dope codes ghost),
+    /// unknown UUID on FK throws (caller distinguishes vanished from typo).
+    ///
+    /// - Parameter req: The briefing completion request with resolved references.
+    /// - Returns: The briefing row with unresolved dope refs, if any.
+    /// - Throws: `StoreError` when the briefing, scope, or references do not exist.
     func complete(_ req: BriefingCompleteRequest) throws -> BriefingRowResponse {
         guard let existing = try fetchBriefing(uuid: req.briefingUuid) else {
             throw StoreError.notFound(entity: "agent_briefing", key: req.briefingUuid)
@@ -291,10 +299,15 @@ struct BriefingRepository: RepositoryContext {
         )
     }
 
+    /// Validates the shape of a dope ref using purely lexical rules.
+    ///
     /// The hard-reject half of the dope ref policy: purely LEXICAL, so it can
-    /// never refuse a legitimate code that merely ghosts. One to four
-    /// snake_case dot-segments — the depth `DopeRepository.dotPathExists`
-    /// resolves — and nothing else.
+    /// never refuse a legitimate code that merely ghosts. One to four snake_case
+    /// dot-segments — the depth `DopeRepository.dotPathExists` resolves — and
+    /// nothing else.
+    ///
+    /// - Parameter code: The dope dot-path to validate.
+    /// - Throws: `StoreError.badRequest` when the code has an invalid shape.
     private func validateDopeRefShape(_ code: String) throws {
         let segments = code.split(separator: ".", omittingEmptySubsequences: false)
             .map(String.init)
@@ -315,6 +328,12 @@ struct BriefingRepository: RepositoryContext {
         }
     }
 
+    /// Formats an error message for an invalid dope ref.
+    ///
+    /// - Parameters:
+    ///   - code: The invalid dope ref code.
+    ///   - why: The reason the code is invalid.
+    /// - Returns: A formatted error message.
     private func dopeRefRefusal(_ code: String, _ why: String) -> String {
         "dope ref '\(code)' is not a dope dot-path — \(why). A dope ref is a "
             + "domain.entity[.property] CODE out of the dope tree (the dope_search pen "
@@ -322,12 +341,22 @@ struct BriefingRepository: RepositoryContext {
             + "Nothing was written; fix the ref and complete again."
     }
 
+    /// Retrieves a briefing and its staleness.
+    ///
+    /// - Parameter req: The briefing get request specifying the selector.
+    /// - Returns: The briefing with staleness information.
+    /// - Throws: `StoreError` when the briefing does not exist or selector is invalid.
     func get(_ req: BriefingGetRequest) throws -> BriefingGetResponse {
         let row = try resolveSelector(req: req)
         let staleness = try computeStaleness(briefing: row)
         return BriefingGetResponse(briefing: row, staleness: staleness)
     }
 
+    /// Retrieves briefings for a prompt or session.
+    ///
+    /// - Parameter req: The briefing list request specifying the owner.
+    /// - Returns: The list of matching briefings.
+    /// - Throws: `StoreError` when the owner does not exist or selector is invalid.
     func list(_ req: BriefingListRequest) throws -> BriefingListResponse {
         let rows: [AgentBriefingRow]
         if let promptUuid = req.promptUuid {
@@ -352,8 +381,14 @@ struct BriefingRepository: RepositoryContext {
         return BriefingListResponse(briefings: rows)
     }
 
-    /// The SubagentStart hook's one call. Empty stub + success when nothing
-    /// applies — the hook must never wedge a spawn.
+    /// The SubagentStart hook's one call.
+    ///
+    /// Empty stub + success when nothing applies — the hook must never wedge a
+    /// spawn.
+    ///
+    /// - Parameter req: The briefing stub request specifying the session and agent type.
+    /// - Returns: A briefing stub with session and briefing context.
+    /// - Throws: Never; returns an empty stub or error message on failure.
     func stub(_ req: BriefingStubRequest) throws -> BriefingStubResponse {
         guard let sessionUuid = req.sessionUuid else {
             return BriefingStubResponse(stub: "")
@@ -415,6 +450,11 @@ struct BriefingRepository: RepositoryContext {
 
     // MARK: - Selector + staleness internals
 
+    /// Resolves a briefing from a get request using uuid, prompt, or session selectors.
+    ///
+    /// - Parameter req: The briefing get request with selector information.
+    /// - Returns: The resolved briefing row.
+    /// - Throws: `StoreError` when the selector is invalid or ambiguous.
     private func resolveSelector(req: BriefingGetRequest) throws -> AgentBriefingRow {
         if let uuid = req.briefingUuid {
             guard let row = try fetchBriefing(uuid: uuid) else {
@@ -467,10 +507,19 @@ struct BriefingRepository: RepositoryContext {
         )
     }
 
+    /// Resolves the active briefing scoped to the calling instance or session.
+    ///
     /// The ACTIVE resolution, scoped like attribution: the calling instance's
     /// own activation claim → the session's single claim when unambiguous →
     /// the session-owned (task) row. This is what makes a spawned agent's
     /// lookup deterministic — no uuid has to survive a spawn prompt.
+    ///
+    /// - Parameters:
+    ///   - session: The session row containing the briefing owner.
+    ///   - step: The briefing step to resolve.
+    ///   - clientKey: The client key for instance-scoped activation lookup, or nil.
+    /// - Returns: The active briefing row, or nil when none is found.
+    /// - Throws: `StoreError` on database access failures.
     private func resolveActiveBriefing(
         session: SessionRow,
         step: String,
@@ -496,8 +545,14 @@ struct BriefingRepository: RepositoryContext {
         )
     }
 
+    /// Computes staleness of a briefing relative to its dope scope.
+    ///
     /// Forwards to the owner of dope_persistence*: `DopeRepository.scopeStaleness`
     /// and `.dotPathExists`, so agent_briefing and care_package cannot drift.
+    ///
+    /// - Parameter briefing: The briefing row to compute staleness for.
+    /// - Returns: The staleness information including dope scope revision and ghosts.
+    /// - Throws: `StoreError` on database access failures.
     private func computeStaleness(briefing: AgentBriefingRow) throws -> BriefingStaleness {
         let s = try dope.scopeStaleness(
             scopeUuid: briefing.dopeScopeUuid,
@@ -514,6 +569,10 @@ struct BriefingRepository: RepositoryContext {
 
     // MARK: - Fetch helpers
 
+    /// Deletes all child ref rows associated with a briefing.
+    ///
+    /// - Parameter briefingUuid: The briefing uuid whose children to delete.
+    /// - Throws: Never; database errors are propagated.
     private func deleteChildren(briefingUuid: String) throws {
         for table in [
             "agent_briefing_dope_persistence",
@@ -527,6 +586,14 @@ struct BriefingRepository: RepositoryContext {
         }
     }
 
+    /// Fetches a briefing for a prompt or session at a specific step.
+    ///
+    /// - Parameters:
+    ///   - ownerPrompt: The prompt uuid to match, or nil for session-owned briefings.
+    ///   - ownerSession: The session uuid to match.
+    ///   - step: The briefing step to match.
+    /// - Returns: The briefing row, or nil when no match is found.
+    /// - Throws: `StoreError` on database access failures.
     private func fetchBriefingRow(
         ownerPrompt: String?,
         ownerSession: String,
@@ -547,10 +614,20 @@ struct BriefingRepository: RepositoryContext {
         .first
     }
 
+    /// Fetches a briefing by uuid.
+    ///
+    /// - Parameter uuid: The briefing uuid to fetch.
+    /// - Returns: The briefing row, or nil when not found.
+    /// - Throws: `StoreError` on database access failures.
     func fetchBriefing(uuid: String) throws -> AgentBriefingRow? {
         try fetchBriefings(matching: AgentBriefingRecord.Columns.uuid == uuid).first
     }
 
+    /// Fetches briefings matching a SQL predicate.
+    ///
+    /// - Parameter predicate: The SQL predicate to filter briefing records.
+    /// - Returns: The ordered list of briefing rows matching the predicate.
+    /// - Throws: `StoreError` on database access failures.
     private func fetchBriefings(matching predicate: SQLExpression) throws -> [AgentBriefingRow] {
         try AgentBriefingWithRefs.request()
             .filter(predicate)

@@ -89,6 +89,10 @@ struct ProjectSettingsSheet: View {
         }
     }
 
+    /// Displays the project's identity information.
+    ///
+    /// - Parameter project: The project row to display.
+    /// - Returns: A view showing the project's code, git repository, and GMFS path.
     @ViewBuilder
     private func identityBlock(_ project: ProjectRow) -> some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -108,6 +112,10 @@ struct ProjectSettingsSheet: View {
         .foregroundStyle(.secondary)
     }
 
+    /// Displays the primary branch field and editing controls.
+    ///
+    /// - Parameter project: The project row being edited.
+    /// - Returns: A view with the branch text field and validation messages.
     @ViewBuilder
     private func branchField(_ project: ProjectRow) -> some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -144,6 +152,10 @@ struct ProjectSettingsSheet: View {
         }
     }
 
+    /// Submits the project settings changes to the catalog.
+    ///
+    /// Sends only the changed branch field and locks against the current project
+    /// row to ensure the settings are consistent with what is shown on screen.
     private func submit() {
         // Re-read: the row this locks against must be the one on screen now,
         // not the one that existed when the sheet opened.

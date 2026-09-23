@@ -21,8 +21,9 @@ enum DopeCogElementType: String, Codable, Hashable, CaseIterable, Sendable {
     case persistenceOwner = "PersistenceOwner"
 }
 
-/// Fields a cog element may own beyond the shared ones. Mirrors DopeField's
-/// role for the persistence levels.
+/// Fields a cog element may own beyond the shared ones.
+///
+/// Mirrors DopeField's role for the persistence levels.
 enum DopeCogField: String, Codable, Hashable, CaseIterable, Sendable {
     case primaryPath
     case dopeScopeCode
@@ -41,9 +42,11 @@ enum DopeCogField: String, Codable, Hashable, CaseIterable, Sendable {
     }
 }
 
-/// One element type's registration: its subtype table, the fields it owns,
-/// and what may parent it. The single truth consumed by the CRUD verbs, the
-/// hydration pass, and the validator.
+/// One element type's registration: its subtype table, the fields it owns, and
+/// what may parent it.
+///
+/// The single truth consumed by the CRUD verbs, the hydration pass, and the
+/// validator.
 struct DopeCogElementSpec: Sendable {
     let type: DopeCogElementType
     /// Where this type's typed metadata lives — the diagram_drawing_stroke
@@ -51,10 +54,11 @@ struct DopeCogElementSpec: Sendable {
     let subtypeTable: String
     /// Fields this type MAY carry.
     let ownedFields: Set<DopeCogField>
-    /// Fields this type MUST carry. Distinct from ownedFields on purpose:
-    /// the two were conflated while primary_path happened to be both, and a
-    /// second type with a different required field is exactly what breaks
-    /// that coincidence.
+    /// Fields this type MUST carry.
+    ///
+    /// Distinct from ownedFields on purpose: the two were conflated while
+    /// primary_path happened to be both, and a second type with a different
+    /// required field is exactly what breaks that coincidence.
     let requiredFields: Set<DopeCogField>
     /// nil = top level only.
     let allowedParentTypes: Set<DopeCogElementType>?
@@ -77,8 +81,13 @@ struct DopeCogElementSpec: Sendable {
         ),
     ]
 
-    /// Throws on an unknown value rather than letting a bad row render as
-    /// something plausible. This IS the constraint the column does not carry.
+    /// Looks up the specification for a cog element type.
+    ///
+    /// Throws on an unknown value rather than letting a bad row render
+    /// plausibly. This is the constraint the column does not carry.
+    /// - Parameter raw: The element type string value.
+    /// - Returns: The specification for that type.
+    /// - Throws: `StoreError.badRequest` if the type is unknown.
     static func spec(for raw: String) throws -> DopeCogElementSpec {
         guard let type = DopeCogElementType(rawValue: raw), let spec = all[type] else {
             throw StoreError.badRequest(
@@ -90,9 +99,10 @@ struct DopeCogElementSpec: Sendable {
     }
 }
 
-/// The sub-loadable areas of a dope scope. Each carries its own
-/// content_revision so a client can ask "did cogs change?" without pulling
-/// the persistence tree, and vice versa.
+/// The sub-loadable areas of a dope scope.
+///
+/// Each carries its own content_revision so a client can ask "did cogs
+/// change?" without pulling the persistence tree, and vice versa.
 enum DopeArea: String, Codable, Hashable, CaseIterable, Sendable {
     case persistence
     case cogs

@@ -1,13 +1,22 @@
 import Foundation
 
 /// KBITE_MAW_OPEN — filesystem skeleton only, NO db rows (maws are not
-/// tracked in the db; mirrors /gm_crunch_open_maw). The interactive
-/// KBITE_PURPOSE.md step stays a client-side skill responsibility — a daemon
-/// message can never prompt. Idempotent: existing dirs/index are left alone.
+/// tracked in the db; mirrors /gm_crunch_open_maw).
+///
+/// The interactive KBITE_PURPOSE.md step stays a client-side skill
+/// responsibility — a daemon message can never prompt. Idempotent: existing
+/// dirs/index are left alone.
 enum KbiteMawOpenHandler {
     static let axis1 = ["primary", "secondary"]
     static let axis2 = ["documentation", "example_project", "api_reference", "blogs", "all_others"]
 
+    /// Handles a kbiteMawOpen request.
+    ///
+    /// - Parameters:
+    ///   - line: The message payload.
+    ///   - head: The message envelope header.
+    /// - Returns: A handler result with the maw path and created directories.
+    /// - Throws: An error if directory creation or template generation fails.
     static func handle(line: Data, head: EnvelopeHead) throws -> HandlerResult {
         let request = try decodePayload(KbiteMawOpenRequest.self, from: line)
         let fm = FileManager.default
@@ -44,7 +53,10 @@ enum KbiteMawOpenHandler {
         )
     }
 
-    /// MAW_INDEX.md per the gmcc_kbite skill format (gm_crunch_open_maw Step 4).
+    /// Generates the initial MAW_INDEX.md template for a maw.
+    ///
+    /// - Parameter kbiteName: The kbite name to reference in the template.
+    /// - Returns: The template markdown string.
     private static func mawIndexTemplate(kbiteName: String) -> String {
         """
         # Maw Index: \(kbiteName)

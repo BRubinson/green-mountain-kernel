@@ -7,6 +7,11 @@ import SwiftUI
 @main
 enum GMVibesApp {
 
+    /// The entry point that resolves personalities and launches the app.
+    ///
+    /// A personality resolved from argv runs before any AppKit symbol is
+    /// touched, so the headless daemon stays a plain process; only a bare
+    /// launch from inside the bundle becomes the app.
     static func main() {
         let arguments = CommandLine.arguments
         switch arguments.dropFirst().first {
@@ -39,8 +44,9 @@ enum GMVibesApp {
     }
 }
 
-/// The app personality's scenes. A separate type from the entry because a type
-/// that supplies its own `App.main()` cannot reach the stock launch.
+/// The app personality's scenes.
+///
+/// A separate type from the entry because a type that supplies its own `App.main()` cannot reach the stock launch.
 private struct GMVibesScenes: App {
     // Bounded flush of dirty prompt edits on quit.
     @NSApplicationDelegateAdaptor(GMVibesAppDelegate.self) private var appDelegate
@@ -48,9 +54,15 @@ private struct GMVibesScenes: App {
     @State private var vitals: KernelVitals
     @Environment(\.openWindow) private var openWindow
 
-    /// NO SECOND POLLER. `DaemonConnectionModel` runs the health watchdog and keeps `ping`
-    /// current, so the vitals sampler READS that rather than opening its own connection: one
-    /// socket, one cadence, and no chance of the menu bar disagreeing with the status pill.
+    /// Initializes the app scenes with services and vitals.
+    ///
+    /// NO SECOND POLLER: `DaemonConnectionModel` runs the health watchdog and
+    /// keeps `ping` current, so the vitals sampler READS that rather than
+    /// opening its own connection. One socket, one cadence, and no chance of
+    /// the menu bar disagreeing with the status pill. ORDER IS FIXED HERE AND
+    /// MUST NOT BE TIDIED: `GMVibesServices()` ARBITRATES DATABASE OWNERSHIP on
+    /// its first line — flock, migrate, bind the socket, or degrade to client
+    /// mode — so it must exist before anything that reads from it.
     init() {
         // ORDER IS FIXED HERE AND MUST NOT BE TIDIED. `GMVibesServices()` ARBITRATES DATABASE
         // OWNERSHIP on its first line — flock, migrate, bind the socket, or degrade to client
@@ -66,8 +78,9 @@ private struct GMVibesScenes: App {
         appDelegate.services = services
     }
 
-    /// Who holds the database, as the answering kernel reports it. The mapping lives on
-    /// `GMVibesServices`, beside the connection model it reads.
+    /// Who holds the database, as the answering kernel reports it.
+    ///
+    /// The mapping lives on `GMVibesServices`, beside the connection model it reads.
     private var role: KernelRole { services.kernelRole }
 
     var body: some Scene {
@@ -135,14 +148,12 @@ private struct GMVibesScenes: App {
 
 }
 
-/// ⌘Q PUTS GM VIBES AWAY. IT DOES NOT END THE KERNEL.
+/// ⌘Q PUTS GM VIBES AWAY.
 ///
-/// While this process holds the database lock, a stock `NSApp.terminate` would tear the writer
-/// out from under every hook and MCP session on the machine. `.appTermination` is REPLACED
-/// rather than disabled, because an inert ⌘Q reads as a hung app: it closes every window, and
-/// `WindowPresence` drops the activation policy on the last close so the Dock icon and ⌘-Tab
-/// slot disappear as on a real quit. The kernel is stopped from ONE place, the menu bar's
-/// two-step confirming quit. ⌘W keeps its stock meaning; do not rebind it here.
+/// IT DOES NOT END THE KERNEL. Stock `NSApp.terminate` tears the writer from hooks and MCP;
+/// `.appTermination` is REPLACED (not disabled). Inert ⌘Q closes all windows; `WindowPresence`
+/// drops activation on last close, Dock icon and ⌘-Tab disappear. Kernel stopped from ONE place:
+/// menu bar's two-step quit. ⌘W keeps stock meaning.
 struct KernelTerminationCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .appTermination) {

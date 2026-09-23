@@ -3,11 +3,10 @@ import Foundation
 /// Any JSON value, as a `Codable` — the type that makes an untyped passthrough
 /// possible without teaching a caller 123 payload shapes. `HookCli` spells it
 /// `JSONValue` through a typealias.
-/// An enum rather than `[String: Any]` because `Any` is none of `Codable`,
-/// `Sendable` or `Hashable`, and the envelope machinery needs all three:
-/// `Sendable` because payloads cross the server's serial queue, `Hashable`
-/// because the message structs are. KEYS ARE NEVER TRANSLATED HERE — the wire
-/// is snake_case and whatever went in comes out.
+///
+/// An enum rather than `[String: Any]` because `Any` is none of `Codable`, `Sendable` or `Hashable`, and the envelope
+/// machinery needs all three: `Sendable` because payloads cross the server's serial queue, `Hashable` because the
+/// message structs are. KEYS ARE NEVER TRANSLATED HERE — the wire is snake_case and whatever went in comes out.
 enum GmJsonValue: Codable, Hashable, Sendable {
     case null
     case bool(Bool)
@@ -17,6 +16,9 @@ enum GmJsonValue: Codable, Hashable, Sendable {
     case array([GmJsonValue])
     case object([String: GmJsonValue])
 
+    /// Decodes a JSON value from a decoder.
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: `DecodingError` when the value is unrepresentable.
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         if container.decodeNil() { self = .null; return }
@@ -32,6 +34,9 @@ enum GmJsonValue: Codable, Hashable, Sendable {
         throw DecodingError.dataCorruptedError(in: container, debugDescription: "unrepresentable JSON")
     }
 
+    /// Encodes this JSON value to an encoder.
+    /// - Parameter encoder: The encoder to write to.
+    /// - Throws: Encoding errors.
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         switch self {

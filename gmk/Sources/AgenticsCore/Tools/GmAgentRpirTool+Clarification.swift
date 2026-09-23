@@ -164,9 +164,10 @@ struct GmAgentCdeRpirClarifyArguments: Sendable {
 
 // swiftlint:enable identifier_name
 
-/// The clarification record and the care package hanging off it. The package is
-/// selected by the CLARIFICATION SUMMARY uuid on `package_open` and by the
-/// prompt on `package_get`, because it hangs off the summary that produced it.
+/// The clarification record and the care package hanging off it.
+///
+/// The package is selected by the CLARIFICATION SUMMARY uuid on `package_open` and by the prompt on `package_get`,
+/// because it hangs off the summary that produced it.
 struct GmAgentCdeRpirClarifyTool: GmAgentRpirTool {
 
     /// Raw values are the wire op names; the case names stay lowerCamelCase so
@@ -193,74 +194,74 @@ struct GmAgentCdeRpirClarifyTool: GmAgentRpirTool {
         GmAgentToolOp(
             Op.open,
             verbs: [.clarifyOpen],
-            requiredParams: ["prompt_uuid"],
-            summary: "Open the prompt's clarification summary. No status move — the prompt is already initiated."
+            summary: "Open the prompt's clarification summary. No status move — the prompt is already initiated.",
+            requiredParams: ["prompt_uuid"]
         ),
         GmAgentToolOp(
             Op.writeQuestions,
             verbs: [.clarifyQuestionAdd],
-            requiredParams: ["summary_uuid", "question"],
-            summary: "Insert ONE user-facing question with its ordered options, while the summary is building."
+            summary: "Insert ONE user-facing question with its ordered options, while the summary is building.",
+            requiredParams: ["summary_uuid", "question"]
         ),
         GmAgentToolOp(
             Op.writeNotes,
             verbs: [.clarifyNoteAdd],
-            requiredParams: ["summary_uuid", "body"],
-            summary: "Insert ONE internal note, weighted 0 (critical) to 999 (ignore), in any summary state."
+            summary: "Insert ONE internal note, weighted 0 (critical) to 999 (ignore), in any summary state.",
+            requiredParams: ["summary_uuid", "body"]
         ),
         GmAgentToolOp(
             Op.answer,
             verbs: [.clarifyAnswer],
-            requiredParams: ["question_uuid", "expected_version"],
-            summary: "Record the user's answer to ONE question, or mark it skipped."
+            summary: "Record the user's answer to ONE question, or mark it skipped.",
+            requiredParams: ["question_uuid", "expected_version"]
         ),
         GmAgentToolOp(
             Op.seal,
             verbs: [.clarifySeal],
-            requiredParams: ["summary_uuid", "expected_version"],
-            summary: "building → answering. Answers are writable only after this seal. The primary's call."
+            summary: "building → answering. Answers are writable only after this seal. The primary's call.",
+            requiredParams: ["summary_uuid", "expected_version"]
         ),
         GmAgentToolOp(
             Op.finalize,
             verbs: [.clarifyFinalize],
-            requiredParams: ["summary_uuid", "expected_version"],
-            summary: "answering → complete, once every question is answered or skipped. The LATER move, after seal."
+            summary: "answering → complete, once every question is answered or skipped. The LATER move, after seal.",
+            requiredParams: ["summary_uuid", "expected_version"]
         ),
         GmAgentToolOp(
             Op.get,
             verbs: [.clarifyGet],
+            summary: "The summary, its questions with answers, and its notes. The package stays a stub.",
             narrowing: CdeNarrowing(
                 parameters: ["cursor", "page_bytes", "note_uuid"],
                 retryWith: "cde_rpir_clarify op=get with cursor = page.next_cursor; note_uuid for one body"
-            ),
-            summary: "The summary, its questions with answers, and its notes. The package stays a stub."
+            )
         ),
         GmAgentToolOp(
             Op.packageOpen,
             verbs: [.carePackageOpen],
-            requiredParams: ["summary_uuid"],
-            summary: "Open the care package on a clarification summary — the selector is the SUMMARY uuid."
+            summary: "Open the care package on a clarification summary — the selector is the SUMMARY uuid.",
+            requiredParams: ["summary_uuid"]
         ),
         GmAgentToolOp(
             Op.packageWrite,
             verbs: [.carePackageRefAdd],
-            requiredParams: ["package_uuid", "kind"],
-            summary: "Add ONE ref while building: a dope code, a kbite file, or a curated exploration COPY."
+            summary: "Add ONE ref while building: a dope code, a kbite file, or a curated exploration COPY.",
+            requiredParams: ["package_uuid", "kind"]
         ),
         GmAgentToolOp(
             Op.packageClose,
             verbs: [.carePackageComplete],
-            requiredParams: ["package_uuid", "expected_version", "clarified_intent"],
-            summary: "Seal the package with the clarified intent — building → ready. The primary's call."
+            summary: "Seal the package with the clarified intent — building → ready. The primary's call.",
+            requiredParams: ["package_uuid", "expected_version", "clarified_intent"]
         ),
         GmAgentToolOp(
             Op.packageGet,
             verbs: [.carePackageGet],
+            summary: "The sealed package on its own: the intent, its refs, and the curated copies as a stub roster.",
             narrowing: CdeNarrowing(
                 parameters: ["cursor", "page_bytes", "ref_uuid"],
                 retryWith: "cde_rpir_clarify op=package_get with cursor = page.next_cursor; ref_uuid for one body"
-            ),
-            summary: "The sealed package on its own: the intent, its refs, and the curated copies as a stub roster."
+            )
         ),
     ]
 
@@ -270,5 +271,6 @@ struct GmAgentCdeRpirClarifyTool: GmAgentRpirTool {
         answers, and the care package that carries the decided intent forward.
         """
 
+    /// Creates a new clarification tool instance.
     init() {}
 }

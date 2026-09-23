@@ -10,6 +10,13 @@ extension Migrations {
     // enforced at READ by DopeCogElementSpec.spec(for:). dope_scope_code is a
     // ghost-tolerant CODE, not a uuid FK: ingest re-mints every child uuid, and
     // a dangling code is a legal renderable state.
+    /// Registers the m0014 migration: creates dope cog and element tables.
+    ///
+    /// Pure ADD migration. Creates dope_cog, dope_cog_element, and
+    /// dope_cog_primary_system tables with indices. Element type validity is
+    /// enforced at read-time via spec registry, not via CHECK constraint.
+    ///
+    /// - Parameter migrator: The database migrator to register the migration with.
     static func m0014_dopeCogElement(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0014_dopeCogElement") { db in
             try db.execute(

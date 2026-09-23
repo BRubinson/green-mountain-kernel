@@ -9,8 +9,9 @@ import Foundation
 enum DopeVocabulary {
     /// DOPE — the core expansion.
     static let acronym = "Domain Optimized Project Essence"
-    /// DOPED — the on-disk `.doped.json` form. The trailing D (Driver) is
-    /// optional and primarily references the saved jsons; the core is DOPE.
+    /// DOPED — the on-disk `.doped.json` form.
+    ///
+    /// The trailing D (Driver) is optional and primarily references the saved jsons; the core is DOPE.
     static let driverAcronym = "Domain Optimized Project Essence Driver"
     /// The retired expansion — exists only so tests can ban it from the repo.
     static let retiredAcronym = "Domain Oriented Persistence Entity Diagram"

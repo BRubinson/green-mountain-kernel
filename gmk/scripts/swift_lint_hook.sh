@@ -46,12 +46,18 @@ if [ -n "$SWIFTLINT" ]; then
 }$OUT"
 fi
 
+if command -v python3 >/dev/null 2>&1 && [ -f "$ROOT/gmk/scripts/swift_doc_check.py" ]; then
+    OUT="$(python3 "$ROOT/gmk/scripts/swift_doc_check.py" "$FILE" 2>/dev/null | grep -E ': error: \[DocComment\]' || true)"
+    [ -n "$OUT" ] && FINDINGS="${FINDINGS:+$FINDINGS
+}$OUT"
+fi
+
 [ -n "$FINDINGS" ] || exit 0
 
 REL="${FILE#"$ROOT"/}"
 MSG="swift lint findings for $REL:
 $FINDINGS
-Formatting findings (Indentation, LineLength, Spacing, AddLines, RemoveLine, TrailingComma, OrderedImports): run /gm_swift_lint --fix $REL once the edit sequence is complete. Every other finding needs a hand edit at the reported line."
+Formatting findings (Indentation, LineLength, Spacing, AddLines, RemoveLine, TrailingComma, OrderedImports): run /gm_swift_lint --fix $REL once the edit sequence is complete. Every other finding needs a hand edit at the reported line. [DocComment] findings follow .claude/skills/swift-doc-comments/SKILL.md."
 
 jq -n --arg msg "$MSG" '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $msg}}'
 exit 0

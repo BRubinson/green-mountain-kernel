@@ -10,7 +10,9 @@ import GRDB
 
 /// Read-side mirror of the `agent_briefing` table (m0025 shape: opinion-free
 /// ref set — body/dope_refs/kbite_refs TEXT columns are gone, refs are child
-/// rows). Columns map via convertFromSnakeCase.
+/// rows).
+///
+/// Columns map via convertFromSnakeCase.
 struct AgentBriefingRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "agent_briefing"
     var uuid: String

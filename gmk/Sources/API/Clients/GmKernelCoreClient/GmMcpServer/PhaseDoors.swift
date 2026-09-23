@@ -7,7 +7,9 @@ import Foundation
 /// passes a pen serving nothing. See `GmCdeTools.rosterProblems()`.
 
 /// This file's contribution to `CdeDispatch` — the writes of the clarification,
-/// briefing-close, architecture, review and kbite phases. The op names are the
+/// briefing-close, architecture, review and kbite phases.
+///
+/// The op names are the
 /// roster's; an op here the roster does not declare is reported at startup.
 nonisolated(unsafe) let phaseDoorArms: CdeArms = [
     "cde_rpir_briefing": briefingPhaseArms(),
@@ -17,6 +19,9 @@ nonisolated(unsafe) let phaseDoorArms: CdeArms = [
     "cde_kbite": kbitePhaseArms(),
 ]
 
+/// Returns the arms for briefing phase operations.
+///
+/// - Returns: A mapping of op names to their handlers.
 private func briefingPhaseArms() -> [String: CdeArm] {
     var briefing: [String: CdeArm] = [:]
     briefing["close"] = { args, client in
@@ -34,6 +39,9 @@ private func briefingPhaseArms() -> [String: CdeArm] {
     return briefing
 }
 
+/// Returns the arms for clarification phase operations.
+///
+/// - Returns: A mapping of op names to their handlers.
 private func clarifyPhaseArms() -> [String: CdeArm] {
     var clarify: [String: CdeArm] = [:]
     clarify["open"] = { args, client in
@@ -82,12 +90,18 @@ private func clarifyPhaseArms() -> [String: CdeArm] {
     return clarify
 }
 
+/// Returns the arms for architecture phase operations.
+///
+/// - Returns: A mapping of op names to their handlers.
 private func architecturePhaseArms() -> [String: CdeArm] {
     architectureRowArms().merging(architectureStatusArms()) { _, latest in latest }
 }
 
-/// The rows a plan is made of: the summary page itself and the change records
-/// hung off it.
+/// Returns the arms for architecture row operations.
+///
+/// Handles the summary page and its associated change records.
+///
+/// - Returns: A mapping of op names to their handlers.
 private func architectureRowArms() -> [String: CdeArm] {
     var architecture: [String: CdeArm] = [:]
     architecture["open"] = { args, client in
@@ -118,10 +132,10 @@ private func architectureRowArms() -> [String: CdeArm] {
             ArchGeneralAddRequest(
                 summaryUuid: try args.string("summary_uuid"),
                 filePath: try args.string("file_path"),
-                className: args.optString("class_name"),
                 reasonBrief: try args.string("reason_brief"),
                 changeDepth: depth,
-                changeCode: try args.string("change_code")
+                changeCode: try args.string("change_code"),
+                className: args.optString("class_name")
             )
         )
     }
@@ -146,8 +160,12 @@ private func architectureRowArms() -> [String: CdeArm] {
     return architecture
 }
 
-/// The summary's own body and its status edges: drafting → proposed → approved,
-/// and the revision edge back.
+/// Returns the arms for architecture status operations.
+///
+/// Handles the summary's body and status edges: drafting → proposed →
+/// approved, and revision.
+///
+/// - Returns: A mapping of op names to their handlers.
 private func architectureStatusArms() -> [String: CdeArm] {
     var architecture: [String: CdeArm] = [:]
     architecture["summarize"] = { args, client in
@@ -186,6 +204,9 @@ private func architectureStatusArms() -> [String: CdeArm] {
     return architecture
 }
 
+/// Returns the arms for review phase operations.
+///
+/// - Returns: A mapping of op names to their handlers.
 private func reviewPhaseArms() -> [String: CdeArm] {
     var review: [String: CdeArm] = [:]
     review["open"] = { args, client in
@@ -231,6 +252,9 @@ private func reviewPhaseArms() -> [String: CdeArm] {
     return review
 }
 
+/// Returns the arms for kbite phase operations.
+///
+/// - Returns: A mapping of op names to their handlers.
 private func kbitePhaseArms() -> [String: CdeArm] {
     var kbite: [String: CdeArm] = [:]
     kbite["open_maw"] = { args, client in

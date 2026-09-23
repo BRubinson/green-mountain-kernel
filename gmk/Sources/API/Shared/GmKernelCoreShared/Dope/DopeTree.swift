@@ -16,6 +16,11 @@ struct DopeScopeBody: Codable, Hashable, Sendable {
     let name: String
     let description: String
 
+    /// Creates a scope body with code, name and description.
+    /// - Parameters:
+    ///   - code: The scope identifier.
+    ///   - name: The human-readable scope name.
+    ///   - description: A summary of the scope's purpose.
     init(code: String, name: String, description: String) {
         self.code = code
         self.name = name
@@ -29,6 +34,12 @@ struct DopePersistenceBody: Codable, Hashable, Sendable {
     let description: String
     let sortOrder: Int
 
+    /// Creates a persistence domain body with code, name, description and sort order.
+    /// - Parameters:
+    ///   - code: The domain identifier.
+    ///   - name: The human-readable domain name.
+    ///   - description: A summary of the domain's purpose.
+    ///   - sortOrder: The ordering index within the scope.
     init(
         code: String,
         name: String,
@@ -49,12 +60,22 @@ struct DopeEntityBody: Codable, Hashable, Sendable {
     let description: String
     let sortOrder: Int
     let repoRepresentativeFile: String?
-    /// `domain_code.entity_code` — the BASE_COMPOSABLE entity whose
-    /// properties this entity composes. A pure lookup like enumRef: the
-    /// base's properties are NEVER replicated onto this entity in the db or
-    /// the JSON; consumers union them at render time.
+    /// `domain_code.entity_code` — the BASE_COMPOSABLE entity whose properties this entity composes.
+    ///
+    /// A pure lookup like enumRef: the base's properties are NEVER replicated
+    /// onto this entity in the db or the JSON; consumers union them at render
+    /// time.
     let baseComposableRef: String?
 
+    /// Creates an entity body with all properties.
+    /// - Parameters:
+    ///   - code: The entity identifier.
+    ///   - name: The human-readable entity name.
+    ///   - entityType: The entity classification.
+    ///   - description: A summary of the entity's purpose.
+    ///   - sortOrder: The ordering index within the domain.
+    ///   - repoRepresentativeFile: Path to the source file, if any.
+    ///   - baseComposableRef: The base composable entity reference, if inherited.
     init(
         code: String,
         name: String,
@@ -88,11 +109,26 @@ struct DopePropertyBody: Codable, Hashable, Sendable {
     let enumRef: String?
     /// `domain.entity.property` — non-nil iff dataType == "relationship".
     let relationshipTargetRef: String?
-    /// `domain.entity.property` — the BASE_COMPOSABLE property this one
-    /// materializes. Provenance only: the row is real and FK-referenceable;
-    /// the tag records where it came from. Orthogonal to dataType.
+    /// `domain.entity.property` — the BASE_COMPOSABLE property this one materializes.
+    ///
+    /// Provenance only: the row is real and FK-referenceable; the tag records
+    /// where it came from. Orthogonal to dataType.
     let baseOriginRef: String?
 
+    /// Creates a property body with all properties.
+    /// - Parameters:
+    ///   - code: The property identifier.
+    ///   - name: The human-readable property name.
+    ///   - description: A summary of the property's purpose.
+    ///   - sortOrder: The ordering index within the entity.
+    ///   - dataType: The data type classification.
+    ///   - nullable: Whether the property allows nil.
+    ///   - isUnique: Whether the property is unique.
+    ///   - autoIncrement: Whether the property auto-increments, if applicable.
+    ///   - textCharLimit: Character limit for text properties, if any.
+    ///   - enumRef: The enum reference if `dataType` is "enum".
+    ///   - relationshipTargetRef: The relationship target if `dataType` is "relationship".
+    ///   - baseOriginRef: The base composable property reference, if inherited.
     init(
         code: String,
         name: String,
@@ -129,6 +165,13 @@ struct DopeEnumBody: Codable, Hashable, Sendable {
     let sortOrder: Int
     let repoRepresentativeFile: String?
 
+    /// Creates an enum body with code, name, description and sort order.
+    /// - Parameters:
+    ///   - code: The enum identifier.
+    ///   - name: The human-readable enum name.
+    ///   - description: A summary of the enum's purpose.
+    ///   - sortOrder: The ordering index within the domain.
+    ///   - repoRepresentativeFile: Path to the source file, if any.
     init(
         code: String,
         name: String,
@@ -150,6 +193,12 @@ struct DopeOptionBody: Codable, Hashable, Sendable {
     let description: String
     let sortOrder: Int
 
+    /// Creates an enum option body with code, name, description and sort order.
+    /// - Parameters:
+    ///   - code: The option identifier.
+    ///   - name: The human-readable option name.
+    ///   - description: A summary of the option's purpose.
+    ///   - sortOrder: The ordering index within the enum.
     init(
         code: String,
         name: String,
@@ -170,16 +219,21 @@ struct DopeNodeIdentity: Codable, Hashable, Sendable {
     let version: Int64
     let createdAt: String
     let updatedAt: String
-    /// Soft delete / whiteout. Lives HERE, on the wire-only identity layer,
-    /// and deliberately NOT on the body: the body is what
-    /// DopeProjection.documents emits, and a saved .doped.json represents
-    /// REAL STATE only. A tombstone is a masking artifact — it is assumed
-    /// absent from a base scope and rides only on the overlay tiers
-    /// (PROJECT_ITEM / SESSION_INSTANCE_ITEM), which are db-only and never
-    /// serialized. Keeping it off the body makes that structural rather than
-    /// a rule someone has to remember.
+    /// Soft delete / whiteout.
+    ///
+    /// Wire-only identity layer, NOT on the body (body is what
+    /// DopeProjection.documents emits). A tombstone is a masking artifact on
+    /// overlay tiers (PROJECT_ITEM / SESSION_INSTANCE_ITEM), which are db-only.
+    /// Keeping it off the body makes that structural.
     let deletedOn: String?
 
+    /// Creates a dope node identity with version metadata.
+    /// - Parameters:
+    ///   - uuid: The unique identifier for this node.
+    ///   - version: The version number of this node.
+    ///   - createdAt: The timestamp when this node was created.
+    ///   - updatedAt: The timestamp when this node was last updated.
+    ///   - deletedOn: The timestamp when this node was deleted, or nil if active.
     init(
         uuid: String,
         version: Int64,
@@ -194,7 +248,9 @@ struct DopeNodeIdentity: Codable, Hashable, Sendable {
         self.deletedOn = deletedOn
     }
 
-    /// Tolerant: neither field exists on a pre-m0012 peer.
+    /// Decodes a dope node identity from a decoder, tolerant of pre-m0012 peers.
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Any decoding error from the decoder.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         uuid = try c.decode(String.self, forKey: .uuid)
@@ -206,8 +262,12 @@ struct DopeNodeIdentity: Codable, Hashable, Sendable {
 }
 
 extension DopeScopeTree {
-    /// The same scope with a different domain list — the resolver rebuilds
-    /// the tree structurally and must not invent scope identity.
+    /// Returns a new scope tree with different domains.
+    ///
+    /// The resolver rebuilds the tree structurally and must not invent scope
+    /// identity. All other fields of the scope remain unchanged.
+    /// - Parameter domains: The new domain list for this scope.
+    /// - Returns: A new `DopeScopeTree` with the same identity and body but different domains.
     func replacingDomains(_ domains: [DopePersistenceNode]) -> DopeScopeTree {
         DopeScopeTree(
             identity: identity,
@@ -240,16 +300,26 @@ struct DopeOptionNode: Codable, Hashable, Sendable {
     let identity: DopeNodeIdentity
     let body: DopeOptionBody
 
+    /// Creates an enum option node with identity and body.
+    /// - Parameters:
+    ///   - identity: The node's version metadata and identity.
+    ///   - body: The option's content fields.
     init(identity: DopeNodeIdentity, body: DopeOptionBody) {
         self.identity = identity
         self.body = body
     }
 
+    /// Decodes an enum option node from a decoder.
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Any decoding error from the decoder.
     init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopeOptionBody(from: decoder)
     }
 
+    /// Encodes an enum option node to an encoder.
+    /// - Parameter encoder: The encoder to write to.
+    /// - Throws: Any encoding error from the encoder.
     func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
@@ -263,12 +333,20 @@ struct DopeEnumNode: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case options }
 
+    /// Creates an enum node with identity, body and options.
+    /// - Parameters:
+    ///   - identity: The node's version metadata and identity.
+    ///   - body: The enum's content fields.
+    ///   - options: The list of options in this enum.
     init(identity: DopeNodeIdentity, body: DopeEnumBody, options: [DopeOptionNode]) {
         self.identity = identity
         self.body = body
         self.options = options
     }
 
+    /// Decodes an enum node from a decoder.
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Any decoding error from the decoder.
     init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopeEnumBody(from: decoder)
@@ -276,6 +354,9 @@ struct DopeEnumNode: Codable, Hashable, Sendable {
             .decode([DopeOptionNode].self, forKey: .options)
     }
 
+    /// Encodes an enum node to an encoder.
+    /// - Parameter encoder: The encoder to write to.
+    /// - Throws: Any encoding error from the encoder.
     func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
@@ -288,16 +369,26 @@ struct DopePropertyNode: Codable, Hashable, Sendable {
     let identity: DopeNodeIdentity
     let body: DopePropertyBody
 
+    /// Creates an entity property node with identity and body.
+    /// - Parameters:
+    ///   - identity: The node's version metadata and identity.
+    ///   - body: The property's content fields.
     init(identity: DopeNodeIdentity, body: DopePropertyBody) {
         self.identity = identity
         self.body = body
     }
 
+    /// Decodes an entity property node from a decoder.
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Any decoding error from the decoder.
     init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopePropertyBody(from: decoder)
     }
 
+    /// Encodes an entity property node to an encoder.
+    /// - Parameter encoder: The encoder to write to.
+    /// - Throws: Any encoding error from the encoder.
     func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
@@ -311,12 +402,20 @@ struct DopeEntityNode: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case properties }
 
+    /// Creates an entity node with identity, body and properties.
+    /// - Parameters:
+    ///   - identity: The node's version metadata and identity.
+    ///   - body: The entity's content fields.
+    ///   - properties: The list of properties in this entity.
     init(identity: DopeNodeIdentity, body: DopeEntityBody, properties: [DopePropertyNode]) {
         self.identity = identity
         self.body = body
         self.properties = properties
     }
 
+    /// Decodes an entity node from a decoder.
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Any decoding error from the decoder.
     init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopeEntityBody(from: decoder)
@@ -324,6 +423,9 @@ struct DopeEntityNode: Codable, Hashable, Sendable {
             .decode([DopePropertyNode].self, forKey: .properties)
     }
 
+    /// Encodes an entity node to an encoder.
+    /// - Parameter encoder: The encoder to write to.
+    /// - Throws: Any encoding error from the encoder.
     func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
@@ -340,6 +442,12 @@ struct DopePersistenceNode: Codable, Hashable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case entities, enums }
 
+    /// Creates a persistence domain node with identity, body, entities and enums.
+    /// - Parameters:
+    ///   - identity: The node's version metadata and identity.
+    ///   - body: The domain's content fields.
+    ///   - entities: The list of entities in this domain.
+    ///   - enums: The list of enums in this domain.
     init(
         identity: DopeNodeIdentity,
         body: DopePersistenceBody,
@@ -352,6 +460,9 @@ struct DopePersistenceNode: Codable, Hashable, Sendable {
         self.enums = enums
     }
 
+    /// Decodes a persistence domain node from a decoder.
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Any decoding error from the decoder.
     init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopePersistenceBody(from: decoder)
@@ -360,6 +471,9 @@ struct DopePersistenceNode: Codable, Hashable, Sendable {
         enums = try c.decode([DopeEnumNode].self, forKey: .enums)
     }
 
+    /// Encodes a persistence domain node to an encoder.
+    /// - Parameter encoder: The encoder to write to.
+    /// - Throws: Any encoding error from the encoder.
     func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
@@ -373,8 +487,10 @@ struct DopePersistenceNode: Codable, Hashable, Sendable {
 struct DopeScopeTree: Codable, Hashable, Sendable {
     let identity: DopeNodeIdentity
     let body: DopeScopeBody
-    /// nil for the two project tiers (m0013). A project-tier tree has no
-    /// session, and the repo/boot axis is session-only by construction.
+    /// nil for the two project tiers (m0013).
+    ///
+    /// A project-tier tree has no session, and the repo/boot axis is
+    /// session-only by construction.
     let sessionUuid: String?
     let promptUuid: String?
     let scopeType: String
@@ -385,6 +501,15 @@ struct DopeScopeTree: Codable, Hashable, Sendable {
         case sessionUuid, promptUuid, scopeType, revision, domains
     }
 
+    /// Creates a scope tree with identity, body and all metadata.
+    /// - Parameters:
+    ///   - identity: The node's version metadata and identity.
+    ///   - body: The scope's content fields.
+    ///   - sessionUuid: The session UUID, nil for project-tier scopes.
+    ///   - promptUuid: The prompt UUID if this scope belongs to a prompt.
+    ///   - scopeType: The classification of this scope.
+    ///   - revision: The revision number of this tree.
+    ///   - domains: The list of persistence domains in this scope.
     init(
         identity: DopeNodeIdentity,
         body: DopeScopeBody,
@@ -403,6 +528,9 @@ struct DopeScopeTree: Codable, Hashable, Sendable {
         self.domains = domains
     }
 
+    /// Decodes a scope tree from a decoder.
+    /// - Parameter decoder: The decoder to read from.
+    /// - Throws: Any decoding error from the decoder.
     init(from decoder: Decoder) throws {
         identity = try DopeNodeIdentity(from: decoder)
         body = try DopeScopeBody(from: decoder)
@@ -414,6 +542,9 @@ struct DopeScopeTree: Codable, Hashable, Sendable {
         domains = try c.decode([DopePersistenceNode].self, forKey: .domains)
     }
 
+    /// Encodes a scope tree to an encoder.
+    /// - Parameter encoder: The encoder to write to.
+    /// - Throws: Any encoding error from the encoder.
     func encode(to encoder: Encoder) throws {
         try identity.encode(to: encoder)
         try body.encode(to: encoder)
@@ -434,6 +565,13 @@ struct DopeTreeCounts: Codable, Hashable, Sendable {
     let enums: Int
     let options: Int
 
+    /// Creates cascade counts with deletion accounting.
+    /// - Parameters:
+    ///   - domains: Number of domains affected.
+    ///   - entities: Number of entities affected.
+    ///   - properties: Number of properties affected.
+    ///   - enums: Number of enums affected.
+    ///   - options: Number of options affected.
     init(domains: Int, entities: Int, properties: Int, enums: Int, options: Int) {
         self.domains = domains
         self.entities = entities

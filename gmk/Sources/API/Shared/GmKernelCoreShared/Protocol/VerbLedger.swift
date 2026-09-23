@@ -8,15 +8,16 @@ import Foundation
 /// authorize, and nothing consults it to refuse a caller.
 enum VerbLedger {
 
-    /// ONE ROW PER INVOCATION SPELLING, not per MessageType. A verb with aliases
-    /// emits one row each, all carrying the same message type, role and pen
-    /// tool — which is what lets the guard match on a flat list and still see
-    /// every spelling.
+    /// ONE ROW PER INVOCATION SPELLING, not per MessageType.
+    ///
+    /// A verb with aliases emits one row each, all carrying the same message
+    /// type, role and pen tool — which is what lets the guard match on a flat
+    /// list and still see every spelling.
     struct VerbRow: Encodable, Sendable {
         let messageType: String
         let gm: String
         let cdeTool: String?
-        /// record | read
+        /// record | read.
         let role: String
         /// Is this a write?
         let write: Bool
@@ -36,6 +37,10 @@ enum VerbLedger {
         let primaryPenTools: [String]
     }
 
+    /// Builds the verb ledger payload from the registry.
+    ///
+    /// - Parameter writesOnly: If true, include only write operations.
+    /// - Returns: A payload containing all verb rows and pen tool mappings.
     static func build(writesOnly: Bool = false) -> Payload {
         var rows: [VerbRow] = []
         var replacements: [String: String] = [:]

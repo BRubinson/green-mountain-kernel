@@ -10,6 +10,9 @@ import XCTest
 /// makes this repository undevelopable from inside its own tooling.
 final class HookGuardTests: XCTestCase {
 
+    /// Runs the PreToolUse hook guard with the given payload.
+    /// - Parameter payload: The command string to check.
+    /// - Returns: An error message if the command is denied, nil if allowed.
     private func preToolUse(_ payload: String) -> String? {
         PreToolUseHook.run(GmHookContext(stdin: Data(payload.utf8), dryRun: false, caller: nil))
     }

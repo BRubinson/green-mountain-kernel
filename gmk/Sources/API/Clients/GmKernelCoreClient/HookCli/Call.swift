@@ -1,19 +1,22 @@
 import Foundation
 
 /// Any JSON value, as a Codable — the type that makes an untyped passthrough
-/// possible without teaching the client 123 payload shapes. It rides the SAME
-/// `DaemonClient.request` as every typed verb, inheriting the hello handshake,
-/// the protocol-version check, the reconnect-once retry and the server-error
-/// mapping; a hand-rolled socket write would be a second wire client to keep in
-/// step. The type lives in `GmDaemonSdk` as `GmJsonValue`, because the harness
-/// envelope needs the same shape on the protocol side.
+/// possible without teaching the client 123 payload shapes.
+///
+/// Rides the SAME `DaemonClient.request` as every typed verb. The type lives
+/// in `GmDaemonSdk` as `GmJsonValue`; the harness envelope needs the same
+/// shape on the protocol side.
 typealias JSONValue = GmJsonValue
 
-/// `gm_hook call <MESSAGE_TYPE> [--json '<payload>' | --json-file <path>]`
+/// Sends a raw message to the daemon via the hook CLI.
 ///
-/// KEYS ARE SENT VERBATIM. The wire is snake_case, and this does not translate
-/// — a caller reaching for the raw passthrough is working at wire level and a
-/// silent key rewrite here would be a second dialect to learn.
+/// `gm_hook call <MESSAGE_TYPE> [--json '<payload>' | --json-file <path>]`.
+///
+/// KEYS ARE SENT VERBATIM. The wire is snake_case, and this does not
+/// translate — a caller reaching for the raw passthrough is working at wire
+/// level and a silent key rewrite here would be a second dialect to learn.
+/// - Parameter argv: The command-line arguments (message type, options, payload).
+/// - Returns: Exit code (0 on success, 2 for usage errors, 1 for daemon errors).
 func runCall(_ argv: [String]) -> Int32 {
     guard let typeName = argv.first, !typeName.hasPrefix("-") else {
         FileHandle.standardError.write(

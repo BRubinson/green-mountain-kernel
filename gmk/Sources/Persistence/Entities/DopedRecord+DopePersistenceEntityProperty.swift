@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `dope_persistence_entity_property` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `dope_persistence_entity_property` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DopePersistenceEntityPropertyRecord: DopeNodeRecord, TableRecord, SoftDeletable {
     static let databaseTableName = "dope_persistence_entity_property"
     var uuid: String

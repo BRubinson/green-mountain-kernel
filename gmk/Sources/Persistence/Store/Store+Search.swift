@@ -11,6 +11,10 @@ import GRDB
 // score rather than selling a unified relevance number.
 
 extension Store {
+    /// Searches prompt-related content by full-text query.
+    /// - Parameter req: The search request with query and optional filters.
+    /// - Returns: A search response with ranked results and excerpts.
+    /// - Throws: `StoreError.badRequest` if the query has no searchable tokens; other store errors otherwise.
     func search(_ req: SearchRequest) throws -> SearchResponse {
         // Deliberate divergence from the kbite precedent: a whitespace-only
         // query is BAD_REQUEST rather than an empty hit list — a silent empty

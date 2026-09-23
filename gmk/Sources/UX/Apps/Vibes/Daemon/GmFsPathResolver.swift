@@ -1,19 +1,18 @@
 import Foundation
 
-/// Filesystem derivations off daemon rows, isolated in one place. Rows carry gmfs-RELATIVE
-/// storage paths; everything here resolves against $GM_FS_ROOT. The archive mirror lives at
-/// `_archive/cold_storage/<same relative path>` and is probed at the PROMPT-folder level,
-/// because that is the granularity archiving works at.
+/// Filesystem derivations off daemon rows, isolated in one place.
 ///
-/// Every function performs synchronous FileManager probes: resolve off the main actor and
-/// cache the result, never call from a View body.
+/// Rows carry gmfs-RELATIVE storage paths, resolved against $GM_FS_ROOT; archive mirror at
+/// `_archive/cold_storage/<same relative path>`, probed at PROMPT-folder level (archiving granularity).
+/// Synchronous FileManager probes—resolve off main actor and cache result; never call from View body.
 nonisolated enum GmFsPathResolver {
-    /// The folder-segment slug rule, shared with prompt codes.
+    /// Returns a folder-segment slug, shared with prompt codes.
     ///
-    /// This is NOT the session-code rule: `session.code` folds only `/` → `__`, with no case
-    /// or punctuation folding, and INSTANCE_CURRENT_SESSION returns the authoritative code.
-    /// Never compare a branch against this slug — it folds aggressively, so `Feature/Login`
-    /// would silently never match its session.
+    /// Folds case, slashes, and punctuation. Not the session-code rule: `session.code` folds only
+    /// `/` → `__`. Never compare a branch against this slug; it folds aggressively.
+    ///
+    /// - Parameter name: The original folder name.
+    /// - Returns: A slug with lowercase letters, digits, hyphens, and underscores only.
     static func slug(_ name: String) -> String {
         let lower = name.lowercased()
         var out = ""
@@ -32,15 +31,26 @@ nonisolated enum GmFsPathResolver {
         return out
     }
 
+    /// Returns the archive mirror URL for a gmfs-relative storage path.
+    ///
+    /// - Parameters:
+    ///   - relative: The gmfs-relative storage path.
+    ///   - gmFsRoot: The filesystem root directory.
+    /// - Returns: A URL to the cold storage mirror location.
     private static func archiveMirror(relative: String, gmFsRoot: String) -> URL {
         URL(fileURLWithPath: gmFsRoot, isDirectory: true)
             .appendingPathComponent("_archive/cold_storage", isDirectory: true)
             .appendingPathComponent(relative, isDirectory: true)
     }
 
-    /// Resolve a gmfs-relative path, falling back to the archive mirror when
-    /// the live location is gone. Returns the live URL when neither exists
-    /// (callers render empty states off a missing directory).
+    /// Resolves a gmfs-relative path, falling back to archive when live is gone.
+    ///
+    /// Returns the live URL when neither exists; callers render empty states for missing directories.
+    ///
+    /// - Parameters:
+    ///   - relative: The gmfs-relative storage path.
+    ///   - gmFsRoot: The filesystem root directory.
+    /// - Returns: The live URL, archive mirror, or live when both missing.
     static func resolve(relative: String, gmFsRoot: String) -> URL {
         let live = URL(fileURLWithPath: gmFsRoot, isDirectory: true)
             .appendingPathComponent(relative, isDirectory: true)
@@ -50,18 +60,26 @@ nonisolated enum GmFsPathResolver {
         return live
     }
 
+    /// Returns the session directory URL for a given root and session stub.
+    ///
+    /// - Parameters:
+    ///   - gmFsRoot: The filesystem root directory.
+    ///   - session: The session stub with storage path information.
+    /// - Returns: The session directory URL.
     static func sessionDir(gmFsRoot: String, session: SessionStub) -> URL {
         URL(fileURLWithPath: gmFsRoot, isDirectory: true)
             .appendingPathComponent(session.gmfsRelativeStoragePath, isDirectory: true)
     }
 
-    /// A prompt's folder, or nil when it has no filesystem presence. The
-    /// row's `gmfs_relative_storage_path` is the ONLY source (probed live,
-    /// then in the archive mirror — archiving moves prompt folders, leaving
-    /// the session dir live with an emptied prompts/). There is NO folder
-    /// guessing: a guessed `<seq>_*` folder can collide with a stranger's
-    /// files, so an empty path renders a non-blocking unavailable state
-    /// instead.
+    /// Returns a prompt's folder, or nil when it has no filesystem presence.
+    ///
+    /// The row's `gmfs_relative_storage_path` is the ONLY source, probed live then in archive.
+    /// There is no folder guessing; an empty path renders unavailable.
+    ///
+    /// - Parameters:
+    ///   - gmFsRoot: The filesystem root directory.
+    ///   - storagePath: The prompt's gmfs-relative storage path, or empty if absent.
+    /// - Returns: The prompt folder URL, or nil if not found.
     static func promptFolder(gmFsRoot: String, storagePath: String) -> URL? {
         guard !storagePath.isEmpty else { return nil }
         let live = URL(fileURLWithPath: gmFsRoot, isDirectory: true)
@@ -77,22 +95,28 @@ nonisolated enum GmFsPathResolver {
     struct ResolvedMemory: Equatable, Sendable {
         let root: URL?
         /// True only when `root` IS `<gmFsRoot>/<storagePath>/memory` — the
-        /// directory PROMPT_MEMORY_CHANGED describes. The artifact-common-
-        /// ancestor rule can legitimately land elsewhere, and the event would
-        /// never describe that directory: only this flag may switch the
-        /// explorer from polling to event-driven refresh.
+        /// directory PROMPT_MEMORY_CHANGED describes.
+        ///
+        /// The artifact-common-ancestor rule can legitimately land elsewhere, and
+        /// the event would never describe that directory: only this flag may
+        /// switch the explorer from polling to event-driven refresh.
         let isDaemonWatched: Bool
     }
 
-    /// Memory root for a prompt, in priority order:
-    /// 1. Deepest common ancestor of the prompt's registered artifact files
-    ///    that exists on disk — db-driven (the rows say where the files are).
-    /// 2. The storage-path folder's memory/ subdirectory.
-    /// Root is nil when neither resolves.
+    /// Returns the memory root for a prompt, resolved in priority order.
+    ///
+    /// Priority 1: Deepest common ancestor of artifact files (db-driven). Priority 2: The
+    /// storage-path folder's memory/ subdirectory. Root is nil when neither resolves.
+    ///
+    /// - Parameters:
+    ///   - gmFsRoot: The filesystem root directory.
+    ///   - artifacts: The prompt's registered artifact rows.
+    ///   - storagePath: The prompt's gmfs-relative storage path, or empty if absent.
+    /// - Returns: A ResolvedMemory with the root URL and daemon-watched flag.
     static func memoryRoot(
         gmFsRoot: String,
-        storagePath: String = "",
-        artifacts: [ArtifactRow]
+        artifacts: [ArtifactRow],
+        storagePath: String = ""
     ) -> ResolvedMemory {
         let watched: URL? =
             storagePath.isEmpty

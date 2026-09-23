@@ -38,6 +38,12 @@ enum DopeMerge {
         let kind: String
         let contentHash: String
 
+        /// Creates an element with its identity and content hash.
+        ///
+        /// - Parameters:
+        ///   - dotPath: The dot-path address of the element.
+        ///   - kind: The element type (persistence, entity, property, enum, option).
+        ///   - contentHash: The hash of the element's content.
         init(dotPath: String, kind: String, contentHash: String) {
             self.dotPath = dotPath
             self.kind = kind
@@ -50,16 +56,27 @@ enum DopeMerge {
         let syncedContentHash: String?
         let locallyModified: Bool
 
+        /// Creates a base record for merge tracking.
+        ///
+        /// - Parameters:
+        ///   - syncedContentHash: The content hash when last synced, or nil if never synced.
+        ///   - locallyModified: Whether this element has been modified locally.
         init(syncedContentHash: String?, locallyModified: Bool) {
             self.syncedContentHash = syncedContentHash
             self.locallyModified = locallyModified
         }
     }
 
-    /// Decide every dot-path in the union of both sides.
+    /// Decides every dot-path in the union of both sides.
     ///
     /// Deliberately total: a path present on either side gets an outcome, so
     /// nothing is silently dropped by being absent from one tree.
+    ///
+    /// - Parameters:
+    ///   - ours: The elements currently in the database.
+    ///   - theirs: The elements present in the incoming tree.
+    ///   - base: The known bases for each dot-path.
+    /// - Returns: An array of decisions for every path in either tree.
     static func plan(
         ours: [Element],
         theirs: [Element],
@@ -130,17 +147,23 @@ enum DopeMerge {
             }
     }
 
-    /// The unresolved conflicts in a plan, in dot-path order.
+    /// Extracts the unresolved conflicts from a plan.
+    ///
+    /// - Parameter plan: The plan outcomes from a merge.
+    /// - Returns: The outcomes with `.conflict` decision, in dot-path order.
     static func conflicts(in plan: [Outcome]) -> [Outcome] {
         plan.filter { $0.decision == .conflict }
     }
 
     // MARK: - Element extraction
 
-    /// Flattens a document bundle into the dot-path addressed elements the
-    /// merge reasons about. The dot-path forms are the same ones dope refs
-    /// already use, so a conflict names something a person can actually go
-    /// and look at.
+    /// Flattens a document bundle into dot-path addressed elements.
+    ///
+    /// The dot-path forms are the same ones dope refs already use, so a
+    /// conflict names something a person can actually go and look at.
+    ///
+    /// - Parameter bundle: The document bundle to flatten.
+    /// - Returns: An array of elements addressing all items in the bundle.
     static func elements(of bundle: DopeDocumentBundle) -> [Element] {
         var out: [Element] = []
         for domain in bundle.domainFiles.sorted(by: { $0.body.code < $1.body.code }) {
@@ -192,9 +215,14 @@ enum DopeMerge {
         return out
     }
 
-    /// Content hash of any document node. Uses the file codec so the hash is
-    /// computed over exactly the bytes that would be written — the encoder is
-    /// `.sortedKeys`, so this is stable across runs.
+    /// Computes the SHA256 hash of a document node.
+    ///
+    /// Uses the file codec so the hash is computed over exactly the bytes
+    /// that would be written. The encoder is `.sortedKeys`, making it stable
+    /// across runs.
+    ///
+    /// - Parameter value: The encodable value to hash.
+    /// - Returns: The SHA256 hash as a hex string, or an empty string on error.
     static func hash<T: Encodable>(_ value: T) -> String {
         guard let data = try? DopeDocumentCodec.encoder.encode(value) else { return "" }
         return SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()

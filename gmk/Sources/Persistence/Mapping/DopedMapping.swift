@@ -7,17 +7,18 @@
 import Foundation
 
 extension DopeScopeRecord {
-    /// db → wire.
+    /// Converts the scope record to a wire row.
     ///
     /// Every parameter is passed explicitly, including the three the wire
     /// init defaults (projectUuid, instanceUuid, deletedOn). Omitting
     /// `deletedOn` here would COMPILE and would quietly un-delete every
     /// tombstoned dope node for all 14 readers of this row.
+    ///
+    /// - Returns: A `DopeScopeRow` representing this scope.
     func dto() -> DopeScopeRow {
         DopeScopeRow(
             uuid: uuid,
             version: version,
-            projectUuid: projectUuid,
             instanceUuid: instanceUuid,
             sessionUuid: sessionUuid,
             promptUuid: promptUuid,
@@ -28,18 +29,20 @@ extension DopeScopeRecord {
             revision: revision,
             deletedOn: deletedOn,
             createdAt: createdAt,
-            updatedAt: updatedAt
+            updatedAt: updatedAt,
+            projectUuid: projectUuid
         )
     }
 }
 
 extension DopeNodeRecord {
-    /// One identity shape over the five dope node tables: each carries the
-    /// same BaseEntity columns plus `deleted_on`.
+    /// Extracts the identity fields shared by all dope node types.
     ///
-    /// `deletedOn` is passed explicitly. Omitting it would COMPILE, because
-    /// the wire init defaults it, and would quietly un-delete every tombstoned
-    /// node the masking resolver relies on seeing.
+    /// Each of the five dope node tables carries the same BaseEntity columns
+    /// plus `deleted_on`. The identity is passed explicitly to avoid quietly
+    /// un-deleting tombstoned nodes when the wire init defaults are used.
+    ///
+    /// - Returns: A `DopeNodeIdentity` with the record's identity fields.
     func identity() -> DopeNodeIdentity {
         DopeNodeIdentity(
             uuid: uuid,
@@ -78,8 +81,13 @@ extension DopeDomainGrandchildPath {
 }
 
 extension DopeCogRecord {
-    /// db → wire. The elements arrive hydrated: their per-type subtype values
-    /// are resolved from a runtime-chosen table the cog spec names.
+    /// Converts the cog record to a wire node with hydrated elements.
+    ///
+    /// Per-type subtype values are resolved from a runtime-chosen table the
+    /// cog spec names.
+    ///
+    /// - Parameter elements: The hydrated element nodes for this cog.
+    /// - Returns: A `DopeCogNode` representing this cog with its elements.
     func dto(elements: [DopeCogElementNode]) -> DopeCogNode {
         DopeCogNode(
             uuid: uuid,
@@ -95,8 +103,16 @@ extension DopeCogRecord {
 }
 
 extension DopeCogElementRecord {
-    /// db → wire. The two subtype values are read separately, because the
-    /// column set differs per element type.
+    /// Converts the element record to a wire node with resolved subtypes.
+    ///
+    /// The two subtype values are read separately because the column set
+    /// differs per element type.
+    ///
+    /// - Parameters:
+    ///   - primaryPath: The resolved primary-type subtype value.
+    ///   - dopePersistenceCode: The resolved dope-persistence-type subtype
+    ///     value.
+    /// - Returns: A `DopeCogElementNode` representing this element.
     func dto(primaryPath: String?, dopePersistenceCode: String?) -> DopeCogElementNode {
         DopeCogElementNode(
             uuid: uuid,
@@ -109,8 +125,8 @@ extension DopeCogElementRecord {
             parentElementUuid: parentElementUuid,
             dopeScopeCode: dopeScopeCode,
             primaryPath: primaryPath,
-            dopePersistenceCode: dopePersistenceCode,
-            deletedOn: deletedOn
+            deletedOn: deletedOn,
+            dopePersistenceCode: dopePersistenceCode
         )
     }
 }

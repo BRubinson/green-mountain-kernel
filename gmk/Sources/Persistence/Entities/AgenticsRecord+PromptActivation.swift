@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `prompt_activation` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `prompt_activation` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct PromptActivationRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "prompt_activation"
     var uuid: String

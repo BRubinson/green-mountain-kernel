@@ -5,8 +5,12 @@
 import Foundation
 
 extension DiagramWithOwner {
-    /// db → wire, with the derived instance injected. `visibility` is passed
-    /// explicitly rather than leaning on DiagramRow's "PRIVATE" init default.
+    /// Converts a diagram record to a wire DTO.
+    ///
+    /// The derived instance is injected, and `visibility` is passed explicitly
+    /// rather than relying on DiagramRow's default initializer.
+    ///
+    /// - Returns: The wire row representation of the diagram.
     func dto() -> DiagramRow {
         DiagramRow(
             uuid: diagram.uuid,
@@ -22,17 +26,24 @@ extension DiagramWithOwner {
             gmccDiagramPath: diagram.gmccDiagramPath,
             dopeScopeCode: diagram.dopeScopeCode,
             revision: diagram.revision,
-            visibility: diagram.visibility,
             createdAt: diagram.createdAt,
-            updatedAt: diagram.updatedAt
+            updatedAt: diagram.updatedAt,
+            visibility: diagram.visibility
         )
     }
 }
 
 extension DiagramElementRecord {
-    /// db → wire for one tree node. The payload and the children are handed
-    /// in: which subtype row belongs to this element, and how the flat row set
-    /// folds into a tree, are the hydrator's questions, not this mapping's.
+    /// Converts a diagram element record to a tree node.
+    ///
+    /// The payload and children are provided by the caller. The hydrator
+    /// determines which subtype row belongs to this element and how the flat row
+    /// set folds into a tree structure.
+    ///
+    /// - Parameters:
+    ///   - payload: The diagram element payload for this node.
+    ///   - children: The child nodes in the tree.
+    /// - Returns: The tree node representation of this element.
     func node(payload: DiagramElementPayload, children: [DiagramElementNode]) -> DiagramElementNode {
         DiagramElementNode(
             identity: DopeNodeIdentity(
@@ -58,19 +69,29 @@ extension DiagramElementRecord {
 }
 
 extension DiagramStrokeVertexRecord {
+    /// Converts a stroke vertex record to a wire vertex.
+    ///
+    /// - Returns: The wire vertex representation with x, y, and pressure values.
     func vertex() -> DiagramVertex {
         DiagramVertex(x: x, y: y, pressure: pressure)
     }
 }
 
 extension DiagramShapeVertexRecord {
-    /// This table carries no pressure column.
+    /// Converts a shape vertex record to a wire vertex.
+    ///
+    /// Shape vertices do not include pressure information.
+    ///
+    /// - Returns: The wire vertex representation with x and y values.
     func vertex() -> DiagramVertex {
         DiagramVertex(x: x, y: y, pressure: nil)
     }
 }
 
 extension DiagramDrawingLayerRecord {
+    /// Converts a drawing layer record to a diagram element payload.
+    ///
+    /// - Returns: The diagram element payload wrapping the drawing layer data.
     func payload() -> DiagramElementPayload {
         .drawingLayer(
             DrawingLayerPayload(opacity: opacity, visible: visible, locked: locked)
@@ -79,9 +100,14 @@ extension DiagramDrawingLayerRecord {
 }
 
 extension DiagramDrawingStrokeRecord {
-    /// Read precedence, per the storage-strategy axis: the packed blob when
-    /// present, else the vertex rows the caller supplies. The write path never
-    /// leaves both populated.
+    /// Converts a stroke record to a diagram element payload.
+    ///
+    /// Uses the packed vertex blob if present, otherwise uses the vertex rows
+    /// provided by the caller. The write path never leaves both populated.
+    ///
+    /// - Parameter vertexRows: The vertex rows to use if no packed blob exists.
+    /// - Returns: The diagram element payload wrapping the stroke data.
+    /// - Throws: Any error from unpacking the vertex blob.
     func payload(vertexRows: [DiagramVertex]) throws -> DiagramElementPayload {
         let packed: [DiagramVertex]?
         if let blob = packedVertices, let count = vertexCount {
@@ -101,6 +127,11 @@ extension DiagramDrawingStrokeRecord {
 }
 
 extension DiagramDrawingShapeRecord {
+    /// Converts a shape record to a diagram element payload.
+    ///
+    /// - Parameter vertexRows: The vertex rows that define the shape's geometry.
+    /// - Returns: The diagram element payload wrapping the shape data.
+    /// - Throws: `StoreError.corruptState` when the shape kind is unknown.
     func payload(vertexRows: [DiagramVertex]) throws -> DiagramElementPayload {
         guard let kind = DiagramShapeKind(rawValue: shapeKind) else {
             throw StoreError.corruptState(
@@ -122,6 +153,9 @@ extension DiagramDrawingShapeRecord {
 }
 
 extension DiagramDrawingTextRecord {
+    /// Converts a text record to a diagram element payload.
+    ///
+    /// - Returns: The diagram element payload wrapping the text data.
     func payload() -> DiagramElementPayload {
         .drawingText(
             DrawingTextPayload(
@@ -137,6 +171,9 @@ extension DiagramDrawingTextRecord {
 }
 
 extension DiagramConnectorRecord {
+    /// Converts a connector record to a diagram element payload.
+    ///
+    /// - Returns: The diagram element payload wrapping the connector data.
     func payload() -> DiagramElementPayload {
         .connector(
             ConnectorPayload(
@@ -154,6 +191,10 @@ extension DiagramConnectorRecord {
 }
 
 extension DiagramUmlNodeRecord {
+    /// Converts a UML node record to a diagram element payload.
+    ///
+    /// - Returns: The diagram element payload wrapping the UML node data.
+    /// - Throws: `StoreError.corruptState` when the node kind is unknown.
     func payload() throws -> DiagramElementPayload {
         guard let kind = DiagramNodeKind(rawValue: nodeKind) else {
             throw StoreError.corruptState(
@@ -178,12 +219,18 @@ extension DiagramUmlNodeRecord {
 }
 
 extension DiagramDopeScopePersistenceLayerRecord {
+    /// Converts a dope scope persistence layer record to a diagram element payload.
+    ///
+    /// - Returns: The diagram element payload wrapping the layer data.
     func payload() -> DiagramElementPayload {
         .dopeScopePersistenceLayer(DopeScopePersistenceLayerPayload(dopeScopeCode: dopeScopeCode))
     }
 }
 
 extension DiagramDopeEntityRecord {
+    /// Converts a dope entity record to a diagram element payload.
+    ///
+    /// - Returns: The diagram element payload wrapping the entity data.
     func payload() -> DiagramElementPayload {
         .dopeEntity(DopeEntityPayload(entityCode: entityCode))
     }

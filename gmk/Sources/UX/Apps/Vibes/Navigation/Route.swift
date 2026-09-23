@@ -1,9 +1,11 @@
 import Foundation
 
-/// Codable navigation payload for the single window type. `nil`/absence means
-/// the landing page. The session screen is a `NavigationSplitView`, which must
-/// be a container root — so windows switch routes at the root rather than
-/// pushing destinations onto a `NavigationStack`.
+/// Codable navigation payload for the single window type.
+///
+/// `nil`/absence means the landing page. The session screen is a
+/// `NavigationSplitView`, which must be a container root — so windows switch
+/// routes at the root rather than pushing destinations onto a
+/// `NavigationStack`.
 enum Route: Codable, Hashable {
     /// The session view: prompt list + statuses and the session-level tabs.
     case session(SessionWindowID)
@@ -25,8 +27,9 @@ enum Route: Codable, Hashable {
     case promptMemories(PromptMemoriesWindowID)
     case search(SearchSeed)
 
-    /// The session both session routes scope to — the window lease key. The
-    /// SAME uuid for `.session` and `.sessionPrompt` on one session, so the
+    /// The session both session routes scope to — the window lease key.
+    ///
+    /// The SAME uuid for `.session` and `.sessionPrompt` on one session, so the
     /// window-root lease task's id never changes across that hop and the
     /// scope structurally cannot retire mid-navigation.
     var sessionScopeUuid: String? {
@@ -58,25 +61,32 @@ struct SearchSeed: Codable, Hashable {
 
 /// Window identity. `id` is unique per open, so `WindowGroup(for:)` NEVER
 /// dedupes — two windows on one session are legal (SessionScopeCache makes
-/// them safe). Decoding always yields a landing seed: restored windows land
-/// on the landing page by design.
+/// them safe).
+///
+/// Decoding always yields a landing seed: restored windows land on the landing
+/// page by design.
 struct WindowSeed: Codable, Hashable, Identifiable {
     let id: UUID
     let route: Route?
 
+    /// Creates a window seed with an optional route.
+    /// - Parameter route: The target route, or nil for the landing page.
     init(_ route: Route? = nil) {
         self.id = UUID()
         self.route = route
     }
 
-    /// The app target's door. `Route` stays INTERNAL deliberately — the app only
-    /// ever asks for a fresh landing seed (`WindowSeed()`), so making the routing
-    /// vocabulary public to satisfy one call site would widen the module boundary
-    /// for nothing and turn every later routing change into a public API change.
+    /// Creates a window seed with the landing page route.
+    ///
+    /// The app target's door. `Route` stays internal deliberately — the app
+    /// only asks for a fresh landing seed, so making routing public would widen
+    /// the module boundary for nothing.
     init() {
         self.init(nil)
     }
 
+    /// Decodes a window seed, always yielding the landing page.
+    /// - Parameter _: The decoder (unused; always yields nil route).
     init(from _: Decoder) {
         self.init(nil)
     }

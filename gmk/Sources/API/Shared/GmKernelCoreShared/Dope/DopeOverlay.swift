@@ -2,12 +2,12 @@ import Foundation
 
 /// Read-through / copy-on-write masking across two dope layers: a PURE
 /// FUNCTION over two already-hydrated `DopeScopeTree` values, with no
-/// database, filesystem or SQL. It never touches the base_composable
-/// machinery, which REFUSES cross-scope references and would reject exactly
-/// what masking needs. Identity across layers is POSITIONAL — a node at
-/// dot-path `d.e.p` masks whatever sits there in the base, and no cross-layer
-/// pointer is stored, so nothing can dangle. `resolve` NEVER throws; a
-/// malformed pair degrades to warnings.
+/// database, filesystem or SQL.
+///
+/// It never touches the base_composable machinery, which REFUSES cross-scope references and would reject exactly what
+/// masking needs. Identity across layers is POSITIONAL — a node at dot-path `d.e.p` masks whatever sits there in the
+/// base, and no cross-layer pointer is stored, so nothing can dangle. `resolve` NEVER throws; a malformed pair degrades
+/// to warnings.
 enum DopeOverlay {
 
     /// Where a resolved node came from, and what happened to it.
@@ -38,6 +38,13 @@ enum DopeOverlay {
         let baseUuid: String?
         let overlayUuid: String?
 
+        /// Creates a resolution record for a node at a given path.
+        /// - Parameters:
+        ///   - path: The dot-path where the node is located.
+        ///   - origin: Where the resolved node came from.
+        ///   - effectiveUuid: The uuid of the copy-on-write source.
+        ///   - baseUuid: The uuid of the base layer node, or nil if absent.
+        ///   - overlayUuid: The uuid of the overlay node, or nil if absent.
         init(
             path: String,
             origin: Origin,
@@ -63,6 +70,12 @@ enum DopeOverlay {
         /// Non-fatal observations (orphaned masks, most often).
         let warnings: [String]
 
+        /// Creates a resolved overlay result.
+        /// - Parameters:
+        ///   - tree: The merged tree with tombstoned subtrees removed.
+        ///   - resolutions: Dot-path to provenance mapping, including hidden nodes.
+        ///   - hidden: Dot-paths of nodes masked away by whiteouts.
+        ///   - warnings: Non-fatal observations from the merge.
         init(
             tree: DopeScopeTree,
             resolutions: [String: Resolution],
@@ -75,20 +88,32 @@ enum DopeOverlay {
             self.warnings = warnings
         }
 
-        /// Hand a plain `DopeScopeTree` to everything downstream —
-        /// DopeCanvasLayout, DiagramResolver, the headless renderer, GMVibes.
-        /// This is what keeps the resolver from forcing a type change through
-        /// five subsystems at once.
+        /// Returns the merged tree for use downstream.
+        ///
+        /// Hands a plain `DopeScopeTree` to DopeCanvasLayout, DiagramResolver,
+        /// the headless renderer, and GMVibes. This keeps the resolver from forcing
+        /// a type change through five subsystems at once.
+        ///
+        /// - Returns: The merged tree.
         func flattened() -> DopeScopeTree { tree }
     }
 
+    /// Tests whether a node is a tombstone (marked for deletion).
+    /// - Parameter identity: The node identity to check.
+    /// - Returns: True if the node is a tombstone, false otherwise.
     static func isTombstone(_ identity: DopeNodeIdentity) -> Bool {
         identity.deletedOn != nil
     }
 
-    /// Merge `overlay` over `base`. A nil overlay resolves to the base
-    /// unchanged; a nil base resolves the overlay alone (every node an
-    /// orphaned mask, since there is nothing to mask).
+    /// Merges an overlay over a base dope tree.
+    ///
+    /// A nil overlay resolves to the base unchanged; a nil base resolves the
+    /// overlay alone (every node an orphaned mask, since there is nothing to mask).
+    ///
+    /// - Parameters:
+    ///   - base: The base dope tree, or nil.
+    ///   - overlay: The overlay dope tree, or nil.
+    /// - Returns: The merged tree with provenance, hidden nodes, and warnings.
     static func resolve(base: DopeScopeTree?, overlay: DopeScopeTree?) -> Resolved {
         switch (base, overlay) {
         case (nil, nil):
@@ -110,6 +135,11 @@ enum DopeOverlay {
 
     // MARK: - Single layer (nothing to merge against)
 
+    /// Resolves a single dope tree layer without merging.
+    /// - Parameters:
+    ///   - tree: The dope tree to resolve.
+    ///   - origin: The origin to assign to all nodes.
+    /// - Returns: The resolved tree with provenance.
     private static func singleLayerResolve(_ tree: DopeScopeTree, origin: Origin) -> Resolved {
         var resolutions: [String: Resolution] = [:]
         var hidden: [String] = []
@@ -214,6 +244,11 @@ enum DopeOverlay {
 
     // MARK: - Two-layer merge
 
+    /// Merges two dope trees with the overlay taking precedence.
+    /// - Parameters:
+    ///   - base: The base dope tree.
+    ///   - overlay: The overlay dope tree.
+    /// - Returns: The merged tree with provenance, hidden nodes, and warnings.
     private static func merge(base: DopeScopeTree, overlay: DopeScopeTree) -> Resolved {
         var resolutions: [String: Resolution] = [:]
         var hidden: [String] = []
@@ -309,6 +344,14 @@ enum DopeOverlay {
         )
     }
 
+    /// Merges entities and enums within a domain.
+    /// - Parameters:
+    ///   - basePath: The dot-path of the domain.
+    ///   - base: The base domain node.
+    ///   - overlay: The overlay domain node, or nil.
+    ///   - resolutions: Inout map of dot-path to provenance; updated with child nodes.
+    ///   - hidden: Inout array of hidden node paths; updated with tombstoned children.
+    /// - Returns: A tuple of merged entities and enums.
     private static func mergeDomainChildren(
         basePath: String,
         base: DopePersistenceNode,

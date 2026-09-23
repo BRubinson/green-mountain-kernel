@@ -50,8 +50,10 @@ enum GmBridgeRoster {
         }
     }
 
-    /// The keywords that survive normalisation. Everything else the emitter
-    /// writes is either presentational or unvalidated against the harness.
+    /// The keywords that survive normalisation.
+    ///
+    /// Everything else the emitter writes is either presentational or
+    /// unvalidated against the harness.
     private static let keptKeywords: Set<String> = [
         "type",
         "description",
@@ -65,9 +67,10 @@ enum GmBridgeRoster {
     ]
 
     /// The keywords dropped on purpose: the ref machinery this inlines, and the
-    /// presentational fields Claude Code does not read. Anything the emitter
-    /// writes that is in neither set is a refusal, because a keyword nobody
-    /// ruled on is a keyword served or discarded by accident.
+    /// presentational fields Claude Code does not read.
+    ///
+    /// Anything the emitter writes that is in neither set is a refusal, because
+    /// a keyword nobody ruled on is a keyword served or discarded by accident.
     private static let knownDropped: Set<String> = [
         "$ref",
         "$defs",
@@ -79,15 +82,22 @@ enum GmBridgeRoster {
     /// The property whose enum an op-bearing tool declares its vocabulary in.
     private static let opProperties = ["op", "scope"]
 
-    /// Every declared tool as a spec, sorted by name so two runs render the
-    /// same bytes whatever order the registry is written in.
+    /// Every declared tool as a spec, sorted by name.
+    ///
+    /// Two runs render the same bytes whatever order the registry is written in.
+    ///
+    /// - Returns: An array of `CdeToolSpec` for each tool.
+    /// - Throws: `RosterError` if any tool's schema cannot be normalised.
     static func specs() throws -> [CdeToolSpec] {
         try GmAgentTools.all
             .sorted { $0.name < $1.name }
             .map(spec(for:))
     }
 
-    /// The whole text of `CdeToolRoster.generated.swift`.
+    /// Render the whole text of `CdeToolRoster.generated.swift`.
+    ///
+    /// - Returns: The Swift source code for the generated tool roster file.
+    /// - Throws: `RosterError` if any tool's schema cannot be normalised.
     static func render() throws -> String {
         let data = try CdeToolRoster.rosterEncoder.encode(specs())
         let json = String(decoding: data, as: UTF8.self)
@@ -112,6 +122,11 @@ enum GmBridgeRoster {
         .joined(separator: "\n")
     }
 
+    /// Create a spec for a tool from its declaration and normalised schema.
+    ///
+    /// - Parameter tool: The tool to create a spec for.
+    /// - Returns: A `CdeToolSpec` for the tool.
+    /// - Throws: `RosterError` if the schema is invalid or ops mismatch.
     private static func spec(for tool: any GmAgentTool) throws -> CdeToolSpec {
         let declaration = type(of: tool)
         let schema = try normalisedSchema(for: tool)
@@ -138,6 +153,11 @@ enum GmBridgeRoster {
         )
     }
 
+    /// Extract and normalise a tool's parameters schema.
+    ///
+    /// - Parameter tool: The tool whose schema to normalise.
+    /// - Returns: A normalised `GmJsonValue` schema for the tool's parameters.
+    /// - Throws: `RosterError` if the schema is invalid or unencodable.
     private static func normalisedSchema(for tool: any GmAgentTool) throws -> GmJsonValue {
         let encoded: GmJsonValue
         do {
@@ -170,6 +190,16 @@ enum GmBridgeRoster {
         return .object(fields)
     }
 
+    /// Normalise a JSON Schema by dropping unsupported keywords and inlining refs.
+    ///
+    /// - Parameters:
+    ///   - value: The JSON value to normalise.
+    ///   - defs: The schema definitions to inline references from.
+    ///   - resolving: The set of definitions currently being resolved.
+    ///   - tool: The tool name for error reporting.
+    ///   - path: The path in the schema for error reporting.
+    /// - Returns: The normalised `GmJsonValue`.
+    /// - Throws: `RosterError` if an unknown keyword or unresolved ref is found.
     private static func normalise(
         _ value: GmJsonValue,
         defs: [String: GmJsonValue],
@@ -230,6 +260,16 @@ enum GmBridgeRoster {
     }
 
     /// Replace a `$ref` with the `$defs` entry it names, normalised in place.
+    ///
+    /// - Parameters:
+    ///   - ref: The `$ref` string to resolve.
+    ///   - fields: Fields beside the `$ref` that may override inlined values.
+    ///   - defs: The schema definitions to resolve from.
+    ///   - resolving: The set of definitions currently being resolved.
+    ///   - tool: The tool name for error reporting.
+    ///   - path: The path in the schema for error reporting.
+    /// - Returns: The inlined and normalised schema.
+    /// - Throws: `RosterError` if the ref cannot be resolved.
     private static func inline(
         _ ref: String,
         besides fields: [String: GmJsonValue],
@@ -258,9 +298,17 @@ enum GmBridgeRoster {
         return .object(merged)
     }
 
-    /// The binding that makes the declaration one source rather than two: the
-    /// enum the schema advertises and the op table the tool dispatches on must
-    /// be the same list, in the same order.
+    /// Verify that the declared ops match the schema's op enum.
+    ///
+    /// The enum the schema advertises and the op table the tool dispatches on
+    /// must be the same list, in the same order — the binding that makes the
+    /// declaration one source rather than two.
+    ///
+    /// - Parameters:
+    ///   - declared: The ops declared in the tool implementation.
+    ///   - schema: The normalised tool schema.
+    ///   - tool: The tool name for error reporting.
+    /// - Throws: `RosterError` if the declared ops do not match the schema.
     private static func assertOpsMatchSchema(
         _ declared: [String],
         schema: GmJsonValue,

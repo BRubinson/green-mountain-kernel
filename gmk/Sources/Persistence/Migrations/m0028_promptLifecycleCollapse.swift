@@ -10,6 +10,8 @@ extension Migrations {
     // (b) SCHEMA — six per-prompt UNIQUE constraints come off so a re-opened
     // prompt can hold a second set of summaries. SQLite cannot drop an inline
     // UNIQUE, so seven tables take the documented 12-step rebuild.
+    /// Registers the m0028 migration: prompt lifecycle collapse and unique constraint removals.
+    /// - Parameter migrator: The database migrator.
     static func m0028_promptLifecycleCollapse(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0028_promptLifecycleCollapse") { db in
             let retiredStates = ["clarifying", "architecting", "implementing", "reviewing"]
@@ -58,8 +60,8 @@ extension Migrations {
                     table: String,
                     createSql: String,
                     columns: String,
-                    selectColumns: String? = nil,
-                    after: [String]
+                    after: [String],
+                    selectColumns: String? = nil
                 ) {
                     self.table = table
                     self.createSql = createSql
@@ -98,14 +100,6 @@ extension Migrations {
                         code, name, backstory, goal, detail, command, status, \
                         gmfs_relative_storage_path
                         """,
-                    // Same list, with `status` mapped through the CASE. The two
-                    // UNIQUE constraints are KEPT — only the status CHECK
-                    // changes here.
-                    selectColumns: """
-                        id, uuid, version, created_at, updated_at, session_uuid, seq, \
-                        code, name, backstory, goal, detail, command, \(promptStatusExpr), \
-                        gmfs_relative_storage_path
-                        """,
                     after: [
                         "CREATE INDEX idx_prompt_session_uuid ON prompt(session_uuid)",
                         """
@@ -128,7 +122,15 @@ extension Migrations {
                             VALUES (new.id, new.name, new.goal, new.detail, new.backstory);
                         END
                         """,
-                    ]
+                    ],
+                    // Same list, with `status` mapped through the CASE. The two
+                    // UNIQUE constraints are KEPT — only the status CHECK
+                    // changes here.
+                    selectColumns: """
+                        id, uuid, version, created_at, updated_at, session_uuid, seq, \
+                        code, name, backstory, goal, detail, command, \(promptStatusExpr), \
+                        gmfs_relative_storage_path
+                        """
                 ),
                 Rebuild(
                     table: "exploration_summary",

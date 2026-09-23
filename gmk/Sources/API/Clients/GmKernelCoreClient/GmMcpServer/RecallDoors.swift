@@ -5,9 +5,10 @@ import Foundation
 /// `DOPE_WRITE_REPO` and `SESSION_UPDATE`, so an agent can go looking for a
 /// finding somebody else wrote.
 
-/// THE FIVE SEARCH SCOPES ARE ONE VERB. The `kinds` filter is applied HERE
-/// rather than left to the caller, so "search explorations" cannot accidentally
-/// mean "search everything".
+/// THE FIVE SEARCH SCOPES ARE ONE VERB.
+///
+/// The `kinds` filter is applied HERE rather than left to the caller, so "search explorations" cannot accidentally mean
+/// "search everything".
 private let searchScopeKinds: [String: [SearchKind]] = [
     "exploration": [.explorationSummary, .explorationFinding],
     "clarification": [.clarificationQuestion, .clarificationNote],
@@ -17,6 +18,9 @@ private let searchScopeKinds: [String: [SearchKind]] = [
 ]
 
 /// One `SEARCH` body, pinned to the record kinds its scope is named for.
+///
+/// - Parameter kinds: The search kinds to include in the search.
+/// - Returns: A CDE arm that performs the search with the given kinds.
 private func searchArm(kinds: [SearchKind]) -> CdeArm {
     { args, client in
         let response = try client.search(
@@ -39,6 +43,9 @@ nonisolated(unsafe) let recallDoorArms: CdeArms = [
     "cde_rpir_search": searchScopeKinds.mapValues(searchArm(kinds:)),
 ]
 
+/// Creates the session arms for catalog search and session updates.
+///
+/// - Returns: A dictionary of CDE arms for session operations.
 private func sessionArms() -> [String: CdeArm] {
     var session: [String: CdeArm] = [:]
     session["search"] = { args, client in
@@ -66,8 +73,11 @@ private func sessionArms() -> [String: CdeArm] {
     return session
 }
 
-/// The two dope ops this file owns; `search_session` is contributed by
-/// GmMcpServer.swift.
+/// Creates the dope arms for search and repository writes.
+///
+/// The `search_session` op is contributed by GmMcpServer.swift.
+///
+/// - Returns: A dictionary of CDE arms for dope operations.
 private func dopeRecallArms() -> [String: CdeArm] {
     var dope: [String: CdeArm] = [:]
     dope["search_global"] = { args, client in

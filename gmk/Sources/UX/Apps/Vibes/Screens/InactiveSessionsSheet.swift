@@ -1,11 +1,10 @@
 import SwiftUI
 
-/// Browser for NON-checked-out sessions. PROJECT-level: scoped to one project
-/// when the caller passes its uuid (the instance page does), searching across
-/// all that project's instances — never limited to a single instance. The
-/// landing page passes nil for the all-projects view. Clicking a row loads
-/// the session view — the same screen as an active session, just not the
-/// checked-out branch.
+/// Browser for NON-checked-out sessions.
+///
+/// PROJECT-level: scoped to one project when the caller passes its uuid (the instance page does), searching across all
+/// that project's instances — never limited to a single instance. The landing page passes nil for the all-projects
+/// view. Clicking a row loads the session view — the same screen as an active session, just not the checked-out branch.
 struct InactiveSessionsSheet: View {
     /// Scope to one project; nil = all projects.
     var projectUuid: String?
@@ -29,6 +28,10 @@ struct InactiveSessionsSheet: View {
         var id: UUID { windowID.sessionUUID }
     }
 
+    /// Derives the table rows from the current catalog and search query.
+    ///
+    /// Flattens the catalog tree snapshot using CatalogFilter and filters to
+    /// only non-checked-out sessions matching the current search query.
     private func deriveRows() {
         // The tree walk is CatalogFilter (the app's one traversal); this just
         // flattens its snapshot into presentable rows.

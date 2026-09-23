@@ -18,6 +18,10 @@ struct DopePersistenceCascadeCounts: FetchableRecord, Decodable {
     var propertyCount: Int
     var optionCount: Int
 
+    /// Counts of rows each `dope_persistence` cascades.
+    ///
+    /// - Parameter persistenceUuid: The persistence record UUID.
+    /// - Returns: A query to fetch the cascade counts.
     static func request(persistenceUuid: String) -> QueryInterfaceRequest<Self> {
         DopePersistenceRecord
             .all()
@@ -42,6 +46,9 @@ struct DopeCogWithElements: FetchableRecord, Decodable {
     var cog: DopeCogRecord
     var elements: [DopeCogElementRecord]
 
+    /// Fetches a cog and its elements.
+    ///
+    /// - Returns: A query to fetch the cog with its elements.
     static func request() -> QueryInterfaceRequest<Self> {
         DopeCogRecord
             .including(
@@ -59,6 +66,10 @@ struct DopeScopeLineage: FetchableRecord, Decodable {
     var projectUuid: String
     var instanceUuid: String
 
+    /// Fetches the project and instance lineage for a session.
+    ///
+    /// - Parameter uuid: The session UUID.
+    /// - Returns: A query to fetch the session's ancestor identifiers.
     static func forSession(_ uuid: String) -> QueryInterfaceRequest<Self> {
         let instance = TableAlias<InstanceRecord>()
         return
@@ -82,6 +93,10 @@ struct DopePropertyOrigin: FetchableRecord, Decodable {
     var entityUuid: String
     var entityType: String
 
+    /// Fetches a property's origin with its entity.
+    ///
+    /// - Parameter propertyUuid: The property UUID.
+    /// - Returns: A query to fetch the property origin data.
     static func request(propertyUuid: String) -> QueryInterfaceRequest<Self> {
         let property = TableAlias<DopePersistenceEntityPropertyRecord>()
         let entity = TableAlias<DopePersistenceEntityRecord>()
@@ -99,12 +114,16 @@ struct DopePropertyOrigin: FetchableRecord, Decodable {
     }
 }
 
-/// The two codes an entity's or an enum's dot-path is built from. The root
-/// table differs per builder; the decoded shape does not.
+/// The two codes an entity's or an enum's dot-path is built from.
+///
+/// The root table differs per builder; the decoded shape does not.
 struct DopeDomainChildPath: FetchableRecord, Decodable {
     var domainCode: String
     var childCode: String
 
+    /// Fetches the domain and entity codes for each entity.
+    ///
+    /// - Returns: A query to fetch entity path codes.
     static func entities() -> QueryInterfaceRequest<Self> {
         let domain = TableAlias<DopePersistenceRecord>()
         return
@@ -117,6 +136,9 @@ struct DopeDomainChildPath: FetchableRecord, Decodable {
             .asRequest(of: Self.self)
     }
 
+    /// Fetches the domain and enum codes for each enum option.
+    ///
+    /// - Returns: A query to fetch enum path codes.
     static func enums() -> QueryInterfaceRequest<Self> {
         let domain = TableAlias<DopePersistenceRecord>()
         return
@@ -129,8 +151,12 @@ struct DopeDomainChildPath: FetchableRecord, Decodable {
             .asRequest(of: Self.self)
     }
 
-    /// Entities OUTSIDE one domain that compose a base INSIDE it — what a
-    /// whole-domain delete would strand.
+    /// Entities outside a domain that compose a base inside it.
+    ///
+    /// Identifies entities that would be stranded by a whole-domain delete.
+    ///
+    /// - Parameter persistenceUuid: The persistence domain UUID.
+    /// - Returns: A query to fetch composing entities outside the domain.
     static func entitiesComposingInside(
         persistenceUuid: String
     ) -> QueryInterfaceRequest<Self> {
@@ -153,13 +179,19 @@ struct DopeDomainGrandchildPath: FetchableRecord, Decodable {
     var parentCode: String
     var childCode: String
 
+    /// Fetches the domain, entity, and property codes for each property.
+    ///
+    /// - Returns: A query to fetch property path codes.
     static func properties() -> QueryInterfaceRequest<Self> {
         propertyBase().asRequest(of: Self.self)
     }
 
-    /// The property projection, still typed to the record so the builders
-    /// below can add joins: a request typed to the composite takes only
-    /// predicates.
+    /// The property projection, typed to the record for further joins.
+    ///
+    /// Maintains the record type to allow builders below to add joins; a
+    /// request typed to the composite accepts only predicates.
+    ///
+    /// - Returns: A query typed to the property record.
     private static func propertyBase()
         -> QueryInterfaceRequest<DopePersistenceEntityPropertyRecord>
     {
@@ -178,6 +210,9 @@ struct DopeDomainGrandchildPath: FetchableRecord, Decodable {
             )
     }
 
+    /// Fetches the domain, enum, and option codes for each enum option.
+    ///
+    /// - Returns: A query to fetch enum option path codes.
     static func options() -> QueryInterfaceRequest<Self> {
         let domain = TableAlias<DopePersistenceRecord>()
         let dopeEnum = TableAlias<DopePersistenceEnumRecord>()
@@ -195,10 +230,16 @@ struct DopeDomainGrandchildPath: FetchableRecord, Decodable {
             .asRequest(of: Self.self)
     }
 
-    /// Properties pointing into one entity through `column`, from some other
-    /// entity. Both referrer columns land on `dope_persistence_entity_property`
-    /// and reach the entity the same way, so one builder serves relationship
+    /// Properties pointing into an entity from another entity.
+    ///
+    /// Both referrer columns land on `dope_persistence_entity_property` and
+    /// reach the entity the same way, so one builder serves relationship
     /// targets and base origins alike.
+    ///
+    /// - Parameters:
+    ///   - entityUuid: The target entity UUID.
+    ///   - association: The association to join through.
+    /// - Returns: A query to fetch properties reaching into the entity.
     static func propertiesReaching(
         entityUuid: String,
         through association: BelongsToAssociation<
@@ -219,8 +260,12 @@ struct DopeDomainGrandchildPath: FetchableRecord, Decodable {
             .asRequest(of: Self.self)
     }
 
-    /// Properties OUTSIDE one domain that point at an enum or a property
-    /// INSIDE it — what a whole-domain delete would strand.
+    /// Properties outside a domain that point into it.
+    ///
+    /// Identifies properties that would be stranded by a whole-domain delete.
+    ///
+    /// - Parameter persistenceUuid: The persistence domain UUID.
+    /// - Returns: A query to fetch properties reaching into the domain.
     static func propertiesReachingInto(
         persistenceUuid: String
     ) -> QueryInterfaceRequest<Self> {
@@ -241,9 +286,13 @@ struct DopeDomainGrandchildPath: FetchableRecord, Decodable {
             )
     }
 
-    /// Properties OUTSIDE one domain materialized from a base property INSIDE
-    /// it. Kept apart from `propertiesReachingInto` because `base_origin` is
-    /// data_type-independent and so is guarded on its own.
+    /// Properties outside a domain materialized from a base inside it.
+    ///
+    /// Kept apart from `propertiesReachingInto` because `base_origin` is
+    /// data_type-independent and guarded separately.
+    ///
+    /// - Parameter persistenceUuid: The persistence domain UUID.
+    /// - Returns: A query to fetch materialized properties from the domain.
     static func propertiesOriginatingInside(
         persistenceUuid: String
     ) -> QueryInterfaceRequest<Self> {
@@ -256,8 +305,13 @@ struct DopeDomainGrandchildPath: FetchableRecord, Decodable {
             )
     }
 
-    /// The domain a property sits in is reached through its entity, so
-    /// "outside this domain" is a predicate on the join, never on the root.
+    /// Properties outside a domain, filtered via the entity association.
+    ///
+    /// The domain is reached through a property's entity, so the predicate
+    /// filters on the join, not the root.
+    ///
+    /// - Parameter persistenceUuid: The persistence domain UUID to filter out.
+    /// - Returns: A query to fetch properties outside the domain.
     private static func propertiesOutside(
         _ persistenceUuid: String
     ) -> QueryInterfaceRequest<Self> {
@@ -271,6 +325,10 @@ struct DopeDomainGrandchildPath: FetchableRecord, Decodable {
             .asRequest(of: Self.self)
     }
 
+    /// Properties inside a domain.
+    ///
+    /// - Parameter persistenceUuid: The persistence domain UUID to filter by.
+    /// - Returns: A query to fetch property UUIDs inside the domain.
     private static func propertiesInside(
         _ persistenceUuid: String
     ) -> QueryInterfaceRequest<DopePersistenceEntityPropertyRecord> {
@@ -291,6 +349,10 @@ struct DopeMaterializedOrigin: FetchableRecord, Decodable {
     var code: String
     var originEntityUuid: String
 
+    /// Fetches materialized properties and their base origins for an entity.
+    ///
+    /// - Parameter entityUuid: The entity UUID.
+    /// - Returns: A query to fetch materialized properties and their origins.
     static func request(entityUuid: String) -> QueryInterfaceRequest<Self> {
         let property = TableAlias<DopePersistenceEntityPropertyRecord>()
         let originEntity = TableAlias<DopePersistenceEntityRecord>()
@@ -323,6 +385,10 @@ struct DopeMaterializedOrigin: FetchableRecord, Decodable {
 struct DopeScopePersistenceCount: FetchableRecord, Decodable {
     var persistenceCount: Int
 
+    /// Counts the persistence records in a scope.
+    ///
+    /// - Parameter scopeUuid: The scope UUID.
+    /// - Returns: A query to fetch the persistence count.
     static func request(scopeUuid: String) -> QueryInterfaceRequest<Self> {
         DopeScopeRecord
             .all()

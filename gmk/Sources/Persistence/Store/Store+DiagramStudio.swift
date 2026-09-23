@@ -10,6 +10,11 @@ extension Store {
 
     // MARK: - Search / browse (the GMVibes gallery backend)
 
+    /// Searches diagrams by query or browses all diagrams.
+    ///
+    /// - Parameter req: The search request with optional query and filters.
+    /// - Returns: The search results with matching diagrams.
+    /// - Throws: `StoreError.badRequest` if the visibility or query is invalid.
     func diagramSearch(_ req: DiagramSearchRequest) throws -> DiagramSearchResponse {
         if let visibility = req.visibility, DiagramVisibility(rawValue: visibility) == nil {
             throw StoreError.badRequest(
@@ -37,6 +42,11 @@ extension Store {
 
     // MARK: - Delete
 
+    /// Deletes a diagram.
+    ///
+    /// - Parameter req: The delete request with diagram identifier.
+    /// - Returns: The delete response confirming removal.
+    /// - Throws: Any store error from the deletion.
     func diagramDelete(_ req: DiagramDeleteRequest) throws -> DiagramDeleteResponse {
         try boundary { db in
             try DiagramStudioRepository(db: db, core: core).diagramDelete(req)

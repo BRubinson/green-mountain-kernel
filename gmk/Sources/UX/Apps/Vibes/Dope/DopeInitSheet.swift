@@ -1,23 +1,26 @@
 import SwiftUI
 
 /// DOPE_INIT cannot be a bare button: it requires a validated code + name.
+///
 /// The code is checked client-side on every keystroke via the kit's public
-/// `DopeCode.validateCode` (^[a-z][a-z0-9_]*$, no `__`, no trailing `_`,
-/// ≤64 bytes) so no daemon round trip is ever spent on a malformed code.
-/// Idempotent server-side (create-or-return, the archOpen precedent).
+/// `DopeCode.validateCode` (^[a-z][a-z0-9_]*$, no `__`, no trailing `_`, ≤64
+/// bytes) so no daemon round trip is spent on malformed codes. Idempotent
+/// server-side (create-or-return, the archOpen precedent).
 struct DopeInitSheet: View {
     @Environment(\.dismiss) private var dismiss
     let store: DopeStore
     let key: DopeStore.Key
     let forPrompt: Bool
-    /// Codes already known at this target (own + fallback level), so the
-    /// user never types blind. Informational union — collision semantics use
-    /// `sameTypeCodes` only.
+    /// Codes already known at this target (own + fallback level), so the user
+    /// never types blind.
+    ///
+    /// Informational union — collision semantics use `sameTypeCodes` only.
     let siblingCodes: [String]
-    /// Codes at the scope TYPE this sheet creates. The daemon's idempotent
-    /// create-or-return is scoped per (scope_type, promptUuid): only a
-    /// same-type match is "opened"; an other-type match yields a separate
-    /// new scope that merely shares the code.
+    /// Codes at the scope TYPE this sheet creates.
+    ///
+    /// The daemon's idempotent create-or-return is scoped per (scope_type,
+    /// promptUuid): only a same-type match is "opened"; an other-type match
+    /// yields a separate new scope that merely shares the code.
     let sameTypeCodes: [String]
 
     @State private var code = ""
@@ -36,8 +39,9 @@ struct DopeInitSheet: View {
         }
     }
 
-    /// Server-side init is create-or-return, so a collision is not an error —
-    /// but the user deserves to know they are OPENING, not creating.
+    /// Server-side init is create-or-return, so a collision is not an error — but
+    /// the user deserves to know they are OPENING, not creating.
+    ///
     /// Informational only: `canSubmit` deliberately ignores it.
     private var collidesWithSibling: Bool { sameTypeCodes.contains(code) }
     /// The code exists only at the OTHER scope type — initializing here
@@ -122,6 +126,10 @@ struct DopeInitSheet: View {
         .frame(width: 420)
     }
 
+    /// Submits the dope scope initialization request.
+    ///
+    /// Sets the submitting state, clears any error, and calls the store to initialize
+    /// the scope with the validated code, name, and description.
     private func submit() {
         submitting = true
         submitError = nil

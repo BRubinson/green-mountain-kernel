@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `dope_persistence_enum` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `dope_persistence_enum` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DopePersistenceEnumRecord: DopeNodeRecord, TableRecord, SoftDeletable {
     static let databaseTableName = "dope_persistence_enum"
     var uuid: String

@@ -10,6 +10,11 @@ extension Migrations {
     // live the review_summary drop would CASCADE every review_finding away. NO
     // PRAGMA in this body. Each rebuild copies `id` explicitly (the FTS5 mirrors
     // join on content_rowid) and recreates the triggers DROP TABLE removes.
+    /// Registers migration m0005 to purge legacy concepts from the schema.
+    ///
+    /// Rebuilds tables to drop legacy enum values and performs a backfill of placeholder
+    /// summaries for prompts that predate database-native clarifications and architectures.
+    /// - Parameter migrator: The database migrator to register the migration with.
     static func m0005_purgeLegacyConcepts(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0005_purgeLegacyConcepts") { db in
             // Step 1 — data motion FIRST, so the narrowed CHECKs hold when the

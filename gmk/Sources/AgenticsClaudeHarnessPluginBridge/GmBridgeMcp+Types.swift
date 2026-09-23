@@ -29,6 +29,16 @@ enum GmBridgeMcp {
 
         var alwaysLoad: Bool?
 
+        /// Initializes an MCP server configuration.
+        ///
+        /// - Parameters:
+        ///   - type: The transport type for the server.
+        ///   - command: The command to execute for stdio transport.
+        ///   - args: Arguments to pass to the command.
+        ///   - env: Environment variables for the command.
+        ///   - url: The URL for HTTP/SSE/WS transport.
+        ///   - headers: HTTP headers for remote transports.
+        ///   - alwaysLoad: Whether to always load this server.
         init(
             type: Transport? = nil,
             command: String? = nil,
@@ -47,6 +57,14 @@ enum GmBridgeMcp {
             self.alwaysLoad = alwaysLoad
         }
 
+        /// Creates an MCP server configured for stdio transport.
+        ///
+        /// - Parameters:
+        ///   - command: The command to execute.
+        ///   - args: Arguments to pass to the command.
+        ///   - env: Environment variables for the command.
+        ///   - alwaysLoad: Whether to always load this server.
+        /// - Returns: A configured server for stdio transport.
         static func stdio(
             command: String,
             args: [String]? = nil,
@@ -63,6 +81,9 @@ enum GmBridgeMcp {
 
         var mcpServers: [String: Server]
 
+        /// Initializes an MCP configuration file.
+        ///
+        /// - Parameter mcpServers: A map of server names to configurations.
         init(mcpServers: [String: Server]) {
             self.mcpServers = mcpServers
         }

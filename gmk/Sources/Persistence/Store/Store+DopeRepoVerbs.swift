@@ -15,14 +15,19 @@ import GRDB
 /// across filesystem I/O, blocking every other writer on someone else's disk.
 extension Store {
 
-    /// The repo verbs are SESSION-BASE ONLY.
+    /// Validates that a scope is writable at the repo level.
     ///
-    /// `requireSessionUuid()` is not the gate it looks like: it succeeds for BOTH
-    /// `.sessionInstance` and `.sessionInstanceItem`, because `isSessionOwned`
-    /// covers the overlay tier. Without this guard a DOPE_WRITE_REPO aimed at a
-    /// PROMPT scope resolves the same instance root a session-base write does and
-    /// overwrites the shared {instance_root}/.gmcc tree — and an overlay carries
-    /// tombstones, which must never reach a committed .doped.json.
+    /// The repo verbs are SESSION-BASE ONLY. `requireSessionUuid()` is not the gate
+    /// it looks like: it succeeds for BOTH `.sessionInstance` and `.sessionInstanceItem`,
+    /// because `isSessionOwned` covers the overlay tier. Without this guard a
+    /// DOPE_WRITE_REPO aimed at a PROMPT scope resolves the same instance root a
+    /// session-base write does and overwrites the shared {instance_root}/.gmcc tree —
+    /// and an overlay carries tombstones, which must never reach a committed .doped.json.
+    ///
+    /// - Parameters:
+    ///   - scope: The dope scope row.
+    ///   - verb: The repo verb name for error reporting.
+    /// - Throws: `StoreError.dopeScopeNotRepoWritable` if the scope is not writable.
     static func requireRepoWritableScope(_ scope: DopeScopeRow, verb: String) throws {
         guard scope.tier == .sessionInstance else {
             throw StoreError.dopeScopeNotRepoWritable(
@@ -35,6 +40,14 @@ extension Store {
 
     // MARK: - read-repo
 
+    /// Reads and validates the dope tree from the filesystem.
+    ///
+    /// A four-phase operation: scope resolution, parsing, validation, then response.
+    /// Must not run inside a caller-opened transaction.
+    ///
+    /// - Parameter req: The read request with scope uuid or directory path.
+    /// - Returns: The parsed and validated bundle with optional drift report.
+    /// - Throws: `StoreError` for malformed requests or validation failures.
     func dopeReadRepo(_ req: DopeReadRepoRequest) throws -> DopeReadRepoResponse {
         // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
         // Phase 3 does filesystem work while holding NO db lock, by design.
@@ -101,6 +114,15 @@ extension Store {
 
     // MARK: - write-repo
 
+    /// Writes the in-memory dope tree to the filesystem atomically.
+    ///
+    /// A four-phase operation: scope and tree resolution, projection, atomic write,
+    /// then audit event. Must not run inside a caller-opened transaction. Idempotent:
+    /// repeating with the same tree does not bump revision.
+    ///
+    /// - Parameter req: The write request with scope uuid and optional force flag.
+    /// - Returns: The written file paths and pruned paths.
+    /// - Throws: `StoreError` for missing scopes, revision conflicts, or write failures.
     func dopeWriteRepo(_ req: DopeWriteRepoRequest) throws -> DopeWriteRepoResponse {
         // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
         // Phase 3 does filesystem work while holding NO db lock, by design.
@@ -176,6 +198,16 @@ extension Store {
 
     // MARK: - ingest
 
+    /// Ingests the dope tree from the filesystem into the database.
+    ///
+    /// A four-phase operation: scope resolution, file parsing, validation, then
+    /// atomic database update. Must not run inside a caller-opened transaction. The
+    /// tree becomes the new merge base with every element's hash stamped and dirty
+    /// flags cleared. Uses either strict mode (incoming - 1) or adopt (observed revision).
+    ///
+    /// - Parameter req: The ingest request with scope uuid, optional directory, and adopt flag.
+    /// - Returns: The updated scope, element counts, and optional revision gap crossed.
+    /// - Throws: `StoreError` for validation failures, code mismatches, or revision conflicts.
     func dopeIngest(_ req: DopeIngestRequest) throws -> DopeIngestResponse {
         // FOUR-PHASE VERB — must not run inside a caller-opened transaction.
         // Phase 3 does filesystem work while holding NO db lock, by design.
@@ -292,6 +324,15 @@ extension Store {
         }
     }
 
+    /// Records an audit event for a dope tree ingest operation.
+    ///
+    /// - Parameters:
+    ///   - db: The database connection.
+    ///   - scope: The scope row after ingest.
+    ///   - before: The scope's revision before ingest.
+    ///   - counts: The element counts in the ingested tree.
+    ///   - adopted: True if the ingest used adopt mode; false for strict mode.
+    /// - Throws: Database errors.
     private func recordDopeIngestEvent(
         _ db: Database,
         scope: DopeScopeRow,

@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// App-wide search popup (cmd+K). Floats centered over all content; Esc or a
-/// click outside dismisses. Global full-text SEARCH over the GMCC database
-/// with prompt-level deep-linking; "Show all results" hands the query off to
-/// the dedicated search screen for scoping and kind filters.
+/// App-wide search popup (cmd+K).
+///
+/// Floats centered over all content; Esc or a click outside dismisses.
+/// Global full-text SEARCH over the GMCC database with prompt-level
+/// deep-linking; "Show all results" hands the query off to the dedicated
+/// search screen for scoping and kind filters.
 struct CommandPalette: View {
     @Environment(WindowNav.self) private var nav
     @Environment(CatalogStore.self) private var catalog
@@ -82,6 +84,9 @@ struct CommandPalette: View {
         .onDisappear { model.cancel() }
     }
 
+    /// Opens the window for a search hit and dismisses the palette.
+    ///
+    /// - Parameter hit: The search result to open.
     private func open(_ hit: SearchHit) {
         guard
             let windowID = catalog.sessionWindowID(
@@ -95,11 +100,15 @@ struct CommandPalette: View {
         Task { @MainActor in nav.open(windowID) }
     }
 
+    /// Opens the selected search result, or the first result if none selected.
     private func openSelectedOrFirst() {
         let target = model.hits.first { $0.rowID == selection } ?? model.hits.first
         if let target { open(target) }
     }
 
+    /// Moves the selection cursor by a delta, clamped to valid range.
+    ///
+    /// - Parameter delta: The number of rows to move (+1 down, -1 up).
     private func moveSelection(_ delta: Int) {
         guard !model.hits.isEmpty else { return }
         let current = model.hits.firstIndex { $0.rowID == selection }
@@ -109,6 +118,10 @@ struct CommandPalette: View {
 }
 
 private extension Int {
+    /// Returns this value clamped to a closed range.
+    ///
+    /// - Parameter range: The range to clamp to.
+    /// - Returns: This value if within the range, else the nearer boundary.
     func clamped(to range: ClosedRange<Int>) -> Int {
         Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }

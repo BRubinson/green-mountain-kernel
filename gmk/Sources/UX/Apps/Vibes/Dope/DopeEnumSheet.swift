@@ -1,8 +1,10 @@
 import SwiftUI
 
 /// Read-only enum inspector: the enum's options up top, every property that
-/// uses it below. Exists so an enum can be read WITHOUT scrolling to its
-/// definition — it never writes, so there is no version threading here.
+/// uses it below.
+///
+/// Exists so an enum can be read WITHOUT scrolling to its definition — it never
+/// writes, so there is no version threading here.
 struct DopeEnumSheet: View {
     @Environment(\.dismiss) private var dismiss
     let info: DopeEnumCatalog.Resolved
@@ -142,6 +144,11 @@ struct DopeEnumSheet: View {
         }
     }
 
+    /// Builds a styled section title with a count badge.
+    /// - Parameters:
+    ///   - text: The section title text.
+    ///   - count: The count to display in the badge.
+    /// - Returns: A view showing the title and count badge.
     private func sectionTitle(_ text: String, count: Int) -> some View {
         HStack(spacing: 6) {
             Text(text).font(.subheadline.weight(.semibold))

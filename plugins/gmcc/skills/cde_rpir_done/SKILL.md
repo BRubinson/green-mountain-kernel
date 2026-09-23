@@ -3,7 +3,7 @@ name: cde_rpir_done
 description: "The DONE phase: the prompt closed and the activation claim released."
 user-invocable: false
 allowed-tools: mcp__plugin_gmcc_cde__cde_init, mcp__plugin_gmcc_cde__cde_prompt
-model: opus
+model: claude-opus-5-5[1m]
 ---
 
 # Workflow Phase

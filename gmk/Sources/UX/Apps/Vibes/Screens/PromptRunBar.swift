@@ -2,12 +2,12 @@ import SwiftUI
 import AppKit
 
 /// The disk reads behind the plugin preflight, taken ONCE per process, because
-/// `PromptRunBar.block` is recomputed on every view update. The cache cannot see a
-/// re-seed made while the app runs, so EVERY BLOCK MESSAGE ENDS IN "then relaunch".
-/// The reference is THIS BUILD's version: the seed stages this executable and has it
-/// generate the environment's plugin. `claude --plugin-dir <dir>` REPLACES the installed
-/// plugin with no fallback, so a stale tree resolves every plugin-namespaced cde tool
-/// grant to nothing and the only symptom is agents that write nothing.
+/// `PromptRunBar.block` is recomputed on every view update.
+///
+/// The cache cannot see re-seeds while running (hence "then relaunch"). This
+/// BUILD's version is staged and generates the plugin. `claude --plugin-dir
+/// <dir>` replaces the installed plugin with no fallback, so stale trees
+/// resolve every plugin-namespaced cde tool to nothing.
 private enum PluginPreflight {
     enum Result: Equatable {
         /// No environment plugin — production. Not a block: the pane loads the
@@ -25,9 +25,10 @@ private enum PluginPreflight {
     /// The environment's resolution, taken once.
     static let resolution: DevPluginDir.Resolution = DevPluginDir.current
 
-    /// The path to hand `claude --plugin-dir`, or `nil`. ONLY `.present`
-    /// yields one: a directory that is not there must never reach the flag,
-    /// blocked button or not.
+    /// The path to hand `claude --plugin-dir`, or `nil`.
+    ///
+    /// ONLY `.present` yields one: a directory that is not there must never
+    /// reach the flag, blocked button or not.
     static var directory: String? {
         if case .present(let path) = resolution { return path }
         return nil
@@ -35,6 +36,9 @@ private enum PluginPreflight {
 
     static let current: Result = evaluate()
 
+    /// Evaluates the environment plugin directory status.
+    ///
+    /// - Returns: The plugin preflight result.
     private static func evaluate() -> Result {
         let dir: String
         switch resolution {
@@ -254,6 +258,14 @@ struct PromptRunBar: View {
         }
     }
 
+    /// Formats a status message label with icon and color.
+    ///
+    /// - Parameters:
+    ///   - text: The message text to display.
+    ///   - symbol: The SF Symbol name for the icon.
+    ///   - tone: The color to apply to the icon.
+    ///   - monospaced: Whether to render text in a monospaced font; defaults to false.
+    /// - Returns: A SwiftUI label with icon and text.
     private func message(
         _ text: String,
         symbol: String,
@@ -272,6 +284,10 @@ struct PromptRunBar: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Renders a context-specific button for a launch error affordance.
+    ///
+    /// - Parameter affordance: The affordance type to render a button for.
+    /// - Returns: A SwiftUI button matching the affordance, or empty view for none.
     @ViewBuilder
     private func affordanceButton(_ affordance: Affordance) -> some View {
         switch affordance {
@@ -300,6 +316,10 @@ struct PromptRunBar: View {
         }
     }
 
+    /// Formats user-visible copy for a blocked launch condition.
+    ///
+    /// - Parameter block: The block type describing why the launch is blocked.
+    /// - Returns: A user-visible error message.
     private func blockCopy(_ block: Block) -> String {
         switch block {
         case .branchUnresolved:
@@ -329,6 +349,10 @@ struct PromptRunBar: View {
         }
     }
 
+    /// Formats user-visible copy for a launch stage.
+    ///
+    /// - Parameter stage: The current launch stage.
+    /// - Returns: A status message describing the stage.
     private func stageCopy(_ stage: LaunchStage) -> String {
         switch stage {
         case .preparing: return "Preparing…"
@@ -338,6 +362,10 @@ struct PromptRunBar: View {
         }
     }
 
+    /// Formats user-visible copy and affordance for a launch error.
+    ///
+    /// - Parameter error: The iTerm2 error that occurred.
+    /// - Returns: A tuple with error text, optional affordance, and monospaced flag.
     private func failureCopy(
         _ error: ITerm2Error
     )
@@ -383,15 +411,19 @@ struct PromptRunBar: View {
         }
     }
 
-    /// The environment's badge text — the pane's HEADER. Production carries
-    /// none, mirroring paneBackgroundHex's nil: both channels answer "which
-    /// environment is this pane writing to", and production's answer is
-    /// silence.
+    /// The environment's badge text — the pane's HEADER.
+    ///
+    /// Production carries none, mirroring paneBackgroundHex's nil: both channels
+    /// answer "which environment is this pane writing to", and production's
+    /// answer is silence.
     private var envBadgeText: String? {
         let kind = EnvironmentKind.current
         return kind == .production ? nil : kind.displayName.uppercased()
     }
 
+    /// Launches an iTerm2 pane running the selected bot tier.
+    ///
+    /// - Throws: Never; errors are captured in `phase` as `.failed`.
     @MainActor
     private func play() async {
         guard block == nil, let root = gmFsRoot, let repo = repoFolder else { return }
@@ -407,9 +439,13 @@ struct PromptRunBar: View {
         await launchPane(script: script, root: root, repo: repo)
     }
 
+    /// Opens an iTerm2 shell pane with environment variables set.
+    ///
     /// The independent open: the same prepared pane, an interactive shell
     /// instead of a bot run. See the button's comment for why its gating is
     /// deliberately looser than Play's.
+    ///
+    /// - Throws: Never; errors are captured in `phase` as `.failed`.
     @MainActor
     private func openTerminal() async {
         guard let root = gmFsRoot, !root.isEmpty, let repo = repoFolder else { return }
@@ -417,16 +453,23 @@ struct PromptRunBar: View {
             root: root,
             repoPath: repo.path,
             tabColorHex: launchColors.assign(promptUuid: stub.uuid).hex,
+            shell: loginShellPath(),
             badgeText: envBadgeText,
-            envBackgroundHex: EnvironmentKind.current.paneBackgroundHex,
-            shell: loginShellPath()
+            envBackgroundHex: EnvironmentKind.current.paneBackgroundHex
         )
         await launchPane(script: script, root: root, repo: repo)
     }
 
+    /// Executes the shared launch sequence for both pane types.
+    ///
     /// The launch dance both buttons share: profile, script on disk, command
-    /// line, iTerm2 window. One implementation so the claude pane and the
-    /// shell pane cannot drift in how they reach iTerm2.
+    /// line, iTerm2 window. One implementation so the claude pane and the shell
+    /// pane cannot drift in how they reach iTerm2.
+    ///
+    /// - Parameters:
+    ///   - script: The shell script to execute in the pane.
+    ///   - root: The GM_FS_ROOT path where the pane writes its database.
+    ///   - repo: The repository folder where the pane opens.
     @MainActor
     private func launchPane(script: String, root: String, repo: URL) async {
         phase = .launching(.preparing)

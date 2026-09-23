@@ -17,10 +17,11 @@ enum Paths {
     /// the CLI simply does not fire for it.
     static let bakedRootInfoKey = "GMFSRoot"
 
-    /// The environment name an app bundle declares. Purely informational —
-    /// **nothing resolves a path from it**, and it must never become a second
-    /// way to answer "which root am I on". The root is the truth; this is a
-    /// label for humans reading a plist.
+    /// The environment name an app bundle declares.
+    ///
+    /// Purely informational — **nothing resolves a path from it**, and it must
+    /// never become a second way to answer "which root am I on". The root is the
+    /// truth; this is a label for humans reading a plist.
     static let environmentInfoKey = "GMEnvironment"
 
     /// The resolved filesystem root. **A property of the BITS, not of the
@@ -86,9 +87,16 @@ enum Paths {
 
     /// Inode-equality of two roots, via their `gm.db`.
     ///
+    /// Compares two roots by their database inodes.
+    ///
     /// Returns false when either database is absent — an environment that has
     /// never booted is not yet provably production, and guessing "yes" would
     /// suppress the warning chrome on a root we know nothing about.
+    ///
+    /// - Parameters:
+    ///   - a: The first root URL.
+    ///   - b: The second root URL.
+    /// - Returns: True if both roots have the same database inode.
     static func isSameRoot(_ a: URL, _ b: URL) -> Bool {
         var sa = stat(), sb = stat()
         let pa = a.appendingPathComponent("gm.db", isDirectory: false).path
@@ -109,34 +117,34 @@ enum Paths {
 
     // MARK: - Daemon runtime state
 
-    /// `~/gmfs/gm.db`
+    /// `~/gmfs/gm.db`.
     static var db: URL {
         root.appendingPathComponent("gm.db", isDirectory: false)
     }
 
-    /// `~/gmfs/daemon.sock`
+    /// `~/gmfs/daemon.sock`.
     static var socket: URL {
         root.appendingPathComponent("daemon.sock", isDirectory: false)
     }
 
-    /// `~/gmfs/daemon.pid`
+    /// `~/gmfs/daemon.pid`.
     static var pidfile: URL {
         root.appendingPathComponent("daemon.pid", isDirectory: false)
     }
 
-    /// `~/gmfs/daemon.log`
+    /// `~/gmfs/daemon.log`.
     static var log: URL {
         root.appendingPathComponent("daemon.log", isDirectory: false)
     }
 
-    /// `~/gmfs/backups/`
+    /// `~/gmfs/backups/`.
     static var backups: URL {
         root.appendingPathComponent("backups", isDirectory: true)
     }
 
     // MARK: - Binaries
 
-    /// `~/gmfs/bin/`
+    /// `~/gmfs/bin/`.
     static var bin: URL {
         root.appendingPathComponent("bin", isDirectory: true)
     }
@@ -159,50 +167,54 @@ enum Paths {
         bin.appendingPathComponent("gm_daemon", isDirectory: false)
     }
 
-    /// `~/gmfs/bin/gm_mcp`
+    /// `~/gmfs/bin/gm_mcp`.
     static var binMcp: URL {
         bin.appendingPathComponent("gm_mcp", isDirectory: false)
     }
 
-    /// `~/gmfs/bin/gm_hook`
+    /// `~/gmfs/bin/gm_hook`.
     static var binHook: URL {
         bin.appendingPathComponent("gm_hook", isDirectory: false)
     }
 
-    /// `~/gmfs/bin/.gm_version` — the install stamp. The FILENAME carried the
-    /// retired prefix too, which is why it is named here rather than composed
-    /// at each of its call sites.
+    /// `~/gmfs/bin/.gm_version` — the install stamp.
+    ///
+    /// The FILENAME carried the retired prefix too, which is why it is named
+    /// here rather than composed at each of its call sites.
     static var versionStamp: URL {
         bin.appendingPathComponent(".gm_version", isDirectory: false)
     }
 
     // MARK: - Content
 
-    /// `~/gmfs/` — the content root. Identical to `root` by construction, and
-    /// named separately on purpose: it is the successor to the retired separate
-    /// content root, and the call sites that meant "content" are
-    /// worth keeping distinguishable from the ones that meant "runtime". If the
-    /// two ever need to diverge again, this is the one line that changes.
+    /// `~/gmfs/` — the content root.
+    ///
+    /// Identical to `root` by construction, and named separately on purpose: it
+    /// is the successor to the retired separate content root, and the call sites
+    /// that meant "content" are worth keeping distinguishable from the ones that
+    /// meant "runtime". If the two ever need to diverge again, this is the one
+    /// line that changes.
     static var contentRoot: URL { root }
 
-    /// `~/gmfs/projects/` — what every `gmfs_relative_storage_path` resolves
-    /// against. Those columns are RELATIVE by design; this is the only place
-    /// the absolute half lives.
+    /// `~/gmfs/projects/` — what every `gmfs_relative_storage_path` resolves against.
+    ///
+    /// Those columns are RELATIVE by design; this is the only place the
+    /// absolute half lives.
     static var projectsRoot: URL {
         contentRoot.appendingPathComponent("projects", isDirectory: true)
     }
 
-    /// `~/gmfs/kbites/`
+    /// `~/gmfs/kbites/`.
     static var kbitesRoot: URL {
         contentRoot.appendingPathComponent("kbites", isDirectory: true)
     }
 
-    /// `~/gmfs/kbites/open/`
+    /// `~/gmfs/kbites/open/`.
     static var kbitesOpenRoot: URL {
         kbitesRoot.appendingPathComponent("open", isDirectory: true)
     }
 
-    /// `~/gmfs/kbites/digested/`
+    /// `~/gmfs/kbites/digested/`.
     static var kbitesDigestedRoot: URL {
         kbitesRoot.appendingPathComponent("digested", isDirectory: true)
     }
@@ -218,14 +230,20 @@ enum Paths {
         }
     }
 
-    /// The write-containment invariant, ENFORCED rather than documented:
-    /// *never write files outside either gmfs or the working repo.*
+    /// Asserts that the URL is within gmfs or the repo.
     ///
-    /// `repoRoot` is the working repo when a caller has resolved one; a caller
-    /// with no repo context passes nil and gets the strict gmfs-only rule.
-    /// Paths are compared after `standardizedFileURL` resolution so `..`
-    /// cannot smuggle a write out, and the prefix test is on a path-component
-    /// boundary so `~/gmfs-evil` is not inside `~/gmfs`.
+    /// The write-containment invariant, enforced: never write files outside
+    /// either gmfs or the working repo. `repoRoot` is the working repo when a
+    /// caller has resolved one; a caller with no repo context passes nil and
+    /// gets the strict gmfs-only rule. Paths are compared after
+    /// `standardizedFileURL` resolution so `..` cannot smuggle a write out, and
+    /// the prefix test is on a path-component boundary so `~/gmfs-evil` is not
+    /// inside `~/gmfs`.
+    ///
+    /// - Parameters:
+    ///   - url: The URL to check.
+    ///   - repoRoot: The optional repo root; if provided, this root is also permitted.
+    /// - Throws: `ContainmentViolation` if the URL is outside both roots.
     static func assertContained(_ url: URL, repoRoot: URL? = nil) throws {
         let permitted = ([root] + (repoRoot.map { [$0] } ?? []))
             .map(\.standardizedFileURL.path)
@@ -238,14 +256,16 @@ enum Paths {
 
     // MARK: - Directory creation
 
-    /// Create `~/gmfs/`, `~/gmfs/bin/` and `~/gmfs/backups/` if missing.
-    /// Idempotent.
+    /// Creates the runtime directory structure if missing.
     ///
-    /// DELIBERATELY NOT CALLED FROM ANY BUILD OR TEST PATH. This type DEFINES
-    /// the layout; populating `~/gmfs` belongs to the cutover step alone. A
-    /// stray call would have a build create a runtime root as a side effect,
-    /// on a machine whose test suite must be unable to touch anything outside
-    /// a temp dir.
+    /// Create `~/gmfs/`, `~/gmfs/bin/` and `~/gmfs/backups/` if missing.
+    /// Idempotent: deliberately not called from any build or test path. This
+    /// type defines the layout; populating `~/gmfs` belongs to the cutover step
+    /// alone. A stray call would have a build create a runtime root as a side
+    /// effect, on a machine whose test suite must be unable to touch anything
+    /// outside a temp dir.
+    ///
+    /// - Throws: `CocoaError` if directory creation fails.
     static func ensureRuntimeDirs() throws {
         let fm = FileManager.default
         try fm.createDirectory(at: root, withIntermediateDirectories: true)

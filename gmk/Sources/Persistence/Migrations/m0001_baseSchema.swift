@@ -2,6 +2,8 @@ import Foundation
 import GRDB
 
 extension Migrations {
+    /// Registers the initial database schema migration.
+    /// - Parameter migrator: The database migrator to register with.
     static func m0001_baseSchema(_ migrator: inout DatabaseMigrator) {
         migrator.registerMigration("m0001_baseSchema") { db in
             try db.execute(

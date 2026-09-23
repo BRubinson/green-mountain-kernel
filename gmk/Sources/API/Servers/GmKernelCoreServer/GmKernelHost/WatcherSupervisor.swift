@@ -1,19 +1,24 @@
 import Foundation
 
 /// Owns both watchers and the ONE recompute path serving A3 (gmfs re-rooting)
-/// and A8 (instance-set churn). It recomputes both watched sets from
-/// committed db state and pushes them down; both pushes are idempotent, so a
-/// rebuild triggered by an irrelevant change costs two comparisons.
+/// and A8 (instance-set churn).
 ///
-/// MUST be called on the SERVER queue — rebuild performs dbQueue reads, and
-/// calling it from inside the event sink (which fires on the DATABASE's queue
-/// while the issuing write turn is still unwinding) would deadlock.
+/// It recomputes both watched sets from committed db state and pushes them
+/// down; idempotent pushes on any change. MUST be called on the SERVER
+/// queue — rebuild performs dbQueue reads and calling from the event sink
+/// (DATABASE queue during write unwinding) would deadlock.
 final class WatcherSupervisor: @unchecked Sendable {
     private let store: Store
     private let memory: MemoryWatcher
     private let checkout: CheckoutFSEventLane
     private var bootLogged = false
 
+    /// Creates a watcher supervisor with the given dependencies.
+    ///
+    /// - Parameters:
+    ///   - store: The database store.
+    ///   - memory: The memory directory watcher.
+    ///   - checkout: The checkout filesystem event lane.
     init(store: Store, memory: MemoryWatcher, checkout: CheckoutFSEventLane) {
         self.store = store
         self.memory = memory

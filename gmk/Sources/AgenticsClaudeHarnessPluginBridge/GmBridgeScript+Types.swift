@@ -39,6 +39,12 @@ enum GmBridgeScript {
 
         var body: String
 
+        /// Creates a script file.
+        /// - Parameters:
+        ///   - name: The file name.
+        ///   - location: Where the file lives; defaults to scripts.
+        ///   - interpreter: The interpreter to use; if set, prepends its shebang.
+        ///   - body: The file contents.
         init(
             name: String,
             location: Location = .scripts,
@@ -65,6 +71,8 @@ enum GmBridgeScript {
 
         var isExecutable: Bool { true }
 
+        /// Returns the file contents with shebang prepended if needed.
+        /// - Returns: The file contents, or nil if empty.
         func contents() -> String? {
             guard !isEmpty else { return nil }
 

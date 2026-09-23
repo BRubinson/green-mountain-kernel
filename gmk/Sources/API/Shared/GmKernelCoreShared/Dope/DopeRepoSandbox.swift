@@ -1,24 +1,32 @@
 import Foundation
 
 /// The daemon's repo file writer — a value type whose entire public surface
-/// can only name paths under `{instanceRoot}/.gmcc/`. Containment is three
-/// independent layers: `resolve` pre-flights the instance root and THROWS,
-/// `domainFile(code:)` re-validates the code, and every returned URL passes a
-/// standardized-prefix guard. `.gmcc/` is not exclusively dope-owned, so a
-/// write swaps the dope-owned SUBTREES individually and writes
-/// `scope.doped.json` LAST — a crash then leaves an OLDER index over newer
-/// subtrees, which `peekRevision` reports as behind and a re-run repairs.
+/// can only name paths under `{instanceRoot}/.gmcc/`.
+///
+/// Containment is three independent layers: `resolve` pre-flights the instance
+/// root, `domainFile(code:)` re-validates the code, and every returned URL
+/// passes a standardized-prefix guard. Write atomicity: `.gmcc/` dope-owned
+/// SUBTREES swap individually, `scope.doped.json` writes LAST. A crash leaves
+/// an OLDER index over newer subtrees — `peekRevision` detects and re-run repairs.
 struct DopeRepoSandbox: Sendable {
     let instanceRoot: URL
     let dopeRoot: URL
 
     struct SandboxError: Error, CustomStringConvertible, Sendable {
         let description: String
+        /// Creates an error with the given message.
+        ///
+        /// - Parameter description: The error message.
         init(_ description: String) { self.description = description }
     }
 
     // MARK: - Resolution
 
+    /// Creates a sandbox for an instance root after validating it exists and is a git checkout.
+    ///
+    /// - Parameter raw: A path to the instance root; whitespace is trimmed.
+    /// - Returns: A sandbox.
+    /// - Throws: `SandboxError` when the path is empty, relative, missing, or not a git checkout, or when the dope root escapes via symlink.
     static func resolve(instanceRoot raw: String) throws -> DopeRepoSandbox {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -70,8 +78,10 @@ struct DopeRepoSandbox: Sendable {
         dopeRoot.appendingPathComponent(DopeDocumentCodec.cogsDirectoryName, isDirectory: true)
     }
 
-    /// The retired `.gmcc/dope` tree. Named ONLY so callers can detect and
-    /// report a stale checkout; nothing reads or writes through it.
+    /// The retired `.gmcc/dope` tree.
+    ///
+    /// Named ONLY so callers can detect and report a stale checkout; nothing
+    /// reads or writes through it.
     var legacyDopeRoot: URL {
         dopeRoot.appendingPathComponent(
             DopeDocumentCodec.legacyDopeDirectoryName,
@@ -79,11 +89,21 @@ struct DopeRepoSandbox: Sendable {
         )
     }
 
+    /// Returns the directory for a cog after validating its code.
+    ///
+    /// - Parameter code: The cog code; must be a valid cog code.
+    /// - Returns: The cog's directory.
+    /// - Throws: `SandboxError` when `code` is invalid or the path escapes the dope root.
     func cogDirectory(code: String) throws -> URL {
         try DopeCode.validateCode(code, field: "cog code")
         return try contained(cogsDirectory.appendingPathComponent(code, isDirectory: true))
     }
 
+    /// Returns the path to a cog's index file.
+    ///
+    /// - Parameter code: The cog code.
+    /// - Returns: The cog index file path.
+    /// - Throws: `SandboxError` when the path is invalid or escapes the dope root.
     func cogIndexFile(code: String) throws -> URL {
         let dir = try cogDirectory(code: code)
         return try contained(
@@ -93,14 +113,25 @@ struct DopeRepoSandbox: Sendable {
         )
     }
 
-    /// One domain's directory. The layout gained a level, and the old
-    /// single-flat-segment helper did not generalise — every segment below
-    /// is validated here rather than assumed.
+    /// Returns the directory for a domain after validating its code.
+    ///
+    /// The layout gained a level, and the old single-flat-segment helper did
+    /// not generalise — every segment below is validated here rather than
+    /// assumed.
+    ///
+    /// - Parameter code: The domain code; must be valid.
+    /// - Returns: The domain's directory.
+    /// - Throws: `SandboxError` when the code is invalid or the path escapes the dope root.
     func domainDirectory(code: String) throws -> URL {
         try DopeCode.validateCode(code, field: "domain code")
         return try contained(persistenceDirectory.appendingPathComponent(code, isDirectory: true))
     }
 
+    /// Returns the path to a domain's index file.
+    ///
+    /// - Parameter code: The domain code.
+    /// - Returns: The domain index file path.
+    /// - Throws: `SandboxError` when the path is invalid or escapes the dope root.
     func domainIndexFile(code: String) throws -> URL {
         let dir = try domainDirectory(code: code)
         return try contained(
@@ -110,6 +141,13 @@ struct DopeRepoSandbox: Sendable {
         )
     }
 
+    /// Returns the path to an entity file within a domain.
+    ///
+    /// - Parameters:
+    ///   - domain: The domain code.
+    ///   - entity: The entity code; must be valid.
+    /// - Returns: The entity file path.
+    /// - Throws: `SandboxError` when the code is invalid or the path escapes the dope root.
     func domainEntityFile(domain: String, entity: String) throws -> URL {
         try DopeCode.validateCode(entity, field: "entity code")
         let dir = try domainDirectory(code: domain)
@@ -120,6 +158,13 @@ struct DopeRepoSandbox: Sendable {
         )
     }
 
+    /// Returns the path to an enum file within a domain.
+    ///
+    /// - Parameters:
+    ///   - domain: The domain code.
+    ///   - enumCode: The enum code; must be valid.
+    /// - Returns: The enum file path.
+    /// - Throws: `SandboxError` when the code is invalid or the path escapes the dope root.
     func domainEnumFile(domain: String, enumCode: String) throws -> URL {
         try DopeCode.validateCode(enumCode, field: "enum code")
         let dir = try domainDirectory(code: domain)
@@ -130,9 +175,14 @@ struct DopeRepoSandbox: Sendable {
         )
     }
 
-    /// The final belt-and-braces guard on every path this type hands out —
-    /// symlink-resolving, not lexical (a symlinked domains/ or domain file
-    /// must not smuggle a read/write outside the dope root).
+    /// Guards every returned path against symlink-based escapes.
+    ///
+    /// Symlink-resolving, not lexical: a symlinked domains/ or domain file must not
+    /// smuggle a read/write outside the dope root.
+    ///
+    /// - Parameter url: The path to validate.
+    /// - Returns: The path if it is contained.
+    /// - Throws: `SandboxError` when the path escapes the dope root.
     private func contained(_ url: URL) throws -> URL {
         let standardized = url.standardizedFileURL
         let resolved = standardized.resolvingSymlinksInPath()
@@ -150,10 +200,15 @@ struct DopeRepoSandbox: Sendable {
         let warnings: [String]
     }
 
-    /// Reads `scope.doped.json`, then ONLY the files its map names — after
-    /// re-deriving each value from its key — and for each domain, only the
-    /// entity/enum files ITS index names, re-derived the same way. Never
-    /// globs. The map is data at BOTH levels, never followed.
+    /// Reads the dope bundle and all files it references.
+    ///
+    /// Reads `scope.doped.json`, then ONLY the files its map names — after re-deriving
+    /// each value from its key — and for each domain, only the entity/enum files its
+    /// index names, re-derived the same way. Never globs; the map is data at both
+    /// levels, never followed.
+    ///
+    /// - Returns: The bundle and any warnings about orphaned files.
+    /// - Throws: `SandboxError` on parse errors or missing files.
     func readBundle() throws -> RepoBundle {
         let mainURL = mainFile
         guard FileManager.default.fileExists(atPath: mainURL.path) else {
@@ -220,9 +275,16 @@ struct DopeRepoSandbox: Sendable {
         )
     }
 
-    /// Assembles ONE domain from its index plus the entity/enum files the
-    /// index names. The returned value is the same shape the old
-    /// one-file-per-domain layout produced, so nothing downstream changes.
+    /// Assembles a domain from its index and the files it names.
+    ///
+    /// The returned value is the same shape the old one-file-per-domain layout produced,
+    /// so nothing downstream changes.
+    ///
+    /// - Parameters:
+    ///   - code: The domain code.
+    ///   - warnings: Warnings collected during the read; orphaned files are appended.
+    /// - Returns: The domain's persistence file document.
+    /// - Throws: `SandboxError` on parse errors or missing files.
     private func readDomain(
         code: String,
         warnings: inout [String]
@@ -329,8 +391,9 @@ struct DopeRepoSandbox: Sendable {
         )
     }
 
-    /// Peek at the on-disk revision without a full parse. Nil when no tree
-    /// exists on disk.
+    /// Reads the on-disk revision without parsing the full bundle.
+    ///
+    /// - Returns: The revision number, or `nil` when no tree exists on disk.
     func peekRevision() -> Int64? {
         guard let data = try? Data(contentsOf: mainFile),
             let main = try? DopeDocumentCodec.decoder.decode(DopeScopeDocument.self, from: data)
@@ -345,13 +408,17 @@ struct DopeRepoSandbox: Sendable {
         let pruned: [String]
     }
 
-    /// Subtree-atomic write; returned paths are instance-root-relative.
+    /// Writes the bundle atomically, staging subtrees before swap.
     ///
-    /// Each new subtree is staged under `.gmcc/.dope-staging-{uuid}` and
-    /// swapped in with replaceItemAt on the same volume, so a crash mid-write
-    /// leaves the previous subtree byte-intact. `scope.doped.json` is the
-    /// version authority and is written LAST: a crash then leaves an index
-    /// reporting a revision BEHIND the files, which is the benign direction.
+    /// Each new subtree is staged under `.gmcc/.dope-staging-{uuid}` and swapped in
+    /// with replaceItemAt on the same volume, so a crash mid-write leaves the previous
+    /// subtree byte-intact. `scope.doped.json` is the version authority and is written
+    /// LAST: a crash then leaves an index reporting a revision BEHIND the files, the
+    /// benign direction. Returned paths are instance-root-relative.
+    ///
+    /// - Parameter bundle: The bundle to write.
+    /// - Returns: The paths written and the paths pruned, both instance-root-relative.
+    /// - Throws: `SandboxError` on I/O or encoding errors.
     func writeAtomically(_ bundle: DopeDocumentBundle) throws -> WriteResult {
         let fm = FileManager.default
         let staging = dopeRoot.appendingPathComponent(
@@ -492,13 +559,18 @@ struct DopeRepoSandbox: Sendable {
         return WriteResult(written: written.sorted(), pruned: pruned)
     }
 
-    /// Bounded stale scan: exactly one non-recursive listing of
-    /// `persistence/`, yielding directories the scope map does not reference.
+    /// Finds unreferenced directories in the persistence tree.
     ///
-    /// NOT recursive. A non-recursive listing structurally cannot name a path
-    /// outside the directory it lists, and a recursive scan would let this
-    /// pruner delete anywhere beneath the tree. Stale files inside a live
-    /// domain directory go with replaceItemAt, which swaps it wholesale.
+    /// Performs exactly one non-recursive listing of `persistence/`, yielding
+    /// directories the scope map does not reference. A non-recursive listing
+    /// structurally cannot name a path outside the directory it lists, and a
+    /// recursive scan would let this pruner delete anywhere beneath the tree. Stale
+    /// files inside a live domain directory go with replaceItemAt, which swaps it
+    /// wholesale.
+    ///
+    /// - Parameter referenced: The set of domain codes in the scope map.
+    /// - Returns: Relative paths of unreferenced directories.
+    /// - Throws: `SandboxError` on I/O errors.
     private func unreferencedDomainDirectories(referenced: Set<String>) throws -> [String] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: persistenceDirectory.path) else { return [] }
@@ -508,8 +580,13 @@ struct DopeRepoSandbox: Sendable {
             .sorted()
     }
 
-    /// Cog directories the scope map does not reference. Same non-recursive
-    /// discipline as the persistence scan.
+    /// Finds unreferenced directories in the cogs tree.
+    ///
+    /// Same non-recursive discipline as the persistence scan.
+    ///
+    /// - Parameter referenced: The set of cog codes in the scope map.
+    /// - Returns: Relative paths of unreferenced cog directories.
+    /// - Throws: `SandboxError` on I/O errors.
     private func unreferencedCogDirectories(referenced: Set<String>) throws -> [String] {
         let fm = FileManager.default
         guard fm.fileExists(atPath: cogsDirectory.path) else { return [] }
@@ -519,9 +596,16 @@ struct DopeRepoSandbox: Sendable {
             .sorted()
     }
 
-    /// Files inside a live domain directory that its index does not name.
-    /// Read-side reporting only — the write path removes them by swapping
-    /// the whole directory.
+    /// Finds files in a domain directory that its index does not reference.
+    ///
+    /// Read-side reporting only — the write path removes them by swapping the whole
+    /// directory.
+    ///
+    /// - Parameters:
+    ///   - domain: The domain code.
+    ///   - index: The domain's index document.
+    /// - Returns: Relative file names of unreferenced files in the domain.
+    /// - Throws: `SandboxError` on I/O errors.
     private func unreferencedDomainMemberFiles(
         domain: String,
         index: DopePersistenceIndexDocument

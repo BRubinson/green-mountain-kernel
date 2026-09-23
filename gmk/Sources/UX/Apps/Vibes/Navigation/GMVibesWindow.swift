@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// The single window root. Every window can reach the whole app: a sliding
+/// The single window root.
+///
+/// Every window can reach the whole app: a sliding
 /// global rail on the left (collapsed by default) and a route-switched content
 /// area. The session screen is a `NavigationSplitView`, so routes swap at the
 /// root instead of pushing onto a `NavigationStack`.
@@ -15,6 +17,9 @@ struct GMVibesWindow: View {
     // DrawingsStore occupied before the Drawing/ tear-out.
     @State private var diagrams = DiagramWorkspaceStore()
 
+    /// Creates a window initialized with a given route seed.
+    ///
+    /// - Parameter seed: The window seed containing the initial route.
     init(seed: WindowSeed) {
         _nav = State(initialValue: WindowNav(initial: seed.route))
     }
@@ -144,12 +149,11 @@ struct GMVibesWindow: View {
 /// mistakable for prod.
 
 /// The app-wide top-bar group: Back · daemon status pill · rail toggle · new
-/// window · ⌘K actions. Declared once, by GMVibesWindow, with `.navigation`
-/// placement: on plain routes that's the bar's leading edge; on the session
-/// route (NavigationSplitView) it pins the group RIGHT of the sidebar divider,
-/// beside the native collapse toggle — never in the sidebar section, whose
-/// items clip away when the sidebar closes. Dependencies are passed in rather
-/// than read from @Environment so the struct stays host-agnostic.
+/// window · ⌘K actions.
+///
+/// `.navigation` placement makes it leading on plain routes, RIGHT of the
+/// sidebar divider on session routes. Dependencies pass in rather than read from
+/// @Environment so the struct stays host-agnostic.
 struct GlobalToolbarGroup: ToolbarContent {
     let nav: WindowNav
     let openWindow: OpenWindowAction

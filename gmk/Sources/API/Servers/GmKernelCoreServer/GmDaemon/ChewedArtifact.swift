@@ -14,6 +14,13 @@ struct ChewedFileEntry: Hashable, Sendable {
     let description: String
     let fullPath: String?
 
+    /// Creates a file entry from a chewed artifact table row.
+    ///
+    /// - Parameters:
+    ///   - name: The file name.
+    ///   - type: The file type or extension.
+    ///   - description: A description of the file.
+    ///   - fullPath: The full path to the file, if available.
     init(name: String, type: String, description: String, fullPath: String?) {
         self.name = name
         self.type = type
@@ -30,6 +37,14 @@ struct ChewedArtifact: Hashable, Sendable {
     let files: [ChewedFileEntry]
     let keywords: [String]
 
+    /// Creates a chewed artifact from parsed components.
+    ///
+    /// - Parameters:
+    ///   - resourceName: The name of the resource.
+    ///   - confidence: A confidence score if available.
+    ///   - body: The complete markdown body.
+    ///   - files: The parsed file entries.
+    ///   - keywords: The extracted keywords.
     init(resourceName: String, confidence: Int?, body: String, files: [ChewedFileEntry], keywords: [String]) {
         self.resourceName = resourceName
         self.confidence = confidence
@@ -47,6 +62,12 @@ enum ChewedArtifactParser {
         case other
     }
 
+    /// Parses a chewed markdown artifact.
+    ///
+    /// - Parameters:
+    ///   - text: The markdown text to parse.
+    ///   - fallbackName: The name to use if none is found in the text.
+    /// - Returns: The parsed ChewedArtifact.
     static func parse(text: String, fallbackName: String) -> ChewedArtifact {
         var resourceName = fallbackName
         var confidence: Int?
@@ -156,11 +177,15 @@ enum ChewedArtifactParser {
     /// Cells are trimmed of backticks as well as whitespace: chew agents
     /// routinely code-quote the File column, and a `` `path` `` cell resolves to
     /// nothing — the extension comes back as ``swift` `` and the synthesized path
-    /// carries literal backticks, so the row digests empty and SILENTLY. Stripping
-    /// here is what keeps the File column a real path.
+    /// carries literal backticks, so the row digests empty and SILENTLY.
+    ///
+    /// Stripping here is what keeps the File column a real path.
     private static let cellTrim = CharacterSet.whitespaces.union(CharacterSet(charactersIn: "`"))
 
-    /// Split a `| a | b | c |` line into trimmed cells; nil when not a table row.
+    /// Splits a markdown table row into trimmed cells.
+    ///
+    /// - Parameter trimmed: A line that may be a markdown table row.
+    /// - Returns: An array of cell values, or nil if not a table row.
     private static func tableRowCells(_ trimmed: String) -> [String]? {
         guard trimmed.hasPrefix("|") else { return nil }
         let cells =
@@ -171,8 +196,13 @@ enum ChewedArtifactParser {
         return cells.isEmpty ? nil : cells
     }
 
-    /// Keyword vocabulary is snake_case: lowercase, space/hyphen → _, strip
-    /// everything outside [a-z0-9_], collapse runs of _.
+    /// Normalizes a raw keyword to snake_case vocabulary format.
+    ///
+    /// Converts to lowercase, replaces spaces and hyphens with underscores,
+    /// strips everything outside [a-z0-9_], and collapses runs of underscores.
+    ///
+    /// - Parameter raw: The keyword to normalize.
+    /// - Returns: The normalized keyword.
     static func normalizeKeyword(_ raw: String) -> String {
         var result = ""
         var lastWasUnderscore = false
@@ -200,6 +230,7 @@ enum ChewedArtifactParser {
 
     /// Text types get their full content inlined into the db; everything else
     /// (images, archives, media, unknown binaries) stays filesystem-only.
+    ///
     /// `m`/`mm` are here for the same reason `c`/`cc` are: they are the
     /// IMPLEMENTATION half of a language whose headers were already inlined.
     /// Omitting them made every Objective-C body digest as an empty row while
@@ -217,6 +248,13 @@ enum ChewedArtifactParser {
         "log", "conf", "ini", "env",
     ]
 
+    /// Determines if a file's content is text-based and should be inlined.
+    ///
+    /// Text types are inlined into the database; other files remain
+    /// filesystem-only.
+    ///
+    /// - Parameter fileName: The name of the file.
+    /// - Returns: True if the file is a text type.
     static func isTextType(fileName: String) -> Bool {
         textExtensions.contains(URL(fileURLWithPath: fileName).pathExtension.lowercased())
     }

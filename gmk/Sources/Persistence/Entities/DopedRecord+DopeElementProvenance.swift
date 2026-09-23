@@ -8,7 +8,9 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `dope_element_provenance` table. Columns map via convertFromSnakeCase.
+/// Read-side mirror of the `dope_element_provenance` table.
+///
+/// Columns map via convertFromSnakeCase.
 struct DopeElementProvenanceRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "dope_element_provenance"
     var uuid: String
