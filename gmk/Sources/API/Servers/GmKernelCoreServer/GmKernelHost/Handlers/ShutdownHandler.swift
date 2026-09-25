@@ -3,9 +3,8 @@ import Foundation
 /// SHUTDOWN — graceful stop.
 ///
 /// The response flushes first; the connection's
-/// .shutdown postAction then runs Server.performShutdown (drain-by-queue,
-/// DAEMON_STOP goodbye event, WAL checkpoint, pidfile + socket removal,
-/// exit 0).
+/// .shutdown postAction then runs Server.requestShutdown, which hands the stop
+/// to the host; the host tears down through Server.shutdownForHost.
 enum ShutdownHandler {
     /// Handles a shutdown request.
     ///

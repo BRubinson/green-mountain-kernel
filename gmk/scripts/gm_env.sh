@@ -7,8 +7,6 @@
 #     bash gmk/scripts/gm_env.sh refresh beta
 #     bash gmk/scripts/gm_env.sh seed    test
 #     bash gmk/scripts/gm_env.sh doctor  beta
-#     bash gmk/scripts/gm_env.sh run     test -- <command>      # e.g. the test action, on an ephemeral root
-#     bash gmk/scripts/gm_env.sh reap    test
 #     bash gmk/scripts/gm_env.sh destroy beta
 #
 # ── THE THREE ENVIRONMENTS ───────────────────────────────────────────────────
@@ -20,25 +18,12 @@
 #   beta  $HOME/beta_gmfs   a long-lived environment for trying things, running
 #                           the app against real-shaped data you do not mind
 #                           losing.
-#   test  $HOME/test_gmfs   a CHANNEL, not a single environment. Individual test
-#                           runs get EPHEMERAL roots beneath it.
+#   test  $HOME/test_gmfs   the Debug build's environment: one long-lived root.
 #
-# ── WHY `test` IS N ROOTS AND NOT ONE ────────────────────────────────────────
-#
-# A single persistent test root re-creates the exact collision the test lock
-# exists to prevent. Two agents testing at once: the second one's kernel loses
-# the flock on $HOME/test_gmfs/daemon.pid and either fails outright or attaches
-# as a CLIENT to the first run's kernel — at which point both runs share one
-# append-only database while one of them is counting rows in it.
-#
-# Ephemeral roots at $HOME/test_gmfs/runs/<id>/ dissolve that: every run has its
-# own database, its own socket, its own pidfile, its own flock. Each is
-# legitimately a single writer, and nothing needs to arbitrate.
-#
-# RUN IDS ARE SHORT, and that is a hard constraint rather than a style choice.
-# sun_path is 104 BYTES on macOS and the server binds a unix socket beneath the
-# run root; a timestamp-and-pid id blows that budget on a long home directory,
-# and the failure mode is a listener that will not bind.
+# Each root's kernel is its app: a beta or test root stages the whole bundle at
+# bin/gm_kernel.app, and clients on that root launch it from there. Ephemeral
+# isolation belongs to the XCTest suite, which hosts its own kernel in-process
+# on a temporary root.
 #
 # ── WHAT A REFRESH ACTUALLY COPIES ───────────────────────────────────────────
 #
@@ -82,9 +67,7 @@ env_root() { gm_env_root "$1"; }
 # and fails with `illegal pid` against a perfectly healthy kernel. Read the
 # FIRST LINE.
 #
-# That is cosmetic in `doctor` and is NOT cosmetic in `reap`, which deletes the
-# run root of anything it believes is dead: misparsing every live pid as dead
-# makes `reap` rm -rf the root out from under a running kernel mid-test.
+# Misparsing it would make `seed` think a live app was not running.
 env_live_pid() {
     [ -f "$1/daemon.pid" ] || return 1
     _pid="$(head -1 "$1/daemon.pid" 2>/dev/null | tr -d '[:space:]')"
@@ -103,10 +86,9 @@ env_create() {
     echo "[GMB] $_env -> $_root"
     mkdir -p "$_root/bin" "$_root/repos" "$_root/backups"
 
-    # A FULL release store, not just directories. The app autostarts
-    # $ROOT/bin/gm_daemon, and the hook shim exits 0 SILENTLY when its binary is
-    # absent — so an unpopulated bin/ does not fail loudly, it records nothing.
-    echo "[GMB] staging binaries into $_root"
+    # A FULL release store, not just directories. Clients on this root launch
+    # $ROOT/bin/gm_kernel.app; without it nothing here records anything.
+    echo "[GMB] staging the kernel app into $_root"
     GM_ENV="$_env" GM_FS_ROOT="$_root" bash "$SCRIPT_DIR/rebuild_local.sh" --fast
 
     env_seed_repo "$_env" "$_root"
@@ -253,94 +235,42 @@ env_seed() {
     # SIGKILL — so a changed build re-stages its whole version directory and
     # gm_activate's symlink swap is what makes that safe.
     #
-    # The comparison is against the BUNDLE's bytes as recorded at the last
-    # stage, not against the staged file: an Xcode-signed executable is
-    # re-signed ad-hoc on the way out (see gm_stage_from_bundle), so the staged
-    # bytes never equal the bundle's and a byte comparison would re-stage on
-    # every ⌘R.
+    # The comparison is against the BUNDLE's executable as recorded at the last
+    # stage, not against the staged copy: an unsigned build is re-signed ad-hoc
+    # on the way in (see gm_stage_bundle), so the staged bytes never equal the
+    # build's and a byte comparison would re-stage on every ⌘R.
     _stage="$(gm_stage_dir local "$_version")"
     _new_sha="$(shasum -a 256 "$_built" | awk '{print $1}')"
     _old_sha=""
-    [ -e "$GM_BIN/$GM_MACHO" ] && [ -f "$_stage/.bundle_sha256" ] \
+    [ -e "$GM_BIN/$GM_APP_NAME.app" ] && [ -f "$_stage/.bundle_sha256" ] \
         && _old_sha="$(cat "$_stage/.bundle_sha256")"
     if [ "$_new_sha" = "$_old_sha" ]; then
-        echo "[GMB] staged kernel already matches the build — skipping stage"
+        echo "[GMB] staged kernel app already matches the build — skipping stage"
     else
+        # A running copy of the old bundle must not be replaced under itself.
+        gm_stop_kernel_and_wait
         rm -rf "$_stage"
         _src_sha="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)"
-        gm_stage_from_bundle "$_app" local "$_version" "$_src_sha" >/dev/null \
-            || { echo "[GMB] ERROR: staging the kernel out of $_app failed" >&2; exit 1; }
-        "$_stage/$GM_MACHO" --version >/dev/null \
+        gm_stage_bundle "$_app" local "$_version" "$_src_sha" >/dev/null \
+            || { echo "[GMB] ERROR: staging $_app failed" >&2; exit 1; }
+        "$_stage/$GM_APP_NAME.app/Contents/MacOS/$GM_MACHO" --version >/dev/null \
             || { echo "[GMB] ERROR: the staged $GM_MACHO does not run (exit $?) — refusing to activate it" >&2; exit 1; }
         gm_activate local "$_version"
         printf '%s\n' "$_new_sha" > "$_stage/.bundle_sha256"
     fi
 
+    # Registration launches the staged app when nothing is serving. Quit it
+    # afterwards in that case: the app Xcode is about to run would find the
+    # lock held, alert, and quit. A kernel that was already up stays up.
+    _was_live=0
+    gm_kernel_live && _was_live=1
     env_seed_repo "$_env" "$_root"
     env_seed_plugin "$_env" "$_root"
-
-    # If registration autostarted a HEADLESS kernel, stop it now: the incoming
-    # app takes a headless holder over by SIGTERM-and-wait, and paying that
-    # wait on every ⌘R is a cost seed exists to avoid. A live APP holder is
-    # left alone — registration went through its socket and it stays up.
-    if [ -f "$_root/daemon.pid" ]; then
-        _holder_bundle="$(sed -n '3p' "$_root/daemon.pid" 2>/dev/null)"
-        if [ -z "$_holder_bundle" ] && _pid="$(env_live_pid "$_root")"; then
-            echo "[GMB] stopping the autostarted headless kernel (pid $_pid)"
-            GM_FS_ROOT="$_root" "$_root/bin/gm_kernel" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
-        fi
+    if [ "$_was_live" -eq 0 ] && gm_kernel_live; then
+        echo "[GMB] quitting the kernel app registration launched"
+        gm_stop_kernel_and_wait
     fi
     echo "[GMB] seed $_env done"
-}
-
-# ── ephemeral test runs ──────────────────────────────────────────────────────
-
-# Mint a run root, run a command against it, tear it down.
-#
-# The id is SHORT for the sun_path reason at the top of this file. Six hex
-# characters under $HOME/test_gmfs/runs/ leaves ample headroom for
-# `<root>/daemon.sock` inside 104 bytes on any plausible home directory.
-env_run() {
-    _root="$(env_root test)"
-    _id="$(hexdump -n3 -e '"%06x"' /dev/urandom)"
-    _run="$_root/runs/$_id"
-    mkdir -p "$_run/bin"
-    # Stage by SYMLINK from the channel's store rather than rebuilding: a run is
-    # supposed to test the bits that are already there, and a per-run build
-    # would make every run test something slightly different.
-    if [ -d "$_root/bin/releases" ]; then
-        ln -sfn "$_root/bin/releases" "$_run/bin/releases"
-        for _n in gm_kernel gm_daemon; do
-            [ -e "$_root/bin/$_n" ] && ln -sfn "$_root/bin/$_n" "$_run/bin/$_n"
-        done
-    fi
-    echo "[GMB] run root $_run"
-    # The lock file this run's holder flocks. Its EXISTENCE plus an flock is the
-    # liveness signal the daemon probes — no TTL anywhere in the scheme.
-    : > "$_run/run.lock"
-    set +e
-    GM_FS_ROOT="$_run" "$@"
-    _rc=$?
-    set -e
-    GM_FS_ROOT="$_run" "$_run/bin/gm_kernel" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
-    rm -rf "$_run"
-    return $_rc
-}
-
-# Remove run roots whose kernel is gone. Lazy, like the lock's own reaping —
-# there is no timer anywhere in this design.
-env_reap() {
-    _root="$(env_root test)"
-    [ -d "$_root/runs" ] || { echo "[GMB] no runs"; return 0; }
-    for _run in "$_root"/runs/*; do
-        [ -d "$_run" ] || continue
-        if _pid="$(env_live_pid "$_run")"; then
-            echo "[GMB] live: $_run (pid $_pid)"
-        else
-            echo "[GMB] reaping $_run"
-            rm -rf "$_run"
-        fi
-    done
 }
 
 # ── inspect / destroy ────────────────────────────────────────────────────────
@@ -352,6 +282,18 @@ env_doctor() {
     echo "exists      : $([ -d "$_root" ] && echo yes || echo NO)"
     echo "db          : $([ -f "$_root/gm.db" ] && echo yes || echo no)"
     echo "binaries    : $([ -x "$_root/bin/gm_kernel" ] && echo yes || echo NO)"
+    if [ "$_env" = "prod" ]; then
+        _app="/Applications/gm_kernel.app"
+    else
+        _app="$_root/bin/gm_kernel.app"
+    fi
+    if [ ! -d "$_app" ]; then
+        echo "kernel app  : NO ($_app)"
+    elif codesign --verify --deep --strict "$_app" >/dev/null 2>&1; then
+        echo "kernel app  : $_app (signature verifies)"
+    else
+        echo "kernel app  : $_app (SIGNATURE DOES NOT VERIFY)"
+    fi
     echo "version     : $(cat "$_root/bin/.gm_version" 2>/dev/null || echo none)"
     echo "plugin      : $(ls -d "$_root"/repos/*/plugins/gmbeta 2>/dev/null | head -n1 || true)"
     if _pid="$(env_live_pid "$_root")"; then
@@ -369,7 +311,8 @@ env_destroy() {
     _env="$1"; guard_not_prod "$_env" destroy
     _root="$(env_root "$_env")" || exit 2
     [ -d "$_root" ] || { echo "[GMB] $_root does not exist"; return 0; }
-    GM_FS_ROOT="$_root" "$_root/bin/gm_kernel" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
+    GM_ENV="$_env"; GM_FS_ROOT="$_root"; gm_resolve_fs_root
+    gm_stop_kernel_and_wait
     rm -rf "$_root"
     echo "[GMB] removed $_root"
 }
@@ -383,15 +326,8 @@ case "$CMD" in
     seed)    env_seed    "${1:?environment: beta|test}" ;;
     doctor)  env_doctor  "${1:-prod}" ;;
     destroy) env_destroy "${1:?environment: beta|test}" ;;
-    reap)    env_reap ;;
-    run)
-        shift 2>/dev/null || true
-        [ "${1:-}" = "--" ] && shift
-        [ $# -gt 0 ] || die "gm_env.sh run test -- <command>"
-        env_run "$@"
-        ;;
     *)
-        sed -n '2,12p' "$0"
+        sed -n '2,10p' "$0"
         exit 2
         ;;
 esac

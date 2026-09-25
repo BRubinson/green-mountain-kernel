@@ -250,7 +250,6 @@ extension GmBridgeResource {
             ├── skills/
             │   ├── gmcc/SKILL.md              # Core rules (slim)
             │   ├── gmcc/ref/                  # Reference files (read on-demand)
-            │   ├── gm_daemon/               # Daemon + pen invocation reference
             │   ├── gmcc_kbite/                # KBite knowledge system
             │   ├── gmcc_maw/                  # KBite web-fetch skill
             │   ├── gmcc_boot/                 # Boot validation
@@ -264,7 +263,7 @@ extension GmBridgeResource {
             ├── bin/src/gm_{mcp,hook}.swift           # Their generated mains; built by gmk/scripts/build_plugin_binaries.sh
             ├── hooks/bin/gm_hook_<event>             # One compiled executable per hooked event (PreToolUse, PostToolUse, SubagentStart)
             ├── hooks/src/gm_hook_<event>.swift       # Its generated main; same builder
-            ├── scripts/install_gm.sh          # Installs the kernel app + stages gm_kernel/gm_daemon into $GM_FS_ROOT/bin
+            ├── scripts/install_gm.sh          # Installs the kernel app + stages the gm_kernel CLI into $GM_FS_ROOT/bin
             ├── scripts/gm_releases.sh         # The release-store contract (staging, activation, rollback)
             └── hooks/hooks.json               # Hook configuration (SessionStart, SubagentStart, PreToolUse, PostToolUse)
             ```
@@ -278,7 +277,8 @@ extension GmBridgeResource {
             ```
             ~/gmfs/                                                       # $GM_FS_ROOT — ONE root (NOT in git)
             ├── bin/
-            │   ├── gm_kernel, gm_daemon                                  # symlinks -> releases/active/gm_kernel (gm_mcp/gm_hook ship in the plugin)
+            │   ├── gm_kernel                                             # symlink -> releases/active/gm_kernel, a CLI (gm_mcp/gm_hook ship in the plugin)
+            │   ├── gm_kernel.app                                         # beta/test roots only: the staged bundle clients launch
             │   ├── .gm_version                                           # active version ("50.0.1" or "50.0.1-BETA")
             │   └── releases/
             │       ├── active -> downloads/50.0.1

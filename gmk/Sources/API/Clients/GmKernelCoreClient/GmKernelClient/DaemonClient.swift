@@ -5,12 +5,13 @@ import Foundation
 ///
 /// An internal lock serializes concurrent request() callers so the shared fd
 /// and read buffer can never interleave frames. Connect-or-autostart: a dead
-/// socket spawns the headless kernel, which the pidfile flock makes
-/// idempotent. Event streaming lives in DaemonEventSubscription, which owns
-/// its own connection, so a streaming connection cannot issue requests.
+/// socket launches the kernel app through LaunchServices, whose pidfile flock
+/// makes a second copy quit. Event streaming lives in DaemonEventSubscription,
+/// which owns its own connection, so a streaming connection cannot issue requests.
 final class DaemonClient: @unchecked Sendable {
     private let socketPath: String
-    private let daemonBinaryPath: String
+    /// The kernel app to launch, by path.
+    private let appBundlePath: String
     private let clientName: String
     private let autostartEnabled: Bool
     private let lock = NSLock()
@@ -22,17 +23,17 @@ final class DaemonClient: @unchecked Sendable {
     ///
     /// - Parameters:
     ///   - socketPath: Unix socket path; defaults to the standard location.
-    ///   - daemonBinaryPath: Path to the daemon executable to spawn if needed.
+    ///   - appBundlePath: The kernel app to launch if needed; defaults to this root's `Paths.launchApp`.
     ///   - clientName: Name sent in the hello handshake; defaults to `"gm"`.
-    ///   - autostart: Whether to spawn the daemon if the socket is unreachable.
+    ///   - autostart: Whether to launch the kernel app if the socket is unreachable.
     init(
         socketPath: String = Paths.socket.path,
-        daemonBinaryPath: String = Paths.binDaemon.path,
+        appBundlePath: String = Paths.launchApp.path,
         clientName: String = "gm",
         autostart: Bool = true
     ) {
         self.socketPath = socketPath
-        self.daemonBinaryPath = daemonBinaryPath
+        self.appBundlePath = appBundlePath
         self.clientName = clientName
         self.autostartEnabled = autostart
     }
@@ -67,7 +68,7 @@ final class DaemonClient: @unchecked Sendable {
     /// Connects to the daemon, autostarting if needed, and exchanges hello.
     ///
     /// Mismatch handling is directional: retry-with-autostart only when the daemon reported an older version
-    /// than ours (the freshly built binary wins); when the daemon is newer, a respawn cycle is doomed — surface
+    /// than ours (the freshly built binary wins); when the daemon is newer, a relaunch cycle is doomed — surface
     /// the mismatch immediately.
     ///
     /// - Returns: The hello acknowledgment from the daemon.
@@ -90,8 +91,21 @@ final class DaemonClient: @unchecked Sendable {
             if let daemonVersion, daemonVersion >= GmWireProtocol.version {
                 throw DaemonClientError.protocolMismatch(message: message, daemonVersion: daemonVersion)
             }
+            waitForListenerToClose()
             try autostart()
             return try connectOnce()
+        }
+    }
+
+    /// Waits up to 5 s for the socket to stop accepting, so a relaunch cannot reach the old app.
+    ///
+    /// The mismatch reply asked the old app to quit, and it quits asynchronously; a dial
+    /// made before its listener closes reaches the old kernel again.
+    private func waitForListenerToClose() {
+        for _ in 0..<50 {
+            guard let probe = try? dial() else { return }
+            Darwin.close(probe)
+            usleep(100_000)
         }
     }
 
@@ -172,7 +186,7 @@ final class DaemonClient: @unchecked Sendable {
         return ack
     }
 
-    /// Dials the socket or spawns the daemon if autostart is enabled.
+    /// Dials the socket or launches the kernel app if autostart is enabled.
     ///
     /// - Throws: `DaemonClientError.unreachable` if the socket is dead and autostart is disabled.
     private func openSocket() throws {
@@ -186,26 +200,28 @@ final class DaemonClient: @unchecked Sendable {
         try autostart()
     }
 
-    /// Spawns the daemon and retries connection with exponential backoff.
+    /// Launches the kernel app and retries connection with exponential backoff.
     ///
-    /// The spawn happens inside the retry loop: a spawn that races a dying daemon's pidfile
-    /// flock exits 0 by design, so only re-spawning (idempotent under the flock) survives the
-    /// rebuild cycle. Retries up to 10 times with delays from 100 ms to 1 s.
+    /// Launches ONCE: LaunchServices activates a running copy rather than starting a second,
+    /// and the app's baked root decides its database. Retries up to 20 times with delays
+    /// from 100 ms to 1 s, since an app cold start is slower than a CLI.
     ///
-    /// - Throws: `DaemonClientError.unreachable` when the binary is missing or all retries fail.
+    /// - Throws: `DaemonClientError.unreachable` when the bundle is missing, `open` fails, or all retries fail.
     private func autostart() throws {
-        guard FileManager.default.isExecutableFile(atPath: daemonBinaryPath) else {
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: appBundlePath, isDirectory: &isDirectory),
+            isDirectory.boolValue
+        else {
             throw DaemonClientError.unreachable(
-                "daemon binary missing at \(daemonBinaryPath) — run install_gm.sh"
+                "no kernel app at \(appBundlePath) — run install_gm.sh (prod) or gm_env.sh create <env>"
             )
         }
+        guard launchApp() else {
+            FileHandle.standardError.write(Data("[GMB] kernel not running and no GUI session\n".utf8))
+            throw DaemonClientError.unreachable("kernel not running and no GUI session")
+        }
         var delay: UInt32 = 100_000  // µs
-        for _ in 0..<10 {
-            guard spawnDaemon() else {
-                throw DaemonClientError.unreachable(
-                    "posix_spawn(\(daemonBinaryPath)) failed: \(String(cString: strerror(errno)))"
-                )
-            }
+        for _ in 0..<20 {
             usleep(delay)
             if let connected = try? dial() {
                 fd = connected
@@ -213,44 +229,25 @@ final class DaemonClient: @unchecked Sendable {
             }
             delay = min(delay * 2, 1_000_000)
         }
-        throw DaemonClientError.unreachable("daemon did not come up at \(socketPath) after autostart")
+        throw DaemonClientError.unreachable("kernel did not come up at \(socketPath) after launching the app")
     }
 
-    /// Spawns the headless daemon process with explicit personality argument.
+    /// Runs `/usr/bin/open -g` on the kernel app and waits for it to return.
     ///
-    /// Uses `posix_spawn` with the daemon personality to bypass LaunchServices instance-per-bundle
-    /// enforcement. Running on a GUI binary would create a second writer. Passes `GM_FS_ROOT`
-    /// to ensure the spawned daemon uses the same root as the current process.
+    /// `-g` keeps focus where it is. Never `-j`: a hidden app cannot show its menu-bar panel.
+    /// `open` exits non-zero when LaunchServices cannot launch an app, which is
+    /// the case with no Aqua session (SSH without a console login, CI).
     ///
-    /// - Returns: `true` when the spawn succeeds, `false` on `posix_spawn` failure.
-    private func spawnDaemon() -> Bool {
-        var attr: posix_spawnattr_t?
-        posix_spawnattr_init(&attr)
-        // Detach into its own session so the daemon outlives the CLI cleanly.
-        posix_spawnattr_setflags(&attr, Int16(POSIX_SPAWN_SETSID))
-        var pid: pid_t = 0
-        let argv: [UnsafeMutablePointer<CChar>?] = [
-            strdup(daemonBinaryPath), strdup("daemon"), nil,
-        ]
+    /// - Returns: `true` when `open` exits 0, `false` on spawn failure or a non-zero exit.
+    private func launchApp() -> Bool {
+        let arguments = ["/usr/bin/open", "-g", appBundlePath]
+        let argv: [UnsafeMutablePointer<CChar>?] = arguments.map { strdup($0) } + [nil]
         defer { argv.forEach { free($0) } }
-
-        // THE CHILD'S ROOT IS SET EXPLICITLY, ALWAYS — production included.
-        //
-        // An app resolves its root from its BUNDLE and a LaunchServices-launched
-        // process carries no GM_FS_ROOT at all, so passing `environ` through
-        // would point the spawned writer at a different database from the one
-        // its parent reads. `Paths.root` is whatever this process actually
-        // resolved — bundle key, env, or default — and an explicit value cannot
-        // be redirected by a stray export in the launching shell.
-        var env = ProcessInfo.processInfo.environment
-        env["GM_FS_ROOT"] = Paths.root.path
-        let envp: [UnsafeMutablePointer<CChar>?] =
-            env.map { strdup("\($0.key)=\($0.value)") } + [nil]
-        defer { envp.forEach { free($0) } }
-
-        let rc = posix_spawn(&pid, daemonBinaryPath, nil, &attr, argv, envp)
-        posix_spawnattr_destroy(&attr)
-        return rc == 0
+        var pid: pid_t = 0
+        guard posix_spawn(&pid, arguments[0], nil, nil, argv, environ) == 0 else { return false }
+        var status: Int32 = 0
+        while waitpid(pid, &status, 0) < 0 && errno == EINTR {}
+        return status == 0
     }
 
     /// Creates a connected unix-domain socket bound to the daemon path.

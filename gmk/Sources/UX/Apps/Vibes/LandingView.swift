@@ -422,10 +422,10 @@ private struct DaemonGateState: View {
         case .notInstalled:
             if let env = Paths.declaredEnvironmentName, env != "prod" {
                 return
-                    "No daemon binary at \(Paths.binDaemon.path). This is the \(env) environment root — stage binaries into it from your checkout:"
+                    "No kernel app at \(Paths.binApp.path). This is the \(env) environment root — stage it from your checkout:"
             }
             return
-                "No daemon binary at \(Paths.binDaemon.path). Build and install it from the green-mountain-kernel repo:"
+                "No kernel app installed. Build and install it from the green-mountain-kernel repo:"
         case .down(let reason, let intentional):
             return intentional ? "The daemon was stopped." : reason
         default:

@@ -179,11 +179,12 @@ say "4/8  TESTS — never ship what was not tested"
 # what it ran and refuses zero. That count reads the per-case lines, which is
 # why the test action runs WITHOUT -quiet.
 #
-# The suite boots a real gm_kernel. It is pointed at the artifact about to
-# SHIP rather than at whatever the build left behind: testing bits other than
-# the ones being published is how "what you tested is what ships" quietly
-# stops being true. The harness reads GM_TEST_KERNEL_BIN; the TEST_RUNNER_
-# spelling is the one the test action forwards into the runner explicitly.
+# The suite hosts the kernel in-process and runs the pen as a CLI. The pen is
+# pointed at the artifact about to SHIP rather than at whatever the build left
+# behind: testing bits other than the ones being published is how "what you
+# tested is what ships" quietly stops being true. The harness reads
+# GM_TEST_KERNEL_BIN; the TEST_RUNNER_ spelling is the one the test action
+# forwards into the runner explicitly.
 TEST_TARGET="GmKernelTests"
 TMP_TEST_LOG="$(mktemp "${TMPDIR:-/tmp}/gm-test.XXXXXX")"
 trap 'rm -f "$TMP_TEST_LOG"' EXIT
@@ -371,7 +372,7 @@ One release, one version: the runtime and the app are both \`$VERSION\`.
 
 | Asset | What it is |
 | --- | --- |
-| \`$DMG_ASSET\` | **The whole release.** The $GM_APP_NAME app — a menu-bar-resident kernel that owns the database and serves every client — with the \`gm_kernel\` CLI inside it at \`Contents/MacOS\`. The installer takes the app to \`/Applications\` and the CLI to \`\$GM_FS_ROOT/bin\`, where \`gm_daemon\`, \`gm_mcp\` and \`gm_hook\` are symlinks at it. |
+| \`$DMG_ASSET\` | **The whole release.** The $GM_APP_NAME app — a menu-bar-resident kernel that owns the database and serves every client — with the \`gm_kernel\` CLI inside it at \`Contents/MacOS\`. The installer takes the app to \`/Applications\` and the CLI to \`\$GM_FS_ROOT/bin\`. The app is the only kernel host; clients launch it when it is not running. |
 
 $SIGNING_NOTE
 
@@ -404,7 +405,7 @@ rm -rf "$DL"; DL="$(gm_stage_dir downloads "$VERSION")"
 for b in $GM_MACHO; do cp "$STAGE/$b" "$DL/$b"; done
 gm_write_manifest "$DL" "$VERSION" downloads "$HEAD_SHA" "arm64,x86_64"
 gm_activate downloads "$VERSION"
-gm_retire_daemon
+gm_stop_kernel_and_wait
 
 # The app comes across too, from the same bytes that were just uploaded. Staged
 # into the app store first so this machine's store looks exactly like one that

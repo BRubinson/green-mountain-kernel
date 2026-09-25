@@ -27,9 +27,9 @@ struct DaemonStatusPopover: View {
                     Paths.declaredEnvironmentName.flatMap { env in
                         env == "prod"
                             ? nil
-                            : "Daemon binary missing at \(Paths.binDaemon.path).\nStage binaries with bash gmk/scripts/gm_env.sh create \(env)."
+                            : "Kernel app missing at \(Paths.binApp.path).\nStage it with bash gmk/scripts/gm_env.sh create \(env)."
                     }
-                        ?? "Daemon binary missing at \(Paths.binDaemon.path).\nRun plugins/gmcc/scripts/install_gm.sh, or bash gmk/scripts/rebuild_local.sh from a checkout."
+                        ?? "Kernel app missing.\nRun plugins/gmcc/scripts/install_gm.sh, or bash gmk/scripts/rebuild_local.sh from a checkout."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

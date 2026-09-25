@@ -32,7 +32,7 @@
             "type" : "command"
           },
           {
-            "command" : "if [ ! -x \"${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_daemon\" ]; then \\\n  echo \"[GMB] kernel missing at ${GM_FS_ROOT:-$HOME/gmfs}/bin/gm_daemon — run: bash \\\"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\\\"\" >&2; \\\nfi; exit 0",
+            "command" : "_root=\"${GM_FS_ROOT:-$HOME/gmfs}\"; \\\nif [ \"$_root\" = \"$HOME/gmfs\" ]; then _app=\"${GM_APP_DEST:-/Applications}/gm_kernel.app\"; \\\n  _fix=\"bash \\\"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\\\"\"; \\\nelse _app=\"$_root/bin/gm_kernel.app\"; _fix=\"bash gmk/scripts/gm_env.sh create <env>\"; fi; \\\nif [ ! -d \"$_app\" ]; then \\\n  echo \"[GMB] kernel app missing at $_app — run: $_fix\" >&2; \\\nfi; exit 0",
             "type" : "command"
           }
         ],

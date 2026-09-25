@@ -1,17 +1,17 @@
 import SwiftUI
 
 /// THE ENTRY POINT of the one Mach-O. A personality resolved from argv runs
-/// before any AppKit symbol is touched, so the headless daemon stays a plain
-/// process; only a bare launch from inside the bundle — which is what
-/// LaunchServices does — becomes the app.
+/// before any AppKit symbol is touched, so a CLI stays a plain process; only a
+/// bare launch from inside the bundle — which is what LaunchServices does —
+/// becomes the app, the only kernel host.
 @main
 enum GMVibesApp {
 
     /// The entry point that resolves personalities and launches the app.
     ///
     /// A personality resolved from argv runs before any AppKit symbol is
-    /// touched, so the headless daemon stays a plain process; only a bare
-    /// launch from inside the bundle becomes the app.
+    /// touched, so a CLI stays a plain process; only a bare launch from inside
+    /// the bundle becomes the app.
     static func main() {
         let arguments = CommandLine.arguments
         switch arguments.dropFirst().first {
@@ -33,8 +33,7 @@ enum GMVibesApp {
         // Xcode's debugger passes `-NSDocumentRevisionsDebugMode YES` and AppKit
         // accepts `-Key value` user-default pairs, so inside a bundle anything
         // that is not a personality is the app. A bare `gm_kernel` OUTSIDE a
-        // bundle opens NOTHING: defaulting to the daemon would let a typo
-        // silently become a process holding the database.
+        // bundle opens NOTHING: a typo must never become a process holding the database.
         if Bundle.main.bundleURL.pathExtension == "app" {
             MainActor.assumeIsolated { GMVibesScenes.main() }
             return

@@ -4,8 +4,8 @@ import Foundation
 ///
 /// Views and stores branch on these cases — never on message text — per the kernel's typed-code contract.
 nonisolated enum DaemonError: Error, Equatable {
-    /// Binary absent at `Paths.binDaemon` — the RESOLVED root's `bin/gm_daemon`,
-    /// which is `~/gmfs` only for production. Distinct from a stopped daemon.
+    /// No kernel app for the RESOLVED root — `Paths.binApp` off production,
+    /// the installed app on it. Distinct from a stopped kernel.
     case notInstalled
     /// Socket dead and autostart disabled (or autostart exhausted its retries).
     case unreachable(String)

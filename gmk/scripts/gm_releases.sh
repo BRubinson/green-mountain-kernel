@@ -9,13 +9,21 @@
 # ── THE STORE ────────────────────────────────────────────────────────────────
 #
 #   $GM_FS_ROOT/bin/
-#   ├── gm_kernel  -> releases/active/gm_kernel      the ONE staged Mach-O
-#   ├── gm_daemon  -> releases/active/gm_kernel      the ONE entry point; argv[0] selects it
+#   ├── gm_kernel  -> releases/active/gm_kernel      the ONE staged Mach-O (prod)
 #   ├── .gm_version                                  the ACTIVE version string
 #   └── releases/
 #       ├── active -> downloads/50.0.1               or local/50.0.1-BETA
 #       ├── downloads/50.0.1/{gm_kernel,manifest.json,SHA256SUMS}
 #       └── local/50.0.1-BETA/{gm_kernel,manifest.json,SHA256SUMS}
+#
+#   A beta or test root stages the WHOLE signed bundle instead, because nothing
+#   but the app hosts a kernel and clients launch it from the store by path:
+#
+#   ├── gm_kernel.app -> releases/active/gm_kernel.app
+#   ├── gm_kernel     -> releases/active/gm_kernel.app/Contents/MacOS/gm_kernel
+#   └── releases/local/50.0.1-BETA/{gm_kernel.app,manifest.json,SHA256SUMS}
+#
+#   Production launches /Applications/gm_kernel.app by path.
 #
 #   gm_mcp and gm_hook are NOT here: they ship inside the plugin (plugins/gmcc/bin),
 #   compiled with the client closure, and never pass through this store.
@@ -78,23 +86,16 @@
 [ -n "${GM_RELEASES_SH:-}" ] && return 0
 GM_RELEASES_SH=1
 
-# ── The binary contract: ONE Mach-O, THREE entry-point names ────────────────
-#
-# These were one variable when there were three binaries. They are two now
-# because the two lists mean genuinely different things, and conflating them is
-# how a staged kernel ends up with entry points that resolve to nothing:
+# ── The binary contract: ONE Mach-O, no entry-point names ────────────────────
 #
 #   GM_MACHO       what gets STAGED, hashed, lipo-checked and tarred. One file.
-#   GM_ENTRYPOINTS what gets SYMLINKED in $GM_BIN. Names, not files.
+#   GM_ENTRYPOINTS what gets SYMLINKED in $GM_BIN beside it. Empty: the headless
+#                  `gm_daemon` host is retired and the app is the only writer.
 #
-# The entry-point name is load-bearing rather than cosmetic. `DaemonClient`
-# autostarts `bin/gm_daemon` by NAME and the kernel resolves its personality
-# from `basename(argv[0])` (GmPersonality) — so the symlink name is what selects
-# the headless host. A staged kernel whose symlink is missing is not a degraded
-# install; it is a writer nothing can start. GmPersonality.entrypoints is the
-# Swift side of this list; keep them equal by hand.
+# The variable stays so manifests keep an `entrypoints` field and the legacy
+# pre-collapse arm below still reads.
 GM_MACHO="gm_kernel"
-GM_ENTRYPOINTS="gm_daemon"
+GM_ENTRYPOINTS=""
 
 # Kept as the union for the paths that genuinely mean "everything in $GM_BIN":
 # the quarantine strip and the staleness stat do not care which is a real file.
@@ -167,11 +168,10 @@ gm_env_root() {
 # a test harness uses; it simply no longer has a filesystem fallback to disagree
 # with.
 #
-# EVERY environment gets a FULL release store, not just a database. The app
-# autostarts $ROOT/bin/gm_daemon, and the hook shim exits 0 SILENTLY when its
-# binary is missing — so a root with an unpopulated bin/ does not fail loudly,
-# it simply records nothing. That is why gm_env create stages binaries rather
-# than only making directories.
+# EVERY environment gets a FULL release store, not just a database. A client on
+# a beta or test root launches $ROOT/bin/gm_kernel.app, and without it nothing
+# on that root records anything. That is why gm_env create stages the bundle
+# rather than only making directories.
 gm_resolve_fs_root() {
     GM_ENV="${GM_ENV:-prod}"
     GM_FS_ROOT="${GM_FS_ROOT:-$(gm_env_root "$GM_ENV")}"
@@ -264,6 +264,40 @@ gm_stage_from_bundle() {
     printf '%s\n' "$_dir"
 }
 
+# gm_stage_bundle <app-path> <channel> <version> [sha]
+#
+# Stage the WHOLE app bundle as a version, for a beta or test root, where
+# clients launch the kernel from the store.
+#
+# Re-sign ONLY what does not verify, exactly as gm_stage_from_bundle does for
+# the Mach-O: a signed archive keeps its identity, while a scripted build
+# (CODE_SIGNING_ALLOWED=NO) carries only the linker's signature, which seals no
+# resources, so its staged COPY is signed ad-hoc — never the source bundle.
+gm_stage_bundle() {
+    _app="$1"; _channel="$2"; _version="$3"; _sha="${4:-unknown}"
+    [ -x "$_app/Contents/MacOS/$GM_MACHO" ] || {
+        echo "[GMB] ERROR: $_app carries no Contents/MacOS/$GM_MACHO" >&2; return 1; }
+
+    _dir="$(gm_stage_dir "$_channel" "$_version")" || return 1
+    # ditto, not cp -R: a code signature does not survive without the bundle's
+    # extended attributes.
+    ditto "$_app" "$_dir/$GM_APP_NAME.app" || return 1
+    if ! codesign --verify --deep --strict "$_dir/$GM_APP_NAME.app" >/dev/null 2>&1; then
+        codesign --force --deep --sign - --preserve-metadata=entitlements \
+            "$_dir/$GM_APP_NAME.app" >/dev/null 2>&1 || return 1
+        codesign --verify --deep --strict "$_dir/$GM_APP_NAME.app" >/dev/null 2>&1 || {
+            echo "[GMB] ERROR: $GM_APP_NAME.app from $_app does not verify even after an ad-hoc re-sign" >&2
+            return 1; }
+        echo "[GMB] re-signed $GM_APP_NAME.app ad-hoc: the build carried no bundle signature" >&2
+    fi
+
+    _arches="$(lipo -archs "$_dir/$GM_APP_NAME.app/Contents/MacOS/$GM_MACHO" 2>/dev/null | tr ' ' ',')"
+    gm_write_manifest "$_dir" "$_version" "$_channel" "$_sha" "${_arches:-unknown}" || return 1
+
+    echo "[GMB] staged $GM_APP_NAME.app [$_arches] from $_app"
+    printf '%s\n' "$_dir"
+}
+
 # gm_write_manifest <dir> <version> <channel> <sha> <arches>
 #
 # The manifest answers "what exactly is this and where did it come from" without
@@ -278,7 +312,7 @@ gm_write_manifest() {
   "arches": "$_arches",
   "staged_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "macho": "$(gm_staged_binaries "$_dir")",
-  "entrypoints": [$(printf '"%s", ' $GM_ENTRYPOINTS | sed 's/, $//')]
+  "entrypoints": [$([ -n "$GM_ENTRYPOINTS" ] && printf '"%s", ' $GM_ENTRYPOINTS | sed 's/, $//')]
 }
 EOF
     # Hash WHAT IS THERE. For the kernel shape that is the one Mach-O; for a
@@ -292,14 +326,16 @@ EOF
 # holds, as a space-separated list. Empty means the directory is not a usable
 # staged version.
 #
-# TWO SHAPES COEXIST ON DISK, and that is not a transition artifact — it is the
-# permanent consequence of keeping rollback honest. A version staged before the
-# kernel collapse holds three binaries; one staged after holds a single
-# multi-call Mach-O. Both must verify and both must activate, or
-# `gm_activate local <old>-BETA` — the whole point of the store — refuses on
-# exactly the day someone needs it.
+# THREE SHAPES COEXIST ON DISK, and that is not a transition artifact — it is the
+# permanent consequence of keeping rollback honest. A beta or test version holds
+# the whole bundle; a production version holds a single multi-call Mach-O; one
+# staged before the kernel collapse holds three binaries. All must verify and
+# activate, or `gm_activate local <old>-BETA` — the whole point of the store —
+# refuses on exactly the day someone needs it.
 gm_staged_binaries() {
-    if [ -f "$1/$GM_MACHO" ]; then
+    if [ -f "$1/$GM_APP_NAME.app/Contents/MacOS/$GM_MACHO" ]; then
+        printf '%s' "$GM_APP_NAME.app/Contents/MacOS/$GM_MACHO"
+    elif [ -f "$1/$GM_MACHO" ]; then
         printf '%s' "$GM_MACHO"
     elif [ -f "$1/gm_daemon" ]; then
         # Pre-collapse: the entry-point names WERE the artifacts.
@@ -316,7 +352,7 @@ gm_verify_staged() {
     _dir="$1"
     _set="$(gm_staged_binaries "$_dir")"
     if [ -z "$_set" ]; then
-        echo "[GMB] ERROR: $_dir holds neither $GM_MACHO nor gm_daemon — not a staged version" >&2
+        echo "[GMB] ERROR: $_dir holds neither $GM_APP_NAME.app, $GM_MACHO nor gm_daemon — not a staged version" >&2
         return 1
     fi
     for b in $_set; do
@@ -380,21 +416,33 @@ gm_activate() {
     # the moment someone points one of them at a directory.
     # LINK BY SHAPE.
     #
-    # Kernel shape: every name points at the ONE staged Mach-O. `gm_kernel` gets
-    # its own name so a person can invoke it directly; the three entry points get
-    # theirs so argv[0] dispatch selects a personality and every command string in
-    # hooks.json / .mcp.json keeps resolving.
+    # Bundle shape: `gm_kernel.app` is what a client launches on this root, and
+    # `gm_kernel` points at the Mach-O inside it so the CLI is the same bytes.
+    #
+    # Kernel shape: `gm_kernel` points at the ONE staged Mach-O.
     #
     # Legacy shape: each name points at ITS OWN binary, because a pre-collapse
     # version has no dispatcher to select a personality — the names were the
     # artifacts. Linking them all at one file would produce three paths to a
     # binary that only knows how to be the daemon.
+    #
+    # `gm_daemon` is gone from both current shapes; a link left by an earlier
+    # activation would name a personality the kernel no longer has.
     _staged="$(gm_staged_binaries "$_dir")"
-    if [ "$_staged" = "$GM_MACHO" ]; then
+    if [ "$_staged" != "$GM_MACHO" ] && [ "$_staged" != "gm_daemon gm_mcp gm_hook" ]; then
+        for _pair in "${GM_APP_NAME}.app:releases/active/${GM_APP_NAME}.app" \
+                     "${GM_MACHO}:releases/active/${_staged}"; do
+            _name="${_pair%%:*}"; _target="${_pair#*:}"
+            ln -sfn "$_target" "$GM_BIN/.$_name.tmp.$$"
+            mv -fh "$GM_BIN/.$_name.tmp.$$" "$GM_BIN/$_name"
+        done
+        rm -f "$GM_BIN/gm_daemon"
+    elif [ "$_staged" = "$GM_MACHO" ]; then
         for b in $GM_MACHO $GM_ENTRYPOINTS; do
             ln -sfn "releases/active/$GM_MACHO" "$GM_BIN/.$b.tmp.$$"
             mv -fh "$GM_BIN/.$b.tmp.$$" "$GM_BIN/$b"
         done
+        rm -f "$GM_BIN/$GM_APP_NAME.app" "$GM_BIN/gm_daemon"
         # A rollback FROM the kernel shape TO legacy leaves a stale `gm_kernel`
         # link behind; the reverse case removes it below.
     else
@@ -428,14 +476,33 @@ gm_installed_version() {
     if [ -f "$GM_VERSION_STAMP" ]; then cat "$GM_VERSION_STAMP"; else echo none; fi
 }
 
-# gm_retire_daemon — best-effort shutdown so the next client autostarts on the
-# newly activated binary. A running daemon holds its own inode and would go on
-# serving the OLD build from a deleted-but-open file, which presents as an
-# install that silently did nothing.
+# gm_kernel_live — true when the pidfile names a live owner.
+#
+# Checked before every SHUTDOWN: `gm_kernel hook call` autostarts, so a SHUTDOWN
+# sent to a root with nothing running would LAUNCH the app only to quit it.
+gm_kernel_live() {
+    _owner="$(head -1 "$GM_FS_ROOT/daemon.pid" 2>/dev/null | tr -d '[:space:]')"
+    [ -n "$_owner" ] && kill -0 "$_owner" 2>/dev/null
+}
+
+# gm_send_shutdown — SHUTDOWN to THIS root's kernel, never another's.
+#
+# GM_FS_ROOT is passed EXPLICITLY. Callers set it as a plain shell variable, and a
+# bare Mach-O CLI with no bundle and no exported root resolves ~/gmfs — so a
+# Debug build's seed would stop the PRODUCTION app.
+gm_send_shutdown() {
+    GM_FS_ROOT="$GM_FS_ROOT" "$GM_BIN/$GM_MACHO" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
+}
+
+# gm_retire_daemon — best-effort shutdown so the next client launches the
+# newly activated build. SHUTDOWN asks the hosting app to quit; a running app
+# holds its own inodes and would go on serving the OLD build, which presents as
+# an install that silently did nothing.
 gm_retire_daemon() {
     [ -x "$GM_BIN/$GM_MACHO" ] || return 0
-    "$GM_BIN/$GM_MACHO" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
-    echo "[GMB] retired the running kernel (if any) — the next client call autostarts the new build"
+    gm_kernel_live || return 0
+    gm_send_shutdown
+    echo "[GMB] retired the running kernel — the next client call launches the new build"
 }
 
 # gm_stop_kernel_and_wait — SHUTDOWN, then WAIT for the lock to actually free.
@@ -460,36 +527,30 @@ gm_retire_daemon() {
 # perfectly healthy machine. Polling the lock rather than the process is what
 # makes this correct — the lock is what the next writer actually needs.
 gm_stop_kernel_and_wait() {
-    _timeout="${1:-3}"
+    _timeout="${1:-5}"
     [ -x "$GM_BIN/$GM_MACHO" ] || return 0
 
-    # Nothing listening means nothing to stop; not an error.
-    "$GM_BIN/$GM_MACHO" hook call SHUTDOWN --json '{}' >/dev/null 2>&1 || true
+    # Nothing running means nothing to stop; not an error, and no SHUTDOWN, which
+    # would launch the app only to quit it.
+    gm_kernel_live || return 0
+    _owner="$(head -1 "$GM_FS_ROOT/daemon.pid" 2>/dev/null | tr -d '[:space:]')"
+    gm_send_shutdown
 
-    # POLL THE LOCK OWNER, NEVER A VERB.
+    # POLL THE OWNER PROCESS, NEVER A VERB.
     #
     # The obvious probe — `gm_hook call PING` — is WRONG here, and wrong in a way
     # that inverts this function. `gm_hook call` builds a `DaemonClient()` whose
-    # `autostart` defaults to TRUE, so a PING that finds nothing listening SPAWNS
-    # A KERNEL. This loop would then shut the writer down, immediately restart it
-    # while checking whether it had stopped, observe that it answers, and time out
-    # — leaving a freshly-spawned writer running and `gm_install_app` refusing, the
-    # exact failure the reordering exists to prevent.
+    # `autostart` defaults to TRUE, so a PING that finds nothing listening
+    # LAUNCHES THE APP. This loop would then observe that it answers and time out
+    # — leaving a freshly-launched writer running and `gm_install_app` refusing,
+    # the exact failure the reordering exists to prevent.
     #
-    # The pidfile is the lock file, its first line is the owner's pid, and the
-    # kernel unlinks it on the way out. Reading it starts nothing.
-    _pidfile="$GM_FS_ROOT/daemon.pid"
+    # The owner pid, not the pidfile: the app unlinks the pidfile during its
+    # ordered quit, a moment before the process (and its open bundle) is gone,
+    # and replacing the bundle needs the process gone.
     _waited=0
     while [ "$_waited" -lt "$((_timeout * 10))" ]; do
-        # No pidfile means a clean exit already unlinked it.
-        if [ ! -f "$_pidfile" ]; then
-            [ "$_waited" -gt 0 ] && echo "[GMB] kernel stopped after $((_waited / 10)).$((_waited % 10))s"
-            return 0
-        fi
-        # A pidfile whose owner is gone is a crash leftover, not a live writer.
-        # The flock auto-released with the process, so the db is free.
-        _owner="$(head -1 "$_pidfile" 2>/dev/null | tr -d '[:space:]')"
-        if [ -z "$_owner" ] || ! kill -0 "$_owner" 2>/dev/null; then
+        if ! kill -0 "$_owner" 2>/dev/null; then
             [ "$_waited" -gt 0 ] && echo "[GMB] kernel stopped after $((_waited / 10)).$((_waited % 10))s"
             return 0
         fi
@@ -561,9 +622,9 @@ gm_app_is_running() {
     # MATCHED BY BUNDLE PATH, NOT BY PROCESS NAME.
     #
     # `pgrep -x gm_kernel` looks right and is wrong: the app's executable and the
-    # headless CLI now share that name. A `gm_kernel daemon` running in a terminal
-    # would make this report the APP as running, `gm_install_app` would refuse,
-    # and the upgrade would fail on a machine where no app is open at all.
+    # CLI share that name. A `gm_kernel hook` running in a terminal would make
+    # this report the APP as running, `gm_install_app` would refuse, and the
+    # upgrade would fail on a machine where no app is open at all.
     #
     # The bundle path is unambiguous — only a process launched from inside the
     # .app carries it — and the legacy name is still checked so an upgrade from a
@@ -661,5 +722,41 @@ gm_install_app() {
     mkdir -p "$GM_APPS"
     printf '%s\n' "$_app_version" > "$GM_APP_VERSION_STAMP"
     echo "[GMB] $GM_APP_NAME $_app_version -> $_app"
+    return 0
+}
+
+# gm_install_app_bundle <app> — swap a locally built bundle into $GM_APP_DEST.
+#
+# The production kernel is launched from $GM_APP_DEST by path, so a local build
+# that is not installed leaves the OLD app answering the NEW hooks: each newer client
+# asks it to quit, relaunches the same old app, and does it again. The swap is
+# gm_install_app's move-aside-then-move-in, without the DMG.
+gm_install_app_bundle() {
+    _src="$1"
+    _app="$GM_APP_DEST/$GM_APP_NAME.app"
+    [ -d "$_src" ] || { echo "[GMB] ERROR: no app bundle at $_src" >&2; return 1; }
+    if gm_app_is_running; then
+        echo "[GMB] ERROR: $GM_APP_NAME is running — quit it and re-run." >&2
+        return 1
+    fi
+    if [ ! -d "$GM_APP_DEST" ] || [ ! -w "$GM_APP_DEST" ]; then
+        echo "[GMB] ERROR: $GM_APP_DEST is not writable." >&2
+        return 1
+    fi
+    _new="$GM_APP_DEST/.$GM_APP_NAME.new.$$"
+    _old="$GM_APP_DEST/.$GM_APP_NAME.old.$$"
+    rm -rf "$_new" "$_old"
+    ditto "$_src" "$_new" || { rm -rf "$_new"; return 1; }
+    if [ -d "$_app" ]; then
+        mv "$_app" "$_old" || { rm -rf "$_new"; echo "[GMB] ERROR: could not move the existing app aside" >&2; return 1; }
+    fi
+    if ! mv "$_new" "$_app"; then
+        [ -d "$_old" ] && mv "$_old" "$_app"
+        rm -rf "$_new"
+        echo "[GMB] ERROR: could not move the new app into place" >&2
+        return 1
+    fi
+    rm -rf "$_old"
+    echo "[GMB] installed $_src -> $_app"
     return 0
 }

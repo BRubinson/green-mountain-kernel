@@ -1,11 +1,11 @@
 import Foundation
 
-/// The kernel, as something an application can HOLD: the ONE boot sequence —
-/// take the lock, open, back up if pending, migrate, bind, serve — composed by
-/// both personalities rather than spelled twice.
+/// The kernel, as something a process can HOLD: the ONE boot sequence —
+/// take the lock, open, back up if pending, migrate, bind, serve — used by the
+/// app and by the test harness.
 ///
-/// It does no `exit()`, no signal handling, no `dispatchMain()` and no log
-/// redirection; each of those belongs to a PERSONALITY. `bootWriter` consumes a
+/// It does no `exit()`, no signal handling and no log redirection; how the
+/// process ends belongs to the host. `bootWriter` consumes a
 /// `KernelOwnership.Token`, so a losing process has no expression that opens
 /// the database.
 final class KernelServices {
@@ -34,18 +34,14 @@ final class KernelServices {
     ///
     /// Throws rather than exits: a schema written by newer bits makes `KernelWriter.start`
     /// refuse, and a refusal an app can catch and show beats a process that vanished.
-    /// `personality` appears in the ready line only, so a log reader can tell a headless
-    /// kernel from an app-hosted one.
     ///
     /// - Parameters:
     ///   - token: The kernel ownership token from the host.
-    ///   - personality: A label for the kernel role; defaults to `"hosted"`.
     ///   - log: A callback for log messages; defaults to ignoring them.
     /// - Returns: The kernel services instance.
     /// - Throws: `KernelError` on database or server startup failures.
     static func bootWriter(
         _ token: consuming KernelOwnership.Token,
-        personality: String = "hosted",
         log: @escaping (String) -> Void = { _ in }
     ) throws -> KernelServices {
         let writer = try KernelWriter.start(consume token, log: log)
@@ -56,7 +52,7 @@ final class KernelServices {
         KernelVitalsSource.writerRole = "writer"
         log(
             "kernel pid \(getpid()) protocol v\(GmWireProtocol.version) "
-                + "listening at \(Paths.socket.path) [\(personality)]"
+                + "listening at \(Paths.socket.path) [hosted]"
         )
         return KernelServices(writer: writer, server: server)
     }
@@ -103,12 +99,12 @@ final class KernelServices {
         server.shutdownForHost(beforeClose: beforeClose)
     }
 
-    /// The HEADLESS shutdown: the same teardown, ending in `exit(0)`.
+    /// Installs what the host does when SHUTDOWN or a newer-protocol client asks the kernel to stop.
     ///
-    /// A signalled headless kernel MUST actually terminate — `KernelHostRole` polls for the
-    /// lock after SIGTERM, and a process that stopped serving but stayed alive still holds
-    /// the `flock`.
-    func serverShutdownAndExit() {
-        server.shutdown()
+    /// The kernel never ends its process. A host that installs nothing ignores the request.
+    ///
+    /// - Parameter handler: The host's stop routine, called on the server queue.
+    func onShutdownRequest(_ handler: @escaping @Sendable () -> Void) {
+        server.setShutdownRequestHandler(handler)
     }
 }

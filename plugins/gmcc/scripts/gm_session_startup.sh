@@ -44,9 +44,9 @@ GM_PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
 
 # --- 2. Locate gm_hook: it ships INSIDE the plugin ----------------------------
 # Compiled with the client closure by gmk/scripts/build_plugin_binaries.sh and
-# committed beside this script. The KERNEL it dials still comes from
-# $GM_FS_ROOT/bin/gm_daemon (install_gm.sh); a missing kernel surfaces as the
-# "daemon unavailable" notice below, never as a missing gm_hook.
+# committed beside this script. The KERNEL it dials is the gm_kernel app, which
+# it launches when the socket is dead (install_gm.sh installs it); a missing
+# kernel surfaces as the "kernel unavailable" notice below, never as a missing gm_hook.
 HOOK_BIN="$GM_PLUGIN_DIR/bin/gm_hook"
 if [ ! -x "$HOOK_BIN" ]; then
     echo "[GMB] gm_hook missing at $HOOK_BIN — this plugin tree was written without build_plugin_binaries.sh"
@@ -58,7 +58,7 @@ warnings=$( (cd "$REPO_ROOT" && printf '%s' "$payload" \
     | "$HOOK_BIN" context ensure --hook-payload >/dev/null) 2>&1 )
 if [ $? -ne 0 ]; then
     warnings="$warnings
-[GMB] daemon unavailable — context not ensured (run 'bash $GM_PLUGIN_DIR/scripts/install_gm.sh' or /gm_daemon, then 'gm_hook context ensure')"
+[GMB] kernel unavailable — context not ensured (run 'bash $GM_PLUGIN_DIR/scripts/install_gm.sh', open the gm_kernel app, then 'gm_hook context ensure')"
 fi
 
 # --- 3b. Version drift: the plugin names one kernel version; a different

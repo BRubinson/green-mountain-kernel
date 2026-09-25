@@ -30,14 +30,18 @@ extension GmBridgeHook {
 
     /// `check_gm_stale.sh`, inlined.
     ///
-    /// It reports a missing or dangling KERNEL — the `gm_daemon` symlink the
-    /// plugin's own clients dial and autostart — which is why it is shell and
-    /// not a subcommand: a subcommand cannot run when the binary it would report
-    /// on is the thing that is absent. Exits 0 on every path — a stale install is
-    /// a warning, never a blocked session.
+    /// It reports a missing KERNEL APP — the bundle the plugin's own clients
+    /// launch when the socket is dead: the installed app on production, the
+    /// staged `bin/gm_kernel.app` elsewhere. Shell, not a subcommand: a subcommand
+    /// cannot run when the binary it would report on is the thing that is absent.
+    /// Exits 0 on every path — a stale install is a warning, never a blocked session.
     static let staleCheckCommand = #"""
-        if [ ! -x "\#(binDir)/gm_daemon" ]; then \
-          echo "[GMB] kernel missing at \#(binDir)/gm_daemon — run: bash \"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\"" >&2; \
+        _root="${GM_FS_ROOT:-$HOME/gmfs}"; \
+        if [ "$_root" = "$HOME/gmfs" ]; then _app="${GM_APP_DEST:-/Applications}/gm_kernel.app"; \
+          _fix="bash \"$CLAUDE_PLUGIN_ROOT/scripts/install_gm.sh\""; \
+        else _app="$_root/bin/gm_kernel.app"; _fix="bash gmk/scripts/gm_env.sh create <env>"; fi; \
+        if [ ! -d "$_app" ]; then \
+          echo "[GMB] kernel app missing at $_app — run: $_fix" >&2; \
         fi; exit 0
         """#
 

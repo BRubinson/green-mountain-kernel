@@ -76,6 +76,8 @@ gm_resolve_fs_root
 # — never $GM_FS_ROOT, which a LaunchServices-started app cannot see — is what
 # decides which database that app writes.
 BUILD_CONFIG="$(gm_env_config "$GM_ENV")" || die "no build configuration for environment '$GM_ENV'"
+IS_PROD=0
+[ "$GM_FS_ROOT" = "$HOME/gmfs" ] && IS_PROD=1
 ARCH="$(gm_xcb_arch "$ARCH_CHOICE")"
 
 # An explicit --env and an inherited GM_FS_ROOT that disagree would print one
@@ -148,20 +150,31 @@ build_and_stage() {
     fi
 
     # Staged fresh every time: the directory is removed and rebuilt, so a binary
-    # that stopped being produced cannot linger and get shipped.
+    # that stopped being produced cannot linger and get shipped. A running app
+    # from this store holds the old bundle open, so it is stopped first.
+    #
+    # Production stages the Mach-O and installs the bundle into /Applications
+    # after activation; a beta or test root stages the whole bundle, because
+    # clients on it launch the kernel from the store.
+    [ "$IS_PROD" = 1 ] || gm_stop_kernel_and_wait
     rm -rf "$(gm_stage_dir local "$STAGE_VERSION")"
-    STAGE="$(gm_stage_from_bundle "$APP" local "$STAGE_VERSION" "$BUILD_SHA" | tail -1)"
-    [ -f "$STAGE/$GM_MACHO" ] || die "staging from $APP produced nothing"
+    if [ "$IS_PROD" = 1 ]; then
+        STAGE="$(gm_stage_from_bundle "$APP" local "$STAGE_VERSION" "$BUILD_SHA" | tail -1)"
+    else
+        STAGE="$(gm_stage_bundle "$APP" local "$STAGE_VERSION" "$BUILD_SHA" | tail -1)"
+    fi
+    STAGED_MACHO="$(gm_staged_binaries "$STAGE")"
+    [ -n "$STAGED_MACHO" ] || die "staging from $APP produced nothing"
+    STAGED_MACHO="$STAGE/$STAGED_MACHO"
 
     # NEVER STRIPPED, NEVER RE-SIGNED HERE. The plain build carries the linker's
     # ad-hoc signature and the --app build the Developer ID's; either verifies
     # standalone and is staged as-is. Stripping would invalidate the first and
-    # re-signing would destroy the second. Only a bundle-sealed Xcode signature
-    # is re-signed, and gm_stage_from_bundle does that before the manifest is
-    # written.
-    codesign --verify --strict "$STAGE/$GM_MACHO" || die "$GM_MACHO in $STAGE has no valid signature"
-    echo "[GMB] staged $STAGE  ($GM_MACHO [$(lipo -archs "$STAGE/$GM_MACHO" 2>/dev/null || echo '?')], signature verified)"
-    echo "         entry points (symlinked at activation): $GM_ENTRYPOINTS"
+    # re-signing would destroy the second. Only what does not verify is
+    # re-signed ad-hoc, and the staging function does that before the manifest
+    # is written.
+    codesign --verify --strict "$STAGED_MACHO" || die "$GM_MACHO in $STAGE has no valid signature"
+    echo "[GMB] staged $STAGE  ($GM_MACHO [$(lipo -archs "$STAGED_MACHO" 2>/dev/null || echo '?')], signature verified)"
 }
 
 build_and_stage
@@ -178,11 +191,11 @@ build_and_stage
 # the second pass is a generator that is not converging, and the exit propagates.
 echo "[GMB] generating the plugin from the staged kernel..."
 GEN_RC=0
-GM_KERNEL_BIN="$STAGE/$GM_MACHO" bash "$SCRIPT_DIR/generate_plugin.sh" || GEN_RC=$?
+GM_KERNEL_BIN="$STAGED_MACHO" bash "$SCRIPT_DIR/generate_plugin.sh" || GEN_RC=$?
 if [ "$GEN_RC" -eq 3 ]; then
     echo "[GMB] roster moved — rebuilding so the staged kernel serves it"
     build_and_stage
-    GM_KERNEL_BIN="$STAGE/$GM_MACHO" bash "$SCRIPT_DIR/generate_plugin.sh"
+    GM_KERNEL_BIN="$STAGED_MACHO" bash "$SCRIPT_DIR/generate_plugin.sh"
 elif [ "$GEN_RC" -ne 0 ]; then
     exit "$GEN_RC"
 fi
@@ -190,7 +203,11 @@ fi
 # --- activate ----------------------------------------------------------------
 if [ "$ACTIVATE" -eq 1 ]; then
     gm_activate local "$STAGE_VERSION"
-    gm_retire_daemon
+    gm_stop_kernel_and_wait
+    # Production launches /Applications/gm_kernel.app by bundle identifier, so
+    # the build just activated must be the bundle installed there, or newer
+    # hooks keep quitting and relaunching the older app.
+    [ "$IS_PROD" = 1 ] && { gm_install_app_bundle "$APP" || die "could not install $APP into $GM_APP_DEST"; }
 else
     echo "[GMB] not activated (--no-activate). Activate with:"
     echo "      bash $SCRIPT_DIR/rebuild_local.sh   # or re-run without the flag"

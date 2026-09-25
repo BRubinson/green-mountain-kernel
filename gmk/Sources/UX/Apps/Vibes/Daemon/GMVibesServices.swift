@@ -95,6 +95,10 @@ final class GMVibesServices {
             daemon.hostsKernelInProcess = true
             // The store and the status closure are Sendable; the kernel object is not,
             // so only those two halves are handed to the actor.
+            // SHUTDOWN and a newer-protocol client end the app through its ordered quit.
+            kernel.onShutdownRequest {
+                Task { @MainActor in NSApp.terminate(nil) }
+            }
             let store = kernel.store
             let status = kernel.statusBuilder
             Task {

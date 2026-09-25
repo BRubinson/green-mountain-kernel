@@ -39,8 +39,8 @@ enum Paths {
     /// same bits would mean two databases depending on how they were started.
     /// The CLI keeps env resolution, because a CLI does inherit one.
 
-    /// Resolved once per process: the daemon env is a `posix_spawn` snapshot,
-    /// so a per-request read would be stale by design, and ONE ROOT PER
+    /// Resolved once per process: a per-request read could disagree with the
+    /// database the process already opened, and ONE ROOT PER
     /// PROCESS is a property callers depend on. `$HOME` is a different lever —
     /// `homeDirectoryForCurrentUser` resolves via `getpwuid`, not `$HOME`.
     static let root: URL = {
@@ -149,22 +149,43 @@ enum Paths {
         root.appendingPathComponent("bin", isDirectory: true)
     }
 
-    /// `~/gmfs/bin/gm_kernel` — the ONE staged Mach-O.
+    /// `~/gmfs/bin/gm_kernel` — the ONE staged Mach-O, a CLI that never writes.
     ///
-    /// `binDaemon`, `binMcp` and `binHook` below are now SYMLINK names pointing
-    /// here, not separate binaries. Keeping them as named accessors rather than
-    /// collapsing every caller onto this one is deliberate: the entry-point
-    /// names are what `hooks.json`, `.mcp.json`, `run_mcp.sh` and
-    /// `check_gm_stale.sh` resolve, and argv[0] is what the multi-call dispatch
-    /// reads — so the names are load-bearing even though the inode is shared.
+    /// On a beta or test root it points inside `binApp`.
     static var binKernel: URL {
         bin.appendingPathComponent("gm_kernel", isDirectory: false)
     }
 
-    /// `~/gmfs/bin/gm_daemon` — a symlink to `gm_kernel`; argv[0] selects the
-    /// headless daemon personality.
-    static var binDaemon: URL {
-        bin.appendingPathComponent("gm_daemon", isDirectory: false)
+    /// `<root>/bin/gm_kernel.app` — the staged bundle a client launches on a beta or test root.
+    ///
+    /// Production launches `productionApp` instead.
+    static var binApp: URL {
+        bin.appendingPathComponent("gm_kernel.app", isDirectory: true)
+    }
+
+    /// `$GM_APP_DEST/gm_kernel.app` (default `/Applications`) — the installed production app, launched by PATH.
+    ///
+    /// Never by bundle identifier: every Release build in DerivedData shares it, and
+    /// LaunchServices would be free to pick one of those instead. `GM_APP_DEST` is the
+    /// same override the installer honours, so the two agree on where the app lives.
+    static var productionApp: URL {
+        let dest = ProcessInfo.processInfo.environment["GM_APP_DEST"].flatMap { $0.isEmpty ? nil : $0 }
+        return URL(fileURLWithPath: dest ?? "/Applications", isDirectory: true)
+            .appendingPathComponent("gm_kernel.app", isDirectory: true)
+    }
+
+    /// The kernel app a client on this root launches: `productionApp` on production, `binApp` elsewhere.
+    static var launchApp: URL {
+        isProductionRootPath ? productionApp : binApp
+    }
+
+    /// Whether this process's root is the production root, compared by resolved path.
+    ///
+    /// Path rather than inode: a fresh production root has no `gm.db` yet, and
+    /// the launch target must still be right before the first boot creates it.
+    static var isProductionRootPath: Bool {
+        root.resolvingSymlinksInPath().standardizedFileURL.path
+            == defaultProductionRoot.resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     /// `~/gmfs/bin/gm_mcp`.

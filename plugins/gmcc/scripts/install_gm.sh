@@ -319,9 +319,8 @@ fi
 # running. Retiring after activation — where `gm_retire_daemon` used to sit —
 # would mean the app install had already refused by the time we stopped anything.
 #
-# Once, here, rather than once per section: the two sections used to each retire
-# the daemon, which was harmless when it was a separate process that autostarted
-# again. Now it would terminate a user's windows twice in one install.
+# Once, here, rather than once per section: stopping the kernel quits the app,
+# and twice would terminate a user's windows twice in one install.
 gm_stop_kernel_and_wait 3
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/gm-install.XXXXXX")"

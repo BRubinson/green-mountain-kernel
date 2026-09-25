@@ -4,8 +4,8 @@ import Network
 /// What the connection should do after writing a handler's response.
 enum PostAction {
     case none
-    /// Stop the whole daemon after the response is flushed (gm daemon stop,
-    /// or a protocol-mismatch self-exit).
+    /// Ask the host to stop after the response is flushed (SHUTDOWN, or a
+    /// newer-protocol client that needs a restart).
     case shutdown
 }
 
@@ -40,9 +40,11 @@ final class Server: @unchecked Sendable {
     private let startedDate = Date()
     private var connections: [ObjectIdentifier: ClientConnection] = [:]
     private var subscribers: [ObjectIdentifier] = []
-    /// Non-nil only inside performShutdown: broadcast tracks the DAEMON_STOP
-    /// goodbye sends so exit(0) waits for delivery instead of racing it.
+    /// Non-nil only inside shutdownForHost: broadcast tracks the DAEMON_STOP
+    /// goodbye sends.
     private var goodbyeGroup: DispatchGroup?
+    /// What the host does when a client asks the kernel to stop; queue-confined.
+    private var shutdownRequestHandler: (@Sendable () -> Void)?
     /// A3/A8: owns both filesystem watchers and the one recompute path.
     ///
     /// Built in start() (needs a fully initialised self), rebuilt via the post-commit event sink on CONFIG_SET /
@@ -55,7 +57,7 @@ final class Server: @unchecked Sendable {
     private var lastCheckoutState: [String: String] = [:]
     /// Our row in the store's post-commit subscriber table.
     ///
-    /// Released in `performShutdown` so a stopped server stops being fanned out to — under the old single-sink shape
+    /// Released in `shutdownForHost` so a stopped server stops being fanned out to — under the old single-sink shape
     /// there was nothing to release, because there was nothing another consumer could have been holding.
     private var eventToken: UUID?
 
@@ -245,23 +247,33 @@ final class Server: @unchecked Sendable {
         }
     }
 
-    /// Stops the server and exits the process.
+    /// Installs what the host does when a client asks the kernel to stop.
     ///
-    /// SHUTDOWN contract: drain in-flight work, checkpoint the WAL, remove
-    /// pidfile + socket, exit 0.
+    /// The kernel never ends its own process; the host decides how, and runs `shutdownForHost` on the way out.
     ///
-    /// Always hops onto the server queue so signal handlers (main queue) and connection callbacks take the same clean
-    /// path, and the DAEMON_STOP goodbye event broadcasts to subscribers before EOF. "Drain" is structural: this runs
-    /// as one serial-queue turn, so every line received ahead of it has already completed.
-    func shutdown() {
-        queue.async { self.performShutdown() }
+    /// - Parameter handler: The host's stop routine, called on the server queue.
+    func setShutdownRequestHandler(_ handler: @escaping @Sendable () -> Void) {
+        queue.sync { shutdownRequestHandler = handler }
+    }
+
+    /// Hands a client's stop request to the host, or logs it when no host handler is installed.
+    ///
+    /// Runs as one serial-queue turn, so every line received ahead of it has already completed.
+    func requestShutdown() {
+        queue.async {
+            guard let handler = self.shutdownRequestHandler else {
+                FileHandle.standardError.write(Data("[gm_kernel] stop requested; this host ignores it\n".utf8))
+                return
+            }
+            handler()
+        }
     }
 
     /// Prepares the server for host shutdown without exiting the process.
     ///
-    /// The HOSTED shutdown: everything `performShutdown` does except `exit(0)`,
-    /// plus one caller-supplied step. `beforeClose` runs after the listener is
-    /// cancelled and after DAEMON_STOP has gone out, but BEFORE the database
+    /// The ONE teardown, whoever hosts the kernel, plus one caller-supplied step.
+    /// `beforeClose` runs after the listener is cancelled and after DAEMON_STOP
+    /// has gone out, but BEFORE the database
     /// closes, or a write can arrive after the flush decided what was dirty.
     ///
     /// It runs SYNCHRONOUSLY on the caller's thread, because a terminating app can die across an async hop before the
@@ -291,29 +303,6 @@ final class Server: @unchecked Sendable {
         // exit. Nothing here is.
     }
 
-    /// Executes the shutdown sequence and exits the process.
-    private func performShutdown() {
-        listener.cancel()
-        if let token = eventToken {
-            store.unsubscribeFromEvents(token)
-            eventToken = nil
-        }
-        // The DAEMON_STOP goodbye is subscribers' clean-termination signal —
-        // gate exit(0) on its send completions (with a timeout fallback)
-        // instead of racing the async sends.
-        let group = DispatchGroup()
-        goodbyeGroup = group
-        try? store.recordDaemonStop()  // fan-out → subscribers see DAEMON_STOP, then EOF
-        goodbyeGroup = nil
-        try? store.checkpointTruncate()
-        try? store.closeDatabase()
-        unlink(Paths.socket.path)
-        unlink(Paths.pidfile.path)
-        // Completions fire on this queue, so notify (never wait) here.
-        group.notify(queue: queue) { exit(0) }
-        queue.asyncAfter(deadline: .now() + 1.0) { exit(0) }
-    }
-
     // MARK: - Dispatch
 
     /// Builds the STATUS payload from this server's start time, exactly as the STATUS verb answers it.
@@ -326,8 +315,8 @@ final class Server: @unchecked Sendable {
 
     /// Routes one decoded NDJSON line to the appropriate handler.
     ///
-    /// Handshake is DIRECTIONAL: newer client = daemon stale (self-exit for
-    /// retry); older client = rejected (daemon stays up). A nil `client` means
+    /// Handshake is DIRECTIONAL: newer client = kernel stale (the host is asked
+    /// to stop so the client can relaunch it); older client = rejected (kernel stays up). A nil `client` means
     /// IN-PROCESS caller (only SUBSCRIBE and re-entrant TX_BATCH/harness use
     /// it). SUBSCRIBE without connection refused; in-process uses
     /// `Store.subscribeToEvents`.
@@ -339,7 +328,7 @@ final class Server: @unchecked Sendable {
     func dispatch(line: Data, from client: ClientConnection?) -> HandlerResult {
         // Version-FIRST: the pre-head keeps `type` raw so a newer client
         // invoking a message name this build doesn't know still reaches the
-        // mismatch branch (and its directional self-exit) instead of dying as
+        // mismatch branch (and its stop request) instead of dying as
         // an undecodable envelope.
         let rawHead: RawEnvelopeHead
         do {
@@ -356,7 +345,7 @@ final class Server: @unchecked Sendable {
             let clientNewer = rawHead.protocolVersion > GmWireProtocol.version
             let message =
                 clientNewer
-                ? "daemon speaks v\(GmWireProtocol.version), client spoke newer v\(rawHead.protocolVersion) — daemon exiting for restart"
+                ? "daemon speaks v\(GmWireProtocol.version), client spoke newer v\(rawHead.protocolVersion) — asking the host to stop for restart"
                 : "daemon speaks v\(GmWireProtocol.version), client spoke older v\(rawHead.protocolVersion) — rejected, daemon stays up"
             let result = errorResult(
                 type: rawHead.type ?? .error,
@@ -953,7 +942,7 @@ final class ClientConnection: @unchecked Sendable {
                 connection.send(
                     content: result.line,
                     completion: .contentProcessed { _ in
-                        server.shutdown()
+                        server.requestShutdown()
                     }
                 )
             }

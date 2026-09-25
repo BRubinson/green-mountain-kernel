@@ -30,13 +30,13 @@ final class DaemonEventSubscription: @unchecked Sendable {
     /// - Parameters:
     ///   - sinceId: The last event id to resume from, or nil to start fresh.
     ///   - socketPath: The daemon socket path.
-    ///   - daemonBinaryPath: The daemon binary path for autostart.
+    ///   - appBundlePath: The kernel app to launch for autostart; defaults to this root's `Paths.launchApp`.
     ///   - clientName: The client name for daemon logging.
-    ///   - autostart: Whether to autostart the daemon if not running.
+    ///   - autostart: Whether to launch the kernel app if not running.
     init(
         sinceId: Int64? = nil,
         socketPath: String = Paths.socket.path,
-        daemonBinaryPath: String = Paths.binDaemon.path,
+        appBundlePath: String = Paths.launchApp.path,
         clientName: String = "subscriber",
         autostart: Bool = true
     ) {
@@ -44,7 +44,7 @@ final class DaemonEventSubscription: @unchecked Sendable {
         self.lastEventId = sinceId ?? 0
         self.client = DaemonClient(
             socketPath: socketPath,
-            daemonBinaryPath: daemonBinaryPath,
+            appBundlePath: appBundlePath,
             clientName: clientName,
             autostart: autostart
         )

@@ -2,14 +2,14 @@ import Foundation
 import GRDB
 import XCTest
 
-/// The ONE environment every case in this package shares: it boots a real
-/// `gm_kernel` against a freshly minted temporary root, hands out a `DaemonClient`
-/// and a READ-ONLY database handle, and reaps both at the end.
+/// The ONE environment every case in this package shares: it hosts the kernel
+/// IN THIS PROCESS against a freshly minted temporary root, hands out a
+/// `DaemonClient` and a READ-ONLY database handle, and reaps both at the end.
 ///
-/// `Paths.root` is a `static let`, so one root per PROCESS is a constraint and
-/// this must be a process-scoped singleton. Nothing here calls `Paths.*`: the root
-/// is minted under `NSTemporaryDirectory()`, every path beneath it is
-/// string-appended, and `GM_FS_ROOT` is WRITTEN into the spawned child.
+/// The suite is the one writer. Cases still write only over the wire, through a
+/// client with autostart off, so the socket path is what they exercise.
+/// `Paths.root` is a `static let`, so `GM_FS_ROOT` is set before anything reads
+/// it and this must be a process-scoped singleton.
 final class SharedEnvironment: NSObject, XCTestObservation {
 
     /// Process-scoped, and `nonisolated(unsafe)` on purpose.
@@ -23,7 +23,9 @@ final class SharedEnvironment: NSObject, XCTestObservation {
 
     private(set) var root: URL!
     private(set) var client: DaemonClient!
-    private var kernelBinary: URL!
+    /// Why the in-process kernel did not boot, for the skip message.
+    private(set) var bootFailure: String?
+    private var kernel: KernelServices?
     private var started = false
 
     /// Registers the environment and boots the kernel once if needed.
@@ -40,7 +42,7 @@ final class SharedEnvironment: NSObject, XCTestObservation {
 
     // MARK: - Lifecycle
 
-    /// Creates a temporary root, stages the kernel, and spawns a daemon.
+    /// Creates a temporary root, boots the kernel in-process on it, and opens a wire client.
     ///
     /// Precondition: `started` is true.
     private func boot() {
@@ -51,8 +53,7 @@ final class SharedEnvironment: NSObject, XCTestObservation {
             at: root.appendingPathComponent("bin", isDirectory: true),
             withIntermediateDirectories: true
         )
-
-        kernelBinary = Self.stageKernel(into: root)
+        _ = Self.stageKernel(into: root)
 
         // The socket path is what has to fit in 104 bytes. Assert it here
         // rather than letting the bind fail opaquely later.
@@ -62,18 +63,32 @@ final class SharedEnvironment: NSObject, XCTestObservation {
             "socket path \(socketPath.utf8.count) bytes — sun_path is 104 on macOS; shorten the run id"
         )
 
-        guard let kernelBinary else { return }
-
-        // `autostart: true` makes the client spawn the kernel on first use. The
-        // spawn injects GM_FS_ROOT explicitly (see DaemonClient.spawnDaemon), so
-        // the child lands on OUR root rather than inheriting whatever this
-        // process was launched with.
+        // xctest's Bundle.main bakes no GMFSRoot, so this is the arm Paths.root resolves.
         setenv("GM_FS_ROOT", root.path, 1)
-        client = DaemonClient(
-            socketPath: socketPath,
-            daemonBinaryPath: kernelBinary.path,
-            autostart: true
+        precondition(
+            Paths.root.standardizedFileURL.path == root.standardizedFileURL.path,
+            "Paths.root was read before the harness set GM_FS_ROOT: \(Paths.root.path)"
         )
+
+        do {
+            let outcome = try KernelOwnership.acquire()
+            switch consume outcome {
+            case .acquired(let token):
+                kernel = try KernelServices.bootWriter(consume token)
+            case .heldBy(let holder):
+                bootFailure = "the run root's lock is held by pid \(holder.pid)"
+            }
+        } catch {
+            bootFailure = String(describing: error)
+        }
+
+        client = DaemonClient(socketPath: socketPath, autostart: false)
+
+        // NWListener binds asynchronously; the first case must not race it.
+        guard kernel != nil else { return }
+        for _ in 0..<50 where !isAvailable {
+            usleep(100_000)
+        }
     }
 
     /// True when a real kernel is reachable.
@@ -119,16 +134,12 @@ final class SharedEnvironment: NSObject, XCTestObservation {
 
     /// Shuts down the kernel and cleans up the temporary root.
     ///
+    /// The hosted teardown, never the SHUTDOWN verb: this process is the host.
     /// Failures are silently ignored; the suite must not fail on cleanup.
     private func shutdown() {
-        if let client {
-            _ = try? client.request(
-                type: .shutdown,
-                payload: ShutdownRequest(),
-                responseType: ShutdownResponse.self
-            )
-            client.close()
-        }
+        client?.close()
+        kernel?.shutdown()
+        kernel = nil
         // Best-effort: the kernel may already be gone, and a failure to tidy a
         // temp directory must never fail a suite.
         if let root {
@@ -158,12 +169,13 @@ final class SharedEnvironment: NSObject, XCTestObservation {
 
     // MARK: - Staging the binary under test
 
-    /// Copy the kernel under test into the run root and return the copy.
+    /// Copy the kernel binary into the run root for cases that run it as the pen, and return the copy.
     ///
     /// `GM_TEST_KERNEL_BIN` first, else the app bundle beside this test bundle in
     /// BUILT_PRODUCTS_DIR. Never `~/gmfs/bin/gm_kernel`: that would test the last
-    /// RELEASE instead of the working tree. The COPY is what gets spawned, so no
+    /// RELEASE instead of the working tree. The COPY is what runs, so no
     /// Info.plist sits beside it and the harness's GM_FS_ROOT wins over the baked root.
+    /// It is a client of the in-process kernel, never a writer.
     ///
     /// - Parameter root: The run root directory where the kernel is staged.
     /// - Returns: The path to the copied kernel, or nil if the source is not found.
@@ -181,9 +193,9 @@ final class SharedEnvironment: NSObject, XCTestObservation {
 
 /// Base class for cases that need the booted kernel.
 ///
-/// Skips the whole class when no kernel binary is present, with a message that
-/// says what to do about it. A suite that cannot find the thing it tests should
-/// say so once, not fail every assertion in turn.
+/// Skips the whole class when the in-process kernel did not boot, with the
+/// reason. A suite that cannot boot the thing it tests should say so once, not
+/// fail every assertion in turn.
 class KernelBackedTestCase: XCTestCase {
 
     var env: SharedEnvironment { SharedEnvironment.shared }
@@ -193,8 +205,7 @@ class KernelBackedTestCase: XCTestCase {
         SharedEnvironment.bootIfNeeded()
         try XCTSkipUnless(
             SharedEnvironment.shared.isAvailable,
-            "no gm_kernel to test — build it first: "
-                + "xcodebuild -workspace gmk/gmk.xcworkspace -scheme gm_kernel build (or set GM_TEST_KERNEL_BIN)"
+            "in-process kernel failed to boot: \(SharedEnvironment.shared.bootFailure ?? "not reachable over the wire")"
         )
     }
 }
