@@ -341,6 +341,34 @@ rm -rf "$PKG"; mkdir -p "$PKG"
 # The DMG keeps its sidecar. install_gm.sh verifies the checksum before it mounts
 # anything, so an asset without one is an asset the installer refuses.
 cp "$DMG_BUILT" "$PKG/$DMG_ASSET"
+
+# ── NOTARIZE HERE, on the copy that ships ───────────────────────────────────
+#
+# Notarization used to live only in build-dmg.sh behind NOTARIZE=1, which this
+# script exported but never reached once it stopped building: every release
+# from 54.3.0 to 55.0.0 shipped unnotarized under notes that said otherwise.
+# The staple changes the DMG's bytes, so it happens BEFORE the checksum. A dry
+# run proves the credentials exist and submits nothing.
+NOTARY_PROFILE="${NOTARY_PROFILE:-gmcc-ui}"
+if [ "$NOTARIZE" = "1" ]; then
+    xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1 \
+        || die "no notarytool keychain profile '$NOTARY_PROFILE'. See the release-dmg skill's one-time setup."
+    if [ "$DRY" -eq 1 ]; then
+        echo "  notarization: profile '$NOTARY_PROFILE' works; not submitted (dry run)"
+    else
+        echo "  notarizing $DMG_ASSET (profile $NOTARY_PROFILE) — this takes a few minutes"
+        NOTARY_STATUS="$(xcrun notarytool submit "$PKG/$DMG_ASSET" --keychain-profile "$NOTARY_PROFILE" \
+            --wait --output-format json | sed -n 's/.*"status" *: *"\([^"]*\)".*/\1/p' | tail -1)"
+        [ "$NOTARY_STATUS" = "Accepted" ] || die "notarization returned '${NOTARY_STATUS:-no status}', not Accepted.
+       Inspect with: xcrun notarytool history --keychain-profile $NOTARY_PROFILE"
+        xcrun stapler staple "$PKG/$DMG_ASSET" >/dev/null || die "stapling $DMG_ASSET failed"
+        xcrun stapler validate "$PKG/$DMG_ASSET" >/dev/null || die "the stapled ticket does not validate"
+        spctl -a -t open --context context:primary-signature "$PKG/$DMG_ASSET" 2>/dev/null \
+            || die "Gatekeeper rejects the notarized $DMG_ASSET"
+        echo "  notarized, stapled, Gatekeeper accepts it"
+    fi
+fi
+
 ( cd "$PKG" && shasum -a 256 "$DMG_ASSET" > "$DMG_ASSET.sha256" )
 echo "  $PKG/$DMG_ASSET  ($(du -h "$PKG/$DMG_ASSET" | cut -f1))"
 echo "  $(cat "$PKG/$DMG_ASSET.sha256")"
@@ -412,7 +440,7 @@ gm_stop_kernel_and_wait
 # installed from the release.
 APP_DL="$(dirname "$(gm_app_dmg "$VERSION")")"
 mkdir -p "$APP_DL"
-cp "$DMG_BUILT" "$(gm_app_dmg "$VERSION")"
+cp "$PKG/$DMG_ASSET" "$(gm_app_dmg "$VERSION")"
 
 # BEST EFFORT, DELIBERATELY. Everything above this line is already on GitHub;
 # a running app must not turn a successful publish into a failed script.
