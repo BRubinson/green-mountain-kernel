@@ -712,6 +712,132 @@ actor GMCCDaemonService {
         return try await perform { try $0.diagramBatchApply(req) }
     }
 
+    // MARK: - Machine host (app-only, no verb)
+
+    /// The machine carrying `hardwareUuid`, created with window management off when absent.
+    /// - Parameters:
+    ///   - hardwareUuid: The IOPlatformUUID.
+    ///   - name: The human name, used only on create.
+    ///   - code: The short code, used only on create.
+    /// - Returns: The machine row.
+    /// - Throws: `DaemonError` on a store failure.
+    func machineHostEnsureMachine(hardwareUuid: String, name: String, code: String) async throws -> MachineRow {
+        try await perform { try $0.machineHostEnsureMachine(hardwareUuid: hardwareUuid, name: name, code: code) }
+    }
+
+    /// Turns window management on or off at the version the caller read.
+    /// - Parameters:
+    ///   - machineUuid: The machine to change.
+    ///   - enabled: The new value of the flag.
+    ///   - expectedVersion: The version the caller last read.
+    /// - Returns: The machine row after the write.
+    /// - Throws: `DaemonError.versionConflict` on a stale version; `DaemonError.notFound`.
+    func machineHostSetEnabled(machineUuid: String, enabled: Bool, expectedVersion: Int64) async throws -> MachineRow {
+        try await perform {
+            try $0.machineHostSetEnabled(machineUuid: machineUuid, enabled: enabled, expectedVersion: expectedVersion)
+        }
+    }
+
+    /// Upserts the enumerated displays, marks the rest disconnected and mints a new set's workstation.
+    /// - Parameters:
+    ///   - machineUuid: The machine the displays belong to.
+    ///   - displays: Every display the current enumeration reports.
+    /// - Returns: All of the machine's display rows.
+    /// - Throws: `DaemonError` on a store failure.
+    func machineHostSyncDisplays(machineUuid: String, displays: [DisplayInput]) async throws -> [DisplayRow] {
+        try await perform { try $0.machineHostSyncDisplays(machineUuid: machineUuid, displays: displays) }
+    }
+
+    /// Every live machine_host row of one machine, read in one transaction.
+    /// - Parameter machineUuid: The machine to read.
+    /// - Returns: The machine's snapshot.
+    /// - Throws: `DaemonError.notFound` when the machine is unknown.
+    func machineHostLoad(machineUuid: String) async throws -> MachineHostSnapshotRow {
+        try await perform { try $0.machineHostLoad(machineUuid: machineUuid) }
+    }
+
+    /// Moves a workspace code to another member display of a workstation.
+    /// - Parameters:
+    ///   - workstationUuid: The workstation whose placement changes.
+    ///   - code: The workspace code to move.
+    ///   - displayUuid: The member display it moves to.
+    /// - Returns: The code's placement row after the write.
+    /// - Throws: `DaemonError` wrapping `MachineHostError.wouldStrandDisplay` and other refusals.
+    func machineHostAssignWorkspace(
+        workstationUuid: String,
+        code: String,
+        displayUuid: String
+    ) async throws -> WorkstationWorkspaceRow {
+        try await perform {
+            try $0.machineHostAssignWorkspace(workstationUuid: workstationUuid, code: code, displayUuid: displayUuid)
+        }
+    }
+
+    /// Makes a workspace code the visible one on a display of a workstation.
+    /// - Parameters:
+    ///   - workstationUuid: The workstation to switch within.
+    ///   - displayUuid: The display to switch.
+    ///   - code: The workspace code to show.
+    /// - Returns: Every placement row on the display after the switch.
+    /// - Throws: `DaemonError` wrapping `MachineHostError.codeNotOnDisplay`.
+    func machineHostSetActiveWorkspace(
+        workstationUuid: String,
+        displayUuid: String,
+        code: String
+    ) async throws -> [WorkstationWorkspaceRow] {
+        try await perform {
+            try $0.machineHostSetActiveWorkspace(workstationUuid: workstationUuid, displayUuid: displayUuid, code: code)
+        }
+    }
+
+    /// Renames a workstation at the version the caller read.
+    /// - Parameters:
+    ///   - uuid: The workstation to rename.
+    ///   - name: The new name.
+    ///   - expectedVersion: The version the caller last read.
+    /// - Returns: The workstation row after the write.
+    /// - Throws: `DaemonError.versionConflict` or `DaemonError.notFound`.
+    func machineHostRenameWorkstation(
+        uuid: String,
+        name: String,
+        expectedVersion: Int64
+    ) async throws
+        -> WorkstationRow
+    {
+        try await perform {
+            try $0.machineHostRenameWorkstation(uuid: uuid, name: name, expectedVersion: expectedVersion)
+        }
+    }
+
+    /// Deletes an inactive workstation at the version the caller read, with its members and placements.
+    /// - Parameters:
+    ///   - uuid: The workstation to forget.
+    ///   - expectedVersion: The version the caller last read.
+    /// - Throws: `DaemonError` wrapping `MachineHostError.cannotForgetActiveWorkstation`;
+    ///   `DaemonError.versionConflict` or `DaemonError.notFound`.
+    func machineHostForgetWorkstation(uuid: String, expectedVersion: Int64) async throws {
+        try await perform { try $0.machineHostForgetWorkstation(uuid: uuid, expectedVersion: expectedVersion) }
+    }
+
+    /// Writes one mirror tick in a single transaction.
+    /// - Parameter batch: The process and window upserts and the retire lists.
+    /// - Returns: The rows the tick inserted or changed.
+    /// - Throws: `DaemonError` wrapping `MachineHostError.unknownProcess` and other refusals.
+    func machineHostMirrorFlush(_ batch: MirrorBatch) async throws -> MirrorFlushRow {
+        try await perform { try $0.machineHostMirrorFlush(batch) }
+    }
+
+    /// Retires every process not running now and returns the parked windows a crash left behind.
+    /// - Parameters:
+    ///   - machineUuid: The machine being booted.
+    ///   - live: The identities of the processes running now.
+    /// - Returns: The surviving windows whose pre-park frame is set.
+    /// - Throws: `DaemonError` on a store failure.
+    func machineHostReconcileMirror(machineUuid: String, live: [AppProcessIdentity]) async throws -> [ManagedWindowRow]
+    {
+        try await perform { try $0.machineHostReconcileMirror(machineUuid: machineUuid, live: live) }
+    }
+
     // MARK: - Helpers
 
     /// Lowercases an optional UUID string, or returns nil.

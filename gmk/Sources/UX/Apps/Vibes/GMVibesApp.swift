@@ -110,7 +110,15 @@ private struct GMVibesScenes: App {
                 // reason quitting lives here and not on ⌘Q: this process owns
                 // the database for every hook and MCP session on the machine.
                 // `applicationShouldTerminate` runs the ordered shutdown.
-                onQuit: { NSApp.terminate(nil) }
+                onQuit: { NSApp.terminate(nil) },
+                windowManagerStatus: services.machineHost.status,
+                onToggleWindowManager: { enabled in
+                    Task { await services.machineHost.setEnabled(enabled) }
+                },
+                onOpenMachineHost: {
+                    WindowPresence.shared.prepareForWindow()
+                    openWindow(id: "gm_machine_host")
+                }
             )
         } label: {
             // NO `.renderingMode(.original)` here — template rendering is the
@@ -139,6 +147,14 @@ private struct GMVibesScenes: App {
             PaletteCommands()
             KernelTerminationCommands()
         }
+
+        // Opened only from the menu bar; never at launch.
+        Window("Machine Host", id: "gm_machine_host") {
+            MachineHostWindow()
+                .gmEnv(services)
+        }
+        .defaultSize(width: 720, height: 640)
+        .defaultLaunchBehavior(.suppressed)
     }
 
 }

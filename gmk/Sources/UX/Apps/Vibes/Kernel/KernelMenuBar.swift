@@ -24,6 +24,9 @@ struct KernelMenuBarContent: View {
     let buildSha: String?
     let onNewWindow: () -> Void
     let onQuit: () -> Void
+    let windowManagerStatus: MachineHostService.Status
+    let onToggleWindowManager: (Bool) -> Void
+    let onOpenMachineHost: () -> Void
 
     /// Two-step quit, in place.
     ///
@@ -42,13 +45,19 @@ struct KernelMenuBarContent: View {
     ///   - buildSha: Build identifier, or `nil` if unknown.
     ///   - onNewWindow: Callback to open a new window.
     ///   - onQuit: Callback to quit the kernel.
+    ///   - windowManagerStatus: Where the window manager stands.
+    ///   - onToggleWindowManager: Callback with the new window-management flag.
+    ///   - onOpenMachineHost: Callback to open the Machine Host window.
     init(
         role: KernelRole,
         vitals: KernelVitals,
         protocolVersion: Int? = nil,
         buildSha: String? = nil,
         onNewWindow: @escaping () -> Void,
-        onQuit: @escaping () -> Void
+        onQuit: @escaping () -> Void,
+        windowManagerStatus: MachineHostService.Status,
+        onToggleWindowManager: @escaping (Bool) -> Void,
+        onOpenMachineHost: @escaping () -> Void
     ) {
         self.role = role
         self.vitals = vitals
@@ -56,6 +65,9 @@ struct KernelMenuBarContent: View {
         self.buildSha = buildSha
         self.onNewWindow = onNewWindow
         self.onQuit = onQuit
+        self.windowManagerStatus = windowManagerStatus
+        self.onToggleWindowManager = onToggleWindowManager
+        self.onOpenMachineHost = onOpenMachineHost
     }
 
     var body: some View {
@@ -66,6 +78,9 @@ struct KernelMenuBarContent: View {
             vitalRows
             Divider()
             buildRow
+
+            Divider()
+            windowManagerRows
 
             Divider()
             menuRow("New Vibe Window", systemImage: "macwindow.badge.plus") {
@@ -198,6 +213,47 @@ struct KernelMenuBarContent: View {
         let version = protocolVersion.map { "protocol v\($0)" } ?? "protocol v?"
         let build = buildSha.flatMap { $0.isEmpty ? nil : $0 } ?? "unknown build"
         return "\(version) · \(build)"
+    }
+
+    // MARK: - Window management
+
+    /// The window-management flag, its status line and the way into the Machine Host window.
+    @ViewBuilder
+    private var windowManagerRows: some View {
+        Toggle(
+            "Window management",
+            isOn: Binding(get: { windowManagerIsOn }, set: { onToggleWindowManager($0) })
+        )
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .padding(.horizontal, 8)
+        HStack(spacing: 6) {
+            Text(MachineHostStatusText.line(windowManagerStatus))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .truncationMode(.middle)
+            if windowManagerStatus == .notTrusted {
+                Button("Grant…") { openMachineHost() }
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 8)
+        menuRow("Machine Host…", systemImage: "rectangle.3.group") { openMachineHost() }
+    }
+
+    /// True unless the window manager is off or failed.
+    private var windowManagerIsOn: Bool {
+        switch windowManagerStatus {
+        case .off, .failed: false
+        default: true
+        }
+    }
+
+    /// Activates this process, then opens the Machine Host window.
+    private func openMachineHost() {
+        NSApp.activate()
+        onOpenMachineHost()
     }
 
     // MARK: - Actions

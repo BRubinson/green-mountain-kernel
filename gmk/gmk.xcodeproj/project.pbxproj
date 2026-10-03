@@ -35,10 +35,10 @@
 
 /* Begin PBXBuildFile section */
 		A17E00042FDCB00000DAF751 /* VERSION in Sources */ = {isa = PBXBuildFile; fileRef = A17E00032FDCB00000DAF751 /* VERSION */; };
-		A17E00302FDCB00000DAF751 /* VERSION in Sources */ = {isa = PBXBuildFile; fileRef = A17E00032FDCB00000DAF751 /* VERSION */; };
 		A17E000C2FDCB00000DAF751 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A17E00092FDCB00000DAF751 /* GRDB */; };
 		A17E000D2FDCB00000DAF751 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = A17E000A2FDCB00000DAF751 /* SwiftProtobuf */; };
 		A17E00172FDCB00000DAF751 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = A17E00162FDCB00000DAF751 /* GRDB */; };
+		A17E00302FDCB00000DAF751 /* VERSION in Sources */ = {isa = PBXBuildFile; fileRef = A17E00032FDCB00000DAF751 /* VERSION */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXBuildRule section */
@@ -96,6 +96,9 @@
 		A17E00022FDCB00000DAF751 /* Exceptions for "Sources" folder in "GmKernelTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				AgenticsCore/Feedback/GmHook.swift,
+				AgenticsCore/Feedback/GmHookHandlers.swift,
+				AgenticsCore/Feedback/HookLogic.swift,
 				API/Clients/GmKernelCoreClient/GmKernelClient/BriefingWait.swift,
 				API/Clients/GmKernelCoreClient/GmKernelClient/DaemonClient.swift,
 				API/Clients/GmKernelCoreClient/GmKernelClient/DaemonEventSubscription.swift,
@@ -250,8 +253,10 @@
 				API/Shared/GmKernelCoreShared/Protocol/CdeToolSpec.swift,
 				API/Shared/GmKernelCoreShared/Protocol/Envelope.swift,
 				API/Shared/GmKernelCoreShared/Protocol/GmJsonValue.swift,
-				"API/Shared/GmKernelCoreShared/Protocol/GmVerbCaller+API.swift",
 				API/Shared/GmKernelCoreShared/Protocol/GmVerbCaller.swift,
+				"API/Shared/GmKernelCoreShared/Protocol/GmVerbCaller+API.swift",
+				API/Shared/GmKernelCoreShared/Protocol/MachineHostPlacement.swift,
+				API/Shared/GmKernelCoreShared/Protocol/MachineHostRows.swift,
 				API/Shared/GmKernelCoreShared/Protocol/Messages.swift,
 				API/Shared/GmKernelCoreShared/Protocol/Rows.swift,
 				API/Shared/GmKernelCoreShared/Protocol/VerbLedger.swift,
@@ -261,9 +266,6 @@
 				API/Shared/GmKernelCoreShared/RepoRelativePath.swift,
 				API/Shared/GmKernelCoreShared/StoreError.swift,
 				API/Shared/GmKernelCoreShared/StructuredPatch.swift,
-				AgenticsCore/Feedback/GmHook.swift,
-				AgenticsCore/Feedback/GmHookHandlers.swift,
-				AgenticsCore/Feedback/HookLogic.swift,
 				Persistence/Composites/AgenticsComposites.swift,
 				Persistence/Composites/DiagramsComposites.swift,
 				Persistence/Composites/DopedComposites.swift,
@@ -340,6 +342,13 @@
 				"Persistence/Entities/KernelRecord+DaemonEvent.swift",
 				"Persistence/Entities/KernelRecord+ProjectTestLock.swift",
 				"Persistence/Entities/KernelRecord+TestRun.swift",
+				"Persistence/Entities/MachineHostRecord+AppProcess.swift",
+				"Persistence/Entities/MachineHostRecord+Display.swift",
+				"Persistence/Entities/MachineHostRecord+Machine.swift",
+				"Persistence/Entities/MachineHostRecord+ManagedWindow.swift",
+				"Persistence/Entities/MachineHostRecord+Workstation.swift",
+				"Persistence/Entities/MachineHostRecord+WorkstationDisplay.swift",
+				"Persistence/Entities/MachineHostRecord+WorkstationWorkspace.swift",
 				"Persistence/Entities/ProjectRecord+Instance.swift",
 				"Persistence/Entities/ProjectRecord+Project.swift",
 				"Persistence/Entities/ProjectRecord+Prompt.swift",
@@ -349,8 +358,8 @@
 				Persistence/Mapping/DopedMapping.swift,
 				Persistence/Mapping/KbitesMapping.swift,
 				Persistence/Mapping/KernelMapping.swift,
+				Persistence/Mapping/MachineHostMapping.swift,
 				Persistence/Mapping/ProjectMapping.swift,
-				Persistence/Migrations/Migrations.swift,
 				Persistence/Migrations/m0001_baseSchema.swift,
 				Persistence/Migrations/m0002_clarificationArchitectureLifecycleV2.swift,
 				Persistence/Migrations/m0003_searchIndexes.swift,
@@ -381,6 +390,8 @@
 				Persistence/Migrations/m0028_promptLifecycleCollapse.swift,
 				Persistence/Migrations/m0029_testRunLock.swift,
 				Persistence/Migrations/m0030_retiredRootConfigValues.swift,
+				Persistence/Migrations/m0031_machineHost.swift,
+				Persistence/Migrations/Migrations.swift,
 				"Persistence/Requests/DerivableRequest+Shared.swift",
 				Persistence/Store/Repositories/AgentRegistrationRepository.swift,
 				Persistence/Store/Repositories/ArchitectureRepository.swift,
@@ -408,6 +419,7 @@
 				Persistence/Store/Repositories/KbiteRepository.swift,
 				Persistence/Store/Repositories/KbiteResourceRepository.swift,
 				Persistence/Store/Repositories/ListingRepository.swift,
+				Persistence/Store/Repositories/MachineHostRepository.swift,
 				Persistence/Store/Repositories/ProjectRepository.swift,
 				Persistence/Store/Repositories/PromptDiagramRepository.swift,
 				Persistence/Store/Repositories/PromptRepository.swift,
@@ -416,6 +428,7 @@
 				Persistence/Store/Repositories/SearchRepository.swift,
 				Persistence/Store/Repositories/SessionRepository.swift,
 				Persistence/Store/Repositories/TestRunRepository.swift,
+				Persistence/Store/Store.swift,
 				"Persistence/Store/Store+AgentRegistration.swift",
 				"Persistence/Store/Store+Architecture.swift",
 				"Persistence/Store/Store+Artifact.swift",
@@ -443,6 +456,7 @@
 				"Persistence/Store/Store+KbiteArchive.swift",
 				"Persistence/Store/Store+KbiteResource.swift",
 				"Persistence/Store/Store+Listing.swift",
+				"Persistence/Store/Store+MachineHost.swift",
 				"Persistence/Store/Store+Project.swift",
 				"Persistence/Store/Store+Prompt.swift",
 				"Persistence/Store/Store+PromptDiagram.swift",
@@ -450,10 +464,20 @@
 				"Persistence/Store/Store+Search.swift",
 				"Persistence/Store/Store+Session.swift",
 				"Persistence/Store/Store+TestRun.swift",
-				Persistence/Store/Store.swift,
 				Persistence/Store/StoreBoundary.swift,
 				Persistence/Store/StoreCore.swift,
 				Util/BashWritePaths.swift,
+				UX/Apps/MachineHost/Pure/ColumnLayout.swift,
+				UX/Apps/MachineHost/Pure/CoordinateSpace.swift,
+				UX/Apps/MachineHost/Pure/CrashRecovery.swift,
+				UX/Apps/MachineHost/Pure/KeyCodeTable.swift,
+				UX/Apps/MachineHost/Pure/MirrorProjection.swift,
+				UX/Apps/MachineHost/Pure/ParkGeometry.swift,
+				UX/Apps/MachineHost/Pure/WindowClassifier.swift,
+				UX/Apps/MachineHost/Pure/WMEffect.swift,
+				UX/Apps/MachineHost/Pure/WMEvent.swift,
+				UX/Apps/MachineHost/Pure/WMModel.swift,
+				UX/Apps/MachineHost/Pure/WMReducer.swift,
 			);
 			target = A17E00102FDCB00000DAF751 /* GmKernelTests */;
 		};

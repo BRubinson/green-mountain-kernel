@@ -185,6 +185,14 @@ enum SchemaEnrollment {
         mirror(ProjectTestLockRecord.self),
         mirror(TestRunRecord.self),
 
+        mirror(AppProcessRecord.self),
+        mirror(DisplayRecord.self),
+        mirror(MachineRecord.self),
+        mirror(ManagedWindowRecord.self),
+        mirror(WorkstationRecord.self),
+        mirror(WorkstationDisplayRecord.self),
+        mirror(WorkstationWorkspaceRecord.self),
+
         mirror(InstanceRecord.self),
         mirror(ProjectRecord.self),
         mirror(PromptRecord.self),
@@ -600,6 +608,25 @@ enum SchemaEnrollment {
         join(TestRunRecord.instance, key: "instance", from: "test_run", to: "instance"),
         join(TestRunRecord.session, key: "session", from: "test_run", to: "session"),
         join(TestRunRecord.lock, key: "lock", from: "project_test_lock", to: "test_run"),
+
+        join(AppProcessRecord.machine, key: "machine", from: "app_process", to: "machine"),
+        join(DisplayRecord.machine, key: "machine", from: "display", to: "machine"),
+        join(ManagedWindowRecord.appProcess, key: "appProcess", from: "managed_window", to: "app_process"),
+        join(WorkstationRecord.machine, key: "machine", from: "workstation", to: "machine"),
+        join(WorkstationDisplayRecord.display, key: "display", from: "workstation_display", to: "display"),
+        join(
+            WorkstationDisplayRecord.workstation,
+            key: "workstation",
+            from: "workstation_display",
+            to: "workstation"
+        ),
+        join(WorkstationWorkspaceRecord.display, key: "display", from: "workstation_workspace", to: "display"),
+        join(
+            WorkstationWorkspaceRecord.workstation,
+            key: "workstation",
+            from: "workstation_workspace",
+            to: "workstation"
+        ),
 
         join(InstanceRecord.project, key: "project", from: "instance", to: "project"),
         prefetch(InstanceRecord.sessions, key: "sessions", from: "session", to: "instance"),

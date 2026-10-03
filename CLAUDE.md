@@ -21,7 +21,7 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 ## Do not re-derive these wrongly
 
 ### Build and tests
-- The test bundle's membership-exception list in `project.pbxproj` names files ONE BY ONE (358 today; folder entries are inert). It includes all of `GmKernelHost/` and `GmMcpServer/`, and the test target shares the app's VERSION build rule for `BuildInfo`. A new file under `API/Shared/GmKernelCoreShared`, `API/Servers/GmKernelCoreServer`, `Persistence` or `GmKernelCoreClient/GmKernelClient` must be added by hand or the test bundle fails to link.
+- The test bundle's membership-exception list in `project.pbxproj` names files ONE BY ONE (382 today; folder entries are inert). It includes all of `GmKernelHost/` and `GmMcpServer/`, and the test target shares the app's VERSION build rule for `BuildInfo`. A new file under `API/Shared/GmKernelCoreShared`, `API/Servers/GmKernelCoreServer`, `Persistence`, `GmKernelCoreClient/GmKernelClient` or `UX/Apps/MachineHost/Pure` must be added by hand or the test bundle fails to link. `MachineHost/Pure` is Foundation + CoreGraphics only; no AppKit/AX/Carbon/GRDB.
 - New files under `gmk/Tests/GmKernelTests` need no pbxproj entry (synchronized group, no exception set).
 - A folder move made behind Xcode's back DROPS every exception under the old path, silently. Dump the list first, remap, write back, assert each entry resolves on disk, re-record the count here.
 - The suite hosts `KernelServices` IN-PROCESS on a temp root: `GM_FS_ROOT` is set before `Paths.root` is first read, then `KernelOwnership.acquire` → `bootWriter`. Teardown is `KernelServices.shutdown()`, never the SHUTDOWN verb. Still no `TEST_HOST`: the app would be a second writer.
@@ -67,7 +67,7 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 - A refresh clones bits and repo, never the database: `gm.db` holds absolute paths, and a copy makes a non-production kernel watch your real checkout.
 - Root comparison is by inode, not path. Chrome derives from the resolved root, never a `#if`.
 - `PluginBridge` (Beta only) and `TestEnvSeed` (Debug only) DEPEND on `gm_kernel` and act on its product; gates live in `xcode_phase.sh`. Debug must never regenerate the plugin.
-- `Paths.assertContained` throws outside `$GM_FS_ROOT` or the working repo. The one exception is `ITerm.writeProfile`; it is not precedent.
+- `Paths.assertContained` throws outside `$GM_FS_ROOT` or the working repo. The two named exceptions are `ITerm.writeProfile` and `MachineHostLock`'s `~/Library/Application Support/gm_kernel/gm_machine_host.lock`; neither is precedent.
 - "sandbox" is a homonym: `DopeRepoSandbox`, `ENABLE_APP_SANDBOX = NO` and `HookScriptTests.Sandbox` are live; `.gmcc_sandbox` is retired.
 - `GmPersonality` resolves from `argv[0]` then `gm_`+`argv[1]`; no personality writes and the release store symlinks none. A bare `gm_kernel` in a shell prints usage; only inside a bundle does a no-arg launch open the app.
 - The app never dials the socket or dispatches an envelope: `GMCCDaemonService` calls Store facades directly, and its queue hop is load-bearing because the store boundary is synchronous. `DaemonClient`, `GmVerbCaller` and `KernelVerbCaller` belong to hooks, MCP, the CLI and the tests. Event subscribers run inside the commit hook: hand off immediately, never call back into the store.

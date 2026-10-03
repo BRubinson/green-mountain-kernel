@@ -25,6 +25,8 @@ final class GMVibesServices {
     /// and every prompt row read one store.
     let diagramCatalog: DiagramCatalogStore
     let launchColors: LaunchColorRegistry
+    /// The window manager; booted once the kernel is hosted, restored on every termination path.
+    let machineHost: MachineHostService
 
     /// THE KERNEL, hosted in this process.
     ///
@@ -80,6 +82,7 @@ final class GMVibesServices {
         checkout = CheckoutWatcher()
         diagramCatalog = DiagramCatalogStore()
         launchColors = LaunchColorRegistry()
+        machineHost = MachineHostService()
         // The one wiring of the route() → checkout-state edge; both are
         // app-lifetime singletons, so no re-registration ever happens.
         daemon.checkoutSink = checkout
@@ -104,6 +107,7 @@ final class GMVibesServices {
             Task {
                 await GMCCDaemonService.shared.install(store: store, status: status)
                 self.daemon.markKernelHosted()
+                await self.machineHost.boot()
             }
             kernelEventToken = kernel.store.subscribeToEvents { [weak self] event in
                 // FAN-OUT RUNS ON GRDB'S WRITER THREAD, inside the commit hook. Hand off
@@ -157,6 +161,7 @@ final class GMVibesServices {
             kernel.store.unsubscribeFromEvents(token)
             kernelEventToken = nil
         }
+        machineHost.stopRestoringSynchronously(deadline: MachineHostService.restoreDeadline)
         kernel.shutdown()
     }
 
@@ -180,5 +185,6 @@ extension View {
             .environment(services.checkout)
             .environment(services.diagramCatalog)
             .environment(services.launchColors)
+            .environment(services.machineHost)
     }
 }
