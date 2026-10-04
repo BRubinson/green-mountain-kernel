@@ -37,8 +37,8 @@ LINT_ROOTS = ("gmk/Sources", "gmk/Tests")
 
 CITATION_RE = re.compile(r"\b[A-Z][A-Za-z]+Tests\b")
 TEST_CLASS_RE = re.compile(r"\bclass\s+([A-Z]\w*)")
-# Names that are not test classes: the test target, and one CLAUDE.md still cites.
-CITATION_ALLOW = {"GmKernelTests", "HookScriptTests"}
+# Names that are not test classes: the test target.
+CITATION_ALLOW = {"GmKernelTests"}
 
 UNBASELINABLE = {
     "historical_comment",

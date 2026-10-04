@@ -11,6 +11,7 @@ $XCB -configuration Debug test          # never -quiet: the "' passed (" lines p
 bash gmk/scripts/swift_lint_format.sh   # --fix formats in place; the PostToolUse hook only lints
 bash gmk/scripts/rebuild_local.sh       # build → stage <version>-BETA → generate plugin → activate
 bash gmk/scripts/rebuild_local.sh --app # + signed bundle; required before publish
+bash gmk/scripts/rebuild_local.sh --env beta  # the default env is prod: ~/gmfs, bundle into /Applications
 bash gmk/scripts/publish_release.sh     # promotes the staged bundle; never builds
 bash gmk/scripts/generate_plugin.sh     # GM_KERNEL_BIN required; --check reports only
 bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
@@ -21,25 +22,25 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 ## Do not re-derive these wrongly
 
 ### Build and tests
-- The test bundle's membership-exception list in `project.pbxproj` names files ONE BY ONE (382 today; folder entries are inert). It includes all of `GmKernelHost/` and `GmMcpServer/`, and the test target shares the app's VERSION build rule for `BuildInfo`. A new file under `API/Shared/GmKernelCoreShared`, `API/Servers/GmKernelCoreServer`, `Persistence`, `GmKernelCoreClient/GmKernelClient` or `UX/Apps/MachineHost/Pure` must be added by hand or the test bundle fails to link. `MachineHost/Pure` is Foundation + CoreGraphics only; no AppKit/AX/Carbon/GRDB.
-- New files under `gmk/Tests/GmKernelTests` need no pbxproj entry (synchronized group, no exception set).
-- A folder move made behind Xcode's back DROPS every exception under the old path, silently. Dump the list first, remap, write back, assert each entry resolves on disk, re-record the count here.
+- `gmk/Sources` is a plain group of five synchronized roots. `Core` is in BOTH `gm_kernel` and `GmKernelTests`; `AgenticsClaudeHarnessPluginBridge`, `AgenticsCore`, `API` and `UX` are app-only. Test-compiled code lives in `Sources/Core` and nowhere else; a new top-level folder under `Sources` builds into nothing until it is added as a root (`gm_tree_check` `sources_roots`). The only membership exception is `UX/Apps/Vibes/Info.plist` for `gm_kernel`. The test target shares the app's VERSION build rule for `BuildInfo`. `Core/MachineHostPure` is Foundation + CoreGraphics only; no AppKit/AX/Carbon/GRDB (SwiftLint `machinehost_pure_imports`).
+- New files under `gmk/Tests/GmKernelTests` need no pbxproj entry (synchronized group, no exception set); each lands in the folder named for the `Sources/Core` folder it exercises, `Harness` aside (`gm_tree_check` `tests_mirror`).
+- No test exception list exists. Moving a folder ACROSS roots changes its target membership. Never nest a synchronized root inside another: folder exceptions are inert and every file compiles twice.
 - The suite hosts `KernelServices` IN-PROCESS on a temp root: `GM_FS_ROOT` is set before `Paths.root` is first read, then `KernelOwnership.acquire` → `bootWriter`. Teardown is `KernelServices.shutdown()`, never the SHUTDOWN verb. Still no `TEST_HOST`: the app would be a second writer.
 - The staged `gm_kernel` copy (`GM_TEST_KERNEL_BIN` or `BUILT_PRODUCTS_DIR`, never `~/gmfs/bin`) runs only as the pen, a client.
 - `Paths.root` is one `static let` per process. Run ids must be short: `sun_path` is 104 bytes and an overrun is a listener that never binds.
-- Tests write only over the wire, through a client with autostart off; a test-side `Store(path:)` is a second writer. XCTest, never swift-testing.
+- Tests write only over the wire, through a client with autostart off; a test-side `Store(path:)` is a second writer. XCTest, never swift-testing (SwiftLint `no_swift_testing`).
 - Keep `ENABLE_DEBUG_DYLIB = NO` on Debug: the default stub does not dispatch on argv, so a binary copied out of the bundle is not the kernel.
 - Keep `ENABLE_APP_SANDBOX = NO` forever. `ENABLE_USER_SCRIPT_SANDBOXING` is YES on `gm_kernel`, NO on the two aggregates.
-- `MACOSX_DEPLOYMENT_TARGET` is 26 in all three configurations and `build_plugin_binaries.sh` targets `macosx26.0`: one floor spelled twice. The only macOS-27 API left is the `@available`-gated `languageModelProfile()` in `AgentSessionProfile.swift`; a new 27-only call anywhere else raises the floor for the DMG and every hook binary. The Claude-for-FoundationModels package is gone; the bridge's effort enum is its own.
+- The deployment floor has one spelling: `MACOSX_DEPLOYMENT_TARGET` in `project.pbxproj`, 26 in all three configurations. `build_plugin_binaries.sh` reads it; `gm_tree_check` `build_settings` asserts one value. The only macOS-27 API left is the `@available`-gated `languageModelProfile()` in `AgentSessionProfile.swift`; a new 27-only call anywhere else raises the floor for the DMG and every hook binary. The Claude-for-FoundationModels package is gone; the bridge's effort enum is its own.
 - No root SwiftPM manifest: it shadows `buildServer.json`. Never archive with `-project`; the workspace lockfile is the only one.
-- Confinement is convention: `import GRDB` only under `Persistence/` and `GmKernelCoreServer/GmDaemon/`; `SwiftProtobuf` only under `ITerm2Client/`.
+- `import GRDB` only under `Persistence/` in `gmk/Sources` (SwiftLint `no_grdb_outside_persistence`; tests are exempt); `SwiftProtobuf` only under `ITerm2Client/` (`no_swiftprotobuf_outside_iterm2`). The fences key on folder names, never on a root prefix.
 - No thread hop inside a store boundary or the handlers; the ambient handle is thread-local. Remove the hop, never relax the boundary.
 
 ### Release
 - Publish promotes the staged signed bundle and refuses without one. Never add a fallback build.
-- `gm_releases.sh` exists TWICE: `gmk/scripts/gm_releases.sh` and `GmBridgeScript.releaseStoreBody`. Nothing checks they agree. Edit both, regenerate, `diff`. Never edit `plugins/gmcc/scripts/gm_releases.sh`.
+- `gm_releases.sh` exists TWICE: `gmk/scripts/gm_releases.sh` and `GmBridgeScript.releaseStoreBody`. `generate_plugin.sh` diffs the rendered copy against the script; `gm_tree_check` `releases_twin` also diffs `releaseStoreBody` against it. Edit both, regenerate. Never edit `plugins/gmcc/scripts/gm_releases.sh`.
 - `MARKETING_VERSION` is a build-setting override from `gmk/VERSION`; never hand-edit it in `project.pbxproj`. `gmk/VERSION` also drives the plugin and marketplace versions.
-- `GM_TAG_PREFIX` in `gm_releases.sh` is the only spelling of the release namespace. `release.sh` is retired.
+- `GM_TAG_PREFIX` in `gm_releases.sh` is the only spelling of the release namespace. `release.sh` is a retired signpost.
 - The `gm-daemon-<v>-macos-universal.tar.gz` literal and the `daemon-v*` branch in the installer are frozen: they install the back-catalogue.
 - Staged binaries are never overwritten in place (stale signature cache → SIGKILL 137). Symlink swap only. Local builds are always `-BETA`.
 - Publish refuses an ad-hoc signature without `--allow-adhoc`, a missing arm64 slice, or a baked root other than `~/gmfs`.
@@ -68,18 +69,18 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 - Root comparison is by inode, not path. Chrome derives from the resolved root, never a `#if`.
 - `PluginBridge` (Beta only) and `TestEnvSeed` (Debug only) DEPEND on `gm_kernel` and act on its product; gates live in `xcode_phase.sh`. Debug must never regenerate the plugin.
 - `Paths.assertContained` throws outside `$GM_FS_ROOT` or the working repo. The two named exceptions are `ITerm.writeProfile` and `MachineHostLock`'s `~/Library/Application Support/gm_kernel/gm_machine_host.lock`; neither is precedent.
-- "sandbox" is a homonym: `DopeRepoSandbox`, `ENABLE_APP_SANDBOX = NO` and `HookScriptTests.Sandbox` are live; `.gmcc_sandbox` is retired.
+- "sandbox" is a homonym: `DopeRepoSandbox` and `ENABLE_APP_SANDBOX = NO` are live; `.gmcc_sandbox` is retired.
 - `GmPersonality` resolves from `argv[0]` then `gm_`+`argv[1]`; no personality writes and the release store symlinks none. A bare `gm_kernel` in a shell prints usage; only inside a bundle does a no-arg launch open the app.
-- The app never dials the socket or dispatches an envelope: `GMCCDaemonService` calls Store facades directly, and its queue hop is load-bearing because the store boundary is synchronous. `DaemonClient`, `GmVerbCaller` and `KernelVerbCaller` belong to hooks, MCP, the CLI and the tests. Event subscribers run inside the commit hook: hand off immediately, never call back into the store.
+- The app never dials the socket or dispatches an envelope: `KernelStoreService` calls Store facades directly, and its queue hop is load-bearing because the store boundary is synchronous. `KernelClient`, `GmVerbCaller` and `KernelVerbCaller` belong to hooks, MCP, the CLI and the tests. Event subscribers run inside the commit hook: hand off immediately, never call back into the store.
 - ⌘Q closes windows; only the menu bar's two-step quit stops the kernel. Nothing app-side is tested; arbitration, takeover and termination rest on hand-running in `~/test_gmfs`.
 
 ### Persistence and wire
 - Migrations are append-only, one file each plus the `ladder`; the db is never wiped. `gm_hook call BACKUP --json '{}'` before risky work (automatic before a pending migration). A db AHEAD of the binary refuses to open.
 - Dropping an inline UNIQUE/CHECK means the 12-step table rebuild: copy `id` explicitly (FTS5 keys on rowid), recreate the AFTER triggers, keep `legacy_alter_table = ON` across renames. All three fail silently.
-- Bump `GmWireProtocol.version` (now 30) only for a new message type, a renamed field or a removed enum case. Additive optional fields never bump. `wire_keys.py` output is gated by nothing.
+- Bump `GmWireProtocol.version` (now 30) only for a new message type, a renamed field or a removed enum case. Additive optional fields never bump. `wire_keys.py` records every Codable key and raw enum value under `GmKernelCoreShared`; `gm_tree_check` `wire_keys` holds it to `gmk/scripts/wire_keys.golden` by wire shape: a pure type rename passes, a lost key or raw value needs the bump. Re-record with `wire_keys.py --write-golden`.
 - `TX_BATCH` uses a deny-list of control verbs; `checkpointTruncate` and the four-phase repo verbs refuse to compose. No session-scoped begin/commit. The in-process boundary buys no throughput.
-- `Persistence/Entities` holds exactly one `TableRecord` per table and nothing else; `Persistence/Composites` holds `FetchableRecord`+`Decodable` composites of Records with a `static request` builder each; `Persistence/Mapping` is the only place a persistence type and a wire Row meet (`func dto()`). No wire type gains a GRDB conformance and no custom `init(from:)` is written on one for the database's sake: `WireCodec` decodes the same types from JSON on the client.
-- `TableRecord` is conformed per Record in its entity file, never on `BaseRecordFields`; Records never gain `PersistableRecord`; SwiftLint `no_record_bulk_write` fences `deleteAll`/`deleteOne`/`updateAll` outside `StoreCore.swift`.
+- `Sources/Core/Persistence/Entities` holds exactly one `TableRecord` per table and nothing else (`gm_tree_check` `entities_one_table`); the record-family protocols (`BaseRecordFields`, `DopeNodeRecord`, `DiagramSubtypeRecord`) live in `Persistence/Records`; `Persistence/Composites` holds `FetchableRecord`+`Decodable` composites of Records with a `static request` builder each; `Persistence/Mapping` is the only place a persistence type and a wire Row meet (`func dto()`). No wire type gains a GRDB conformance and no custom `init(from:)` is written on one for the database's sake: `WireCodec` decodes the same types from JSON on the client.
+- `TableRecord` is conformed per Record in its entity file, never on `BaseRecordFields`; Records never gain `PersistableRecord` (SwiftLint `no_persistable_record`); SwiftLint `no_record_bulk_write` fences `deleteAll`/`deleteOne`/`updateAll` outside `StoreCore.swift`.
 - Every association and aggregate carries an explicit `forKey` equal to the property it decodes into (snake_case tables pluralize into illegal identifiers); a composite's root-record property must not share a name with a column of its table (GRDB resolves the column first and decodes the record out of it); nested `including(optional:/required:)` scopes inherit the parent's decoding strategy, so joined child types declare `SnakeCaseDecoded` themselves.
 - `dope_persistence_entity_property` and `diagram_connector` carry explicit `ForeignKey`; GRDB fatalErrors on ambiguous inference. Every Record, association and composite request is enrolled by hand in `SchemaEnrollmentRoster.swift` (fenced counts) or it is unverified; `ComposedReadTests` proves prefetches over the wire because an empty db cannot exercise one.
 - `withUuid`/`orderedBySeq`/`notDeleted` are `DerivableRequest` methods: spell them `Record.all().withUuid(x)`; there is no static form.
@@ -87,7 +88,7 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 ### CDE surface
 - Server key `cde`, 14 served / 11 grantable; the three `*_not_supported` tools are served so a refusal is discoverable, never granted. `rosterProblems()` is bidirectional at generation and at startup.
 - Five tools carry `anthropic/alwaysLoad`; no server-wide pin. `CdeSheet.instructions` has a 2048-byte budget: trim prose, never names.
-- Paging (45,000-byte cap) lives in `CdePager` in the MCP layer; never add `page_bytes`/`cursor` to a wire request.
+- Paging (45,000-byte cap) lives in `CdePager` (`Core/GmKernelCoreShared/Protocol/CdePaging.swift`) and only the MCP layer drives it; never add `page_bytes`/`cursor` to a wire request.
 - `cde_prompt op=file_changes` is search-only; capture belongs to the PostToolUse hook alone.
 - Phase instructions live in the twelve `cde_rpir_<phase>` skills; do not re-inline them into commands. Skill `ref/*.md` are indexed, never rolled up.
 - Prompt lifecycle is three states; `BRIEFING_OPEN` performs draft→initiated, loading never does; summaries open explicitly.
@@ -95,6 +96,9 @@ bash gmk/scripts/gm_env.sh create|refresh|doctor|reap beta|test
 ### Lint
 - swift-format owns layout; SwiftLint owns semantics and the comment rules (errors, never baselined). `excluded` uses single-star paths: `**` crashes SwiftLint 0.65.1. The PostToolUse hook never formats.
 - `swift_doc_check.py` is gate stage 3: one-line summary (100 chars), Parameters, Returns, Throws on every function. There is no baseline and none is to be created; `--write-baseline` exists for adopting another tree. Doc comments may run to 30 lines (a 20-parameter wire init needs 23), plain `//` runs still stop at 8.
+- `gm_tree_check.py` is gate stage 4 (`--list` names its sub-checks): `releases_twin`, `test_citations`, `baseline`, `build_settings`, `lint_skip`, `wire_keys`, `resources`, `sources_roots`, `entities_one_table`, `tests_mirror`. The pre-commit hook runs it over a checkout of the index, so it judges the staged bytes.
+- `gm_lint_skip` in `gm_build.sh` is the one skip list; `.swiftlint.yml` `excluded` and `.swift-format-ignore` spell it, and `lint_skip` holds them to it.
+- The SwiftLint baseline only shrinks. A move, split or type rename is carried across with `baseline_remap.py` (`--map`, `--split`, `--rename-symbol`); the baseline is never regenerated. `baseline` refuses an entry HEAD does not hold unless it moved with a file the commit renames or adds; a type rename rides its file's rename.
 
 ## Working-tree note
 
