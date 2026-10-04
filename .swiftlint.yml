@@ -266,7 +266,8 @@ custom_rules:
   machinehost_pure_imports:
     name: "MachineHost Pure is Foundation and CoreGraphics only"
     regex: '^(?:@\w+(?:\([^)\n]*\))? +)*(?:(?:public|package|internal|fileprivate|private) +)?import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?+(?!(?:Foundation|CoreGraphics)\b)\w'
-    included: ".*/gmk/Sources/Core/MachineHostPure/.*"
+    included: ".*/MachineHostPure/.*"
+    excluded: ".*/Tests/.*"
     excluded_match_kinds: [comment, doccomment, string]
     message: "MachineHost Pure imports Foundation and CoreGraphics only; AppKit, AX, Carbon and GRDB live outside it."
     severity: error
