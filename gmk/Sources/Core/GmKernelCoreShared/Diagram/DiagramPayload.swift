@@ -337,7 +337,7 @@ enum DiagramConnectorHead: String, Codable, Hashable, CaseIterable, Sendable {
     case cross
 }
 
-/// Connector routing style (v23).
+/// Connector routing style.
 ///
 /// Every case selects among geometry that already existed: `orthogonalStep`
 /// is the router's polyline (the ONLY pre-v23 renderer, hence the decode

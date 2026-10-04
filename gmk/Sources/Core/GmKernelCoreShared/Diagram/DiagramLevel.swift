@@ -20,7 +20,7 @@ enum DiagramTier: String, Codable, Hashable, CaseIterable, Sendable {
 }
 
 /// diagram.visibility values — an AXIS beside the tier ladder, never a rung
-/// on it (m0024).
+/// on it.
 ///
 /// PRIVATE lives in the db only; PUBLIC additionally serializes into the repo's
 /// committed .gmcc tree via DIAGRAM_WRITE_REPO. PUBLIC is legal ONLY on

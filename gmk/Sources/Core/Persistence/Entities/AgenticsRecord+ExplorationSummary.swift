@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `exploration_summary` table (m0025: literal
+/// Read-side mirror of the `exploration_summary` table (literal
 /// per-agent rows keyed UNIQUE(prompt_uuid, agent_type); the prompt-level
 /// synthesis/seal is the row with agent_type='synthesis').
 struct ExplorationSummaryRecord: BaseRecordFields, TableRecord {

@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `workstation_workspace` table (m0031): where one global code sits in a workstation.
+/// Read-side mirror of the `workstation_workspace` table: where one global code sits in a workstation.
 ///
 /// Each workstation holds one row per code. At most one row per `(workstationUuid, displayUuid)` is
 /// active, so deactivations are written before activations inside one transaction.

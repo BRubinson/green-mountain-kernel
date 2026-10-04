@@ -524,7 +524,7 @@ final class Server: @unchecked Sendable {
             case .botGet:
                 return try BotGetHandler.handle(line: line, head: head, store: store)
 
-            // Agent test mutual exclusion (v29).
+            // Agent test mutual exclusion.
             case .testSuiteList:
                 return try TestSuiteListHandler.handle(line: line, head: head, store: store)
             case .testLockStatus:

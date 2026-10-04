@@ -232,7 +232,7 @@ final class DaemonConnectionModel {
             if let uuid = event.subjectUuid?.lowercased() { hub.invalidate(.prompt(uuid)) }
         case .kbiteDigest, .kbiteKeywordTag, .kbiteImport:
             // No subscriber surface: the KBites browser reads the filesystem
-            // and its search hits the daemon on demand. Import (v22) changes
+            // and its search hits the daemon on demand. Import changes
             // content only — it never registers, so no pills move.
             break
         case .kbiteDelete:

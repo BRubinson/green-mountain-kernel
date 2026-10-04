@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `claude_session_binding` table (m0026).
+/// Read-side mirror of the `claude_session_binding` table.
 ///
 /// Columns map via convertFromSnakeCase.
 ///

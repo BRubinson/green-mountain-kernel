@@ -4,9 +4,8 @@ import Foundation
 
 // Client-side identity derivation, shared by every DAEMON CLIENT that needs
 // the project → instance → session triple or the calling Claude instance's
-// key — gm_hook and the gm_mcp server alike (m0025 moved this here from the
-// client's
-// Support/ so the MCP server never grows a parallel implementation).
+// key — gm_hook and the gm_mcp server alike, so the MCP server never grows a
+// parallel implementation.
 
 /// A client-context failure (not inside a git repo, detached HEAD, …).
 struct ClientContextError: Error, LocalizedError {

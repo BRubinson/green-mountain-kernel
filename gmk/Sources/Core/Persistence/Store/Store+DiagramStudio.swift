@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Diagram Studio (v23): the cross-tier browse/search surface and the row
+/// Diagram Studio: the cross-tier browse/search surface and the row
 /// delete. Both deliberately live OUTSIDE DiagramListRequest's no-union
 /// picker contract — SEARCH is the message that unions tiers, LIST never
 /// does. Bodies live in DiagramStudioRepository; these wrappers own the

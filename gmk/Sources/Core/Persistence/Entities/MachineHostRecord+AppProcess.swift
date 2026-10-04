@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `app_process` table (m0031): a running GUI app the window manager observes.
+/// Read-side mirror of the `app_process` table: a running GUI app the window manager observes.
 ///
 /// Identity is `(pid, launchedAt)`, so a recycled pid never inherits another app's rows. Rows retire
 /// through `deletedOn` and are never hard-deleted.

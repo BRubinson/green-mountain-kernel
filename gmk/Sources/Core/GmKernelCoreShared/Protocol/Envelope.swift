@@ -33,7 +33,7 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case contextGet = "CONTEXT_GET"
     // Listing (enumeration — the Landing browse surface)
     case projectList = "PROJECT_LIST"
-    // v16 — the first project-level mutation (m0011's primary_project_branch).
+    // The first project-level mutation (primary_project_branch).
     case projectUpdate = "PROJECT_UPDATE"
     // v17 — the masking/promotion/cogs/search family.
     case dopePromote = "DOPE_PROMOTE"
@@ -56,7 +56,7 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case promptGet = "PROMPT_GET"
     case promptUpdateContent = "PROMPT_UPDATE_CONTENT"
     case promptSetStatus = "PROMPT_SET_STATUS"
-    // Bot workflow machine (v24): the daemon-held state machine. START
+    // Bot workflow machine: the daemon-held state machine. START
     // creates the workflow row on a draft prompt (no status change — the
     // set-status door is untouched); RESUME adopts existing evidence; NEXT
     // computes the phase from db state and serves instructions + uuids;
@@ -65,13 +65,13 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case promptResume = "PROMPT_RESUME"
     case botNext = "BOT_NEXT"
     case botGet = "BOT_GET"
-    // Agent registry (v25): the spawner's authority write for one agent_id,
+    // Agent registry: the spawner's authority write for one agent_id,
     // merged with the identity the SubagentStart hook records.
     case agentRegister = "AGENT_REGISTER"
     // Artifacts
     case artifactAdd = "ARTIFACT_ADD"
     case artifactList = "ARTIFACT_LIST"
-    // Prompt-qualified diagrams (v20) — a prompt's reading of a rendered
+    // Prompt-qualified diagrams — a prompt's reading of a rendered
     // diagram. Prompt-scoped, so it sits with the artifacts rather than with
     // the DIAGRAM family, which is owner-tier addressed.
     case promptDiagramQualify = "PROMPT_DIAGRAM_QUALIFY"
@@ -95,9 +95,9 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case kbiteDelete = "KBITE_DELETE"
     // Catalog search (instances + sessions, the GMVibes search bar)
     case catalogSearch = "CATALOG_SEARCH"
-    // Full-text search over prompt/clarification/architecture text (v8)
+    // Full-text search over prompt/clarification/architecture text
     case search = "SEARCH"
-    // Clarification machine (v24: the m0025 split — questions/notes/care
+    // Clarification machine (the clarification split — questions/notes/care
     // package; CLARIFY_ASK retired with the legacy single-table model)
     case clarifyOpen = "CLARIFY_OPEN"
     case clarifyQuestionAdd = "CLARIFY_QUESTION_ADD"
@@ -107,12 +107,12 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case clarifyReopen = "CLARIFY_REOPEN"
     case clarifyFinalize = "CLARIFY_FINALIZE"
     case clarifyGet = "CLARIFY_GET"
-    // Care package (v24): the standalone clarified-intent bundle.
+    // Care package: the standalone clarified-intent bundle.
     case carePackageOpen = "CARE_PACKAGE_OPEN"
     case carePackageRefAdd = "CARE_PACKAGE_REF_ADD"
     case carePackageComplete = "CARE_PACKAGE_COMPLETE"
     case carePackageGet = "CARE_PACKAGE_GET"
-    // Architecture machine (v7)
+    // Architecture machine
     case archOpen = "ARCH_OPEN"
     case archSummarize = "ARCH_SUMMARIZE"
     case archPersistAdd = "ARCH_PERSIST_ADD"
@@ -122,11 +122,11 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case archApprove = "ARCH_APPROVE"
     case archRevise = "ARCH_REVISE"
     case archGet = "ARCH_GET"
-    // Architecture options (v24): the architect pen inversion — option rows
+    // Architecture options: the architect pen inversion — option rows
     // written by architect agents; DECIDE selects one and rejects siblings.
     case archOptionAdd = "ARCH_OPTION_ADD"
     case archDecide = "ARCH_DECIDE"
-    // Exploration report machine (v9)
+    // Exploration report machine
     case exploreOpen = "EXPLORE_OPEN"
     case exploreKeyFileAdd = "EXPLORE_KEY_FILE_ADD"
     case exploreFindingAdd = "EXPLORE_FINDING_ADD"
@@ -134,7 +134,7 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case exploreComplete = "EXPLORE_COMPLETE"
     case exploreReopen = "EXPLORE_REOPEN"
     case exploreGet = "EXPLORE_GET"
-    // Review report machine (v9)
+    // Review report machine
     case reviewOpen = "REVIEW_OPEN"
     case reviewFindingAdd = "REVIEW_FINDING_ADD"
     case reviewRank = "REVIEW_RANK"
@@ -142,14 +142,14 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case reviewComplete = "REVIEW_COMPLETE"
     case reviewReopen = "REVIEW_REOPEN"
     case reviewGet = "REVIEW_GET"
-    // Agent briefing (v21): the context package a briefer agent assembles for a
+    // Agent briefing: the context package a briefer agent assembles for a
     // phase; consumed by spawned agents via the stub -> get pull.
     case briefingOpen = "BRIEFING_OPEN"
     case briefingComplete = "BRIEFING_COMPLETE"
     case briefingGet = "BRIEFING_GET"
     case briefingList = "BRIEFING_LIST"
     case briefingStub = "BRIEFING_STUB"
-    // DOPED domain modeling (v11; dopeList v12)
+    // DOPED domain modeling
     case dopeInit = "DOPE_INIT"
     case dopeList = "DOPE_LIST"
     case dopeGet = "DOPE_GET"
@@ -161,7 +161,7 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case dopeResolve = "DOPE_RESOLVE"
     case dopeWriteRepo = "DOPE_WRITE_REPO"
     case dopeIngest = "DOPE_INGEST"
-    // DIAGRAM domain modeling (v15). BATCH_APPLY is the primary interactive
+    // DIAGRAM domain modeling. BATCH_APPLY is the primary interactive
     // write; the NODE verbs are one-mutation batches over the same store body.
     case diagramInit = "DIAGRAM_INIT"
     case diagramList = "DIAGRAM_LIST"
@@ -170,22 +170,22 @@ enum MessageType: String, Codable, Hashable, CaseIterable, Sendable {
     case diagramNodeUpdate = "DIAGRAM_NODE_UPDATE"
     case diagramNodeDelete = "DIAGRAM_NODE_DELETE"
     case diagramBatchApply = "DIAGRAM_BATCH_APPLY"
-    // Diagram Studio (v23): cross-tier browse/search (LIST keeps its
+    // Diagram Studio: cross-tier browse/search (LIST keeps its
     // no-union picker contract), row delete, and the public-visibility
     // serialization pair (the dope write-repo/ingest twins).
     case diagramSearch = "DIAGRAM_SEARCH"
     case diagramDelete = "DIAGRAM_DELETE"
     case diagramWriteRepo = "DIAGRAM_WRITE_REPO"
     case diagramIngest = "DIAGRAM_INGEST"
-    // Git-state resolution (v7)
+    // Git-state resolution
     case sessionResolve = "SESSION_RESOLVE"
     case instanceCurrentSession = "INSTANCE_CURRENT_SESSION"
-    // Daemon config (v7)
+    // Daemon config
     case pathsGet = "PATHS_GET"
     case configSet = "CONFIG_SET"
     // Audit
     case eventList = "EVENT_LIST"
-    // Transactional batching (v28) — N inner request lines, ONE transaction.
+    // Transactional batching — N inner request lines, ONE transaction.
     // The dispatcher re-enters itself, which it already does per connection;
     // the inner lines stay opaque so this verb needs no knowledge of the
     // ~230 it can carry.

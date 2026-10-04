@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 // BOT_* / PROMPT_START / PROMPT_RESUME — the daemon-held workflow state
-// machine (m0025). Bodies live in BotWorkflowRepository; these wrappers own
+// machine. Bodies live in BotWorkflowRepository; these wrappers own
 // the transaction. Phase is DERIVED at every next — resume is the first-run
 // code path by construction.
 

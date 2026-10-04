@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `machine` table (m0031): one row per physical host.
+/// Read-side mirror of the `machine` table: one row per physical host.
 ///
 /// Keyed on `hardwareUuid` (IOPlatformUUID), which is local-only and never sent on the wire.
 struct MachineRecord: BaseRecordFields, TableRecord {

@@ -1,6 +1,6 @@
 import Foundation
 
-// DIAGRAM_* (v15) — thin decode+dispatch shims, one per verb. The NODE
+// DIAGRAM_* — thin decode+dispatch shims, one per verb. The NODE
 // verbs land in the store as one-mutation batches over the same body as
 // DIAGRAM_BATCH_APPLY, so granular and batch semantics cannot drift.
 
@@ -117,7 +117,7 @@ enum DiagramBatchApplyHandler {
     }
 }
 
-// Diagram Studio (v23)
+// Diagram Studio
 
 enum DiagramSearchHandler {
     /// Handles a diagram search request.

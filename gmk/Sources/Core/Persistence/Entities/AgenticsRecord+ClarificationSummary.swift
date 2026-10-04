@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `clarification_summary` table (m0025: slimmed —
+/// Read-side mirror of the `clarification_summary` table (slimmed —
 /// backstory_note/refined_goal/refined_detail are gone; clarified intent
 /// lives on the care package).
 ///

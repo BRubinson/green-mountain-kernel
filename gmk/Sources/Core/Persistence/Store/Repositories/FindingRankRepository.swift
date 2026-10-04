@@ -113,7 +113,7 @@ struct FindingRankRepository: RepositoryContext {
         try type.all().forParent(summaryUuid).unranked().fetchCount(db)
     }
 
-    // MARK: - Prompt-scoped (m0025 per-agent exploration summaries)
+    // MARK: - Prompt-scoped (per-agent exploration summaries)
 
     /// Applies a calibrated rank batch across all exploration summaries of one prompt.
     ///

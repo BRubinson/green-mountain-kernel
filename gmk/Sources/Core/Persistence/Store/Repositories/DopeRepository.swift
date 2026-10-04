@@ -334,7 +334,7 @@ struct DopeRepository: RepositoryContext {
 
         // The chain-non-null tier ladder: a session-tier scope fills its
         // own FK and every ancestor uuid, so list/get by any ancestor stays
-        // a plain indexed WHERE (m0010 grammar, ported by m0013).
+        // a plain indexed WHERE.
         guard let lineage = try SessionLineage.request(sessionUuid: req.sessionUuid).fetchOne(db) else {
             throw StoreError.corruptState(
                 entity: "session",
@@ -557,7 +557,7 @@ struct DopeRepository: RepositoryContext {
             .map { $0.dto() }
     }
 
-    // MARK: - List (v12; picker enumeration — never a PROMPT/SESSION_INSTANCE union)
+    // MARK: - List (picker enumeration — never a PROMPT/SESSION_INSTANCE union)
 
     /// Lists dope scopes for a session or prompt.
     /// - Parameter req: The list request with session, optional prompt, and optional scope code.

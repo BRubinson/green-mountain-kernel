@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `managed_window` table (m0031): one row per observed window.
+/// Read-side mirror of the `managed_window` table: one row per observed window.
 ///
 /// Frames are global Cocoa coordinates. The pre-park frame is non-nil only while the window is
 /// parked, and crash recovery reads it before falling back to geometry.

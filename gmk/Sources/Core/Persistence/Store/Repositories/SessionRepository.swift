@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// SESSION_GET / SESSION_UPDATE data access, plus the activation registry
-/// (v21) and the shared prompt-stub/change-summary aggregations.
+/// and the shared prompt-stub/change-summary aggregations.
 ///
 /// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
 /// self-transacts.
@@ -135,7 +135,7 @@ struct SessionRepository: RepositoryContext {
             .dto()
     }
 
-    // MARK: - Activation registry (v21)
+    // MARK: - Activation registry
 
     /// Registers or updates a prompt activation claim for a running Claude instance.
     ///

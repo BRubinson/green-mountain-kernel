@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `test_run` table (m0029): APPEND-ONLY run history.
+/// Read-side mirror of the `test_run` table: APPEND-ONLY run history.
 ///
 /// Nothing here is ever deleted, and the only mutations are the lifecycle
 /// stamps (`state`, `startedAt`, `finishedAt`, `exitCode`, `summary`) on a row

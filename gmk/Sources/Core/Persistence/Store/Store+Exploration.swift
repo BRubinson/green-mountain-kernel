@@ -173,7 +173,7 @@ extension Store {
         // ("Aggressive" vs "aggressive") that fracture per-agent queries.
         let agentName = Store.normalizedAgentName(agentName)
         guard !title.isEmpty else { throw StoreError.badRequest(detail: "finding title is empty") }
-        // key_file findings (m0025) are path-anchored with no narrative.
+        // key_file findings are path-anchored with no narrative.
         guard allowEmptyBody || !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw StoreError.badRequest(detail: "finding body is empty")
         }

@@ -446,7 +446,7 @@ struct DiagramRepository: RepositoryContext {
         return DiagramResponse(diagram: diagram, created: true)
     }
 
-    // MARK: - List (v12 semantics: one owner, one tier, never a union)
+    // MARK: - List (one owner, one tier, never a union)
 
     /// List diagrams owned by a single tier owner.
     ///

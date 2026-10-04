@@ -15,7 +15,7 @@ struct ProjectRow: Codable, Hashable, Sendable {
     /// BASE_DOPED_BRANCH — the branch whose SESSION_INSTANCE dope scope may
     /// promote into this project's BASE_PROJECT scope.
     ///
-    /// Defaults to "main" (m0011 backfills every existing row); user-configured
+    /// Defaults to "main" (backfills every existing row); user-configured
     /// through PROJECT_UPDATE or GMVibes' project view.
     ///
     /// Defaulted rather than Optional so a stale peer that omits the key
@@ -1073,7 +1073,7 @@ struct PromptChangeSummary: Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - Clarification (m0025 split)
+// MARK: - Clarification
 
 struct ClarificationSummaryRow: Codable, Hashable, Sendable {
     let uuid: String
@@ -1237,7 +1237,7 @@ struct ClarificationNoteRow: Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - Care package (m0025)
+// MARK: - Care package
 
 /// The standalone clarified-intent bundle on a clarification summary.
 ///
@@ -1374,7 +1374,7 @@ struct CarePackageExplorationRefRow: Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - Architecture (v7)
+// MARK: - Architecture
 
 struct ArchitectureSummaryRow: Codable, Hashable, Sendable {
     let uuid: String
@@ -1551,7 +1551,7 @@ struct ArchPersistenceChangeRow: Codable, Hashable, Sendable {
     }
 }
 
-/// One methodology's persisted architecture proposal (m0025 pen inversion —
+/// One methodology's persisted architecture proposal (pen inversion —
 /// the first architect pen).
 ///
 /// Only the SELECTED option expands into change rows; losers persist as
@@ -1601,7 +1601,7 @@ struct ArchitectureOptionRow: Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - Bot workflow (m0025)
+// MARK: - Bot workflow
 
 /// The daemon-held workflow state machine row.
 ///
@@ -1719,7 +1719,7 @@ struct UnplannedChangeRow: Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - Exploration (v9)
+// MARK: - Exploration
 
 struct ExplorationSummaryRow: Codable, Hashable, Sendable {
     let uuid: String
@@ -1771,7 +1771,7 @@ struct ExplorationSummaryRow: Codable, Hashable, Sendable {
     }
 }
 
-/// One agent briefing (m0025 shape): an opinion-free ref pre-selection a
+/// One agent briefing: an opinion-free ref pre-selection a
 /// briefer agent assembles for a phase.
 ///
 /// The old body/dope_refs/kbite_refs TEXT columns are gone — refs are typed
@@ -1996,7 +1996,7 @@ struct ExplorationFindingStub: Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - Review (v9)
+// MARK: - Review
 
 struct ReviewSummaryRow: Codable, Hashable, Sendable {
     let uuid: String
@@ -2154,7 +2154,7 @@ struct DopeScopeRow: Codable, Hashable, Sendable {
     let sessionUuid: String?
     let promptUuid: String?
     let scopeType: String
-    /// Soft delete (m0012/m0013).
+    /// Soft delete.
     ///
     /// Reads deliberately do NOT filter on it.
     let deletedOn: String?
@@ -2273,8 +2273,7 @@ struct DiagramRow: Codable, Hashable, Sendable {
     let name: String
     let description: String
     let gmccDiagramPath: String?
-    /// Which dope scope this WHOLE diagram reads and writes through
-    /// (m0016).
+    /// Which dope scope this WHOLE diagram reads and writes through.
     ///
     /// A ghost-tolerant CODE, resolved at read time, restricted to masking
     /// tiers. Distinct from per-element diagram_dope_scope bindings (those

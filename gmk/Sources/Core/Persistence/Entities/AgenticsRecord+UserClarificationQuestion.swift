@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of `user_clarification_question` (m0025 split).
+/// Read-side mirror of `user_clarification_question`.
 struct UserClarificationQuestionRecord: BaseRecordFields, TableRecord, SeqOrdered {
     static let databaseTableName = "user_clarification_question"
     var uuid: String

@@ -749,7 +749,7 @@ struct ArchitectureRepository: RepositoryContext {
         return (generalChanges, generalChangeStubs)
     }
 
-    // MARK: - Option guard (m0025)
+    // MARK: - Option guard
 
     /// Guards expansion until an undecided option set is resolved.
     ///

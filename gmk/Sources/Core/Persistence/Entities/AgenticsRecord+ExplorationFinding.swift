@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `exploration_finding` table (m0025: absorbed
+/// Read-side mirror of the `exploration_finding` table (absorbed
 /// exploration_key_file — a key file is a finding of kind 'key_file' with
 /// file_path set).
 struct ExplorationFindingRecord: BaseRecordFields, TableRecord, Rankable, ParentKeyed {

@@ -1,8 +1,8 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `architecture_option` table (m0025 pen
-/// inversion).
+/// Read-side mirror of the `architecture_option` table (the architect
+/// pen inversion).
 ///
 /// Columns map via convertFromSnakeCase.
 struct ArchitectureOptionRecord: BaseRecordFields, TableRecord {

@@ -120,7 +120,7 @@ struct DopeLevelSpec: Sendable {
     }
 }
 
-/// DopeScope.scope_type values — the four-tier ladder (m0013).
+/// DopeScope.scope_type values — the four-tier ladder.
 ///
 /// The two retired spellings map one-to-one onto the session tiers, which is
 /// what made the widening drop-in: SESSION_BASE became SESSION_INSTANCE and

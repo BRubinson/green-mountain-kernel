@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `display` table (m0031): every monitor the machine has seen.
+/// Read-side mirror of the `display` table: every monitor the machine has seen.
 ///
 /// Identity is `(machineUuid, stableKey)`; rows outlive an unplug so workstation placements survive.
 /// Frames are global Cocoa coordinates.

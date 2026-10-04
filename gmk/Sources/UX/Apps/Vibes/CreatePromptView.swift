@@ -127,7 +127,7 @@ struct CreatePromptView: View {
         do {
             // Code passed EXPLICITLY — a nil code defaults to "p{seq}".
             // gmfsRelativeStoragePath stays nil: the daemon allocates seq
-            // atomically and derives the slugged path itself (v8); the
+            // atomically and derives the slugged path itself; the
             // returned row's path is the only folder the resolver (and the
             // daemon's MemoryWatcher) will ever look at.
             let row = try await service.createPrompt(

@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// BOT_* / PROMPT_START / PROMPT_RESUME data access — the daemon-held workflow state machine (m0025).
+/// BOT_* / PROMPT_START / PROMPT_RESUME data access — the daemon-held workflow state machine.
 ///
 /// Runs INSIDE a Store-owned transaction. The row is deliberately thin: variant + status +
 /// claim + observability. The CURRENT PHASE IS DERIVED from db evidence on every NEXT — there

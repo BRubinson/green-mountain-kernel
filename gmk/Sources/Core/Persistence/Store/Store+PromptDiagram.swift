@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 // PROMPT_DIAGRAM_QUALIFY / _GET / _LIST — a prompt's standing reading of a
-// rendered diagram (m0022). No status machine and no findings: the row IS the
+// rendered diagram. No status machine and no findings: the row IS the
 // report, and the newest reading is the only one worth keeping.
 // Bodies live in PromptDiagramRepository; these wrappers own the transaction
 // (and the pre-transaction payload validation).

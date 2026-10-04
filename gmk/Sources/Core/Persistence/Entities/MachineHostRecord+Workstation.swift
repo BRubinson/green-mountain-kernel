@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `workstation` table (m0031): one connected-display set of a machine.
+/// Read-side mirror of the `workstation` table: one connected-display set of a machine.
 ///
 /// Identity is `(machineUuid, displaySetKey)`. A row is minted on first sight of its set and never
 /// retires; the workstation whose key equals the connected set is the active one.

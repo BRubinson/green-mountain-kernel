@@ -191,6 +191,13 @@ custom_rules:
     match_kinds: [comment, doccomment]
     message: "Comments describe what IS. Move history to git."
     severity: error
+  version_tag_comment:
+    name: "No version tags in comments"
+    regex: '//.*\((v\d+|m\d{4})\b'
+    included: ".*/gmk/Sources/.*"
+    match_kinds: [comment, doccomment]
+    message: "A (v7)/(m0025) tag records when, not what. GmWireProtocol and the migration ladder own versions."
+    severity: error
   long_comment_run:
     name: "Comment run over 8 lines"
     regex: '(?:^[ \t]*//(?!/)[^\n]*\n){9,}'

@@ -520,11 +520,9 @@ struct UmlNodeShape: Shape {
             )
             // ONE closed body subpath — sides, bottom bulge, and the top
             // ellipse's lower arc — so an explicit fill paints the whole
-            // barrel, then the top disk as its own subpath. (v1 shipped a
-            // stray zero-sweep addArc here that drew a chord across every
-            // stroked cylinder, and disjoint open subpaths that filled as
-            // wedges — the quad controls at ±cap*2 from the rim put the
-            // curve APEX exactly one cap-height beyond it.)
+            // barrel, then the top disk as its own subpath. The quad controls
+            // at ±cap*2 from the rim put the curve APEX exactly one cap-height
+            // beyond it.
             path.move(to: CGPoint(x: rect.minX, y: rect.minY + cap))
             path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - cap))
             path.addQuadCurve(

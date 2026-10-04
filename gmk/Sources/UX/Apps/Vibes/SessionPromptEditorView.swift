@@ -401,7 +401,7 @@ private struct PromptEditorPane: View {
     }
 
     /// Post-draft, the care package's clarified intent is the durable
-    /// clarified picture (m0025 — nothing writes prompt content past draft;
+    /// clarified picture (nothing writes prompt content past draft;
     /// the human triple stays primary and the intent renders alongside it).
     private var clarifiedIntent: String? {
         guard !editable, case .loaded(let response) = phases.clarification,

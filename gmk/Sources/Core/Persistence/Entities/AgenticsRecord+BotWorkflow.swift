@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `bot_workflow` table (m0025): the daemon-held
+/// Read-side mirror of the `bot_workflow` table: the daemon-held
 /// workflow state machine row.
 ///
 /// Deliberately thin — phase is DERIVED from db

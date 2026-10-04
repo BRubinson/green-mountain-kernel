@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 /// PROMPT_DIAGRAM_QUALIFY / _GET / _LIST data access — a prompt's standing
-/// reading of a rendered diagram (m0022).
+/// reading of a rendered diagram.
 ///
 /// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
 /// self-transacts.

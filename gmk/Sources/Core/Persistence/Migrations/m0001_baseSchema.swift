@@ -159,7 +159,7 @@ extension Migrations {
                     """
             )
 
-            // Kbite content family (v16 prompt 4), folded into the single
+            // Kbite content family, folded into the single
             // re-baselined m0001: the digested-content side — resources,
             // files, keyword vocabulary, and the FTS5 mirror backing
             // KBITE_SEARCH.

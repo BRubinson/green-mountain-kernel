@@ -487,7 +487,7 @@ struct DopePersistenceNode: Codable, Hashable, Sendable {
 struct DopeScopeTree: Codable, Hashable, Sendable {
     let identity: DopeNodeIdentity
     let body: DopeScopeBody
-    /// nil for the two project tiers (m0013).
+    /// nil for the two project tiers.
     ///
     /// A project-tier tree has no session, and the repo/boot axis is
     /// session-only by construction.

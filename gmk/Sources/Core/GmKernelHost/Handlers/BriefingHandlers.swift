@@ -1,6 +1,6 @@
 import Foundation
 
-// BRIEFING_* (v21) — thin decode-and-delegate shims over Store+Briefing, one
+// BRIEFING_* — thin decode-and-delegate shims over Store+Briefing, one
 // file for the family (the DiagramHandlers precedent).
 
 /// BRIEFING_OPEN — reserve (or reset-to-building) the row for one

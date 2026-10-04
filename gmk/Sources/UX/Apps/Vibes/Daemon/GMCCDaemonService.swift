@@ -149,7 +149,7 @@ actor GMCCDaemonService {
         }
     }
 
-    // MARK: - Full-text search (v8)
+    // MARK: - Full-text search
 
     /// Searches prompts, clarifications and architecture by full-text query.
     ///
@@ -300,7 +300,7 @@ actor GMCCDaemonService {
         return try await perform { try $0.setPromptStatus(req) }
     }
 
-    // MARK: - Clarification / architecture (v7, read-only)
+    // MARK: - Clarification / architecture (read-only)
 
     /// Fetches clarification data for a prompt.
     /// - Parameter promptUuid: The prompt UUID.
@@ -320,7 +320,7 @@ actor GMCCDaemonService {
         return try await perform { try $0.archGet(ArchGetRequest(promptUuid: uuid)) }
     }
 
-    // MARK: - Clarification answering (m0025, the app's ONLY report write)
+    // MARK: - Clarification answering (the app's ONLY report write)
 
     /// Answers a clarification question for a prompt.
     ///
@@ -340,7 +340,7 @@ actor GMCCDaemonService {
         return try await perform { try $0.clarifyAnswer(req).question }
     }
 
-    // MARK: - Bot workflow (m0025, read-only)
+    // MARK: - Bot workflow (read-only)
 
     /// Advances the workflow to the next phase.
     ///
@@ -354,7 +354,7 @@ actor GMCCDaemonService {
         return try await perform { try $0.botNext(BotNextRequest(promptUuid: uuid)) }
     }
 
-    // MARK: - Exploration / review (v9, read-only)
+    // MARK: - Exploration / review (read-only)
 
     /// Fetches a windowed or complete set of exploration findings.
     ///
@@ -381,7 +381,7 @@ actor GMCCDaemonService {
         return try await perform { try $0.reviewGet(ReviewGetRequest(promptUuid: uuid, full: full)) }
     }
 
-    // MARK: - Briefing (v21, read-only)
+    // MARK: - Briefing (read-only)
 
     /// Lists briefing steps for a prompt.
     ///
@@ -405,7 +405,7 @@ actor GMCCDaemonService {
         return try await perform { try $0.briefingGet(BriefingGetRequest(briefingUuid: normalized)) }
     }
 
-    // MARK: - Git state / paths (v7)
+    // MARK: - Git state / paths
 
     /// Fetches the current session for an instance.
     /// - Parameter instanceUuid: The instance UUID.

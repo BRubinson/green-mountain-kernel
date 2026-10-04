@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `project_test_lock` table (m0029): the ONE mutable
+/// Read-side mirror of the `project_test_lock` table: the ONE mutable
 /// claim cell per project.
 ///
 /// The pairing with `test_run` is the point. This row is overwritten on every

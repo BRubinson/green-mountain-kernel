@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Read-side mirror of the `workstation_display` table (m0031): one member display of a workstation.
+/// Read-side mirror of the `workstation_display` table: one member display of a workstation.
 ///
 /// `position` is fixed at creation: 0 is the seed display and the rest run left to right.
 struct WorkstationDisplayRecord: BaseRecordFields, TableRecord {

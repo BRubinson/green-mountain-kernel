@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Diagram Studio (v23) data access: cross-tier search/browse and the row
+/// Diagram Studio data access: cross-tier search/browse and the row
 /// delete.
 ///
 /// Runs INSIDE a Store-owned transaction; holds no dbQueue and never self-transacts.

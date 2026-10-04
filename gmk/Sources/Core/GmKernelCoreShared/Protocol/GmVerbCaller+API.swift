@@ -101,7 +101,7 @@ extension GmVerbCaller {
         try request(type: .catalogSearch, payload: req, responseType: CatalogSearchResponse.self)
     }
 
-    // MARK: - Full-text search (v8)
+    // MARK: - Full-text search
 
     /// Performs a full-text search.
     /// - Parameter req: The search request.
@@ -360,7 +360,7 @@ extension GmVerbCaller {
     }
 }
 
-// MARK: - Clarification (v7)
+// MARK: - Clarification
 
 extension GmVerbCaller {
     /// Opens a clarification workflow.
@@ -460,7 +460,7 @@ extension GmVerbCaller {
     }
 }
 
-// MARK: - Exploration (v9)
+// MARK: - Exploration
 
 extension GmVerbCaller {
     /// Opens an exploration workflow.
@@ -520,7 +520,7 @@ extension GmVerbCaller {
     }
 }
 
-// MARK: - Review (v9)
+// MARK: - Review
 
 extension GmVerbCaller {
     /// Opens a review workflow.
@@ -580,7 +580,7 @@ extension GmVerbCaller {
     }
 }
 
-// MARK: - Briefing (v21)
+// MARK: - Briefing
 
 extension GmVerbCaller {
     /// Opens a briefing workflow.
@@ -624,7 +624,7 @@ extension GmVerbCaller {
     }
 }
 
-// MARK: - Architecture (v7)
+// MARK: - Architecture
 
 extension GmVerbCaller {
     /// Opens an architecture workflow.
@@ -756,7 +756,7 @@ extension GmVerbCaller {
     }
 }
 
-// MARK: - Git state + config (v7)
+// MARK: - Git state + config
 
 extension GmVerbCaller {
     /// Resolves a session.
@@ -797,7 +797,7 @@ extension GmVerbCaller {
     }
 }
 
-// MARK: - Dope (v11)
+// MARK: - Dope
 
 extension GmVerbCaller {
     /// Initializes a dope scope.
@@ -973,7 +973,7 @@ extension GmVerbCaller {
     }
 }
 
-// MARK: - Diagram (v15)
+// MARK: - Diagram
 
 extension GmVerbCaller {
     /// Initializes a diagram.
