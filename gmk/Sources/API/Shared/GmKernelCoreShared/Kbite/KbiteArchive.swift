@@ -31,8 +31,8 @@ enum KbiteArchive {
     /// plugin or wire version.
     static let formatVersion = 1
 
-    // Deliberately NOT of the retired GMCC_KBITE* env family —
-    // DocsContractTests bans that spelling everywhere in docs.
+    // Deliberately outside the retired GMCC_KBITE* env family, a spelling
+    // docs must never carry.
     static let treePlaceholder = "{{KBITE_TREE}}"
     static let identityPlaceholder = "{{KBITE_IDENTITY}}"
     static let gmfsPlaceholder = "{{GM_FS}}"

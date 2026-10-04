@@ -71,11 +71,8 @@ final class Store: Sendable {
 
     // MARK: - StoreCore forwards
     //
-    // Bodies live on StoreCore; these exist because callers name them here.
-    // The instance forwards are not dressing: KbiteExportImportTests calls
-    // `store.insertBase(db, table:extra:)` directly, so it must stay an instance
-    // method with this exact signature, defaulted parameters and
-    // @discardableResult included.
+    // Bodies live on StoreCore; these exist because callers, including Store's
+    // own extensions, name them on the store instance.
 
     /// Insert a row with the five BaseEntity columns plus extra columns.
     ///

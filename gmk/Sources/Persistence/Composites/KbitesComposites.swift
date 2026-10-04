@@ -8,7 +8,7 @@ import Foundation
 import GRDB
 
 /// PROJECTION record: a decoder for a select-projected `kbite_resource_file`
-/// row, not a table mirror, so it is not enrolled in RecordSchemaTests.
+/// row, not a table mirror, so it is not enrolled in `SchemaEnrollment.records`.
 ///
 /// `hasContent` decodes the projected `has_content` expression, which keeps
 /// `resource_file_content` — ~115 MB, the largest thing in the schema — out of

@@ -481,6 +481,13 @@
 			);
 			target = A17E00102FDCB00000DAF751 /* GmKernelTests */;
 		};
+		A17E00402FDCB00000DAF751 /* Exceptions for "Sources" folder in "gm_kernel" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				UX/Apps/Vibes/Info.plist,
+			);
+			target = 1B4010722FDCA09200DAF751 /* gm_kernel */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -488,6 +495,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				A17E00022FDCB00000DAF751 /* Exceptions for "Sources" folder in "GmKernelTests" target */,
+				A17E00402FDCB00000DAF751 /* Exceptions for "Sources" folder in "gm_kernel" target */,
 			);
 			path = Sources;
 			sourceTree = "<group>";

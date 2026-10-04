@@ -72,10 +72,9 @@ final class KernelLifecycleTests: KernelBackedTestCase {
     /// Every message type the build knows has a registry row.
     ///
     /// Guards a real hazard: a verb with no row is a WRITE the permission layer
-    /// cannot see.
+    /// cannot see. The only exemptions are the registry's own `unroledMessageTypes`.
     func testEveryMessageTypeHasARegistryRow() {
-        let transportOnly: Set<MessageType> = [.hello, .subscribe, .event, .error]
-        for type in MessageType.allCases where !transportOnly.contains(type) {
+        for type in MessageType.allCases where !VerbRegistry.unroledMessageTypes.contains(type) {
             XCTAssertNotNil(
                 VerbRegistry.spec(for: type),
                 "\(type.rawValue) has no VerbRegistry row — the guard cannot see it"

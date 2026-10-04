@@ -3759,8 +3759,7 @@ struct BotNextResponse: Codable, Hashable, Sendable {
     let workflow: BotWorkflowRow
     /// The furthest phase whose entry gate is satisfied.
     let phase: String
-    /// Compiled-in instruction text for (variant, phase) — the Cheatsheet
-    /// precedent; drift-guarded by WorkflowSpecTests.
+    /// Compiled-in instruction text for (variant, phase).
     let instructions: String
     /// What still blocks the NEXT phase (empty when the phase's own work is
     /// simply not done yet).

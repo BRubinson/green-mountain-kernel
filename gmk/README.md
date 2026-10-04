@@ -1,8 +1,9 @@
 # GM Vibes
 
-A native macOS app for browsing and managing the **GMCC** (Green Mountain
-Compiler Collection) contextual knowledge file system — projects, sessions,
-prompts, and knowledge bites (kbites) — with a modern SwiftUI interface.
+A native macOS app for browsing and managing the **GMCC** (the coding
+collection that supports the Green Mountain Kernel) contextual knowledge file
+system — projects, sessions, prompts, and knowledge bites (kbites) — with a
+modern SwiftUI interface.
 
 GM Vibes is the desktop companion to the GMCC plugin. It reads the same
 `GM_*` environment and `~/gmfs` layout that the GM-CDE toolchain produces, so
@@ -27,7 +28,8 @@ no gmfs to read.
 
 ## Install
 
-The app ships **inside the unified release** alongside the daemon binaries, at
+The app is the only kernel host, and ships **inside the unified release** alongside
+the `gm_kernel` command-line and hook binaries, at
 one version pinned by `gmk/VERSION`. The plugin's installer fetches and installs
 both, and is the recommended path — it verifies the SHA-256 sidecar before
 mounting anything:

@@ -145,7 +145,8 @@ enum VerbRegistry {
     // MARK: - The table
     //
     // ONE ROW PER MessageType. Adding a case to MessageType without adding a
-    // row here (or to `unroledMessageTypes`) fails VerbRegistryTests.
+    // row here (or to `unroledMessageTypes`) fails
+    // KernelLifecycleTests.testEveryMessageTypeHasARegistryRow.
 
     static let all: [VerbSpec] = [
 
