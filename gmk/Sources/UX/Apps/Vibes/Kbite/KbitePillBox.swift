@@ -5,7 +5,7 @@ import SwiftUI
 // accent tint, unselected are outlined. Binds to the caller's selection list and
 // keeps it ordered to match `available` for a stable on-disk registry. Wraps via
 // an internal flow layout.
-struct KBitePillBox: View {
+struct KbitePillBox: View {
     let available: [String]
     @Binding var selected: [String]
 
@@ -22,9 +22,9 @@ struct KBitePillBox: View {
                     .font(.caption).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {
-                KBiteFlowLayout(spacing: 6) {
+                KbiteFlowLayout(spacing: 6) {
                     ForEach(available, id: \.self) { name in
-                        KBitePill(name: name, isSelected: selected.contains(name)) {
+                        KbitePill(name: name, isSelected: selected.contains(name)) {
                             toggle(name)
                         }
                     }
@@ -51,7 +51,7 @@ struct KBitePillBox: View {
     }
 }
 
-private struct KBitePill: View {
+private struct KbitePill: View {
     let name: String
     let isSelected: Bool
     let action: () -> Void
@@ -87,7 +87,7 @@ private struct KBitePill: View {
 
 // Wrapping flow layout: lays subviews left-to-right, wrapping to the next row when
 // the proposed width is exceeded.
-private struct KBiteFlowLayout: Layout {
+private struct KbiteFlowLayout: Layout {
     var spacing: CGFloat = 6
 
     /// Calculates the size needed to fit all subviews with wrapping.

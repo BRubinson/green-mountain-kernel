@@ -1,12 +1,12 @@
 import SwiftUI
 
-struct KBiteMarkdownWindowView: View {
+struct KbiteMarkdownWindowView: View {
     let url: URL?
 
     var body: some View {
         Group {
             if let url {
-                KBiteMarkdownView(url: url, showOpenInWindow: false)
+                KbiteMarkdownView(url: url, showOpenInWindow: false)
             } else {
                 Text("No file selected")
                     .foregroundStyle(.secondary)

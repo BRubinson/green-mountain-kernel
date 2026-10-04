@@ -1,12 +1,12 @@
 import Foundation
 
-enum KBitePreview {
+enum KbitePreview {
     case markdown(blocks: [MarkdownBlock], source: String)
     case text(String)
     case unavailable(String)
 }
 
-enum KBiteMarkdown {
+enum KbiteMarkdown {
     static let maxBytes = 512 * 1024
 
     /// Generates a preview of a kbite file.
@@ -17,7 +17,7 @@ enum KBiteMarkdown {
     ///
     /// - Parameter url: The file URL to preview.
     /// - Returns: The generated preview.
-    static func preview(for url: URL) -> KBitePreview {
+    static func preview(for url: URL) -> KbitePreview {
         let fm = FileManager.default
         let attrs = (try? fm.attributesOfItem(atPath: url.path)) ?? [:]
         if let size = attrs[.size] as? NSNumber, size.intValue > maxBytes {

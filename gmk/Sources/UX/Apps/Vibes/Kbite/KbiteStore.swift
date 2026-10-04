@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-enum KBiteRoot: String, CaseIterable, Hashable, Identifiable {
+enum KbiteRoot: String, CaseIterable, Hashable, Identifiable {
     case open
     case digested
 
@@ -22,7 +22,7 @@ enum KBiteRoot: String, CaseIterable, Hashable, Identifiable {
     }
 }
 
-struct KBiteEntry: Identifiable, Hashable {
+struct KbiteEntry: Identifiable, Hashable {
     let name: String
     let url: URL
     var id: URL { url }
@@ -30,7 +30,7 @@ struct KBiteEntry: Identifiable, Hashable {
 
 @Observable
 @MainActor
-final class KBiteStore {
+final class KbiteStore {
     private(set) var rescanToken: Int = 0
 
     /// Triggers a rescan of the kbite directories.
@@ -46,7 +46,7 @@ final class KBiteStore {
     ///   - root: The kbite root (open or digested).
     ///   - gmcc: The Vibes environment for path resolution.
     /// - Returns: The directory URL, or nil if not configured.
-    func rootURL(for root: KBiteRoot, gmcc: GMVibesEnvironment) -> URL? {
+    func rootURL(for root: KbiteRoot, gmcc: GMVibesEnvironment) -> URL? {
         guard let path = gmcc[root.envKey], !path.isEmpty else { return nil }
         return URL(fileURLWithPath: path, isDirectory: true)
     }
@@ -59,7 +59,7 @@ final class KBiteStore {
     ///   - root: The kbite root (open or digested).
     ///   - gmcc: The Vibes environment for path resolution.
     /// - Returns: An array of kbite entries; empty if not configured or inaccessible.
-    func kbites(in root: KBiteRoot, gmcc: GMVibesEnvironment) -> [KBiteEntry] {
+    func kbites(in root: KbiteRoot, gmcc: GMVibesEnvironment) -> [KbiteEntry] {
         _ = rescanToken
         guard let dir = rootURL(for: root, gmcc: gmcc) else { return [] }
         let fm = FileManager.default
@@ -74,7 +74,7 @@ final class KBiteStore {
         return
             entries
             .filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
-            .map { KBiteEntry(name: $0.lastPathComponent, url: $0) }
+            .map { KbiteEntry(name: $0.lastPathComponent, url: $0) }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 }

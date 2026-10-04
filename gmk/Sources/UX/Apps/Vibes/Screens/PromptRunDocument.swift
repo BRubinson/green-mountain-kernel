@@ -301,7 +301,7 @@ struct PromptRunDocument: View {
     /// disclosure.
     private var footerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            KBitePillBox(available: availableKbites, selected: $selectedKbites)
+            KbitePillBox(available: availableKbites, selected: $selectedKbites)
             DisclosureGroup {
                 DopePane(scope: scope, promptUuid: stub.uuid, scrollable: false)
                     .frame(minHeight: 120)

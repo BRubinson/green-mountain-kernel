@@ -716,7 +716,7 @@ private struct PromptEditorPane: View {
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            KBitePillBox(available: availableKbites, selected: $selectedKbites)
+                            KbitePillBox(available: availableKbites, selected: $selectedKbites)
                             sectionEditor(
                                 "Backstory",
                                 field: .backstory,

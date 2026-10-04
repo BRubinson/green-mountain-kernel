@@ -1,6 +1,6 @@
 import Foundation
 
-// A value-typed, polled snapshot of a directory subtree. Unlike KBiteFileNode
+// A value-typed, polled snapshot of a directory subtree. Unlike KbiteFileNode
 // (eager, synchronous, main-actor, never invalidated), this is walked off the main
 // actor and re-walked on the app's existing 1s poll cadence via
 // FileTreeStore.refreshFileTree — so files an architect agent writes into

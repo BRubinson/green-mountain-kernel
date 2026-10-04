@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct KBiteMarkdownView: View {
+struct KbiteMarkdownView: View {
     let url: URL
     var showOpenInWindow: Bool = true
     // When set + active, the body renders as highlighted plain text (find-in-page)
@@ -47,7 +47,7 @@ struct KBiteMarkdownView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch KBiteMarkdown.preview(for: url) {
+        switch KbiteMarkdown.preview(for: url) {
         case .markdown(let blocks, let source):
             if findQuery.isActive {
                 // While searching, show highlighted plain text.

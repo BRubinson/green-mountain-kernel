@@ -133,9 +133,9 @@ struct GMVibesWindow: View {
         case .projects:
             ProjectsView()  // scaffold inside (owns the searchable binding)
         case .kbites:
-            KBitesScene()  // scaffold inside (owns the KBiteStore)
+            KbitesScene()  // scaffold inside (owns the KbiteStore)
         case .kbiteFile(let url):
-            ScreenScaffold { KBiteMarkdownWindowView(url: url) }
+            ScreenScaffold { KbiteMarkdownWindowView(url: url) }
         case .promptMemories(let windowID):
             ScreenScaffold { PromptMemoriesWindow(windowID: windowID) }
         case .search(let seed):

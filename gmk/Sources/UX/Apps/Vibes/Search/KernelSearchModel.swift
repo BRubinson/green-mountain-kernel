@@ -4,7 +4,7 @@ import SwiftUI
 
 /// The debounced SEARCH engine shared by the ⌘K palette and the search screen.
 ///
-/// Query text stays in the VIEW (@State, the KBiteSearchPane shape) — this owns
+/// Query text stays in the VIEW (@State, the KbiteSearchPane shape) — this owns
 /// only the RPC lifecycle and its published results, so both surfaces inherit
 /// one cancellation/error discipline instead of copy-pasting it.
 @Observable @MainActor

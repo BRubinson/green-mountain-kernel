@@ -4,9 +4,9 @@ import SwiftUI
 ///
 /// KnowledgeBitesView is a TabView with a toolbar but no
 /// navigation container of its own, so wrap it in the ScreenScaffold as the
-/// title/toolbar host; the wrapper also owns the view-local KBiteStore.
-struct KBitesScene: View {
-    @State private var store = KBiteStore()
+/// title/toolbar host; the wrapper also owns the view-local KbiteStore.
+struct KbitesScene: View {
+    @State private var store = KbiteStore()
 
     var body: some View {
         ScreenScaffold {
@@ -19,28 +19,28 @@ struct KBitesScene: View {
 
 struct KnowledgeBitesView: View {
     @Environment(GMVibesEnvironment.self) private var gmcc
-    @Environment(KBiteStore.self) private var store
+    @Environment(KbiteStore.self) private var store
 
-    private enum KBiteTab: Hashable { case open, digested, search }
+    private enum KbiteTab: Hashable { case open, digested, search }
 
-    @State private var selectedTab: KBiteTab = .digested
+    @State private var selectedTab: KbiteTab = .digested
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            KBitesPaneView(root: .open)
+            KbitesPaneView(root: .open)
                 .tabItem { Label("Open", systemImage: "tray") }
-                .tag(KBiteTab.open)
+                .tag(KbiteTab.open)
 
-            KBitesPaneView(root: .digested)
+            KbitesPaneView(root: .digested)
                 .tabItem { Label("Digested", systemImage: "books.vertical") }
-                .tag(KBiteTab.digested)
+                .tag(KbiteTab.digested)
 
             // Search-first discovery over db-digested kbite content (FTS5,
             // bm25-ranked). Filesystem browsing stays on the other tabs; content
             // digested to the db from now on exists ONLY here.
-            KBiteSearchPane()
+            KbiteSearchPane()
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                .tag(KBiteTab.search)
+                .tag(KbiteTab.search)
         }
         .navigationTitle("Knowledge Bites")
         .toolbar {
@@ -67,8 +67,8 @@ struct KnowledgeBitesView: View {
     private var rootFolderURL: URL? {
         let key: GMVibesEnvKey
         switch selectedTab {
-        case .open: key = KBiteRoot.open.envKey
-        case .digested, .search: key = KBiteRoot.digested.envKey
+        case .open: key = KbiteRoot.open.envKey
+        case .digested, .search: key = KbiteRoot.digested.envKey
         }
         guard let path = gmcc[key], !path.isEmpty else { return nil }
         return URL(fileURLWithPath: path, isDirectory: true)
@@ -77,7 +77,7 @@ struct KnowledgeBitesView: View {
 
 // MARK: - Daemon search pane (KBITE_SEARCH → KBITE_FILE_GET)
 
-private struct KBiteSearchPane: View {
+private struct KbiteSearchPane: View {
     @State private var query = ""
     @State private var hits: [KbiteSearchHit] = []
     @State private var searched = false
@@ -242,11 +242,11 @@ private struct KBiteSearchPane: View {
     }
 }
 
-private struct KBitesPaneView: View {
-    let root: KBiteRoot
+private struct KbitesPaneView: View {
+    let root: KbiteRoot
 
     @Environment(GMVibesEnvironment.self) private var gmcc
-    @Environment(KBiteStore.self) private var store
+    @Environment(KbiteStore.self) private var store
 
     @State private var selectedFile: URL?
 
@@ -257,11 +257,11 @@ private struct KBitesPaneView: View {
             emptyState
         } else {
             HSplitView {
-                KBiteAccordionSidebar(kbites: kbites, selection: $selectedFile)
+                KbiteAccordionSidebar(kbites: kbites, selection: $selectedFile)
                     .frame(minWidth: 260, idealWidth: 320, maxWidth: 460)
 
                 if let file = selectedFile, isPreviewableFile(file) {
-                    KBiteMarkdownView(url: file)
+                    KbiteMarkdownView(url: file)
                         .frame(minWidth: 360)
                 } else {
                     Text("Select a kbite, then click a file to preview.")
@@ -306,12 +306,12 @@ private struct KBitesPaneView: View {
     }
 }
 
-private struct KBiteAccordionSidebar: View {
-    let kbites: [KBiteEntry]
+private struct KbiteAccordionSidebar: View {
+    let kbites: [KbiteEntry]
     @Binding var selection: URL?
 
     @State private var expandedURL: URL?
-    @State private var loadedNodes: [URL: KBiteFileNode] = [:]
+    @State private var loadedNodes: [URL: KbiteFileNode] = [:]
 
     var body: some View {
         List(selection: $selection) {
@@ -332,7 +332,7 @@ private struct KBiteAccordionSidebar: View {
     /// - Parameter kbite: The kbite entry to display.
     /// - Returns: The view for the kbite section.
     @ViewBuilder
-    private func kbiteSection(_ kbite: KBiteEntry) -> some View {
+    private func kbiteSection(_ kbite: KbiteEntry) -> some View {
         DisclosureGroup(isExpanded: bindingFor(kbite.url)) {
             if let node = loadedNodes[kbite.url] {
                 OutlineGroup(node.children ?? [], children: \.children) { child in
@@ -368,7 +368,7 @@ private struct KBiteAccordionSidebar: View {
     /// - Parameter node: The file node to display.
     /// - Returns: The view for the file row.
     @ViewBuilder
-    private func fileRow(_ node: KBiteFileNode) -> some View {
+    private func fileRow(_ node: KbiteFileNode) -> some View {
         if node.isDirectory {
             Label(node.name, systemImage: "folder.fill")
                 .foregroundStyle(.secondary)
@@ -410,7 +410,7 @@ private struct KBiteAccordionSidebar: View {
     private func expand(_ url: URL) {
         expandedURL = url
         if loadedNodes[url] == nil {
-            loadedNodes[url] = KBiteFileNode.load(from: url)
+            loadedNodes[url] = KbiteFileNode.load(from: url)
         }
     }
 }
