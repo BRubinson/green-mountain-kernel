@@ -66,12 +66,12 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
 
     // MARK: - Source tree
 
-    /// `Sources/Persistence/Entities`, found by walking up from this file.
+    /// `Sources/Core/Persistence/Entities`, found by walking up from this file.
     ///
     /// - Returns: The URL to the Entities directory.
-    /// - Throws: `XCTSkip` if the directory cannot be found above the test file.
+    /// - Throws: `CocoaError.fileNoSuchFile`, after an `XCTFail`, when no such directory lies above this file.
     private static func entitiesDirectory() throws -> URL {
-        let suffix = "gmk/Sources/Persistence/Entities"
+        let suffix = "gmk/Sources/Core/Persistence/Entities"
         var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
         while directory.path != "/" {
             let candidate = directory.appendingPathComponent(suffix, isDirectory: true)
@@ -83,7 +83,8 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
             }
             directory = directory.deletingLastPathComponent()
         }
-        throw XCTSkip("no \(suffix) above \(#filePath): the fence needs the checkout it was built from")
+        XCTFail("no \(suffix) above \(#filePath): the fence needs the checkout it was built from")
+        throw CocoaError(.fileNoSuchFile)
     }
 
     /// Lists Swift source files in a directory.

@@ -239,9 +239,9 @@ custom_rules:
     name: "GRDB stays in persistence"
     regex: '^(?:@\w+ +)*import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?GRDB\b'
     included: ".*/gmk/Sources/.*"
-    excluded: ".*/(?:Persistence|GmDaemon)/.*"
+    excluded: ".*/Persistence/.*"
     excluded_match_kinds: [comment, doccomment, string]
-    message: "import GRDB only under Persistence/ and GmDaemon/; everything else reaches the database through the Store."
+    message: "import GRDB only under Persistence/; everything else reaches the database through the Store."
     severity: error
   no_swiftprotobuf_outside_iterm2:
     name: "SwiftProtobuf stays in ITerm2Client"

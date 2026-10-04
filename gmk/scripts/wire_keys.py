@@ -2,7 +2,7 @@
 """Static wire-key contract extractor for the GmKernelCoreShared Protocol tree.
 
 Emits one line per stored Codable property of every top-level struct under
-Sources/API/Shared/GmKernelCoreShared/Protocol (recursively, WireCodec.swift
+Sources/Core/GmKernelCoreShared/Protocol (recursively, WireCodec.swift
 excluded): `Type.property -> json_key`. The effective key is the explicit
 CodingKeys mapping when one exists, else Foundation's .convertToSnakeCase of
 the property name.
@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 GMK_DIR = Path(__file__).resolve().parent.parent
-PROTOCOL_DIR = GMK_DIR / "Sources" / "API" / "Shared" / "GmKernelCoreShared" / "Protocol"
+PROTOCOL_DIR = GMK_DIR / "Sources" / "Core" / "GmKernelCoreShared" / "Protocol"
 ENVELOPE = PROTOCOL_DIR / "Envelope.swift"
 GOLDEN = Path(__file__).resolve().parent / "wire_keys.golden"
 VERSION_RE = re.compile(r"^\s*static let version = (\d+)\s*$", re.MULTILINE)

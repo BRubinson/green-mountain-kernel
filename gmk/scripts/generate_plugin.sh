@@ -46,7 +46,7 @@ CHECK=""
 
 PLUGIN="$REPO/plugins/gmcc"
 MARKETPLACE="$REPO/.claude-plugin/marketplace.json"
-ROSTER="$REPO/gmk/Sources/API/Shared/GmKernelCoreShared/Protocol/CdeToolRoster.generated.swift"
+ROSTER="$REPO/gmk/Sources/Core/GmKernelCoreShared/Protocol/CdeToolRoster.generated.swift"
 VERSION="$(tr -d '[:space:]' < "$REPO/gmk/VERSION")"
 
 echo "[GMB] repo:    $REPO"

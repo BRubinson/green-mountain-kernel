@@ -28,10 +28,9 @@ S="$REPO_ROOT/gmk/Sources"
 # here, loudly, which is the check that keeps the closure a closure.
 BASE_LIST="$(mktemp)"
 trap 'rm -f "$BASE_LIST"' EXIT
-find "$S/API/Shared/GmKernelCoreShared" \
-     "$S/API/Clients/GmKernelCoreClient/GmKernelClient" \
-     "$S/AgenticsCore/Feedback" \
-     "$S/Util" \
+find "$S/Core/GmKernelCoreShared" \
+     "$S/Core/GmKernelClient" \
+     "$S/Core/Feedback" \
      -name '*.swift' | sort > "$BASE_LIST"
 
 SWIFTC="$(xcrun --find swiftc)"

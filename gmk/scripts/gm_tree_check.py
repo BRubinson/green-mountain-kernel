@@ -167,7 +167,7 @@ def pbx_objects(text):
     Returns: A dict of object id to (isa, body text).
     """
     objects = {}
-    for match in re.finditer(r"^\t\t([0-9A-F]{24}) (?:/\*.*?\*/ )?= \{\n(.*?)^\t\t\};", text, re.M | re.S):
+    for match in re.finditer(r"^\t\t([0-9A-F]{24}) (?:/\*[^\n]*?\*/ )?= \{\n(.*?)^\t\t\};", text, re.M | re.S):
         isa = re.search(r"^\t\t\tisa = (\w+);", match.group(2), re.M)
         objects[match.group(1)] = (isa.group(1) if isa else "", match.group(2))
     return objects
@@ -459,6 +459,80 @@ def check_resources():
     return findings
 
 
+def pbx_list(body, key):
+    """The entries of one `key = ( ... );` list in a pbxproj object body.
+
+    Parameters:
+      - body: The object's body text.
+      - key: The list's key.
+    Returns: The entries, comments stripped and unquoted.
+    """
+    block = re.search(rf"^\t\t\t{re.escape(key)} = \(\n(.*?)^\t\t\t\);", body, re.M | re.S)
+    if not block:
+        return []
+    entries = []
+    for line in block.group(1).splitlines():
+        entry = re.sub(r"\s*/\*.*?\*/", "", line.strip()).rstrip(",").strip('"')
+        if entry:
+            entries.append(entry)
+    return entries
+
+
+def check_sources_roots():
+    """gmk/Sources is a plain group of synchronized roots, and only Info.plist is an exception.
+
+    Returns: The findings.
+    """
+    text = read(PBXPROJ)
+    if text is None:
+        return [f"{PBXPROJ} is missing"]
+    objects = pbx_objects(text)
+
+    def field(body, key):
+        m = re.search(rf"^\t\t\t{key} = \"?([^\";]+?)\"?(?: /\*.*?\*/)?;", body, re.M)
+        return m.group(1) if m else None
+
+    groups = [b for isa, b in objects.values() if isa == "PBXGroup" and field(b, "path") == "Sources"]
+    if len(groups) != 1:
+        return [f"expected one PBXGroup with path Sources, found {len(groups)}; Sources is a plain group of roots"]
+    roots = {}
+    findings = []
+    for child in pbx_list(groups[0], "children"):
+        isa, body = objects.get(child, ("", ""))
+        if isa != "PBXFileSystemSynchronizedRootGroup":
+            findings.append(f"Sources group child {child} is a {isa or 'missing object'}, not a synchronized root")
+            continue
+        roots[field(body, "path")] = body
+
+    dirs = {rel.split("/")[2] for rel in tracked("gmk/Sources") if rel.count("/") >= 3}
+    for name in sorted(dirs - set(roots)):
+        findings.append(f"gmk/Sources/{name} is not a synchronized root of the Sources group; it builds into nothing")
+    for name in sorted(set(roots) - dirs):
+        findings.append(f"Sources group root {name} names no tracked folder under gmk/Sources")
+
+    targets = {
+        tid: field(body, "name")
+        for tid, (isa, body) in objects.items()
+        if isa in ("PBXNativeTarget", "PBXAggregateTarget")
+    }
+    kernel_exceptions = set()
+    for root_isa, root_body in objects.values():
+        if root_isa != "PBXFileSystemSynchronizedRootGroup":
+            continue
+        root_path = field(root_body, "path")
+        for set_id in pbx_list(root_body, "exceptions"):
+            set_body = objects.get(set_id, ("", ""))[1]
+            target = targets.get(field(set_body, "target") or "")
+            entries = [f"{root_path}/{e}" for e in pbx_list(set_body, "membershipExceptions")]
+            if target == "GmKernelTests":
+                findings.append(f"exception set {set_id} on {root_path} targets GmKernelTests; Core is shared by root")
+            elif target == "gm_kernel":
+                kernel_exceptions.update(entries)
+    if kernel_exceptions != {"UX/Apps/Vibes/Info.plist"}:
+        findings.append(f"gm_kernel exceptions are {sorted(kernel_exceptions)}; the only one is UX/Apps/Vibes/Info.plist")
+    return findings
+
+
 CHECKS = {
     "releases_twin": (check_releases_twin, "gm_releases.sh and its plugin copy are byte-identical"),
     "test_citations": (check_test_citations, "every cited *Tests name is a class under gmk/Tests"),
@@ -467,6 +541,7 @@ CHECKS = {
     "lint_skip": (check_lint_skip, ".swiftlint.yml and .swift-format-ignore agree with gm_lint_skip"),
     "wire_keys": (check_wire_keys, "wire keys equal wire_keys.golden; removals bump GmWireProtocol.version"),
     "resources": (check_resources, "gmk/Sources holds no non-Swift file but the shipped resources"),
+    "sources_roots": (check_sources_roots, "each gmk/Sources folder is a synchronized root; only Info.plist is excepted"),
 }
 
 

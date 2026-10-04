@@ -74,7 +74,7 @@ extension CdeToolRoster {
 
     /// Quoted back when the generated constant will not decode.
     static let generatedPath =
-        "gmk/Sources/API/Shared/GmKernelCoreShared/Protocol/CdeToolRoster.generated.swift"
+        "gmk/Sources/Core/GmKernelCoreShared/Protocol/CdeToolRoster.generated.swift"
 
     /// Decoded once, as an OUTCOME rather than a trap.
     ///

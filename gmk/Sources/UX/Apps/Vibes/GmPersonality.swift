@@ -102,7 +102,7 @@ enum GmPersonality: String, CaseIterable, Sendable {
     /// beyond the base client closure.
     var closureFolders: [String] {
         switch self {
-        case .mcp: return ["API/Clients/GmKernelCoreClient/GmMcpServer"]
+        case .mcp: return ["Core/GmMcpServer"]
         case .hook: return ["API/Clients/GmKernelCoreClient/HookCli"]
         case .bridge: return []
         }

@@ -4,7 +4,7 @@ import Foundation
 // Swift type, the dry-run reports, and the write targets a payload resolves to.
 // Everything here is shaped by Claude Code's hook contract. The shell scanner
 // that answers "what would this command write?" is generic and lives in
-// Util/BashWritePaths.swift. Types stay INTERNAL; the GmHook handlers are the
+// BashWritePaths.swift. Types stay INTERNAL; the GmHook handlers are the
 // only callers that need them.
 
 // MARK: - Dry-run reports
