@@ -8,6 +8,7 @@
 #   swift_lint_format.sh                 # lint; exit 1 on any swift-format, doc-check or SwiftLint error
 #   swift_lint_format.sh --fix           # swift-format in place, then lint (SwiftLint never rewrites)
 #   swift_lint_format.sh [--fix] PATH... # restrict stages 1-3 to the given files or directories
+#   swift_lint_format.sh --no-tree-check # skip stage 4 (pre-commit runs it over the staged tree)
 #
 # Configs are discovered by walking up from each file (root .swift-format, the
 # gmk/Tests override, root .swiftlint.yml), so no --configuration is passed.
@@ -52,12 +53,14 @@ if [ -n "$SWIFTLINT" ]; then
 fi
 
 FIX=0
+TREE_CHECK=1
 PATHS=()
 while [ $# -gt 0 ]; do
     case "$1" in
         --fix) FIX=1 ;;
         --check) FIX=0 ;;
-        -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
+        --no-tree-check) TREE_CHECK=0 ;;
+        -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
         -*) echo "[GMB] swift_lint_format.sh: unknown flag $1" >&2; exit 2 ;;
         *) PATHS+=("$1") ;;
     esac
@@ -144,10 +147,12 @@ else
 fi
 
 # Stage 4: the tree invariants no compiler or linter sees; `gm_tree_check.py --list` names them.
-echo "[GMB] tree-check: checking the tree"
-if ! python3 "$SCRIPT_DIR/gm_tree_check.py"; then
-    echo "[GMB] tree-check: findings above" >&2
-    STATUS=1
+if [ "$TREE_CHECK" = 1 ]; then
+    echo "[GMB] tree-check: checking the tree"
+    if ! python3 "$SCRIPT_DIR/gm_tree_check.py"; then
+        echo "[GMB] tree-check: findings above" >&2
+        STATUS=1
+    fi
 fi
 
 exit $STATUS

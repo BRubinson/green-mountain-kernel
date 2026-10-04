@@ -2,13 +2,17 @@
 """gm_tree_check.py — stage 4 of the lint gate: the repo invariants no compiler or linter sees.
 
 Usage:
-  gm_tree_check.py             # every sub-check
-  gm_tree_check.py NAME...     # only the named sub-checks
-  gm_tree_check.py --list      # name each sub-check and what it holds
+  gm_tree_check.py [--repo DIR]           # every sub-check
+  gm_tree_check.py [--repo DIR] NAME...   # only the named sub-checks
+  gm_tree_check.py --list                 # name each sub-check and what it holds
 
 Each finding prints as `[GMB] tree-check: <sub-check>: <message>`. The exit status is 1 when any
-sub-check fails, 2 on a usage error. The tree is read through `git ls-files`, so what is checked
-is what a commit would carry.
+sub-check fails, 2 on a usage error. Paths come from `git ls-files` and bytes from the tree this
+script sits in. --repo names the repository whose index and HEAD are compared when the script
+runs from an index checkout (the pre-commit hook does), so the check judges the staged tree.
+
+The wire gate is wire-shaped: a JSON key set or enum raw-value set recorded at HEAD must survive,
+under its own type name or identically under another, unless the golden's version line moved.
 """
 import fnmatch
 import json
@@ -18,7 +22,12 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Where git runs; --repo moves it off ROOT when ROOT is an index checkout.
+GIT_ROOT = ROOT
 SCRIPTS = os.path.join(ROOT, "gmk", "scripts")
+RELEASES = "gmk/scripts/gm_releases.sh"
+RELEASES_PLUGIN = "plugins/gmcc/scripts/gm_releases.sh"
+RELEASES_SWIFT = "gmk/Sources/AgenticsClaudeHarnessPluginBridge/GmBridgeScript+Bodies.swift"
 PBXPROJ = "gmk/gmk.xcodeproj/project.pbxproj"
 BASELINE = ".swiftlint-baseline.json"
 GOLDEN = "gmk/scripts/wire_keys.golden"
@@ -62,7 +71,7 @@ def git(*args):
       - args: The git arguments.
     Returns: The command's stdout as text, or None on a non-zero exit.
     """
-    proc = subprocess.run(["git", "-C", ROOT, *args], capture_output=True, text=True)
+    proc = subprocess.run(["git", "-C", GIT_ROOT, *args], capture_output=True, text=True)
     return proc.stdout if proc.returncode == 0 else None
 
 
@@ -104,20 +113,57 @@ def lint_skip_globs():
     return [line for line in proc.stdout.splitlines() if line.strip()]
 
 
+def swift_raw_body(text, name):
+    """The value of a `static let NAME` raw multi-line string literal, rendered as the bridge writes it.
+
+    Parameters:
+      - text: The Swift source.
+      - name: The constant's name.
+    Returns: (rendered text or None, problem or None).
+    """
+    lines = text.splitlines()
+    opener = re.compile(rf'^\s*static let {re.escape(name)} = #"""\s*$')
+    start = next((i for i, line in enumerate(lines) if opener.match(line)), None)
+    if start is None:
+        return None, f"no `static let {name} = #\"\"\"` found"
+    end = next((i for i in range(start + 1, len(lines)) if re.match(r'^\s*"""#\s*$', lines[i])), None)
+    if end is None:
+        return None, f"{name} has no closing delimiter"
+    indent = lines[end][: len(lines[end]) - len(lines[end].lstrip())]
+    body = []
+    for no in range(start + 1, end):
+        line = lines[no]
+        if "\\#(" in line:
+            return None, f"line {no + 1}: {name} interpolates, so it cannot be compared statically"
+        if line.strip() and not line.startswith(indent):
+            return None, f"line {no + 1}: indented less than {name}'s closing delimiter"
+        body.append(line[len(indent):] if line.strip() else "")
+    rendered = "\n".join(body)
+    return (rendered if rendered.endswith("\n") else rendered + "\n"), None
+
+
 def check_releases_twin():
-    """The release library and its vendored plugin copy are byte-identical.
+    """gm_releases.sh, GmBridgeScript.releaseStoreBody and the rendered plugin copy agree byte for byte.
 
     Returns: The findings.
     """
-    a, b = "gmk/scripts/gm_releases.sh", "plugins/gmcc/scripts/gm_releases.sh"
-    try:
-        with open(os.path.join(ROOT, a), "rb") as fa, open(os.path.join(ROOT, b), "rb") as fb:
-            same = fa.read() == fb.read()
-    except OSError as err:
-        return [f"cannot read the twins: {err}"]
-    if same:
-        return []
-    return [f"{a} and {b} differ: make GmBridgeScript.releaseStoreBody match {a}, then regenerate the plugin"]
+    script = read(RELEASES)
+    if script is None:
+        return [f"cannot read {RELEASES}"]
+    findings = []
+    plugin = read(RELEASES_PLUGIN)
+    if plugin != script:
+        findings.append(f"{RELEASES} and {RELEASES_PLUGIN} differ: regenerate the plugin over {RELEASES_SWIFT}")
+    swift, problem = swift_raw_body(read(RELEASES_SWIFT) or "", "releaseStoreBody")
+    if problem:
+        findings.append(f"{RELEASES_SWIFT}: {problem}")
+    elif swift != script:
+        a, b = swift.splitlines(), script.splitlines()
+        no = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
+        findings.append(
+            f"GmBridgeScript.releaseStoreBody and {RELEASES} differ first at body line {no + 1}: edit both, regenerate"
+        )
+    return findings
 
 
 def check_test_citations():
@@ -141,8 +187,91 @@ def check_test_citations():
     return findings
 
 
+def head_changes():
+    """The paths this change set renames, adds or rewrites relative to HEAD, with rename detection.
+
+    Returns: (renames as {old: new}, paths new in the change, paths it changed or removed).
+    """
+    cached = ["--cached"] if GIT_ROOT != ROOT else []
+    out = git("diff", *cached, "-M", "--name-status", "-z", "HEAD") or ""
+    fields = out.split("\0")
+    renames, new, old = {}, set(), set()
+    i = 0
+    while i < len(fields) and fields[i]:
+        status = fields[i]
+        if status[0] in "RC":
+            src, dst = fields[i + 1], fields[i + 2]
+            if status[0] == "R":
+                renames[src] = dst
+            old.add(src)
+            new.add(dst)
+            i += 3
+            continue
+        if status[0] == "A":
+            new.add(fields[i + 1])
+        else:
+            old.add(fields[i + 1])
+        i += 2
+    return renames, new, old
+
+
+def rename_symbols(text, renames):
+    """Rewrite a line with every type rename the change's file renames imply (Old.swift -> New.swift).
+
+    Parameters:
+      - text: The baselined line text.
+      - renames: The change's file renames, {old path: new path}.
+    Returns: The rewritten text.
+    """
+    for src, dst in renames.items():
+        a, b = os.path.splitext(os.path.basename(src))[0], os.path.splitext(os.path.basename(dst))[0]
+        if a != b and src.endswith(".swift"):
+            text = re.sub(rf"\b{re.escape(a)}\b", b, text)
+    return text
+
+
+def baseline_strays(entries, head_entries):
+    """The entries no HEAD entry accounts for, matching each HEAD entry at most once.
+
+    A HEAD entry accounts for an entry with the same rule and file and text; or one whose file is
+    new in the change while the HEAD entry's file was renamed, rewritten or removed; or either of
+    those with the text rewritten by a type rename the change's file renames record.
+
+    Parameters:
+      - entries: The baseline under check.
+      - head_entries: HEAD's baseline.
+    Returns: The unaccounted entries.
+    """
+    renames, new, old = head_changes()
+    by_text = {}
+    for index, entry in enumerate(head_entries):
+        v = entry["violation"]
+        for text in {entry["text"], rename_symbols(entry["text"], renames)}:
+            by_text.setdefault((v["ruleIdentifier"], text), []).append(index)
+    used, strays = set(), []
+    for entry in entries:
+        v = entry["violation"]
+        file = v["location"]["file"]
+        candidates = [
+            i
+            for i in by_text.get((v["ruleIdentifier"], entry["text"]), [])
+            if i not in used
+            and (
+                head_entries[i]["violation"]["location"]["file"] == file
+                or renames.get(head_entries[i]["violation"]["location"]["file"]) == file
+                or (file in new and head_entries[i]["violation"]["location"]["file"] in old)
+            )
+        ]
+        exact = [i for i in candidates if head_entries[i]["violation"]["location"]["file"] == file]
+        if exact or candidates:
+            used.add((exact or candidates)[0])
+        else:
+            strays.append(entry)
+    return strays
+
+
 def check_baseline():
-    """The SwiftLint baseline never grows, never holds a comment rule, and names only real files.
+    """The SwiftLint baseline never grows or gains an entry, never holds a comment rule, and names only real files.
 
     Returns: The findings.
     """
@@ -153,9 +282,16 @@ def check_baseline():
     findings = []
     head = git("show", f"HEAD:{BASELINE}")
     if head is not None:
-        before = len(json.loads(head))
+        head_entries = json.loads(head)
+        before = len(head_entries)
         if len(entries) > before:
             findings.append(f"{BASELINE} grew from {before} to {len(entries)} entries; the baseline only shrinks")
+        for entry in baseline_strays(entries, head_entries):
+            v = entry["violation"]
+            findings.append(
+                f"{v['location']['file']}:{v['location']['line']}: {v['ruleIdentifier']} is new to the baseline "
+                "(HEAD holds no entry it was moved or renamed from); fix the violation instead"
+            )
     for entry in entries:
         violation = entry["violation"]
         rule = violation["ruleIdentifier"]
@@ -404,8 +540,46 @@ def golden_parts(text):
     return (int(m.group(1)) if m else None, {line for line in lines[1:] if line.strip()})
 
 
+def wire_shapes(lines):
+    """Group golden lines into wire shapes: each type's JSON key set and its enum raw-value set.
+
+    Parameters:
+      - lines: Golden lines, `Type.member -> key` or `Type.case = raw`.
+    Returns: A dict of (type, "->" or "=") to the set of keys or raw values.
+    """
+    shapes = {}
+    for line in lines:
+        m = re.fullmatch(r"(.+)\.(\w+) (->|=) (.*)", line)
+        if m:
+            shapes.setdefault((m.group(1), m.group(3)), set()).add(m.group(4))
+    return shapes
+
+
+def wire_losses(before, after):
+    """The wire shapes of `before` that `after` no longer carries.
+
+    A shape survives when its type still carries every key or raw value, or when some type carries
+    exactly the same set: a pure type rename moves nothing on the wire.
+
+    Parameters:
+      - before: The earlier golden lines.
+      - after: The later golden lines.
+    Returns: One message per lost shape.
+    """
+    old, new = wire_shapes(before), wire_shapes(after)
+    losses = []
+    for (name, op), values in sorted(old.items()):
+        if (name, op) in new:
+            missing = values - new[(name, op)]
+            if missing:
+                losses.append(f"{name} loses {', '.join(sorted(missing)[:5])}")
+        elif not any(o == op and v == values for (_, o), v in new.items()):
+            losses.append(f"{name} ({len(values)} {'keys' if op == '->' else 'raw values'}) survives under no type name")
+    return losses
+
+
 def check_wire_keys():
-    """The extracted wire keys equal the golden; a removal rides a GmWireProtocol.version bump.
+    """The extracted wire keys equal the golden; a wire-shaped removal rides a GmWireProtocol.version bump.
 
     Returns: The findings.
     """
@@ -416,7 +590,7 @@ def check_wire_keys():
         return [f"wire_keys.py exited {proc.returncode}: {proc.stderr.strip()[:300]}"]
     keys = {line for line in proc.stdout.splitlines() if line.strip()}
     if not keys:
-        return ["wire_keys.py found no keys; its PROTOCOL_DIR names no protocol sources"]
+        return ["wire_keys.py found no keys; its SHARED_DIR names no shared sources"]
     text = read(GOLDEN)
     if text is None:
         return [f"{GOLDEN} is missing; re-record: {WRITE_GOLDEN}"]
@@ -428,27 +602,27 @@ def check_wire_keys():
         return ["GmWireProtocol.version not found under gmk/Sources"]
 
     findings = []
-    removed, added = sorted(golden - keys), sorted(keys - golden)
-    if removed and protocol == version:
+    losses = wire_losses(golden, keys)
+    if losses and protocol == version:
         findings.append(
-            f"{len(removed)} wire key(s) removed or renamed without a GmWireProtocol.version bump "
-            f"(still {protocol}): {', '.join(removed[:5])}"
+            f"{len(losses)} wire shape(s) removed or renamed without a GmWireProtocol.version bump "
+            f"(still {protocol}): {'; '.join(losses[:5])}"
         )
-    elif removed:
-        findings.append(f"{len(removed)} wire key(s) removed at version {protocol}; re-record: {WRITE_GOLDEN}")
-    if added:
-        findings.append(f"{len(added)} wire key(s) added ({', '.join(added[:5])}); re-record: {WRITE_GOLDEN}")
+    removed, added = sorted(golden - keys), sorted(keys - golden)
+    if removed or added:
+        sample = ", ".join((["-" + line for line in removed] + ["+" + line for line in added])[:5])
+        findings.append(f"{GOLDEN} is stale (-{len(removed)} +{len(added)}: {sample}); re-record: {WRITE_GOLDEN}")
     if version != protocol:
         findings.append(f"{GOLDEN} records version {version}, GmWireProtocol.version is {protocol}; re-record: {WRITE_GOLDEN}")
 
     head = git("show", f"HEAD:{GOLDEN}")
     if head is not None:
         head_version, head_keys = golden_parts(head)
-        dropped = sorted(head_keys - golden)
+        dropped = wire_losses(head_keys, golden)
         if dropped and head_version == version:
             findings.append(
-                f"{GOLDEN} drops {len(dropped)} key(s) HEAD recorded at the same version {version}: "
-                f"{', '.join(dropped[:5])}; a removal needs a GmWireProtocol.version bump"
+                f"{GOLDEN} drops {len(dropped)} wire shape(s) HEAD recorded at the same version {version}: "
+                f"{'; '.join(dropped[:5])}; a removal needs a GmWireProtocol.version bump"
             )
     return findings
 
@@ -487,7 +661,7 @@ def pbx_list(body, key):
 
 
 def check_sources_roots():
-    """gmk/Sources is a plain group of synchronized roots, and only Info.plist is an exception.
+    """gmk/Sources is a plain group of the roots gm_kernel builds; tests build Core; only Info.plist is excepted.
 
     Returns: The findings.
     """
@@ -538,6 +712,24 @@ def check_sources_roots():
                 kernel_exceptions.update(entries)
     if kernel_exceptions != {"UX/Apps/Vibes/Info.plist"}:
         findings.append(f"gm_kernel exceptions are {sorted(kernel_exceptions)}; the only one is UX/Apps/Vibes/Info.plist")
+
+    by_name = {name: tid for tid, name in targets.items()}
+
+    def synchronized(target):
+        body = objects.get(by_name.get(target, ""), ("", ""))[1]
+        return {field(objects.get(g, ("", ""))[1], "path") or g for g in pbx_list(body, "fileSystemSynchronizedGroups")}
+
+    kernel = synchronized("gm_kernel")
+    for name in sorted(set(roots) - kernel):
+        findings.append(f"Sources root {name} is not among gm_kernel's synchronized groups; it builds into nothing")
+    for name in sorted(kernel - set(roots)):
+        findings.append(f"gm_kernel synchronizes {name}, which is not a root of the Sources group")
+    tests = synchronized("GmKernelTests")
+    if tests != {"Core", "Tests/GmKernelTests"}:
+        findings.append(f"GmKernelTests synchronizes {sorted(tests)}; it compiles exactly Core and Tests/GmKernelTests")
+    for rel in tracked("gmk/Sources"):
+        if rel.count("/") == 2:
+            findings.append(f"{rel}: lies loose in gmk/Sources, outside every synchronized root")
     return findings
 
 
@@ -573,14 +765,14 @@ def check_tests_mirror():
 
 
 CHECKS = {
-    "releases_twin": (check_releases_twin, "gm_releases.sh and its plugin copy are byte-identical"),
+    "releases_twin": (check_releases_twin, "gm_releases.sh, releaseStoreBody and the plugin copy are identical"),
     "test_citations": (check_test_citations, "every cited *Tests name is a class under gmk/Tests"),
-    "baseline": (check_baseline, "the SwiftLint baseline only shrinks, holds no comment rule, names real files"),
+    "baseline": (check_baseline, "the SwiftLint baseline only shrinks or moves, holds no comment rule, names real files"),
     "build_settings": (check_build_settings, "pinned build settings, one deployment floor, version wiring"),
     "lint_skip": (check_lint_skip, ".swiftlint.yml and .swift-format-ignore agree with gm_lint_skip"),
-    "wire_keys": (check_wire_keys, "wire keys equal wire_keys.golden; removals bump GmWireProtocol.version"),
+    "wire_keys": (check_wire_keys, "wire keys equal wire_keys.golden; wire-shaped removals bump GmWireProtocol.version"),
     "resources": (check_resources, "gmk/Sources holds no non-Swift file but the shipped resources"),
-    "sources_roots": (check_sources_roots, "each gmk/Sources folder is a synchronized root; only Info.plist is excepted"),
+    "sources_roots": (check_sources_roots, "gmk/Sources roots are gm_kernel's; tests build Core; only Info.plist is excepted"),
     "entities_one_table": (check_entities_one_table, "each Persistence/Entities file declares exactly one table"),
     "tests_mirror": (check_tests_mirror, "each GmKernelTests folder but Harness mirrors a Sources/Core folder"),
 }
@@ -590,9 +782,15 @@ def main(argv):
     """Run the requested sub-checks and report.
 
     Parameters:
-      - argv: Sub-check names, or `--list`; none runs every sub-check.
+      - argv: `--repo DIR` and sub-check names, or `--list`; no name runs every sub-check.
     Returns: The exit status.
     """
+    global GIT_ROOT
+    if argv[:1] == ["--repo"]:
+        if len(argv) < 2:
+            print("[GMB] tree-check: --repo needs a directory", file=sys.stderr)
+            return 2
+        GIT_ROOT, argv = os.path.abspath(argv[1]), argv[2:]
     if argv == ["--list"]:
         for name, (_, about) in CHECKS.items():
             print(f"{name}: {about}")

@@ -1,13 +1,14 @@
 #!/bin/bash
 #
 # pre-commit — run the repo gate before the commit lands: every staged .swift file through
-# swift_lint_format.sh, whose stage 4 is gm_tree_check.py, or the tree check alone when no
-# Swift is staged. Every commit runs the tree check.
+# stages 1-3 of swift_lint_format.sh, then gm_tree_check.py over the STAGED tree. Every commit
+# runs the tree check.
 # Activated per clone by: git config core.hooksPath gmk/scripts/githooks
 # (rebuild_local.sh sets it when unset). Bypass once with: git commit --no-verify
 #
-# Lints the working-tree version of each staged file, so a partially staged file is
-# judged whole.
+# Lints the working-tree version of each staged file, so a partially staged file is judged
+# whole. The tree check runs from a checkout of the index, so it judges the bytes the commit
+# carries, not the working copy.
 
 set -u
 
@@ -16,23 +17,25 @@ cd "$ROOT" || exit 1
 # shellcheck source=../gm_build.sh
 . gmk/scripts/gm_build.sh || exit 1
 
+TREE="$(mktemp -d "${TMPDIR:-/tmp}/gm_precommit.XXXXXX")" || exit 1
+trap 'rm -rf "$TREE"' EXIT
+git checkout-index -a --prefix="$TREE/" || exit 1
+
 FILES=()
 while IFS= read -r f; do
     gm_lint_skipped "$f" && continue
     [ -f "$f" ] && FILES+=("$f")
 done < <(git diff --cached --name-only --diff-filter=ACMR -- '*.swift')
 
-if [ ${#FILES[@]} -eq 0 ]; then
-    python3 gmk/scripts/gm_tree_check.py && exit 0
-    echo "[GMB] pre-commit: tree check failed (findings above)" >&2
-    echo "[GMB] pre-commit: or bypass once with: git commit --no-verify" >&2
-    exit 1
+STATUS=0
+if [ ${#FILES[@]} -gt 0 ] && ! bash gmk/scripts/swift_lint_format.sh --no-tree-check "${FILES[@]}"; then
+    echo "[GMB] pre-commit: lint failed. Fix with: bash gmk/scripts/swift_lint_format.sh --fix ${FILES[*]}" >&2
+    STATUS=1
 fi
-
-if bash gmk/scripts/swift_lint_format.sh "${FILES[@]}"; then
-    exit 0
+if ! python3 "$TREE/gmk/scripts/gm_tree_check.py" --repo "$ROOT"; then
+    echo "[GMB] pre-commit: tree check of the staged tree failed (findings above)" >&2
+    STATUS=1
 fi
-
-echo "[GMB] pre-commit: lint failed. Fix with: bash gmk/scripts/swift_lint_format.sh --fix ${FILES[*]}" >&2
+[ "$STATUS" -eq 0 ] && exit 0
 echo "[GMB] pre-commit: or bypass once with: git commit --no-verify" >&2
 exit 1
