@@ -44,6 +44,10 @@ ENTITIES = "gmk/Sources/Core/Persistence/Entities"
 # The same declaration SchemaEnrollmentTests counts against the roster.
 TABLE_NAME_RE = re.compile(r"static let databaseTableName\b")
 
+CORE = "gmk/Sources/Core"
+TESTS = "gmk/Tests/GmKernelTests"
+TESTS_MIRROR_EXEMPT = {"Harness"}
+
 RESOURCE_ALLOW = (
     "gmk/Sources/UX/Apps/Vibes/Assets.xcassets/*",
     "gmk/Sources/UX/Apps/MachineHost/Legal/ThirdPartyNotices.txt",
@@ -555,6 +559,19 @@ def check_entities_one_table():
     return findings
 
 
+def check_tests_mirror():
+    """Every top-level test folder but Harness names a top-level folder of Sources/Core.
+
+    Returns: The findings.
+    """
+    core = {rel[len(CORE) + 1 :].split("/")[0] for rel in tracked(CORE) if rel.count("/") > CORE.count("/") + 1}
+    tests = {rel[len(TESTS) + 1 :].split("/")[0] for rel in tracked(TESTS) if rel.count("/") > TESTS.count("/") + 1}
+    return [
+        f"{TESTS}/{folder}: names no folder of {CORE}; a test lives in the folder of the Core subtree it exercises"
+        for folder in sorted(tests - core - TESTS_MIRROR_EXEMPT)
+    ]
+
+
 CHECKS = {
     "releases_twin": (check_releases_twin, "gm_releases.sh and its plugin copy are byte-identical"),
     "test_citations": (check_test_citations, "every cited *Tests name is a class under gmk/Tests"),
@@ -565,6 +582,7 @@ CHECKS = {
     "resources": (check_resources, "gmk/Sources holds no non-Swift file but the shipped resources"),
     "sources_roots": (check_sources_roots, "each gmk/Sources folder is a synchronized root; only Info.plist is excepted"),
     "entities_one_table": (check_entities_one_table, "each Persistence/Entities file declares exactly one table"),
+    "tests_mirror": (check_tests_mirror, "each GmKernelTests folder but Harness mirrors a Sources/Core folder"),
 }
 
 
