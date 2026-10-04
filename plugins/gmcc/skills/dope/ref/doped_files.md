@@ -163,7 +163,7 @@ Hulls ship flat; there is no nested cog directory level.
   "elements": [
     { "code": "gm_daemon", "name": "GM Daemon", "description": "",
       "sort_order": 0, "element_type": "Hull",
-      "primary_path": "gmk/gmDaemon",
+      "primary_path": "gmk/Sources/AgenticsCore",
       "links": { "persistence_owners": ["agentics", "base", "doped"] } } ] }
 ```
 
