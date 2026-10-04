@@ -3,7 +3,7 @@ import Foundation
 /// The failure vocabulary every `GmVerbCaller` answers in, socket-backed or
 /// not: `KernelVerbCaller` mirrors these arms so an in-process caller and a
 /// dialled one are indistinguishable to the typed surface above them.
-enum DaemonClientError: Error, Sendable {
+enum KernelClientError: Error, Sendable {
     /// Socket unreachable after autostart + retries → client exit code 2.
     case unreachable(String)
     /// Server rejected our protocol version (after one respawn when the
@@ -18,8 +18,8 @@ enum DaemonClientError: Error, Sendable {
 }
 
 /// The one requirement behind the entire typed verb facade. Hanging
-/// `DaemonClient+API.swift`'s ~110 one-liners off this PROTOCOL rather than
-/// off `DaemonClient` gives the whole typed surface to any conformer, which is
+/// `KernelClient+API.swift`'s ~110 one-liners off this PROTOCOL rather than
+/// off `KernelClient` gives the whole typed surface to any conformer, which is
 /// what lets MCP and hook bodies run kernel-side instead of dialing the daemon
 /// they are already inside — a self-connection on the serial queue that would
 /// have to service it is a deadlock, not a slow path.
@@ -51,7 +51,7 @@ protocol GmVerbCaller: Sendable {
     ) throws -> Resp
 }
 
-/// The socket conformance. `DaemonClient.request` already has exactly this
+/// The socket conformance. `KernelClient.request` already has exactly this
 /// shape, so the conformance is empty — which is the evidence that the protocol
 /// was extracted from the real signature rather than designed alongside it.
-extension DaemonClient: GmVerbCaller {}
+extension KernelClient: GmVerbCaller {}

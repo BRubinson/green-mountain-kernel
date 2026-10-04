@@ -200,12 +200,12 @@ private struct KBiteSearchPane: View {
             try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
             do {
-                let result = try await GMCCDaemonService.shared.searchKbites(query: trimmed, limit: 40)
+                let result = try await KernelStoreService.shared.searchKbites(query: trimmed, limit: 40)
                 guard !Task.isCancelled else { return }
                 hits = result
                 searched = true
                 errorText = nil
-            } catch let error as DaemonError {
+            } catch let error as KernelError {
                 hits = []  // never leave stale results behind an error view
                 if case .unreachable(let m) = error {
                     errorText = m
@@ -230,7 +230,7 @@ private struct KBiteSearchPane: View {
         fileError = nil
         Task {
             do {
-                let file = try await GMCCDaemonService.shared.getKbiteFile(fileUuid: uuid)
+                let file = try await KernelStoreService.shared.getKbiteFile(fileUuid: uuid)
                 guard selectedFileUuid == uuid else { return }
                 fileName = file.resourceFileName
                 fileContent = file.resourceFileContent ?? "*Binary file — content stored on the filesystem.*"

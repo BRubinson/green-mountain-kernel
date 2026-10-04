@@ -1,7 +1,7 @@
 import Foundation
 
 /// The SERVICES half of the component library: GMVibes (or any host)
-/// implements `DiagramCommitting` over its vendored DaemonClient and hands it to
+/// implements `DiagramCommitting` over its vendored KernelClient and hands it to
 /// a `DiagramEditSession`, which accumulates typed mutations during a gesture and
 /// flushes them as ONE DIAGRAM_BATCH_APPLY at gesture end (optionally CAS-guarded
 /// by the last-seen revision).

@@ -9,7 +9,7 @@ import SwiftUI
 /// the tab shares one cache with the dope tab, and the CREATE seeds the canvas. Importing
 /// pulls a PROJECT-tier diagram down into this session as a copy.
 struct SessionDiagramsPane: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(DiagramCatalogStore.self) private var diagrams
     let scope: SessionScope
     let windowID: SessionWindowID
@@ -214,7 +214,7 @@ struct SessionDiagramsPane: View {
                 try await body()
             } catch let error as LocalizedError {
                 actionError = error.errorDescription ?? String(describing: error)
-            } catch let error as DaemonError {
+            } catch let error as KernelError {
                 actionError = error.userMessage
             } catch {
                 actionError = String(describing: error)

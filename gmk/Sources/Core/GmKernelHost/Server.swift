@@ -129,8 +129,8 @@ final class Server: @unchecked Sendable {
     /// - Parameter kind: The kind of database event that occurred.
     private func watchedStateMayHaveChanged(_ kind: String) {
         guard
-            kind == DaemonEventKind.configSet.rawValue
-                || kind == DaemonEventKind.createInstance.rawValue
+            kind == KernelEventKind.configSet.rawValue
+                || kind == KernelEventKind.createInstance.rawValue
         else { return }
         queue.async {
             guard !self.rebuildPending else { return }
@@ -166,7 +166,7 @@ final class Server: @unchecked Sendable {
             self.broadcast(
                 EventNotification(
                     id: 0,
-                    kind: DaemonEventKind.checkoutChange.rawValue,
+                    kind: KernelEventKind.checkoutChange.rawValue,
                     createdAt: Store.isoNow(),
                     subjectUuid: instanceUuid,
                     payload: Store.jsonPayload(payload)
@@ -204,7 +204,7 @@ final class Server: @unchecked Sendable {
             self.broadcast(
                 EventNotification(
                     id: 0,
-                    kind: DaemonEventKind.promptMemoryChange.rawValue,
+                    kind: KernelEventKind.promptMemoryChange.rawValue,
                     createdAt: Store.isoNow(),
                     subjectUuid: promptUuid,
                     payload: "{\"gmfs_relative_storage_path\":\(Self.jsonString(storagePath))}"
@@ -288,7 +288,7 @@ final class Server: @unchecked Sendable {
         }
         let group = DispatchGroup()
         goodbyeGroup = group
-        try? store.recordDaemonStop()
+        try? store.recordKernelStop()
         goodbyeGroup = nil
 
         beforeClose()

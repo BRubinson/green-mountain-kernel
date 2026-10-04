@@ -539,7 +539,7 @@ gm_stop_kernel_and_wait() {
     # POLL THE OWNER PROCESS, NEVER A VERB.
     #
     # The obvious probe — `gm_hook call PING` — is WRONG here, and wrong in a way
-    # that inverts this function. `gm_hook call` builds a `DaemonClient()` whose
+    # that inverts this function. `gm_hook call` builds a `KernelClient()` whose
     # `autostart` defaults to TRUE, so a PING that finds nothing listening
     # LAUNCHES THE APP. This loop would then observe that it answers and time out
     # — leaving a freshly-launched writer running and `gm_install_app` refusing,

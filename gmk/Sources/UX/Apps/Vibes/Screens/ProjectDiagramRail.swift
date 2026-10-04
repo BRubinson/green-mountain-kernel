@@ -9,7 +9,7 @@ import SwiftUI
 /// out on the fly. It is a preview with no diagram row and nothing written, so opening the
 /// project's domain model never mints a document nobody asked for.
 struct ProjectDiagramRail: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(DiagramCatalogStore.self) private var diagrams
     @Environment(CatalogStore.self) private var catalog
     let projectUuid: String
@@ -167,7 +167,7 @@ struct ProjectDiagramRail: View {
         // A project with no dope scope yet is normal — the row then just says
         // "computed from dope" and the create path binds nothing.
         guard
-            let response = try? await GMCCDaemonService.shared.dopeGet(
+            let response = try? await KernelStoreService.shared.dopeGet(
                 projectUuid: projectUuid
             )
         else { return }
@@ -229,7 +229,7 @@ struct ProjectDiagramRail: View {
                 try await body()
             } catch let error as LocalizedError {
                 actionError = error.errorDescription ?? String(describing: error)
-            } catch let error as DaemonError {
+            } catch let error as KernelError {
                 actionError = error.userMessage
             } catch {
                 actionError = String(describing: error)

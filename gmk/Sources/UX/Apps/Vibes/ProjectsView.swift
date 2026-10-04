@@ -28,7 +28,7 @@ struct ProjectsView: View {
 // MARK: - Project tree (the whole screen)
 
 private struct ProjectTreeView: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(CatalogStore.self) private var catalog
 
     @Binding var query: String

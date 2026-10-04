@@ -76,7 +76,7 @@ final class DiagramCatalogStore {
     private(set) var thumbnailsByUuid: [String: (revision: Int64, resolved: ResolvedDiagram)] = [:]
     @ObservationIgnored private var thumbnailLoads: Set<String> = []
 
-    private let service = GMCCDaemonService.shared
+    private let service = KernelStoreService.shared
     /// Coalesced per owner: list is a pure enumeration with no
     /// read-after-write ordering requirement, so concurrent callers JOIN.
     private var inFlight: [Owner: Task<Void, Never>] = [:]
@@ -133,7 +133,7 @@ final class DiagramCatalogStore {
                 .sorted { $0.code < $1.code }
             if rowsByOwner[owner] != rows { rowsByOwner[owner] = rows }
             if errorsByOwner[owner] != nil { errorsByOwner[owner] = nil }
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             errorsByOwner[owner] = error.userMessage
         } catch {
             errorsByOwner[owner] = String(describing: error)
@@ -177,7 +177,7 @@ final class DiagramCatalogStore {
             guard galleryQueries[scope] == trimmed else { return }
             if galleryByScope[scope] != rows { galleryByScope[scope] = rows }
             if galleryErrors[scope] != nil { galleryErrors[scope] = nil }
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             galleryErrors[scope] = error.userMessage
         } catch {
             galleryErrors[scope] = String(describing: error)

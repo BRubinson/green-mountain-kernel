@@ -85,7 +85,7 @@ final class SessionScope {
     let sessionUuid: String
     let store: SessionStore
 
-    private weak var daemon: DaemonConnectionModel?
+    private weak var daemon: KernelConnectionModel?
     private var savers: [String: PromptSaveActor] = [:]
     private var phaseStores: [String: PromptPhaseStore] = [:]
     private var dopeStore: DopeStore?
@@ -106,7 +106,7 @@ final class SessionScope {
     /// - Parameters:
     ///   - promptUuids: The prompt UUIDs to register.
     ///   - daemon: The daemon connection model.
-    func registerPrompts(_ promptUuids: Set<String>, daemon: DaemonConnectionModel) {
+    func registerPrompts(_ promptUuids: Set<String>, daemon: KernelConnectionModel) {
         self.daemon = daemon
         daemon.registerSession(sessionUuid, promptUuids: promptUuids, owner: ObjectIdentifier(self))
     }

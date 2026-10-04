@@ -44,7 +44,7 @@ struct BaseEntity: Codable, Hashable, Sendable {
 /// Stored as free text in the db; this enum is the write-path enforcement. On
 /// the wire (events, EVENT_LIST) kind travels as a raw string so old clients
 /// survive new kinds.
-enum DaemonEventKind: String, Codable, Hashable, CaseIterable, Sendable {
+enum KernelEventKind: String, Codable, Hashable, CaseIterable, Sendable {
     case createProject = "CREATE_PROJECT"
     case createInstance = "CREATE_INSTANCE"
     case createSession = "CREATE_SESSION"
@@ -679,7 +679,7 @@ struct EventNotification: Codable, Hashable, Sendable {
     let payload: String?
     let createdAt: String
 
-    var eventKind: DaemonEventKind? { DaemonEventKind(rawValue: kind) }
+    var eventKind: KernelEventKind? { KernelEventKind(rawValue: kind) }
 
     /// Creates an event notification mirroring a daemon_event row.
     /// - Parameters:

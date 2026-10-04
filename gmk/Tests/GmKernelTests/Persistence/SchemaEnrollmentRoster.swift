@@ -180,8 +180,8 @@ enum SchemaEnrollment {
         mirror(ResourceFileKeywordJunctionRecord.self),
         mirror(SessionActiveKbiteRecord.self),
 
-        mirror(DaemonConfigRecord.self),
-        mirror(DaemonEventRecord.self),
+        mirror(KernelConfigRecord.self),
+        mirror(KernelEventRecord.self),
         mirror(ProjectTestLockRecord.self),
         mirror(TestRunRecord.self),
 

@@ -60,7 +60,7 @@ final class PromptPhaseStore {
     private(set) var wantsFullExploration = false
     private(set) var wantsFullReview = false
 
-    private let service = GMCCDaemonService.shared
+    private let service = KernelStoreService.shared
     // Scope-aware single flight: a narrower in-flight pass cannot satisfy a
     // wider request — wider requests CHAIN after it (never race it), and the
     // slot is cleared by token so a finished predecessor can't clobber a
@@ -216,9 +216,9 @@ final class PromptPhaseStore {
             // the next Save is legal. One line, no second lifecycle.
             answers.adopt(response.questions)
             return .loaded(response)
-        } catch DaemonError.summaryAbsent {
+        } catch KernelError.summaryAbsent {
             return .absent
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             return .failed(error.userMessage)
         } catch {
             return .failed(String(describing: error))
@@ -230,9 +230,9 @@ final class PromptPhaseStore {
     private func fetchArchitecture() async -> Phase<ArchGetResponse> {
         do {
             return .loaded(try await service.architecture(promptUuid: promptUuid))
-        } catch DaemonError.summaryAbsent {
+        } catch KernelError.summaryAbsent {
             return .absent
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             return .failed(error.userMessage)
         } catch {
             return .failed(String(describing: error))
@@ -245,9 +245,9 @@ final class PromptPhaseStore {
     private func fetchExploration(full: Bool) async -> Phase<ExploreGetResponse> {
         do {
             return .loaded(try await service.exploration(promptUuid: promptUuid, full: full))
-        } catch DaemonError.summaryAbsent {
+        } catch KernelError.summaryAbsent {
             return .absent
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             return .failed(error.userMessage)
         } catch {
             return .failed(String(describing: error))
@@ -260,9 +260,9 @@ final class PromptPhaseStore {
     private func fetchReview(full: Bool) async -> Phase<ReviewGetResponse> {
         do {
             return .loaded(try await service.review(promptUuid: promptUuid, full: full))
-        } catch DaemonError.summaryAbsent {
+        } catch KernelError.summaryAbsent {
             return .absent
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             return .failed(error.userMessage)
         } catch {
             return .failed(String(describing: error))
@@ -281,7 +281,7 @@ final class PromptPhaseStore {
         do {
             do {
                 return .loaded(try await service.botNext(promptUuid: promptUuid))
-            } catch DaemonError.versionConflict {
+            } catch KernelError.versionConflict {
                 // ONE silent retry. BOT_NEXT writes last_served_phase through
                 // core.updateBase with an expected version, so a live bot run
                 // calling BOT_NEXT concurrently can make this call lose the
@@ -289,9 +289,9 @@ final class PromptPhaseStore {
                 // failure — retry once; only a second loss surfaces.
                 return .loaded(try await service.botNext(promptUuid: promptUuid))
             }
-        } catch DaemonError.summaryAbsent {
+        } catch KernelError.summaryAbsent {
             return .absent
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             return .failed(error.userMessage)
         } catch {
             return .failed(String(describing: error))
@@ -314,7 +314,7 @@ final class PromptPhaseStore {
             // Empty is NORMAL: briefings have no SUMMARY_ABSENT on LIST — a
             // prompt whose briefer never ran simply lists zero rows.
             return .loaded(items)
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             return .failed(error.userMessage)
         } catch {
             return .failed(String(describing: error))

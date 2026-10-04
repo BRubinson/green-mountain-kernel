@@ -24,7 +24,7 @@ enum DopePromotion {
     ///   - client: The daemon client.
     ///   - sessionUuid: The session identifier.
     /// - Returns: The promotion outcome.
-    static func run(client: DaemonClient, sessionUuid: String) -> Outcome {
+    static func run(client: KernelClient, sessionUuid: String) -> Outcome {
         do {
             let response = try client.dopePromote(DopePromoteRequest(sessionUuid: sessionUuid))
             if !response.promoted.isEmpty { return .promoted(response.promoted) }

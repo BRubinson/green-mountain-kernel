@@ -9,7 +9,7 @@ import AppKit
 /// launcher, and a healthy daemon with an empty db shows the migration state.
 struct LandingView: View {
     @Environment(GMVibesEnvironment.self) private var gmcc
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(CatalogStore.self) private var catalog
     @Environment(CheckoutWatcher.self) private var checkout
     @Environment(WindowNav.self) private var nav
@@ -34,7 +34,7 @@ struct LandingView: View {
                 ProgressView("Connecting to the GMCC daemon…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .notInstalled, .down, .incompatible:
-                DaemonGateState()
+                KernelGateState()
             }
         }
         .navigationTitle("GM Vibes")
@@ -362,8 +362,8 @@ private struct ProjectGroupCard: View {
 
 // MARK: - Gate states (daemon down / empty db)
 
-private struct DaemonGateState: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+private struct KernelGateState: View {
+    @Environment(KernelConnectionModel.self) private var daemon
 
     var body: some View {
         VStack(spacing: 16) {
@@ -472,7 +472,7 @@ private struct EmptyDatabaseState: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// Root-aware, same family as DaemonGateState.remediationCommand: a bare
+    /// Root-aware, same family as KernelGateState.remediationCommand: a bare
     /// `gm_hook context ensure` from a plain shell resolves the PROD binary
     /// with GM_FS_ROOT unset and seeds PRODUCTION's database — while a test
     /// or beta app keeps showing this screen.

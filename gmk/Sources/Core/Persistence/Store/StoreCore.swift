@@ -318,7 +318,7 @@ final class StoreCore: Sendable {
     @discardableResult
     func appendEvent(
         _ db: Database,
-        kind: DaemonEventKind,
+        kind: KernelEventKind,
         subjectUuid: String? = nil,
         payload: String? = nil
     ) throws -> String {

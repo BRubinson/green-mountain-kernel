@@ -96,7 +96,7 @@ final class GMVibesEnvironment {
         }
         let task = Task { @MainActor in
             do {
-                let response = try await GMCCDaemonService.shared.paths()
+                let response = try await KernelStoreService.shared.paths()
                 adopt(response)
             } catch {
                 // Probe keeps serving; log so a divergent-root situation

@@ -206,7 +206,7 @@ struct PromptStatusHeader: View {
         await store.refreshPrompt(uuid: stub.uuid)
         let version = store.prompts.first(where: { $0.uuid == stub.uuid })?.version ?? stub.version
         do {
-            _ = try await GMCCDaemonService.shared.setPromptStatus(
+            _ = try await KernelStoreService.shared.setPromptStatus(
                 PromptSetStatusRequest(
                     promptUuid: stub.uuid,
                     expectedVersion: version,
@@ -215,7 +215,7 @@ struct PromptStatusHeader: View {
             )
             await store.refreshPrompt(uuid: stub.uuid)
             await store.refresh()
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             switch error {
             case .invalidTransition:
                 // Lost race (a bot advanced between render and click) — show

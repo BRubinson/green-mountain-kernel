@@ -20,7 +20,7 @@ enum GmCdeTools {
 
     /// Runs one tool and renders its result under budget.
     ///
-    /// `caller` is `DaemonClient` on the stdio path and `KernelVerbCaller` when
+    /// `caller` is `KernelClient` on the stdio path and `KernelVerbCaller` when
     /// the kernel serves `MCP_CALL`, which is what puts the body inside the
     /// ambient transaction boundary and gives a composite tool one transaction
     /// instead of N.

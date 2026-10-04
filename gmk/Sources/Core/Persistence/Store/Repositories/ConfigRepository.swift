@@ -17,7 +17,7 @@ struct ConfigRepository: RepositoryContext {
     func pathsGet() throws -> PathsGetResponse {
         let config = try Dictionary(
             uniqueKeysWithValues:
-                DaemonConfigRecord.fetchAll(db)
+                KernelConfigRecord.fetchAll(db)
                 .map { ($0.configKey, $0.configValue) }
         )
         func value(_ key: ConfigKey, fallback: String) -> String {
@@ -70,8 +70,8 @@ struct ConfigRepository: RepositoryContext {
         // Upsert without version threading: config keys are singletons
         // owned by the daemon; last write wins (still audited via the
         // event trail).
-        if try DaemonConfigRecord
-            .filter(DaemonConfigRecord.Columns.configKey == req.key.rawValue)
+        if try KernelConfigRecord
+            .filter(KernelConfigRecord.Columns.configKey == req.key.rawValue)
             .fetchCount(db) > 0
         {
             try db.execute(
@@ -106,9 +106,9 @@ struct ConfigRepository: RepositoryContext {
     /// - Returns: The configuration value, or nil if not set.
     /// - Throws: Database errors.
     func configValue(_ key: ConfigKey) throws -> String? {
-        try DaemonConfigRecord
-            .filter(DaemonConfigRecord.Columns.configKey == key.rawValue)
-            .select(DaemonConfigRecord.Columns.configValue, as: String.self)
+        try KernelConfigRecord
+            .filter(KernelConfigRecord.Columns.configKey == key.rawValue)
+            .select(KernelConfigRecord.Columns.configValue, as: String.self)
             .fetchOne(db)
     }
 

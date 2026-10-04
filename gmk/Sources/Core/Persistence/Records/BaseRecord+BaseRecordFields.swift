@@ -31,7 +31,7 @@ extension SnakeCaseDecoded {
 /// Note there is no `id` (SQLite rowid) property: the daemon's identity is
 /// `uuid` everywhere, records are FetchableRecord-only so a rowid can never be
 /// used for a write, and a non-optional `id` would make every Record unable to
-/// decode the explicit-column-list SELECTs that omit it. `DaemonEventRecord`
+/// decode the explicit-column-list SELECTs that omit it. `KernelEventRecord`
 /// is the sole exception — there the rowid IS the wire identity
 /// (`EventNotification.id`, the SUBSCRIBE replay cursor).
 protocol BaseRecordFields: SnakeCaseDecoded, Sendable {

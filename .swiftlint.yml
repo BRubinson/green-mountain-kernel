@@ -228,6 +228,12 @@ custom_rules:
     match_kinds: [attribute.builtin, typeidentifier]
     message: "Prove Sendable; do not assert it."
     severity: error
+  no_daemon_type_names:
+    name: "No Daemon type names"
+    regex: '\b(struct|class|enum|protocol|actor|typealias)\s+\w*Daemon'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "The process is the kernel: name the type Kernel*. Lock, socket, wire and table names stay frozen."
+    severity: error
   no_file_literal:
     name: "No #file"
     regex: '#file\b'

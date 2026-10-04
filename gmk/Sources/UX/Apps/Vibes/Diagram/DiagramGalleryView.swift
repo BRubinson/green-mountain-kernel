@@ -7,7 +7,7 @@ import SwiftUI
 /// The host owns creation and per-tier row actions; this view owns fetch, live
 /// refresh, and the grid.
 struct DiagramGalleryView<CardMenu: View>: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(DiagramCatalogStore.self) private var diagrams
     let scope: DiagramCatalogStore.GalleryScope
     let onOpen: (DiagramRow) -> Void

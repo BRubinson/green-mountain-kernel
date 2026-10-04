@@ -63,7 +63,7 @@ func runOps(_ argv: [String]) -> Int32 {
         case "status", "ping":
             // Deliberately does NOT autostart: "is it up" must not be a
             // question that starts it.
-            let client = DaemonClient(autostart: false)
+            let client = KernelClient(autostart: false)
             defer { client.close() }
             do { emit(try client.ping()); return 0 } catch { return fail("daemon unreachable: \(error)") }
         default:
@@ -77,17 +77,17 @@ func runOps(_ argv: [String]) -> Int32 {
         }
 
     case "paths":
-        let client = DaemonClient()
+        let client = KernelClient()
         defer { client.close() }
         do { emit(try client.pathsGet()); return 0 } catch { return fail("\(error)") }
 
     case "status":
-        let client = DaemonClient()
+        let client = KernelClient()
         defer { client.close() }
         do { emit(try client.status()); return 0 } catch { return fail("\(error)") }
 
     case "ping":
-        let client = DaemonClient()
+        let client = KernelClient()
         defer { client.close() }
         do { emit(try client.ping()); return 0 } catch { return fail("\(error)") }
 
@@ -127,7 +127,7 @@ private func runContext(_ argv: [String]) -> Int32 {
         if argv.contains("--hook-payload") {
             claudeSessionId = HookPayload.decode(GmHookSupport.readStdin())?.sessionId
         }
-        let client = DaemonClient()
+        let client = KernelClient()
         defer { client.close() }
         do {
             let request = try ContextBuilder.ensureRequest(claudeSessionId: claudeSessionId)

@@ -4,7 +4,7 @@ import XCTest
 
 /// The ONE environment every case in this package shares: it hosts the kernel
 /// IN THIS PROCESS against a freshly minted temporary root, hands out a
-/// `DaemonClient` and a READ-ONLY database handle, and reaps both at the end.
+/// `KernelClient` and a READ-ONLY database handle, and reaps both at the end.
 ///
 /// The suite is the one writer. Cases still write only over the wire, through a
 /// client with autostart off, so the socket path is what they exercise.
@@ -22,7 +22,7 @@ final class SharedEnvironment: NSObject, XCTestObservation {
     nonisolated(unsafe) static let shared = SharedEnvironment()
 
     private(set) var root: URL!
-    private(set) var client: DaemonClient!
+    private(set) var client: KernelClient!
     /// Why the in-process kernel did not boot, for the skip message.
     private(set) var bootFailure: String?
     private var kernel: KernelServices?
@@ -82,7 +82,7 @@ final class SharedEnvironment: NSObject, XCTestObservation {
             bootFailure = String(describing: error)
         }
 
-        client = DaemonClient(socketPath: socketPath, autostart: false)
+        client = KernelClient(socketPath: socketPath, autostart: false)
 
         // NWListener binds asynchronously; the first case must not race it.
         guard kernel != nil else { return }

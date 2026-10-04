@@ -20,7 +20,7 @@ struct MemoriesExplorer: View {
     var isDaemonWatched: Bool = false
 
     @Environment(FileTreeStore.self) private var fs
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
 
     private var tree: FileTreeNode? { fs.fileTrees[rootURL] }
 

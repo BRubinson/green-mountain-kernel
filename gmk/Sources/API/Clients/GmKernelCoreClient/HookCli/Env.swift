@@ -18,7 +18,7 @@ func emitSessionEnv(pluginRoot: String?) -> Int32 {
     // try?, deliberately: a session must still come up with a usable env when
     // the daemon is down. The warning below is what tells the user why the
     // values are defaults.
-    let client = DaemonClient()
+    let client = KernelClient()
     defer { client.close() }
     let paths = try? client.pathsGet()
 

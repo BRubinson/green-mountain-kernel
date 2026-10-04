@@ -3,7 +3,7 @@ import Foundation
 // Typed one-method-per-message facade — the entire integration surface for
 // gm_hook, gm_mcp and GMVibes. Callers never touch MessageType or responseType.
 //
-// HUNG OFF `GmVerbCaller`, NOT `DaemonClient`. Every method below is the same
+// HUNG OFF `GmVerbCaller`, NOT `KernelClient`. Every method below is the same
 // one-liner over `request(type:payload:responseType:)`, so binding them to the
 // protocol hands this whole surface to the kernel's in-process caller too,
 // which is what lets MCP and hook bodies run kernel-side instead of dialing

@@ -184,7 +184,7 @@ enum GmHookSupport {
     /// Opens a short-lived socket client only when one was not supplied, and
     /// closes only what it opened. Maps no error onto exit code (hooks have none
     /// to map). The kernel's in-process caller prevents a deadlock from opening
-    /// a `DaemonClient` that would connect the kernel to itself.
+    /// a `KernelClient` that would connect the kernel to itself.
     ///
     /// - Parameters:
     ///   - caller: An optional verb caller, or `nil` to open a socket client.
@@ -196,7 +196,7 @@ enum GmHookSupport {
         _ body: (any GmVerbCaller) throws -> T
     ) throws -> T {
         if let caller { return try body(caller) }
-        let client = DaemonClient()
+        let client = KernelClient()
         defer { client.close() }
         return try body(client)
     }

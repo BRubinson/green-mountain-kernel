@@ -10,7 +10,7 @@ import AppKit
 /// `.offset` modifier is banned. Zoom rides `.scaleEffect(zoom, anchor: .topLeading)`.
 /// Together that is `DiagramViewport.toScreen`, the single screen-to-diagram truth.
 struct DiagramScreen: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(DiagramWorkspaceStore.self) private var workspaces
     @Environment(\.colorScheme) private var colorScheme
     let windowID: DiagramWindowID

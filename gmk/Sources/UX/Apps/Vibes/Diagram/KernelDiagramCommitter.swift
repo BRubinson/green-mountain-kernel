@@ -8,10 +8,10 @@ import Foundation
 /// normalized on the way in: minted codes, packed stroke vertices, clientRef-resolved
 /// connector targets. Rebuilding that client-side is a second implementation of the reducer.
 @MainActor
-final class DaemonDiagramCommitter: DiagramCommitting {
+final class KernelDiagramCommitter: DiagramCommitting {
     private let diagramUuid: String
     private let onCommit: @MainActor @Sendable (DiagramGetResponse) -> Void
-    private let service = GMCCDaemonService.shared
+    private let service = KernelStoreService.shared
 
     /// Creates a committer for a diagram.
     ///

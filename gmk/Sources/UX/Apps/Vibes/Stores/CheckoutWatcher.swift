@@ -3,7 +3,7 @@ import Observation
 
 /// The route() → checkout-state edge.
 ///
-/// A protocol so DaemonConnectionModel stays free of concrete store types. No
+/// A protocol so KernelConnectionModel stays free of concrete store types. No
 /// owner token: the sink is an app-lifetime singleton with no successor-
 /// clobbering race to guard.
 @MainActor
@@ -89,7 +89,7 @@ final class CheckoutWatcher: CheckoutEventSink {
     /// fairness-free serial queue.
     private var refreshTasks: [String: Task<Void, Never>] = [:]
 
-    private let service = GMCCDaemonService.shared
+    private let service = KernelStoreService.shared
 
     // MARK: - Reads
 

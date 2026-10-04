@@ -53,7 +53,7 @@ final class KernelLifecycleTests: KernelBackedTestCase {
 
     /// The kernel's own boot write is visible in SQL.
     ///
-    /// `recordDaemonStart` runs during `KernelWriter.start`, so this asserts the
+    /// `recordKernelStart` runs during `KernelWriter.start`, so this asserts the
     /// full round trip — process spawned, lock taken, database opened, migration
     /// ledger advanced, event appended — using nothing but a read-only query.
     /// No fixture, no `@testable`, no `Store`.
@@ -63,7 +63,7 @@ final class KernelLifecycleTests: KernelBackedTestCase {
             try Int.fetchOne(
                 $0,
                 sql: "SELECT COUNT(*) FROM daemon_event WHERE kind = ?",
-                arguments: [DaemonEventKind.daemonStart.rawValue]
+                arguments: [KernelEventKind.daemonStart.rawValue]
             )
         }
         XCTAssertGreaterThan(starts ?? 0, 0, "a booted kernel must record its own start")

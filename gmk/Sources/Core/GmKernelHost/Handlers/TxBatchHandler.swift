@@ -100,7 +100,7 @@ enum TxBatchHandler {
                 }
             }
         } catch {
-            // THROW, never hand-build an `ok: false` envelope: `DaemonClient.call`
+            // THROW, never hand-build an `ok: false` envelope: `KernelClient.call`
             // branches on `response.error` rather than on `ok`, so a hand-built
             // one reads as SUCCESS and a rolled-back batch reports exit 0 with an
             // empty result. Throwing routes through the path every other handler

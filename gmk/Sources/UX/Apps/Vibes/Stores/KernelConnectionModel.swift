@@ -6,7 +6,7 @@ import Observation
 /// Health is up once the store is installed; there is nothing to probe. Events arrive from the
 /// store's post-commit fan-out via routeInProcess; vitals are sampled from the process.
 @Observable @MainActor
-final class DaemonConnectionModel {
+final class KernelConnectionModel {
     enum Health: Equatable {
         case unknown
         case notInstalled
@@ -131,7 +131,7 @@ final class DaemonConnectionModel {
 
     /// Reads the store's status snapshot (table counts, last event id) on demand.
     func refreshStatus() async {
-        let newStatus = try? await GMCCDaemonService.shared.status()
+        let newStatus = try? await KernelStoreService.shared.status()
         if status != newStatus { status = newStatus }
     }
 
@@ -185,7 +185,7 @@ final class DaemonConnectionModel {
     ///
     /// - Parameter event: The event notification to route.
     private func route(_ event: EventNotification) {
-        guard let kind = DaemonEventKind(rawValue: event.kind) else {
+        guard let kind = KernelEventKind(rawValue: event.kind) else {
             return  // forward compat: unknown kinds bump nothing
         }
         switch kind {

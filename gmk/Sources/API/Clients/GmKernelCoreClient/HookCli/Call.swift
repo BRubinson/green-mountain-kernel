@@ -3,7 +3,7 @@ import Foundation
 /// Any JSON value, as a Codable — the type that makes an untyped passthrough
 /// possible without teaching the client 123 payload shapes.
 ///
-/// Rides the SAME `DaemonClient.request` as every typed verb. The type lives
+/// Rides the SAME `KernelClient.request` as every typed verb. The type lives
 /// in `GmKernelCoreShared` as `GmJsonValue`; the harness envelope needs the same
 /// shape on the protocol side.
 typealias JSONValue = GmJsonValue
@@ -74,7 +74,7 @@ func runCall(_ argv: [String]) -> Int32 {
         return 2
     }
 
-    let client = DaemonClient()
+    let client = KernelClient()
     defer { client.close() }
     do {
         let response: JSONValue = try client.request(type: type, payload: payload, responseType: JSONValue.self)

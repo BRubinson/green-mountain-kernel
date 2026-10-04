@@ -44,7 +44,7 @@ final class ClarificationAnswerModel {
     /// Production never reassigns it.
     @ObservationIgnored
     var send: @MainActor (ClarifyAnswerRequest) async throws -> ClarificationQuestionRow = {
-        try await GMCCDaemonService.shared.clarifyAnswer($0)
+        try await KernelStoreService.shared.clarifyAnswer($0)
     }
 
     // MARK: - Reads
@@ -209,7 +209,7 @@ final class ClarificationAnswerModel {
             // CLARIFICATION_CHANGE round trip would make a second quick save
             // conflict against a version we already hold.
             applyServerRow(row)
-        } catch DaemonError.versionConflict {
+        } catch KernelError.versionConflict {
             finish(
                 questionUuid,
                 conflict:
@@ -219,7 +219,7 @@ final class ClarificationAnswerModel {
             // Without this the user would keep re-sending the same stale
             // expected version and conflict forever.
             await onNeedsRefresh?()
-        } catch DaemonError.invalidTransition(let reason) {
+        } catch KernelError.invalidTransition(let reason) {
             // The summary left `answering` under us (a bot sealed it). The UI
             // gate closes on the next refresh; say why in the meantime.
             finish(
@@ -228,7 +228,7 @@ final class ClarificationAnswerModel {
                     ?? "Clarification is no longer accepting answers."
             )
             await onNeedsRefresh?()
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             finish(questionUuid, conflict: error.userMessage)
         } catch {
             finish(questionUuid, conflict: String(describing: error))

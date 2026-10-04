@@ -3,14 +3,14 @@ import Foundation
 /// App-facing typed error surface for errors from the in-process Store.
 ///
 /// Views and stores branch on these cases — never on message text — per the kernel's typed-code contract.
-nonisolated enum DaemonError: Error, Equatable {
+nonisolated enum KernelError: Error, Equatable {
     /// No kernel app for the RESOLVED root — `Paths.binApp` off production,
     /// the installed app on it. Distinct from a stopped kernel.
     case notInstalled
     /// Socket dead and autostart disabled (or autostart exhausted its retries).
     case unreachable(String)
-    /// Daemon is newer than our linked GmDaemonSdk — rebuild GMVibes /
-    /// update the package. Starting the daemon cannot fix this state.
+    /// The kernel speaks a newer protocol than this client — rebuild the
+    /// client. Starting the kernel cannot fix this state.
     case clientTooOld(daemonVersion: Int)
     /// Daemon reported an older protocol and the kit's respawn cycle still
     /// failed to retire it.
@@ -59,7 +59,7 @@ nonisolated enum DaemonError: Error, Equatable {
     ///
     /// - Parameter error: The error to convert.
     init(_ error: Error) {
-        if let already = error as? DaemonError {
+        if let already = error as? KernelError {
             self = already
             return
         }

@@ -9,7 +9,7 @@ import AppKit
 /// Read-only tree render + a never-writing Read Repo validation + the one
 /// Init write behind a validated sheet.
 struct DopePane: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     let scope: SessionScope
     let promptUuid: String?
     /// false when embedded in an already-scrolling host (the editor's phase

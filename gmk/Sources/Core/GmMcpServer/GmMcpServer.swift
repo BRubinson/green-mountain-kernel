@@ -1,7 +1,7 @@
 import Foundation
 
 // gm_mcp — the GMCC MCP stdio server: the agent PEN surface as typed MCP
-// tools. A thin client of the daemon socket that reuses DaemonClient/WireCodec
+// tools. A thin client of the daemon socket that reuses KernelClient/WireCodec
 // and NEVER touches the db, keeping the single-writer invariant. JSON-RPC 2.0
 // is hand-rolled over newline-delimited stdio for exactly initialize,
 // tools/list, tools/call and ping.
@@ -971,7 +971,7 @@ enum CdeDispatch {
 
 // `nonisolated(unsafe)` because a library target gives globals no implicit
 // main-actor isolation and `[CdeTool]` cannot be `Sendable`: a `CdeTool` carries
-// `run`/`degrade` closures over `Args` and `DaemonClient`. What makes it safe
+// `run`/`degrade` closures over `Args` and `KernelClient`. What makes it safe
 // is that the array is built ONCE, never mutated, and read only from the single
 // stdio read loop in `GmMcpServer.main()` — one thread, one connection, no
 // concurrency in this process.
@@ -1177,7 +1177,7 @@ enum GmMcpServer {
         // ONE CLIENT, ONE SOCKET. Every pen tool is served by the same connection —
         // there is no caller role on the wire and nothing for the daemon to decide
         // about who is on the other end.
-        let client = DaemonClient()
+        let client = KernelClient()
         defer { client.close() }
 
         validateRosterAgainstRegistry()
@@ -1253,7 +1253,7 @@ enum GmMcpServer {
                     switch error {
                     case let toolError as ToolError:
                         text = toolError.message
-                    case let clientError as DaemonClientError:
+                    case let clientError as KernelClientError:
                         text = "\(clientError)"
                     default:
                         text = "\(error)"

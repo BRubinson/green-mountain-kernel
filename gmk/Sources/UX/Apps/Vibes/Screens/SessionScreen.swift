@@ -35,7 +35,7 @@ enum SessionTab: String, CaseIterable, Identifiable, Hashable {
 }
 
 struct SessionScreen: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(CatalogStore.self) private var catalog
     @Environment(WindowNav.self) private var nav
     @Environment(DiagramCatalogStore.self) private var diagrams

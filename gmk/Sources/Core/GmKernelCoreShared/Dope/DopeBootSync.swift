@@ -40,7 +40,7 @@ enum DopeBootSync {
     ///   - instanceRoot: The repo checkout root directory.
     /// - Returns: An `Outcome` describing the reconciliation result.
     static func run(
-        client: DaemonClient,
+        client: KernelClient,
         sessionUuid: String,
         instanceRoot: String
     ) -> Outcome {

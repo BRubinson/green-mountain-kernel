@@ -2,13 +2,13 @@ import Foundation
 
 /// Long-lived event stream (SUBSCRIBE → EVENT*).
 ///
-/// Owns its own connection, structurally separate from DaemonClient's
+/// Owns its own connection, structurally separate from KernelClient's
 /// request/response surface to prevent request frame interleaving. Reconnect:
 /// persist `lastEventId`, pass as `sinceId` on next subscription. Daemon
 /// replays missed events before going live. Replay is capped (see
 /// `replayCapped`): re-subscribe from new `lastEventId` to drain remainder.
-final class DaemonEventSubscription: @unchecked Sendable {
-    private let client: DaemonClient
+final class KernelEventSubscription: @unchecked Sendable {
+    private let client: KernelClient
     private let sinceId: Int64?
     private var started = false
 
@@ -42,7 +42,7 @@ final class DaemonEventSubscription: @unchecked Sendable {
     ) {
         self.sinceId = sinceId
         self.lastEventId = sinceId ?? 0
-        self.client = DaemonClient(
+        self.client = KernelClient(
             socketPath: socketPath,
             appBundlePath: appBundlePath,
             clientName: clientName,
@@ -63,7 +63,7 @@ final class DaemonEventSubscription: @unchecked Sendable {
             // prevent.
             guard !self.started else {
                 continuation.finish(
-                    throwing: DaemonClientError.wire(
+                    throwing: KernelClientError.wire(
                         "DaemonEventSubscription.events() may only be consumed once — create a new subscription"
                     )
                 )

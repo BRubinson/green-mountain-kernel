@@ -59,7 +59,7 @@ final class KernelServices {
 
     /// The in-process verb caller — a `GmVerbCaller` that re-enters the dispatcher instead of dialling the socket.
     ///
-    /// Every verb method is declared in `extension GmVerbCaller` and `DaemonClient: GmVerbCaller {}`
+    /// Every verb method is declared in `extension GmVerbCaller` and `KernelClient: GmVerbCaller {}`
     /// is an EMPTY conformance, so a consumer written against the socket client runs unchanged here.
     /// `from: nil` marks the call in-process, which refuses SUBSCRIBE: an in-process consumer uses
     /// `store.subscribeToEvents`.

@@ -8,7 +8,7 @@ import SwiftUI
 /// root instead of pushing onto a `NavigationStack`.
 struct GMVibesWindow: View {
     @Environment(\.openWindow) private var openWindow
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(GMVibesEnvironment.self) private var gmcc
     @State private var nav: WindowNav
     // Above the `.id(nav.route)` boundary so the non-persisted diagram
@@ -168,7 +168,7 @@ struct GlobalToolbarGroup: ToolbarContent {
                 }
                 .help("Go back")
             }
-            GmDaemonStatus()
+            GmKernelStatus()
             Button {
                 nav.railOpen.toggle()
             } label: {

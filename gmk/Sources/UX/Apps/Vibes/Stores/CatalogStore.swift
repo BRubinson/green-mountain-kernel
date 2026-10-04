@@ -18,7 +18,7 @@ final class CatalogStore {
     private(set) var lastError: String?
     private(set) var hasLoaded = false
 
-    private let service = GMCCDaemonService.shared
+    private let service = KernelStoreService.shared
     private var inFlight: Task<Void, Never>?
 
     /// Refreshes the store from the daemon, coalescing multiple requests.
@@ -39,7 +39,7 @@ final class CatalogStore {
 
     /// Fetches and groups projects, instances, and sessions from the daemon.
     ///
-    /// - Throws: `DaemonError` on daemon failures or other unexpected errors.
+    /// - Throws: `KernelError` on daemon failures or other unexpected errors.
     private func performRefresh() async {
         do {
             let projects = try await service.listProjects()
@@ -76,7 +76,7 @@ final class CatalogStore {
             if self.sessionsByUuid != newSessionsByUuid { self.sessionsByUuid = newSessionsByUuid }
             if self.instancesByUuid != newInstancesByUuid { self.instancesByUuid = newInstancesByUuid }
             if lastError != nil { lastError = nil }
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             lastError = error.userMessage
         } catch {
             lastError = String(describing: error)
@@ -135,7 +135,7 @@ final class CatalogStore {
 
     /// Sets a project's primary branch.
     ///
-    /// The daemon emits `updateProject`, which DaemonConnectionModel already
+    /// The daemon emits `updateProject`, which KernelConnectionModel already
     /// routes to a `.topology` invalidation. This call also refreshes the store
     /// (coalesced) so the sheet's row is current when it dismisses, not a socket
     /// round trip later.
@@ -144,7 +144,7 @@ final class CatalogStore {
     ///   - projectUuid: The project UUID.
     ///   - expectedVersion: The version the caller last read.
     ///   - branch: The new primary branch name.
-    /// - Throws: `DaemonError` on daemon failures or version conflicts.
+    /// - Throws: `KernelError` on daemon failures or version conflicts.
     func setPrimaryBranch(
         projectUuid: String,
         expectedVersion: Int64,

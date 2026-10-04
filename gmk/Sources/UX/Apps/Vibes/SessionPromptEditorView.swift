@@ -11,7 +11,7 @@ import AppKit
 // the editor keeps its fast .id(stub.uuid) recreation path.
 
 struct SessionPromptScreen: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(CatalogStore.self) private var catalog
     @Environment(WindowNav.self) private var nav
     let windowID: SessionWindowID
@@ -111,7 +111,7 @@ struct SessionPromptScreen: View {
                     .popover(isPresented: $showSessionDope, arrowEdge: .trailing) {
                         // DopePane frames to .infinity; a bare popover proposes
                         // nothing, so the explicit frame is load-bearing. The
-                        // environment is re-injected per the GmDaemonStatus
+                        // environment is re-injected per the GmKernelStatus
                         // precedent.
                         DopePane(scope: scope, promptUuid: nil)
                             .environment(daemon)
@@ -250,7 +250,7 @@ struct SessionPromptScreen: View {
 
 private struct PromptEditorPane: View {
     @Environment(GMVibesEnvironment.self) private var gmcc
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(CatalogStore.self) private var catalog
     @Environment(CheckoutWatcher.self) private var checkout
     @Environment(LaunchColorRegistry.self) private var launchColors
@@ -1372,7 +1372,7 @@ private struct PromptEditorPane: View {
     /// still renders and can be deselected.
     private func loadAvailableKbites() async {
         let refs =
-            (try? await GMCCDaemonService.shared.listKbites(
+            (try? await KernelStoreService.shared.listKbites(
                 scope: .prompt,
                 ownerUuid: stub.uuid,
                 all: true
@@ -1395,7 +1395,7 @@ private struct PromptEditorPane: View {
         guard !added.isEmpty || !removed.isEmpty else { return }
         let uuid = stub.uuid
         Task {
-            let service = GMCCDaemonService.shared
+            let service = KernelStoreService.shared
             var failed = false
             for code in added.sorted() {
                 if (try? await service.addKbite(scope: .prompt, ownerUuid: uuid, code: code)) == nil {

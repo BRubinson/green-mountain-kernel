@@ -24,12 +24,12 @@ enum GmAgentToolFamily: String, Sendable, CaseIterable {
 
 /// The transport every native tool call runs its op on.
 ///
-/// The default is `DaemonClient`, the SOCKET transport: the right answer for a
+/// The default is `KernelClient`, the SOCKET transport: the right answer for a
 /// model running outside the kernel. A process that already holds the store —
 /// the app — must assign its own in-process caller here, or every native tool
 /// call dials the daemon it is itself hosting.
 enum GmAgentToolTransport {
-    nonisolated(unsafe) static var caller: any GmVerbCaller = DaemonClient(clientName: "gm_agent")
+    nonisolated(unsafe) static var caller: any GmVerbCaller = KernelClient(clientName: "gm_agent")
 }
 
 protocol GmAgentTool: Tool {

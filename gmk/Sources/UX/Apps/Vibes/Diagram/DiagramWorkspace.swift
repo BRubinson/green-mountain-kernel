@@ -77,7 +77,7 @@ final class DiagramWorkspace {
     @ObservationIgnored private var codeCenters: [String: CGPoint] = [:]
 
     private var colorScheme: DiagramRenderEnvironment.ColorScheme = .light
-    private let service = GMCCDaemonService.shared
+    private let service = KernelStoreService.shared
 
     /// Creates a workspace for the given diagram source.
     ///
@@ -92,7 +92,7 @@ final class DiagramWorkspace {
         switch id.source {
         case .saved(let diagramUuid):
             self.editSession = DiagramEditSession(
-                committer: DaemonDiagramCommitter(diagramUuid: diagramUuid) { [weak self] response in
+                committer: KernelDiagramCommitter(diagramUuid: diagramUuid) { [weak self] response in
                     self?.adopt(response.tree)
                 },
                 baseRevision: nil
@@ -177,7 +177,7 @@ final class DiagramWorkspace {
             adopt(response.tree)
             loadError = nil
             loaded = true
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             loadError = error.userMessage
         } catch {
             loadError = String(describing: error)
@@ -309,7 +309,7 @@ final class DiagramWorkspace {
                 scaffoldPreview(from: response.tree)
             }
             loaded = true
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             loadError = error.userMessage
         } catch {
             loadError = String(describing: error)

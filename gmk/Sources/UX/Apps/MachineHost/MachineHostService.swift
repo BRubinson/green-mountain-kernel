@@ -6,7 +6,7 @@ import os
 
 /// The app-lifetime owner of the machine host: enable and disable, launch recovery and the quit restore.
 ///
-/// Every store call goes through `GMCCDaemonService`; the reducer runs on the main actor and the interpreter
+/// Every store call goes through `KernelStoreService`; the reducer runs on the main actor and the interpreter
 /// carries out its effects. A second app copy never reaches `boot()`. With the flag off nothing observes an
 /// app, registers a hotkey or holds the machine lock.
 @MainActor
@@ -56,7 +56,7 @@ final class MachineHostService {
     /// Whether this app holds the Accessibility grant.
     let trust = AccessibilityTrust()
 
-    @ObservationIgnored private let service = GMCCDaemonService.shared
+    @ObservationIgnored private let service = KernelStoreService.shared
     @ObservationIgnored private let lock = MachineHostLock()
     @ObservationIgnored private var state = WMState()
     @ObservationIgnored private var hotkeys: CarbonHotkeyCenter?
@@ -300,7 +300,7 @@ final class MachineHostService {
     /// - Parameters:
     ///   - showsActive: True when the write changed which code is visible, so the stored map must be shown.
     ///   - write: The store write.
-    private func edit(showsActive: Bool = false, _ write: (GMCCDaemonService) async throws -> Void) async {
+    private func edit(showsActive: Bool = false, _ write: (KernelStoreService) async throws -> Void) async {
         do {
             try await write(service)
             lastError = nil
@@ -426,13 +426,13 @@ extension MachineHostService {
             machineUuid: machineUuid,
             image: { [weak self] in self?.mirrorImage() ?? MirrorImage() },
             flush: { [weak self] batch in
-                let written = try await GMCCDaemonService.shared.machineHostMirrorFlush(batch)
+                let written = try await KernelStoreService.shared.machineHostMirrorFlush(batch)
                 await self?.storeChanged()
                 return written
             },
             setActive: { [weak self] displayKey, code in
                 guard let target = await self?.activeTarget(displayKey: displayKey, workspaceCode: code) else { return }
-                _ = try await GMCCDaemonService.shared.machineHostSetActiveWorkspace(
+                _ = try await KernelStoreService.shared.machineHostSetActiveWorkspace(
                     workstationUuid: target.workstation,
                     displayUuid: target.display,
                     code: code
@@ -549,9 +549,9 @@ extension MachineHostService {
     ///
     /// The display sync runs at once, so the connected set has its workstation before `.enable`.
     ///
-    /// - Throws: `DaemonError` when a store call fails.
+    /// - Throws: `KernelError` when a store call fails.
     private func prepareRows() async throws {
-        guard let machine = snapshot?.machine else { throw DaemonError.notFound }
+        guard let machine = snapshot?.machine else { throw KernelError.notFound }
         let live = Self.liveApps()
             .map {
                 AppProcessIdentity(pid: Int64($0.pid), launchedAt: LaunchStamp.string($0.launchedAt))
@@ -950,7 +950,7 @@ extension MachineHostService {
     /// - Parameter error: The error.
     /// - Returns: The message.
     static func message(_ error: Error) -> String {
-        (error as? DaemonError)?.userMessage ?? String(describing: error)
+        (error as? KernelError)?.userMessage ?? String(describing: error)
     }
 }
 

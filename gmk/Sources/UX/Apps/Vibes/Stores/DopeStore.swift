@@ -67,7 +67,7 @@ final class DopeStore {
     /// The user's explicit pick per target; absent ⇒ daemon resolution order.
     private(set) var selectedCodes: [Key: String] = [:]
 
-    private let service = GMCCDaemonService.shared
+    private let service = KernelStoreService.shared
     // Per-key single flight, CHAINED like PromptPhaseStore.chainedRun — a
     // load issued after a write must never be satisfied by a fetch that
     // started before it (JOINING would answer a post-write wake with
@@ -317,11 +317,11 @@ final class DopeStore {
                     code: key.code
                 )
             )
-        } catch DaemonError.summaryAbsent {
+        } catch KernelError.summaryAbsent {
             next = .absent
-        } catch DaemonError.server(let code, let message) where code == "BAD_REQUEST" {
+        } catch KernelError.server(let code, let message) where code == "BAD_REQUEST" {
             next = .needsCode(daemonMessage: message)
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             next = .failed(error.userMessage)
         } catch {
             next = .failed(String(describing: error))
@@ -349,7 +349,7 @@ final class DopeStore {
             let read = try await service.dopeReadRepo(scopeUuid: response.tree.identity.uuid)
             repoReads[key] = read
             repoIssues[key] = nil
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             repoIssues[key] = error.userMessage
         } catch {
             repoIssues[key] = String(describing: error)
@@ -365,7 +365,7 @@ final class DopeStore {
     ///   - code: The unique code for the scope.
     ///   - name: The human-readable name.
     ///   - description: Optional description of the scope.
-    /// - Throws: Typed `DaemonError` for the sheet to render.
+    /// - Throws: Typed `KernelError` for the sheet to render.
     func initScope(key: Key, code: String, name: String, description: String) async throws {
         _ = try await service.dopeInit(
             DopeInitRequest(

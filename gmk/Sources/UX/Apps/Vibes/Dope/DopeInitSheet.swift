@@ -142,7 +142,7 @@ struct DopeInitSheet: View {
                     description: descriptionText
                 )
                 dismiss()
-            } catch let error as DaemonError {
+            } catch let error as KernelError {
                 submitError = error.userMessage
             } catch {
                 submitError = String(describing: error)

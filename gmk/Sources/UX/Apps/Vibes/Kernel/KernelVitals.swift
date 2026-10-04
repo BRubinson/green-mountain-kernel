@@ -172,7 +172,7 @@ final class KernelVitals {
 
     /// Formats uptime in days, hours, minutes and seconds.
     ///
-    /// Adds a day arm (like `DaemonStatusPopover`) since long uptimes
+    /// Adds a day arm (like `KernelStatusPopover`) since long uptimes
     /// make hour-only display unreadable at a glance.
     ///
     /// - Parameter seconds: The uptime in seconds.

@@ -15,7 +15,7 @@ actor PromptSaveActor {
         case failed(String)
     }
 
-    private let service = GMCCDaemonService.shared
+    private let service = KernelStoreService.shared
     private let promptUuid: String
     private var version: Int64
     private(set) var lastWrittenVersion: Int64 = 0
@@ -62,7 +62,7 @@ actor PromptSaveActor {
             version = row.version
             lastWrittenVersion = row.version
             return .saved(row.version)
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             switch error {
             case .versionConflict: return .conflict
             case .contentLocked: return .locked

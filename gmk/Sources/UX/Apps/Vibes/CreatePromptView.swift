@@ -97,13 +97,13 @@ struct CreatePromptView: View {
     private func loadKbites() async {
         // Session-scope registry seeds the preselection (kbite inheritance).
         let sessionCodes =
-            (try? await GMCCDaemonService.shared.listKbites(
+            (try? await KernelStoreService.shared.listKbites(
                 scope: .session,
                 ownerUuid: store.sessionUuid
             ))?
             .map(\.code) ?? []
         let names =
-            (try? await GMCCDaemonService.shared.listKbites(
+            (try? await KernelStoreService.shared.listKbites(
                 scope: .session,
                 ownerUuid: store.sessionUuid,
                 all: true
@@ -122,7 +122,7 @@ struct CreatePromptView: View {
     private func save() async {
         isSaving = true
         errorText = nil
-        let service = GMCCDaemonService.shared
+        let service = KernelStoreService.shared
         let kbites = availableKbites.filter { selectedKbites.contains($0) }  // stable order
         do {
             // Code passed EXPLICITLY — a nil code defaults to "p{seq}".
@@ -161,7 +161,7 @@ struct CreatePromptView: View {
             await store.refresh()
             isSaving = false
             dismiss()
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             errorText = error.userMessage
             isSaving = false
         } catch {

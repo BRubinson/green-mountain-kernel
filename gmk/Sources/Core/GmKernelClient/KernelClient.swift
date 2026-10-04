@@ -6,9 +6,9 @@ import Foundation
 /// An internal lock serializes concurrent request() callers so the shared fd
 /// and read buffer can never interleave frames. Connect-or-autostart: a dead
 /// socket launches the kernel app through LaunchServices, whose pidfile flock
-/// makes a second copy quit. Event streaming lives in DaemonEventSubscription,
+/// makes a second copy quit. Event streaming lives in KernelEventSubscription,
 /// which owns its own connection, so a streaming connection cannot issue requests.
-final class DaemonClient: @unchecked Sendable {
+final class KernelClient: @unchecked Sendable {
     private let socketPath: String
     /// The kernel app to launch, by path.
     private let appBundlePath: String
@@ -72,7 +72,7 @@ final class DaemonClient: @unchecked Sendable {
     /// the mismatch immediately.
     ///
     /// - Returns: The hello acknowledgment from the daemon.
-    /// - Throws: `DaemonClientError` on connection, wire, or handshake failure.
+    /// - Throws: `KernelClientError` on connection, wire, or handshake failure.
     func connect() throws -> HelloAck {
         lock.lock()
         defer { lock.unlock() }
@@ -82,14 +82,14 @@ final class DaemonClient: @unchecked Sendable {
     /// Connects when the lock is already held, retrying with autostart if needed.
     ///
     /// - Returns: The hello acknowledgment from the daemon.
-    /// - Throws: `DaemonClientError` on connection, wire, or handshake failure.
+    /// - Throws: `KernelClientError` on connection, wire, or handshake failure.
     private func connectLocked() throws -> HelloAck {
         do {
             return try connectOnce()
-        } catch DaemonClientError.protocolMismatch(let message, let daemonVersion) {
+        } catch KernelClientError.protocolMismatch(let message, let daemonVersion) {
             closeLocked()
             if let daemonVersion, daemonVersion >= GmWireProtocol.version {
-                throw DaemonClientError.protocolMismatch(message: message, daemonVersion: daemonVersion)
+                throw KernelClientError.protocolMismatch(message: message, daemonVersion: daemonVersion)
             }
             waitForListenerToClose()
             try autostart()
@@ -119,7 +119,7 @@ final class DaemonClient: @unchecked Sendable {
     ///   - payload: Encoded message payload.
     ///   - responseType: Response type for generic type parameter inference.
     /// - Returns: The decoded response payload.
-    /// - Throws: `DaemonClientError` on connection, wire, or protocol mismatch.
+    /// - Throws: `KernelClientError` on connection, wire, or protocol mismatch.
     func request<Req: Codable & Sendable, Resp: Codable & Sendable>(
         type: MessageType,
         payload: Req,
@@ -132,7 +132,7 @@ final class DaemonClient: @unchecked Sendable {
         let response: ResponseEnvelope<Resp>
         do {
             response = try roundTrip(envelope)
-        } catch let error as DaemonClientError {
+        } catch let error as KernelClientError {
             // A wire failure usually means the daemon restarted under us
             // (EPIPE/EOF on a stale fd). A one-shot invocation never noticed;
             // long-lived clients (gm_mcp, GMVibes) were permanently
@@ -146,15 +146,15 @@ final class DaemonClient: @unchecked Sendable {
         }
         if let error = response.error {
             if error.code == .protocolMismatch {
-                throw DaemonClientError.protocolMismatch(
+                throw KernelClientError.protocolMismatch(
                     message: error.message,
                     daemonVersion: error.daemonProtocolVersion
                 )
             }
-            throw DaemonClientError.server(error)
+            throw KernelClientError.server(error)
         }
         guard let payload = response.payload else {
-            throw DaemonClientError.wire("response for \(type.rawValue) carried no payload")
+            throw KernelClientError.wire("response for \(type.rawValue) carried no payload")
         }
         return payload
     }
@@ -164,7 +164,7 @@ final class DaemonClient: @unchecked Sendable {
     /// Opens a new socket, exchanges hello, and returns the acknowledgment.
     ///
     /// - Returns: The hello acknowledgment from the daemon.
-    /// - Throws: `DaemonClientError` on socket open, wire, or handshake failure.
+    /// - Throws: `KernelClientError` on socket open, wire, or handshake failure.
     private func connectOnce() throws -> HelloAck {
         if fd < 0 {
             try openSocket()
@@ -173,29 +173,29 @@ final class DaemonClient: @unchecked Sendable {
         let response: ResponseEnvelope<HelloAck> = try roundTrip(hello)
         if let error = response.error {
             if error.code == .protocolMismatch {
-                throw DaemonClientError.protocolMismatch(
+                throw KernelClientError.protocolMismatch(
                     message: error.message,
                     daemonVersion: error.daemonProtocolVersion
                 )
             }
-            throw DaemonClientError.server(error)
+            throw KernelClientError.server(error)
         }
         guard let ack = response.payload else {
-            throw DaemonClientError.wire("hello ack carried no payload")
+            throw KernelClientError.wire("hello ack carried no payload")
         }
         return ack
     }
 
     /// Dials the socket or launches the kernel app if autostart is enabled.
     ///
-    /// - Throws: `DaemonClientError.unreachable` if the socket is dead and autostart is disabled.
+    /// - Throws: `KernelClientError.unreachable` if the socket is dead and autostart is disabled.
     private func openSocket() throws {
         if let connected = try? dial() {
             fd = connected
             return
         }
         guard autostartEnabled else {
-            throw DaemonClientError.unreachable("daemon socket dead at \(socketPath) and autostart disabled")
+            throw KernelClientError.unreachable("daemon socket dead at \(socketPath) and autostart disabled")
         }
         try autostart()
     }
@@ -206,19 +206,19 @@ final class DaemonClient: @unchecked Sendable {
     /// and the app's baked root decides its database. Retries up to 20 times with delays
     /// from 100 ms to 1 s, since an app cold start is slower than a CLI.
     ///
-    /// - Throws: `DaemonClientError.unreachable` when the bundle is missing, `open` fails, or all retries fail.
+    /// - Throws: `KernelClientError.unreachable` when the bundle is missing, `open` fails, or all retries fail.
     private func autostart() throws {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: appBundlePath, isDirectory: &isDirectory),
             isDirectory.boolValue
         else {
-            throw DaemonClientError.unreachable(
+            throw KernelClientError.unreachable(
                 "no kernel app at \(appBundlePath) — run install_gm.sh (prod) or gm_env.sh create <env>"
             )
         }
         guard launchApp() else {
             FileHandle.standardError.write(Data("[GMB] kernel not running and no GUI session\n".utf8))
-            throw DaemonClientError.unreachable("kernel not running and no GUI session")
+            throw KernelClientError.unreachable("kernel not running and no GUI session")
         }
         var delay: UInt32 = 100_000  // µs
         for _ in 0..<20 {
@@ -229,7 +229,7 @@ final class DaemonClient: @unchecked Sendable {
             }
             delay = min(delay * 2, 1_000_000)
         }
-        throw DaemonClientError.unreachable("kernel did not come up at \(socketPath) after launching the app")
+        throw KernelClientError.unreachable("kernel did not come up at \(socketPath) after launching the app")
     }
 
     /// Runs `/usr/bin/open -g` on the kernel app and waits for it to return.
@@ -255,11 +255,11 @@ final class DaemonClient: @unchecked Sendable {
     /// Sets `SO_NOSIGPIPE` to avoid SIGPIPE on writes to stale sockets.
     ///
     /// - Returns: A connected socket file descriptor.
-    /// - Throws: `DaemonClientError.unreachable` on socket creation or connection failure.
+    /// - Throws: `KernelClientError.unreachable` on socket creation or connection failure.
     private func dial() throws -> Int32 {
         let sock = Darwin.socket(AF_UNIX, SOCK_STREAM, 0)
         guard sock >= 0 else {
-            throw DaemonClientError.unreachable("socket() failed: \(String(cString: strerror(errno)))")
+            throw KernelClientError.unreachable("socket() failed: \(String(cString: strerror(errno)))")
         }
         // Daemon restarts are routine (directional self-exit after rebuilds);
         // without SO_NOSIGPIPE, writing to the stale fd delivers SIGPIPE and
@@ -272,7 +272,7 @@ final class DaemonClient: @unchecked Sendable {
         let pathBytes = socketPath.utf8CString
         guard pathBytes.count <= MemoryLayout.size(ofValue: addr.sun_path) else {
             Darwin.close(sock)
-            throw DaemonClientError.unreachable("socket path too long: \(socketPath)")
+            throw KernelClientError.unreachable("socket path too long: \(socketPath)")
         }
         withUnsafeMutableBytes(of: &addr.sun_path) { dest in
             pathBytes.withUnsafeBytes { src in
@@ -288,18 +288,18 @@ final class DaemonClient: @unchecked Sendable {
         guard result == 0 else {
             let message = String(cString: strerror(errno))
             Darwin.close(sock)
-            throw DaemonClientError.unreachable("connect(\(socketPath)) failed: \(message)")
+            throw KernelClientError.unreachable("connect(\(socketPath)) failed: \(message)")
         }
         return sock
     }
 
-    // MARK: - NDJSON I/O (internal: DaemonEventSubscription reads raw lines)
+    // MARK: - NDJSON I/O (internal: KernelEventSubscription reads raw lines)
 
     /// Sends a request envelope and reads the response envelope.
     ///
     /// - Parameter envelope: The request envelope to encode and send.
     /// - Returns: The decoded response envelope.
-    /// - Throws: `DaemonClientError.wire` on encoding, write, read, or decode failure.
+    /// - Throws: `KernelClientError.wire` on encoding, write, read, or decode failure.
     func roundTrip<Req: Codable & Sendable, Resp: Codable & Sendable>(
         _ envelope: RequestEnvelope<Req>
     ) throws -> ResponseEnvelope<Resp> {
@@ -307,21 +307,21 @@ final class DaemonClient: @unchecked Sendable {
         do {
             line = try NDJSON.encodeLine(envelope)
         } catch {
-            throw DaemonClientError.wire("encode failed: \(error)")
+            throw KernelClientError.wire("encode failed: \(error)")
         }
         try writeAll(line)
         let responseLine = try readLine()
         do {
             return try NDJSON.decode(ResponseEnvelope<Resp>.self, from: responseLine)
         } catch {
-            throw DaemonClientError.wire("decode failed: \(error)")
+            throw KernelClientError.wire("decode failed: \(error)")
         }
     }
 
     /// Writes data to the socket, retrying until all bytes are sent.
     ///
     /// - Parameter data: The data to write.
-    /// - Throws: `DaemonClientError.wire` on write failure or broken pipe.
+    /// - Throws: `KernelClientError.wire` on write failure or broken pipe.
     private func writeAll(_ data: Data) throws {
         var remaining = data
         while !remaining.isEmpty {
@@ -329,7 +329,7 @@ final class DaemonClient: @unchecked Sendable {
                 Darwin.write(fd, buf.baseAddress, buf.count)
             }
             guard written > 0 else {
-                throw DaemonClientError.wire("write failed: \(String(cString: strerror(errno)))")
+                throw KernelClientError.wire("write failed: \(String(cString: strerror(errno)))")
             }
             remaining = remaining.dropFirst(written)
         }
@@ -341,7 +341,7 @@ final class DaemonClient: @unchecked Sendable {
     /// excluding the newline from the result.
     ///
     /// - Returns: Data up to but not including the newline.
-    /// - Throws: `DaemonClientError.wire` on read failure or connection closure.
+    /// - Throws: `KernelClientError.wire` on read failure or connection closure.
     func readLine() throws -> Data {
         while true {
             if let newlineIndex = readBuffer.firstIndex(of: 0x0A) {
@@ -354,9 +354,9 @@ final class DaemonClient: @unchecked Sendable {
             if count > 0 {
                 readBuffer.append(contentsOf: chunk[0..<count])
             } else if count == 0 {
-                throw DaemonClientError.wire("connection closed by daemon")
+                throw KernelClientError.wire("connection closed by daemon")
             } else {
-                throw DaemonClientError.wire("read failed: \(String(cString: strerror(errno)))")
+                throw KernelClientError.wire("read failed: \(String(cString: strerror(errno)))")
             }
         }
     }

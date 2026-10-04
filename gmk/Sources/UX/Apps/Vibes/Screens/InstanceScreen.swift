@@ -11,7 +11,7 @@ import SwiftUI
 struct InstanceScreen: View {
     let instanceUuid: String
 
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
     @Environment(CatalogStore.self) private var catalog
     @Environment(CheckoutWatcher.self) private var checkout
     @Environment(WindowNav.self) private var nav

@@ -15,7 +15,7 @@ struct SearchScreen: View {
     @State private var kinds: Set<SearchKind> = []  // empty = every kind
     @State private var scopeToSession = false
     @State private var selection: String?
-    @State private var model = DaemonSearchModel(limit: 100)
+    @State private var model = KernelSearchModel(limit: 100)
     @FocusState private var focused: Bool
 
     private var scopedSession: SessionStub? {

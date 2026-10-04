@@ -9,12 +9,12 @@ import SwiftUI
 /// The kernel is hosted in this process; a second app copy alerts and quits
 /// before it can touch the database. Views keep their existing granular
 /// @Environment bindings (GMVibesEnvironment / FileTreeStore /
-/// DaemonConnectionModel / CatalogStore).
+/// KernelConnectionModel / CatalogStore).
 @Observable @MainActor
 final class GMVibesServices {
     let env: GMVibesEnvironment
     let fileTrees: FileTreeStore
-    let daemon: DaemonConnectionModel
+    let daemon: KernelConnectionModel
     let catalog: CatalogStore
     /// Checked-out session per instance (CHECKOUT_CHANGE push edge +
     /// daemon-side INSTANCE_CURRENT_SESSION resolution).
@@ -77,7 +77,7 @@ final class GMVibesServices {
 
         env = GMVibesEnvironment()
         fileTrees = FileTreeStore.shared
-        daemon = DaemonConnectionModel()
+        daemon = KernelConnectionModel()
         catalog = CatalogStore()
         checkout = CheckoutWatcher()
         diagramCatalog = DiagramCatalogStore()
@@ -105,7 +105,7 @@ final class GMVibesServices {
             let store = kernel.store
             let status = kernel.statusBuilder
             Task {
-                await GMCCDaemonService.shared.install(store: store, status: status)
+                await KernelStoreService.shared.install(store: store, status: status)
                 self.daemon.markKernelHosted()
                 await self.machineHost.boot()
             }
@@ -120,14 +120,14 @@ final class GMVibesServices {
                 }
             }
         } else if let failure {
-            Task { await GMCCDaemonService.shared.install(failure: failure) }
+            Task { await KernelStoreService.shared.install(failure: failure) }
             daemon.markKernelFailed(String(describing: failure))
         }
     }
 
     // MARK: - The app target's window onto the kernel
     //
-    // A FACADE, not `public let daemon`. Exposing `DaemonConnectionModel` would make an
+    // A FACADE, not `public let daemon`. Exposing `KernelConnectionModel` would make an
     // entire observable model part of this module's public surface to serve four scalars.
     // These properties are the whole of what `GMVibesApp` needs.
 

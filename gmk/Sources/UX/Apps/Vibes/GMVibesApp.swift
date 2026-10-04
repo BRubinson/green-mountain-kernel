@@ -55,7 +55,7 @@ private struct GMVibesScenes: App {
 
     /// Initializes the app scenes with services and vitals.
     ///
-    /// NO SECOND SAMPLER: `DaemonConnectionModel` samples the process vitals
+    /// NO SECOND SAMPLER: `KernelConnectionModel` samples the process vitals
     /// on one cadence, so the menu bar READS that rather than measuring on its
     /// own, and it can never disagree with the status pill. ORDER IS FIXED HERE AND
     /// MUST NOT BE TIDIED: `GMVibesServices()` ARBITRATES DATABASE OWNERSHIP on

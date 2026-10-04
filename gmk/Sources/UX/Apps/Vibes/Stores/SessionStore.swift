@@ -20,7 +20,7 @@ final class SessionStore {
     private(set) var lastError: String?
     private(set) var hasLoaded = false
 
-    private let service = GMCCDaemonService.shared
+    private let service = KernelStoreService.shared
     private var inFlight: Task<Void, Never>?
 
     /// Creates a read model for a session.
@@ -81,7 +81,7 @@ final class SessionStore {
                     await refreshPrompt(uuid: stub.uuid)
                 }
             }
-        } catch let error as DaemonError {
+        } catch let error as KernelError {
             lastError = error.userMessage
             hasLoaded = true
         } catch {

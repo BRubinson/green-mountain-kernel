@@ -6,7 +6,7 @@
 
 import Foundation
 
-extension DaemonEventRecord {
+extension KernelEventRecord {
     /// Converts a daemon event record to a wire notification.
     ///
     /// The `id` field is retained because it serves as the SUBSCRIBE replay

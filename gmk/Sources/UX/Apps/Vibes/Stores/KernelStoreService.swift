@@ -4,8 +4,8 @@ import Foundation
 ///
 /// The kernel lives in this process, so calls go to the Store's facades directly; the queue is
 /// load-bearing because the store boundary is synchronous.
-actor GMCCDaemonService {
-    static let shared = GMCCDaemonService()
+actor KernelStoreService {
+    static let shared = KernelStoreService()
 
     /// What the kernel hands over: the store every data call goes through, and the STATUS read.
     ///
@@ -45,17 +45,17 @@ actor GMCCDaemonService {
         let pending = waiters
         waiters = []
         for waiter in pending {
-            waiter.resume(throwing: DaemonError.unreachable(String(describing: failure)))
+            waiter.resume(throwing: KernelError.unreachable(String(describing: failure)))
         }
     }
 
     /// Returns the installed kernel, suspending until `install` runs if it has not yet.
     ///
     /// - Returns: The installed store and status read.
-    /// - Throws: `DaemonError.unreachable` when the kernel failed to start.
+    /// - Throws: `KernelError.unreachable` when the kernel failed to start.
     private func installedKernel() async throws -> Installed {
         if let installed { return installed }
-        if let failure { throw DaemonError.unreachable(String(describing: failure)) }
+        if let failure { throw KernelError.unreachable(String(describing: failure)) }
         return try await withCheckedThrowingContinuation { waiters.append($0) }
     }
 
@@ -65,7 +65,7 @@ actor GMCCDaemonService {
     ///
     /// - Parameter body: A closure that calls a facade on the Store.
     /// - Returns: The facade's result.
-    /// - Throws: `DaemonError` wrapping any error from the body or kernel installation.
+    /// - Throws: `KernelError` wrapping any error from the body or kernel installation.
     private func perform<T: Sendable>(
         _ body: @escaping @Sendable (Store) throws -> T
     ) async throws -> T {
@@ -75,7 +75,7 @@ actor GMCCDaemonService {
                 do {
                     continuation.resume(returning: try body(store))
                 } catch {
-                    continuation.resume(throwing: DaemonError(error))
+                    continuation.resume(throwing: KernelError(error))
                 }
             }
         }
@@ -86,7 +86,7 @@ actor GMCCDaemonService {
     /// Fetches the kernel's current status.
     ///
     /// - Returns: The status response.
-    /// - Throws: `DaemonError` when the kernel is unavailable or the status read fails.
+    /// - Throws: `KernelError` when the kernel is unavailable or the status read fails.
     func status() async throws -> StatusResponse {
         let status = try await installedKernel().status
         return try await withCheckedThrowingContinuation { continuation in
@@ -94,7 +94,7 @@ actor GMCCDaemonService {
                 do {
                     continuation.resume(returning: try status())
                 } catch {
-                    continuation.resume(throwing: DaemonError(error))
+                    continuation.resume(throwing: KernelError(error))
                 }
             }
         }
@@ -104,7 +104,7 @@ actor GMCCDaemonService {
 
     /// Lists all projects.
     /// - Returns: An array of project rows.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func listProjects() async throws -> [ProjectRow] {
         try await perform { try $0.listProjects().projects }
     }
@@ -112,7 +112,7 @@ actor GMCCDaemonService {
     /// Lists instances, optionally filtered by project.
     /// - Parameter projectUuid: The project UUID to filter by, or nil for all instances.
     /// - Returns: An array of instance rows.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func listInstances(projectUuid: String? = nil) async throws -> [InstanceRow] {
         let uuid = Self.normalized(projectUuid)
         return try await perform { try $0.listInstances(InstanceListRequest(projectUuid: uuid)).instances }
@@ -121,7 +121,7 @@ actor GMCCDaemonService {
     /// Lists sessions, optionally filtered by instance.
     /// - Parameter instanceUuid: The instance UUID to filter by, or nil for all sessions.
     /// - Returns: An array of session stubs.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func listSessions(instanceUuid: String? = nil) async throws -> [SessionStub] {
         let uuid = Self.normalized(instanceUuid)
         return try await perform { try $0.listSessions(SessionListRequest(instanceUuid: uuid)).sessions }
@@ -135,7 +135,7 @@ actor GMCCDaemonService {
     ///   - projectUuid: The project UUID to search within, or nil for all projects.
     ///   - limit: The maximum number of results, or nil for default limit.
     /// - Returns: The catalog search response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func searchCatalog(
         query: String,
         projectUuid: String? = nil,
@@ -160,7 +160,7 @@ actor GMCCDaemonService {
     ///   - kinds: The search kinds to include, or nil for all kinds.
     ///   - limit: The maximum number of results, or nil for default limit.
     /// - Returns: An array of search hits.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func search(
         query: String,
         sessionUuid: String? = nil,
@@ -179,7 +179,7 @@ actor GMCCDaemonService {
     /// Fetches the session by UUID.
     /// - Parameter sessionUuid: The session UUID.
     /// - Returns: The session response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func getSession(sessionUuid: String) async throws -> SessionGetResponse {
         let uuid = Self.normalized(sessionUuid)
         return try await perform { try $0.getSession(SessionGetRequest(sessionUuid: uuid)) }
@@ -191,7 +191,7 @@ actor GMCCDaemonService {
     /// is EMPTY_UPDATE server-side, so callers must have something to change.
     /// - Parameter request: The update request with normalized project UUID.
     /// - Returns: The updated project row.
-    /// - Throws: `DaemonError` on connection or `StoreError.versionConflict` on stale version.
+    /// - Throws: `KernelError` on connection or `StoreError.versionConflict` on stale version.
     func updateProject(_ request: ProjectUpdateRequest) async throws -> ProjectRow {
         let req = ProjectUpdateRequest(
             projectUuid: Self.normalized(request.projectUuid),
@@ -204,7 +204,7 @@ actor GMCCDaemonService {
     /// Updates a session's name, backstory or goal.
     /// - Parameter request: The update request with normalized session UUID.
     /// - Returns: The updated session row.
-    /// - Throws: `DaemonError` on connection or `StoreError.versionConflict` on stale version.
+    /// - Throws: `KernelError` on connection or `StoreError.versionConflict` on stale version.
     func updateSession(_ request: SessionUpdateRequest) async throws -> SessionRow {
         let req = SessionUpdateRequest(
             sessionUuid: Self.normalized(request.sessionUuid),
@@ -226,7 +226,7 @@ actor GMCCDaemonService {
     ///   - sessionUuid: The session UUID.
     ///   - withReports: Whether to include clarification and architecture summaries.
     /// - Returns: An array of prompt stubs.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func listPrompts(sessionUuid: String, withReports: Bool = false) async throws -> [PromptStub] {
         let uuid = Self.normalized(sessionUuid)
         return try await perform {
@@ -243,7 +243,7 @@ actor GMCCDaemonService {
     /// Fetches the prompt by UUID.
     /// - Parameter promptUuid: The prompt UUID.
     /// - Returns: The prompt response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func getPrompt(promptUuid: String) async throws -> PromptGetResponse {
         let uuid = Self.normalized(promptUuid)
         return try await perform { try $0.getPrompt(PromptGetRequest(promptUuid: uuid)) }
@@ -256,7 +256,7 @@ actor GMCCDaemonService {
     /// Creates a new prompt in a session.
     /// - Parameter request: The create request with normalized UUIDs.
     /// - Returns: The created prompt row.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func createPrompt(_ request: PromptCreateRequest) async throws -> PromptRow {
         let req = PromptCreateRequest(
             sessionUuid: Self.normalized(request.sessionUuid),
@@ -275,7 +275,7 @@ actor GMCCDaemonService {
     /// Updates a prompt's backstory, goal or detail.
     /// - Parameter request: The update request with normalized prompt UUID.
     /// - Returns: The updated prompt row.
-    /// - Throws: `DaemonError` on connection or `StoreError.versionConflict` on stale version.
+    /// - Throws: `KernelError` on connection or `StoreError.versionConflict` on stale version.
     func updatePromptContent(_ request: PromptUpdateContentRequest) async throws -> PromptRow {
         let req = PromptUpdateContentRequest(
             promptUuid: Self.normalized(request.promptUuid),
@@ -290,7 +290,7 @@ actor GMCCDaemonService {
     /// Updates a prompt's status.
     /// - Parameter request: The status update request with normalized prompt UUID.
     /// - Returns: The updated prompt row.
-    /// - Throws: `DaemonError` on connection or `StoreError.versionConflict` on stale version.
+    /// - Throws: `KernelError` on connection or `StoreError.versionConflict` on stale version.
     func setPromptStatus(_ request: PromptSetStatusRequest) async throws -> PromptRow {
         let req = PromptSetStatusRequest(
             promptUuid: Self.normalized(request.promptUuid),
@@ -305,7 +305,7 @@ actor GMCCDaemonService {
     /// Fetches clarification data for a prompt.
     /// - Parameter promptUuid: The prompt UUID.
     /// - Returns: The clarification response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func clarification(promptUuid: String) async throws -> ClarifyGetResponse {
         let uuid = Self.normalized(promptUuid)
         return try await perform { try $0.clarifyGet(ClarifyGetRequest(promptUuid: uuid)) }
@@ -314,7 +314,7 @@ actor GMCCDaemonService {
     /// Fetches architecture data for a prompt.
     /// - Parameter promptUuid: The prompt UUID.
     /// - Returns: The architecture response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func architecture(promptUuid: String) async throws -> ArchGetResponse {
         let uuid = Self.normalized(promptUuid)
         return try await perform { try $0.archGet(ArchGetRequest(promptUuid: uuid)) }
@@ -328,7 +328,7 @@ actor GMCCDaemonService {
     /// answer text and selected options — incomplete submissions delete orphaned rows.
     /// - Parameter request: The answer request with normalized UUIDs.
     /// - Returns: The updated clarification question row.
-    /// - Throws: `DaemonError` on connection or `StoreError.versionConflict` on stale version.
+    /// - Throws: `KernelError` on connection or `StoreError.versionConflict` on stale version.
     func clarifyAnswer(_ request: ClarifyAnswerRequest) async throws -> ClarificationQuestionRow {
         let req = ClarifyAnswerRequest(
             questionUuid: Self.normalized(request.questionUuid),
@@ -348,7 +348,7 @@ actor GMCCDaemonService {
     /// emitting WORKFLOW_CHANGE. Never steals a live terminal session's claim.
     /// - Parameter promptUuid: The prompt UUID.
     /// - Returns: The next workflow step.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func botNext(promptUuid: String) async throws -> BotNextResponse {
         let uuid = Self.normalized(promptUuid)
         return try await perform { try $0.botNext(BotNextRequest(promptUuid: uuid)) }
@@ -364,7 +364,7 @@ actor GMCCDaemonService {
     ///   - promptUuid: The prompt UUID.
     ///   - full: Whether to return all findings or a window; default is false.
     /// - Returns: The exploration response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func exploration(promptUuid: String, full: Bool = false) async throws -> ExploreGetResponse {
         let uuid = Self.normalized(promptUuid)
         return try await perform { try $0.exploreGet(ExploreGetRequest(promptUuid: uuid, full: full)) }
@@ -375,7 +375,7 @@ actor GMCCDaemonService {
     ///   - promptUuid: The prompt UUID.
     ///   - full: Whether to return all findings or a window; default is false.
     /// - Returns: The review response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func review(promptUuid: String, full: Bool = false) async throws -> ReviewGetResponse {
         let uuid = Self.normalized(promptUuid)
         return try await perform { try $0.reviewGet(ReviewGetRequest(promptUuid: uuid, full: full)) }
@@ -388,7 +388,7 @@ actor GMCCDaemonService {
     /// The step vocabulary is registry-governed daemon-side. An empty list is normal.
     /// - Parameter promptUuid: The prompt UUID.
     /// - Returns: The briefing list response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func briefings(promptUuid: String) async throws -> BriefingListResponse {
         let uuid = Self.normalized(promptUuid)
         return try await perform { try $0.briefingList(BriefingListRequest(promptUuid: uuid)) }
@@ -399,7 +399,7 @@ actor GMCCDaemonService {
     /// Per-row fetch for the staleness report; drift and ghost dot-paths computed at read time.
     /// - Parameter uuid: The briefing UUID.
     /// - Returns: The briefing response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func briefing(uuid: String) async throws -> BriefingGetResponse {
         let normalized = Self.normalized(uuid)
         return try await perform { try $0.briefingGet(BriefingGetRequest(briefingUuid: normalized)) }
@@ -410,7 +410,7 @@ actor GMCCDaemonService {
     /// Fetches the current session for an instance.
     /// - Parameter instanceUuid: The instance UUID.
     /// - Returns: The current session response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func instanceCurrentSession(instanceUuid: String) async throws -> InstanceCurrentSessionResponse {
         let uuid = Self.normalized(instanceUuid)
         return try await perform { try $0.instanceCurrentSession(InstanceCurrentSessionRequest(instanceUuid: uuid)) }
@@ -418,7 +418,7 @@ actor GMCCDaemonService {
 
     /// Fetches the filesystem paths used by the daemon.
     /// - Returns: The paths response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func paths() async throws -> PathsGetResponse {
         try await perform { try $0.pathsGet() }
     }
@@ -428,7 +428,7 @@ actor GMCCDaemonService {
     /// Lists file changes for a session or prompt.
     /// - Parameter request: The list request with normalized UUIDs.
     /// - Returns: An array of file change rows.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func listFileChanges(_ request: FileChangeListRequest) async throws -> [FileChangeRow] {
         let req = FileChangeListRequest(
             sessionUuid: Self.normalized(request.sessionUuid),
@@ -442,7 +442,7 @@ actor GMCCDaemonService {
     /// Lists artifacts created during a prompt workflow.
     /// - Parameter promptUuid: The prompt UUID.
     /// - Returns: An array of artifact rows.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func listArtifacts(promptUuid: String) async throws -> [ArtifactRow] {
         let uuid = Self.normalized(promptUuid)
         return try await perform { try $0.listArtifacts(ArtifactListRequest(promptUuid: uuid)).artifacts }
@@ -456,7 +456,7 @@ actor GMCCDaemonService {
     ///   - ownerUuid: The owner UUID (ignored when `all: true`).
     ///   - all: Whether to return all accessible kbites; default is false.
     /// - Returns: An array of kbite references.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func listKbites(scope: KbiteScope, ownerUuid: String, all: Bool = false) async throws -> [KbiteRef] {
         let uuid = Self.normalized(ownerUuid)
         // Server short-circuits scope resolution when all == true, so the
@@ -472,7 +472,7 @@ actor GMCCDaemonService {
     ///   - ownerUuid: The owner UUID.
     ///   - code: The kbite code.
     /// - Returns: The add response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func addKbite(scope: KbiteScope, ownerUuid: String, code: String) async throws -> KbiteAddResponse {
         let uuid = Self.normalized(ownerUuid)
         return try await perform { try $0.addKbite(KbiteAddRequest(scope: scope, ownerUuid: uuid, code: code)) }
@@ -484,7 +484,7 @@ actor GMCCDaemonService {
     ///   - ownerUuid: The owner UUID.
     ///   - code: The kbite code.
     /// - Returns: The remove response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func removeKbite(scope: KbiteScope, ownerUuid: String, code: String) async throws -> KbiteRemoveResponse {
         let uuid = Self.normalized(ownerUuid)
         return try await perform { try $0.removeKbite(KbiteRemoveRequest(scope: scope, ownerUuid: uuid, code: code)) }
@@ -496,7 +496,7 @@ actor GMCCDaemonService {
     ///   - kbiteUuids: The kbite UUIDs to search within, or nil for all.
     ///   - limit: The maximum number of results, or nil for default limit.
     /// - Returns: An array of search hits.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func searchKbites(query: String, kbiteUuids: [String]? = nil, limit: Int? = nil) async throws -> [KbiteSearchHit] {
         let uuids = kbiteUuids.map { $0.map(Self.normalized) }
         return try await perform {
@@ -507,7 +507,7 @@ actor GMCCDaemonService {
     /// Fetches a kbite resource file.
     /// - Parameter fileUuid: The file UUID.
     /// - Returns: The kbite resource file row.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func getKbiteFile(fileUuid: String) async throws -> KbiteResourceFileRow {
         let uuid = Self.normalized(fileUuid)
         return try await perform { try $0.getKbiteFile(KbiteFileGetRequest(fileUuid: uuid)).file }
@@ -526,7 +526,7 @@ actor GMCCDaemonService {
     ///   - sessionUuid: The session UUID.
     ///   - promptUuid: The prompt UUID for prompt-scoped scopes, or nil for session scopes.
     /// - Returns: The dope list response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func dopeList(sessionUuid: String, promptUuid: String? = nil) async throws -> DopeListResponse {
         let req = DopeListRequest(
             sessionUuid: Self.normalized(sessionUuid),
@@ -541,7 +541,7 @@ actor GMCCDaemonService {
     ///   - promptUuid: The prompt UUID, or nil for session-scoped access.
     ///   - code: The scope code, or nil to return the default scope.
     /// - Returns: The dope scope response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func dopeGet(
         sessionUuid: String,
         promptUuid: String? = nil,
@@ -558,7 +558,7 @@ actor GMCCDaemonService {
     /// Creates a new dope scope in a session.
     /// - Parameter request: The init request with normalized UUIDs.
     /// - Returns: The created dope scope response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func dopeInit(_ request: DopeInitRequest) async throws -> DopeScopeResponse {
         let req = DopeInitRequest(
             sessionUuid: Self.normalized(request.sessionUuid),
@@ -578,7 +578,7 @@ actor GMCCDaemonService {
     ///   - projectUuid: The project UUID.
     ///   - code: The scope code, or nil to return the default scope.
     /// - Returns: The dope scope response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func dopeGet(projectUuid: String, code: String? = nil) async throws -> DopeGetResponse {
         let req = DopeGetRequest(
             projectUuid: Self.normalized(projectUuid),
@@ -590,7 +590,7 @@ actor GMCCDaemonService {
     /// Reads a dope scope's repository snapshot.
     /// - Parameter scopeUuid: The scope UUID.
     /// - Returns: The repository read response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func dopeReadRepo(scopeUuid: String) async throws -> DopeReadRepoResponse {
         let uuid = Self.normalized(scopeUuid)
         return try await perform { try $0.dopeReadRepo(DopeReadRepoRequest(scopeUuid: uuid)) }
@@ -603,7 +603,7 @@ actor GMCCDaemonService {
     /// Per-prompt counts require N calls, one per prompt.
     /// - Parameter request: The list request with normalized UUIDs.
     /// - Returns: An array of diagram rows.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func diagramList(_ request: DiagramListRequest) async throws -> [DiagramRow] {
         let req = DiagramListRequest(
             projectUuid: Self.normalized(request.projectUuid),
@@ -616,7 +616,7 @@ actor GMCCDaemonService {
     /// Fetches a diagram by UUID.
     /// - Parameter diagramUuid: The diagram UUID.
     /// - Returns: The diagram response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func diagramGet(diagramUuid: String) async throws -> DiagramGetResponse {
         let uuid = Self.normalized(diagramUuid)
         return try await perform { try $0.diagramGet(DiagramGetRequest(diagramUuid: uuid)) }
@@ -625,7 +625,7 @@ actor GMCCDaemonService {
     /// Creates a diagram or returns an existing one (idempotent).
     /// - Parameter request: The init request with normalized UUIDs.
     /// - Returns: The diagram response.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func diagramInit(_ request: DiagramInitRequest) async throws -> DiagramResponse {
         let req = DiagramInitRequest(
             code: request.code,
@@ -650,7 +650,7 @@ actor GMCCDaemonService {
     ///   - query: The FTS query, or nil to browse by recency.
     ///   - limit: The maximum number of results, or nil for default limit.
     /// - Returns: An array of diagram rows.
-    /// - Throws: `DaemonError` on connection failure.
+    /// - Throws: `KernelError` on connection failure.
     func diagramSearch(
         projectUuid: String,
         sessionUuid: String? = nil,
@@ -673,7 +673,7 @@ actor GMCCDaemonService {
     ///   - diagramUuid: The diagram UUID.
     ///   - expectedRevision: The expected revision for CAS, or nil to skip the gate.
     /// - Returns: The delete response.
-    /// - Throws: `DaemonError` on connection or `StoreError.versionConflict` on stale version.
+    /// - Throws: `KernelError` on connection or `StoreError.versionConflict` on stale version.
     func diagramDelete(
         diagramUuid: String,
         expectedRevision: Int64? = nil
@@ -698,7 +698,7 @@ actor GMCCDaemonService {
     ///   - expectedRevision: The expected revision for CAS, or nil to skip the gate.
     ///   - mutations: The mutations to apply.
     /// - Returns: The batch apply response.
-    /// - Throws: `DaemonError` on connection or `StoreError.versionConflict` on stale version.
+    /// - Throws: `KernelError` on connection or `StoreError.versionConflict` on stale version.
     func diagramBatchApply(
         diagramUuid: String,
         expectedRevision: Int64?,
@@ -720,7 +720,7 @@ actor GMCCDaemonService {
     ///   - name: The human name, used only on create.
     ///   - code: The short code, used only on create.
     /// - Returns: The machine row.
-    /// - Throws: `DaemonError` on a store failure.
+    /// - Throws: `KernelError` on a store failure.
     func machineHostEnsureMachine(hardwareUuid: String, name: String, code: String) async throws -> MachineRow {
         try await perform { try $0.machineHostEnsureMachine(hardwareUuid: hardwareUuid, name: name, code: code) }
     }
@@ -731,7 +731,7 @@ actor GMCCDaemonService {
     ///   - enabled: The new value of the flag.
     ///   - expectedVersion: The version the caller last read.
     /// - Returns: The machine row after the write.
-    /// - Throws: `DaemonError.versionConflict` on a stale version; `DaemonError.notFound`.
+    /// - Throws: `KernelError.versionConflict` on a stale version; `KernelError.notFound`.
     func machineHostSetEnabled(machineUuid: String, enabled: Bool, expectedVersion: Int64) async throws -> MachineRow {
         try await perform {
             try $0.machineHostSetEnabled(machineUuid: machineUuid, enabled: enabled, expectedVersion: expectedVersion)
@@ -743,7 +743,7 @@ actor GMCCDaemonService {
     ///   - machineUuid: The machine the displays belong to.
     ///   - displays: Every display the current enumeration reports.
     /// - Returns: All of the machine's display rows.
-    /// - Throws: `DaemonError` on a store failure.
+    /// - Throws: `KernelError` on a store failure.
     func machineHostSyncDisplays(machineUuid: String, displays: [DisplayInput]) async throws -> [DisplayRow] {
         try await perform { try $0.machineHostSyncDisplays(machineUuid: machineUuid, displays: displays) }
     }
@@ -751,7 +751,7 @@ actor GMCCDaemonService {
     /// Every live machine_host row of one machine, read in one transaction.
     /// - Parameter machineUuid: The machine to read.
     /// - Returns: The machine's snapshot.
-    /// - Throws: `DaemonError.notFound` when the machine is unknown.
+    /// - Throws: `KernelError.notFound` when the machine is unknown.
     func machineHostLoad(machineUuid: String) async throws -> MachineHostSnapshotRow {
         try await perform { try $0.machineHostLoad(machineUuid: machineUuid) }
     }
@@ -762,7 +762,7 @@ actor GMCCDaemonService {
     ///   - code: The workspace code to move.
     ///   - displayUuid: The member display it moves to.
     /// - Returns: The code's placement row after the write.
-    /// - Throws: `DaemonError` wrapping `MachineHostError.wouldStrandDisplay` and other refusals.
+    /// - Throws: `KernelError` wrapping `MachineHostError.wouldStrandDisplay` and other refusals.
     func machineHostAssignWorkspace(
         workstationUuid: String,
         code: String,
@@ -779,7 +779,7 @@ actor GMCCDaemonService {
     ///   - displayUuid: The display to switch.
     ///   - code: The workspace code to show.
     /// - Returns: Every placement row on the display after the switch.
-    /// - Throws: `DaemonError` wrapping `MachineHostError.codeNotOnDisplay`.
+    /// - Throws: `KernelError` wrapping `MachineHostError.codeNotOnDisplay`.
     func machineHostSetActiveWorkspace(
         workstationUuid: String,
         displayUuid: String,
@@ -796,7 +796,7 @@ actor GMCCDaemonService {
     ///   - name: The new name.
     ///   - expectedVersion: The version the caller last read.
     /// - Returns: The workstation row after the write.
-    /// - Throws: `DaemonError.versionConflict` or `DaemonError.notFound`.
+    /// - Throws: `KernelError.versionConflict` or `KernelError.notFound`.
     func machineHostRenameWorkstation(
         uuid: String,
         name: String,
@@ -813,8 +813,8 @@ actor GMCCDaemonService {
     /// - Parameters:
     ///   - uuid: The workstation to forget.
     ///   - expectedVersion: The version the caller last read.
-    /// - Throws: `DaemonError` wrapping `MachineHostError.cannotForgetActiveWorkstation`;
-    ///   `DaemonError.versionConflict` or `DaemonError.notFound`.
+    /// - Throws: `KernelError` wrapping `MachineHostError.cannotForgetActiveWorkstation`;
+    ///   `KernelError.versionConflict` or `KernelError.notFound`.
     func machineHostForgetWorkstation(uuid: String, expectedVersion: Int64) async throws {
         try await perform { try $0.machineHostForgetWorkstation(uuid: uuid, expectedVersion: expectedVersion) }
     }
@@ -822,7 +822,7 @@ actor GMCCDaemonService {
     /// Writes one mirror tick in a single transaction.
     /// - Parameter batch: The process and window upserts and the retire lists.
     /// - Returns: The rows the tick inserted or changed.
-    /// - Throws: `DaemonError` wrapping `MachineHostError.unknownProcess` and other refusals.
+    /// - Throws: `KernelError` wrapping `MachineHostError.unknownProcess` and other refusals.
     func machineHostMirrorFlush(_ batch: MirrorBatch) async throws -> MirrorFlushRow {
         try await perform { try $0.machineHostMirrorFlush(batch) }
     }
@@ -832,7 +832,7 @@ actor GMCCDaemonService {
     ///   - machineUuid: The machine being booted.
     ///   - live: The identities of the processes running now.
     /// - Returns: The surviving windows whose pre-park frame is set.
-    /// - Throws: `DaemonError` on a store failure.
+    /// - Throws: `KernelError` on a store failure.
     func machineHostReconcileMirror(machineUuid: String, live: [AppProcessIdentity]) async throws -> [ManagedWindowRow]
     {
         try await perform { try $0.machineHostReconcileMirror(machineUuid: machineUuid, live: live) }

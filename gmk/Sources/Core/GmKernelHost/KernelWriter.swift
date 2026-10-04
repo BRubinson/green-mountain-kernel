@@ -55,7 +55,7 @@ final class KernelWriter {
         }
 
         try store.migrate()
-        try store.recordDaemonStart()
+        try store.recordKernelStart()
         reportRosterProblems(log)
         return KernelWriter(store: store, token: consume token)
     }

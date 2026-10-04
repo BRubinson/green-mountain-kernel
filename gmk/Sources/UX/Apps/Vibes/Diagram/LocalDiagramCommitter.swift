@@ -96,7 +96,7 @@ actor DiagramTreeBox {
 /// The `DiagramCommitting` conformer behind a NON-PERSISTED workspace: the
 /// dope preview canvases, which have no diagram row to write to.
 ///
-/// The db-backed editor swaps in `DaemonDiagramCommitter` and nothing else changes — the one-committer-swap contract,
+/// The db-backed editor swaps in `KernelDiagramCommitter` and nothing else changes — the one-committer-swap contract,
 /// now with both halves built.
 @MainActor
 final class LocalDiagramCommitter: DiagramCommitting {

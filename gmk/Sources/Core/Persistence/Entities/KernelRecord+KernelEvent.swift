@@ -4,7 +4,7 @@ import GRDB
 /// Read-side mirror of the `daemon_event` table.
 ///
 /// Columns map via convertFromSnakeCase.
-struct DaemonEventRecord: BaseRecordFields, TableRecord {
+struct KernelEventRecord: BaseRecordFields, TableRecord {
     static let databaseTableName = "daemon_event"
     var id: Int64
     var uuid: String

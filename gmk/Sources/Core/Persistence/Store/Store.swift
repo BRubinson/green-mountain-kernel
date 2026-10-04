@@ -143,7 +143,7 @@ final class Store: Sendable {
     @discardableResult
     func appendEvent(
         _ db: Database,
-        kind: DaemonEventKind,
+        kind: KernelEventKind,
         subjectUuid: String? = nil,
         payload: String? = nil
     ) throws -> String {
@@ -206,7 +206,7 @@ final class Store: Sendable {
     /// Record a daemon start event in the database.
     ///
     /// - Throws: `DatabaseError` if the event cannot be recorded.
-    func recordDaemonStart() throws {
+    func recordKernelStart() throws {
         _ = try boundary { db in
             try self.appendEvent(db, kind: .daemonStart, payload: Store.jsonPayload(["pid": Int(getpid())]))
         }
@@ -215,7 +215,7 @@ final class Store: Sendable {
     /// Record a daemon stop event in the database.
     ///
     /// - Throws: `DatabaseError` if the event cannot be recorded.
-    func recordDaemonStop() throws {
+    func recordKernelStop() throws {
         _ = try boundary { db in
             try self.appendEvent(db, kind: .daemonStop, payload: Store.jsonPayload(["pid": Int(getpid())]))
         }

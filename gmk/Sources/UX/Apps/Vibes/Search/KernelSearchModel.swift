@@ -8,7 +8,7 @@ import SwiftUI
 /// only the RPC lifecycle and its published results, so both surfaces inherit
 /// one cancellation/error discipline instead of copy-pasting it.
 @Observable @MainActor
-final class DaemonSearchModel {
+final class KernelSearchModel {
     private(set) var hits: [SearchHit] = []
     private(set) var searched = false
     private(set) var isSearching = false
@@ -53,7 +53,7 @@ final class DaemonSearchModel {
             try? await Task.sleep(for: debounce)
             guard !Task.isCancelled else { return }
             do {
-                let result = try await GMCCDaemonService.shared.search(
+                let result = try await KernelStoreService.shared.search(
                     query: trimmed,
                     sessionUuid: sessionUuid,
                     kinds: kindList,
@@ -63,7 +63,7 @@ final class DaemonSearchModel {
                 if hits != result { hits = result }  // change-gated publication
                 searched = true
                 errorText = nil
-            } catch let error as DaemonError {
+            } catch let error as KernelError {
                 guard !Task.isCancelled else { return }
                 hits = []  // never strand stale hits behind an error view
                 errorText = error.searchMessage
@@ -84,9 +84,9 @@ final class DaemonSearchModel {
     }
 }
 
-// DaemonError's userMessage doc invites feature surfaces to re-word a few
+// KernelError's userMessage doc invites feature surfaces to re-word a few
 // cases; the generic message remains the fallback so new cases need no edit.
-private extension DaemonError {
+private extension KernelError {
     var searchMessage: String {
         switch self {
         case .server(let code, _) where code == "BAD_REQUEST":

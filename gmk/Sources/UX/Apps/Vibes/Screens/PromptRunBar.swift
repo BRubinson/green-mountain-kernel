@@ -77,7 +77,7 @@ struct PromptRunBar: View {
 
     @Environment(CheckoutWatcher.self) private var checkout
     @Environment(LaunchColorRegistry.self) private var launchColors
-    @Environment(DaemonConnectionModel.self) private var daemon
+    @Environment(KernelConnectionModel.self) private var daemon
 
     enum Block: Equatable {
         case branchUnresolved

@@ -1,10 +1,9 @@
 import SwiftUI
 
-// The old dot-style DaemonStatusIndicator is gone — the top bar's
-// GmDaemonStatus pill (Chrome/GmDaemonStatus.swift) is the single status
-// control, and it reuses this popover verbatim.
-struct DaemonStatusPopover: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+// The top bar's GmKernelStatus pill (Chrome/GmKernelStatus.swift) is the
+// single status control, and it reuses this popover verbatim.
+struct KernelStatusPopover: View {
+    @Environment(KernelConnectionModel.self) private var daemon
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {

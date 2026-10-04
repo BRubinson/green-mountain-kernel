@@ -173,7 +173,7 @@ struct ProjectSettingsSheet: View {
                     branch: trimmedBranch
                 )
                 dismiss()
-            } catch let error as DaemonError {
+            } catch let error as KernelError {
                 submitError = error.userMessage
             } catch {
                 submitError = String(describing: error)

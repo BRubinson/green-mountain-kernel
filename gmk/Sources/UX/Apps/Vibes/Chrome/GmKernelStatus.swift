@@ -4,9 +4,9 @@ import SwiftUI
 /// tracks daemon health.
 ///
 /// Clicking opens the same diagnostic popover as the old
-/// dot indicator (`DaemonStatusPopover` reused verbatim).
-struct GmDaemonStatus: View {
-    @Environment(DaemonConnectionModel.self) private var daemon
+/// dot indicator (`KernelStatusPopover` reused verbatim).
+struct GmKernelStatus: View {
+    @Environment(KernelConnectionModel.self) private var daemon
     @State private var showPopover = false
 
     var body: some View {
@@ -28,7 +28,7 @@ struct GmDaemonStatus: View {
         .buttonStyle(.plain)
         .help("GMCC daemon status")
         .popover(isPresented: $showPopover, arrowEdge: .bottom) {
-            DaemonStatusPopover()
+            KernelStatusPopover()
                 .environment(daemon)
         }
     }

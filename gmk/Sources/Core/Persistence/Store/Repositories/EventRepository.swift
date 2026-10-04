@@ -13,26 +13,26 @@ struct EventRepository {
     /// - Returns: A response containing the filtered events.
     /// - Throws: Any database error.
     func listEvents(_ req: EventListRequest) throws -> EventListResponse {
-        var request = DaemonEventRecord.all()
+        var request = KernelEventRecord.all()
         if let kind = req.kind {
-            request = request.filter(DaemonEventRecord.Columns.kind == kind)
+            request = request.filter(KernelEventRecord.Columns.kind == kind)
         }
         if let subjectUuid = req.subjectUuid {
-            request = request.filter(DaemonEventRecord.Columns.subjectUuid == subjectUuid)
+            request = request.filter(KernelEventRecord.Columns.subjectUuid == subjectUuid)
         }
         if let sinceId = req.sinceId {
-            request = request.filter(DaemonEventRecord.Columns.id > sinceId)
+            request = request.filter(KernelEventRecord.Columns.id > sinceId)
         }
         if let sinceTime = req.sinceTime {
-            request = request.filter(DaemonEventRecord.Columns.createdAt >= sinceTime)
+            request = request.filter(KernelEventRecord.Columns.createdAt >= sinceTime)
         }
         if let untilTime = req.untilTime {
-            request = request.filter(DaemonEventRecord.Columns.createdAt <= untilTime)
+            request = request.filter(KernelEventRecord.Columns.createdAt <= untilTime)
         }
         let limit = min(max(req.limit ?? 200, 1), 10_000)
         let events =
             try request
-            .order(DaemonEventRecord.Columns.id)
+            .order(KernelEventRecord.Columns.id)
             .limit(limit)
             .fetchAll(db)
             .map { $0.dto() }
@@ -43,8 +43,8 @@ struct EventRepository {
     /// - Returns: The highest event id, or 0 if no events exist.
     /// - Throws: Any database error.
     func lastEventId() throws -> Int64 {
-        try DaemonEventRecord
-            .select(max(DaemonEventRecord.Columns.id) ?? 0, as: Int64.self)
+        try KernelEventRecord
+            .select(max(KernelEventRecord.Columns.id) ?? 0, as: Int64.self)
             .fetchOne(db) ?? 0
     }
 }

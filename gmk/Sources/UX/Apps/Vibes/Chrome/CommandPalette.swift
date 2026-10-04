@@ -12,7 +12,7 @@ struct CommandPalette: View {
 
     @State private var query = ""
     @State private var selection: String?
-    @State private var model = DaemonSearchModel(limit: 20)  // overlay: top hits only
+    @State private var model = KernelSearchModel(limit: 20)  // overlay: top hits only
     @FocusState private var focused: Bool
 
     var body: some View {
