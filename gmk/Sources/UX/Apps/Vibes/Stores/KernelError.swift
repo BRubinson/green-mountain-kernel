@@ -11,10 +11,10 @@ nonisolated enum KernelError: Error, Equatable {
     case unreachable(String)
     /// The kernel speaks a newer protocol than this client — rebuild the
     /// client. Starting the kernel cannot fix this state.
-    case clientTooOld(daemonVersion: Int)
-    /// Daemon reported an older protocol and the kit's respawn cycle still
+    case clientTooOld(kernelVersion: Int)
+    /// The kernel reported an older protocol and the kit's respawn cycle still
     /// failed to retire it.
-    case daemonTooOld(daemonVersion: Int?, message: String)
+    case kernelTooOld(kernelVersion: Int?, message: String)
     /// The uuid itself is unknown to the db — as of wire v8 ALWAYS a real
     /// failure, never "no summary yet" (that is `summaryAbsent`).
     case notFound
@@ -41,7 +41,7 @@ nonisolated enum KernelError: Error, Equatable {
         case .notInstalled: return "Daemon not installed (run install_gm.sh)."
         case .unreachable(let m): return m
         case .clientTooOld(let v): return "Daemon (wire v\(v)) is newer than this app — rebuild GMVibes."
-        case .daemonTooOld(_, let m): return m
+        case .kernelTooOld(_, let m): return m
         case .notFound: return "Not in the GMCC database — the uuid is unknown."
         case .summaryAbsent:
             return "Not opened yet — run the bot to start this phase."

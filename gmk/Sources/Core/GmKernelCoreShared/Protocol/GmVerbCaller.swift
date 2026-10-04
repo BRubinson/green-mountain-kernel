@@ -7,10 +7,10 @@ enum KernelClientError: Error, Sendable {
     /// Socket unreachable after autostart + retries → client exit code 2.
     case unreachable(String)
     /// Server rejected our protocol version (after one respawn when the
-    /// daemon was the stale side) → exit 3. daemonVersion carries the
+    /// daemon was the stale side) → exit 3. kernelVersion carries the
     /// server's version when it sent one, so callers can tell which side
     /// is stale.
-    case protocolMismatch(message: String, daemonVersion: Int?)
+    case protocolMismatch(message: String, kernelVersion: Int?)
     /// Server returned an error payload.
     case server(ErrorPayload)
     /// Wire-level encode/decode or truncated-stream failure.

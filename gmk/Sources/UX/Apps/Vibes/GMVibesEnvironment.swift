@@ -18,7 +18,7 @@ enum GMVibesEnvKey: String, CaseIterable, Hashable {
 /// Locator for the filesystem roots, in two layers with explicit precedence.
 ///
 /// `probed` is synchronous and filled in `init()`, which is why folder-open and the KBites
-/// browser survive with the daemon down. `fromDaemon` comes from PATHS_GET and WINS on merge:
+/// browser survive with the daemon down. `fromKernel` comes from PATHS_GET and WINS on merge:
 /// the daemon's MemoryWatcher is rooted at ITS gmfs root, so a divergent client root would
 /// silently mis-resolve memories.
 @Observable
@@ -27,7 +27,7 @@ final class GMVibesEnvironment {
     private(set) var values: [GMVibesEnvKey: String] = [:]
 
     private var probed: [GMVibesEnvKey: String] = [:]
-    private var fromDaemon: [GMVibesEnvKey: String] = [:]
+    private var fromKernel: [GMVibesEnvKey: String] = [:]
     private var loadInFlight: Task<Void, Never>?
 
     /// Accesses an environment variable value by key.
@@ -89,7 +89,7 @@ final class GMVibesEnvironment {
     /// ONE round trip on the fairness-free serial queue, not N. This avoids 2N trips
     /// on reconnect stampedes when the generation restart and the `.paths` yield
     /// from invalidateAll() both fire.
-    func loadFromDaemon() async {
+    func loadFromKernel() async {
         if let running = loadInFlight {
             await running.value
             return
@@ -135,7 +135,7 @@ final class GMVibesEnvironment {
                 out[.kbiteOpen] = kbites.appendingPathComponent("open").path
             }
         }
-        if fromDaemon != out { fromDaemon = out }
+        if fromKernel != out { fromKernel = out }
         publish()
     }
 
@@ -143,7 +143,7 @@ final class GMVibesEnvironment {
     ///
     /// Daemon roots win on merge. Only updates the published values when they change.
     private func publish() {
-        let merged = probed.merging(fromDaemon) { _, daemon in daemon }
+        let merged = probed.merging(fromKernel) { _, daemon in daemon }
         if values != merged { values = merged }  // change-gated (house idiom)
     }
 }

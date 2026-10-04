@@ -64,7 +64,7 @@ final class KernelEventSubscription: @unchecked Sendable {
             guard !self.started else {
                 continuation.finish(
                     throwing: KernelClientError.wire(
-                        "DaemonEventSubscription.events() may only be consumed once — create a new subscription"
+                        "KernelEventSubscription.events() may only be consumed once — create a new subscription"
                     )
                 )
                 return

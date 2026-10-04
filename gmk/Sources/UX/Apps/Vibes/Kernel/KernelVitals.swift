@@ -42,9 +42,8 @@ struct KernelVitalsReading: Equatable, Sendable {
 /// strings for all three.
 ///
 /// Unrelated to `MemoryWatcher` in `GmKernelHost`, which watches prompt directories unrelated to RAM.
-/// REPORTED values win over local samples; reports describe the kernel owning the store, another
-/// process in client-only mode. Showing our footprint under the owner's label is wrong, not missing.
-/// Local sampling is fallback.
+/// REPORTED values, sampled by the hosted kernel, win over local samples; local sampling is the
+/// fallback until the first report arrives.
 @Observable
 @MainActor
 final class KernelVitals {

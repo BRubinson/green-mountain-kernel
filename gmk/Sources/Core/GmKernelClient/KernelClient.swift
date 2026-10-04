@@ -86,10 +86,10 @@ final class KernelClient: @unchecked Sendable {
     private func connectLocked() throws -> HelloAck {
         do {
             return try connectOnce()
-        } catch KernelClientError.protocolMismatch(let message, let daemonVersion) {
+        } catch KernelClientError.protocolMismatch(let message, let kernelVersion) {
             closeLocked()
-            if let daemonVersion, daemonVersion >= GmWireProtocol.version {
-                throw KernelClientError.protocolMismatch(message: message, daemonVersion: daemonVersion)
+            if let kernelVersion, kernelVersion >= GmWireProtocol.version {
+                throw KernelClientError.protocolMismatch(message: message, kernelVersion: kernelVersion)
             }
             waitForListenerToClose()
             try autostart()
@@ -148,7 +148,7 @@ final class KernelClient: @unchecked Sendable {
             if error.code == .protocolMismatch {
                 throw KernelClientError.protocolMismatch(
                     message: error.message,
-                    daemonVersion: error.daemonProtocolVersion
+                    kernelVersion: error.daemonProtocolVersion
                 )
             }
             throw KernelClientError.server(error)
@@ -175,7 +175,7 @@ final class KernelClient: @unchecked Sendable {
             if error.code == .protocolMismatch {
                 throw KernelClientError.protocolMismatch(
                     message: error.message,
-                    daemonVersion: error.daemonProtocolVersion
+                    kernelVersion: error.daemonProtocolVersion
                 )
             }
             throw KernelClientError.server(error)

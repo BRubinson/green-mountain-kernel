@@ -73,9 +73,9 @@ struct GMVibesWindow: View {
         // CONFIG_SET (.paths). Coalescing is the env's own change-gate.
         .task(id: daemon.generation) {
             let paths = daemon.hub.stream(for: .paths)
-            await gmcc.loadFromDaemon()  // single-flight — N windows, 1 RPC
+            await gmcc.loadFromKernel()  // single-flight — N windows, 1 RPC
             for await _ in paths {
-                await gmcc.loadFromDaemon()
+                await gmcc.loadFromKernel()
             }
         }
         // The Dock/⌘-Tab/window-manager presence lease, held by the WINDOW.

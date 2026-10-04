@@ -71,7 +71,7 @@ In order, separated by blank `///` lines:
 - `- Returns:` on every function whose return type is not `Void`. Say what the value is, including
   the nil case: `The row, or nil when no prompt carries `code`.`
 - `- Throws:` on every `throws`/`rethrows` function. Name the error cases a caller can act on:
-  `` `StoreError.versionConflict` on a stale version; `DaemonError.unreachable` when the socket is gone. ``
+  `` `StoreError.versionConflict` on a stale version; `KernelError.unreachable` when the socket is gone. ``
   Something like `Any error the daemon returns.` is acceptable only for pure pass-throughs.
 - Neither section on `init` or `subscript` unless it throws.
 - swift-format removes a `Returns:` from a `Void` function and requires one otherwise, so keep them

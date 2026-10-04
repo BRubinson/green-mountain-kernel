@@ -44,7 +44,7 @@ struct KernelVerbCaller: GmVerbCaller {
             if error.code == .protocolMismatch {
                 throw KernelClientError.protocolMismatch(
                     message: error.message,
-                    daemonVersion: error.daemonProtocolVersion
+                    kernelVersion: error.daemonProtocolVersion
                 )
             }
             throw KernelClientError.server(error)

@@ -207,7 +207,9 @@ if [ "$ACTIVATE" -eq 1 ]; then
     # Production launches /Applications/gm_kernel.app by bundle identifier, so
     # the build just activated must be the bundle installed there, or newer
     # hooks keep quitting and relaunching the older app.
-    [ "$IS_PROD" = 1 ] && { gm_install_app_bundle "$APP" || die "could not install $APP into $GM_APP_DEST"; }
+    if [ "$IS_PROD" = 1 ]; then
+        gm_install_app_bundle "$APP" || die "could not install $APP into $GM_APP_DEST"
+    fi
 else
     echo "[GMB] not activated (--no-activate). Activate with:"
     echo "      bash $SCRIPT_DIR/rebuild_local.sh   # or re-run without the flag"

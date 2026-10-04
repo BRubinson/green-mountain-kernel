@@ -13,7 +13,7 @@ final class KernelConnectionModel {
         case down(reason: String, intentional: Bool)
         /// Daemon speaks a newer protocol than our linked kit — rebuild
         /// GMVibes / update the package. Starting the daemon can't fix it.
-        case incompatible(daemonVersion: Int?)
+        case incompatible(kernelVersion: Int?)
         case starting
         case up
     }

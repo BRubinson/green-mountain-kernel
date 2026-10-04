@@ -173,9 +173,9 @@ extension GmBridgeResource {
             Hulls ship flat; there is no nested cog directory level.
 
             ```json
-            { "code": "gm_daemon", "name": "GM Daemon", "description": "...", "sort_order": 0,
+            { "code": "agentics_core", "name": "Agentics Core", "description": "...", "sort_order": 0,
               "elements": [
-                { "code": "gm_daemon", "name": "GM Daemon", "description": "",
+                { "code": "agentics_core", "name": "Agentics Core", "description": "",
                   "sort_order": 0, "element_type": "Hull",
                   "primary_path": "gmk/Sources/AgenticsCore",
                   "links": { "persistence_owners": ["agentics", "base", "doped"] } } ] }

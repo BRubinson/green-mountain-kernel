@@ -32,9 +32,9 @@ struct KernelStatusPopover: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            case .incompatible(let daemonVersion):
+            case .incompatible(let kernelVersion):
                 Text(
-                    "The running daemon speaks protocol v\(daemonVersion.map(String.init) ?? "?"), newer than this build of GMVibes (v\(GmWireProtocol.version)). Rebuild GMVibes against the updated daemon package."
+                    "The running daemon speaks protocol v\(kernelVersion.map(String.init) ?? "?"), newer than this build of GMVibes (v\(GmWireProtocol.version)). Rebuild GMVibes against the updated daemon package."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

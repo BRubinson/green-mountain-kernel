@@ -250,7 +250,7 @@ custom_rules:
   # Import fences: path regexes key on folder names, never on a root prefix.
   no_grdb_outside_persistence:
     name: "GRDB stays in persistence"
-    regex: '^(?:@\w+ +)*import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?GRDB\b'
+    regex: '^(?:@\w+(?:\([^)\n]*\))? +)*(?:(?:public|package|internal|fileprivate|private) +)?import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?GRDB\b'
     included: ".*/gmk/Sources/.*"
     excluded: ".*/Persistence/.*"
     excluded_match_kinds: [comment, doccomment, string]
@@ -258,21 +258,21 @@ custom_rules:
     severity: error
   no_swiftprotobuf_outside_iterm2:
     name: "SwiftProtobuf stays in ITerm2Client"
-    regex: '^(?:@\w+ +)*import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?SwiftProtobuf\b'
+    regex: '^(?:@\w+(?:\([^)\n]*\))? +)*(?:(?:public|package|internal|fileprivate|private) +)?import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?SwiftProtobuf\b'
     excluded: ".*/ITerm2Client/.*"
     excluded_match_kinds: [comment, doccomment, string]
     message: "import SwiftProtobuf only under ITerm2Client/."
     severity: error
   machinehost_pure_imports:
     name: "MachineHost Pure is Foundation and CoreGraphics only"
-    regex: '^(?:@\w+ +)*import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?+(?!(?:Foundation|CoreGraphics)\b)\w'
+    regex: '^(?:@\w+(?:\([^)\n]*\))? +)*(?:(?:public|package|internal|fileprivate|private) +)?import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?+(?!(?:Foundation|CoreGraphics)\b)\w'
     included: ".*/gmk/Sources/Core/MachineHostPure/.*"
     excluded_match_kinds: [comment, doccomment, string]
     message: "MachineHost Pure imports Foundation and CoreGraphics only; AppKit, AX, Carbon and GRDB live outside it."
     severity: error
   no_swift_testing:
     name: "XCTest, never swift-testing"
-    regex: '^(?:@\w+ +)*import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?Testing\b'
+    regex: '^(?:@\w+(?:\([^)\n]*\))? +)*(?:(?:public|package|internal|fileprivate|private) +)?import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?Testing\b'
     excluded_match_kinds: [comment, doccomment, string]
     message: "Tests are XCTest; do not import Testing."
     severity: error

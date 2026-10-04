@@ -56,7 +56,7 @@ This asks GitHub for the newest `gm_kernel-v*` release and then:
 - downloads the binary tarball **and** the GMVibes DMG, verifying the SHA-256 of each
   **before** anything is unpacked or mounted
 - stages both under `~/gmfs/bin/releases/` so a re-install or a rollback needs no network
-- symlinks the three entry points — `gm_daemon`, `gm_mcp`, `gm_hook` — at `~/gmfs/bin/`
+- symlinks `gm_kernel` at `~/gmfs/bin/`; `gm_mcp` and `gm_hook` ship inside the plugin's `bin/`
 - installs **GMVibes** to `/Applications`
 
 If you have not installed the plugin yet, or want to run it straight from a clone, the same
@@ -212,15 +212,15 @@ everything the plugin ships.
 
 ## How it fits together
 
-- **One binary, three personalities.** `gm_kernel` is a single Mach-O that answers as
-  `gm_daemon`, `gm_mcp` or `gm_hook` depending on the name it is invoked under. Those are
-  symlinks in `~/gmfs/bin`, not separate programs.
+- **One binary, typed personalities.** `gm_kernel` is a single Mach-O that answers as
+  `gm_mcp`, `gm_hook` or `gm_bridge` depending on the name it is invoked under (or as
+  `gm_kernel mcp|hook|bridge`). Inside the GMVibes bundle it is the kernel host, the only writer.
 - **One filesystem root**, `~/gmfs`, holding the database, the release store and all content.
 - **The plugin is generated.** Everything under `plugins/gmcc/` is emitted from Swift in
   `gmk/Sources/AgenticsClaudeHarnessPluginBridge`. It is committed because a marketplace install materialises it directly,
   which makes it *look* hand-maintained — it is not. Editing it is editing a build artifact.
 - **Write containment is enforced, not documented.** Nothing is written outside `$GM_FS_ROOT`
-  or the working repository unless you ask; a path check in the SDK throws otherwise.
+  or the working repository unless you ask; a path check in the kernel (`Paths.assertContained`) throws otherwise.
 - **The database is append-only history.** It is never wiped, and migrations only ever add.
 
 ---
