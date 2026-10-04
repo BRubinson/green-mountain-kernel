@@ -1,11 +1,11 @@
-// Shared read-only surface for records carrying the BaseEntity columns.
+// Shared read-only surface for records carrying the BaseEntity columns; every record mirrors the live schema.
 //
-// A table's decode type is its record, declared with TableRecord and
-// SnakeCaseDecoded in that table's entity file alongside its associations.
-// Records are FetchableRecord only: no PersistableRecord, and no deleteAll,
-// deleteOne or updateAll, which the no_record_bulk_write lint rule enforces.
-// Every write routes through StoreCore so the version gate stays single-sourced.
-// `db` never enters Entities/, so records stay flat and decodable from a row.
+// A table's decode type is its record, declared with TableRecord and SnakeCaseDecoded in that
+// table's entity file alongside its associations. Records are FetchableRecord only: no
+// PersistableRecord, and no deleteAll, deleteOne or updateAll, which the no_record_bulk_write lint
+// rule enforces. Every write routes through StoreCore so the version gate and BaseEntity defaults
+// stay single-sourced. Timestamps are TEXT ISO-8601 Z strings, never Date, so they order
+// lexicographically. `db` never enters Entities/, so records stay flat and decodable from a row.
 
 import Foundation
 import GRDB

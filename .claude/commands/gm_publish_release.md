@@ -48,20 +48,21 @@ bash gmk/scripts/publish_release.sh
 1. `gh` authenticated, and push on the repo.
 2. Working tree clean; `gm_kernel-v<version>` unused both locally and on the remote.
 3. The staged `<version>-BETA` exists, matches its own `SHA256SUMS`, carries
-   **both** arm64 and x86_64 slices (read with `lipo`, not from the manifest —
-   a `--fast` build is caught exactly here), is signed, and was built from
-   `HEAD`.
-4. Every suite green: the five test packages plus a compile of
-   `gmAgententicsSdk`. Never ship what was not tested.
+   an arm64 slice (read with `lipo`, not from the manifest), is signed, and was
+   built from `HEAD`.
+4. `GmKernelTests` green against the staged kernel, with at least one
+   `' passed (` line so a vacuous run fails. Never ship what was not tested.
+5. The staged signed DMG exists, is notarized unless `--allow-adhoc`, and
+   carries the version being published.
 
 ## What it then does
 
-Packages a flat tarball byte-identical in shape to what `daemon-release.yml`
-produces, pushes the tag **before** creating the release — `gh release create`
-against a tag the remote lacks would create one from the default branch and
-silently ship main instead of what was verified — uploads the asset plus its
-`.sha256`, then promotes this machine from `<version>-BETA` onto the published
-version without a download, since the bytes are identical.
+Packages the staged `gm_kernel-<version>.dmg` and its `.sha256`, pushes the tag
+**before** creating the release — `gh release create` against a tag the remote
+lacks would create one from the default branch and silently ship main instead
+of what was verified — uploads the DMG plus its `.sha256`, then promotes this
+machine from `<version>-BETA` onto the published version without a download,
+since the bytes are identical.
 
 ## Bumping the version
 

@@ -110,7 +110,7 @@ enum DopeArea: String, Codable, Hashable, CaseIterable, Sendable {
     // The DopeArea -> TABLE NAME mapping deliberately does NOT live here. A
     // table name is persistence knowledge, and this is the base layer: the
     // concept belongs here, the storage it happens to sit in does not. See
-    // `DopeArea.table` in gmDaemon.
+    // `DopeArea.table` in DopeAreaTable.swift.
     //
     // The alternative was making that mapping `public` so the repositories
     // could read it across the module boundary, which would have published a

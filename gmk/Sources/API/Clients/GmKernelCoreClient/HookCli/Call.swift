@@ -4,7 +4,7 @@ import Foundation
 /// possible without teaching the client 123 payload shapes.
 ///
 /// Rides the SAME `DaemonClient.request` as every typed verb. The type lives
-/// in `GmDaemonSdk` as `GmJsonValue`; the harness envelope needs the same
+/// in `GmKernelCoreShared` as `GmJsonValue`; the harness envelope needs the same
 /// shape on the protocol side.
 typealias JSONValue = GmJsonValue
 

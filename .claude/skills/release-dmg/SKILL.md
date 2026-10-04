@@ -5,11 +5,11 @@ description: Build the gm_kernel macOS app (the GM Vibes UI — gmk/Sources/UX/A
 
 # release-dmg
 
-## The app no longer has a release of its own
+## One release for the app and the CLI
 
 **There is ONE release, ONE artifact.** `gm_kernel-v<version>` carries the DMG
 and its checksum at a single version taken from `gmk/VERSION`. The CLI
-(`gm_daemon`, `gm_mcp`, `gm_hook`) is the bundle's own executable,
+(`gm_mcp`, `gm_hook`) is the bundle's own executable,
 `Contents/MacOS/gm_kernel`; the installer extracts it:
 
 ```
@@ -18,8 +18,7 @@ gm_kernel-v54.0.2
 └── gm_kernel-54.0.2.dmg.sha256
 ```
 
-This replaced a separate `gmvibes-v<MARKETING_VERSION>` track, and later a
-tarball beside the DMG. `gmk/scripts/release.sh` is retired and exits 2 with a
+`gmk/scripts/release.sh` is retired and exits 2 with a
 pointer — **do not call it**, and do not reimplement what it did. The app's
 `MARKETING_VERSION` is not edited by hand either: `build-dmg.sh` stamps it from
 `gmk/VERSION` at archive time. The Xcode target is `gm_kernel`, the schemes are

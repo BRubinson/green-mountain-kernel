@@ -1,10 +1,3 @@
-//
-//  GmBridgeWriter+Claude.swift
-//  gmAgententicsSdk
-//
-//  Created by Bryce Rubinson on 9/13/26.
-//
-
 import Foundation
 
 /// Writes the ENTIRE `plugins/gmcc` Claude Code plugin from the bridge values in

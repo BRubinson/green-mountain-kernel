@@ -41,7 +41,7 @@ struct KernelVitalsReading: Equatable, Sendable {
 /// The menu bar's vitals sampler: resident footprint, CPU load, uptime, and the display
 /// strings for all three.
 ///
-/// Unrelated to `MemoryWatcher` in `gmk/gmDaemon`, which watches prompt directories unrelated to RAM.
+/// Unrelated to `MemoryWatcher` in `GmKernelHost`, which watches prompt directories unrelated to RAM.
 /// REPORTED values win over local samples; reports describe the kernel owning the store, another
 /// process in client-only mode. Showing our footprint under the owner's label is wrong, not missing.
 /// Local sampling is fallback.

@@ -991,7 +991,7 @@ nonisolated(unsafe) let tools: [CdeTool] =
 // MARK: - The initialize instructions, generated from the registry
 
 /// The `instructions` field of `initialize` is generated from VerbRegistry by
-/// `CdeSheet` in GmDaemonSdk, so it cannot drift from the roster. The
+/// `CdeSheet` in GmKernelCoreShared, so it cannot drift from the roster. The
 /// SubagentStart hook hands spawned agents the same generated text: two
 /// generators over one registry drift apart.
 

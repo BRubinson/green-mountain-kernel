@@ -217,7 +217,7 @@ everything the plugin ships.
   symlinks in `~/gmfs/bin`, not separate programs.
 - **One filesystem root**, `~/gmfs`, holding the database, the release store and all content.
 - **The plugin is generated.** Everything under `plugins/gmcc/` is emitted from Swift in
-  `gmAgententicsSdk`. It is committed because a marketplace install materialises it directly,
+  `gmk/Sources/AgenticsClaudeHarnessPluginBridge`. It is committed because a marketplace install materialises it directly,
   which makes it *look* hand-maintained — it is not. Editing it is editing a build artifact.
 - **Write containment is enforced, not documented.** Nothing is written outside `$GM_FS_ROOT`
   or the working repository unless you ask; a path check in the SDK throws otherwise.
@@ -228,8 +228,8 @@ everything the plugin ships.
 ## Contributing
 
 Requires Xcode 27. `gmk/` is one Xcode project with one `gm_kernel` target that compiles
-every source under `gmk/Sources/`, one unit-test bundle, and one vendored third-party
-package; SwiftPM is only Xcode's dependency resolver.
+every source under `gmk/Sources/`, one unit-test bundle, and two remote third-party packages
+(GRDB and SwiftProtobuf); SwiftPM is only Xcode's dependency resolver.
 
 ```bash
 XCB="xcodebuild -workspace gmk/gmk.xcworkspace -scheme gm_kernel -derivedDataPath gmk/.build/DerivedData CODE_SIGNING_ALLOWED=NO"

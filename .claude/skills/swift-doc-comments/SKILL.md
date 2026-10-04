@@ -50,7 +50,7 @@ In order, separated by blank `///` lines:
 - **Subscript**: what it accesses. `Accesses the element at `index`.`
 - **Type, property, case, protocol**: what it is. `A collection that …`, `The root the kernel
   serves, resolved once per process.`
-- **Boolean**: an assertion about the receiver. `True when the holder is a headless daemon.`
+- **Boolean**: an assertion about the receiver. `True when another process holds the lock.`
 
 ## Parameters
 
@@ -131,9 +131,9 @@ exceeds 100 characters), `parameters` (names it lists that the Parameters sectio
 inside a body, and `test*`/`setUp`/`tearDown` under `gmk/Tests`. It does not judge prose, and it
 does not check types or properties; the guideline still applies to them.
 
-The tree is fully documented, so there is no baseline: every finding fails the gate. The checker
-still supports one for adopting the rule on another tree (`--write-baseline` writes
-`.swift-doc-baseline.json`, keyed by file, signature and finding kind, and suppressed findings are
+The tree is fully documented and no doc baseline exists, so every finding fails the gate. The
+checker still supports one for adopting the rule on another tree (`--baseline PATH
+--write-baseline` writes it, keyed by file, signature and finding kind, and suppressed findings are
 reported as such). Do not create one here to get past a finding; write the comment.
 
 ## Working on findings

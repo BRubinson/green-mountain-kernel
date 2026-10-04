@@ -3,9 +3,7 @@
 `proto/api.proto` is a **byte-identical** copy of iTerm2's own API schema. It
 carries no provenance header, deliberately: a header inside the file would make
 every future re-sync diff start with a conflict on a line upstream does not
-have. Provenance lives here instead, following the `gmClaudeForFoundationModels`
-precedent, where the only local modification is on `Package.swift` and every
-other byte is upstream's.
+have. Provenance lives here instead, and every byte of the schema is upstream's.
 
 ## Provenance
 
@@ -59,31 +57,28 @@ the tree is meant to use.
 
 ## **READ THE DIFF BEFORE COMMITTING IT**
 
-**Regenerating ACCEPTS ALL PENDING DRIFT AS INTENTIONAL.** This repository
-already has one generator whose output nothing checks — `wire_keys.golden`,
-which carried a stale `TxBatchResponse.failedIndex` for several releases because
-nobody diffed a regeneration. That is the cautionary precedent, and it applies
-here with 16,500 lines instead of a few hundred.
+**Regenerating ACCEPTS ALL PENDING DRIFT AS INTENTIONAL.** Nothing checks the
+generated file against upstream intent: a regeneration nobody diffs lands
+unreviewed, across 16,500 lines.
 
 A re-sync that changes 40,000 lines is a re-sync that was not reviewed. Diff it,
 read it, and know what moved before it lands.
 
 ## Why the proto is NOT trimmed
 
-Trimming `api.proto` down to the two or three messages we actually send was
-considered and **declined**.
+`api.proto` is the whole upstream schema, not the two or three messages we
+actually send.
 
-The decision names `proto/api.proto`. A hand-trimmed wire vocabulary is a second
-source of truth that drifts from upstream silently, and whose drift nothing can
-see — you would not discover a field had changed meaning, you would discover a
-launch stopped working. This is the same argument that put `gmAgententicsSdk` on
-`gmDaemonSdk` rather than on a hand-maintained copy of a dozen enums whose raw
-values are load-bearing.
+A hand-trimmed wire vocabulary is a second source of truth that drifts from
+upstream silently, and whose drift nothing can see — you would not discover a
+field had changed meaning, you would discover a launch stopped working. The same
+argument keeps the plugin bridge on the kernel's own protocol types rather than
+on a hand-maintained copy of a dozen enums whose raw values are load-bearing.
 
 The cost of not trimming is compile time and file size. The cost of trimming is
 a schema that lies. We pay the first one.
 
-## What this package actually sends
+## What the iTerm2 client actually sends
 
 Exactly one request type: `CreateTabRequest` (submessage tag 108 on
 `ClientOriginatedMessage`), carrying its command through

@@ -2,7 +2,7 @@ import Foundation
 
 /// The ARBITRATION RESULT: what THIS process is, decided locally before DB open.
 ///
-/// Distinct from `GmVibesCore.KernelRole` (DISPLAY value for socket responder).
+/// Distinct from the Vibes menu bar's `KernelRole` (DISPLAY value for socket responder).
 /// A lock held by anyone else means another app copy or a test host owns the
 /// store; the app never fights it.
 enum KernelHostRole: ~Copyable {
