@@ -40,6 +40,10 @@ UNBASELINABLE = {
     "no_record_bulk_write",
 }
 
+ENTITIES = "gmk/Sources/Core/Persistence/Entities"
+# The same declaration SchemaEnrollmentTests counts against the roster.
+TABLE_NAME_RE = re.compile(r"static let databaseTableName\b")
+
 RESOURCE_ALLOW = (
     "gmk/Sources/UX/Apps/Vibes/Assets.xcassets/*",
     "gmk/Sources/UX/Apps/MachineHost/Legal/ThirdPartyNotices.txt",
@@ -533,6 +537,24 @@ def check_sources_roots():
     return findings
 
 
+def check_entities_one_table():
+    """Every file in Persistence/Entities declares exactly one table.
+
+    Returns: The findings.
+    """
+    findings = []
+    for rel in tracked(ENTITIES):
+        if not rel.endswith(".swift"):
+            continue
+        count = len(TABLE_NAME_RE.findall(read(rel) or ""))
+        if count != 1:
+            findings.append(
+                f"{rel}: declares {count} `static let databaseTableName`; Entities holds one TableRecord per file, "
+                "record-family protocols live in Persistence/Records"
+            )
+    return findings
+
+
 CHECKS = {
     "releases_twin": (check_releases_twin, "gm_releases.sh and its plugin copy are byte-identical"),
     "test_citations": (check_test_citations, "every cited *Tests name is a class under gmk/Tests"),
@@ -542,6 +564,7 @@ CHECKS = {
     "wire_keys": (check_wire_keys, "wire keys equal wire_keys.golden; removals bump GmWireProtocol.version"),
     "resources": (check_resources, "gmk/Sources holds no non-Swift file but the shipped resources"),
     "sources_roots": (check_sources_roots, "each gmk/Sources folder is a synchronized root; only Info.plist is excepted"),
+    "entities_one_table": (check_entities_one_table, "each Persistence/Entities file declares exactly one table"),
 }
 
 
