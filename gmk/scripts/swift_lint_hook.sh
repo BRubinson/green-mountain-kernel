@@ -15,14 +15,14 @@ FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/nul
 [ -n "$FILE" ] || exit 0
 case "$FILE" in *.swift) ;; *) exit 0 ;; esac
 [ -f "$FILE" ] || exit 0
-case "$FILE" in
-    */Generated/*|*/.build/*|*/plugins/*|*/Package.swift) exit 0 ;;
-esac
 
 ROOT="${CLAUDE_PROJECT_DIR:-}"
 [ -n "$ROOT" ] || ROOT="$(git -C "$(dirname "$FILE")" rev-parse --show-toplevel 2>/dev/null || true)"
 [ -n "$ROOT" ] && [ -f "$ROOT/.swift-format" ] || exit 0
 cd "$ROOT" || exit 0
+# shellcheck source=gm_build.sh
+. "$ROOT/gmk/scripts/gm_build.sh" 2>/dev/null || exit 0
+gm_lint_skipped "${FILE#"$ROOT"/}" && exit 0
 
 FINDINGS=""
 if command -v swift-format >/dev/null 2>&1; then

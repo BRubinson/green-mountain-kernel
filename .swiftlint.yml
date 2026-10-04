@@ -7,15 +7,12 @@ included:
   - gmk
 
 # Single-star paths only: a ** globstar here crashes SwiftLint 0.65.1 on this tree.
+# gm_lint_skip (gmk/scripts/gm_build.sh) is the list; gm_tree_check.py lint_skip holds this to it.
 excluded:
   - gmk/Sources/API/Clients/ITerm2Client/Generated
   - gmk/build
   - gmk/scripts
   - gmk/.build
-  - plugins/gmcc/hooks/src
-  - plugins/gmbeta/hooks/src
-  - plugins/gmcc/bin/src
-  - plugins/gmbeta/bin/src
 
 # Run by hand only: swiftlint analyze --compiler-log-path <log>
 analyzer_rules:
@@ -236,4 +233,40 @@ custom_rules:
     excluded_match_kinds: [comment, doccomment, string]
     excluded: ".*/Persistence/Store/StoreCore\\.swift"
     message: "TableRecord grants deleteAll/deleteOne/updateAll with no PersistableRecord. Every write routes through StoreCore.insertBase/updateBase/deleteBase so the version gate and appendEvent stay single-sourced."
+    severity: error
+  # Import fences: path regexes key on folder names, never on a root prefix.
+  no_grdb_outside_persistence:
+    name: "GRDB stays in persistence"
+    regex: '^(?:@\w+ +)*import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?GRDB\b'
+    included: ".*/gmk/Sources/.*"
+    excluded: ".*/(?:Persistence|GmDaemon)/.*"
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "import GRDB only under Persistence/ and GmDaemon/; everything else reaches the database through the Store."
+    severity: error
+  no_swiftprotobuf_outside_iterm2:
+    name: "SwiftProtobuf stays in ITerm2Client"
+    regex: '^(?:@\w+ +)*import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?SwiftProtobuf\b'
+    excluded: ".*/ITerm2Client/.*"
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "import SwiftProtobuf only under ITerm2Client/."
+    severity: error
+  machinehost_pure_imports:
+    name: "MachineHost Pure is Foundation and CoreGraphics only"
+    regex: '^(?:@\w+ +)*import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?+(?!(?:Foundation|CoreGraphics)\b)\w'
+    included: ".*/MachineHost/?Pure/.*"
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "MachineHost Pure imports Foundation and CoreGraphics only; AppKit, AX, Carbon and GRDB live outside it."
+    severity: error
+  no_swift_testing:
+    name: "XCTest, never swift-testing"
+    regex: '^(?:@\w+ +)*import +(?:(?:struct|class|enum|protocol|typealias|func|let|var) +)?Testing\b'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "Tests are XCTest; do not import Testing."
+    severity: error
+  no_persistable_record:
+    name: "No PersistableRecord"
+    regex: '\b(?:Mutable)?PersistableRecord\b'
+    included: ".*/gmk/Sources/.*"
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "Records are TableRecord only; every write routes through StoreCore.insertBase/updateBase/deleteBase."
     severity: error

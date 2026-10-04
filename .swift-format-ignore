@@ -1,4 +1,6 @@
-gmk/Sources/API/Clients/ITerm2Client/Generated/
+Generated/
 .build/
 DerivedData/
-plugins/
+/plugins/
+Package.swift
+.swiftpm/

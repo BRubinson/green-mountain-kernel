@@ -97,6 +97,13 @@ echo "[GMB] gmbeta alias -> $GMBETA"
 # shellcheck disable=SC2086
 GM_BRIDGE_PLUGIN_NAME=gmbeta "${BRIDGE[@]}" $CHECK "$GMBETA"
 
+# gm_releases.sh is written twice, as this script and as GmBridgeScript.releaseStoreBody;
+# the rendered copy must be the same bytes.
+if ! diff -u "$REPO/gmk/scripts/gm_releases.sh" "$PLUGIN/scripts/gm_releases.sh" >&2; then
+    echo "[GMB] gm_releases.sh twins differ — make GmBridgeScript.releaseStoreBody match gmk/scripts/gm_releases.sh" >&2
+    exit 4
+fi
+
 if [ -n "$CHECK" ]; then
     CURRENT="$(python3 -c "import json;print(json.load(open('$MARKETPLACE'))['plugins'][0]['version'])")"
     if [ "$CURRENT" = "$VERSION" ]; then

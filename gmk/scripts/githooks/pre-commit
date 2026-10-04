@@ -1,6 +1,8 @@
 #!/bin/bash
 #
-# pre-commit — lint every staged .swift file with the repo gate before the commit lands.
+# pre-commit — run the repo gate before the commit lands: every staged .swift file through
+# swift_lint_format.sh, whose stage 4 is gm_tree_check.py, or the tree check alone when no
+# Swift is staged. Every commit runs the tree check.
 # Activated per clone by: git config core.hooksPath gmk/scripts/githooks
 # (rebuild_local.sh sets it when unset). Bypass once with: git commit --no-verify
 #
@@ -11,16 +13,21 @@ set -u
 
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT" || exit 1
+# shellcheck source=../gm_build.sh
+. gmk/scripts/gm_build.sh || exit 1
 
 FILES=()
 while IFS= read -r f; do
-    case "$f" in
-        gmk/gmClaudeForFoundationModels/*|*/Generated/*|plugins/*|*/Package.swift) continue ;;
-    esac
+    gm_lint_skipped "$f" && continue
     [ -f "$f" ] && FILES+=("$f")
 done < <(git diff --cached --name-only --diff-filter=ACMR -- '*.swift')
 
-[ ${#FILES[@]} -gt 0 ] || exit 0
+if [ ${#FILES[@]} -eq 0 ]; then
+    python3 gmk/scripts/gm_tree_check.py && exit 0
+    echo "[GMB] pre-commit: tree check failed (findings above)" >&2
+    echo "[GMB] pre-commit: or bypass once with: git commit --no-verify" >&2
+    exit 1
+fi
 
 if bash gmk/scripts/swift_lint_format.sh "${FILES[@]}"; then
     exit 0

@@ -5,21 +5,39 @@ naming every parameter, a Returns section when it returns a value, and a Throws 
 throws.
 
 Usage:
-  swift_doc_check.py [--baseline PATH] [--write-baseline] PATH...
+  swift_doc_check.py [--baseline PATH [--write-baseline]] PATH...
 
 Findings print as `path:line:col: error: [DocComment] message`, the same shape as swift-format,
-and the exit status is 1 when any finding is not in the baseline. The baseline is keyed by file,
-declaration and finding kind, not by line, so edits elsewhere in a file never churn it. It exists
-to adopt the rule on a tree that predates it; a new declaration is never added to it.
+and the exit status is 1 on any finding. This tree has no baseline. `--baseline PATH` reads one,
+keyed by file, declaration and finding kind (not by line, so edits elsewhere never churn it), and
+`--write-baseline` records the current findings there: it exists to adopt the rule on another tree.
 
-Skipped on purpose: `override` members (their docs are inherited), local functions nested in a
-body, and XCTest lifecycle and `test*` methods under gmk/Tests.
+Skipped on purpose: every path gm_lint_skip (gm_build.sh) names, read from GM_LINT_SKIP when the
+gate exports it; `override` members (their docs are inherited); local functions nested in a body;
+and XCTest lifecycle and `test*` methods under gmk/Tests.
 """
-import json, os, re, sys
+import fnmatch, json, os, re, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DEFAULT_BASELINE = os.path.join(ROOT, ".swift-doc-baseline.json")
-SKIP_DIRS = ("/.build/", "/Generated/", "/DerivedData/", "/.swiftpm/", "/plugins/")
+
+
+def lint_skip_globs():
+    """The skip globs: GM_LINT_SKIP when exported, else gm_lint_skip from gm_build.sh."""
+    text = os.environ.get("GM_LINT_SKIP")
+    if text is None:
+        build = os.path.join(ROOT, "gmk", "scripts", "gm_build.sh")
+        text = subprocess.run(["bash", "-c", '. "$1" && gm_lint_skip', "gm_lint_skip", build],
+                              capture_output=True, text=True).stdout
+    return [g for g in text.splitlines() if g.strip()]
+
+
+SKIP_GLOBS = lint_skip_globs()
+
+
+def skipped(path, is_dir=False):
+    """Whether gm_lint_skip names an absolute path (a directory is probed with a trailing slash)."""
+    rel = os.path.relpath(path, ROOT) + ("/" if is_dir else "")
+    return any(fnmatch.fnmatchcase(rel, g) for g in SKIP_GLOBS)
 
 MODIFIER = r"(?:public|internal|private|fileprivate|open|package|static|class|final|override|mutating|nonmutating|convenience|required|dynamic|nonisolated|isolated|consuming|borrowing|indirect|optional|@\w+(?:\([^)]*\))?)"
 DECL_RE = re.compile(r"^(\s*)((?:" + MODIFIER + r"\s+)*)(func\s+(`?[\w]+`?|[^\s(]+)|init[?!]?|subscript)\s*(<[^{]*?>)?\s*\(")
@@ -296,7 +314,7 @@ def collect(paths):
     for p in paths:
         if os.path.isdir(p):
             for dp, dns, fns in os.walk(p):
-                dns[:] = [d for d in dns if d not in (".build", "Generated", "DerivedData", ".swiftpm")]
+                dns[:] = [d for d in dns if not skipped(os.path.abspath(os.path.join(dp, d)), is_dir=True)]
                 for fn in fns:
                     if fn.endswith(".swift"):
                         files.append(os.path.join(dp, fn))
@@ -305,14 +323,14 @@ def collect(paths):
     out = []
     for f in files:
         a = os.path.abspath(f)
-        if any(s in a for s in SKIP_DIRS) or a.endswith("Package.swift"):
+        if skipped(a):
             continue
         out.append(a)
     return sorted(set(out))
 
 
 def main(argv):
-    baseline_path = DEFAULT_BASELINE
+    baseline_path = None
     write = False
     paths = []
     it = iter(argv)
@@ -328,6 +346,9 @@ def main(argv):
     findings = []
     for f in collect(paths):
         check_file(f, os.path.relpath(f, ROOT), findings)
+    if write and baseline_path is None:
+        print("[GMB] doc-check: --write-baseline needs --baseline PATH", file=sys.stderr)
+        return 2
     if write:
         keys = sorted({k for _, _, _, k, _ in findings})
         with open(baseline_path, "w") as fh:
@@ -335,7 +356,7 @@ def main(argv):
         print(f"[GMB] doc-check: baseline written with {len(keys)} entries to {os.path.relpath(baseline_path, ROOT)}")
         return 0
     baseline = set()
-    if os.path.exists(baseline_path):
+    if baseline_path is not None and os.path.exists(baseline_path):
         try:
             baseline = set(json.load(open(baseline_path)).get("findings", []))
         except (OSError, ValueError):

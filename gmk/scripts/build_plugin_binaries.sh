@@ -36,10 +36,16 @@ find "$S/API/Shared/GmKernelCoreShared" \
 
 SWIFTC="$(xcrun --find swiftc)"
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
+# The deployment floor has one spelling: MACOSX_DEPLOYMENT_TARGET in project.pbxproj.
+FLOOR="$(sed -n 's/^[[:space:]]*MACOSX_DEPLOYMENT_TARGET = "\{0,1\}\([0-9.]*\)"\{0,1\};$/\1/p' \
+    "$REPO_ROOT/gmk/gmk.xcodeproj/project.pbxproj" | sort -u)"
+case "$FLOOR" in
+    ''|*[!0-9.]*) echo "[GMB] project.pbxproj must carry exactly one MACOSX_DEPLOYMENT_TARGET, found '${FLOOR//$'\n'/ }'" >&2; exit 1 ;;
+esac
 # Same language mode the Xcode target compiles under, so a source cannot
 # compile here and fail there or the reverse.
 FLAGS=(-O -swift-version 6 -strict-concurrency=complete -default-isolation nonisolated
-       -sdk "$SDK" -target arm64-apple-macosx26.0 -Xlinker -dead_strip)
+       -sdk "$SDK" -target "arm64-apple-macosx$FLOOR" -Xlinker -dead_strip)
 
 # extra_folders <main.swift> — the folders named on the file's gm-closure line.
 extra_folders() {

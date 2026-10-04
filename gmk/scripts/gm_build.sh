@@ -34,6 +34,36 @@ gm_repo_root() {
         echo "[GMB] ERROR: no gmk.xcworkspace under $GMK" >&2; return 1; }
 }
 
+# GM_LINT_SKIP_GLOBS — THE list of paths no lint stage reads: case globs over a
+# repo-relative path, where `*` also matches `/`. .swiftlint.yml `excluded` and
+# .swift-format-ignore spell the same list; gm_tree_check.py lint_skip holds them
+# to it. GM_LINT_SKIP is the exported newline form swift_doc_check.py reads.
+GM_LINT_SKIP_GLOBS=(
+    '*/Generated/*'
+    '*/.build/*'
+    '*/DerivedData/*'
+    'plugins/*'
+    '*/Package.swift'
+    '*/.swiftpm/*'
+)
+GM_LINT_SKIP="$(printf '%s\n' "${GM_LINT_SKIP_GLOBS[@]}")"
+export GM_LINT_SKIP
+
+# gm_lint_skip — prints the skip list, one glob per line.
+gm_lint_skip() {
+    printf '%s\n' "${GM_LINT_SKIP_GLOBS[@]}"
+}
+
+# gm_lint_skipped <repo-relative path> — succeeds when the skip list names it.
+gm_lint_skipped() {
+    _path="${1#./}"
+    for _glob in "${GM_LINT_SKIP_GLOBS[@]}"; do
+        # shellcheck disable=SC2254
+        case "$_path" in $_glob) return 0 ;; esac
+    done
+    return 1
+}
+
 # gm_env_config <env> — the build configuration that bakes this environment's
 # root: prod→Release, beta→Beta, test→Debug.
 gm_env_config() {
