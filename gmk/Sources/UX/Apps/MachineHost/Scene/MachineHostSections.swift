@@ -452,6 +452,155 @@ struct WorkspaceChip: View {
     }
 }
 
+// MARK: - Windows by app
+
+/// One app in the rules list: its windows as the mirror last recorded them and its rule, if any.
+struct AppRuleEntry: Identifiable, Hashable {
+    /// The bundle identifier, which is the row's identity.
+    var id: String { bundleId }
+    /// The app's bundle identifier.
+    let bundleId: String
+    /// The app's display name.
+    let name: String
+    /// The app's live windows that tile.
+    let tiled: Int
+    /// The app's live windows that float, minimized and hidden ones included.
+    let floating: Int
+    /// True when a live process of the app is recorded.
+    let isRunning: Bool
+    /// The app's rule, or nil when the classifier decides.
+    let rule: WindowRuleDisposition?
+}
+
+/// Folds a snapshot's processes, windows and rules into the rules list.
+enum AppRules {
+    /// One entry per running app with a window or a rule, plus one per rule whose app is not running.
+    ///
+    /// - Parameter snapshot: The snapshot, or nil before the first load.
+    /// - Returns: The entries, sorted by name.
+    static func entries(in snapshot: MachineHostSnapshotRow?) -> [AppRuleEntry] {
+        guard let snapshot else { return [] }
+        let rules = Dictionary(snapshot.windowRules.map { ($0.bundleId, $0) }, uniquingKeysWith: { first, _ in first })
+        var bundleOf: [String: String] = [:]
+        var names: [String: String] = [:]
+        for process in snapshot.appProcesses where process.deletedOn == nil {
+            guard let bundleId = process.bundleId else { continue }
+            bundleOf[process.uuid] = bundleId
+            names[bundleId] = names[bundleId] ?? process.name
+        }
+        var counts: [String: (tiled: Int, floating: Int)] = [:]
+        for window in snapshot.managedWindows where window.deletedOn == nil {
+            guard let bundleId = bundleOf[window.appProcessUuid] else { continue }
+            var count = counts[bundleId] ?? (0, 0)
+            if window.isFloating { count.floating += 1 } else { count.tiled += 1 }
+            counts[bundleId] = count
+        }
+        var entries: [AppRuleEntry] = names.compactMap { bundleId, name in
+            let count = counts[bundleId] ?? (0, 0)
+            guard count.tiled + count.floating > 0 || rules[bundleId] != nil else { return nil }
+            return AppRuleEntry(
+                bundleId: bundleId,
+                name: name,
+                tiled: count.tiled,
+                floating: count.floating,
+                isRunning: true,
+                rule: rules[bundleId]?.disposition
+            )
+        }
+        for rule in snapshot.windowRules where names[rule.bundleId] == nil {
+            entries.append(
+                AppRuleEntry(
+                    bundleId: rule.bundleId,
+                    name: rule.appName,
+                    tiled: 0,
+                    floating: 0,
+                    isRunning: false,
+                    rule: rule.disposition
+                )
+            )
+        }
+        return entries.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+}
+
+/// Every app with windows or a remembered rule, each with a Default, Tile or Float choice.
+struct AppRulesSection: View {
+    @Environment(MachineHostService.self) private var host
+
+    var body: some View {
+        Section {
+            if entries.isEmpty {
+                Text("No app windows observed").foregroundStyle(.secondary)
+            }
+            ForEach(entries) { entry in
+                AppRuleRowView(entry: entry)
+            }
+        } header: {
+            Text("Windows by app")
+        } footer: {
+            Text(
+                "Tile gives every window of the app a column. Float keeps them above the tiles where you leave "
+                    + "them. Default lets the window manager decide. Rules are remembered on this Mac."
+            )
+        }
+    }
+
+    /// The rules list for the current snapshot.
+    private var entries: [AppRuleEntry] {
+        AppRules.entries(in: host.snapshot)
+    }
+}
+
+/// One app: its name, bundle id and window counts, and a segmented Default, Tile or Float picker.
+struct AppRuleRowView: View {
+    @Environment(MachineHostService.self) private var host
+    let entry: AppRuleEntry
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(entry.name).fontWeight(.medium)
+                Text(caption)
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            Spacer(minLength: 0)
+            Picker("Rule for \(entry.name)", selection: rule) {
+                Text("Default").tag(WindowRuleDisposition?.none)
+                Text("Tile").tag(WindowRuleDisposition?.some(.tile))
+                Text("Float").tag(WindowRuleDisposition?.some(.float))
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 210)
+        }
+        .padding(.vertical, 2)
+        .opacity(entry.isRunning ? 1 : 0.6)
+    }
+
+    /// The bundle id with the window counts, or with `not running`.
+    private var caption: String {
+        guard entry.isRunning else { return "\(entry.bundleId) · not running" }
+        return "\(entry.bundleId) · \(entry.tiled) tiled · \(entry.floating) floating"
+    }
+
+    /// The rule as the picker's selection; a pick writes it through the host.
+    private var rule: Binding<WindowRuleDisposition?> {
+        Binding(
+            get: { entry.rule },
+            set: { disposition in
+                let entry = entry
+                Task {
+                    await host.setWindowRule(bundleId: entry.bundleId, appName: entry.name, disposition: disposition)
+                }
+            }
+        )
+    }
+}
+
 // MARK: - Key legend
 
 /// The fixed hotkeys, read-only, with any chord another app already holds called out.

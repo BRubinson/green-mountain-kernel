@@ -18,7 +18,7 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
     /// keys it never asks for — and the fabricated values assume primitive
     /// property types: a `Date` or `RawRepresentable` property fails on "1".
     func testEveryRecordMatchesItsTable() throws {
-        XCTAssertEqual(SchemaEnrollment.records.count, 79, "a table mirror left the roster or never joined it")
+        XCTAssertEqual(SchemaEnrollment.records.count, 80, "a table mirror left the roster or never joined it")
 
         try env.readOnlyDatabase()
             .read { db in
@@ -114,7 +114,7 @@ final class SchemaEnrollmentTests: KernelBackedTestCase {
     /// GRDB traps rather than throwing when inference finds none or several, so
     /// this reads the `foreign_key_list` pragma and never prepares a request.
     func testEveryAssociationResolvesItsForeignKey() throws {
-        XCTAssertEqual(SchemaEnrollment.associations.count, 162, "an association left the roster or never joined it")
+        XCTAssertEqual(SchemaEnrollment.associations.count, 163, "an association left the roster or never joined it")
 
         try env.readOnlyDatabase()
             .read { db in

@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 import CoreGraphics
 import Foundation
@@ -17,8 +18,21 @@ final class AxAppThread: Sendable {
     let pid: Int32
     /// The observed process's launch date, which disambiguates a reused pid.
     let launchedAt: Date
+    /// The observed app's bundle identifier, when it has one.
+    let bundleId: String?
+    /// True when the observed app runs with a non-regular activation policy.
+    let isAccessory: Bool
     /// The seconds an accessibility call may wait on the app before it gives up.
     static let messagingTimeout: Float = 0.25
+    /// The seconds a native focus read may take before it counts as unanswered.
+    static let focusReadTimeout: TimeInterval = 0.5
+    /// The notifications subscribed on the application element.
+    private static let appNotifications = [kAXWindowCreatedNotification, kAXFocusedWindowChangedNotification]
+    /// The notifications subscribed on every window element.
+    private static let windowNotifications = [
+        kAXUIElementDestroyedNotification, kAXWindowMovedNotification, kAXWindowResizedNotification,
+        kAXWindowMiniaturizedNotification, kAXWindowDeminiaturizedNotification,
+    ]
 
     // Both touched only on this app's thread; confinement, not a lock, is what makes them safe.
     nonisolated(unsafe) private let app: AXUIElement
@@ -29,7 +43,7 @@ final class AxAppThread: Sendable {
     private let flags: Mutex<AxAppFlags>
     /// The newest unwritten frame per window, written from the main actor and drained on the thread.
     private let pending = Mutex(AxPendingFrames())
-    /// The debug log of every frame this thread writes.
+    /// The log of frame writes, subscriptions, verdicts and snapshot skips for this thread's app.
     private static let log = Logger(subsystem: "rube.GMVibes.wm", category: "ax")
     /// The selector target jobs are delivered through.
     private let port = AxJobPort()
@@ -41,12 +55,23 @@ final class AxAppThread: Sendable {
     /// - Parameters:
     ///   - pid: The process to observe; this app's own pid yields nil.
     ///   - launchedAt: The process's launch date.
+    ///   - bundleId: The app's bundle identifier, when it has one.
+    ///   - isAccessory: True when the app runs with a non-regular activation policy.
     ///   - primaryHeight: The primary display's frame height, for the coordinate flip.
     ///   - sink: Where observed events go.
-    init?(pid: Int32, launchedAt: Date, primaryHeight: CGFloat, sink: @escaping WMEventSink) {
+    init?(
+        pid: Int32,
+        launchedAt: Date,
+        bundleId: String?,
+        isAccessory: Bool,
+        primaryHeight: CGFloat,
+        sink: @escaping WMEventSink
+    ) {
         guard pid != ProcessInfo.processInfo.processIdentifier else { return nil }
         self.pid = pid
         self.launchedAt = launchedAt
+        self.bundleId = bundleId
+        self.isAccessory = isAccessory
         self.sink = sink
         self.app = AXUIElementCreateApplication(pid)
         self.flags = Mutex(AxAppFlags(primaryHeight: primaryHeight))
@@ -95,14 +120,69 @@ final class AxAppThread: Sendable {
         return done.wait(timeout: .now() + timeout) == .success
     }
 
-    /// Raises a window and gives it keyboard focus within its app.
+    /// Raises a window, gives it keyboard focus within its app, then activates the app.
     ///
-    /// - Parameter cgWindowId: The window to focus.
-    func focus(cgWindowId: UInt32) {
-        perform { thread in
-            guard let element = thread.element(for: cgWindowId) else { return }
+    /// Activation follows the raise on the same thread, so the app comes forward with this window on top.
+    /// The job is queued before this returns, so it keeps its place among the jobs around it.
+    ///
+    /// - Parameters:
+    ///   - cgWindowId: The window to focus.
+    ///   - timeout: The longest the returned task waits for the job before answering `.timedOut`.
+    /// - Returns: A task answering how the focus job ended, whichever of the job or the timeout comes first.
+    func focus(cgWindowId: UInt32, landingWithin timeout: TimeInterval) -> Task<FocusLanding, Never> {
+        let (stream, landing) = AsyncStream.makeStream(of: FocusLanding.self, bufferingPolicy: .bufferingOldest(1))
+        enqueue { thread in
+            defer { landing.finish() }
+            guard !thread.flags.withLock(\.stopped), let element = thread.element(for: cgWindowId) else {
+                landing.yield(.dropped)
+                return
+            }
             AxWindow.raise(element)
             AXUIElementSetAttributeValue(element, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+            NSRunningApplication(processIdentifier: thread.pid)?.activate(options: .activateIgnoringOtherApps)
+            landing.yield(.landed)
+        }
+        let pid = self.pid
+        DispatchQueue.global()
+            .asyncAfter(deadline: .now() + timeout) {
+                defer { landing.finish() }
+                guard case .enqueued = landing.yield(.timedOut) else { return }
+                Self.log.notice("focus timed out pid=\(pid, privacy: .public) wid=\(cgWindowId, privacy: .public)")
+            }
+        return Task {
+            for await outcome in stream { return outcome }
+            return .timedOut
+        }
+    }
+
+    /// Orders a window to the front of its app without activating the app or changing its main window.
+    ///
+    /// - Parameter cgWindowId: The window to raise.
+    func raise(cgWindowId: UInt32) {
+        perform { thread in
+            guard let element = thread.element(for: cgWindowId) else { return }
+            AxWindow.raiseOnly(element)
+        }
+    }
+
+    /// Reads the app's focused window, bounded by `focusReadTimeout`.
+    ///
+    /// - Returns: The focused window, `.unmanaged` when the app reports none or one with no id, or
+    ///   `.unanswered` when the thread is stopped or the read timed out.
+    func focusedWindowRead() async -> NativeFocusRead {
+        await withCheckedContinuation { continuation in
+            let reply = AxOneShot<NativeFocusRead>(continuation)
+            enqueue { thread in
+                guard !thread.flags.withLock(\.stopped) else { return reply.resume(.unanswered) }
+                guard let element = AxWindow.focusedWindow(of: thread.app), let id = thread.track(element) else {
+                    return reply.resume(.unmanaged)
+                }
+                reply.resume(.window(thread.key(id)))
+            }
+            DispatchQueue.global()
+                .asyncAfter(deadline: .now() + Self.focusReadTimeout) {
+                    reply.resume(.unanswered)
+                }
         }
     }
 
@@ -145,13 +225,14 @@ final class AxAppThread: Sendable {
 
     /// Every window the app reports now, re-read on this app's thread.
     ///
-    /// Answers nil, never an empty list, when the thread is stopped, the app errs or times out on any read,
-    /// or the whole read takes over one second; an empty list means the app answered with no windows.
+    /// Answers nil when the thread is stopped, the app errs or times out on the window list, or the whole
+    /// read takes over one second. A window whose frame does not read is listed as unreadable, not dropped.
     ///
-    /// - Returns: The observed windows in Cocoa coordinates, or nil when the app did not answer.
-    func snapshotWindows() async -> [ObservedWindow]? {
+    /// - Returns: The observed windows in Cocoa coordinates and the unreadable ids, or nil when the app did
+    ///   not answer.
+    func snapshotWindows() async -> AxSnapshot? {
         await withCheckedContinuation { continuation in
-            let reply = AxOneShot(continuation)
+            let reply = AxOneShot<AxSnapshot?>(continuation)
             enqueue { reply.resume($0.flags.withLock(\.stopped) ? nil : $0.snapshot()) }
             DispatchQueue.global().asyncAfter(deadline: .now() + 1) { reply.resume(nil) }
         }
@@ -166,16 +247,96 @@ final class AxAppThread: Sendable {
     // MARK: - On the app's thread
 
     /// Sets the timeout, installs the observer on this thread's run loop and tracks the existing windows.
+    ///
+    /// An observer that cannot be created, or a notification that fails transiently, is retried at the start
+    /// of every snapshot; a notification the app refuses outright is never asked for again.
     private func attach() {
         AXUIElementSetMessagingTimeout(app, Self.messagingTimeout)
-        var created: AXObserver?
-        guard AXObserverCreate(pid, axObserverCallback, &created) == .success, let observer = created else { return }
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
-        AXObserverAddNotification(observer, app, kAXWindowCreatedNotification as CFString, refcon)
-        AXObserverAddNotification(observer, app, kAXFocusedWindowChangedNotification as CFString, refcon)
-        confined.observer = observer
+        guard createObserver() else { return }
+        subscribeApp()
         AxWindow.windows(of: app)?.forEach { track($0) }
+    }
+
+    /// Creates the app's observer and adds its run-loop source to this thread.
+    ///
+    /// - Returns: True when the observer was created.
+    private func createObserver() -> Bool {
+        var created: AXObserver?
+        let result = AXObserverCreate(pid, axObserverCallback, &created)
+        guard result == .success, let observer = created else {
+            Self.log.notice(
+                "observer failed pid=\(self.pid, privacy: .public) bundle=\(self.bundleId ?? "-", privacy: .public) err=\(result.rawValue, privacy: .public)"
+            )
+            return false
+        }
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        confined.observer = observer
+        return true
+    }
+
+    /// Adds every application-level notification neither held nor refused.
+    ///
+    /// - Returns: The notification names added by this call.
+    @discardableResult
+    private func subscribeApp() -> [String] {
+        guard let observer = confined.observer else { return [] }
+        var added: [String] = []
+        for name in Self.appNotifications
+        where !confined.appSubscribed.contains(name) && !confined.appRefused.contains(name) {
+            switch subscribe(observer, app, name, wid: nil) {
+            case .held: added.append(name)
+            case .refused: confined.appRefused.insert(name)
+            case .failed: continue
+            }
+        }
+        confined.appSubscribed.formUnion(added)
+        return added
+    }
+
+    /// Adds one notification on `element`, logging a refusal at notice and a transient failure at debug.
+    ///
+    /// - Parameters:
+    ///   - observer: The app's observer.
+    ///   - element: The application or window element.
+    ///   - name: The notification name.
+    ///   - wid: The window id when `element` is a window, nil for the application.
+    /// - Returns: Whether the notification is held, refused for good, or worth asking for again.
+    private func subscribe(
+        _ observer: AXObserver,
+        _ element: AXUIElement,
+        _ name: String,
+        wid: UInt32?
+    )
+        -> AxSubscribeOutcome
+    {
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+        let result = AXObserverAddNotification(observer, element, name as CFString, refcon)
+        let outcome = AxSubscribeOutcome(result)
+        let window = wid.map(String.init) ?? "-"
+        switch outcome {
+        case .held:
+            break
+        case .refused:
+            Self.log.notice(
+                "subscribe refused pid=\(self.pid, privacy: .public) bundle=\(self.bundleId ?? "-", privacy: .public) wid=\(window, privacy: .public) note=\(name, privacy: .public) err=\(result.rawValue, privacy: .public)"
+            )
+        case .failed:
+            Self.log.debug(
+                "subscribe failed pid=\(self.pid, privacy: .public) bundle=\(self.bundleId ?? "-", privacy: .public) wid=\(window, privacy: .public) note=\(name, privacy: .public) err=\(result.rawValue, privacy: .public)"
+            )
+        }
+        return outcome
+    }
+
+    /// Re-creates a missing observer and re-adds every application-level notification not yet held.
+    private func retrySubscriptions() {
+        let hadObserver = confined.observer != nil
+        guard hadObserver || createObserver() else { return }
+        let added = subscribeApp()
+        guard !hadObserver || !added.isEmpty else { return }
+        Self.log.notice(
+            "subscribe recovered pid=\(self.pid, privacy: .public) bundle=\(self.bundleId ?? "-", privacy: .public) observer=\(!hadObserver, privacy: .public) notes=\(added.joined(separator: ","), privacy: .public)"
+        )
     }
 
     /// Removes the observer from this thread's run loop and cancels the thread.
@@ -201,7 +362,8 @@ final class AxAppThread: Sendable {
                     observed.key,
                     frame: observed.frame,
                     classification: observed.classification,
-                    title: observed.title
+                    title: observed.title,
+                    isMinimized: observed.isMinimized
                 )
             )
         case kAXFocusedWindowChangedNotification:
@@ -217,27 +379,40 @@ final class AxAppThread: Sendable {
                 notification == kAXWindowMovedNotification
                     ? .windowMoved(window, frame) : .windowResized(window, frame)
             )
+        case kAXWindowMiniaturizedNotification:
+            guard let id = confined.ids[element] else { return }
+            emit(.windowMinimized(key(id)))
+        case kAXWindowDeminiaturizedNotification:
+            guard let id = confined.ids[element], let observed = observe(element, id: id) else { return }
+            emit(.windowDeminimized(observed.key, frame: observed.frame, classification: observed.classification))
         default:
             return
         }
     }
 
-    /// Records a window element and subscribes to its per-window notifications, once.
+    /// Records a window element and adds each per-window notification neither held nor refused.
     ///
     /// - Parameter element: A window element.
     /// - Returns: The window id, or nil when the app did not answer.
     @discardableResult
     private func track(_ element: AXUIElement) -> UInt32? {
         guard let id = AxWindow.windowId(element) else { return nil }
-        let known = confined.windows[id] != nil
+        if confined.windows[id] == nil { AXUIElementSetMessagingTimeout(element, Self.messagingTimeout) }
         confined.windows[id] = element
         confined.ids[element] = id
-        guard !known, let observer = confined.observer else { return id }
-        AXUIElementSetMessagingTimeout(element, Self.messagingTimeout)
-        let refcon = Unmanaged.passUnretained(self).toOpaque()
-        for name in [kAXUIElementDestroyedNotification, kAXWindowMovedNotification, kAXWindowResizedNotification] {
-            AXObserverAddNotification(observer, element, name as CFString, refcon)
+        guard let observer = confined.observer else { return id }
+        var held = confined.windowSubscribed[id, default: []]
+        var refused = confined.windowRefused[id, default: []]
+        guard held.count + refused.count < Self.windowNotifications.count else { return id }
+        for name in Self.windowNotifications where !held.contains(name) && !refused.contains(name) {
+            switch subscribe(observer, element, name, wid: id) {
+            case .held: held.insert(name)
+            case .refused: refused.insert(name)
+            case .failed: continue
+            }
         }
+        confined.windowSubscribed[id] = held
+        confined.windowRefused[id] = refused
         return id
     }
 
@@ -247,8 +422,18 @@ final class AxAppThread: Sendable {
     /// - Returns: The window id it carried, or nil when it was not tracked.
     private func forget(_ element: AXUIElement) -> UInt32? {
         guard let id = confined.ids.removeValue(forKey: element) else { return nil }
-        confined.windows[id] = nil
+        forget(id: id)
         return id
+    }
+
+    /// Drops every record of the window `id` except its element-to-id entry.
+    ///
+    /// - Parameter id: The window id.
+    private func forget(id: UInt32) {
+        confined.windows[id] = nil
+        confined.windowSubscribed[id] = nil
+        confined.windowRefused[id] = nil
+        confined.verdicts[id] = nil
     }
 
     /// The tracked element for `cgWindowId`, re-enumerating the app's windows once when it is unknown.
@@ -288,27 +473,45 @@ final class AxAppThread: Sendable {
         }
     }
 
-    /// Every window the app reports now; forgets tracked windows it does not report.
+    /// Every window the app reports now, after retrying any missing subscription.
     ///
-    /// A window whose id or frame cannot be read makes the whole snapshot unanswered rather than partial.
+    /// A window with no id is skipped; one whose frame does not read is listed as unreadable. Tracked windows
+    /// that neither read nor are listed unreadable are forgotten.
     ///
-    /// - Returns: The observed windows in Cocoa coordinates, or nil when the app did not answer.
-    private func snapshot() -> [ObservedWindow]? {
+    /// - Returns: The observed windows in Cocoa coordinates and the unreadable ids, or nil when the app did
+    ///   not answer the window list.
+    private func snapshot() -> AxSnapshot? {
+        retrySubscriptions()
         guard let elements = AxWindow.windows(of: app) else { return nil }
         var observed: [ObservedWindow] = []
+        var unreadable: [UInt32] = []
+        var withoutId = 0
         for element in elements {
-            guard let id = track(element), let window = observe(element, id: id) else { return nil }
+            guard let id = track(element) else {
+                withoutId += 1
+                continue
+            }
+            guard let window = observe(element, id: id) else {
+                unreadable.append(id)
+                continue
+            }
             observed.append(window)
         }
-        let live = Set(observed.map(\.key.cgWindowId))
+        if withoutId > 0 || !unreadable.isEmpty {
+            let ids = unreadable.map(String.init).joined(separator: ",")
+            Self.log.notice(
+                "snapshot skipped pid=\(self.pid, privacy: .public) bundle=\(self.bundleId ?? "-", privacy: .public) noId=\(withoutId, privacy: .public) unreadable=\(unreadable.count, privacy: .public) ids=\(ids, privacy: .public)"
+            )
+        }
+        let live = Set(observed.map(\.key.cgWindowId)).union(unreadable)
         for (id, element) in confined.windows where !live.contains(id) {
-            confined.windows[id] = nil
+            forget(id: id)
             confined.ids[element] = nil
         }
-        return observed
+        return AxSnapshot(observed: observed, unreadable: unreadable)
     }
 
-    /// Reads one window's frame, classification and title.
+    /// Reads one window's frame, classification, title and minimized state.
     ///
     /// - Parameters:
     ///   - element: The window element.
@@ -316,18 +519,37 @@ final class AxAppThread: Sendable {
     /// - Returns: The observation, or nil when the frame could not be read.
     private func observe(_ element: AXUIElement, id: UInt32) -> ObservedWindow? {
         guard let frame = cocoaFrame(element) else { return nil }
-        let classification = WindowClassifier.classify(
-            role: AxWindow.role(element),
-            subrole: AxWindow.subrole(element),
-            isMinimized: AxWindow.isMinimized(element),
-            isFullscreen: AxWindow.isFullscreen(element)
-        )
         return ObservedWindow(
             key: key(id),
             frame: frame,
-            classification: classification,
-            title: AxWindow.title(element)
+            classification: classify(element, id: id),
+            title: AxWindow.title(element),
+            isMinimized: AxWindow.isMinimized(element)
         )
+    }
+
+    /// The window's class: a cached `.tiled` verdict, else a fresh classification of its facts.
+    ///
+    /// Every verdict is remembered, but only `.tiled` is reused, so a float or popup is re-tested on every
+    /// read. A verdict that first appears or changes is logged.
+    ///
+    /// - Parameters:
+    ///   - element: The window element.
+    ///   - id: Its window id.
+    /// - Returns: The window's class.
+    private func classify(_ element: AXUIElement, id: UInt32) -> WindowClass {
+        let previous = confined.verdicts[id]
+        if previous == .tiled { return .tiled }
+        let facts = AxWindow.facts(element, app: app, cgWindowId: id, bundleId: bundleId, isAccessoryApp: isAccessory)
+        let verdict = WindowClassifier.classify(facts)
+        confined.verdicts[id] = verdict
+        if verdict != previous {
+            let button = "\(facts.hasFullscreenButton)/\(facts.fullscreenButtonEnabled)"
+            Self.log.notice(
+                "classify pid=\(self.pid, privacy: .public) bundle=\(self.bundleId ?? "-", privacy: .public) wid=\(id, privacy: .public) role=\(facts.role ?? "-", privacy: .public) subrole=\(facts.subrole ?? "-", privacy: .public) fs=\(button, privacy: .public) -> \(String(describing: verdict), privacy: .public)"
+            )
+        }
+        return verdict
     }
 
     /// A window's frame in Cocoa coordinates.
@@ -398,6 +620,55 @@ private struct AxAppConfined {
     var ids: [AXUIElement: UInt32] = [:]
     /// The app's observer while attached.
     var observer: AXObserver?
+    /// The application-level notifications the observer holds.
+    var appSubscribed: Set<String> = []
+    /// The application-level notifications the app refused for good.
+    var appRefused: Set<String> = []
+    /// The per-window notifications the observer holds, by window id.
+    var windowSubscribed: [UInt32: Set<String>] = [:]
+    /// The per-window notifications the window refused for good, by window id.
+    var windowRefused: [UInt32: Set<String>] = [:]
+    /// The last classifier verdict per window id.
+    var verdicts: [UInt32: WindowClass] = [:]
+}
+
+/// How one notification subscription attempt ended.
+private enum AxSubscribeOutcome {
+    /// The observer holds the notification, newly or already.
+    case held
+    /// The element can never deliver it; it is not asked for again.
+    case refused
+    /// A transient failure; it is asked for again on the next snapshot.
+    case failed
+
+    /// Sorts an `AXObserverAddNotification` result.
+    ///
+    /// - Parameter result: The accessibility error the call returned.
+    init(_ result: AXError) {
+        switch result {
+        case .success, .notificationAlreadyRegistered: self = .held
+        case .cannotComplete, .apiDisabled, .failure: self = .failed
+        default: self = .refused
+        }
+    }
+}
+
+/// How a focus job handed to an `AxAppThread` ended.
+enum FocusLanding: Sendable {
+    /// The window was raised, focused and its app activated.
+    case landed
+    /// The thread was stopped or the app does not report the window.
+    case dropped
+    /// The job had not finished when the caller's timeout passed.
+    case timedOut
+}
+
+/// One snapshot of an app's windows: those that read, and the ids of those whose frame did not.
+struct AxSnapshot: Sendable {
+    /// The windows whose frame read, in Cocoa coordinates.
+    let observed: [ObservedWindow]
+    /// The ids of windows whose id read but whose frame did not.
+    let unreadable: [UInt32]
 }
 
 /// The part of an `AxAppThread` the main actor writes and the app's thread reads.
@@ -448,23 +719,23 @@ struct AxFrameWrite: Sendable {
 }
 
 /// Resumes a continuation exactly once, from whichever of the job or the timeout answers first.
-private final class AxOneShot: Sendable {
+private final class AxOneShot<Value: Sendable>: Sendable {
     /// The continuation until it is resumed.
-    private let continuation: Mutex<CheckedContinuation<[ObservedWindow]?, Never>?>
+    private let continuation: Mutex<CheckedContinuation<Value, Never>?>
 
     /// Wraps `continuation`.
     ///
     /// - Parameter continuation: The continuation to resume once.
-    init(_ continuation: CheckedContinuation<[ObservedWindow]?, Never>) {
+    init(_ continuation: CheckedContinuation<Value, Never>) {
         self.continuation = Mutex(continuation)
     }
 
-    /// Resumes with `windows` if nothing resumed first.
+    /// Resumes with `value` if nothing resumed first.
     ///
-    /// - Parameter windows: The answer, or nil for no answer.
-    func resume(_ windows: [ObservedWindow]?) {
+    /// - Parameter value: The answer.
+    func resume(_ value: Value) {
         continuation.withLock { current in
-            current?.resume(returning: windows)
+            current?.resume(returning: value)
             current = nil
         }
     }

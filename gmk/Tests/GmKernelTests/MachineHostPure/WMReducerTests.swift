@@ -539,22 +539,27 @@ final class WMReducerTests: XCTestCase {
     func testMinimizedAndFullscreenWindowsNeverEnterAColumn() {
         var state = enabled(one: columns(1))
         let frame = CGRect(x: 100, y: 100, width: 300, height: 300)
-        let minimized = WindowClassifier.classify(
-            role: "AXWindow",
-            subrole: "AXStandardWindow",
-            isMinimized: true,
-            isFullscreen: false
-        )
         let fullscreen = WindowClassifier.classify(
-            role: "AXWindow",
-            subrole: "AXStandardWindow",
-            isMinimized: false,
-            isFullscreen: true
+            WindowFacts(
+                role: "AXWindow",
+                subrole: "AXStandardWindow",
+                isFullscreen: true,
+                hasFullscreenButton: true,
+                fullscreenButtonEnabled: true
+            )
         )
-        _ = WMReducer.reduce(&state, .windowCreated(window(7), frame: frame, classification: minimized, title: nil))
+        let minimized = WMEvent.windowCreated(
+            window(7),
+            frame: frame,
+            classification: .tiled,
+            title: nil,
+            isMinimized: true
+        )
+        _ = WMReducer.reduce(&state, minimized)
         _ = WMReducer.reduce(&state, .windowCreated(window(8), frame: frame, classification: fullscreen, title: nil))
         XCTAssertEqual(state.workspaces["1"]?.columns.map(\.window), [window(1)])
-        XCTAssertEqual(state.floating, [window(7), window(8)])
+        XCTAssertEqual(state.stashed[window(7)]?.reason, .minimized)
+        XCTAssertEqual(state.floating, [window(8)])
     }
 
     func testDisplaysChangedDroppingADisplayDropsItsActiveEntryAndLeavesItsStripHidden() {
@@ -678,14 +683,8 @@ final class WMReducerTests: XCTestCase {
 
     func testConfigureWithUnchangedStripsMovesNothingAndKeepsParkedAndFloating() {
         var state = enabled(one: columns(1), two: columns(2))
-        let minimized = WindowClassifier.classify(
-            role: "AXWindow",
-            subrole: "AXStandardWindow",
-            isMinimized: true,
-            isFullscreen: false
-        )
         let frame = CGRect(x: 100, y: 100, width: 300, height: 300)
-        _ = WMReducer.reduce(&state, .windowCreated(window(7), frame: frame, classification: minimized, title: nil))
+        _ = WMReducer.reduce(&state, .windowCreated(window(7), frame: frame, classification: .floating, title: nil))
         let parked = state.parked
         let floating = state.floating
         let strips = heldStrips(WMState())
@@ -896,5 +895,7 @@ final class WMReducerTests: XCTestCase {
         XCTAssertEqual(state.workspaces["2"]?.columns.map(\.window), [window(1)])
         XCTAssertEqual(state.workspaces["1"]?.columns.map(\.window), [window(2)])
         XCTAssertTrue(parks(effects, window(1)))
+        XCTAssertEqual(state.focused, window(2))
+        XCTAssertTrue(effects.contains(.focus(window(2))))
     }
 }

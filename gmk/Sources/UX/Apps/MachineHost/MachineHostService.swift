@@ -44,6 +44,8 @@ final class MachineHostService {
     private static let sinkLog = Logger(subsystem: "rube.GMVibes.wm", category: "sink")
     /// The debug log of every live reorder a mouse drag made.
     private static let dragLog = Logger(subsystem: "rube.GMVibes.wm", category: "drag")
+    /// The log of every per-app rule write.
+    private static let rulesLog = Logger(subsystem: "rube.GMVibes.wm", category: "rules")
 
     /// Where the window manager stands.
     private(set) var status: Status = .off
@@ -66,6 +68,7 @@ final class MachineHostService {
     @ObservationIgnored private var trustWait: Task<Void, Never>?
     @ObservationIgnored private var lockRetry: Task<Void, Never>?
     @ObservationIgnored private var displaySettle: Task<Void, Never>?
+    @ObservationIgnored private var hotkeyChain: Task<Void, Never>?
     @ObservationIgnored private var screenToken: NSObjectProtocol?
     @ObservationIgnored private var connectedSetKey: String?
     @ObservationIgnored private var awaitingDisplay = false
@@ -311,6 +314,57 @@ final class MachineHostService {
         reconfigure(showsActive: showsActive)
     }
 
+    /// Sets or clears one app's tile or float rule, then hands every rule to the reducer.
+    ///
+    /// The reducer records the rules while disabled and re-places the app's windows while managing.
+    ///
+    /// - Parameters:
+    ///   - bundleId: The app's bundle identifier.
+    ///   - appName: The app's display name, remembered for when it is not running.
+    ///   - disposition: The rule, or nil to clear it so the classifier decides.
+    func setWindowRule(bundleId: String, appName: String, disposition: WindowRuleDisposition?) async {
+        guard let machine = snapshot?.machine else { return }
+        let label = disposition?.rawValue ?? "default"
+        do {
+            if let disposition {
+                _ = try await service.machineHostSetWindowRule(
+                    machineUuid: machine.uuid,
+                    bundleId: bundleId,
+                    appName: appName,
+                    disposition: disposition
+                )
+            } else {
+                try await service.machineHostClearWindowRule(machineUuid: machine.uuid, bundleId: bundleId)
+            }
+            lastError = nil
+        } catch {
+            lastError = Self.message(error)
+            Self.rulesLog.notice(
+                "rule failed bundle=\(bundleId, privacy: .public) rule=\(label, privacy: .public) error=\(String(describing: error), privacy: .public)"
+            )
+            return
+        }
+        await reload()
+        guard let snapshot else { return }
+        let rules = Self.windowRules(snapshot)
+        Self.rulesLog.notice(
+            "rule bundle=\(bundleId, privacy: .public) rule=\(label, privacy: .public) count=\(rules.count, privacy: .public)"
+        )
+        handle(.rulesReplaced(rules))
+    }
+
+    /// The reducer's rule map for the machine's rule rows: tile is `.tiled`, float is `.floating`.
+    ///
+    /// - Parameter snapshot: The machine's rows.
+    /// - Returns: The class per bundle identifier.
+    static func windowRules(_ snapshot: MachineHostSnapshotRow) -> [String: WindowClass] {
+        var rules: [String: WindowClass] = [:]
+        for rule in snapshot.windowRules {
+            rules[rule.bundleId] = rule.disposition == .float ? .floating : .tiled
+        }
+        return rules
+    }
+
     /// Sends `.configure` built from the connected set's workstation rows while managing.
     ///
     /// The stored active map is sent only when `showsActive`; otherwise it is empty, so a rename or a
@@ -421,7 +475,7 @@ extension MachineHostService {
     /// - Parameter machineUuid: The machine every mirror row belongs to.
     private func buildEngine(machineUuid: String) {
         let sink: WMEventSink = { [weak self] event in self?.handle(event) }
-        let hotkeys = CarbonHotkeyCenter(sink: sink)
+        let hotkeys = CarbonHotkeyCenter(sink: { [weak self] event in self?.hotkeyFired(event) })
         let mirror = MirrorWriter(
             machineUuid: machineUuid,
             image: { [weak self] in self?.mirrorImage() ?? MirrorImage() },
@@ -470,6 +524,28 @@ extension MachineHostService {
             "\(WMTrace.event(event), privacy: .public) held=\(held) drag=\(drag, privacy: .public) -> \(WMTrace.effects(effects), privacy: .public)"
         )
         interpreter?.interpret(effects)
+    }
+
+    /// Applies a hotkey against native focus read fresh from the frontmost app, in press order.
+    ///
+    /// Each press waits for the one before it and for any focus effect that press left pending, then folds
+    /// the focus read in as `windowFocused` or `focusUnmanaged` ahead of the hotkey; an unanswered read
+    /// leaves the reducer's focus as it was.
+    ///
+    /// - Parameter event: The event the hotkey center sent.
+    private func hotkeyFired(_ event: WMEvent) {
+        guard case .hotkey = event, let interpreter else { return handle(event) }
+        hotkeyChain = Task { [weak self, previous = hotkeyChain] in
+            await previous?.value
+            let read = await interpreter.nativeFocus()
+            guard let self, state.enabled else { return }
+            switch read {
+            case .window(let key): handle(.windowFocused(key))
+            case .unmanaged: handle(.focusUnmanaged)
+            case .unanswered: break
+            }
+            handle(event)
+        }
     }
 
     /// The dragged window and the order of the strip holding it.
@@ -535,11 +611,18 @@ extension MachineHostService {
         let moves = Self.recoveryMoves(observed: before.observed, snapshot: snapshot)
         if !moves.isEmpty { await interpreter.interpretFully(moves.map { WMEffect.setFrame($0.0, $0.1) }) }
         guard status == .acquiringLock else { return }
-        let seed = seedState(snapshot, observed: before, recovered: moves)
+        let seed = seedState(snapshot, observed: (before.observed, before.answered), recovered: moves)
         apply(snapshot, interpreter: interpreter, seed: seed)
         let after = await interpreter.snapshotAll()
         guard state.enabled else { return }
-        handle(.reconcile(observed: after.observed, answered: after.answered))
+        handle(
+            .reconcile(
+                observed: after.observed,
+                answered: after.answered,
+                hidden: AppLifecycleObserver.hiddenPids(),
+                unreadable: after.unreadable
+            )
+        )
         if let front = NSWorkspace.shared.frontmostApplication {
             interpreter.reportFocusedWindow(pid: front.processIdentifier)
         }
@@ -566,7 +649,7 @@ extension MachineHostService {
         mirror?.seed(processes: loaded.appProcesses, windows: loaded.managedWindows)
     }
 
-    /// Sends `.enable` built from the rows and records the hotkey conflicts.
+    /// Sends the stored rules, then `.enable` built from the rows, and records the hotkey conflicts.
     ///
     /// - Parameters:
     ///   - snapshot: The machine's rows.
@@ -584,6 +667,7 @@ extension MachineHostService {
             strips: strips(placement: layout?.placement ?? [:], seed: seed),
             active: layout?.active ?? [:]
         )
+        interpreter.interpret(WMReducer.reduce(&state, .rulesReplaced(Self.windowRules(snapshot))))
         interpreter.interpret(WMReducer.reduce(&state, event))
         status = .running(conflicts: Array(interpreter.hotkeyConflicts.keys))
     }
@@ -966,20 +1050,28 @@ private enum WMTrace {
         case .configure: return "configure"
         case .disable: return "disable"
         case let .hotkey(binding): return "hotkey \(binding.action.rawValue)"
-        case let .appLaunched(pid, _): return "appLaunched pid=\(pid)"
+        case let .appLaunched(pid, _, bundleId): return "appLaunched pid=\(pid) bundle=\(bundleId ?? "-")"
         case let .appTerminated(pid): return "appTerminated pid=\(pid)"
-        case let .windowCreated(key, frame, classification, _):
-            return "windowCreated \(window(key)) \(rect(frame)) \(classification)"
+        case let .windowCreated(key, frame, classification, _, isMinimized):
+            return "windowCreated \(window(key)) \(rect(frame)) \(classification) minimized=\(isMinimized)"
         case let .windowDestroyed(key): return "windowDestroyed \(window(key))"
         case let .windowFocused(key): return "windowFocused \(window(key))"
+        case .focusUnmanaged: return "focusUnmanaged"
         case let .windowMoved(key, frame): return "windowMoved \(window(key)) \(rect(frame))"
         case let .windowResized(key, frame): return "windowResized \(window(key)) \(rect(frame))"
+        case let .windowMinimized(key): return "windowMinimized \(window(key))"
+        case let .windowDeminimized(key, frame, classification):
+            return "windowDeminimized \(window(key)) \(rect(frame)) \(classification)"
+        case let .appHidden(pid): return "appHidden pid=\(pid)"
+        case let .appUnhidden(pid): return "appUnhidden pid=\(pid)"
+        case let .rulesReplaced(rules): return "rulesReplaced count=\(rules.count)"
         case let .mousePressed(point): return "mousePressed at=\(point.x),\(point.y)"
         case let .mouseReleased(point): return "mouseReleased at=\(point.map { "\($0.x),\($0.y)" } ?? "nil")"
         case let .displaysChanged(displays): return "displaysChanged count=\(displays.count)"
         case .wake: return "wake"
-        case let .reconcile(observed, answered):
-            return "reconcile observed=\(observed.count) answered=\(answered.count)"
+        case let .reconcile(observed, answered, hidden, unreadable):
+            return
+                "reconcile observed=\(observed.count) answered=\(answered.count) hidden=\(hidden.count) unreadable=\(unreadable.count)"
         }
     }
 
@@ -996,6 +1088,7 @@ private enum WMTrace {
                 case let .park(key, _): return "park \(window(key))"
                 case let .unpark(key, frame): return "unpark \(window(key)) \(rect(frame))"
                 case let .focus(key): return "focus \(window(key))"
+                case let .raise(key): return "raise \(window(key))"
                 case .registerHotkeys: return "registerHotkeys"
                 case .unregisterAllHotkeys: return "unregisterAllHotkeys"
                 case let .mirrorDirty(windows, _, urgent): return "mirrorDirty count=\(windows.count) urgent=\(urgent)"

@@ -1,7 +1,7 @@
 import Foundation
 import GRDB
 
-/// Data access for the seven machine_host tables.
+/// Data access for the eight machine_host tables.
 ///
 /// Runs INSIDE a Store-owned transaction; holds no dbQueue and never
 /// self-transacts. Writes append no daemon_event: the mirror is high-frequency
@@ -280,7 +280,7 @@ struct MachineHostRepository: RepositoryContext {
     ///
     /// - Parameter machineUuid: The machine to read.
     /// - Returns: The machine with its displays, workstations, members, placements, live processes and
-    ///   windows, and the workstation whose key matches the connected set.
+    ///   windows, its window rules, and the workstation whose key matches the connected set.
     /// - Throws: `StoreError.notFound` when the machine is unknown; database errors.
     func loadSnapshot(machineUuid: String) throws -> MachineHostSnapshotRow {
         let machine = try MachineRecord.require(db, uuid: machineUuid)
@@ -307,7 +307,8 @@ struct MachineHostRepository: RepositoryContext {
             workstationWorkspaces: placements.map { $0.dto() },
             activeWorkstationUuid: activeWorkstation(workstations, displays: displays)?.uuid,
             appProcesses: processes.map { $0.dto() },
-            managedWindows: windows.map { $0.dto() }
+            managedWindows: windows.map { $0.dto() },
+            windowRules: try windowRuleRecords(machineUuid: machineUuid).map { $0.dto() }
         )
     }
 
@@ -371,6 +372,92 @@ struct MachineHostRepository: RepositoryContext {
             .filter(processUuids.contains(ManagedWindowRecord.Columns.appProcessUuid))
             .notDeleted()
             .order(ManagedWindowRecord.Columns.createdAt, ManagedWindowRecord.Columns.uuid)
+            .fetchAll(db)
+    }
+
+    // MARK: - Window rules
+
+    /// Sets the tile or float rule for one app on a machine, inserting it or updating it in place.
+    ///
+    /// - Parameters:
+    ///   - machineUuid: The machine the rule belongs to.
+    ///   - bundleId: The app's bundle identifier; the rule's key within the machine.
+    ///   - appName: The app's display name, refreshed on every write.
+    ///   - disposition: Whether the app's windows tile or float.
+    /// - Returns: The rule after the write.
+    /// - Throws: `StoreError.notFound` when the machine is unknown; database errors.
+    func setWindowRule(
+        machineUuid: String,
+        bundleId: String,
+        appName: String,
+        disposition: WindowRuleDisposition
+    ) throws
+        -> WindowRuleRecord
+    {
+        _ = try MachineRecord.require(db, uuid: machineUuid)
+        if let existing = try windowRule(machineUuid: machineUuid, bundleId: bundleId) {
+            try core.updateBase(
+                db,
+                table: WindowRuleRecord.databaseTableName,
+                uuid: existing.uuid,
+                expectedVersion: existing.version,
+                set: ["disposition": disposition.rawValue, "app_name": appName]
+            )
+            return try WindowRuleRecord.require(db, uuid: existing.uuid)
+        }
+        let uuid = try core.insertBase(
+            db,
+            table: WindowRuleRecord.databaseTableName,
+            extra: [
+                "machine_uuid": machineUuid,
+                "bundle_id": bundleId,
+                "app_name": appName,
+                "disposition": disposition.rawValue,
+            ]
+        )
+        return try WindowRuleRecord.require(db, uuid: uuid)
+    }
+
+    /// Deletes the rule for one app on a machine; an app with no rule is left as it is.
+    ///
+    /// - Parameters:
+    ///   - machineUuid: The machine the rule belongs to.
+    ///   - bundleId: The app's bundle identifier.
+    /// - Throws: `StoreError.versionConflict` from the version gate; database errors.
+    func clearWindowRule(machineUuid: String, bundleId: String) throws {
+        guard let existing = try windowRule(machineUuid: machineUuid, bundleId: bundleId) else { return }
+        try core.deleteBase(
+            db,
+            table: WindowRuleRecord.databaseTableName,
+            uuid: existing.uuid,
+            expectedVersion: existing.version
+        )
+    }
+
+    /// The rule for one app on a machine, if one is set.
+    ///
+    /// - Parameters:
+    ///   - machineUuid: The machine the rule belongs to.
+    ///   - bundleId: The app's bundle identifier.
+    /// - Returns: The rule record, or nil when the app has none.
+    /// - Throws: Database errors.
+    private func windowRule(machineUuid: String, bundleId: String) throws -> WindowRuleRecord? {
+        try WindowRuleRecord
+            .filter(
+                WindowRuleRecord.Columns.machineUuid == machineUuid && WindowRuleRecord.Columns.bundleId == bundleId
+            )
+            .fetchOne(db)
+    }
+
+    /// Every rule of a machine, ordered by app name then bundle id.
+    ///
+    /// - Parameter machineUuid: The owning machine.
+    /// - Returns: The window-rule records.
+    /// - Throws: Database errors.
+    private func windowRuleRecords(machineUuid: String) throws -> [WindowRuleRecord] {
+        try WindowRuleRecord
+            .filter(WindowRuleRecord.Columns.machineUuid == machineUuid)
+            .order(WindowRuleRecord.Columns.appName, WindowRuleRecord.Columns.bundleId)
             .fetchAll(db)
     }
 

@@ -1,7 +1,7 @@
 import Foundation
 
 // The machine_host facades: the app's window manager reads and writes its
-// seven tables only through these. No verb reaches them. Bodies live in
+// eight tables only through these. No verb reaches them. Bodies live in
 // MachineHostRepository; these wrappers own the transaction.
 
 extension Store {
@@ -143,6 +143,40 @@ extension Store {
         try boundary { db in
             try MachineHostRepository(db: db, core: core).reconcileAtBoot(machineUuid: machineUuid, live: live)
                 .map { $0.dto() }
+        }
+    }
+
+    /// Sets the tile or float rule for one app on a machine, inserting it or updating it in place.
+    /// - Parameters:
+    ///   - machineUuid: The machine the rule belongs to.
+    ///   - bundleId: The app's bundle identifier.
+    ///   - appName: The app's display name, refreshed on every write.
+    ///   - disposition: Whether the app's windows tile or float.
+    /// - Returns: The rule row after the write.
+    /// - Throws: `StoreError.notFound` when the machine is unknown; other store errors.
+    func machineHostSetWindowRule(
+        machineUuid: String,
+        bundleId: String,
+        appName: String,
+        disposition: WindowRuleDisposition
+    ) throws
+        -> WindowRuleRow
+    {
+        try boundary { db in
+            try MachineHostRepository(db: db, core: core)
+                .setWindowRule(machineUuid: machineUuid, bundleId: bundleId, appName: appName, disposition: disposition)
+                .dto()
+        }
+    }
+
+    /// Deletes the rule for one app on a machine, so the classifier decides again; absent is a no-op.
+    /// - Parameters:
+    ///   - machineUuid: The machine the rule belongs to.
+    ///   - bundleId: The app's bundle identifier.
+    /// - Throws: `StoreError.versionConflict`; other store errors.
+    func machineHostClearWindowRule(machineUuid: String, bundleId: String) throws {
+        try boundary { db in
+            try MachineHostRepository(db: db, core: core).clearWindowRule(machineUuid: machineUuid, bundleId: bundleId)
         }
     }
 }

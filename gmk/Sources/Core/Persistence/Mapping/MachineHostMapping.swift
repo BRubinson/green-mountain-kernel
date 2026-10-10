@@ -154,3 +154,21 @@ extension ManagedWindowRecord {
         )
     }
 }
+
+extension WindowRuleRecord {
+    /// Converts a window-rule record to its wire row; an unknown disposition reads as tile.
+    ///
+    /// - Returns: The wire window-rule row.
+    func dto() -> WindowRuleRow {
+        WindowRuleRow(
+            uuid: uuid,
+            version: version,
+            machineUuid: machineUuid,
+            bundleId: bundleId,
+            appName: appName,
+            disposition: WindowRuleDisposition(rawValue: disposition) ?? .tile,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}

@@ -11,7 +11,7 @@ struct ProcessKey: Hashable, Sendable {
 
 /// The mirrored values of one window.
 struct MirrorWindow: Equatable, Sendable {
-    /// The workspace the window is assigned to, or nil when floating or unassigned.
+    /// The workspace the window is assigned to, or nil when unassigned.
     var workspaceCode: String?
     /// The column index in its strip, or nil when floating.
     var columnIndex: Int?
@@ -148,8 +148,11 @@ enum MirrorProjection {
 
     /// The mirrored value of every window the reducer tracks.
     ///
+    /// A floating window mirrors the workspace it is bound to. A stashed window mirrors as floating on the
+    /// workspace it left, so it survives in the mirror and is never seeded as a column.
+    ///
     /// - Parameter state: The reducer state.
-    /// - Returns: One value per tiled or floating window.
+    /// - Returns: One value per tiled, floating or stashed window.
     static func windows(of state: WMState) -> [WindowKey: MirrorWindow] {
         var result: [WindowKey: MirrorWindow] = [:]
         for strip in state.workspaces.values {
@@ -167,9 +170,20 @@ enum MirrorProjection {
         }
         for key in state.floating {
             result[key] = MirrorWindow(
-                workspaceCode: nil,
+                workspaceCode: state.floatWorkspace[key],
                 columnIndex: nil,
                 weight: 1,
+                floating: true,
+                frame: state.frames[key],
+                prePark: state.parked[key],
+                title: state.titles[key]
+            )
+        }
+        for (key, stash) in state.stashed {
+            result[key] = MirrorWindow(
+                workspaceCode: stash.workspaceCode,
+                columnIndex: nil,
+                weight: stash.weight ?? 1,
                 floating: true,
                 frame: state.frames[key],
                 prePark: state.parked[key],

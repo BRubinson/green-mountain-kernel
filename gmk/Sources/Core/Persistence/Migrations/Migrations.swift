@@ -14,7 +14,7 @@ enum Migrations {
     ///
     /// Shipped migration bodies are frozen: the migrator keys on the migration id and silently skips a changed body on
     /// an existing db, so every schema change lands as a new registerMigration.
-    static let currentSchemaVersion = 31
+    static let currentSchemaVersion = 32
 
     /// The five BaseEntity columns wrapped into every domain table.
     /// `id` is the internal rowid; `uuid` is the external join key — all FKs
@@ -62,6 +62,7 @@ enum Migrations {
         m0029_testRunLock,
         m0030_retiredRootConfigValues,
         m0031_machineHost,
+        m0032_windowRule,
     ]
 
     static var migrator: DatabaseMigrator {

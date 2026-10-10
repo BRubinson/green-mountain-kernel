@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The root view of the `gm_machine_host` scene: status, displays, workstations, workspaces and keys.
+/// The root view of the `gm_machine_host` scene: status, displays, workstations, workspaces, app rules, keys.
 struct MachineHostWindow: View {
     @Environment(MachineHostService.self) private var host
     /// The workstation the user picked for the grid; nil follows the active one.
@@ -13,6 +13,7 @@ struct MachineHostWindow: View {
             DisplaysSection()
             WorkstationsSection(selection: selection)
             WorkspaceGridSection(workstationUuid: selection.wrappedValue)
+            AppRulesSection()
             KeyLegendSection()
         }
         .formStyle(.grouped)

@@ -1554,6 +1554,7 @@ MachineHostSnapshotRow.appProcesses -> app_processes
 MachineHostSnapshotRow.displays -> displays
 MachineHostSnapshotRow.machine -> machine
 MachineHostSnapshotRow.managedWindows -> managed_windows
+MachineHostSnapshotRow.windowRules -> window_rules
 MachineHostSnapshotRow.workstationDisplays -> workstation_displays
 MachineHostSnapshotRow.workstationWorkspaces -> workstation_workspaces
 MachineHostSnapshotRow.workstations -> workstations
@@ -2178,6 +2179,16 @@ VerbSpec.gmAliases -> gm_aliases
 VerbSpec.gmInvocation -> gm_invocation
 VerbSpec.messageType -> message_type
 VerbSpec.role -> role
+WindowRuleDisposition.float = float
+WindowRuleDisposition.tile = tile
+WindowRuleRow.appName -> app_name
+WindowRuleRow.bundleId -> bundle_id
+WindowRuleRow.createdAt -> created_at
+WindowRuleRow.disposition -> disposition
+WindowRuleRow.machineUuid -> machine_uuid
+WindowRuleRow.updatedAt -> updated_at
+WindowRuleRow.uuid -> uuid
+WindowRuleRow.version -> version
 WorkflowSpec.Phase.archOptions = arch_options
 WorkflowSpec.Phase.architecture = architecture
 WorkflowSpec.Phase.briefing = briefing

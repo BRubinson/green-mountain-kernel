@@ -119,6 +119,27 @@ struct ManagedWindowRow: Codable, Hashable, Sendable {
     let deletedOn: String?
 }
 
+/// How the window manager treats every window of one app, overriding the classifier.
+enum WindowRuleDisposition: String, Codable, Hashable, Sendable, CaseIterable {
+    /// Every window of the app joins a workspace's columns.
+    case tile
+    /// Every window of the app floats above the columns.
+    case float
+}
+
+/// The user's tile or float choice for one app on one machine, keyed by bundle id.
+struct WindowRuleRow: Codable, Hashable, Sendable {
+    let uuid: String
+    let version: Int64
+    let machineUuid: String
+    let bundleId: String
+    /// The app's display name as of the last write, shown when the app is not running.
+    let appName: String
+    let disposition: WindowRuleDisposition
+    let createdAt: String
+    let updatedAt: String
+}
+
 /// Every live machine_host row of one machine, read in one transaction.
 struct MachineHostSnapshotRow: Codable, Hashable, Sendable {
     let machine: MachineRow
@@ -130,6 +151,8 @@ struct MachineHostSnapshotRow: Codable, Hashable, Sendable {
     let activeWorkstationUuid: String?
     let appProcesses: [AppProcessRow]
     let managedWindows: [ManagedWindowRow]
+    /// The machine's per-app window rules, ordered by app name then bundle id.
+    let windowRules: [WindowRuleRow]
 }
 
 /// The rows one mirror flush inserted or changed, so the writer learns their uuids.

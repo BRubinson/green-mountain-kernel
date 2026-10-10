@@ -97,6 +97,89 @@ enum AxWindow {
         return AXUIElementPerformAction(element, kAXRaiseAction as CFString) == .success
     }
 
+    /// Raises `element` within its app without making it the app's main window.
+    ///
+    /// - Parameter element: A window element.
+    /// - Returns: True when the raise was accepted.
+    @discardableResult
+    static func raiseOnly(_ element: AXUIElement) -> Bool {
+        AXUIElementPerformAction(element, kAXRaiseAction as CFString) == .success
+    }
+
+    /// Whether `element` is its app's main window, or nil when the app did not answer.
+    ///
+    /// - Parameter element: A window element.
+    /// - Returns: The `AXMain` value, or nil when unreadable.
+    static func isMain(_ element: AXUIElement) -> Bool? {
+        optionalBool(element, kAXMainAttribute as CFString)
+    }
+
+    /// Whether `element` holds keyboard focus, or nil when the app did not answer.
+    ///
+    /// - Parameter element: A window element.
+    /// - Returns: The `AXFocused` value, or nil when unreadable.
+    static func isFocused(_ element: AXUIElement) -> Bool? {
+        optionalBool(element, kAXFocusedAttribute as CFString)
+    }
+
+    /// Whether `element` has the title-bar button `attribute` names, and whether that button is enabled.
+    ///
+    /// - Parameters:
+    ///   - element: A window element.
+    ///   - attribute: The button attribute, e.g. `kAXFullScreenButtonAttribute`.
+    /// - Returns: The button's presence and its `AXEnabled` value; both false when the app did not answer.
+    static func button(_ element: AXUIElement, _ attribute: CFString) -> (present: Bool, enabled: Bool) {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success,
+            let value, CFGetTypeID(value) == AXUIElementGetTypeID()
+        else { return (false, false) }
+        let button = (value as! AXUIElement)  // swiftlint:disable:this force_cast
+        return (true, bool(button, kAXEnabledAttribute as CFString))
+    }
+
+    /// The accessibility facts the window classifier reads for `element`.
+    ///
+    /// The fullscreen button is always read. The other buttons and the focus fields are read only for a
+    /// non-standard subrole, and the close button also for an accessory app, which needs it to count as a window.
+    ///
+    /// - Parameters:
+    ///   - element: A window element.
+    ///   - app: The owning application element.
+    ///   - cgWindowId: The window's id, compared with the app's focused window.
+    ///   - bundleId: The owning app's bundle identifier, when it has one.
+    ///   - isAccessoryApp: True when the owning app runs with the accessory activation policy.
+    /// - Returns: The facts.
+    static func facts(
+        _ element: AXUIElement,
+        app: AXUIElement,
+        cgWindowId: UInt32,
+        bundleId: String?,
+        isAccessoryApp: Bool
+    ) -> WindowFacts {
+        let fullscreenButton = button(element, kAXFullScreenButtonAttribute as CFString)
+        var facts = WindowFacts(
+            role: role(element),
+            subrole: subrole(element),
+            title: title(element),
+            isFullscreen: isFullscreen(element),
+            hasFullscreenButton: fullscreenButton.present,
+            fullscreenButtonEnabled: fullscreenButton.enabled,
+            bundleId: bundleId,
+            isAccessoryApp: isAccessoryApp
+        )
+        let standard = facts.subrole == kAXStandardWindowSubrole as String
+        if !standard || isAccessoryApp {
+            facts.hasCloseButton = button(element, kAXCloseButtonAttribute as CFString).present
+        }
+        guard !standard else { return facts }
+        facts.hasZoomButton = button(element, kAXZoomButtonAttribute as CFString).present
+        facts.hasMinimizeButton = button(element, kAXMinimizeButtonAttribute as CFString).present
+        facts.isMain = isMain(element)
+        facts.isFocused = isFocused(element)
+        facts.isAppFocusedWindow = focusedWindow(of: app).flatMap(windowId) == cgWindowId
+        return facts
+    }
+
     /// The `AXRole` of `element`.
     ///
     /// - Parameter element: An element.
@@ -186,9 +269,19 @@ enum AxWindow {
     ///   - attribute: The attribute name.
     /// - Returns: The value, or false when absent or unanswered.
     private static func bool(_ element: AXUIElement, _ attribute: CFString) -> Bool {
+        optionalBool(element, attribute) ?? false
+    }
+
+    /// A boolean attribute of `element` that distinguishes false from unreadable.
+    ///
+    /// - Parameters:
+    ///   - element: An element.
+    ///   - attribute: The attribute name.
+    /// - Returns: The value, or nil when absent, unanswered or not a boolean.
+    private static func optionalBool(_ element: AXUIElement, _ attribute: CFString) -> Bool? {
         var value: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success else { return false }
-        return (value as? Bool) ?? false
+        guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success else { return nil }
+        return value as? Bool
     }
 
     /// A point attribute of `element`.

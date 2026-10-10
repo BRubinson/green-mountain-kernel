@@ -129,6 +129,28 @@ struct MouseDrag: Equatable, Sendable {
     var displacement: CGFloat { latestFrame.minX - slotOriginX }
 }
 
+/// Why a window is out of the layout while it still exists.
+enum StashReason: Equatable, Sendable {
+    /// The window is minimized to the Dock.
+    case minimized
+    /// The window's app is hidden.
+    case hidden
+}
+
+/// Where a minimized or hidden window was, so its return puts it back.
+struct StashedWindow: Equatable, Sendable {
+    /// Why the window is stashed.
+    var reason: StashReason
+    /// The workspace the window belonged to, or nil when it had none.
+    var workspaceCode: String?
+    /// How the window was placed, or nil when it was first seen stashed and is classified on its return.
+    var kind: WindowClass?
+    /// The column index it held, for a tiled window.
+    var index: Int?
+    /// Its column weight relative to the mean of the strip's remaining columns, for a tiled window.
+    var weight: Double?
+}
+
 /// A configuration edit held back while the mouse button is down.
 struct WMConfiguration: Equatable, Sendable {
     /// Every workspace, in configuration order.
@@ -175,6 +197,18 @@ struct WMState: Equatable, Sendable {
     var configurationPendingRelease: WMConfiguration?
     /// True while window management is on.
     var enabled = false
+    /// The bundle identifier per pid, recorded even while disabled.
+    var bundleIds: [Int32: String] = [:]
+    /// The per-app rule, by bundle identifier: `.tiled` or `.floating`.
+    var rules: [String: WindowClass] = [:]
+    /// The last heuristic verdict per window, which a cleared rule falls back to.
+    var classes: [WindowKey: WindowClass] = [:]
+    /// The workspace each floating window belongs to; it parks and returns with that workspace.
+    var floatWorkspace: [WindowKey: String] = [:]
+    /// The minimized and hidden windows, with where each was.
+    var stashed: [WindowKey: StashedWindow] = [:]
+    /// True while keyboard focus is on a window the reducer does not manage, or on no window.
+    var focusUnmanaged = false
 }
 
 extension WMState {
@@ -214,16 +248,33 @@ extension WMState {
         return activeByDisplay[main.key]
     }
 
-    /// True when `window` is tiled in some strip or tracked as floating.
+    /// True when `window` is tiled in some strip, tracked as floating, or stashed.
     ///
     /// - Parameter window: The window to look up.
     /// - Returns: Whether the reducer knows the window.
     func knows(_ window: WindowKey) -> Bool {
-        floating.contains(window) || stripCode(containing: window) != nil
+        floating.contains(window) || stashed[window] != nil || stripCode(containing: window) != nil
     }
 
-    /// Every window the reducer tracks, tiled or floating.
+    /// Every window the reducer tracks, tiled, floating or stashed.
     var allWindows: Set<WindowKey> {
-        floating.union(workspaces.values.flatMap { $0.columns.map(\.window) })
+        floating.union(stashed.keys).union(workspaces.values.flatMap { $0.columns.map(\.window) })
+    }
+
+    /// The rule for the app owning `key`, or nil when the app has none or its bundle id is unknown.
+    ///
+    /// - Parameter key: The window.
+    /// - Returns: `.tiled` or `.floating`, or nil.
+    func ruleKind(for key: WindowKey) -> WindowClass? {
+        bundleIds[key.pid].flatMap { rules[$0] }
+    }
+
+    /// The floating windows that belong to workspace `code`, ordered by pid then window id.
+    ///
+    /// - Parameter code: The workspace code.
+    /// - Returns: The floating windows bound to it.
+    func floats(boundTo code: String) -> [WindowKey] {
+        floating.filter { floatWorkspace[$0] == code }
+            .sorted { ($0.pid, $0.cgWindowId) < ($1.pid, $1.cgWindowId) }
     }
 }

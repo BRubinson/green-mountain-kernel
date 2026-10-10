@@ -838,6 +838,39 @@ actor KernelStoreService {
         try await perform { try $0.machineHostReconcileMirror(machineUuid: machineUuid, live: live) }
     }
 
+    /// Sets the tile or float rule for one app on a machine, inserting it or updating it in place.
+    /// - Parameters:
+    ///   - machineUuid: The machine the rule belongs to.
+    ///   - bundleId: The app's bundle identifier.
+    ///   - appName: The app's display name, refreshed on every write.
+    ///   - disposition: Whether the app's windows tile or float.
+    /// - Returns: The rule row after the write.
+    /// - Throws: `KernelError.notFound` when the machine is unknown; `KernelError` on other store failures.
+    func machineHostSetWindowRule(
+        machineUuid: String,
+        bundleId: String,
+        appName: String,
+        disposition: WindowRuleDisposition
+    ) async throws -> WindowRuleRow {
+        try await perform {
+            try $0.machineHostSetWindowRule(
+                machineUuid: machineUuid,
+                bundleId: bundleId,
+                appName: appName,
+                disposition: disposition
+            )
+        }
+    }
+
+    /// Deletes the rule for one app on a machine, so the classifier decides again; absent is a no-op.
+    /// - Parameters:
+    ///   - machineUuid: The machine the rule belongs to.
+    ///   - bundleId: The app's bundle identifier.
+    /// - Throws: `KernelError.versionConflict` on a concurrent write; `KernelError` on other store failures.
+    func machineHostClearWindowRule(machineUuid: String, bundleId: String) async throws {
+        try await perform { try $0.machineHostClearWindowRule(machineUuid: machineUuid, bundleId: bundleId) }
+    }
+
     // MARK: - Helpers
 
     /// Lowercases an optional UUID string, or returns nil.

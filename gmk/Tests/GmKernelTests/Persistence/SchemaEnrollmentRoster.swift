@@ -189,6 +189,7 @@ enum SchemaEnrollment {
         mirror(DisplayRecord.self),
         mirror(MachineRecord.self),
         mirror(ManagedWindowRecord.self),
+        mirror(WindowRuleRecord.self),
         mirror(WorkstationRecord.self),
         mirror(WorkstationDisplayRecord.self),
         mirror(WorkstationWorkspaceRecord.self),
@@ -612,6 +613,7 @@ enum SchemaEnrollment {
         join(AppProcessRecord.machine, key: "machine", from: "app_process", to: "machine"),
         join(DisplayRecord.machine, key: "machine", from: "display", to: "machine"),
         join(ManagedWindowRecord.appProcess, key: "appProcess", from: "managed_window", to: "app_process"),
+        join(WindowRuleRecord.machine, key: "machine", from: "window_rule", to: "machine"),
         join(WorkstationRecord.machine, key: "machine", from: "workstation", to: "machine"),
         join(WorkstationDisplayRecord.display, key: "display", from: "workstation_display", to: "display"),
         join(

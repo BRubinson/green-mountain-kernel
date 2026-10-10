@@ -13,6 +13,8 @@ enum WMEffect: Equatable, Sendable {
     case unpark(WindowKey, CGRect)
     /// Gives a window keyboard focus.
     case focus(WindowKey)
+    /// Orders a window to the front of its app without activating it.
+    case raise(WindowKey)
     /// Registers these hotkeys, replacing any registered before.
     case registerHotkeys([HotkeyBinding])
     /// Unregisters every hotkey.

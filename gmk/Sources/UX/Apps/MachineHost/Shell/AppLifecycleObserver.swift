@@ -119,8 +119,22 @@ final class AppLifecycleObserver {
             let snapshot = await interpreter.snapshotAll()
             reconciling = false
             guard !tokens.isEmpty else { return }
-            sink(.reconcile(observed: snapshot.observed, answered: snapshot.answered))
+            sink(
+                .reconcile(
+                    observed: snapshot.observed,
+                    answered: snapshot.answered,
+                    hidden: Self.hiddenPids(),
+                    unreadable: snapshot.unreadable
+                )
+            )
         }
+    }
+
+    /// The pids of every running app that is hidden.
+    ///
+    /// - Returns: The hidden apps' pids.
+    static func hiddenPids() -> Set<Int32> {
+        Set(NSWorkspace.shared.runningApplications.filter(\.isHidden).map(\.processIdentifier))
     }
 
     /// Subscribes to the workspace and screen notifications.
@@ -136,9 +150,17 @@ final class AppLifecycleObserver {
             observer.sink(.appTerminated(pid: app.pid))
         }
         observe(workspace, NSWorkspace.didActivateApplicationNotification) { observer, app in
-            // A click-activation's focused window can be stale; the focused-window notification reports it.
-            guard let app, !Self.buttonDown else { return }
+            guard let app else { return }
+            if !observer.interpreter.attachedPids.contains(app.pid) { observer.attach(app) }
             observer.interpreter.reportFocusedWindow(pid: app.pid)
+        }
+        observe(workspace, NSWorkspace.didHideApplicationNotification) { observer, app in
+            guard let app else { return }
+            observer.sink(.appHidden(pid: app.pid))
+        }
+        observe(workspace, NSWorkspace.didUnhideApplicationNotification) { observer, app in
+            guard let app else { return }
+            observer.sink(.appUnhidden(pid: app.pid))
         }
         observe(workspace, NSWorkspace.didWakeNotification) { observer, _ in observer.sink(.wake) }
         observe(NotificationCenter.default, NSApplication.didChangeScreenParametersNotification) { observer, _ in
@@ -178,8 +200,15 @@ final class AppLifecycleObserver {
     private func attach(_ app: NotifiedApp) {
         guard app.pid != ProcessInfo.processInfo.processIdentifier, let launchDate = app.launchDate else { return }
         let launchedAt = LaunchStamp.canonical(launchDate)
-        guard interpreter.attach(pid: app.pid, launchedAt: launchedAt) else { return }
-        sink(.appLaunched(pid: app.pid, launchedAt: launchedAt))
+        guard
+            interpreter.attach(
+                pid: app.pid,
+                launchedAt: launchedAt,
+                bundleId: app.bundleIdentifier,
+                isAccessory: !app.isRegular
+            )
+        else { return }
+        sink(.appLaunched(pid: app.pid, launchedAt: launchedAt, bundleId: app.bundleIdentifier))
     }
 }
 
@@ -191,6 +220,8 @@ struct NotifiedApp: Sendable {
     let launchDate: Date?
     /// The bundle identifier, when the app has one.
     let bundleIdentifier: String?
+    /// True when the app runs with the regular activation policy.
+    let isRegular: Bool
 
     /// Copies the identity of `app`.
     ///
@@ -199,5 +230,6 @@ struct NotifiedApp: Sendable {
         pid = app.processIdentifier
         launchDate = app.launchDate
         bundleIdentifier = app.bundleIdentifier
+        isRegular = app.activationPolicy == .regular
     }
 }

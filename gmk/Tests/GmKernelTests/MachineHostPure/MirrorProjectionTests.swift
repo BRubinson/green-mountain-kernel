@@ -71,6 +71,39 @@ final class MirrorProjectionTests: XCTestCase {
         XCTAssertEqual(base.applying(delta), MirrorImage())
     }
 
+    func testAFloatMirrorsItsBoundWorkspace() {
+        var state = WMState()
+        state.floating = [window(1)]
+        state.floatWorkspace[window(1)] = "2"
+        let mirrored = MirrorProjection.windows(of: state)[window(1)]
+        XCTAssertEqual(mirrored?.workspaceCode, "2")
+        XCTAssertEqual(mirrored?.floating, true)
+        XCTAssertNil(mirrored?.columnIndex)
+    }
+
+    func testAStashedWindowMirrorsAsAFloatOnItsPriorWorkspace() {
+        var state = WMState()
+        let frame = CGRect(x: 100, y: 100, width: 300, height: 300)
+        state.frames[window(2)] = frame
+        state.stashed[window(2)] = StashedWindow(
+            reason: .minimized,
+            workspaceCode: "1",
+            kind: .tiled,
+            index: 0,
+            weight: 1.5
+        )
+        let expected = MirrorWindow(
+            workspaceCode: "1",
+            columnIndex: nil,
+            weight: 1.5,
+            floating: true,
+            frame: frame,
+            prePark: nil,
+            title: nil
+        )
+        XCTAssertEqual(MirrorProjection.windows(of: state), [window(2): expected])
+    }
+
     func testSettingAPreParkFrameAppearsInTheUpsert() {
         var current = base
         let prePark = CGRect(x: 0, y: 0, width: 500, height: 780)
